@@ -56,14 +56,14 @@ type Data = {
   grantHeads?: GrantHeadRow[];
   roleHeads?: RoleHeadRow[];
   resourceRows?: ResourceGrantRow[];
+  /** Wraps the recording ledger, for tests that need to observe or fail a
+   *  send rather than only read what was sent. */
+  wrapLedger?: (ledger: Ledger) => Ledger;
 };
 
 type Ledger = ConstructorParameters<typeof AuthzEngineMigration>[0]["ledger"];
 
-function harness(
-  data: Data = {},
-  options: { wrapLedger?: (ledger: Ledger) => Ledger } = {},
-) {
+function harness(data: Data = {}) {
   const sent: Sent[] = [];
   const seeded: ResourceGrantUsageSeed[][] = [];
   const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
@@ -113,7 +113,7 @@ function harness(
   };
   const migration = new AuthzEngineMigration({
     store,
-    ledger: options.wrapLedger ? options.wrapLedger(recording) : recording,
+    ledger: data.wrapLedger ? data.wrapLedger(recording) : recording,
     now: () => NOW,
   });
   return { migration, sent, seeded, reads };
@@ -125,7 +125,13 @@ function attachedFacts(sent: Sent[]): GrantFact[] {
     .map((entry) => entry.payload.grant as GrantFact);
 }
 
-function member(userId: string, role = "MEMBER"): OrganizationMemberFact {
+function member({
+  userId,
+  role = "MEMBER",
+}: {
+  userId: string;
+  role?: string;
+}): OrganizationMemberFact {
   return { userId, role, createdAtMs: CREATED };
 }
 
@@ -187,9 +193,9 @@ describe("given an organization with legacy access rows", () => {
     it("states every legacy table's rows as facts", async () => {
       const { migration, sent } = harness({
         members: [
-          member("user_member"),
-          member("user_admin", "ADMIN"),
-          member("user_external", "EXTERNAL"),
+          member({ userId: "user_member" }),
+          member({ userId: "user_admin", role: "ADMIN" }),
+          member({ userId: "user_external", role: "EXTERNAL" }),
         ],
         externalMembers: [{ userId: "user_external", createdAtMs: CREATED }],
         teamRows: [
@@ -322,7 +328,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "The organization member floor is stated once" */
     it("floors an unbound member with the organization grant and nothing else", async () => {
       const { migration, sent } = harness({
-        members: [member("user_lonely")],
+        members: [member({ userId: "user_lonely" })],
       });
 
       await migration.migrateTenant({ tenantId: ORG_ID });
@@ -459,7 +465,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "Re-running the migration states the same facts" */
     it("derives the same ids and the same command ids", async () => {
       const data: Data = {
-        members: [member("user_1")],
+        members: [member({ userId: "user_1" })],
         teamRows: [
           {
             userId: "user_1",
@@ -486,22 +492,21 @@ describe("given an organization with legacy access rows", () => {
     it("restates every fact under the command id the failed attempt used", async () => {
       const attempted: string[] = [];
       let failFirst = true;
-      const { migration, sent } = harness(
-        { bindings: [binding()], organizationCreatedAtMs: null },
-        {
-          wrapLedger: (ledger) => ({
-            ...ledger,
-            attachGrant: async (args) => {
-              attempted.push(args.commandId);
-              if (failFirst) {
-                failFirst = false;
-                throw new Error("queue hiccup");
-              }
-              return ledger.attachGrant(args);
-            },
-          }),
-        },
-      );
+      const { migration, sent } = harness({
+        bindings: [binding()],
+        organizationCreatedAtMs: null,
+        wrapLedger: (ledger) => ({
+          ...ledger,
+          attachGrant: async (args) => {
+            attempted.push(args.commandId);
+            if (failFirst) {
+              failFirst = false;
+              throw new Error("queue hiccup");
+            }
+            return ledger.attachGrant(args);
+          },
+        }),
+      });
 
       await expect(
         migration.migrateTenant({ tenantId: ORG_ID }),
@@ -542,18 +547,17 @@ describe("given an organization with legacy access rows", () => {
       const manyBindings = Array.from({ length: 150 }, (_, index) =>
         binding({ id: `binding_${index}` }),
       );
-      const { migration, sent } = harness(
-        { bindings: manyBindings, organizationCreatedAtMs: null },
-        {
-          wrapLedger: (ledger) => ({
-            ...ledger,
-            attachGrant: async (args) => {
-              controller.abort();
-              return ledger.attachGrant(args);
-            },
-          }),
-        },
-      );
+      const { migration, sent } = harness({
+        bindings: manyBindings,
+        organizationCreatedAtMs: null,
+        wrapLedger: (ledger) => ({
+          ...ledger,
+          attachGrant: async (args) => {
+            controller.abort();
+            return ledger.attachGrant(args);
+          },
+        }),
+      });
 
       await expect(
         migration.migrateTenant({
@@ -1077,7 +1081,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "The organization member floor is stated once" */
     it("does not double-grant an ADMIN who already holds a binding", async () => {
       const { migration, sent } = harness({
-        members: [member("user_admin", "ADMIN")],
+        members: [member({ userId: "user_admin", role: "ADMIN" })],
         bindings: [binding({ userId: "user_admin" })],
         organizationCreatedAtMs: null,
       });
@@ -1091,7 +1095,7 @@ describe("given an organization with legacy access rows", () => {
     /** @scenario "The organization member floor is stated once" */
     it("reads a group-held binding as a binding, the way the legacy resolver does", async () => {
       const { migration, sent } = harness({
-        members: [member("user_admin", "ADMIN")],
+        members: [member({ userId: "user_admin", role: "ADMIN" })],
         bindings: [binding({ userId: null, groupId: "group_1" })],
         groupMemberships: [{ userId: "user_admin", groupId: "group_1" }],
         organizationCreatedAtMs: null,

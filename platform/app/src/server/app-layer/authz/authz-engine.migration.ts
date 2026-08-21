@@ -335,18 +335,21 @@ export class AuthzEngineMigration implements SystemMigration {
     expected: ExpectedFacts;
     signal?: AbortSignal;
   }): Promise<void> {
-    await this.each(expected.roles, signal, (role) =>
-      this.deps.ledger.defineRole({
-        organizationId,
-        commandId: contentCommandId({
-          kind: "role",
-          id: role.roleId,
-          content: role,
+    await this.each({
+      items: expected.roles,
+      signal,
+      send: (role) =>
+        this.deps.ledger.defineRole({
+          organizationId,
+          commandId: contentCommandId({
+            kind: "role",
+            id: role.roleId,
+            content: role,
+          }),
+          role,
+          actor: ACTOR,
         }),
-        role,
-        actor: ACTOR,
-      }),
-    );
+    });
     const grants = [
       ...expected.bindingFacts,
       ...expected.teamFacts,
@@ -354,17 +357,20 @@ export class AuthzEngineMigration implements SystemMigration {
       ...expected.credentialFacts,
       ...expected.shareLinks.map((link) => link.fact),
     ];
-    await this.each(grants, signal, (fact) =>
-      this.deps.ledger.attachGrant({
-        organizationId,
-        commandId: contentCommandId({
-          kind: "grant",
-          id: fact.grantId,
-          content: fact,
+    await this.each({
+      items: grants,
+      signal,
+      send: (fact) =>
+        this.deps.ledger.attachGrant({
+          organizationId,
+          commandId: contentCommandId({
+            kind: "grant",
+            id: fact.grantId,
+            content: fact,
+          }),
+          grant: { ...fact, actor: ACTOR },
         }),
-        grant: { ...fact, actor: ACTOR },
-      }),
-    );
+    });
   }
 
   /**
@@ -412,26 +418,29 @@ export class AuthzEngineMigration implements SystemMigration {
         )
         .map((row) => row.grantId),
     ].sort();
-    await this.each(staleGrants, signal, (grantId) =>
-      this.deps.ledger.revokeGrant({
-        organizationId,
-        // The pass's business time is in the key for the reason the repair
-        // keys carry it: a legacy row deleted, restored under the same id,
-        // then deleted again would otherwise collide with the first deny's
-        // idempotency key and be swallowed, leaving a live head with no
-        // legacy row behind it. A live head is the only sweep candidate, so
-        // a re-appended deny costs at most one event while the fold lags.
-        commandId: contentCommandId({
-          kind: "deny:grant",
-          id: grantId,
-          content: { occurredAtMs },
+    await this.each({
+      items: staleGrants,
+      signal,
+      send: (grantId) =>
+        this.deps.ledger.revokeGrant({
+          organizationId,
+          // The pass's business time is in the key for the reason the repair
+          // keys carry it: a legacy row deleted, restored under the same id,
+          // then deleted again would otherwise collide with the first deny's
+          // idempotency key and be swallowed, leaving a live head with no
+          // legacy row behind it. A live head is the only sweep candidate, so
+          // a re-appended deny costs at most one event while the fold lags.
+          commandId: contentCommandId({
+            kind: "deny:grant",
+            id: grantId,
+            content: { occurredAtMs },
+          }),
+          grantId,
+          reason: "authz-engine reconciliation: legacy row no longer exists",
+          actor: ACTOR,
+          occurredAtMs,
         }),
-        grantId,
-        reason: "authz-engine reconciliation: legacy row no longer exists",
-        actor: ACTOR,
-        occurredAtMs,
-      }),
-    );
+    });
 
     const expectedRoleIds = new Set(expected.roles.map((role) => role.roleId));
     const staleRoles = heads.roleHeads
@@ -442,19 +451,22 @@ export class AuthzEngineMigration implements SystemMigration {
       .filter((head) => !expectedRoleIds.has(head.id))
       .map((head) => head.id)
       .sort();
-    await this.each(staleRoles, signal, (roleId) =>
-      this.deps.ledger.deleteRole({
-        organizationId,
-        commandId: contentCommandId({
-          kind: "deny:role",
-          id: roleId,
-          content: { occurredAtMs },
+    await this.each({
+      items: staleRoles,
+      signal,
+      send: (roleId) =>
+        this.deps.ledger.deleteRole({
+          organizationId,
+          commandId: contentCommandId({
+            kind: "deny:role",
+            id: roleId,
+            content: { occurredAtMs },
+          }),
+          roleId,
+          actor: ACTOR,
+          occurredAtMs,
         }),
-        roleId,
-        actor: ACTOR,
-        occurredAtMs,
-      }),
-    );
+    });
   }
 
   /**
@@ -498,21 +510,24 @@ export class AuthzEngineMigration implements SystemMigration {
       if (fact.roleKey.startsWith("custom:")) return [];
       return [{ grantId: fact.grantId, from: head.roleKey, to: fact.roleKey }];
     });
-    await this.each(rekeys, signal, (rekey) =>
-      this.deps.ledger.changeGrantRole({
-        organizationId,
-        commandId: contentCommandId({
-          kind: "rekey",
-          id: rekey.grantId,
-          content: { to: rekey.to, occurredAtMs },
+    await this.each({
+      items: rekeys,
+      signal,
+      send: (rekey) =>
+        this.deps.ledger.changeGrantRole({
+          organizationId,
+          commandId: contentCommandId({
+            kind: "rekey",
+            id: rekey.grantId,
+            content: { to: rekey.to, occurredAtMs },
+          }),
+          grantId: rekey.grantId,
+          from: rekey.from,
+          to: rekey.to,
+          actor: ACTOR,
+          occurredAtMs,
         }),
-        grantId: rekey.grantId,
-        from: rekey.from,
-        to: rekey.to,
-        actor: ACTOR,
-        occurredAtMs,
-      }),
-    );
+    });
 
     // A drifted role is restated WHOLE: `defineRole` at today's business
     // time wins the head's strictly-newer guard and carries every field —
@@ -525,18 +540,21 @@ export class AuthzEngineMigration implements SystemMigration {
       if (!head || !roleDrifted({ role, head })) return [];
       return [{ ...role, occurredAtMs }];
     });
-    await this.each(redefines, signal, (role) =>
-      this.deps.ledger.defineRole({
-        organizationId,
-        commandId: contentCommandId({
-          kind: "redefine",
-          id: role.roleId,
-          content: role,
+    await this.each({
+      items: redefines,
+      signal,
+      send: (role) =>
+        this.deps.ledger.defineRole({
+          organizationId,
+          commandId: contentCommandId({
+            kind: "redefine",
+            id: role.roleId,
+            content: role,
+          }),
+          role,
+          actor: ACTOR,
         }),
-        role,
-        actor: ACTOR,
-      }),
-    );
+    });
   }
 
   /**
@@ -570,11 +588,15 @@ export class AuthzEngineMigration implements SystemMigration {
 
   /** Bounded fan-out, aborted between chunks — the runner will not
    *  interrupt an in-flight send, so the boundary is the chunk. */
-  private async each<T>(
-    items: readonly T[],
-    signal: AbortSignal | undefined,
-    send: (item: T) => Promise<void>,
-  ): Promise<void> {
+  private async each<T>({
+    items,
+    signal,
+    send,
+  }: {
+    items: readonly T[];
+    signal: AbortSignal | undefined;
+    send: (item: T) => Promise<void>;
+  }): Promise<void> {
     for (let i = 0; i < items.length; i += SEND_CONCURRENCY) {
       if (signal?.aborted) {
         throw new Error(
