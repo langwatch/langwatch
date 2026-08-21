@@ -1,4 +1,4 @@
-import { afterAll, beforeAll } from "vitest";
+import { afterAll, beforeEach } from "vitest";
 import { globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 
@@ -33,7 +33,11 @@ import { createTestApp } from "~/server/app-layer/presets";
  * an empty slot.
  */
 export function wireDefaultTestApp(): void {
-  beforeAll(() => {
+  // beforeEach, not beforeAll: a file that wires its own App for one describe
+  // and `resetApp()`s in its afterAll would otherwise leave every later
+  // describe without an App. Filling an empty slot is constructor-only work,
+  // and a slot another hook already filled is left alone.
+  beforeEach(() => {
     globalForApp.__langwatch_app ??= createTestApp();
   });
   afterAll(() => {

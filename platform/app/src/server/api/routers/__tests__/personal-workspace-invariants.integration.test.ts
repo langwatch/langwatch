@@ -63,6 +63,9 @@ import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-
 import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
+
+wireDefaultTestApp();
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),

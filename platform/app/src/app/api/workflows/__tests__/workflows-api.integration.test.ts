@@ -26,10 +26,10 @@ vi.mock("~/optimization_studio/server/loadDatasets", () => ({
   loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 
-import { app } from "../[[...route]]/app";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
+import { app } from "../[[...route]]/app";
 
+wireDefaultTestApp();
 
 describe("Workflows REST API", () => {
   let testApiKey: string;

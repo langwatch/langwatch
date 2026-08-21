@@ -37,8 +37,13 @@ vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 // Only the permission check is replaced: the rest of the module is the
 // permission catalogue the secured-app builder reads at import time, and a bare
 // factory would blank it out.
-vi.mock("~/server/api/rbac", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/api/rbac")>()),
+// The route reads hasProjectPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092); mocking the old
+// path leaves the real check running.
+vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/permissions/imperative")
+  >()),
   hasProjectPermission,
 }));
 

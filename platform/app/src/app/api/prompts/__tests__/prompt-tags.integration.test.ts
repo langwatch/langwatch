@@ -13,10 +13,10 @@ import type {
   Team,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { app } from "../[[...route]]/app";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
+import { app } from "../[[...route]]/app";
 
+wireDefaultTestApp();
 
 describe("Prompt Tags REST API (/api/prompts/tags)", () => {
   let testOrganization: Organization;

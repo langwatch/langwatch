@@ -32,6 +32,9 @@ import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+wireDefaultTestApp();
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),

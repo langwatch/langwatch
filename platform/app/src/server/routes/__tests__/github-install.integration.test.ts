@@ -24,8 +24,15 @@ import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 wireDefaultTestApp();
 
 
-const TEST_SIGNING_KEY = "x".repeat(64);
-process.env.CREDENTIALS_SECRET = TEST_SIGNING_KEY;
+// vi.hoisted runs before the import graph executes. A plain module-body
+// assignment is too late: wireDefaultTestApp's import chain reaches
+// ~/env.mjs, whose snapshot would capture the real .env secret first and the
+// route would refuse every state this file signs.
+const { TEST_SIGNING_KEY } = vi.hoisted(() => {
+  const key = "x".repeat(64);
+  process.env.CREDENTIALS_SECRET = key;
+  return { TEST_SIGNING_KEY: key };
+});
 
 // The App credentials are read through getGithubAppConfig, so the suite can
 // take the App away mid-file without fighting the env snapshot t3-env takes at
@@ -80,11 +87,16 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 // Partial mock: the route uses only this helper, but other modules in the
 // import graph read further rbac exports (Resources etc.).
-vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  hasOrganizationPermission: ((...args: unknown[]) =>
-    hasOrganizationPermission(...args)) as never,
-}));
+// The route reads hasOrganizationPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092).
+vi.mock(
+  import("~/server/app-layer/permissions/imperative"),
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    hasOrganizationPermission: ((...args: unknown[]) =>
+      hasOrganizationPermission(...args)) as never,
+  }),
+);
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 async function request(path: string, init?: RequestInit) {
