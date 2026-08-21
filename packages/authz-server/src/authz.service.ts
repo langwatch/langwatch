@@ -32,11 +32,9 @@ import {
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   type CollectedGrants,
-  PermissionDeniedError,
   type ResourceGrant,
   scopeOrganizationId,
 } from "@langwatch/authz";
-// subpath alongside the passport primitives.
 import { createLogger } from "@langwatch/observability";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type { AuthzReadRepository } from "./authz-read.repository";
@@ -183,7 +181,7 @@ export class AuthzService {
     ceiling = true,
   }: ScopeIds & {
     principal: AuthzPrincipalRef;
-    permission: string;
+    permission: AuthzPermission;
     ceiling?: boolean;
   }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
     const scope = await this.resolveScope({ projectId, teamId, organizationId });
@@ -223,24 +221,42 @@ export class AuthzService {
     projectId,
   }: {
     principal: AuthzPrincipalRef;
-    permissions: readonly string[];
+    permissions: readonly AuthzPermission[];
     projectId: string;
   }): Promise<{
     allowed: boolean;
-    matchedPermission?: string;
+    matchedPermission?: AuthzPermission;
     organizationRole: OrganizationRoleOrNull;
   }> {
     const scope = await this.collector.resolveScopeRef({ projectId });
     if (!scope) return { allowed: false, organizationRole: null };
 
-    const grants = await this.collector.collectGrants({
-      principal,
-      organizationId: scopeOrganizationId(scope),
-    });
+    // Same api-key owner ceiling every other decision path applies: an
+    // api-key principal is capped at its owner's grants, so demoting the owner
+    // shrinks the key here too. `ownerGrantsFor` returns null for a user
+    // principal, and `decideWithCeiling` with a null ceiling is a plain
+    // decide — so this is a no-op for the user callers this has today and
+    // closes the hole before an api-key caller reaches it.
+    const scopeOrg = scopeOrganizationId(scope);
+    const pass = this.collector.beginPass();
+    const [grants, ownerGrants] = await Promise.all([
+      this.collector.collectGrants({
+        principal,
+        organizationId: scopeOrg,
+        reader: pass,
+      }),
+      this.ownerGrantsFor({ principal, organizationId: scopeOrg, reader: pass }),
+    ]);
     const demoProjectId = this.demoProjectId();
     const matched = permissions.find(
       (permission) =>
-        this.engine.decide({ grants, permission, scope, demoProjectId }).allowed,
+        this.engine.decideWithCeiling({
+          keyGrants: grants,
+          ownerGrants,
+          permission,
+          scope,
+          demoProjectId,
+        }).allowed,
     );
     return {
       allowed: matched !== undefined,
@@ -264,7 +280,7 @@ export class AuthzService {
     projects,
   }: {
     principal: AuthzPrincipalRef;
-    permission: string;
+    permission: AuthzPermission;
     organizationId: string;
     teams: ReadonlyArray<{ teamId: string }>;
     projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
@@ -273,14 +289,28 @@ export class AuthzService {
     projects: Map<string, boolean>;
     organizationRole: OrganizationRoleOrNull;
   }> {
-    const grants = await this.collector.collectGrants({
-      principal,
-      organizationId,
-    });
+    // The api-key owner ceiling, off the same snapshot as the key's grants —
+    // see `canAnyByIds`. Null for a user principal, so a no-op for the callers
+    // this has today.
+    const pass = this.collector.beginPass();
+    const [grants, ownerGrants] = await Promise.all([
+      this.collector.collectGrants({
+        principal,
+        organizationId,
+        reader: pass,
+      }),
+      this.ownerGrantsFor({ principal, organizationId, reader: pass }),
+    ]);
     const demoProjectId = this.demoProjectId();
     const allowedAt = (scope: AuthzScopeRef | null): boolean =>
       scope
-        ? this.engine.decide({ grants, permission, scope, demoProjectId }).allowed
+        ? this.engine.decideWithCeiling({
+            keyGrants: grants,
+            ownerGrants,
+            permission,
+            scope,
+            demoProjectId,
+          }).allowed
         : false;
 
     const resolvedProjects = await Promise.all(

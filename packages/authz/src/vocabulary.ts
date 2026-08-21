@@ -122,19 +122,28 @@ export const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
   ]),
 ) as Record<StoredPrincipalKind, PrincipalKind>;
 
+// An own-property check, not `in`: an object literal inherits from
+// Object.prototype, so `"constructor" in SCOPE_TIERS` and
+// `"toString" in SCOPE_TIERS` are both true and would narrow those untrusted
+// strings to a tier, whose table lookup then yields a function rather than a
+// member. `hasOwnProperty.call` rather than `Object.hasOwn` because this
+// package targets es2020 on purpose (it is isomorphic).
+const hasOwn = (object: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(object, key);
+
 export const isScopeTier = (value: unknown): value is ScopeTier =>
-  typeof value === "string" && value in SCOPE_TIERS;
+  typeof value === "string" && hasOwn(SCOPE_TIERS, value);
 
 export const isStoredScopeTier = (value: unknown): value is StoredScopeTier =>
-  typeof value === "string" && value in SCOPE_TIER_FROM_STORED;
+  typeof value === "string" && hasOwn(SCOPE_TIER_FROM_STORED, value);
 
 export const isPrincipalKind = (value: unknown): value is PrincipalKind =>
-  typeof value === "string" && value in PRINCIPAL_KINDS;
+  typeof value === "string" && hasOwn(PRINCIPAL_KINDS, value);
 
 export const isStoredPrincipalKind = (
   value: unknown,
 ): value is StoredPrincipalKind =>
-  typeof value === "string" && value in PRINCIPAL_KIND_FROM_STORED;
+  typeof value === "string" && hasOwn(PRINCIPAL_KIND_FROM_STORED, value);
 
 export const isBindingScopeTier = (value: unknown): value is BindingScopeTier =>
   BINDING_SCOPE_TIERS.includes(value as BindingScopeTier);

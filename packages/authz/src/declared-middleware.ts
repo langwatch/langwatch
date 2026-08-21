@@ -46,9 +46,15 @@ export type DeclaredAuthzMiddleware<
 export function declareAuthzMiddleware<
   M extends (params: never) => Promise<unknown>,
 >(declaration: AuthzDeclaration, middleware: M): DeclaredAuthzMiddleware<M> {
-  return Object.assign(middleware as any, {
+  // Wrap rather than stamp the passed function: `Object.assign(middleware, …)`
+  // mutates the caller's object, so declaring one shared middleware instance
+  // twice with different descriptors would leave both procedures reporting the
+  // last, and the sweep would read the wrong declaration for the first. A
+  // fresh wrapper carries this declaration and nothing else's.
+  const declared = ((params: never) => middleware(params)) as M;
+  return Object.assign(declared, {
     [AUTHZ_DECLARATION]: declaration,
-  });
+  }) as DeclaredAuthzMiddleware<M>;
 }
 
 export function authzDeclarationOf(value: unknown): AuthzDeclaration | null {
