@@ -46,6 +46,7 @@ import type {
   ValidatePermissionForInput,
   ViaFieldFor,
 } from "@langwatch/authz";
+import { authzDeclarationOf } from "@langwatch/authz";
 import {
   HandledError,
   isZodLikeError,
@@ -65,6 +66,7 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
+import { scopeLineageGuard } from "../app-layer/authz/scope-lineage-guard";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,
@@ -1427,6 +1429,11 @@ const permissionProcedureBuilder = <
       .use(tracerMiddleware as any)
       .use(loggerMiddleware as any)
       .use(handledErrorMiddleware as any)
+      // Ahead of the check on purpose: a request mixing scope ids across
+      // organizations is refused before ANY declaration kind — declared,
+      // custom, or opted-out — can pass on one id while the handler acts on
+      // another. See scope-lineage-guard.ts.
+      .use(scopeLineageGuard(authzDeclarationOf(check)) as any)
       .use(check as any)
       .use(enforcePermissionCheck as any)
       .use(auditLogMutations as any) as any;

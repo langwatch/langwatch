@@ -275,6 +275,22 @@ Spec: `specs/rbac/credential-arbitration.feature`.
 | `guard()`-less management endpoint | Does not exist — build error |
 | A cast (`as any`, `as never`) around any of this | Passes the compiler and lands in the boot check or the sweep; the reviewers treat it as a defect |
 
+## The lineage guard behind every check
+
+Whatever the declaration kind — declared, custom, or opted out — a runtime
+guard in front of it refuses any request whose input carries scope ids that
+do not all resolve to one organization
+(`platform/app/src/server/app-layer/authz/scope-lineage-guard.ts`, wired in
+`withPermissionCheck`). The declaration sweep closes tier-shadowing
+statically, but only for declarations it can see through; this guard removes
+the exploit's precondition everywhere instead — a check passing on your own
+narrow id can never aim a handler at someone else's wider one, because the
+mixed request is refused before the check runs. The refusal is shaped exactly
+like a permission denial, so it is not an oracle for which organization an id
+belongs to; the mismatch itself is logged. Same-organization cross-team
+shapes (moving a project between teams) pass untouched, and a request
+carrying at most one scope id costs nothing.
+
 ## Where things live
 
 - `packages/authz` — the registry, the declaration types

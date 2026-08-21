@@ -259,6 +259,34 @@ Feature: Typed permission declarations
     When its input carries no id at a tier the permission is grantable at
     Then the sweep refuses the procedure
 
+  # The sweep closes tier-shadowing statically, but only for declarations it
+  # can see through; a custom middleware's enforcement is a black box, and a
+  # future bug could still check one id while the handler acts on another.
+  # This runtime guard makes the exploit's precondition unreachable: a request
+  # cannot carry scope ids from two tenants at all, so passing a check on your
+  # own narrow id can never aim a query at someone else's wider one.
+  @unit
+  Scenario: Scope ids from two organizations in one request are refused
+    Given a request whose input carries scope ids resolving to two different organizations
+    When any procedure receives it, whatever its declaration kind
+    Then the request is refused before the permission check runs
+    And the refusal is indistinguishable from a permission denial
+    And the mismatch is logged with both organizations for the operator
+
+  @unit
+  Scenario: A scope id resolving to no organization cannot anchor a mixed request
+    Given a request carrying more than one scope id
+    And one of them resolves to no organization at all
+    When any procedure receives it
+    Then the request is refused before the permission check runs
+
+  @unit
+  Scenario: A request whose scope ids agree passes the lineage guard untouched
+    Given a request whose scope ids all resolve to one organization
+    When the procedure receives it
+    Then the guard adds no refusal and the declared check decides as before
+    And a request carrying at most one scope id is not resolved at all
+
   @unit
   Scenario: A procedure whose input cannot be inspected fails the sweep
     Given a procedure whose input schema the sweep cannot read
