@@ -39,15 +39,32 @@ cd "$ROOT"
 # seconds on every pull request instead of only inside the npx smoke matrix.
 # The expensive half is skipped: packing, and the staged-versus-tarball guard
 # that needs a tarball.
+#
+# `--stage-to DIR` stages into DIR and leaves it there. The filters decide what
+# every npm user receives and their verdict is otherwise only visible in a
+# temporary directory this script deletes on the way out, so this is how a
+# person, or a test, reads what actually survived.
 CHECK_FILTERS_ONLY=0
+STAGE_TO=""
 PACK_ARGS=()
+prev_arg=""
 for arg in "$@"; do
-  if [ "$arg" = "--check-filters" ]; then
-    CHECK_FILTERS_ONLY=1
-  else
-    PACK_ARGS+=("$arg")
+  if [ "$prev_arg" = "--stage-to" ]; then
+    STAGE_TO="$arg"
+    prev_arg=""
+    continue
   fi
+  case "$arg" in
+    --check-filters) CHECK_FILTERS_ONLY=1 ;;
+    --stage-to) prev_arg="--stage-to" ;;
+    --stage-to=*) STAGE_TO="${arg#--stage-to=}" ;;
+    *) PACK_ARGS+=("$arg") ;;
+  esac
 done
+if [ "$prev_arg" = "--stage-to" ]; then
+  echo "✗ --stage-to needs a directory" >&2
+  exit 1
+fi
 set -- ${PACK_ARGS[@]+"${PACK_ARGS[@]}"}
 
 # The CLI bundle is the package's entrypoint; packing without it produces a
@@ -61,8 +78,13 @@ if [ ! -f "pnpm-lock.yaml" ]; then
   exit 1
 fi
 
-STAGE="$(mktemp -d "${TMPDIR:-/tmp}/langwatch-pack.XXXXXX")"
-trap 'rm -rf "$STAGE"' EXIT
+if [ -n "$STAGE_TO" ]; then
+  mkdir -p "$STAGE_TO"
+  STAGE="$(cd "$STAGE_TO" && pwd)"
+else
+  STAGE="$(mktemp -d "${TMPDIR:-/tmp}/langwatch-pack.XXXXXX")"
+  trap 'rm -rf "$STAGE"' EXIT
+fi
 APP="$STAGE/app"
 mkdir -p "$APP"
 
@@ -140,6 +162,13 @@ EXCLUDES=(
   --exclude=.DS_Store
   --exclude=.vscode
   --exclude=.idea
+  # Editor and merge leftovers. npm-packlist drops `*.orig`, `.*.swp` and
+  # `._*` at every depth whatever the manifest says, so a working tree holding
+  # one would stage a file the tarball then refuses, and the staged-versus-
+  # tarball guard below would fail the pack.
+  --exclude=*.orig
+  --exclude=.*.swp
+  --exclude=._*
   # EVERY dotenv variant, not just `.env` and `*.local`. This tarball is
   # PUBLIC, and the working tree carries dotenv files that are gitignored but
   # very much present: haven writes platform/app/.env.portless (mode 0600, with
@@ -291,12 +320,28 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   # Ignore files are on the list because an ignore file inside the package
   # gets a second say over what npm publishes, which is the whole reason the
   # staging tree strips them. Key material and dotenv files are on it because
-  # the secrets check below refuses to publish them at all.
+  # the secrets check below refuses to publish them at all. The build-output
+  # and editor directories are on it because nothing under them is source, even
+  # on the day somebody commits one by accident.
+  #
+  # Tests, notebooks and containers.
   not_application_source='(^|/)(__tests__|tests?|notebooks)/'
-  not_application_source="$not_application_source"'|(^|/)\.(git|npm|docker)ignore$'
   not_application_source="$not_application_source"'|(^|/)Dockerfile(\.|$)'
+  # Ignore files, registry auth, dotenv and key material.
+  not_application_source="$not_application_source"'|(^|/)\.(git|npm|docker)ignore$'
   not_application_source="$not_application_source"'|(^|/)\.npmrc$|(^|/)\.env($|\.)'
   not_application_source="$not_application_source"'|\.(pem|key|p12|pfx)$'
+  # Build output, tool caches and editor state.
+  not_application_source="$not_application_source"'|(^|/)(node_modules|coverage'
+  not_application_source="$not_application_source"'|test-results|playwright-report|blob-report'
+  not_application_source="$not_application_source"'|__pycache__|\.pytest_cache|\.venv'
+  not_application_source="$not_application_source"'|\.github|\.vscode|\.idea'
+  not_application_source="$not_application_source"'|\.next|\.turbo|\.vercel|\.pnpm-store)/'
+  # The bundle source maps the filters re-include are build output, so no
+  # tracked path can reach this rule and the re-include stays asserted by the
+  # staged-versus-tarball guard after the pack.
+  not_application_source="$not_application_source"'|\.(log|map|tsbuildinfo|orig|swp)$'
+  not_application_source="$not_application_source"'|(^|/)(\.DS_Store|\._[^/]*)$'
 
   staged_list="$(mktemp)"
   all_tracked="$(mktemp)"

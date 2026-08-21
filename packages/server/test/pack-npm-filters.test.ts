@@ -1,5 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -37,7 +44,15 @@ afterEach(() => {
 	fixture = undefined;
 });
 
-function write(root: string, relPath: string, content = "x\n"): void {
+function write({
+	root,
+	relPath,
+	content = "x\n",
+}: {
+	root: string;
+	relPath: string;
+	content?: string;
+}): void {
 	const full = join(root, relPath);
 	mkdirSync(dirname(full), { recursive: true });
 	writeFileSync(full, content);
@@ -53,10 +68,7 @@ function buildFixture(trackedPaths: string[]): string {
 	fixture = root;
 
 	mkdirSync(join(root, "dev", "scripts"), { recursive: true });
-	writeFileSync(
-		join(root, "dev", "scripts", "pack-npm.sh"),
-		execFileSync("cat", [scriptPath], { encoding: "utf8" }),
-	);
+	copyFileSync(scriptPath, join(root, "dev", "scripts", "pack-npm.sh"));
 	writeFileSync(
 		join(root, "package.json"),
 		`${JSON.stringify(
@@ -73,23 +85,35 @@ function buildFixture(trackedPaths: string[]): string {
 	writeFileSync(join(root, "README.md"), "fixture\n");
 	writeFileSync(join(root, "LICENSE.md"), "fixture\n");
 
-	for (const relPath of trackedPaths) write(root, relPath);
+	for (const relPath of trackedPaths) write({ root, relPath });
 
 	execFileSync("git", ["init", "-q"], { cwd: root });
 	execFileSync("git", ["add", "-A"], { cwd: root });
 	return root;
 }
 
-function runCheck(root: string): { code: number; output: string } {
+function runCheck(
+	root: string,
+	extraArgs: string[] = [],
+): { code: number; output: string } {
+	const args = [
+		join(root, "dev", "scripts", "pack-npm.sh"),
+		"--check-filters",
+		...extraArgs,
+	];
 	try {
-		const output = execFileSync(
-			"bash",
-			[join(root, "dev", "scripts", "pack-npm.sh"), "--check-filters"],
-			{ cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-		);
+		const output = execFileSync("bash", args, {
+			cwd: root,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		});
 		return { code: 0, output };
 	} catch (error) {
-		const failure = error as { status?: number; stdout?: string; stderr?: string };
+		const failure = error as {
+			status?: number;
+			stdout?: string;
+			stderr?: string;
+		};
 		return {
 			code: failure.status ?? 1,
 			output: `${failure.stdout ?? ""}${failure.stderr ?? ""}`,
@@ -97,23 +121,32 @@ function runCheck(root: string): { code: number; output: string } {
 	}
 }
 
+/** Whether a repo-relative path survived into the staged tree. */
+function staged(stageDir: string, relPath: string): boolean {
+	return existsSync(join(stageDir, "app", relPath));
+}
+
 describe("npm pack staging filters", () => {
 	it("keeps source whose name collides with a working-tree artifact", () => {
 		// Each of these shares a name with something the script strips from the
 		// app root. A bare-name pattern removes all of them; an anchored one
 		// reaches only the app root copy.
-		const root = buildFixture([
+		const collisions = [
 			"platform/app/src/server/licenses.json",
 			"platform/app/src/server/quickwit/index.ts",
 			"packages/api/src/licenses.json",
 			"packages/api/src/quickwit-client.ts",
 			"platform/app/src/server/reports/report-chart.service.ts",
-		]);
+		];
+		const root = buildFixture(collisions);
+		const stageDir = join(root, "_stage");
 
-		const { code, output } = runCheck(root);
-		expect(output).not.toContain("licenses.json");
-		expect(output).not.toContain("quickwit");
+		const { code } = runCheck(root, ["--stage-to", stageDir]);
+
 		expect(code).toBe(0);
+		for (const relPath of collisions) {
+			expect(staged(stageDir, relPath)).toBe(true);
+		}
 	});
 
 	it("passes when a shipped tree tracks an ignore file", () => {
@@ -137,41 +170,51 @@ describe("npm pack staging filters", () => {
 	});
 
 	it("ships .env.example and no other dotenv file", () => {
+		// `.env.example` is tracked documentation, and the re-include that keeps
+		// it has to be read before the excludes that would take it. The staged
+		// tree is what says whether that ordering still holds, because the guard
+		// exempts every other dotenv file and so cannot report one.
 		const root = buildFixture([
 			"platform/app/.env.example",
+			"platform/app/.env.staging",
 			"platform/app/src/server/config.ts",
 		]);
+		const stageDir = join(root, "_stage");
 
-		const { code } = runCheck(root);
+		const { code } = runCheck(root, ["--stage-to", stageDir]);
+
 		expect(code).toBe(0);
+		expect(staged(stageDir, "platform/app/.env.example")).toBe(true);
+		expect(staged(stageDir, "platform/app/.env.staging")).toBe(false);
 	});
 
 	it("still strips the artifacts the app root writes", () => {
 		// The inverse probe. These paths are never tracked in the real repository
 		// (they are what a working tree accumulates), so tracking them here is
-		// what makes the guard report each one it dropped, which is the only way
-		// to read rsync's verdict from the outside.
-		const root = buildFixture([
+		// what puts them in front of the filters at all.
+		const artifacts = [
 			"platform/app/licenses.json",
 			"platform/app/quickwit",
 			"platform/app/.sentryclirc",
 			"platform/app/prisma/db.sqlite3",
 			"platform/app/e2e/auth.json",
 			"platform/app/src/server/stray.log",
-		]);
+		];
+		const root = buildFixture(artifacts);
+		const stageDir = join(root, "_stage");
 
-		const { code, output } = runCheck(root);
+		const { code, output } = runCheck(root, ["--stage-to", stageDir]);
+
+		for (const relPath of artifacts) {
+			expect(staged(stageDir, relPath)).toBe(false);
+		}
+		// Everything but the log is outside the guard's exemptions, so the guard
+		// names each one it dropped. That is the failing half of the guard, which
+		// nothing else here exercises.
 		expect(code).toBe(1);
 		expect(output).toContain("staging dropped application source");
-		for (const dropped of [
-			"platform/app/licenses.json",
-			"platform/app/quickwit",
-			"platform/app/.sentryclirc",
-			"platform/app/prisma/db.sqlite3",
-			"platform/app/e2e/auth.json",
-			"platform/app/src/server/stray.log",
-		]) {
-			expect(output).toContain(dropped);
+		for (const named of artifacts.filter((p) => !p.endsWith(".log"))) {
+			expect(output).toContain(named);
 		}
 	});
 });
