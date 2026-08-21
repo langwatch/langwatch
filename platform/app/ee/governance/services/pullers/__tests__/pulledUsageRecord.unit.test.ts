@@ -6,6 +6,7 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 1, 4 and 5).
  */
+import { DEFAULT_ACTOR_KIND } from "@langwatch/identity-links";
 import { describe, expect, it } from "vitest";
 import {
   buildPulledUsageRecord,
@@ -33,6 +34,8 @@ function usageEvent({
     source_event_id: "usage_report:2026-08-01:1d:claude-sonnet-5:ws_1",
     event_timestamp: "2026-08-01T00:00:00.000Z",
     actor: "",
+    actor_id: "",
+    actor_kind: DEFAULT_ACTOR_KIND,
     action: "usage_report",
     target: "anthropic/claude-sonnet-5",
     cost_usd: "0",
