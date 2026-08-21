@@ -180,6 +180,7 @@ describe("langy turn-start rejections", () => {
       );
     });
 
+    /** @scenario A model from a named provider row is accepted with the row id in front */
     it("accepts the canonical mp_<rowId> wire form with a multi-segment model", async () => {
       const result = await caller().createConversation({
         projectId: "project_1",
@@ -214,6 +215,32 @@ describe("langy turn-start rejections", () => {
 
       // The wire names the offending field, so the client card can say which
       // value to look at instead of the anonymous fallback sentence.
+      const wire = onTheWire(error);
+      expect(wire.data.error).not.toBeNull();
+      expect(wire.data.error).toMatchObject({ code: "validation_error" });
+      expect(
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
+          .meta.fieldErrors,
+      ).toHaveProperty("modelOverride");
+      expect(startConversationTurn).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A model reference with an empty segment is rejected as invalid input */
+    it("rejects a reference whose model segment is empty", async () => {
+      const error = await caller()
+        .createConversation({
+          projectId: "project_1",
+          idempotencyKey: "idem-key-0001",
+          messages: [message],
+          // THE POINT: the slash is a delimiter, not a model. Widening the
+          // pattern for aggregator ids must not let a bare delimiter through —
+          // there is no model here for the allowlist check to match.
+          modelOverride: "custom//stealth",
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
       const wire = onTheWire(error);
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "validation_error" });

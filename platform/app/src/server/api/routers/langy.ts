@@ -134,11 +134,15 @@ const langyTurnMessageSchema = z.object({
  * slashes and colons of its own, because custom OpenAI-compatible providers
  * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
  * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._:/-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);
