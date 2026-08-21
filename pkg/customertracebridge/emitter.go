@@ -505,11 +505,12 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 		domain.RequestTypeResponses, domain.RequestTypeSpeech:
 		return EndUserIDFromBody(params.RequestBody)
 	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
-		domain.RequestTypeTranscription:
+		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
-		// bodies are provider-shaped and forwarded verbatim, and transcription
-		// arrives as multipart form data rather than JSON.
+		// bodies are provider-shaped and forwarded verbatim, transcription
+		// arrives as multipart form data rather than JSON, and a realtime mint
+		// declares a socket rather than a completion.
 	}
 	return ""
 }
@@ -550,10 +551,12 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 			return sid
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription:
+		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
 		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all); the header lifted above (when present) is
-		// the only source.
+		// session field at all, and a realtime mint's session id is the one
+		// the gateway itself hands back); the header lifted above (when
+		// present) is the only source.
 	}
 	return ""
 }

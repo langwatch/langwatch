@@ -2033,6 +2033,20 @@ const presentations = {
     describe: () =>
       "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
   },
+  realtime_session_limit: {
+    // The request-rate limits do not bound voice: one mint opens a call that
+    // bills for as long as it runs. What frees a slot is a call ending, so
+    // the copy says that rather than "slow down".
+    title: "This key has all its voice calls open",
+    describe: () =>
+      "Wait for a call to end, or raise the key's max open sessions in settings.",
+  },
+  realtime_registry_unavailable: {
+    // Nothing was minted, so the reader is not holding a half-open session.
+    // Saying so is what stops them looking for one.
+    title: "Couldn't start the voice session",
+    describe: () => "No session was created. Try again in a moment.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
