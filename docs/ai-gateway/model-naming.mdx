@@ -30,7 +30,8 @@ For every request the gateway reads the `model` string once, in this order:
 3. **Provider type.** If the text before the first `/` is a provider type (`openai`, `anthropic`, `custom`, and the rest of the list under [Provider types](#provider-types)), the request goes to a provider of that type. Everything after the first `/` is the model name, including any further `/`.
 4. **Declared models.** Otherwise the whole string is a model name. It is matched against the models each bound provider declares: the custom models you configured on the provider, the model ids of its deployment mapping, and, for the hosted providers, the model catalog LangWatch ships.
 5. **Model name pattern.** If no provider declares the model, a short built-in table maps a name to the vendor that originated it: `gpt-…` to OpenAI, `claude-…` to Anthropic, `gemini-…` to Google. This is the safety net for a model newer than the shipped catalog.
-6. **Providers that declared nothing.** A provider that has not listed the models it serves cannot be ruled out by a model missing from its list, so those providers stay candidates. A key with only one provider always sends the request to it.
+6. **Providers that declared nothing.** A provider that has not listed the models it serves cannot be ruled out by a model missing from its list, so those providers stay candidates.
+7. **A key with one provider.** One provider is one door, not a choice between vendors, so the request goes to it whatever it declared. This step is what keeps a key working when its provider serves more than it lists.
 
 If none of that places the model, the request is refused with `model_not_recognized`, and the message lists the prefixes the key accepts.
 
