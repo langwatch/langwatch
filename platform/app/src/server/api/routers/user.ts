@@ -906,7 +906,7 @@ export const userRouter = createTRPCRouter({
         includeTopModels: z.boolean().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const service = BudgetOverviewService.create(
         ctx.prisma,
