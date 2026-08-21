@@ -112,6 +112,30 @@ describe("dualAuth", () => {
     });
   });
 
+  describe("given a foreign proxy's Basic header alongside a live session", () => {
+    /** @scenario "A non-LangWatch proxy credential abstains so the session decides" */
+    it("does not contest — the session authenticates the request", async () => {
+      getServerAuthSessionMock.mockResolvedValue({ user: { id: "user-1" } });
+      const { app } = appWithDualAuth();
+
+      // A reverse proxy injects `Authorization: Basic base64("user:pass")`;
+      // its token part is not a LangWatch credential, so the api-key claim
+      // abstains and the session wins instead of the two contesting.
+      const res = await app.request("/", {
+        headers: {
+          authorization: `Basic ${Buffer.from("proxyuser:proxypass").toString("base64")}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        userId: "user-1",
+        apiKeyProjectId: null,
+      });
+      expect(authMiddlewareMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given API key credentials that do not resolve", () => {
     /** @scenario "An invalid API key is refused without falling back to the session" */
     it("answers the API key's own refusal with no fallback", async () => {

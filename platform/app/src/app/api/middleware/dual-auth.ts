@@ -2,6 +2,7 @@ import { arbitrateClaims } from "@langwatch/authz";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { Project } from "~/generated/prisma/client";
+import { getTokenType } from "~/server/api-key/api-key-token.utils";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { getServerAuthSession } from "~/server/auth";
 import { authMiddleware } from "./auth";
@@ -59,6 +60,19 @@ export const dualAuth: MiddlewareHandler<{
   Variables: DualAuthVariables;
 }> = async (c, next) => {
   const apiKeyCredentials = extractCredentials((name) => c.req.header(name));
+  // The API key claims only when its material could plausibly be ours. A
+  // reverse proxy that terminates its own `auth_basic` (or a corporate proxy
+  // injecting `Authorization: Basic base64(user:pass)` upstream) makes the
+  // browser send a well-formed Basic header on every <img>/<audio> request;
+  // `extractCredentials` would read it as a credential, and without this gate
+  // it would contest with the session cookie and 401 every avatar and media
+  // fetch on proxy-fronted deployments. `getTokenType` returns "unknown" for
+  // anything without a LangWatch prefix, so a foreign header abstains and the
+  // session decides — while a real `sk-lw-`/`pat-lw-`/`ik-lw-` credential
+  // still claims and still contests a co-present session, which is the point.
+  const apiKeyClaimed =
+    apiKeyCredentials != null &&
+    getTokenType(apiKeyCredentials.token) !== "unknown";
   // A session claims only when the cookie jar resolves to a live session:
   // better-auth owns the cookie's name and shape, so resolution is the one
   // stable "this kind is in play" test. A stale or absent cookie abstains,
@@ -68,7 +82,7 @@ export const dualAuth: MiddlewareHandler<{
   const sessionUserId = session?.user?.id;
 
   const arbitration = arbitrateClaims<ByteEndpointClaim>([
-    apiKeyCredentials ? { kind: "api-key" } : null,
+    apiKeyClaimed ? { kind: "api-key" } : null,
     sessionUserId ? { kind: "session", userId: sessionUserId } : null,
   ]);
 

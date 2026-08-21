@@ -63,6 +63,15 @@ Feature: Credential arbitration
     And the refusal tells the caller to send exactly one credential
 
   @unit
+  Scenario: A non-LangWatch proxy credential abstains so the session decides
+    Given a browser request whose Authorization header a reverse proxy set to
+      a credential that is not a LangWatch token
+    And the same request carries a live session
+    When the request is arbitrated
+    Then the proxy credential does not claim the request
+    And the session authenticates it rather than the two contesting
+
+  @unit
   Scenario: An invalid API key is refused without falling back to the session
     Given a request whose API key credentials do not resolve
     When the request is arbitrated
