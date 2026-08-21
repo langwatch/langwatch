@@ -114,9 +114,26 @@ const missingModelDescriptions = {
   passthrough: "Put the model in the Gemini request URL, then try again.",
 } as const satisfies Record<MissingModelRequestType, string>;
 
+/**
+ * Names the prefixes the key can reach, when the gateway listed them.
+ *
+ * The list arrives as data (`meta.options`) rather than as a finished
+ * sentence, so the words a customer reads stay here, in the registry, and a
+ * relayed message is never rendered back to them. Empty when the gateway sent
+ * nothing, and the surrounding copy then stands on its own.
+ */
+const reachableSentence = (error: HandledErrorShape): string => {
+  const options = strList(error, "options");
+  if (options.length === 0) return "";
+  return ` This key can reach ${options.join(", ")}.`;
+};
+
 /** Reads a `meta` string and compares it, treating anything unexpected as no match. */
-const strEq = (error: HandledErrorShape, key: string, expected: string): boolean =>
-  str(error, key, "") === expected;
+const strEq = (
+  error: HandledErrorShape,
+  key: string,
+  expected: string,
+): boolean => str(error, key, "") === expected;
 
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[
@@ -2054,8 +2071,7 @@ const presentations = {
     // message is absent (an older gateway), the generic sentence still stands.
     title: "That provider isn't bound to this key",
     describe: (error) =>
-      str(error, "message", "") ||
-      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+      `The model name asks for a provider this virtual key has no slot for.${reachableSentence(error)} Bind that provider to the key, or drop the prefix from the model name.`,
   },
   model_not_recognized: {
     // Different from model_provider_not_bound: there the caller named a
@@ -2063,8 +2079,7 @@ const presentations = {
     // two fixes differ, so the two errors do.
     title: "No provider on this key serves that model",
     describe: (error) =>
-      str(error, "message", "") ||
-      "No provider bound to this virtual key declares that model. Add the model to the provider that serves it, or name the provider in the model string.",
+      `No provider bound to this virtual key declares that model.${reachableSentence(error)} Add the model to the provider that serves it, or name the provider in the model string.`,
   },
   model_provider_routing_handle_invalid: {
     title: "That routing handle can't be used",

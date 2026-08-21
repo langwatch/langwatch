@@ -64,6 +64,17 @@ function byProviderInProject({
   };
 }
 
+/**
+ * The routing-handle field of a write, or nothing when the caller left it out.
+ * Omitting keeps the stored handle; an explicit null clears it and releases
+ * the name for another provider in the organization.
+ */
+function routingHandleWrite(routingHandle: string | null | undefined): {
+  routingHandle?: string | null;
+} {
+  return routingHandle === undefined ? {} : { routingHandle };
+}
+
 export class ModelProviderRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -287,9 +298,7 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
-        ...(data.routingHandle !== undefined && {
-          routingHandle: data.routingHandle,
-        }),
+        ...routingHandleWrite(data.routingHandle),
         ...(data.rateLimitRpm !== undefined && {
           rateLimitRpm: data.rateLimitRpm,
         }),

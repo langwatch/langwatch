@@ -223,8 +223,9 @@ export function VirtualKeyProviderAccessSection({
               // key. The first row of each provider type in this list is the
               // one that answers.
               winsProviderTypePrefix={
-                eligible.findIndex((other) => other.provider === mp.provider) ===
-                index
+                eligible.findIndex(
+                  (other) => other.provider === mp.provider,
+                ) === index
               }
               allProviders={value.allProviders}
               checked={value.allProviders || selected.has(mp.id)}

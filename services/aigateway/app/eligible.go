@@ -35,7 +35,12 @@ func routableChain(ctx context.Context, bundle *domain.Bundle, req *domain.Reque
 		}
 		return nil, err
 	}
-	creds, err = eligibleCredentials(ctx, credentialChoice{creds: creds, resolved: req.Resolved, cfg: bundle.Config})
+	creds, err = eligibleCredentials(ctx, credentialChoice{
+		creds:     creds,
+		resolved:  req.Resolved,
+		cfg:       bundle.Config,
+		reachable: bundle.Credentials,
+	})
 	if err != nil {
 		// eligibleCredentials refused an explicitly named provider that has no
 		// credential (the not-reachable-from-scope reason). When the control
@@ -158,7 +163,7 @@ func eligibleCredentials(ctx context.Context, choice credentialChoice) ([]domain
 		if out := credentialsForProvider(choice.creds, choice.resolved.ProviderID); len(out) > 0 {
 			return out, nil
 		}
-		return nil, providerNotReachable(ctx, choice.resolved.ProviderID, choice.cfg)
+		return nil, choice.notReachable(ctx)
 	}
 	return choice.forBareModel(ctx)
 }
@@ -170,6 +175,12 @@ type credentialChoice struct {
 	creds    []domain.Credential
 	resolved *domain.ResolvedModel
 	cfg      domain.BundleConfig
+	// reachable is the key's WHOLE credential chain, before the surface trim
+	// narrowed it. The refusals list what the key can reach, and reading that
+	// off the trimmed chain would name only the providers that survived the
+	// trim, which is a different and smaller answer than the one the caller
+	// needs.
+	reachable []domain.Credential
 }
 
 // pinnedInstance answers a request that named a routing handle. A handle names
@@ -182,7 +193,18 @@ func (choice credentialChoice) pinnedInstance(ctx context.Context) ([]domain.Cre
 			return []domain.Credential{c}, nil
 		}
 	}
-	return nil, providerNotReachable(ctx, choice.resolved.ProviderID, choice.cfg)
+	return nil, choice.notReachable(ctx)
+}
+
+// notReachable refuses a provider the caller named that this key cannot reach,
+// naming what it can.
+func (choice credentialChoice) notReachable(ctx context.Context) error {
+	return providerNotReachable(ctx, choice.resolved.ProviderID, choice.options())
+}
+
+// options is the prefixes this key accepts.
+func (choice credentialChoice) options() reachable {
+	return reachableOptions(choice.reachable, choice.cfg)
 }
 
 // credentialsForBareModel picks the credentials that can serve a model name
@@ -211,7 +233,7 @@ func (choice credentialChoice) forBareModel(ctx context.Context) ([]domain.Crede
 	if out := choice.narrowToBareModel(model); len(out) > 0 {
 		return out, nil
 	}
-	return nil, modelNotRecognized(ctx, model, choice.cfg)
+	return nil, modelNotRecognized(ctx, model, choice.options())
 }
 
 // narrowToBareModel applies the four steps in order and returns the first
@@ -382,30 +404,33 @@ func providerBlockedByAccess(ctx context.Context, kind domain.ProviderID) error 
 // caller is holding the virtual key, GET /v1/models on that same key already
 // enumerates its models, and a refusal naming nothing left them with no way to
 // find the spelling that works.
-func providerNotReachable(ctx context.Context, kind domain.ProviderID, cfg domain.BundleConfig) error {
-	options := reachableOptions(cfg)
+func providerNotReachable(ctx context.Context, kind domain.ProviderID, options reachable) error {
 	return herr.New(ctx, domain.ErrProviderNotBound, herr.M{
 		"message": fmt.Sprintf(
 			"The %q provider is not reachable from this key's scope, so no credential is configured for it. This key reaches %s. Ask the key's owner to add the provider, or send the request to one of those.",
-			kind, options,
+			kind, options.rendered,
 		),
-		"hint":  fmt.Sprintf("prefix the model with one of %s, or drop the %q prefix and name a model one of them serves", options, kind),
+		"hint":  fmt.Sprintf("prefix the model with one of %s, or drop the %q prefix and name a model one of them serves", options.rendered, kind),
 		"fault": "customer",
+		// The list as data, so a client can compose its own copy from it
+		// instead of re-displaying our sentence. Bounded the same way.
+		"options": options.names,
 	})
 }
 
 // modelNotRecognized is the block when a bare model name matches nothing the
 // key can place and the key holds more than one provider that said what it
 // serves.
-func modelNotRecognized(ctx context.Context, model string, cfg domain.BundleConfig) error {
-	options := reachableOptions(cfg)
+func modelNotRecognized(ctx context.Context, model string, options reachable) error {
 	return herr.New(ctx, domain.ErrModelNotRecognized, herr.M{
 		"message": fmt.Sprintf(
 			"No provider on this key serves the model %q. This key reaches %s. Name the provider in the model string, or declare the model on the provider that serves it.",
-			model, options,
+			model, options.rendered,
 		),
-		"hint":  fmt.Sprintf("send %q as \"<provider>/%s\" using one of %s, or add %q to that provider's models", model, model, options, model),
-		"fault": "customer",
+		"hint":    fmt.Sprintf("send %q as \"<provider>/%s\" using one of %s, or add %q to that provider's models", model, model, options.rendered, model),
+		"fault":   "customer",
+		"model":   model,
+		"options": options.names,
 	})
 }
 
@@ -418,10 +443,18 @@ const maxReachableOptions = 10
 // families its credentials belong to, plus the routing handles its providers
 // carry. Rendered as a quoted, comma-separated list, capped, with the overflow
 // stated rather than silently dropped.
-func reachableOptions(cfg domain.BundleConfig) string {
-	options := reachableSpellings(cfg)
+// reachable is the prefixes a key accepts, both as the list itself and as the
+// sentence fragment a message embeds. Both come from one place so a client
+// composing its own copy and a caller reading ours never disagree.
+type reachable struct {
+	names    []string
+	rendered string
+}
+
+func reachableOptions(creds []domain.Credential, cfg domain.BundleConfig) reachable {
+	options := reachableSpellings(creds, cfg)
 	if len(options) == 0 {
-		return "no provider"
+		return reachable{rendered: "no provider"}
 	}
 	overflow := 0
 	if len(options) > maxReachableOptions {
@@ -436,17 +469,20 @@ func reachableOptions(cfg domain.BundleConfig) string {
 	if overflow > 0 {
 		rendered = fmt.Sprintf("%s and %d more", rendered, overflow)
 	}
-	return rendered
+	return reachable{names: options, rendered: rendered}
 }
 
 // reachableSpellings lists every prefix this key accepts: the provider
 // families its credentials belong to, sorted, then the routing handles its
 // providers carry. Families first because they are the spelling most callers
 // already use.
-func reachableSpellings(cfg domain.BundleConfig) []string {
+func reachableSpellings(creds []domain.Credential, cfg domain.BundleConfig) []string {
+	if len(creds) == 0 {
+		creds = cfg.Credentials
+	}
 	seen := make(map[string]bool)
 	var families []string
-	for _, c := range cfg.Credentials {
+	for _, c := range creds {
 		name := string(c.ProviderID)
 		if name == "" || seen[name] {
 			continue
@@ -455,10 +491,10 @@ func reachableSpellings(cfg domain.BundleConfig) []string {
 		families = append(families, name)
 	}
 	slices.Sort(families)
-	for _, handle := range cfg.RoutingHandles() {
-		if !seen[handle] {
-			seen[handle] = true
-			families = append(families, handle)
+	for _, c := range creds {
+		if c.Handle != "" && !seen[c.Handle] {
+			seen[c.Handle] = true
+			families = append(families, c.Handle)
 		}
 	}
 	return families

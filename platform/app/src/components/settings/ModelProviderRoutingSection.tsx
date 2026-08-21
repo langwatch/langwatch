@@ -1,7 +1,6 @@
 import { Box, Field, HStack, Input, Text } from "@chakra-ui/react";
-
-import { SmallLabel } from "../SmallLabel";
 import { ROUTING_HANDLE_MAX_LENGTH } from "../../server/modelProviders/routingHandle";
+import { SmallLabel } from "../SmallLabel";
 
 /**
  * How a request reaches THIS provider.
@@ -62,7 +61,13 @@ export function ModelProviderRoutingSection({
 
 function RoutingSpelling({ spelling }: { spelling: string }) {
   return (
-    <Text as="code" fontSize="xs" background="gray.100" paddingX={1} rounded="sm">
+    <Text
+      as="code"
+      fontSize="xs"
+      background="gray.100"
+      paddingX={1}
+      rounded="sm"
+    >
       {spelling}
     </Text>
   );

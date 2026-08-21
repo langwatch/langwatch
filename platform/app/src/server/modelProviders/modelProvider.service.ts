@@ -56,6 +56,35 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 export type AuthzContext = { prisma: PrismaClient; session: Session | null };
 
 /**
+ * Everything one model-provider write needs, after the checks have run and
+ * before the transaction opens. Carried as one value so the update and create
+ * branches read the same payload rather than each re-deriving it.
+ */
+type ModelProviderWrite = {
+  existingProvider: Awaited<
+    ReturnType<ModelProviderService["findExistingProvider"]>
+  >;
+  createScopes: ScopeInput[] | undefined;
+  handleProvided: boolean;
+  normalizedHandle: string | null;
+  input: UpdateModelProviderInput;
+  validatedKeys: Record<string, unknown> | null;
+  customKeysProvided: boolean;
+  scopes: ScopeInput[] | undefined;
+};
+
+/** The advanced gateway settings that ride the same row as the basic fields. */
+function advancedFields(input: UpdateModelProviderInput): AdvancedGatewayInput {
+  return {
+    rateLimitRpm: input.rateLimitRpm,
+    rateLimitTpm: input.rateLimitTpm,
+    rateLimitRpd: input.rateLimitRpd,
+    fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+    providerConfig: input.providerConfig,
+  };
+}
+
+/**
  * A provider row this service materialized, as opposed to a form-time shape.
  *
  * `MaybeStoredModelProvider` leaves `scopes` optional because the same type
@@ -592,37 +621,20 @@ export class ModelProviderService {
     input: UpdateModelProviderInput,
     ctx?: AuthzContext,
   ) {
+    // Only what the checks below read. The rest of the payload is carried
+    // whole into `writeModelProvider`, which is what performs the write.
     const {
       id,
       projectId,
       organizationId,
       provider,
-      enabled,
       customKeys,
-      customModels,
-      customEmbeddingsModels,
-      extraHeaders,
-      defaultModel,
-      name,
       routingHandle,
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
     } = input;
 
     if (!projectId && !organizationId) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
-
-    const advanced = {
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
-    };
 
     // Validate provider exists
     if (!(provider in modelProviders)) {
@@ -770,130 +782,99 @@ export class ModelProviderService {
     }
   }
 
-  private async writeModelProvider({
-    existingProvider,
-    createScopes,
-    handleProvided,
-    normalizedHandle,
-    input,
-    validatedKeys,
-    customKeysProvided,
-    scopes,
-  }: {
-    existingProvider: Awaited<
-      ReturnType<ModelProviderService["findExistingProvider"]>
-    >;
-    createScopes: ScopeInput[] | undefined;
-    handleProvided: boolean;
-    normalizedHandle: string | null;
-    input: UpdateModelProviderInput;
-    validatedKeys: Record<string, unknown> | null;
-    customKeysProvided: boolean;
-    scopes: ScopeInput[] | undefined;
-  }) {
-    const {
-      provider,
-      enabled,
-      customModels,
-      customEmbeddingsModels,
-      extraHeaders,
-      defaultModel,
-      name,
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
-    } = input;
-    const advanced = {
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
-    };
+  private async writeModelProvider(write: ModelProviderWrite) {
+    return await this.prisma.$transaction(async (tx) =>
+      write.existingProvider
+        ? await this.applyUpdate(write, write.existingProvider, tx)
+        : await this.applyCreate(write, tx),
+    );
+  }
 
-    return await this.prisma.$transaction(async (tx) => {
-      let result;
+  /** Updates a stored row and evicts the gateway config in the same write. */
+  private async applyUpdate(
+    write: ModelProviderWrite,
+    existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>,
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+  ) {
+    const { input, handleProvided, normalizedHandle, scopes } = write;
+    const result = await this.updateExisting(
+      existingProvider,
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name,
+        scopes,
+        customModels: input.customModels ?? [],
+        customEmbeddingsModels: input.customEmbeddingsModels ?? [],
+        extraHeaders: input.extraHeaders ?? [],
+        ...(handleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
 
-      if (existingProvider) {
-        result = await this.updateExisting(
-          existingProvider,
-          {
-            provider,
-            enabled,
-            name,
-            scopes,
-            customModels: customModels ?? [],
-            customEmbeddingsModels: customEmbeddingsModels ?? [],
-            extraHeaders: extraHeaders ?? [],
-            ...(handleProvided && { routingHandle: normalizedHandle }),
-            advanced,
-          },
-          validatedKeys,
-          customKeysProvided,
-          tx,
-        );
+    // A running gateway is serving the previous credential, base URL, headers
+    // and routing handle from cache. Rotating a key or renaming a handle is
+    // exactly the moment where that matters, so the eviction rides the same
+    // transaction as the write: either both land or the operator sees the
+    // write fail.
+    await this.changeEvents.append(
+      {
+        organizationId: existingProvider.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: existingProvider.id,
+      },
+      tx,
+    );
 
-        // A running gateway is serving the previous credential, base URL and
-        // headers from cache. Rotating a key is exactly the moment where that
-        // matters, so the eviction rides the same transaction as the write:
-        // either both land or the operator sees the write fail.
-        await this.changeEvents.append(
-          {
-            organizationId: existingProvider.organizationId,
-            kind: "MODEL_PROVIDER_UPDATED",
-            modelProviderId: existingProvider.id,
-          },
-          tx,
-        );
-      } else {
-        result = await this.createNew(
-          {
-            provider,
-            enabled,
-            name: name ?? this.deriveDefaultName(provider),
-            scopes: createScopes!,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-            extraHeaders: extraHeaders ?? [],
-            ...(handleProvided && { routingHandle: normalizedHandle }),
-            advanced,
-          },
-          validatedKeys,
-          customKeysProvided,
-          tx,
-        );
+    return result;
+  }
 
-        // Onboarding seed: writes one role-level ModelDefault row per
-        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
-        // at every scope the new credential is bound to. Strictly
-        // additive — `seedOnboardingDefaultsForProvider` skips any
-        // (scope, role) pair that already has a row, so enabling a
-        // second provider later can't silently replace a user's
-        // configured choice. Without this wiring the seed function is
-        // dead code; the bug surfaces as a fresh org showing
-        // "not configured" on every role despite having a provider
-        // enabled. See
-        // specs/model-providers/model-resolver-and-registry.feature.
-        for (const scope of createScopes!) {
-          await seedOnboardingDefaultsForProvider({
-            prisma: tx as unknown as PrismaClient,
-            provider,
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-          });
-        }
-      }
+  /** Creates a new row and seeds the role defaults it can fulfill. */
+  private async applyCreate(
+    write: ModelProviderWrite,
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+  ) {
+    const { input, handleProvided, normalizedHandle } = write;
+    const createScopes = write.createScopes!;
+    const result = await this.createNew(
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name ?? this.deriveDefaultName(input.provider),
+        scopes: createScopes,
+        customModels: input.customModels ?? undefined,
+        customEmbeddingsModels: input.customEmbeddingsModels ?? undefined,
+        extraHeaders: input.extraHeaders ?? [],
+        ...(handleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
 
-      // The legacy `defaultModel` parameter is accepted in the input
-      // shape for backwards compatibility but no longer writes anywhere.
-      // Default-model writes go through `setRoleAtScope` against
-      // ModelDefaultConfig (see useProviderFormSubmit).
-      void defaultModel;
+    // Onboarding seed: writes one role-level ModelDefault row per role the
+    // provider can fulfill (DEFAULT / FAST / EMBEDDINGS), at every scope the
+    // new credential is bound to. Strictly additive —
+    // `seedOnboardingDefaultsForProvider` skips any (scope, role) pair that
+    // already has a row, so enabling a second provider later can't silently
+    // replace a user's configured choice. Without this wiring the seed
+    // function is dead code; the bug surfaces as a fresh org showing
+    // "not configured" on every role despite having a provider enabled. See
+    // specs/model-providers/model-resolver-and-registry.feature.
+    for (const scope of createScopes) {
+      await seedOnboardingDefaultsForProvider({
+        prisma: tx as unknown as PrismaClient,
+        provider: input.provider,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      });
+    }
 
-      return result;
-    });
+    return result;
   }
 
   /**

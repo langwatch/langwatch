@@ -91,15 +91,27 @@ export function routingHandleProblem(
 /**
  * Reads a database error as "that routing handle is taken".
  *
- * Prisma reports a unique-index violation as P2002 and names the target. The
- * target is checked so a collision on some other unique index is never
- * reported to a customer as a handle conflict.
+ * Prisma reports a unique-index violation as P2002 and names the index it hit,
+ * but WHERE it names it moves between versions and between an index declared
+ * in the schema and one created in raw SQL (`meta.target`, or a nested
+ * `meta.constraint.index`). The whole of `meta` is searched for the column
+ * name rather than one field, so a Prisma upgrade cannot quietly turn this
+ * refusal back into an unhandled crash. Still scoped: it fires only on P2002,
+ * and only when the routing-handle index is the one named, so a collision on
+ * another unique index is never reported as a handle conflict.
  */
 export function isRoutingHandleConflict(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const { code, meta } = error as { code?: unknown; meta?: unknown };
-  if (code !== "P2002") return false;
-  const target = (meta as { target?: unknown } | undefined)?.target;
-  const rendered = Array.isArray(target) ? target.join(",") : String(target);
-  return rendered.includes("routingHandle");
+  if (code !== "P2002" || meta == null) return false;
+  return describeMeta(meta).includes("routinghandle");
+}
+
+/** Flattens an error's `meta` to lowercase text so a name can be looked for. */
+function describeMeta(meta: unknown): string {
+  try {
+    return JSON.stringify(meta).toLowerCase();
+  } catch {
+    return String(meta).toLowerCase();
+  }
 }

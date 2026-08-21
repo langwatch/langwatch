@@ -790,7 +790,6 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)
     : undefined;
-  const declaredModels = declaredModelsForProvider(mp);
   return {
     id: mp.id,
     slot: index === 0 ? "primary" : `fallback_${index}`,
@@ -799,9 +798,24 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-    ...(declaredModels ? { models: declaredModels } : {}),
+    ...routingWire(mp),
     config: buildProviderConfig(mp),
+  };
+}
+
+/**
+ * The routing half of a provider slot: the handle that addresses this exact
+ * instance, and the models it declares it serves. Both are absent rather than
+ * empty when there is nothing to say, which is what the gateway reads as "this
+ * provider said nothing" instead of "this provider serves nothing".
+ */
+function routingWire(
+  mp: ModelProvider,
+): Pick<ProviderSlot, "handle" | "models"> {
+  const models = declaredModelsForProvider(mp);
+  return {
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+    ...(models ? { models } : {}),
   };
 }
 

@@ -15,8 +15,9 @@
  * This is a ROUTING vocabulary. It never widens what a key may call:
  * `models_allowed` stays the allowlist and is applied separately.
  */
-import { llmModels } from "../modelProviders/loadModelCatalog";
+
 import { toLegacyCompatibleCustomModels } from "../modelProviders/customModel.schema";
+import { llmModels } from "../modelProviders/loadModelCatalog";
 
 /**
  * Provider keys whose models the platform already knows, mapped to the prefix

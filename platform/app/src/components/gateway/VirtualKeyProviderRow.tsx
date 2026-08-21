@@ -111,11 +111,21 @@ export function ProviderRow({
           <HStack gap={1} color="fg.muted" fontSize="2xs">
             <Text>Reached as</Text>
             {raw?.routingHandle ? (
-              <Text as="code">{`${raw.routingHandle}/<model>`}</Text>
+              <Text
+                as="code"
+                data-testid={`vk-provider-${mp.id}-handle-spelling`}
+              >{`${raw.routingHandle}/<model>`}</Text>
             ) : null}
-            <Text as="code">{`${mp.provider}/<model>`}</Text>
+            <Text
+              as="code"
+              data-testid={`vk-provider-${mp.id}-type-spelling`}
+            >{`${mp.provider}/<model>`}</Text>
             {winsProviderTypePrefix ? (
-              <Badge size="xs" colorPalette="green">
+              <Badge
+                size="xs"
+                colorPalette="green"
+                data-testid={`vk-provider-${mp.id}-first-for-type`}
+              >
                 first for {mp.provider}
               </Badge>
             ) : null}

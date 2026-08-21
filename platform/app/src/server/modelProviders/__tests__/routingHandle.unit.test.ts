@@ -1,0 +1,116 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  isRoutingHandleConflict,
+  normalizeRoutingHandle,
+  RESERVED_ROUTING_HANDLES,
+  routingHandleProblem,
+} from "../routingHandle";
+
+/** Reads a submitted handle the way the service does. */
+const check = (input: string | null | undefined) =>
+  routingHandleProblem(normalizeRoutingHandle(input));
+
+describe("routing handle", () => {
+  describe("given a handle an operator typed", () => {
+    /** @scenario "A handle is stored lowercased" */
+    it("stores it lowercased and trimmed", () => {
+      expect(normalizeRoutingHandle("  MyRouter ")).toBe("myrouter");
+      expect(check("MyRouter")).toBeNull();
+    });
+
+    it("accepts letters, numbers, hyphens and underscores", () => {
+      for (const handle of ["eu", "eu-west-1", "team_a", "r2d2", "0main"]) {
+        expect(check(handle)).toBeNull();
+      }
+    });
+  });
+
+  describe("when the text is not a handle", () => {
+    /** @scenario "A handle outside the allowed characters is refused" */
+    it("refuses characters a model string cannot carry", () => {
+      for (const handle of ["my router!", "eu/west", "-leading", "_leading"]) {
+        expect(check(handle)).toBe("shape");
+      }
+    });
+
+    /** @scenario "A handle longer than the limit is refused" */
+    it("refuses a handle longer than the limit", () => {
+      expect(check("a".repeat(32))).toBeNull();
+      expect(check("a".repeat(33))).toBe("shape");
+    });
+  });
+
+  describe("when the text already names a provider family", () => {
+    /** @scenario "A handle that names a provider family is refused" */
+    it("refuses a provider family key", () => {
+      for (const handle of ["anthropic", "openai", "custom", "bedrock"]) {
+        expect(check(handle)).toBe("reserved");
+      }
+    });
+
+    /** @scenario "A handle that names a provider family alias is refused" */
+    it("refuses the alternative spellings the gateway also accepts", () => {
+      for (const handle of [
+        "vertex_ai",
+        "vertex",
+        "google_vertex",
+        "azure_openai",
+        "aws_bedrock",
+        "google_gemini",
+      ]) {
+        expect(check(handle)).toBe("reserved");
+      }
+    });
+
+    it("refuses the application's own model wire prefix", () => {
+      expect(check("mp")).toBe("reserved");
+    });
+
+    it("covers every provider family the registry knows", () => {
+      // The gateway reads a handle BEFORE a provider family, so a family key
+      // missing from this set would be shadowed for a whole organization.
+      for (const key of ["openai", "anthropic", "gemini", "azure", "voyage"]) {
+        expect(RESERVED_ROUTING_HANDLES.has(key)).toBe(true);
+      }
+    });
+  });
+
+  describe("when the handle is cleared", () => {
+    /** @scenario "Clearing a handle releases the name" */
+    it("reads every blank shape as no handle", () => {
+      for (const input of [undefined, null, "", "   "]) {
+        expect(normalizeRoutingHandle(input)).toBeNull();
+        expect(check(input)).toBeNull();
+      }
+    });
+  });
+
+  describe("when the database refuses the write", () => {
+    it("reads a routing-handle unique violation as a conflict", () => {
+      expect(
+        isRoutingHandleConflict({
+          code: "P2002",
+          meta: { target: ["organizationId", "routingHandle"] },
+        }),
+      ).toBe(true);
+      expect(
+        isRoutingHandleConflict({
+          code: "P2002",
+          meta: { target: "ModelProvider_organizationId_routingHandle_key" },
+        }),
+      ).toBe(true);
+    });
+
+    it("leaves another index's violation alone", () => {
+      expect(
+        isRoutingHandleConflict({
+          code: "P2002",
+          meta: { target: ["organizationId", "name"] },
+        }),
+      ).toBe(false);
+      expect(isRoutingHandleConflict(new Error("boom"))).toBe(false);
+      expect(isRoutingHandleConflict(null)).toBe(false);
+    });
+  });
+});

@@ -12,29 +12,29 @@ Feature: AI Gateway — a routing handle names one provider instance
 
   Rule: A handle is a slug the organization owns
 
-    @integration
+    @unit
     Scenario: A handle is stored lowercased
       Given an administrator sets the routing handle "MyRouter" on a provider
       Then the stored handle is "myrouter"
 
-    @integration
+    @unit
     Scenario: A handle outside the allowed characters is refused
       When an administrator sets the routing handle "my router!"
       Then the write is refused as a validation error
       And the refusal states which characters a handle accepts
 
-    @integration
+    @unit
     Scenario: A handle longer than the limit is refused
       When an administrator sets a routing handle of 33 characters
       Then the write is refused as a validation error
 
-    @integration
+    @unit
     Scenario: A handle that names a provider family is refused
       When an administrator sets the routing handle "anthropic"
       Then the write is refused as a validation error
       And the refusal states that the name already means a provider family
 
-    @integration
+    @unit
     Scenario: A handle that names a provider family alias is refused
       When an administrator sets the routing handle "vertex_ai"
       Then the write is refused as a validation error
