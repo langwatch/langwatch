@@ -878,7 +878,15 @@ function checkProviderValidationPermission() {
       kind: "custom",
       reason:
         "the credential probe authorizes against the scopes it is being set up for when no project is named",
-      permissions: ["project:update"],
+      // Both paths the body can take: project:update when a project is named,
+      // and the per-scope manage permissions assertCanManageAllScopes probes
+      // when it is not (canManageScope in modelProvider.authz.ts).
+      permissions: [
+        "project:update",
+        "project:manage",
+        "team:manage",
+        "organization:manage",
+      ],
     },
     async (params: {
       ctx: any;
