@@ -19,9 +19,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
  *     transparency. No edit/disable/fork v1; admin authoring lands v2.
  *
- * The tile drawer lives with the panel, not here, so opening it does not
- * re-render the strip: this component only reports which tile was asked
- * for.
+ * The tile drawer lives with the panel, not here — this component only
+ * reports which tile was asked for. That does not make the strip cheaper:
+ * opening the drawer sets state on the panel, and the strip re-renders
+ * with it (measured: one render before, two after). What it does buy is
+ * that the strip is only ever re-rendered, never remounted, so the
+ * selected tab and any open template drawer survive.
  */
 function CatalogTabs({
   organizationId,
