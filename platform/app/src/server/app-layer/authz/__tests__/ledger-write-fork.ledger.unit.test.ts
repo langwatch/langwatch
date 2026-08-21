@@ -13,6 +13,7 @@ vi.mock("../epoch", () => ({
   bumpAuthzEpoch: vi.fn().mockResolvedValue(undefined),
 }));
 
+import { bumpAuthzEpoch } from "../epoch";
 import { ACTOR, harness, ORG_ID } from "./ledger-write-fork.harness";
 
 beforeEach(() => {
@@ -116,6 +117,24 @@ describe("given an organization past the genesis import", () => {
 
       expect(db.grant.findMany).not.toHaveBeenCalled();
       expect(count).toBe(1);
+    });
+  });
+
+  describe("when a caller only needs the role retired", () => {
+    /** @scenario "Retiring the old key's private role does not hold the answer" */
+    it("appends the deletion without polling for the row's disappearance", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+
+      await writer.deleteRole({
+        organizationId: ORG_ID,
+        roleId: "role_1",
+        actor: ACTOR,
+        awaitProjection: false,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
+      expect(db.customRole.count).not.toHaveBeenCalled();
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
     });
   });
 });
