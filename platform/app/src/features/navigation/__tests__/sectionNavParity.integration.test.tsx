@@ -15,6 +15,7 @@ interface CapturedItem {
   label: string;
   href: string;
   target?: string;
+  menuEnd?: unknown;
 }
 let capturedItems: CapturedItem[] = [];
 
@@ -38,42 +39,29 @@ describe("given the gateway section navigation data", () => {
       render(<AiGatewayLayout>x</AiGatewayLayout>);
 
       expect(
-        capturedItems.map((item) => ({
-          label: item.label,
-          href: item.href,
-          target: item.target,
-        })),
+        capturedItems.map((item) => ({ label: item.label, href: item.href })),
       ).toEqual([
-        {
-          label: "Virtual Keys",
-          href: "/gateway/virtual-keys",
-          target: undefined,
-        },
-        {
-          label: "Model Providers",
-          href: "/settings/model-providers",
-          target: "_blank",
-        },
-        { label: "Budgets", href: "/gateway/budgets", target: undefined },
-        {
-          label: "Routing Policies",
-          href: "/gateway/routing-policies",
-          target: undefined,
-        },
-        {
-          label: "Cache Rules",
-          href: "/gateway/cache-rules",
-          target: undefined,
-        },
-        { label: "Guardrails", href: "/gateway/guardrails", target: undefined },
-        { label: "Usage", href: "/gateway/usage", target: undefined },
-        {
-          label: "Billing Events",
-          href: "/gateway/billing-events",
-          target: undefined,
-        },
-        { label: "Webhooks", href: "/gateway/webhooks", target: undefined },
+        { label: "Virtual Keys", href: "/gateway/virtual-keys" },
+        { label: "Model Providers", href: "/settings/model-providers" },
+        { label: "Budgets", href: "/gateway/budgets" },
+        { label: "Routing Policies", href: "/gateway/routing-policies" },
+        { label: "Cache Rules", href: "/gateway/cache-rules" },
+        { label: "Guardrails", href: "/gateway/guardrails" },
+        { label: "Usage", href: "/gateway/usage" },
+        { label: "Billing Events", href: "/gateway/billing-events" },
+        { label: "Webhooks", href: "/gateway/webhooks" },
       ]);
+    });
+
+    /** @scenario "Every gateway entry opens in the tab the reader is in" */
+    it("opens every entry in the same tab, with no new-tab marker", () => {
+      render(<AiGatewayLayout>x</AiGatewayLayout>);
+
+      expect(
+        capturedItems.filter(
+          (item) => item.target !== undefined || item.menuEnd !== undefined,
+        ),
+      ).toEqual([]);
     });
   });
 });
