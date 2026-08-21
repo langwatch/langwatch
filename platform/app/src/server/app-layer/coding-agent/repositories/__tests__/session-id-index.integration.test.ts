@@ -45,10 +45,15 @@ const tag = `t${nanoid(8)}`;
  * suite fails consistently and is fixed by changing them, which is a far better
  * failure than an occasional red build.
  *
- * BRACKET_LOW and BRACKET_HIGH sort either side of ABSENT_SESSION on purpose.
- * SessionId is the last sort-key column, so an id outside the granule's key
- * range is excluded by the primary key on min/max alone, and the assertion would
- * hold with no skip index at all.
+ * BRACKET_LOW and BRACKET_HIGH sort either side of ABSENT_SESSION, and are
+ * written into the SAME weekly partition on purpose. SessionId is the last
+ * sort-key column and the primary key prunes on a granule's min/max, so only
+ * when both bracketing ids share a granule does its range span ABSENT_SESSION
+ * and leave the granule eligible. Split across partitions, each granule holds
+ * one session, its SessionId range is a single point, ABSENT_SESSION falls
+ * outside it, and the primary key alone excludes it: the assertion would then
+ * hold with no skip index at all. FAR_SESSION sits in another partition so the
+ * read still spans more than one.
  */
 const TENANTS = ["a", "b", "c", "d"] as const;
 const tenantIdFor = (suffix: (typeof TENANTS)[number]) =>
@@ -57,38 +62,44 @@ const tenantIdFor = (suffix: (typeof TENANTS)[number]) =>
 const BRACKET_LOW = "aaaa-session-low";
 const ABSENT_SESSION = "mmmm-session-absent";
 const BRACKET_HIGH = "zzzz-session-high";
+const FAR_SESSION = "ffff-session-far";
 
-async function insertSession({
-  tenantId,
-  sessionId,
-  startedAt,
-  updatedAt,
-  modelCalls = 0,
-}: {
+/** One week apart at most, so the bracketing pair shares a partition. */
+const BRACKET_WEEK_A = new Date("2026-01-05T00:00:00.000Z");
+const BRACKET_WEEK_B = new Date("2026-01-06T00:00:00.000Z");
+/** A different partition, so the lookup spans more than one. */
+const FAR_WEEK = new Date("2026-02-09T00:00:00.000Z");
+
+interface SessionFixture {
   tenantId: string;
   sessionId: string;
   startedAt: Date;
   updatedAt: Date;
   modelCalls?: number;
-}) {
+}
+
+/** One call, one part. Which rows share a part decides what the primary key can prune. */
+async function insertSessions(sessions: SessionFixture[]) {
   await ch.insert({
     table: "coding_agent_sessions",
-    values: [
-      {
-        TenantId: tenantId,
-        SessionId: sessionId,
-        SessionKeySource: "session_id",
-        Version: "v1",
-        StartedAt: startedAt,
-        CreatedAt: startedAt,
-        UpdatedAt: updatedAt,
-        Agent: "claude_code",
-        ModelCalls: modelCalls,
-      },
-    ],
+    values: sessions.map((session) => ({
+      TenantId: session.tenantId,
+      SessionId: session.sessionId,
+      SessionKeySource: "session_id",
+      Version: "v1",
+      StartedAt: session.startedAt,
+      CreatedAt: session.startedAt,
+      UpdatedAt: session.updatedAt,
+      Agent: "claude_code",
+      ModelCalls: session.modelCalls ?? 0,
+    })),
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
+}
+
+async function insertSession(session: SessionFixture) {
+  await insertSessions([session]);
 }
 
 /**
@@ -100,9 +111,11 @@ async function insertSession({
 async function rowsReadForSessionLookup({
   tenantId,
   sessionId,
+  useSkipIndexes = true,
 }: {
   tenantId: string;
   sessionId: string;
+  useSkipIndexes?: boolean;
 }): Promise<number> {
   const result = await ch.query({
     query: `
@@ -112,6 +125,7 @@ async function rowsReadForSessionLookup({
       GROUP BY TenantId, SessionId
     `,
     query_params: { tenantId, sessionId },
+    clickhouse_settings: { use_skip_indexes: useSkipIndexes ? 1 : 0 },
     format: "JSON",
   });
   const body = (await result.json()) as {
@@ -188,18 +202,43 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // Sessions spread across partitions, so a time-unbounded lookup would
       // otherwise have a candidate granule in each one.
       //
-      await insertSession({
-        tenantId,
-        sessionId: BRACKET_LOW,
-        startedAt: new Date("2026-01-05T00:00:00.000Z"),
-        updatedAt: new Date("2026-01-05T00:00:01.000Z"),
-      });
-      await insertSession({
-        tenantId,
-        sessionId: BRACKET_HIGH,
-        startedAt: new Date("2026-02-09T00:00:00.000Z"),
-        updatedAt: new Date("2026-02-09T00:00:01.000Z"),
-      });
+      // ONE insert, so both bracketing ids land in a single part and therefore a
+      // single granule whose SessionId range spans ABSENT_SESSION. Two inserts
+      // would make two parts, each with a single-point range that the primary
+      // key could exclude on its own.
+      await insertSessions([
+        {
+          tenantId,
+          sessionId: BRACKET_LOW,
+          startedAt: BRACKET_WEEK_A,
+          updatedAt: new Date(BRACKET_WEEK_A.getTime() + 1000),
+        },
+        {
+          tenantId,
+          sessionId: BRACKET_HIGH,
+          startedAt: BRACKET_WEEK_B,
+          updatedAt: new Date(BRACKET_WEEK_B.getTime() + 1000),
+        },
+      ]);
+      await insertSessions([
+        {
+          tenantId,
+          sessionId: FAR_SESSION,
+          startedAt: FAR_WEEK,
+          updatedAt: new Date(FAR_WEEK.getTime() + 1000),
+        },
+      ]);
+
+      // With skip indexes off, the granule is still eligible and gets read:
+      // the primary key cannot exclude an id inside its range. This is what
+      // makes the assertion below about the bloom filter and nothing else.
+      expect(
+        await rowsReadForSessionLookup({
+          tenantId,
+          sessionId: ABSENT_SESSION,
+          useSkipIndexes: false,
+        }),
+      ).toBeGreaterThan(0);
 
       expect(
         await rowsReadForSessionLookup({ tenantId, sessionId: ABSENT_SESSION }),
