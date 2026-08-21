@@ -38,6 +38,18 @@ function assistantMessages(
 }
 
 /**
+ * Command cards the adapter mirrors off the turn stream (langy-agent.ts) —
+ * product UI included so the judge sees the command results, stripped here so
+ * structural assertions grade only Langy's own prose. Agent-authored
+ * ```langy-card blocks stay: those are part of the reply the model wrote.
+ */
+const TOOL_CARD_BLOCKS = /```langy-tool-card\n[\s\S]*?```\n?/g;
+
+function proseOf(content: unknown): string {
+  return flattenContent(content).replace(TOOL_CARD_BLOCKS, "").trim();
+}
+
+/**
  * Every assistant reply in the run, flattened and newline-joined.
  *
  * Use this for anything that must hold across the WHOLE conversation — a
@@ -47,7 +59,7 @@ function assistantMessages(
  */
 export function allAssistantText(result: ScenarioResult): string {
   return assistantMessages(result)
-    .map((msg) => flattenContent(msg.content))
+    .map((msg) => proseOf(msg.content))
     .filter((text) => text.length > 0)
     .join("\n");
 }
@@ -61,5 +73,5 @@ export function allAssistantText(result: ScenarioResult): string {
 export function lastAssistantText(result: ScenarioResult): string {
   const assistants = assistantMessages(result);
   const last = assistants[assistants.length - 1];
-  return last ? flattenContent(last.content) : "";
+  return last ? proseOf(last.content) : "";
 }

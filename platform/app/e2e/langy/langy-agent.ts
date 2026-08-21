@@ -32,6 +32,10 @@ interface LangySessionState {
    * order. Navigation scenarios assert on these: the href is the hard fact
    * that the agent-driven navigate actually landed on the stream. */
   navigateHrefs: string[];
+  /** Every settled bash command observed on this session's turn streams, in
+   * order. The github-gate scenario asserts on these: the command card that
+   * tripped the gate must reach the stream before the gate cancels it. */
+  toolCommands: string[];
 }
 
 let cachedCookie: Promise<string> | null = null;
@@ -242,11 +246,14 @@ async function streamTurnText({
   cookie,
   params,
   onNavigate,
+  onToolCommand,
 }: {
   cookie: string;
   params: { projectId: string; conversationId: string; turnId: string };
   /** Called for each navigate entry on the stream (live-only, never durable). */
   onNavigate?: (href: string) => void;
+  /** Called for each settled tool card that carried a shell command. */
+  onToolCommand?: (command: string) => void;
 }): Promise<string> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
   const res = await fetch(
@@ -270,6 +277,13 @@ async function streamTurnText({
   // the judge grades the reply the user actually receives, not the raw stream.
   let textAfterLastTool = "";
   let sawTool = false;
+  // Every settled tool card on the stream, rendered the way the panel shows
+  // them and prepended to the judged reply as ```langy-tool-card blocks. The
+  // rubric's grounding criterion names the command results as the authority,
+  // so the judge must see what the user sees. scenario-transcript.ts strips
+  // exactly these blocks from its prose helpers, so structural assertions
+  // keep grading only what Langy itself said.
+  const cards: string[] = [];
   let streamError: string | null = null;
   let streamErrorCode: string | null = null;
   let sawTerminal = false;
@@ -293,6 +307,20 @@ async function streamTurnText({
       } else if (entry.type === "tool") {
         textAfterLastTool = "";
         sawTool = true;
+        if (entry.phase === "end") {
+          const command = (entry.input as { command?: unknown } | undefined)
+            ?.command;
+          const head =
+            typeof command === "string" && command
+              ? `$ ${command.slice(0, 400)}`
+              : `${typeof entry.name === "string" ? entry.name : "tool"} ${JSON.stringify(entry.input ?? {}).slice(0, 300)}`;
+          const output =
+            typeof entry.output === "string" && entry.output.trim() !== ""
+              ? `\n${entry.output.slice(0, 1200)}`
+              : "";
+          cards.push(`\`\`\`langy-tool-card\n${head}${output}\n\`\`\`\n`);
+          if (typeof command === "string" && command) onToolCommand?.(command);
+        }
       } else if (entry.type === "error") {
         // The server emits errorText (see langyChatTransport.ts's onEntry
         // "error" case), not message — checking the wrong field silently
@@ -305,6 +333,9 @@ async function streamTurnText({
         // this is the product's expected answer to any PR request.
         const parsed = parseHandledStreamError(entry);
         if (parsed?.code === "langy_github_not_connected") {
+          // The gate stops the turn after the tripping command card (already
+          // captured above); the panel then renders the install prompt from
+          // the error's tips, so that line joins the judged reply here.
           assistantText +=
             parsed.tips[0] ??
             "The LangWatch GitHub App is not installed for this project.";
@@ -349,13 +380,15 @@ async function streamTurnText({
   }
   // Same fold as turnfold.go: when tools ran and real text followed the last
   // tool, the product shows only that trailing text (the cards carry the rest),
-  // so the judge must grade what the user actually reads.
+  // so the judge must grade what the user actually reads — the cards, then
+  // that trailing text, exactly the panel's order.
+  const cardsText = cards.join("");
   if (sawTool && textAfterLastTool.trim() !== "") {
-    return textAfterLastTool.replace(/^[\s]+/, "");
+    return cardsText + textAfterLastTool.replace(/^[\s]+/, "");
   }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.
-  if (assistantText.trim()) return assistantText;
+  if (assistantText.trim()) return cardsText + assistantText;
 
   // No text. WHICH no-text this is decides whether a judge should ever see it,
   // and the two used to be indistinguishable behind a literal "(no response)"
@@ -383,7 +416,11 @@ async function streamTurnText({
 export function makeLangyAdapter(): AgentAdapter & {
   state: LangySessionState;
 } {
-  const state: LangySessionState = { conversationId: null, navigateHrefs: [] };
+  const state: LangySessionState = {
+    conversationId: null,
+    navigateHrefs: [],
+    toolCommands: [],
+  };
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -411,6 +448,7 @@ export function makeLangyAdapter(): AgentAdapter & {
         cookie,
         params: { projectId: PROJECT_ID, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
+        onToolCommand: (command) => state.toolCommands.push(command),
       });
       return { role: "assistant", content: text };
     },

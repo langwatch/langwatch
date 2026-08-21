@@ -142,23 +142,34 @@ async function seedFailingApplicationTraces(): Promise<void> {
  * a re-run hits the 409 duplicate path and keeps the existing prompt.
  */
 async function seedNavigablePrompt(): Promise<void> {
-  const res = await fetch(`${LW_BASE_URL}/api/prompts`, {
-    method: "POST",
-    headers: {
-      "X-Auth-Token": LANGWATCH_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      handle: "langy-dogfood-support-reply",
-      prompt: "You reply to customer support tickets in a friendly tone.",
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok && res.status !== 409) {
-    throw new Error(
-      `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
-    );
+  // Retried: on a loaded machine the process's first request has stalled in
+  // front of the app for longer than any sane single-attempt budget while
+  // probes from a fresh process answered instantly, so a short per-attempt
+  // timeout with retries beats one long wait.
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${LW_BASE_URL}/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": LANGWATCH_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          handle: "langy-dogfood-support-reply",
+          prompt: "You reply to customer support tickets in a friendly tone.",
+        }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.ok || res.status === 409) return;
+      throw new Error(
+        `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
+      );
+    } catch (error) {
+      lastError = error;
+    }
   }
+  throw lastError;
 }
 
 describe("Langy dogfood: named flows", () => {
@@ -352,6 +363,15 @@ describe("Langy dogfood: named flows", () => {
           scenario.judge(),
         ],
       });
+      // Layer 2, the hard fact behind the install prompt: the command card the
+      // gate judged reached the stream before the gate canceled it (the sink
+      // pushes, then observes). An install prompt with no command card behind
+      // it is the regression this guards.
+      expect(
+        langy.state.toolCommands.some((command) =>
+          /[\s(;&|](gh|git)\s/.test(" " + command),
+        ),
+      ).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });

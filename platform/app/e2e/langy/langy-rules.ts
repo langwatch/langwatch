@@ -27,9 +27,9 @@ export const LANGY_DECISIVENESS_CRITERION =
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
   "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result), not with a plan, a capability list, or a description of what it is about to do. Four kinds of answer legitimately carry no project result and still pass, as long as each is stated plainly with whatever path forward exists: the platform refusing the action over permissions, a request outside LangWatch declined in a line, a capability Langy does not have, and a greeting or acknowledgment.",
-  "Every claim about the user's project traces back to something retrieved in this conversation. The COMMAND RESULTS in the transcript are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job.",
+  "Every claim about the user's project traces back to something retrieved in this conversation. The COMMAND RESULTS in the transcript (the fenced blocks tagged langy-tool-card, each a command the product ran with its output) are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job.",
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card or langy-tool-card is the product's own UI (it renders as a real card) and is not a violation. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
   "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
@@ -72,7 +72,7 @@ export const LANGY_FAILING_TRACES_CRITERIA = [
 /** Criteria specific to the GitHub "open a PR" flow (the github internal skill). */
 export const LANGY_OPEN_PR_CRITERIA = [
   "Langy attempts to open a real pull request (clone/branch/commit/push/PR), or clearly reports the concrete blocker (e.g. the GitHub App is not installed for this org).",
-  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned.",
+  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned. Only Langy's own prose can violate this: a command's own output shown inside a langy-tool-card block (for example gh printing its auth-login hint) is the tool talking, not Langy asking.",
   "If a PR was opened, the reply carries its URL. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
@@ -90,7 +90,7 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic), and creates NOTHING until the user answers.",
   "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
   "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with BOTH the evaluator and the monitor created and named. A silent stop, an unexplained drop of the request, or stopping at the evaluator because the monitor was treated as out of reach all fail this.",
-  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field.",
+  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field. A run where no create is rejected satisfies this criterion; do not mark it inconclusive.",
   ...LANGY_CORE_RULE_CRITERIA.filter(
     (criterion) => criterion !== LANGY_DECISIVENESS_CRITERION,
   ),
