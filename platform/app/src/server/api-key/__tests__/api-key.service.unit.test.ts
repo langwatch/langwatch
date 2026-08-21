@@ -539,6 +539,44 @@ describe("ApiKeyService", () => {
       });
     });
 
+    describe("when the caller leaves the projection hold to a later write", () => {
+      /** @scenario "A hard-cut rotation holds once, on the new key's grants" */
+      it("passes the skipped hold through to the role deletion", async () => {
+        const keyWithCustomRole = {
+          ...existingKey,
+          roleBindings: [
+            {
+              id: "rb_1",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            },
+          ],
+        };
+        prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
+        prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        const revoked = await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+          awaitProjection: false,
+        });
+
+        // The key row itself is revoked imperatively either way.
+        expect(revoked.revokedAt).not.toBeNull();
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_1", awaitProjection: false }),
+        );
+      });
+    });
+
     describe("when revoking a key with multiple bindings sharing one CustomRole", () => {
       it("deduplicates and deletes the CustomRole once", async () => {
         const keyWithSharedRole = {

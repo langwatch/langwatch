@@ -355,6 +355,43 @@ describe("given an organization whose genesis import has landed", () => {
     expect(db.auditLog.createMany).not.toHaveBeenCalled();
   });
 
+  describe("when a caller leaves the projection hold to a later write", () => {
+    /** @scenario "Defining a role can leave the hold to a later write" */
+    it("appends the definition without polling for the role row", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+
+      await writer.defineRole({
+        organizationId: ORG_ID,
+        roleId: "role_1",
+        name: "Auditor",
+        permissions: ["traces:read"],
+        kind: "custom",
+        actor: ACTOR,
+        awaitProjection: false,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["defineRoles"]);
+      expect(db.customRole.findFirst).not.toHaveBeenCalled();
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
+    });
+
+    /** @scenario "Deleting a role can leave the hold to a later write" */
+    it("appends the deletion without polling for the row's disappearance", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+
+      await writer.deleteRole({
+        organizationId: ORG_ID,
+        roleId: "role_1",
+        actor: ACTOR,
+        awaitProjection: false,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
+      expect(db.customRole.count).not.toHaveBeenCalled();
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
+    });
+  });
+
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
   it("emits the offboard command and deletes no binding row itself", async () => {
     const { writer, db, sent } = harness({ onLedger: true });

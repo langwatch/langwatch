@@ -1279,6 +1279,7 @@ export class GrantsLedgerWriter {
     permissions,
     kind,
     actor,
+    awaitProjection = true,
   }: {
     organizationId: string;
     roleId: string;
@@ -1287,6 +1288,16 @@ export class GrantsLedgerWriter {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /**
+     * Whether to hold for the projection to land the role row. On by
+     * default: a caller that just defined a role usually reads it next. A
+     * caller that follows this write with ANOTHER write on the same
+     * organization's queue and awaits THAT one turns it off — the queue is
+     * per-organization FIFO, so the later write's projection landing proves
+     * this one landed too, and each skipped wait saves a full fold pickup
+     * cycle on the request.
+     */
+    awaitProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
     if (!(await this.onLedger(organizationId))) {
@@ -1317,26 +1328,28 @@ export class GrantsLedgerWriter {
       ],
       actor,
     });
-    await this.awaitProjection({
-      what: `definition of role ${roleId}`,
-      organizationId,
-      // The COMPAT head, like every other read-your-writes check here: that
-      // is the table `deleteRole` polls, the table the resolver reads, and
-      // the table every consumer of a freshly defined role reads. `Role` is
-      // the future head, written by the same `store()` — polling it would
-      // return before the row the caller is about to look for exists.
-      check: async () => {
-        const row = await this.prisma.customRole.findFirst({
-          where: { id: roleId, organizationId },
-          select: { name: true, permissions: true },
-        });
-        return (
-          row != null &&
-          row.name === name &&
-          samePermissions({ stored: row.permissions, wanted: permissions })
-        );
-      },
-    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `definition of role ${roleId}`,
+        organizationId,
+        // The COMPAT head, like every other read-your-writes check here: that
+        // is the table `deleteRole` polls, the table the resolver reads, and
+        // the table every consumer of a freshly defined role reads. `Role` is
+        // the future head, written by the same `store()` — polling it would
+        // return before the row the caller is about to look for exists.
+        check: async () => {
+          const row = await this.prisma.customRole.findFirst({
+            where: { id: roleId, organizationId },
+            select: { name: true, permissions: true },
+          });
+          return (
+            row != null &&
+            row.name === name &&
+            samePermissions({ stored: row.permissions, wanted: permissions })
+          );
+        },
+      });
+    }
     await bumpAuthzEpoch({ organizationId });
   }
 
@@ -1421,10 +1434,13 @@ export class GrantsLedgerWriter {
     organizationId,
     roleId,
     actor,
+    awaitProjection = true,
   }: {
     organizationId: string;
     roleId: string;
     actor: LedgerActor;
+    /** Same contract as `defineRole`'s parameter of this name. */
+    awaitProjection?: boolean;
   }): Promise<void> {
     if (!(await this.onLedger(organizationId))) {
       // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
@@ -1451,16 +1467,18 @@ export class GrantsLedgerWriter {
       actor,
       occurredAtMs: this.now(),
     });
-    await this.awaitProjection({
-      what: `deletion of role ${roleId}`,
-      organizationId,
-      check: async () => {
-        const present = await this.prisma.customRole.count({
-          where: { id: roleId, organizationId },
-        });
-        return present === 0;
-      },
-    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `deletion of role ${roleId}`,
+        organizationId,
+        check: async () => {
+          const present = await this.prisma.customRole.count({
+            where: { id: roleId, organizationId },
+          });
+          return present === 0;
+        },
+      });
+    }
     await bumpAuthzEpoch({ organizationId });
   }
 

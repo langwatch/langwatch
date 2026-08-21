@@ -111,6 +111,12 @@ export class IngestionKeyService {
         callerUserId,
         callerIsAdmin: true,
         organizationId,
+        // The mint below ends with an awaited grant attach on the same
+        // organization's FIFO ledger queue, so that single wait proves this
+        // revoke's writes landed too. Waiting here as well made a rotation
+        // stack fold pickup cycles: the CLI's first `langwatch claude` after
+        // a logout sat well over twenty seconds on this one request.
+        awaitProjection: false,
       });
     }
 

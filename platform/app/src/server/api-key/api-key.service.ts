@@ -333,6 +333,12 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        // A restricted key ALWAYS attaches a CUSTOM binding right after this
+        // (validated above), and that attach awaits its own projection. The
+        // organization's ledger queue is FIFO, so the binding row landing
+        // proves the role row landed first — waiting here too would spend a
+        // second full fold pickup cycle on the same request for nothing.
+        awaitProjection: false,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -967,6 +973,7 @@ export class ApiKeyService {
     callerUserId,
     callerIsAdmin,
     organizationId,
+    awaitProjection,
   }: {
     id: string;
     /**
@@ -976,6 +983,15 @@ export class ApiKeyService {
     callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
+    /**
+     * Whether the ledger writes hold for their projections. The key row
+     * itself is revoked imperatively either way, so the key is dead on the
+     * next read regardless. A caller that follows this revoke with an
+     * awaited write on the same organization's queue (the hard-cut
+     * ingestion-key rotation re-mints right after) turns this off and rides
+     * that later wait instead of stacking fold cycles on one request.
+     */
+    awaitProjection?: boolean;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
@@ -1009,6 +1025,7 @@ export class ApiKeyService {
           userId: callerUserId,
           fallback: "apiKeyService",
         }),
+        ...(awaitProjection !== undefined ? { awaitProjection } : {}),
       });
     }
 

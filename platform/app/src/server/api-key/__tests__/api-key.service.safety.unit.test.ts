@@ -219,6 +219,31 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         );
       });
+
+      /** @scenario "A restricted key's private role rides the grant attach's hold" */
+      it("defines the private role without its own projection hold", async () => {
+        await service.create({
+          name: "Restricted Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        });
+
+        // The attach that follows holds for its projection (writer default),
+        // and the organization's ledger queue is FIFO, so that one hold
+        // proves the role definition landed too.
+        expect(ledger.defineRole).toHaveBeenCalledWith(
+          expect.objectContaining({ awaitProjection: false }),
+        );
+        expect(ledger.attachBindings).toHaveBeenCalledTimes(1);
+        expect(
+          ledger.attachBindings.mock.calls[0]![0].awaitProjection,
+        ).toBeUndefined();
+      });
     });
 
     describe("when permissions arrive in arbitrary order", () => {

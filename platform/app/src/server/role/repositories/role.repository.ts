@@ -253,9 +253,16 @@ export class RoleRepository {
   async create({
     params,
     actor,
+    awaitProjection,
   }: {
     params: CreateRoleParams;
     actor: LedgerActor;
+    /**
+     * Passed through to the ledger writer. A caller whose next step is
+     * another awaited write on the same organization's queue turns it off;
+     * see `GrantsLedgerWriter.defineRole` for the ordering argument.
+     */
+    awaitProjection?: boolean;
   }): Promise<CustomRole> {
     const roleId = nanoid();
     await this.assertNameFree({
@@ -276,6 +283,7 @@ export class RoleRepository {
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
+      ...(awaitProjection !== undefined ? { awaitProjection } : {}),
     });
     const now = new Date();
     return {
@@ -398,11 +406,14 @@ export class RoleRepository {
     apiKeyId,
     organizationId,
     actor,
+    awaitProjection,
   }: {
     roleIds: string[];
     apiKeyId: string;
     organizationId: string;
     actor: LedgerActor;
+    /** Same contract as `create`'s parameter of this name. */
+    awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;
     // Revoke this api key's CUSTOM grants on these roles FIRST. The
@@ -436,7 +447,12 @@ export class RoleRepository {
         this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
       ]);
       if (holders > 0 || assignedUsers > 0) continue;
-      await this.writer.deleteRole({ organizationId, roleId, actor });
+      await this.writer.deleteRole({
+        organizationId,
+        roleId,
+        actor,
+        ...(awaitProjection !== undefined ? { awaitProjection } : {}),
+      });
     }
   }
 

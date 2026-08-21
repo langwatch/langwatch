@@ -1,11 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createSpinner } from "../../spinner";
 import type { GovernanceConfig } from "../config";
 import { envForTool } from "../tool-env";
 import {
 	buildShellReapply,
 	preflightWrapper,
 	shouldForgetGatewayPin,
+	withTelemetrySetupSpinner,
 } from "../wrapper";
+
+const spinner = vi.hoisted(() => ({
+	start: vi.fn(),
+	stop: vi.fn(),
+}));
+vi.mock("../../spinner", () => ({
+	createSpinner: vi.fn(() => spinner),
+}));
 
 const cfg: GovernanceConfig = {
 	gateway_url: "http://gw.example.com",
@@ -536,6 +546,53 @@ describe("shouldForgetGatewayPin", () => {
 			expect(
 				shouldForgetGatewayPin({ pinnedMode: "ingestion", retryable: false }),
 			).toBe(false);
+		});
+	});
+});
+
+describe("withTelemetrySetupSpinner", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	describe("when the setup step is in flight", () => {
+		/** @scenario "Mode resolution runs behind a spinner" */
+		it("spins while it runs and is gone before the result reaches the caller", async () => {
+			const result = await withTelemetrySetupSpinner({
+				tool: "claude",
+				run: async () => {
+					expect(spinner.start).toHaveBeenCalledTimes(1);
+					expect(spinner.stop).not.toHaveBeenCalled();
+					return "resolved-mode";
+				},
+			});
+
+			expect(result).toBe("resolved-mode");
+			expect(spinner.stop).toHaveBeenCalledTimes(1);
+			expect(vi.mocked(createSpinner)).toHaveBeenCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining("claude"),
+					// ora's default flips stdin to raw mode and swallows Ctrl+C;
+					// the wait must stay killable.
+					discardStdin: false,
+				}),
+			);
+		});
+	});
+
+	describe("when the setup step fails", () => {
+		/** @scenario "The spinner is gone before an error is reported" */
+		it("stops the spinner before the failure surfaces", async () => {
+			await expect(
+				withTelemetrySetupSpinner({
+					tool: "claude",
+					run: async () => {
+						throw new Error("mint failed");
+					},
+				}),
+			).rejects.toThrow("mint failed");
+
+			expect(spinner.stop).toHaveBeenCalledTimes(1);
 		});
 	});
 });

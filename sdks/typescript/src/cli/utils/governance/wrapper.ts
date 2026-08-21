@@ -16,6 +16,7 @@
 
 import { spawn } from "node:child_process";
 import { normalizeEndpoint } from "../../../internal/endpoint";
+import { createSpinner } from "../spinner";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { updateLangwatchClaudePlugin } from "./claude-plugin";
@@ -310,6 +311,35 @@ export function buildShellReapply(args: {
 }
 
 /**
+ * Run one setup step behind a spinner. Mode resolution can reach the
+ * control plane (confirming the cached ingest key is live, minting a fresh
+ * one after a logout), and that used to happen in silence long enough to
+ * read as a hang. The spinner is stopped before the result — or the error —
+ * reaches the caller, so everything printed after it lands on a clean line.
+ *
+ * discardStdin:false for the same reason login-flow sets it: ora's default
+ * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
+ */
+export async function withTelemetrySetupSpinner<T>({
+	tool,
+	run,
+}: {
+	tool: string;
+	run: () => Promise<T>;
+}): Promise<T> {
+	const spinner = createSpinner({
+		text: `Setting up telemetry for ${tool}...`,
+		discardStdin: false,
+	});
+	spinner.start();
+	try {
+		return await run();
+	} finally {
+		spinner.stop();
+	}
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -417,9 +447,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	const toolEnv = envForTool(cfg, tool);
 	const gatewayVars = toolEnv.vars;
 	const gatewayClears = toolEnv.clears ?? [];
+	const resolveModeWithFeedback = (
+		...args: Parameters<typeof resolveWrapperMode>
+	) => withTelemetrySetupSpinner({ tool, run: () => resolveWrapperMode(...args) });
 	let modeResult;
 	try {
-		modeResult = await resolveWrapperMode(
+		modeResult = await resolveModeWithFeedback(
 			cfg,
 			tool,
 			gatewayVars,
@@ -448,7 +481,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// derived from the expired session.
 			const refreshedEnv = envForTool(cfg, tool);
 			try {
-				modeResult = await resolveWrapperMode(
+				modeResult = await resolveModeWithFeedback(
 					cfg,
 					tool,
 					refreshedEnv.vars,
