@@ -13,6 +13,7 @@
 import type { EndpointConfig } from "@langwatch/api";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { requires } from "../security";
 import { protectedProcedure } from "../trpc";
 
@@ -188,6 +189,26 @@ describe("typed permission declarations", () => {
       ]) {
         expect(procedure).toBeDefined();
       }
+    });
+  });
+
+  describe("given a custom middleware on the pending builder", () => {
+    /** @scenario "A hand-rolled procedure middleware cannot claim a permission check" */
+    it("accepts only middleware that declares its policy", () => {
+      const declared = protectedProcedure
+        .input(projectInput)
+        .use(checkDeclaredPermission({ permission: "traces:view" }));
+
+      const handRolled = protectedProcedure
+        .input(projectInput)
+        // @ts-expect-error — a bare function carries no declaration; flipping permissionChecked by hand does not compile
+        .use(async ({ ctx, next }: { ctx: { permissionChecked: boolean }; next: () => Promise<unknown> }) => {
+          ctx.permissionChecked = true;
+          return next();
+        });
+
+      expect(declared).toBeDefined();
+      expect(handRolled).toBeDefined();
     });
   });
 

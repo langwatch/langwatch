@@ -1,7 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { declareAuthzMiddleware } from "~/server/app-layer/authz/declared-middleware";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import {
   SCOPE_TIERS,
   type ScopeAssignment,
@@ -84,6 +84,30 @@ function requireTenantAnchor(
     });
   }
 }
+
+// The declarations for the three hoisted custom permission middlewares
+// below. Consts here, above the router literal, so `.use()` can brand each
+// hoisted function inline (declareAuthzMiddleware returns the branded type
+// the pending builder's `.use()` requires; a bare function no longer
+// compiles there).
+const SCOPE_AWARE_WRITE_DECLARATION = {
+  kind: "custom",
+  reason:
+    "each scope in the write demands its own tier's manage permission, resolved from the input's scopeType",
+  permissions: ["organization:manage", "team:manage", "project:update"],
+} as const;
+const SAVE_CONFIG_DECLARATION = {
+  kind: "custom",
+  reason:
+    "every desired and removed scope attachment is asserted writable before the config write",
+  permissions: ["organization:manage", "team:manage", "project:update"],
+} as const;
+const DELETE_CONFIG_DECLARATION = {
+  kind: "custom",
+  reason:
+    "the config's current scope attachments are loaded by its id and each asserted writable before the delete",
+  permissions: ["organization:manage", "team:manage", "project:update"],
+} as const;
 
 export const modelProviderRouter = createTRPCRouter({
   // tRPC responses land in the browser, so every query here must go
@@ -598,7 +622,7 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(scopeAwarePermissionMiddleware)
+    .use(declareAuthzMiddleware(SCOPE_AWARE_WRITE_DECLARATION, scopeAwarePermissionMiddleware))
     .mutation(async ({ input, ctx }) => {
       await setRoleAtScope(
         { prisma: ctx.prisma },
@@ -622,7 +646,7 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(scopeAwarePermissionMiddleware)
+    .use(declareAuthzMiddleware(SCOPE_AWARE_WRITE_DECLARATION, scopeAwarePermissionMiddleware))
     .mutation(async ({ input, ctx }) => {
       if (!featureByKey(input.featureKey)) {
         throw new Error(`Unknown feature key: "${input.featureKey}".`);
@@ -673,7 +697,7 @@ export const modelProviderRouter = createTRPCRouter({
           .min(1, "Pick at least one scope."),
       }),
     )
-    .use(saveConfigPermissionMiddleware)
+    .use(declareAuthzMiddleware(SAVE_CONFIG_DECLARATION, saveConfigPermissionMiddleware))
     .mutation(async ({ input, ctx }) => {
       if (input.id) {
         await updateConfig(
@@ -705,7 +729,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .use(deleteConfigPermissionMiddleware)
+    .use(declareAuthzMiddleware(DELETE_CONFIG_DECLARATION, deleteConfigPermissionMiddleware))
     .mutation(async ({ input, ctx }) => {
       await deleteConfig({ prisma: ctx.prisma }, input.id);
       return { ok: true };
@@ -953,33 +977,3 @@ async function deleteConfigPermissionMiddleware({
   return next();
 }
 
-// The two hoisted permission middlewares above are referenced by the router
-// literal before any const initializer would run, so their declarations are
-// attached here as a post-definition tag on the same function objects.
-declareAuthzMiddleware(
-  {
-    kind: "custom",
-    reason:
-      "each scope in the write demands its own tier's manage permission, resolved from the input's scopeType",
-    permissions: ["organization:manage", "team:manage", "project:update"],
-  },
-  scopeAwarePermissionMiddleware,
-);
-declareAuthzMiddleware(
-  {
-    kind: "custom",
-    reason:
-      "every desired and removed scope attachment is asserted writable before the config write",
-    permissions: ["organization:manage", "team:manage", "project:update"],
-  },
-  saveConfigPermissionMiddleware,
-);
-declareAuthzMiddleware(
-  {
-    kind: "custom",
-    reason:
-      "the config's current scope attachments are loaded by its id and each asserted writable before the delete",
-    permissions: ["organization:manage", "team:manage", "project:update"],
-  },
-  deleteConfigPermissionMiddleware,
-);

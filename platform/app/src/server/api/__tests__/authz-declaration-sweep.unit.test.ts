@@ -31,7 +31,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AuthzDeclaration,
   authzDeclarationOf,
-} from "~/server/app-layer/authz/declared-middleware";
+} from "@langwatch/authz";
 import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];

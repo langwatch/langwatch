@@ -49,7 +49,7 @@ const {
   declaredNoPermission,
   declaredServiceAuthorization,
 } = await import("../trpc-middleware");
-const { authzDeclarationOf } = await import("../declared-middleware");
+const { authzDeclarationOf } = await import("@langwatch/authz");
 
 const session = { user: { id: "alice" } };
 

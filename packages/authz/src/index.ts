@@ -103,3 +103,12 @@ export type {
   StoredPrincipalKind,
   StoredScopeTier,
 } from "./vocabulary";
+export {
+  AUTHZ_DECLARATION,
+  authzDeclarationOf,
+  declareAuthzMiddleware,
+} from "./declared-middleware";
+export type {
+  AuthzDeclaration,
+  DeclaredAuthzMiddleware,
+} from "./declared-middleware";

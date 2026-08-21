@@ -184,6 +184,13 @@ Feature: Typed permission declarations
     Then the build fails naming both halves of the declaration
 
   @unit
+  Scenario: A hand-rolled procedure middleware cannot claim a permission check
+    Given the pending procedure builder's custom-check escape hatch
+    When a middleware without a declaration is passed to it
+    Then the registration does not compile
+    And only middleware built by the declaration helper is accepted
+
+  @unit
   Scenario: A service endpoint that declares no access fails to compile
     Given a service endpoint configuration
     When it names neither a permission nor a written opt-out

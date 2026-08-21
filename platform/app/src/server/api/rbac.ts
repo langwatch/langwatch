@@ -8,7 +8,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
-import { declareAuthzMiddleware } from "~/server/app-layer/authz/declared-middleware";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
   LiteMemberRestrictedError,

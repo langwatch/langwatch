@@ -40,6 +40,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import type {
   AuthzPermission,
   DeclarationError,
+  DeclaredAuthzMiddleware,
   NoPermissionOptions,
   ScopeTierField,
   ValidatePermissionForInput,
@@ -1220,8 +1221,16 @@ interface PendingPermissionProcedureBuilder<
     TOutputOut,
     TCaller
   >;
+  /**
+   * The custom-check escape hatch, and it only takes middleware that says
+   * what it is: `declareAuthzMiddleware(...)` is the sole way to produce the
+   * brand, so a hand-rolled function that flips `ctx.permissionChecked`
+   * without declaring its policy is a compile error here rather than a CI
+   * sweep finding. Non-authz middleware (plan gates, error handlers) belongs
+   * AFTER the declaration, on the plain builder this returns.
+   */
   use: (
-    middleware: PermissionMiddleware<TInputOut>,
+    middleware: DeclaredAuthzMiddleware<PermissionMiddleware<TInputOut>>,
   ) => ProcedureBuilder<
     TContext,
     TMeta,

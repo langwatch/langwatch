@@ -1,13 +1,14 @@
 /**
- * ADR-092 decision 25 — the declaration marker, standalone so both the
- * declared middleware factories (`./trpc-middleware`) and the legacy
- * vocabulary module (`~/server/api/rbac`, which those factories import their
- * resolvers from) can tag middlewares without forming a cycle.
+ * ADR-092 decision 25 — the declaration marker. In the package so every
+ * framework (the tRPC declared middleware factories, the legacy vocabulary
+ * module, any future surface) shares one vocabulary without forming a cycle,
+ * and so `DeclaredAuthzMiddleware` can brand what `.use()` accepts.
  *
  * The sweep test walks the router and refuses any procedure whose chain
  * carries no declaration; this file is the vocabulary it reads.
  */
-import type { AuthzPermission, ScopeTierField } from "@langwatch/authz";
+import type { ScopeTierField } from "./declaration";
+import type { AuthzPermission } from "./registry";
 
 /**
  * `Symbol.for` so the sweep test and the builders agree on the key even

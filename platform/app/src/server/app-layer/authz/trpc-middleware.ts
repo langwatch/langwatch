@@ -43,7 +43,7 @@ import { LiteMemberRestrictedError } from "../permissions/errors";
 import {
   type DeclaredAuthzMiddleware,
   declareAuthzMiddleware,
-} from "./declared-middleware";
+} from "@langwatch/authz";
 
 const logger = createLogger("langwatch:authz");
 
