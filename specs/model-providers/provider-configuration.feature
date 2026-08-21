@@ -148,16 +148,16 @@ Feature: Model Provider Configuration
     Then the save is rejected with an error the customer can act on
     And the stored API key and endpoint are preserved
 
-  # A row whose stored credentials will not decrypt reads back with none, so
-  # the guard above cannot see them. The row still holds ciphertext that
-  # restoring the old encryption secret would recover, and a save that carries
-  # no replacement would overwrite it for good.
+  # A provider whose credentials can no longer be used shows the same empty
+  # fields as one that never had any, so the guard above cannot see them and
+  # the ordinary save would take them away. They can still come back, so the
+  # save has to bring a replacement.
   @integration
-  Scenario: An unreadable credential is not replaced by a save that carries none
-    Given I have a provider whose stored credentials no longer decrypt
-    When a save carries no credential for the provider
-    Then the save is rejected with an error that names the unreadable credential
-    And the stored value is left exactly as it was
+  Scenario: A provider with unusable credentials refuses a save that brings no replacement
+    Given I have a provider whose stored credentials can no longer be used
+    When a save carries no new credential for the provider
+    Then the save is rejected with an error the customer can act on
+    And the stored credentials are unchanged
 
   # A save that names one credential is editing that one. An API key is never
   # shown back, so nobody can send one they did not type, and leaving it out

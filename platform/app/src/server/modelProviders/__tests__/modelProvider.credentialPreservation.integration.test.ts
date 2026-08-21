@@ -526,7 +526,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     // a row that never had one, so every guard above waved such a save through
     // and replaced ciphertext a restored CREDENTIALS_SECRET would have brought
     // back.
-    describe("given a provider whose stored credentials no longer decrypt", () => {
+    describe("given a provider whose stored credentials can no longer be used", () => {
       // Azure again, because its schema accepts a payload that names none of
       // its credential fields. That is what lets the save reach the guard
       // instead of being turned back by key validation first.
@@ -548,7 +548,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
 
       const CIPHERTEXT = "not-a-value-this-secret-can-decrypt";
 
-      async function corruptStoredKeys(id: string) {
+      async function makeUnusable(id: string) {
         await prisma.modelProvider.update({
           where: { id },
           data: { customKeys: CIPHERTEXT },
@@ -563,26 +563,53 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
         return row?.customKeys;
       }
 
-      describe("when the payload names no credential field", () => {
-        /** @scenario An unreadable credential is not replaced by a save that carries none */
-        it("is refused and the stored ciphertext survives", async () => {
+      async function refusal(id: string, customKeys: Record<string, unknown>) {
+        try {
+          await service().updateModelProvider(
+            {
+              projectId,
+              id,
+              provider: "azure",
+              enabled: true,
+              customKeys,
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+        } catch (error) {
+          return error as { code?: string };
+        }
+        return undefined;
+      }
+
+      describe.each([
+        {
+          name: "names no credential field",
+          customKeys: {},
+        },
+        {
+          name: "sends every credential field empty",
+          customKeys: { AZURE_OPENAI_API_KEY: "", AZURE_OPENAI_ENDPOINT: "" },
+        },
+        {
+          // What the drawer actually sends. It renders the masked placeholder
+          // for the secret fields of an enabled row it found no credentials
+          // on, so the ordinary save names every field and carries none.
+          name: "sends the masked placeholder back",
+          customKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: "",
+          },
+        },
+      ])("when a save $name", ({ customKeys }) => {
+        /** @scenario A provider with unusable credentials refuses a save that brings no replacement */
+        it("is refused and the stored value survives", async () => {
           const created = await createAzureRow();
-          await corruptStoredKeys(created.id);
+          await makeUnusable(created.id);
 
-          await expect(
-            service().updateModelProvider(
-              {
-                projectId,
-                id: created.id,
-                provider: "azure",
-                enabled: true,
-                customKeys: {},
-                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-              },
-              ctx(),
-            ),
-          ).rejects.toThrow(/cannot be read/i);
+          const error = await refusal(created.id, customKeys);
 
+          expect(error?.code).toBe("model_provider_credentials_unreadable");
           expect(await rawKeysOf(created.id)).toBe(CIPHERTEXT);
         });
       });
@@ -590,7 +617,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
       describe("when the payload carries a new credential", () => {
         it("goes through, because that is the way back", async () => {
           const created = await createAzureRow();
-          await corruptStoredKeys(created.id);
+          await makeUnusable(created.id);
 
           await service().updateModelProvider(
             {

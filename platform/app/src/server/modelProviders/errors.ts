@@ -278,7 +278,7 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
   constructor({ provider }: { provider: string }) {
     super(
       "model_provider_credentials_unreadable",
-      "The credentials stored for this provider cannot be read, so this save would replace them with nothing. Send new credentials with it.",
+      "The credentials stored for this provider cannot be read, so this save would replace them with nothing. Type a new credential and save again.",
       {
         meta: { provider },
         httpStatus: 400,

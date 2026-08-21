@@ -28,6 +28,16 @@ const ABSENT: CustomKeysRead = { state: "absent", keys: {} };
 const UNREADABLE: CustomKeysRead = { state: "unreadable", keys: {} };
 
 /**
+ * A credential bag is a plain object. `JSON.parse` also answers null, arrays,
+ * numbers and strings for perfectly valid JSON, and a caller that indexes one
+ * of those throws where it expected a missing key, so anything else reads as
+ * unreadable.
+ */
+function isKeyBag(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
  * Reads a ModelProvider's `customKeys` column.
  *
  * The column holds either an encrypted JSON string or, on rows written before
@@ -44,7 +54,7 @@ const UNREADABLE: CustomKeysRead = { state: "unreadable", keys: {} };
 export function readCustomKeys(raw: unknown): CustomKeysRead {
   if (raw === null || raw === undefined) return ABSENT;
   if (typeof raw === "object") {
-    return { state: "read", keys: raw as Record<string, unknown> };
+    return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
   }
   if (typeof raw !== "string") return UNREADABLE;
   return parseDecrypted(raw);
@@ -60,10 +70,8 @@ function parseDecrypted(raw: string): CustomKeysRead {
     return UNREADABLE;
   }
   try {
-    return {
-      state: "read",
-      keys: JSON.parse(plaintext) as Record<string, unknown>,
-    };
+    const parsed: unknown = JSON.parse(plaintext);
+    return isKeyBag(parsed) ? { state: "read", keys: parsed } : UNREADABLE;
   } catch (error) {
     // The error NAME only, never the error itself. A SyntaxError from
     // JSON.parse quotes the input it choked on, and the input here is the

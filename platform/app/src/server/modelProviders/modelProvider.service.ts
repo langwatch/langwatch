@@ -1595,19 +1595,35 @@ export class ModelProviderService {
     ]);
     if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
 
-    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
-      schemaKeys.has(key),
+    const incomingCredentials = Object.entries(validatedKeys ?? {}).filter(
+      ([key]) => schemaKeys.has(key),
     );
-    if (incomingCredentials.length > 0) return;
 
     // A row whose stored credentials will not decrypt reads back as keyless,
     // so without this branch the same save that is refused on a readable row
     // goes through here and replaces ciphertext that a restored
-    // CREDENTIALS_SECRET would have recovered. Sending a credential is the way
-    // out, and it is already allowed by the check above.
+    // CREDENTIALS_SECRET would have recovered.
+    //
+    // Naming a field is enough on a readable row, where an empty value is a
+    // deliberate clear of something the customer could see. Here it is not: the
+    // drawer renders the masked placeholder for every secret field of an
+    // enabled row it found no credentials on, and empty for the rest, so the
+    // ordinary save carries a full set of field names and no credential at
+    // all. Only a value that could serve a request counts.
     if (existingUnreadable) {
-      throw new ModelProviderCredentialsUnreadableError({ provider });
+      const replacement = incomingCredentials.some(
+        ([, value]) =>
+          typeof value === "string" &&
+          value !== "" &&
+          value !== MASKED_KEY_PLACEHOLDER,
+      );
+      if (!replacement) {
+        throw new ModelProviderCredentialsUnreadableError({ provider });
+      }
+      return;
     }
+
+    if (incomingCredentials.length > 0) return;
 
     if (!existingKeys) return;
 
