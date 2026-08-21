@@ -102,42 +102,47 @@ describe("given a recognizer that is skipped unless the text holds its literal",
  * far and the small territories fail here first.
  */
 describe("given the phone detector's digit gate", () => {
-  const shapesOf = (formatted: string, plain: string) => [
-    plain,
+  const shapesOf = ({
     formatted,
-    `call ${formatted} now`,
-    `{"phone":"${plain}"}`,
-  ];
+    plain,
+  }: {
+    formatted: string;
+    plain: string;
+  }) => [plain, formatted, `call ${formatted} now`, `{"phone":"${plain}"}`];
 
-  /** @scenario "Every number the detector can find is still redacted" */
-  it("still redacts every example number the detector recognises", () => {
-    const missed: string[] = [];
-    let recognised = 0;
-    for (const country of getCountries()) {
-      const example = getExampleNumber(country, examples);
-      if (!example) continue;
-      for (const shape of shapesOf(
-        example.formatInternational(),
-        example.number,
-      )) {
-        const found = findPhoneNumbersInText(shape, { defaultCountry: "US" });
-        if (found.length === 0) continue;
-        recognised++;
-        if (!redact(shape).includes("[PHONE_NUMBER]")) missed.push(shape);
+  describe("when the text holds a number of any country", () => {
+    /** @scenario "A phone number is redacted whatever country it belongs to" */
+    it("still redacts every example number the detector recognises", () => {
+      const missed: string[] = [];
+      let recognised = 0;
+      for (const country of getCountries()) {
+        const example = getExampleNumber(country, examples);
+        if (!example) continue;
+        for (const shape of shapesOf({
+          formatted: example.formatInternational(),
+          plain: example.number,
+        })) {
+          const found = findPhoneNumbersInText(shape, { defaultCountry: "US" });
+          if (found.length === 0) continue;
+          recognised++;
+          if (!redact(shape).includes("[PHONE_NUMBER]")) missed.push(shape);
+        }
       }
-    }
-    expect(recognised).toBeGreaterThan(500);
-    expect(missed).toEqual([]);
+      expect(recognised).toBeGreaterThan(500);
+      expect(missed).toEqual([]);
+    });
   });
 
-  /** @scenario "Text too short to hold a number is left alone" */
-  it("leaves alone the numeric text that carries no number", () => {
-    for (const input of [
-      "the release notes for the 3.9.0 tag say so",
-      '{"input_tokens":15234,"cost_usd":0.0412}',
-      "retry 3 times after 45 seconds",
-    ]) {
-      expect(redact(input)).toBe(input);
-    }
+  describe("when the text holds digits but no number", () => {
+    /** @scenario "Numeric text that is no phone number is left alone" */
+    it("leaves alone the numeric text that carries no number", () => {
+      for (const input of [
+        "the release notes for the 3.9.0 tag say so",
+        '{"input_tokens":15234,"cost_usd":0.0412}',
+        "retry 3 times after 45 seconds",
+      ]) {
+        expect(redact(input)).toBe(input);
+      }
+    });
   });
 });

@@ -262,26 +262,23 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input is a long opaque token
     Then the stored input is byte-for-byte what was sent
 
-  # The phone detector is the same idea with a number instead of a character,
-  # and it is where the time actually goes. It treats every digit as the start
-  # of a number and then tries to parse it, so 200 KB of ordinary JSON cost
-  # 248 ms and found nothing, against under 4 ms for the whole secrets pass over
-  # the same text. Text whose longest run of digits is too short to hold any
-  # number skips the detector: 165 ms to 1 ms on prose carrying a version
-  # number, 248 ms to 4 ms on that JSON.
+  # Phone numbers are the same idea again, counted in digits rather than in
+  # characters: text whose longest run of digits is shorter than any phone
+  # number is skipped. A trace full of version numbers, token counts and
+  # timestamps is the ordinary case, and it used to cost more than the rest of
+  # redaction together.
   #
-  # The floor sits one digit below the shortest number the phone metadata has
-  # for any country, so the skip only ever drops a scan that would have found
-  # nothing. The detector itself is the reference the test holds it to.
+  # A phone number is redacted wherever its country writes it, so the shortest
+  # number in use anywhere stays above the length that decides the skip.
 
   @unit
-  Scenario: Every number the detector can find is still redacted
-    When a trace is ingested whose input contains the example number of every
-      country the phone metadata knows
-    Then each number the detector recognises is redacted
+  Scenario: A phone number is redacted whatever country it belongs to
+    When a trace is ingested whose input contains phone numbers from every
+      country, written the way each country writes them
+    Then every one of them is redacted
 
   @unit
-  Scenario: Text too short to hold a number is left alone
+  Scenario: Numeric text that is no phone number is left alone
     When a trace is ingested whose input carries version numbers and counts but
       no run of digits long enough to be a phone number
     Then the stored input is unchanged
