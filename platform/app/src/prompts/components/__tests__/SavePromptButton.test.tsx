@@ -55,6 +55,7 @@ function TestWrapper({
 
 describe("SavePromptButton", () => {
   describe("when at latest version with no changes", () => {
+    /** @scenario "The save button is quiet when there is nothing to save" */
     it("shows 'Saved' and is disabled", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 5,
@@ -85,7 +86,8 @@ describe("SavePromptButton", () => {
   });
 
   describe("when at latest version with changes", () => {
-    it("shows 'Update to vX' and is enabled", () => {
+    /** @scenario "The save button names saving, not the version number" */
+    it("names the action as saving the changes", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 5,
         latestVersion: 5,
@@ -109,13 +111,14 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Save changes");
       expect(button).not.toBeDisabled();
     });
   });
 
   describe("when NOT at latest version with no changes", () => {
-    it("shows 'Update to vX' and is enabled (allows rollback)", () => {
+    /** @scenario "The save button names rollback when an older version is loaded" */
+    it("offers to make the loaded version the latest one", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 3,
         latestVersion: 5,
@@ -139,13 +142,13 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Make this the latest version");
       expect(button).not.toBeDisabled();
     });
   });
 
   describe("when NOT at latest version with changes", () => {
-    it("shows 'Update to vX' and is enabled", () => {
+    it("names the action as saving the changes", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 3,
         latestVersion: 5,
@@ -169,7 +172,7 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Save changes");
       expect(button).not.toBeDisabled();
     });
   });

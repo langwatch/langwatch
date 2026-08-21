@@ -42,8 +42,8 @@ type UseLatestPromptVersionOptions = {
 
 /**
  * Hook to detect version drift between the current version and the database.
- * Used by SavePromptButton to show accurate "Update to vX" and by VersionBadge
- * to show outdated warnings.
+ * Used by SavePromptButton to name the version a save will produce, and by
+ * VersionBadge to show outdated warnings.
  *
  * React-query will dedupe requests with the same configId, so multiple components
  * using this hook won't cause extra backend calls.
