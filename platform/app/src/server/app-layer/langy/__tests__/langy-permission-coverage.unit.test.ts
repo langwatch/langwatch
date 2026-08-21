@@ -26,15 +26,18 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 
 import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
 import {
   ALL_PERMISSION_ACTIONS,
   ALL_PERMISSION_FAMILIES,
   classifyForLangy,
+  LANGY_ACTION_BUCKET_TOTAL,
+  LANGY_AUTH_SCOPE_FAMILY_NAMES,
   LANGY_CLASSIFIED_ACTIONS,
   LANGY_CLASSIFIED_FAMILIES,
+  LANGY_FAMILY_BUCKET_TOTAL,
 } from "../langyPermissionPolicy";
 import {
   experimentRoutePermissions,
@@ -47,10 +50,10 @@ import {
  * so a failure names the route rather than just the grain.
  *
  * Org-exclusive permissions are handled by their own pin below rather than
- * here. They are not an oversight the mint can fix: `bindingScopeCanGrant`
- * (rbac.ts:190-196) refuses them on the PROJECT-scoped binding the session key
- * is minted with, so adding them to the candidate list would change nothing
- * except the length of the list.
+ * here: `classifyForLangy` calls them `unreachable`, not `granted`, because
+ * `bindingScopeCanGrant` (rbac.ts:190-196) refuses them on the PROJECT-scoped
+ * binding the session key is minted with — adding them to the candidate list
+ * would change nothing except the length of the list.
  */
 function grantedByPolicyButNotByTheMint(): string[] {
   const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
@@ -59,9 +62,6 @@ function grantedByPolicyButNotByTheMint(): string[] {
     .filter(([permission]) => !granted.has(permission))
     .filter(
       ([permission]) => classifyForLangy(permission).disposition === "granted",
-    )
-    .filter(
-      ([permission]) => !isOrgExclusivePermission(permission as Permission),
     )
     .map(
       ([permission, routes]) =>
@@ -82,19 +82,27 @@ function grantedByPolicyButNotByTheMint(): string[] {
  * answer to "why did Langy say it couldn't list our org members?", and it
  * should fail loudly when it grows rather than absorbing a new refusal quietly.
  */
-function reachableOnlyWithAnOrgScopedBinding(): string[] {
-  const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
-
-  return [...permissionsDemandedByRoutes()]
-    .filter(([permission]) => !granted.has(permission))
+function reachableOnlyWithAnOrgScopedBinding(): {
+  permissions: string[];
+  rendered: string;
+} {
+  const demanded = [...permissionsDemandedByRoutes()]
     .filter(
-      ([permission]) => classifyForLangy(permission).disposition === "granted",
+      ([permission]) =>
+        classifyForLangy(permission).disposition === "unreachable",
     )
-    .filter(([permission]) =>
-      isOrgExclusivePermission(permission as Permission),
-    )
-    .map(([permission]) => permission)
-    .sort();
+    .sort(([a], [b]) => a.localeCompare(b));
+  return {
+    permissions: demanded.map(([permission]) => permission),
+    // The routes render in the failure message, not the pin, so a failure
+    // names the door that moved without making the pin churn on route renames.
+    rendered: demanded
+      .map(
+        ([permission, routes]) =>
+          `${permission} — demanded by ${routes.join(", ")}`,
+      )
+      .join("\n"),
+  };
 }
 
 /** Permissions the mint asks for that the policy says Langy must never hold. */
@@ -137,11 +145,14 @@ describe("Langy permission coverage", () => {
 
     describe("when the resource is organization-tier but the key is project-scoped", () => {
       it("names the routes no policy edit can unlock, so an unreachable route is never mistaken for an unclassified one", async () => {
-        // An EXACT pin, not a subset check. Growth here means a new route was
-        // put behind an org-tier permission, which silently costs Langy a
-        // capability the policy believes it has — the failure should be the
-        // first anyone hears of it.
-        expect(reachableOnlyWithAnOrgScopedBinding()).toEqual([
+        // An EXACT pin, not a subset check, and it fails as loudly on shrink
+        // as on growth — both deliberate. Growth means a new route was put
+        // behind an org-tier permission, which silently costs Langy a
+        // capability the policy believes it has; shrink means a resource left
+        // `ORG_EXCLUSIVE_RESOURCES` and its family's classification must be
+        // re-decided (see the FULL_ACCESS_FAMILIES tripwire note).
+        const unreachable = reachableOnlyWithAnOrgScopedBinding();
+        expect(unreachable.permissions, unreachable.rendered).toEqual([
           "activityMonitor:view",
           "aiTools:manage",
           "aiTools:view",
@@ -184,6 +195,35 @@ describe("Langy permission coverage", () => {
         ).toEqual([]);
       });
     });
+
+    // The reverse direction, which the totality checks above cannot see: a
+    // family name TYPO'D or gone stale in a policy bucket is classified-but-
+    // nonexistent, and the one-directional sweep stays green while the real
+    // family it was meant to cover sits wherever it happened to land.
+    describe("when a classified name does not exist in rbac.ts", () => {
+      it("fails here, so a typo'd or removed family cannot sit in a bucket classifying nothing", async () => {
+        const families = new Set(ALL_PERMISSION_FAMILIES);
+        expect(
+          [...LANGY_CLASSIFIED_FAMILIES].filter((f) => !families.has(f)),
+        ).toEqual([]);
+
+        const actions = new Set(ALL_PERMISSION_ACTIONS);
+        expect(
+          [...LANGY_CLASSIFIED_ACTIONS].filter((a) => !actions.has(a)),
+        ).toEqual([]);
+      });
+    });
+
+    // The classified sets are UNIONS, which would hide an overlap: a family
+    // or action in two buckets is decided by `classifyForLangy`'s branch
+    // order, not by anyone's intent. Disjoint iff the pre-dedup sum equals
+    // the union's size.
+    describe("when a name appears in more than one bucket", () => {
+      it("fails here, so branch order never decides a verdict", async () => {
+        expect(LANGY_FAMILY_BUCKET_TOTAL).toBe(LANGY_CLASSIFIED_FAMILIES.size);
+        expect(LANGY_ACTION_BUCKET_TOTAL).toBe(LANGY_CLASSIFIED_ACTIONS.size);
+      });
+    });
   });
 
   // The owner's rule has three carve-outs, and each is asserted against the
@@ -203,33 +243,46 @@ describe("Langy permission coverage", () => {
 
     describe("when the permission would WRITE the auth scope", () => {
       it("is absent, while the corresponding read stays available", async () => {
+        // Asserted against the policy's own inventory, not a hand-copied
+        // family list — four hand copies of this list existed once, and a
+        // family added to the policy would have missed all of them silently.
         const authScopeWrites = LANGY_CANDIDATE_PERMISSIONS.filter((p) => {
           const [family, action] = p.split(":");
           return (
-            [
-              "organization",
-              "team",
-              "project",
-              "gatewayProviders",
-              "webhookEndpoints",
-              "auditLog",
-              "complianceExport",
-            ].includes(family!) && action !== "view"
+            LANGY_AUTH_SCOPE_FAMILY_NAMES.includes(family!) && action !== "view"
           );
         });
         expect(authScopeWrites).toEqual([]);
 
         // The other half of the rule — "auth scope read is okay" — so that
         // tightening the line above cannot quietly take the reads with it.
-        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:view");
-        // virtualKeys is the one gateway-credential family with full writes
-        // (owner decision, 2026-08-21) — pin it so a tightening of the list
-        // above cannot quietly reclassify it.
-        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:create");
-        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:manage");
-        expect(LANGY_CANDIDATE_PERMISSIONS).not.toContain("virtualKeys:rotate");
+        // Only these two demonstrate it: the other auth-scope families are
+        // org-exclusive, so their reads are `unreachable` at project scope,
+        // not granted (see the org-scoped-binding pin above).
         expect(LANGY_CANDIDATE_PERMISSIONS).toContain("auditLog:view");
         expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
+      });
+    });
+
+    describe("when the family is virtualKeys, the gateway-credential carve-out", () => {
+      it("carries the write surface except the grains that reach rotation", async () => {
+        // virtualKeys has full writes (owner decision, 2026-08-21) — pin it
+        // so a tightening of the auth-scope list cannot quietly reclassify it.
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:view");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:create");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:update");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:delete");
+        // `:manage` is withheld (GRAIN_EXCLUSIONS) because the hierarchy
+        // folds `:rotate` into it — the assertion below is on the EFFECTIVE
+        // grain, so it goes red if anyone re-grants `:manage` and quietly
+        // makes rotation reachable again.
+        expect(LANGY_CANDIDATE_PERMISSIONS).not.toContain("virtualKeys:manage");
+        expect(
+          hasPermissionWithHierarchy(
+            [...LANGY_CANDIDATE_PERMISSIONS],
+            "virtualKeys:rotate",
+          ),
+        ).toBe(false);
       });
     });
 
@@ -240,6 +293,38 @@ describe("Langy permission coverage", () => {
             [":share", ":rotate", ":viewOtherPersonal"].some((suffix) =>
               p.endsWith(suffix),
             ),
+          ),
+        ).toEqual([]);
+
+        // The hierarchy version of the same claim: no candidate IMPLIES an
+        // excluded grain that any route actually enforces. `:manage` expands
+        // to `:rotate` (rbac.ts) — a direct-containment check alone stayed
+        // green while `virtualKeys:manage` made rotation fully reachable at
+        // the door. Scoped to route-demanded grains because the hierarchy
+        // folds `:rotate` into EVERY family's `:manage` as a string
+        // (`analytics:rotate` is well-typed and enforced nowhere).
+        const excludedSuffixes = [":share", ":rotate", ":viewOtherPersonal"];
+        for (const [permission] of permissionsDemandedByRoutes()) {
+          if (!excludedSuffixes.some((s) => permission.endsWith(s))) continue;
+          expect(
+            hasPermissionWithHierarchy(
+              [...LANGY_CANDIDATE_PERMISSIONS],
+              permission,
+            ),
+            `${permission} is reachable through the hierarchy`,
+          ).toBe(false);
+        }
+      });
+    });
+
+    describe("when the family is Langy itself or platform operations", () => {
+      it("is absent at every grain, so a session key can never start Langy turns or touch staff ops", async () => {
+        // `langy:create` gates `POST /api/langy` — a key that carries it can
+        // invoke Langy recursively, and the intersection ceiling bounds
+        // authority, not amplification.
+        expect(
+          LANGY_CANDIDATE_PERMISSIONS.filter(
+            (p) => p.startsWith("langy:") || p.startsWith("ops:"),
           ),
         ).toEqual([]);
       });
@@ -336,16 +421,16 @@ describe("Langy permission coverage", () => {
           ),
           "No monitor DELETE route demands evaluations:manage. Destroying a " +
             "monitor is the destructive grain and must stay behind :manage, " +
-            "which no least-privilege key — Langy's included — can hold",
+            "which a least-privilege key holds only if its owner does",
         ).not.toEqual([]);
 
         expect(
           monitorRoutes("evaluations:manage").filter(
             (route) => !route.startsWith("DELETE "),
           ),
-          "A non-delete monitor route demands evaluations:manage. Langy — and " +
-            "any least-privilege key — can never hold that grain, so this is a " +
-            "403 at the door for an action the product allows on :create",
+          "A non-delete monitor route demands evaluations:manage — a coarser " +
+            "grain than the action needs, so this is a 403 at the door for " +
+            "an action the product allows on :create",
         ).toEqual([]);
       });
     });

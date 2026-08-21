@@ -685,8 +685,13 @@ function refuseApiKeyCeiling({
   const langyVerdict = resolved.isLangySessionKey
     ? classifyForLangy(permission)
     : undefined;
+  // `excluded` (policy refusal) and `unreachable` (org-tier grain on a
+  // project-scoped key) both mean no grant anyone can make will help, so
+  // both get the not-delegable message instead of "widen your key".
   const notDelegableReason =
-    langyVerdict?.disposition === "excluded" ? langyVerdict.reason : undefined;
+    langyVerdict && langyVerdict.disposition !== "granted"
+      ? langyVerdict.reason
+      : undefined;
 
   const meta = {
     apiKeyId: resolved.apiKeyId,
