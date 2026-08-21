@@ -29,6 +29,7 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
+import { computeConfigETag } from "./configETag";
 import { withTierFallthrough } from "./modelTierFallthrough";
 import {
   eligibleModelProvidersForVk,
@@ -305,6 +306,19 @@ export class GatewayConfigMaterialiser {
         routing_policy_name: vk.routingPolicy?.name ?? null,
       },
     };
+  }
+
+  /**
+   * The version token for the bundle this materialiser would build for `vk`.
+   *
+   * It lives beside `materialise` because it describes that output: the token
+   * has to move whenever the bundle would come back different, and the two
+   * drifting apart is what lets a 304 confirm a bundle that is no longer
+   * current. See `configETag.ts` for what it covers and what it leaves to the
+   * change feed.
+   */
+  async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
+    return await computeConfigETag({ prisma: this.prisma, virtualKey: vk });
   }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
