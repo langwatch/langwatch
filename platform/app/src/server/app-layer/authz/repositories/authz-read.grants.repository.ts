@@ -471,7 +471,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  *
  * A row this cannot translate - `lite-member`, `legacy-admin`, a null key
  * (RESOURCE and PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
- * dormant head-only facts the cutover imports (dev/docs/plans/adr-092-authz-delivery-plan.md,
+ * dormant head-only facts the cutover imports (dev/docs/adr/110-grant-aggregates-are-grants.md,
  * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
  * until then their decisions are still inferred from membership by the engine's
  * org-role floor, exactly as they were before the cutover. Translating one into

@@ -921,7 +921,7 @@ are rare, and a re-collect is the same 1-2 queries the engine already does.
 stage names survive only as labels for work already merged: A = the engine
 (#6894), B = the self-migration (#7079). The full delivery detail - shapes,
 event vocabulary, PR bills of materials, pre-flight facts, testing doctrine
-- lives in `dev/docs/plans/adr-092-authz-delivery-plan.md` (21 dated
+- lives in `dev/docs/adr/110-grant-aggregates-are-grants.md` (21 dated
 decisions); what follows is the decision itself.*
 
 **Grants are event-sourced.** The ClickHouse `event_log` is the single
@@ -1035,7 +1035,7 @@ forever; the Grant/Role rename never leaks to the wire.
 
 Delivered as 4+1 PRs (plan doc, "The PR map"): **1** same position
 event-sourced (proof: replaying an org's stream is byte-identical to the
-imperative writer, and `in-place-authz-migration.feature` passes
+imperative writer, and `specs/migration/authz-grants-rollout.feature` passes
 unchanged) · **2** the ledger becomes the only writer (genesis import;
 eight write paths become command emitters; SCIM reconciler; audit
 subscriber) · **3** the cutover machine and the fork · **4** the contract ·
@@ -1198,9 +1198,9 @@ deliberately out of scope.
   lets one engine serve both sides.
 - Spec: `specs/rbac/unified-authorization-engine.feature` (this ADR);
   supersedes the override scenarios in `specs/rbac/scoped-role-bindings.feature`.
-- Delivery plan: [`dev/docs/plans/adr-092-authz-delivery-plan.md`](../plans/adr-092-authz-delivery-plan.md)
-  (21 dated decisions, the final shapes and event vocabulary, the 4+1 PR
-  map, pre-flight facts, testing doctrine).
+- Delivery: [ADR-110](110-grant-aggregates-are-grants.md) carries the final
+  aggregate shapes, event vocabulary and rollout model (the standalone
+  delivery-plan doc was retired into it).
 - Evidence: `dev/docs/security/hono-api-rbac-audit.md` (PR #4283); issues
   #1247, #3388, #3429, #3685, #4008; `git log --since=2026-01-01 --
   langwatch/src/server/api/rbac.ts` (28 commits).

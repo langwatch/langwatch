@@ -370,7 +370,7 @@ export class SystemMigrationsService {
 
   /**
    * Enroll one organization for one registered migration
-   * (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+   * (specs/migration/system-migrations-runner.feature, the enrollment scenarios).
    * Takes effect on the next pass - the runner reads enrollment fresh each
    * time - and refuses rather than lies: off cloud (where a row would change
    * nothing, see MigrationEnrollmentCloudOnlyError), for a migration nothing
@@ -413,7 +413,7 @@ export class SystemMigrationsService {
 
   /**
    * Enroll a sampled cohort for one migration in a single action
-   * (specs/rbac/in-place-authz-migration.feature, the cohort scenarios).
+   * (specs/migration/system-migrations-runner.feature, the cohort scenarios).
    * The pool is every organization not yet enrolled for the migration,
    * minus the ones the platform already knows to leave alone by data
    * rather than by a hand-kept list: an active enterprise subscription, or
@@ -518,7 +518,7 @@ export class SystemMigrationsService {
 
   /**
    * Run one migration for one organization now
-   * (specs/rbac/in-place-authz-migration.feature, "An operator runs one
+   * (specs/migration/system-migrations-runner.feature, "An operator runs one
    * migration for one organization now"). Awaited rather than
    * fire-and-forget - the operator asked about one organization and wants
    * its outcome. Enrollment stays the pacing source of truth on cloud: an
@@ -631,7 +631,7 @@ export class SystemMigrationsService {
 
   /**
    * The operator's rollback: pin a migrated or finalized organization back
-   * onto its legacy path (specs/rbac/in-place-authz-migration.feature, "An
+   * onto its legacy path (specs/migration/system-migrations-runner.feature, "An
    * operator rolls a finalized organization back to its legacy path", "An
    * operator rolls a migrated organization back to its legacy path"), then
    * apply whatever that migration's rollback has to DO.

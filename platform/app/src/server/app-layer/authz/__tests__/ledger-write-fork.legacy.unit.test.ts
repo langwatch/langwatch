@@ -6,7 +6,7 @@
  * to write — and emits nothing, so the deploy is inert until the flip. The
  * ledger side lives in `ledger-write-fork.ledger.unit.test.ts`.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
 import {
   BindingMissingError,

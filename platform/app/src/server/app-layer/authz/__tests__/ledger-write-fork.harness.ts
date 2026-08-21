@@ -8,7 +8,7 @@
  * Each test file mocks `../epoch` itself: vi.mock is per-file, so it cannot
  * live here.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
 import type { LedgerActor } from "@langwatch/actor";
 import { vi } from "vitest";

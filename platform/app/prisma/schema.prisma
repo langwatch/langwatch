@@ -4239,7 +4239,7 @@ model GatewayRealtimeSession {
 // Organization id as a plain column ref (no FK) - the runner is generic
 // over tenants and survives organization deletion trivially. First rider:
 // the ADR-092 stage-B TeamUser backfill (@langwatch/authz-server). Spec:
-// specs/rbac/in-place-authz-migration.feature.
+// specs/migration/authz-grants-rollout.feature.
 model SystemMigrationTenantState {
   migrationName String
   tenantId      String

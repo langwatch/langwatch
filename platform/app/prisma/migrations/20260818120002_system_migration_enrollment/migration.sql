@@ -1,5 +1,5 @@
 -- Which organizations the in-place system migrations runner processes on
--- cloud (specs/rbac/in-place-authz-migration.feature): one row per
+-- cloud (specs/migration/authz-grants-rollout.feature): one row per
 -- (organization, stage), written from the ops migrations page. "migrations"
 -- enrolls an organization for the preparation work (the team-user backfill
 -- and the genesis import); "cutover" enrolls it for the flip onto the

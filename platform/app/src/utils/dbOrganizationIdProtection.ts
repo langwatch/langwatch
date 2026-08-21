@@ -321,7 +321,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   Role: {},
   // Which organizations the in-place migration runner processes on cloud
-  // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+  // (specs/migration/authz-grants-rollout.feature, the enrollment scenarios).
   // The runner's per-pass read and the ops listing are platform-scope by
   // design - the same posture as the ops rollup over
   // SystemMigrationTenantState - so READS are admitted unbounded.

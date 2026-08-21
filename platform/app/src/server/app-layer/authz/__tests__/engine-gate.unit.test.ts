@@ -1,7 +1,7 @@
 /**
  * The per-organization WRITE fork's gate (ADR-092 decision 4).
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

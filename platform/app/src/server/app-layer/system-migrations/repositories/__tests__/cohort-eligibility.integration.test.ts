@@ -5,7 +5,7 @@
  * organization out of the pool, an enrollment row keeps its organization out,
  * and a plain organization stays in.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/system-migrations-runner.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

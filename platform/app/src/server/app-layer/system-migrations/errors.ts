@@ -10,7 +10,7 @@ import { HandledError } from "@langwatch/handled-error";
  * `SystemMigrationsService.rollBack`); anything else never reached the
  * ledger. Every other status is a caller mistake the operator can act on, so
  * both failures are handled errors, not 500s
- * (specs/rbac/in-place-authz-migration.feature, "An operator rolls a
+ * (specs/migration/system-migrations-runner.feature, "An operator rolls a
  * finalized organization back to its legacy path", "An operator rolls a
  * migrated organization back to its legacy path").
  */
@@ -101,7 +101,7 @@ export class MigrationRollbackCutoverNotStartedError extends HandledError {
 }
 
 /**
- * Enrollment failures (specs/rbac/in-place-authz-migration.feature, the
+ * Enrollment failures (specs/migration/system-migrations-runner.feature, the
  * enrollment scenarios). Enrollment is the cloud rollout's pacing lever, so
  * every refusal here is an operator mistake the operator can act on - a
  * handled error with a stable code, never a 500.

@@ -5,7 +5,7 @@
  * router names the migration at the boundary, stamps the acting
  * user from the session, and delegates everything else to
  * `systemMigrationsService`. Corresponds to
- * specs/rbac/in-place-authz-migration.feature (the enrollment scenarios).
+ * specs/migration/authz-grants-rollout.feature (the enrollment scenarios).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
