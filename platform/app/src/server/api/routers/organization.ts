@@ -1,4 +1,5 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -47,7 +48,11 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import { batchScopePermissions, hasOrganizationPermission } from "../rbac";
+import {
+  batchScopePermissions,
+  checkProjectPermission,
+  hasOrganizationPermission,
+} from "../rbac";
 
 const customTeamRoleInputSchema = z
   .string()
@@ -64,6 +69,60 @@ const teamRoleInputSchema = z.union([
   builtInTeamRoleInputSchema,
   customTeamRoleInputSchema,
 ]);
+
+/**
+ * The audit-log read authorizes at the ORGANIZATION tier, always.
+ *
+ * A bare `.permission("auditLog:view")` cannot express this: `auditLog` is
+ * grantable at project/team/organization, and the declared check resolves to
+ * the narrowest tier whose id the input carries. Because `projectId` is an
+ * optional filter here, supplying it would move the whole check to the
+ * project tier and leave `input.organizationId` — the id the query is
+ * anchored on — unauthorized. A caller holding `auditLog:view` on any one
+ * project could then read a different organization's org-scoped audit trail.
+ *
+ * So the org id is checked unconditionally, and when a project filter is
+ * present it is additionally checked at the project tier, so a project-scoped
+ * grant cannot widen a read to rows outside that project either.
+ */
+function checkAuditLogPermission() {
+  const projectCheck = checkProjectPermission("auditLog:view");
+  return declareAuthzMiddleware(
+    {
+      kind: "custom",
+      reason:
+        "the audit-log read is authorized at the organization tier the query is anchored on, never the optional project filter",
+      permissions: ["auditLog:view"],
+    },
+    async (params: {
+      ctx: any;
+      input: { organizationId: string; projectId?: string };
+      next: () => any;
+    }) => {
+      if (
+        !(await hasOrganizationPermission(
+          params.ctx,
+          params.input.organizationId,
+          "auditLog:view",
+        ))
+      ) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to access this organization resource",
+        });
+      }
+      if (params.input.projectId) {
+        return projectCheck({
+          ...params,
+          input: { ...params.input, projectId: params.input.projectId },
+        });
+      }
+      params.ctx.permissionChecked = true;
+      return params.next();
+    },
+  );
+}
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -1284,7 +1343,7 @@ export const organizationRouter = createTRPCRouter({
         targetId: z.string().optional(),
       }),
     )
-    .permission("auditLog:view")
+    .use(checkAuditLogPermission())
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

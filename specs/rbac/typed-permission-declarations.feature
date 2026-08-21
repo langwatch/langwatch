@@ -231,8 +231,27 @@ Feature: Typed permission declarations
   Scenario: Every scope id a procedure accepts is checked or explicitly allowed
     Given a procedure whose input requires a project, team or organization id
     When the declaration sweep walks the router
-    Then the sweep refuses any id no declared check resolves a scope from
+    Then the sweep refuses any id no declared check resolves a scope from,
+      except a named, shrink-only list of known gaps
     And an id a custom middleware enforces must be named by that declaration
+    And a gap on that list that has been closed also fails the sweep, so a
+      fix cannot leave its entry behind
+
+  @unit
+  Scenario: An optional narrower scope id cannot shadow a required wider tier
+    Given a procedure that requires an organization id and also accepts an
+      optional project id
+    And a check declared at the organization tier
+    When the sweep resolves the tier the runtime would pick from the full input
+    Then it sees the optional project id shadow the organization tier
+    And it reports the required organization id as unchecked
+
+  @unit
+  Scenario: A nullable scope id is required, not skipped
+    Given a procedure whose scope id is nullable rather than optional
+    When the sweep decides which ids must be checked
+    Then the nullable id counts as one that reaches the handler
+    And it must be covered like any other required id
 
   @unit
   Scenario: A declaration that cannot resolve a scope from its input fails the sweep

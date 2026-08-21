@@ -30,6 +30,7 @@ import {
   type ScopeTierField,
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
@@ -97,10 +98,17 @@ const OPAQUE_INPUTS: readonly string[] = [
 type Procedure = {
   path: string;
   declaration: AuthzDeclaration | null;
-  /** Scope fields the input requires. Optional ones are not swept: the
-   *  runtime only reads a tier whose id is actually present, and an absent
-   *  optional field addresses nothing. */
+  /** Scope fields that always reach the handler carrying an id — every field
+   *  except a genuinely omittable one (`ZodOptional`, or a union that admits
+   *  `undefined`). A nullable or defaulted field counts as required: the
+   *  first must be sent, the second always arrives with a value, so both are
+   *  ids the handler acts on and both must be covered. */
   requiredScopeFields: ScopeTierField[];
+  /** Every scope field the input can carry, optional ones included. This is
+   *  the set the runtime's `declaredScopeId` actually resolves a tier from,
+   *  so a `.permission()` check is judged against it: an optional narrower id
+   *  can shadow a required wider one and leave the wider tier unchecked. */
+  acceptedScopeFields: ScopeTierField[];
   /** True when the input could not be introspected at all — reported rather
    *  than skipped, so an unreadable schema can never pass by silence. */
   opaqueInput: boolean;
@@ -118,25 +126,41 @@ function unwrap(schema: unknown): any {
   return current;
 }
 
-function isOptional(field: unknown): boolean {
+/**
+ * Whether a field can reach the handler with no value at all.
+ *
+ * Only `ZodOptional` (and a union that admits `undefined`) is absentable. A
+ * `ZodDefault` is omittable on the wire but ALWAYS arrives carrying its
+ * default, and a `ZodNullable` MUST be sent — so both reach the handler as an
+ * id the runtime resolves a tier from, and neither may be skipped. Treating
+ * them as absent was the hole that let a `z.string().nullable()` scope id
+ * ship unchecked while the sweep stayed green.
+ */
+function isAbsentable(field: unknown): boolean {
   const name = (field as any)?._def?.typeName;
+  if (name === "ZodDefault" || name === "ZodNullable") return false;
+  if (name === "ZodOptional") return true;
   return (
-    name === "ZodOptional" ||
-    name === "ZodDefault" ||
-    name === "ZodNullable" ||
-    (typeof (field as any)?.isOptional === "function" &&
-      (field as any).isOptional())
+    typeof (field as any)?.isOptional === "function" &&
+    (field as any).isOptional()
   );
 }
 
+type ScopeFieldSets = {
+  required: ScopeTierField[];
+  accepted: ScopeTierField[];
+};
+
 /**
- * The scope fields one parser REQUIRES. Null when the schema cannot be read,
- * which the caller reports rather than treating as "no scope fields".
+ * The scope fields one parser requires and the fields it can carry at all.
+ * Null when the schema cannot be read, which the caller reports rather than
+ * treating as "no scope fields".
  *
  * A union requires a field only when every member does — a member that omits
- * it can be sent without one, so the sweep must not assume it is there.
+ * it can be sent without one — but accepts a field that ANY member carries,
+ * since the runtime resolves a tier from whichever arrived.
  */
-function requiredScopeFieldsOf(parser: unknown): ScopeTierField[] | null {
+function scopeFieldsOf(parser: unknown): ScopeFieldSets | null {
   const schema = unwrap(parser);
   const typeName = schema?._def?.typeName;
 
@@ -145,34 +169,49 @@ function requiredScopeFieldsOf(parser: unknown): ScopeTierField[] | null {
       schema._def.options instanceof Map
         ? [...schema._def.options.values()]
         : (schema._def.options ?? []);
-    const perMember = options.map(requiredScopeFieldsOf);
+    const perMember = options.map(scopeFieldsOf);
     if (perMember.some((member) => member === null)) return null;
-    const [first, ...rest] = perMember as ScopeTierField[][];
-    if (!first) return [];
-    return first.filter((field) =>
-      rest.every((member) => member.includes(field)),
-    );
+    const members = perMember as ScopeFieldSets[];
+    const [first, ...rest] = members;
+    if (!first) return { required: [], accepted: [] };
+    return {
+      required: first.required.filter((field) =>
+        rest.every((member) => member.required.includes(field)),
+      ),
+      accepted: [...new Set(members.flatMap((member) => member.accepted))],
+    };
   }
 
   const shape =
     typeof schema?.shape === "function" ? schema.shape() : schema?.shape;
   if (!shape || typeof shape !== "object") return null;
 
-  return SCOPE_FIELDS.filter(
-    (field) => field in shape && !isOptional(shape[field]),
-  );
+  return {
+    required: SCOPE_FIELDS.filter(
+      (field) => field in shape && !isAbsentable(shape[field]),
+    ),
+    accepted: SCOPE_FIELDS.filter((field) => field in shape),
+  };
 }
 
 /** The scope fields a declaration actually causes to be checked. */
 function coveredScopeFields({
   declaration,
-  present,
+  required,
+  accepted,
 }: {
   declaration: AuthzDeclaration;
-  present: ScopeTierField[];
+  /** Fields that always arrive — the set a custom middleware is trusted to
+   *  check, since its enforcement is opaque to the sweep. */
+  required: ScopeTierField[];
+  /** Every field the input can carry — the set a declared `.permission()`
+   *  resolves its tier from at runtime, so the sweep judges those kinds
+   *  against it to see the tier the runtime will actually pick. */
+  accepted: ScopeTierField[];
 }): ScopeTierField[] {
   const forPermission = (
     permission: AuthzPermission,
+    present: ScopeTierField[],
     via?: ScopeTierField,
   ): ScopeTierField[] => {
     // `via` names the id the check resolves its scope FROM, so that id is
@@ -192,13 +231,23 @@ function coveredScopeFields({
   };
 
   switch (declaration.kind) {
+    // The declared kinds resolve their tier at runtime through
+    // `declaredScopeId`, narrowest present id first, over the whole parsed
+    // input — so they are judged against `accepted`, the set that includes the
+    // optional narrower ids that can shadow a required wider one.
     case "permission":
-      return forPermission(declaration.permission, declaration.via);
+      return forPermission(declaration.permission, accepted, declaration.via);
     case "permission-any":
+      return declaration.permissions.flatMap((permission) =>
+        forPermission(permission, accepted),
+      );
+    // A custom or service-authorized middleware runs its OWN enforcement,
+    // opaque to the sweep, so its declared permissions are trusted against the
+    // fields that always arrive rather than resolved positionally.
     case "service-authorized":
     case "custom":
       return declaration.permissions.flatMap((permission) =>
-        forPermission(permission),
+        forPermission(permission, required),
       );
     case "no-permission":
       return Object.keys(declaration.allow ?? {}) as ScopeTierField[];
@@ -218,15 +267,20 @@ function collectProcedures(): Procedure[] {
         .find((found: AuthzDeclaration | null) => found !== null) ?? null;
 
     const inputs: unknown[] = def.inputs ?? [];
-    const perInput = inputs.map(requiredScopeFieldsOf);
+    const perInput = inputs.map(scopeFieldsOf);
+    const readable = perInput.filter(Boolean) as ScopeFieldSets[];
     return {
       path,
       declaration,
       opaqueInput: perInput.some((fields) => fields === null),
       // tRPC intersects chained `.input()` calls, so a field required by any
-      // of them is required overall.
+      // of them is required overall, and a field any of them accepts is
+      // accepted overall.
       requiredScopeFields: [
-        ...new Set((perInput.filter(Boolean) as ScopeTierField[][]).flat()),
+        ...new Set(readable.flatMap((fields) => fields.required)),
+      ],
+      acceptedScopeFields: [
+        ...new Set(readable.flatMap((fields) => fields.accepted)),
       ],
     };
   });
@@ -253,7 +307,8 @@ describe("tRPC authz declaration sweep", () => {
         .flatMap((procedure) => {
           const covered = coveredScopeFields({
             declaration: procedure.declaration!,
-            present: procedure.requiredScopeFields,
+            required: procedure.requiredScopeFields,
+            accepted: procedure.acceptedScopeFields,
           });
           return procedure.requiredScopeFields
             .filter((field) => !covered.includes(field))
@@ -275,7 +330,8 @@ describe("tRPC authz declaration sweep", () => {
         .filter((procedure) => {
           const covered = coveredScopeFields({
             declaration: procedure.declaration!,
-            present: procedure.requiredScopeFields,
+            required: procedure.requiredScopeFields,
+            accepted: procedure.acceptedScopeFields,
           });
           return covered.length === 0;
         })
@@ -296,6 +352,49 @@ describe("tRPC authz declaration sweep", () => {
         .sort();
 
       expect(opaque).toEqual(OPAQUE_INPUTS);
+    });
+  });
+
+  describe("given a declared check whose tier an optional narrower id shadows", () => {
+    /** @scenario "An optional narrower scope id cannot shadow a required wider tier" */
+    it("reports the required wider id as unchecked", () => {
+      // The getAuditLogs class: an org-tier permission declared on an input
+      // that requires organizationId but also accepts an optional projectId.
+      // `declaredScopeId` resolves narrowest-present first, so a supplied
+      // projectId moves the check to the project tier and the required
+      // organizationId — the id the query is anchored on — goes unchecked.
+      const covered = coveredScopeFields({
+        declaration: { kind: "permission", permission: "auditLog:view" },
+        required: ["organizationId"],
+        accepted: ["organizationId", "projectId"],
+      });
+
+      expect(covered).toEqual(["projectId"]);
+      expect(covered).not.toContain("organizationId");
+    });
+
+    it("keeps the wider id covered when no narrower id is accepted", () => {
+      const covered = coveredScopeFields({
+        declaration: { kind: "permission", permission: "auditLog:view" },
+        required: ["organizationId"],
+        accepted: ["organizationId"],
+      });
+
+      expect(covered).toEqual(["organizationId"]);
+    });
+  });
+
+  describe("given a scope id that is nullable rather than optional", () => {
+    /** @scenario "A nullable scope id is required, not skipped" */
+    it("treats a ZodNullable field as required and a ZodOptional field as absentable", () => {
+      const nullable = z.object({ projectId: z.string().nullable() });
+      const optional = z.object({ projectId: z.string().optional() });
+      const defaulted = z.object({ projectId: z.string().default("") });
+
+      expect(scopeFieldsOf(nullable)?.required).toEqual(["projectId"]);
+      expect(scopeFieldsOf(defaulted)?.required).toEqual(["projectId"]);
+      expect(scopeFieldsOf(optional)?.required).toEqual([]);
+      expect(scopeFieldsOf(optional)?.accepted).toEqual(["projectId"]);
     });
   });
 });
