@@ -26,8 +26,16 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+
 import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
-import { classifyForLangy } from "../langyPermissionPolicy";
+import {
+  ALL_PERMISSION_ACTIONS,
+  ALL_PERMISSION_FAMILIES,
+  LANGY_CLASSIFIED_ACTIONS,
+  LANGY_CLASSIFIED_FAMILIES,
+  classifyForLangy,
+} from "../langyPermissionPolicy";
 import {
   experimentRoutePermissions,
   permissionsDemandedByRoutes,
@@ -37,6 +45,12 @@ import {
  * Permissions a route demands, the policy says Langy may hold, and the mint
  * nonetheless does not ask for — each rendered with the routes that demand it,
  * so a failure names the route rather than just the grain.
+ *
+ * Org-exclusive permissions are handled by their own pin below rather than
+ * here. They are not an oversight the mint can fix: `bindingScopeCanGrant`
+ * (rbac.ts:190-196) refuses them on the PROJECT-scoped binding the session key
+ * is minted with, so adding them to the candidate list would change nothing
+ * except the length of the list.
  */
 function grantedByPolicyButNotByTheMint(): string[] {
   const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
@@ -46,10 +60,37 @@ function grantedByPolicyButNotByTheMint(): string[] {
     .filter(
       ([permission]) => classifyForLangy(permission).disposition === "granted",
     )
+    .filter(([permission]) => !isOrgExclusivePermission(permission as Permission))
     .map(
       ([permission, routes]) =>
         `${permission} — demanded by ${routes.join(", ")}`,
     );
+}
+
+/**
+ * The routes Langy cannot reach for a reason that is NOT its permission policy:
+ * the policy would allow the grain, but the credential is project-scoped and
+ * the resource is org-tier-only.
+ *
+ * Pinned as an explicit inventory rather than filtered away silently, because
+ * this is the one class of Langy refusal that no amount of editing
+ * `langyPermissionPolicy.ts` will fix — it needs an ORGANIZATION-scoped binding
+ * on the minted key, which is a change to the credential's shape and a
+ * deliberately separate decision. Until that decision is made, this list IS the
+ * answer to "why did Langy say it couldn't list our org members?", and it
+ * should fail loudly when it grows rather than absorbing a new refusal quietly.
+ */
+function reachableOnlyWithAnOrgScopedBinding(): string[] {
+  const granted = new Set<string>(LANGY_CANDIDATE_PERMISSIONS);
+
+  return [...permissionsDemandedByRoutes()]
+    .filter(([permission]) => !granted.has(permission))
+    .filter(
+      ([permission]) => classifyForLangy(permission).disposition === "granted",
+    )
+    .filter(([permission]) => isOrgExclusivePermission(permission as Permission))
+    .map(([permission]) => permission)
+    .sort();
 }
 
 /** Permissions the mint asks for that the policy says Langy must never hold. */
@@ -89,6 +130,119 @@ describe("Langy permission coverage", () => {
         ).toEqual([]);
       });
     });
+
+    describe("when the resource is organization-tier but the key is project-scoped", () => {
+      it("names the routes no policy edit can unlock, so an unreachable route is never mistaken for an unclassified one", async () => {
+        // An EXACT pin, not a subset check. Growth here means a new route was
+        // put behind an org-tier permission, which silently costs Langy a
+        // capability the policy believes it has — the failure should be the
+        // first anyone hears of it.
+        expect(reachableOnlyWithAnOrgScopedBinding()).toEqual([
+          "activityMonitor:view",
+          "aiTools:manage",
+          "aiTools:view",
+          "gatewaySpend:manage",
+          "gatewaySpend:view",
+          "ingestionSources:view",
+          "organization:view",
+          "webhookEndpoints:view",
+        ]);
+      });
+    });
+  });
+
+  // The partition checks. These are what let the rest of the policy be a
+  // BLOCKLIST without being fail-open: a family or action invented next quarter
+  // lands in no bucket, and CI goes red naming it, instead of it being granted
+  // by default (unsafe) or refused in silence for a quarter (the original bug).
+  describe("given the permission universe rbac.ts declares", () => {
+    describe("when a family has not been classified for Langy", () => {
+      it("fails here, so a new resource family cannot be granted by default nor refused in silence", async () => {
+        expect(
+          ALL_PERMISSION_FAMILIES.filter(
+            (family) => !LANGY_CLASSIFIED_FAMILIES.has(family),
+          ),
+          "These families exist in rbac.ts `Resources` but no Langy bucket " +
+            "claims them. Put each in FULL_ACCESS_FAMILIES, " +
+            "AUTH_SCOPE_FAMILIES, or FULLY_EXCLUDED_FAMILIES",
+        ).toEqual([]);
+      });
+    });
+
+    describe("when an action has not been classified for Langy", () => {
+      it("fails here, so a new action cannot be swept into the candidate list unassessed", async () => {
+        expect(
+          ALL_PERMISSION_ACTIONS.filter(
+            (action) => !LANGY_CLASSIFIED_ACTIONS.has(action),
+          ),
+          "These actions exist in rbac.ts `Actions` but no Langy bucket " +
+            "claims them. Put each in DELEGABLE_ACTIONS or ACTION_EXCLUSIONS",
+        ).toEqual([]);
+      });
+    });
+  });
+
+  // The owner's rule has three carve-outs, and each is asserted against the
+  // RESOLVED candidate list rather than the source text of the policy. A
+  // regex over `langyPermissionPolicy.ts` would have passed while the list
+  // itself was wrong — that is a mistake this codebase has already made once
+  // in an IAM suite, where 16/16 string assertions stayed green through an
+  // added wildcard privilege.
+  describe("given the boundaries the owner drew", () => {
+    describe("when the permission would read a stored secret", () => {
+      it("is absent from the candidate list at every grain, including view", async () => {
+        expect(
+          LANGY_CANDIDATE_PERMISSIONS.filter((p) => p.startsWith("secrets:")),
+        ).toEqual([]);
+      });
+    });
+
+    describe("when the permission would WRITE the auth scope", () => {
+      it("is absent, while the corresponding read stays available", async () => {
+        const authScopeWrites = LANGY_CANDIDATE_PERMISSIONS.filter((p) => {
+          const [family, action] = p.split(":");
+          return (
+            ["organization", "team", "project", "virtualKeys", "gatewayProviders", "webhookEndpoints", "auditLog", "complianceExport"].includes(
+              family!,
+            ) && action !== "view"
+          );
+        });
+        expect(authScopeWrites).toEqual([]);
+
+        // The other half of the rule — "auth scope read is okay" — so that
+        // tightening the line above cannot quietly take the reads with it.
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:view");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("auditLog:view");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
+      });
+    });
+
+    describe("when the action escapes the user-permission ceiling", () => {
+      it("is absent, because 'the caller could have done it too' does not bound public disclosure or credential rotation", async () => {
+        expect(
+          LANGY_CANDIDATE_PERMISSIONS.filter((p) =>
+            [":share", ":rotate", ":viewOtherPersonal"].some((suffix) =>
+              p.endsWith(suffix),
+            ),
+          ),
+        ).toEqual([]);
+      });
+    });
+
+    describe("when the family is ordinary tenant data", () => {
+      it("carries the full write surface, which is the widening this policy exists to express", async () => {
+        for (const permission of [
+          "datasets:delete",
+          "prompts:manage",
+          "scenarios:delete",
+          "triggers:create",
+          "workflows:manage",
+          "experiments:update",
+        ]) {
+          expect(LANGY_CANDIDATE_PERMISSIONS).toContain(permission);
+        }
+      });
+    });
   });
 
   // A route marked with the wrong `credential` is INVISIBLE rather than wrong:
@@ -114,8 +268,11 @@ describe("Langy permission coverage", () => {
         // by a key when the CLI reaches it every day.
         expect(reachable).toContain("evaluations:view");
         expect(reachable).toContain("evaluations:create");
-        // The session-only execute route must NOT leak in: Langy holds a key,
-        // never a browser session, and that route demands the manage grain.
+        // The session-only execute route must NOT leak into the API-key
+        // surface. This is a pin on the route's `credential` classification,
+        // not on Langy's grants — Langy may hold `evaluations:manage` now, but
+        // a session-only route that starts reading as key-reachable means a
+        // policy was misfiled, which is the drift this test exists to catch.
         expect(reachable).not.toContain("evaluations:manage");
       });
     });

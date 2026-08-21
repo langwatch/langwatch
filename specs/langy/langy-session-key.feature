@@ -46,22 +46,33 @@ Feature: Per-session caller-scoped Langy key
     Then Langy lists them
     And Langy is not refused for a permission I already hold
 
-  Scenario: Langy can start an experiment run without being able to delete experiments
-    Given I can run experiments in my project
-    When I ask Langy to run one
-    Then the run starts
-    And Langy still cannot delete my evaluations
-
   Scenario: Langy is never refused something it is meant to be able to do for me
     Given a task Langy is trusted to do on my behalf, on data I can already reach
     When I ask Langy to do it
     Then Langy is not turned away for lacking permission
 
-  Scenario: Langy cannot delete my work, even though I can
+  # The line, as the owner drew it (2026-08-21): Langy does everything on the
+  # project's data — create, update, delete, manage — and never WRITES the auth
+  # scope (members and roles, credentials, the org's billing). Auth-scope reads
+  # are allowed; secrets have no safe read at all. The user's own permissions
+  # remain the ceiling for all of it.
+  Scenario: Langy can delete my work, because I can
     Given I can delete my own prompts
+    When I ask Langy to delete one
+    Then the prompt is deleted
+    And nothing I did not name is touched
+
+  Scenario: Langy cannot delete my work when I cannot
+    Given I cannot delete prompts in this project
     When I ask Langy to delete one
     Then Langy cannot, and says so
     And the prompt is still there
+
+  Scenario: Langy cannot change who can do what, even though I can
+    Given I can manage my organization's members and roles
+    When I ask Langy to change a member's role
+    Then Langy cannot, and says so
+    And the member's role is unchanged
 
   Scenario: Langy cannot read my project's secrets, even though I can
     Given I can read my project's secrets

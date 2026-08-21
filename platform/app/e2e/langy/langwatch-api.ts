@@ -218,9 +218,41 @@ export async function listMonitors(): Promise<
 }
 
 /**
- * Cleanup for the monitor scenario. Langy's own session key cannot delete —
- * that grain is withheld from it on purpose — but the suite runs with a full
- * project key, so the test can tidy up after itself.
+ * Seeds an evaluator for the delete scenario, so the deletion has a known,
+ * suite-owned target rather than gambling on whatever the project contains.
+ * The `evaluatorType` must be one the platform validates
+ * (`langevals/exact_match` costs nothing and needs no model config).
+ */
+export async function createEvaluator(
+  name: string,
+): Promise<{ id: string; name: string }> {
+  return lwPost({
+    path: "/api/evaluators",
+    body: { name, config: { evaluatorType: "langevals/exact_match" } },
+  });
+}
+
+/**
+ * Teardown for the delete scenario's seeded evaluator, for the runs where
+ * Langy failed to delete it (which is exactly the failing case, so the leak
+ * happens precisely when the suite is red). Already-gone is the desired end
+ * state — on a passing run Langy removed it during the scenario.
+ */
+export async function deleteEvaluator(id: string): Promise<void> {
+  const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
+    method: "DELETE",
+    headers: { "X-Auth-Token": LW_KEY },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.ok || response.status === 404) return;
+  throw new Error(
+    `Failed to delete seeded evaluator ${id}: ${response.status} ${response.statusText}`,
+  );
+}
+
+/**
+ * Cleanup for the monitor scenario. The suite runs with a full project key,
+ * so it can tidy up regardless of what the scenario under test managed to do.
  *
  * A monitor that is already gone (404) is the desired end state, not a failure.
  * Everything else throws. Swallowing the error would be worse than a noisy
