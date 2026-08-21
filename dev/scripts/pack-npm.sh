@@ -295,7 +295,9 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   # matches at any depth in all of them, and the guard being complete for the
   # others was previously true only by accident (none happened to contain a
   # dir named like an exclude). Runtime source only: tests, fixtures and the
-  # secret-shaped names the excludes above deliberately strip are filtered.
+  # secret-shaped names the excludes above deliberately strip are filtered,
+  # as are ignore files: EXCLUDES drops .gitignore/.npmignore on purpose (see
+  # the comment there), so a tracked one is absent by design, not missing.
   # -c core.quotePath=false: git quotes non-ASCII paths by default, which
   # would never match the tar listing and read as missing source. The
   # `|| true` keeps a fully-filtered grep (exit 1) from aborting the script
@@ -307,7 +309,7 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
       packages/handled-error/src packages/langy/src \
       packages/system-migrations/src \
       skills dev/scripts \
-    | { grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' || true; } | sort > "$tracked"
+    | { grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$|(^|/)\.(git|npm)ignore$' || true; } | sort > "$tracked"
   missing="$(comm -23 "$tracked" "$in_tar")"
   rm -f "$in_tar" "$tracked"
   if [ -n "$missing" ]; then
