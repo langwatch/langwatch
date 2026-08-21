@@ -50,8 +50,10 @@ import {
 } from "../enterprise";
 import {
   batchScopePermissions,
+  checkOrganizationPermission,
   checkProjectPermission,
   hasOrganizationPermission,
+  type PermissionMiddlewareParams,
 } from "../rbac";
 
 const customTeamRoleInputSchema = z
@@ -86,6 +88,7 @@ const teamRoleInputSchema = z.union([
  * grant cannot widen a read to rows outside that project either.
  */
 function checkAuditLogPermission() {
+  const organizationCheck = checkOrganizationPermission("auditLog:view");
   const projectCheck = checkProjectPermission("auditLog:view");
   return declareAuthzMiddleware(
     {
@@ -94,32 +97,18 @@ function checkAuditLogPermission() {
         "the audit-log read is authorized at the organization tier the query is anchored on, never the optional project filter",
       permissions: ["auditLog:view"],
     },
-    async (params: {
-      ctx: any;
-      input: { organizationId: string; projectId?: string };
-      next: () => any;
-    }) => {
-      if (
-        !(await hasOrganizationPermission(
-          params.ctx,
-          params.input.organizationId,
-          "auditLog:view",
-        ))
-      ) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to access this organization resource",
-        });
-      }
-      if (params.input.projectId) {
-        return projectCheck({
-          ...params,
-          input: { ...params.input, projectId: params.input.projectId },
-        });
-      }
-      params.ctx.permissionChecked = true;
-      return params.next();
+    async (
+      params: PermissionMiddlewareParams<{
+        organizationId: string;
+        projectId?: string;
+      }>,
+    ) => {
+      const { projectId } = params.input;
+      if (!projectId) return organizationCheck(params);
+      return organizationCheck({
+        ...params,
+        next: () => projectCheck({ ...params, input: { projectId } }),
+      });
     },
   );
 }

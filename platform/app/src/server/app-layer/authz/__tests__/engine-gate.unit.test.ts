@@ -91,13 +91,12 @@ describe("the authz engine gate", () => {
       ).resolves.toBe(false);
     });
 
-    /**
-     * The gate cannot count this itself: prom-client runs at import time and
-     * the browser imports this module through `rbac.ts`, so the counter lives
-     * in the server composition and reaches the gate as an installed reporter.
-     * What the gate owes is the CALL — that a failed read is reported at all,
-     * with the organization and the window it reopened.
-     */
+    // The gate cannot count this itself: prom-client runs at import time and
+    // the browser imports this module through `rbac.ts`, so the counter lives
+    // in the server composition and reaches the gate as an installed reporter.
+    // What the gate owes is the CALL — that a failed read is reported at all,
+    // with the organization and the window it reopened.
+    /** @scenario "A failed migration-state read is reported" */
     it("reports the failure so a reopened legacy-fallback window is observable", async () => {
       const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
       const prisma = {

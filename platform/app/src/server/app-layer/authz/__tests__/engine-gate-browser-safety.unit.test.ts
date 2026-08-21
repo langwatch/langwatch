@@ -63,17 +63,16 @@ describe("the authz engine gate's browser safety", () => {
   });
 
   describe("given the server composition", () => {
-    /**
-     * Naming the installer is not enough — one that is defined and never
-     * called is exactly as silent as no installer at all.
-     *
-     */
-    /** @scenario "A failed migration-state read is reported" */
+    // Supplementary wiring tripwire. What the installed reporter DOES is
+    // pinned behaviourally in engine-gate-reporting.unit.test.ts; the gate's
+    // side is pinned in engine-gate.unit.test.ts. What neither can see is
+    // whether the composition root calls the installer at all — presets.ts is
+    // too heavy to import in a unit test — and an installer defined but never
+    // called is exactly as silent as none. So this checks only the call site.
     it("installs the real failure reporter rather than leaving the no-op", () => {
       const presets = readFileSync(join(AUTHZ_DIR, "..", "presets.ts"), "utf8");
 
-      expect(presets).toContain("setAuthzEngineGateFailureReporter");
-      expect(presets).toContain("installAuthzEngineGateReporting();");
+      expect(presets).toContain("installAuthzEngineGateReporting()");
     });
   });
 });

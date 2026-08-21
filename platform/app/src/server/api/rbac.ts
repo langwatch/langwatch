@@ -540,7 +540,7 @@ export type PermissionResult = {
 // MIDDLEWARE & CONTEXT HELPERS
 // ============================================================================
 
-type PermissionMiddlewareParams<InputType> = {
+export type PermissionMiddlewareParams<InputType> = {
   ctx: {
     prisma: PrismaClient;
     session: Session;

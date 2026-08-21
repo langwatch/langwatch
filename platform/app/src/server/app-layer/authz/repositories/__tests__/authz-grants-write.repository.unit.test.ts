@@ -243,7 +243,6 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
     // When the guard wins (the common path), the event's own row is the
     // authoritative state, so no re-read is issued — the compat binding is
     // written straight from the event.
-    /** @scenario "A grant written to the projection is readable on the legacy head" */
     it("skips the re-read when the guard won and writes compat from the event", async () => {
       const { repository, prisma } = build();
 
@@ -253,7 +252,11 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       } as GrantProjectionWrite);
 
       expect(prisma.grant.findUnique).not.toHaveBeenCalled();
-      expect(prisma.roleBinding.upsert).toHaveBeenCalled();
+      expect(prisma.roleBinding.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG, id: "grant_1" },
+        }),
+      );
     });
 
     /**

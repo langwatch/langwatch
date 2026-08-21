@@ -82,14 +82,11 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
   });
 
   describe("when the migration has finished", () => {
-    /**
-     * Finishing IS the switch (ADR-110), so the engine answers and the
-     * legacy rows are not consulted at all. This is the half the old
-     * four-state matrix could not express: it predated a world where any
-     * status moved the organization off this path.
-     *
-     * @scenario "A migrated organization is decided by the engine"
-     */
+    // Finishing IS the switch (ADR-110), so the engine answers and the legacy
+    // rows are not consulted at all. This is the half the old four-state
+    // matrix could not express: it predated a world where any status moved the
+    // organization off this path.
+    /** @scenario "A cut-over organization is decided by the engine" */
     it("stops consulting the legacy row", async () => {
       mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue({
         status: "migrated",

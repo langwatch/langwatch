@@ -1188,13 +1188,11 @@ export class GrantsLedgerWriter {
     // enumerate, so revoking only the ids `roleBinding.findMany` returns would
     // leave those resolving. Mirror `offboardMember`: union the compat ids
     // with the Grant-head rows the same filter names.
-    const [bindingRows, grantWhere] = [
-      await this.prisma.roleBinding.findMany({
-        where: legacyWhere,
-        select: { id: true },
-      }),
-      grantWhereFromBindingWhere(where, organizationId),
-    ];
+    const bindingRows = await this.prisma.roleBinding.findMany({
+      where: legacyWhere,
+      select: { id: true },
+    });
+    const grantWhere = grantWhereFromBindingWhere(where, organizationId);
     const grantRows = grantWhere
       ? await this.prisma.grant.findMany({
           where: grantWhere,

@@ -49,9 +49,17 @@ describe("given an organization past the genesis import", () => {
         },
         select: { id: true },
       });
-      // Both ids are revoked, the shared one only once.
+      // Both ids are revoked, the shared one only once, via the synchronous
+      // deny (decision 7): a tenant-scoped mark of the authoritative rows.
       expect(count).toBe(2);
-      expect(db.grant.updateMany).toHaveBeenCalled();
+      expect(db.grant.updateMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          id: { in: ["grant_compat", "grant_no_compat"] },
+          revokedAt: null,
+        },
+        data: expect.objectContaining({ revokedReason: "revocation" }),
+      });
     });
   });
 

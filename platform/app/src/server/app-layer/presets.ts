@@ -138,9 +138,8 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
-import { setAuthzEngineGateFailureReporter } from "./authz/engine-gate";
+import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
-import { authzEngineGateReadFailuresTotal } from "./authz/metrics";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
@@ -378,27 +377,6 @@ export function initializeWorkerApp(): App {
  */
 export function initializeInProcessApp(): App {
   return initializeDefaultApp({ processRole: "all" });
-}
-
-/**
- * Give the authz engine gate its failure reporting.
- *
- * The gate itself cannot log or count: `rbac.ts` imports it and the browser
- * imports `rbac.ts`, so a module-scope pino logger or prom-client counter
- * there kills the client bundle at import time. It therefore ships with a
- * no-op reporter and the server installs the real one here — which is the
- * only reason a reopened legacy-fallback window is visible at all.
- * `presets.authz-gate-reporting.unit.test.ts` asserts this ran.
- */
-function installAuthzEngineGateReporting(): void {
-  const gateLogger = createLogger("langwatch:authz:engine-gate");
-  setAuthzEngineGateFailureReporter(({ organizationId, error, ttlMs }) => {
-    gateLogger.warn(
-      { organizationId, error, ttlMs },
-      "could not read the authz migration state; this organization stays on the legacy path until the cache expires",
-    );
-    authzEngineGateReadFailuresTotal.inc();
-  });
 }
 
 export function initializeDefaultApp(options?: {
