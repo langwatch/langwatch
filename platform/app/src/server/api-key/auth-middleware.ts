@@ -629,10 +629,13 @@ export function collectAuthDiagnostics(c: {
  * project-scoped key) both mean no grant anyone can make will help, so both
  * get the not-delegable message instead of "widen your key".
  */
-function langyNotDelegableReason(
-  resolved: ResolvedToken & { type: "apiKey" },
-  permission: Permission,
-): string | undefined {
+function langyNotDelegableReason({
+  resolved,
+  permission,
+}: {
+  resolved: ResolvedToken & { type: "apiKey" };
+  permission: Permission;
+}): string | undefined {
   if (!resolved.isLangySessionKey) return undefined;
   const verdict = classifyForLangy(permission);
   return verdict.disposition !== "granted" ? verdict.reason : undefined;
@@ -672,7 +675,10 @@ export async function enforceApiKeyCeiling({
   });
 
   if (!allowed) {
-    const notDelegableReason = langyNotDelegableReason(resolved, permission);
+    const notDelegableReason = langyNotDelegableReason({
+      resolved,
+      permission,
+    });
 
     permissionLogger.warn(
       {

@@ -173,8 +173,9 @@ export const LANGY_DELETE_REQUEST_CRITERIA = [
  * (operating the project's gateway), gateway VIRTUAL keys (full-access —
  * owner decision, 2026-08-21 — minting one for a caller who could mint it by
  * hand is driving the gateway, not administering the org), deletion (an
- * ordinary write), and reading the audit log or org membership (auth scope
- * READS are allowed).
+ * ordinary write), and reading the audit log (auth scope READS are allowed —
+ * though the org-TIER ones, org membership included, do not resolve on a
+ * project-scoped key, so they are unreachable rather than refused).
  */
 export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   "Langy declines in a line, naming what it does not do (administering the organization) rather than describing an error, an outage, or a missing configuration.",

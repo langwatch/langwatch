@@ -379,16 +379,6 @@ export function splitPermission(permission: string): {
 }
 
 /**
- * Should Langy be able to hold this permission on the caller's behalf?
- *
- * Fail-closed on anything unrecognised, and "anything" is meant literally: an
- * excluded action, an unclassified family, and a string that is not
- * `resource:action` at all each come back `excluded` with a reason. The rule
- * can therefore only ever be too strict, and being too strict shows up as a
- * reviewer having to classify a family — never as a silently over-broad
- * credential.
- */
-/**
  * The grain-level exclusions `classifyForLangy` consults after the action and
  * fully-excluded-family checks: single withheld grains (`GRAIN_EXCLUSIONS`)
  * and actions that only mean anything on one family. `Permission` is a
@@ -413,6 +403,16 @@ function grainExclusionReason(
   return undefined;
 }
 
+/**
+ * Should Langy be able to hold this permission on the caller's behalf?
+ *
+ * Fail-closed on anything unrecognised, and "anything" is meant literally: an
+ * excluded action, an unclassified family, and a string that is not
+ * `resource:action` at all each come back `excluded` with a reason. The rule
+ * can therefore only ever be too strict, and being too strict shows up as a
+ * reviewer having to classify a family — never as a silently over-broad
+ * credential.
+ */
 export function classifyForLangy(
   permission: Permission | string,
 ): LangyPermissionVerdict {
