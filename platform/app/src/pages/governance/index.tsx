@@ -444,11 +444,7 @@ function GovernanceOverviewPage() {
               title="Spend by department"
               subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
               actions={
-                <Link
-                  href="/governance/people"
-                  color="blue.600"
-                  fontSize="sm"
-                >
+                <Link href="/governance/people" color="blue.600" fontSize="sm">
                   Manage departments →
                 </Link>
               }
@@ -502,7 +498,10 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/inventory?tab=sources" color="blue.600">
+                    <Link
+                      href="/governance/inventory?tab=sources"
+                      color="blue.600"
+                    >
                       + Add a source
                     </Link>
                   )}
@@ -878,7 +877,10 @@ function SourceChip({ source }: { source: SourceHealth }) {
     ] ?? "fg.muted";
 
   return (
-    <Link href="/governance/inventory?tab=sources" _hover={{ textDecoration: "none" }}>
+    <Link
+      href="/governance/inventory?tab=sources"
+      _hover={{ textDecoration: "none" }}
+    >
       <HStack
         borderWidth="1px"
         borderColor="border.muted"
