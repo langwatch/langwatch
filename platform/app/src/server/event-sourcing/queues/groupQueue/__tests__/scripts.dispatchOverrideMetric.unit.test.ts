@@ -123,6 +123,39 @@ describe("dispatchBatch override accounting", () => {
         expect(dispatched).toHaveLength(1);
         expect(await overrideCount()).toBe(0);
       });
+
+      /** @scenario "A saturated fleet records no override dispatches" */
+      it("ignores a count that arrives without the jobs it claims", async () => {
+        const scripts = scriptsReturning([null, 2]);
+
+        const dispatched = await dispatch(scripts);
+
+        expect(dispatched).toEqual([]);
+        expect(await overrideCount()).toBe(0);
+      });
+
+      /** @scenario "A saturated fleet records no override dispatches" */
+      it("ignores a count larger than the batch it rode in on", async () => {
+        const scripts = scriptsReturning([[...jobTuple("a")], 5]);
+
+        const dispatched = await dispatch(scripts);
+
+        expect(dispatched).toHaveLength(1);
+        expect(await overrideCount()).toBe(0);
+      });
+
+      /** @scenario "A saturated fleet records no override dispatches" */
+      it("dispatches nothing from a reply with partial tuples", async () => {
+        const scripts = scriptsReturning([
+          [...jobTuple("a"), "orphan-field"],
+          1,
+        ]);
+
+        const dispatched = await dispatch(scripts);
+
+        expect(dispatched).toEqual([]);
+        expect(await overrideCount()).toBe(0);
+      });
     });
   });
 });

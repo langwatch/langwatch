@@ -2222,16 +2222,28 @@ export class GroupStagingScripts {
 
     const [rawResults, rawOverride] = result as [unknown, unknown];
     const flat = Array.isArray(rawResults) ? rawResults : [];
-    const overrideDispatched = Number(rawOverride);
 
-    if (Number.isFinite(overrideDispatched) && overrideDispatched > 0) {
+    // A layout the script cannot produce (partial tuples) means the reply is
+    // corrupt: don't count anything from it, and dispatch nothing.
+    if (flat.length % 4 !== 0) {
+      return [];
+    }
+
+    // Override dispatches are a subset of this batch's dispatches, so the
+    // count can never exceed the tuples that came back with it.
+    const overrideDispatched = Number(rawOverride);
+    if (
+      Number.isSafeInteger(overrideDispatched) &&
+      overrideDispatched > 0 &&
+      overrideDispatched <= flat.length / 4
+    ) {
       gqJobsDispatchedOverrideTotal.inc(
         { queue_name: this.queueName },
         overrideDispatched,
       );
     }
 
-    if (flat.length < 4) {
+    if (flat.length === 0) {
       return [];
     }
 

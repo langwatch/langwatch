@@ -110,7 +110,7 @@ Feature: Work-conserving max-min fair dispatch
     @unit
     Scenario: Slots filled by the override are counted separately from ordinary dispatch
       Given the fleet has idle slots and work is parked behind a fair share
-      When dispatch fills those idle slots from the least-served parked tenant
+      When dispatch fills those idle slots with the parked work
       Then the jobs it admitted that way are counted as override dispatches
       And they are also counted as ordinary dispatches, so no job is missed from the total
 
