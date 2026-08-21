@@ -1123,7 +1123,8 @@
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
               "api-reference/simulation-runs/list-list",
-              "api-reference/simulation-runs/get-simulation-runs"
+              "api-reference/simulation-runs/get-simulation-runs",
+              "api-reference/simulation-runs/get-batches"
             ]
           },
           {

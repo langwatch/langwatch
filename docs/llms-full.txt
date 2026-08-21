@@ -67276,6 +67276,15 @@ openapi: "PUT /api/secrets/{id}"
 
 ---
 
+# FILE: ./api-reference/simulation-runs/get-batches.mdx
+
+---
+title: "Get Batches"
+openapi: "GET /api/simulation-runs/batches/{batchRunId}"
+---
+
+---
+
 # FILE: ./api-reference/simulation-runs/get-simulation-runs.mdx
 
 ---

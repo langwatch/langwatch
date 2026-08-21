@@ -6,11 +6,11 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="GetApiSimulationRunsBatchesListResponse200BatchesItem")
+T = TypeVar("T", bound="GetApiSimulationRunsBatchesByBatchRunIdResponse200")
 
 
 @_attrs_define
-class GetApiSimulationRunsBatchesListResponse200BatchesItem:
+class GetApiSimulationRunsBatchesByBatchRunIdResponse200:
     """
     Attributes:
         batch_run_id (str):
@@ -127,7 +127,7 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
 
         is_complete = d.pop("isComplete")
 
-        get_api_simulation_runs_batches_list_response_200_batches_item = cls(
+        get_api_simulation_runs_batches_by_batch_run_id_response_200 = cls(
             batch_run_id=batch_run_id,
             total_count=total_count,
             pass_count=pass_count,
@@ -142,8 +142,8 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
             is_complete=is_complete,
         )
 
-        get_api_simulation_runs_batches_list_response_200_batches_item.additional_properties = d
-        return get_api_simulation_runs_batches_list_response_200_batches_item
+        get_api_simulation_runs_batches_by_batch_run_id_response_200.additional_properties = d
+        return get_api_simulation_runs_batches_by_batch_run_id_response_200
 
     @property
     def additional_keys(self) -> list[str]:

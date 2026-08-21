@@ -85,7 +85,7 @@ export type BatchSummary = {
 
 /**
  * Pre-aggregated batch summary for the sidebar.
- * Returned by getScenarioSetBatchHistory — no full message arrays.
+ * Returned by getScenarioSetBatchHistory, with no full message arrays.
  */
 export type BatchHistoryItem = BatchSummary & {
   items: BatchHistoryItemRun[];
