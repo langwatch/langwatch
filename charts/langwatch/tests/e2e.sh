@@ -408,10 +408,10 @@ test_app() {
 # that the endpoint refuses while backend objects stand (the flag-off AC), and
 # that re-running provisioning converges without duplicating key-map rows.
 # ─────────────────────────────────────────────────────────────────────────────
+# @scenario "A single-replica deployment provisions LangWatchQL unchanged"
 test_lwql() {
   sep; info "Suite: LangWatchQL self-provisioning"
 
-  local pod="${RELEASE}-clickhouse-0"
   local app_pod pg_pod
   app_pod=$(kc get pod \
     -l "app.kubernetes.io/name=${RELEASE}-app" \
@@ -419,6 +419,13 @@ test_lwql() {
   pg_pod=$(kc get pod \
     -l "app.kubernetes.io/component=postgresql" \
     -o jsonpath='{.items[0].metadata.name}')
+
+  # Discover ClickHouse pods (may be multiple in clustered mode)
+  local pods
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  # Use the first pod for queries (same data visible on all replicas)
+  local pod
+  pod=$(echo "$pods" | head -1)
 
   # ClickHouse access model
   assert_eq "restricted user langwatch_lwql exists" \

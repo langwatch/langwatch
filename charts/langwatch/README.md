@@ -809,7 +809,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 | Name           | Description                                                                                                        | Value  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
-| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views) when the application starts. The feature flag still gates the endpoint. | `true` |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views) when the application starts. Supported at any replica count via keeper-backed replicated access storage (requires clickhouse-serverless image newer than 0.3.0). The feature flag still gates the endpoint. | `true` |
 
 ### Redis
 

@@ -1970,10 +1970,10 @@ clickhouse:
 # flag still gates the HTTP endpoint; backend objects exist regardless.
 #
 # Requires a ClickHouse whose admin user may run access-management DDL
-# (`langwatch/clickhouse-serverless` ships this). With chart-managed
-# ClickHouse at replicas > 1 the wiring is skipped (SQL-created access
-# entities do not replicate across nodes); single-replica and external
-# single-node ClickHouse are the supported shapes.
+# (`langwatch/clickhouse-serverless` ships this). Chart-managed ClickHouse
+# at any replica count is supported via keeper-backed replicated access
+# storage (requires clickhouse-serverless image newer than 0.3.0). External
+# ClickHouse is supported unchanged.
 ## @section LangWatchQL (LWQL)
 lwql:
   ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, views) when the application starts. The feature flag still gates the endpoint.

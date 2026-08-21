@@ -857,10 +857,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      Secret without these keys means LangWatchQL simply stays unprovisioned
      (fail-closed refusals) instead of the pod dying in
      CreateContainerConfigError — a default-on feature must degrade, not brick
-     an upgrade. Skipped for chart-managed ClickHouse at replicas > 1:
-     SQL-created access entities and named collections live per node and do
-     not replicate, so the provisioned identity would exist on one replica
-     only — see NOTES.txt. */}}
+     an upgrade. For chart-managed ClickHouse, access entities and named
+     collections are stored in keeper and replicated across all nodes,
+     enabling self-provisioning at any replica count. */}}
 {{- if (include "langwatch.lwql.selfProvisionActive" .) }}
 {{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
 - name: LWQL_SELF_PROVISION
@@ -1247,21 +1246,16 @@ true
 
 {{/*
   Whether LangWatchQL self-provisioning is wired into the pods (issue #6635).
-  Enabled by default; skipped — not failed — for chart-managed ClickHouse at
-  replicas > 1, because SQL-created access entities and named collections are
-  per-node state that does not replicate: the restricted identity would exist
-  on whichever replica the boot-time DDL landed on and nowhere else. Skipping
-  keeps a multi-replica upgrade converging instead of aborting on a feature
-  the operator never asked to configure; NOTES.txt says so out loud.
-  External ClickHouse is wired regardless — the chart cannot see its topology,
-  and the app degrades to a logged, fail-closed refusal if the server rejects
-  access-management DDL.
+  Enabled whenever lwql.enabled is true. For chart-managed clustered ClickHouse
+  (replicas > 1), access entities and named collections are stored in ClickHouse
+  Keeper and replicated across all nodes; topology-safe self-provisioning is
+  therefore supported at any replica count. External ClickHouse is wired
+  regardless — the chart cannot see its topology, and the app degrades to a
+  logged, fail-closed refusal if the server rejects access-management DDL.
 */}}
 {{- define "langwatch.lwql.selfProvisionActive" -}}
 {{- if .Values.lwql.enabled -}}
-{{- if not (and .Values.clickhouse.chartManaged (gt (int (.Values.clickhouse).replicas) 1)) -}}
 true
-{{- end -}}
 {{- end -}}
 {{- end -}}
 

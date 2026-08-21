@@ -107,6 +107,7 @@ describe("given productionClickHouseObjectStatements", () => {
     views: MIXED_VIEWS,
   });
 
+  // @scenario "Provisioning does not alter the migrated database"
   it("creates the LangWatchQL database first", () => {
     expect(statements[0]).toBe(
       `CREATE DATABASE IF NOT EXISTS ${NAMES.database}`,

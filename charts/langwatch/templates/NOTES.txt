@@ -335,14 +335,12 @@ settings prefix. The `langwatch/clickhouse-serverless` image ships
 both; on other servers, add them or set lwql.enabled=false. If the
 server refuses the DDL the app logs it and LangWatchQL stays
 unavailable — nothing else breaks.
+{{- else }}
+For chart-managed ClickHouse, LangWatchQL access entities are stored in
+ClickHouse Keeper and shared by all replicas. Changing the replica count
+across the 1↔N boundary rolls the application automatically (its environment
+changes), requiring no operator action.
 {{- end }}
-{{- else if .Values.lwql.enabled }}
-lwql.enabled=true but chart-managed ClickHouse runs replicas > 1, so
-the chart did NOT wire LangWatchQL: SQL-created access entities and
-named collections are per-node state that does not replicate, and the
-provisioned identity would exist on a single replica only. Supported
-shapes today are clickhouse.replicas=1 or an external single-node
-ClickHouse.
 {{- else }}
 Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
 and the endpoints refuse every query.

@@ -94,6 +94,7 @@ describe("lwqlDerivedConnectionFromEnv", () => {
     expect(connection?.tenantSetting).toBe("custom_other_setting");
   });
 
+  // @scenario "Provisioning does not alter the migrated database"
   it("accepts LWQL_DATABASE only when it names the admin URL's own database", () => {
     expect(
       lwqlDerivedConnectionFromEnv({

@@ -1,6 +1,7 @@
 package render_test
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -64,6 +65,7 @@ func testLogger() *zap.Logger {
 	return zap.NewNop()
 }
 
+// @scenario "Standalone mode writes no keeper-backed storage configuration"
 func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
@@ -97,6 +99,17 @@ func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 		}
 	}
 
+	// Nor should the keeper-backed stores: a standalone server has no keeper,
+	// and a user_directories file it cannot satisfy stops it from starting.
+	for _, f := range []string{
+		"config.d/user-directories.yaml",
+		"config.d/named-collections-storage.yaml",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			t.Errorf("%s should not exist when Replicated=false", f)
+		}
+	}
+
 	// Prometheus should NOT exist (disabled).
 	promPath := filepath.Join(dir, "config.d/prometheus.yaml")
 	if _, err := os.Stat(promPath); err == nil {
@@ -119,8 +132,9 @@ func TestRenderAll_KeeperNotWrittenForStandalone(t *testing.T) {
 	}
 }
 
-func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
-	dir := t.TempDir()
+// replicatedInput is testInput() flipped into replicated mode with a full set
+// of cluster wiring, so every replicated-mode test starts from one shape.
+func replicatedInput() *config.Input {
 	input := testInput()
 	input.Replicated = true
 	input.ClusterName = "mycluster"
@@ -131,6 +145,12 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	input.DataNodes = "ch-0.ch-headless,ch-1.ch-headless,ch-2.ch-headless"
 	input.DataNodePort = 9000
 	input.ClusterSecretFile = "/mnt/secrets/cluster-secret"
+	return input
+}
+
+func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -196,8 +216,8 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	content := string(data)
 	checks := []string{
 		"merge_tree:",
-		"max_parts_to_merge_at_once: 8",   // 4 CPU -> 8
-		"background_pool_size: 2",          // max(2, 4/2) = 2
+		"max_parts_to_merge_at_once: 8", // 4 CPU -> 8
+		"background_pool_size: 2",       // max(2, 4/2) = 2
 		"max_server_memory_usage:",
 		"query_log:",
 		"INTERVAL 7 DAY DELETE", // query_log TTL
@@ -423,6 +443,167 @@ func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
 	} {
 		if !strings.Contains(accessContent, want) {
 			t.Errorf("zz-access-management.yaml should contain %q", want)
+		}
+	}
+}
+
+// The access-DDL permission and the custom_ prefix are properties of every
+// server, not of a topology. Gating either on replicated mode would break
+// single-replica LangWatchQL, so both modes are asserted from one table.
+// @scenario "Access management stays enabled in <mode> mode"
+func TestRenderAll_AccessPrerequisitesPresentInBothModes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *config.Input
+	}{
+		{"standalone", testInput()},
+		{"replicated", replicatedInput()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			computed := config.ComputeFromResources(tc.input.CPU, tc.input.RAMBytes, tc.input)
+
+			if err := render.RenderAll(testLogger(), tc.input, computed, dir); err != nil {
+				t.Fatalf("RenderAll: %v", err)
+			}
+
+			prefixData, err := os.ReadFile(filepath.Join(dir, "config.d/custom-settings-prefixes.yaml"))
+			if err != nil {
+				t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
+			}
+			if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
+				t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+			}
+
+			accessData, err := os.ReadFile(filepath.Join(dir, "users.d/zz-access-management.yaml"))
+			if err != nil {
+				t.Fatalf("read zz-access-management.yaml: %v", err)
+			}
+			if !strings.Contains(string(accessData), "access_management: 1") {
+				t.Error("zz-access-management.yaml should grant access_management")
+			}
+			if !strings.Contains(string(accessData), "named_collection_control: 1") {
+				t.Error("zz-access-management.yaml should grant named_collection_control")
+			}
+		})
+	}
+}
+
+// @scenario "Replicated mode configures keeper-backed access storage"
+// @scenario "Replicated access storage replaces the server default rather than merging"
+func TestRenderAll_UserDirectoriesWrittenForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "config.d/user-directories.yaml"))
+	if err != nil {
+		t.Fatalf("read user-directories.yaml: %v", err)
+	}
+	content := string(data)
+
+	for _, want := range []string{
+		"user_directories:",
+		// The replace attribute is the whole point of the file. Without it the
+		// block merges with the server's default local_directory, entities keep
+		// landing node-local, and the config is inert while looking correct.
+		"'@replace': replace",
+		// Retaining users_xml is what keeps the XML-defined admin user
+		// reachable; dropping it locks the operator out on restart.
+		"users_xml:",
+		"path: /etc/clickhouse-server/users.xml",
+		"replicated:",
+		"zookeeper_path: /clickhouse/mycluster/access/",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("user-directories.yaml missing %q\n--- actual content ---\n%s", want, content)
+		}
+	}
+
+	// Order is precedence: users_xml must be listed ahead of replicated so
+	// XML-defined users stay XML-defined and writes fall through to keeper.
+	if xml, repl := strings.Index(content, "users_xml:"), strings.Index(content, "replicated:"); xml > repl {
+		t.Errorf("users_xml must be listed before replicated\n--- actual content ---\n%s", content)
+	}
+}
+
+// @scenario "Replicated mode configures keeper-backed named collections"
+func TestRenderAll_NamedCollectionsStorageWrittenForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "config.d/named-collections-storage.yaml"))
+	if err != nil {
+		t.Fatalf("read named-collections-storage.yaml: %v", err)
+	}
+	content := string(data)
+
+	for _, want := range []string{
+		"named_collections_storage:",
+		"type: zookeeper",
+		"path: /clickhouse/mycluster/named_collections/",
+		"update_timeout_ms: 5000",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("named-collections-storage.yaml missing %q\n--- actual content ---\n%s", want, content)
+		}
+	}
+
+	// The encrypted variant needs a key_hex the chart neither generates nor
+	// rotates; picking it up by accident would fail the server at start.
+	if strings.Contains(content, "zookeeper_encrypted") {
+		t.Error("named-collections-storage.yaml should use the unencrypted zookeeper type")
+	}
+}
+
+// Both files address cluster-wide keeper paths, so every replica must render
+// them byte-identically. A per-replica difference would point one node at
+// storage the others do not share, and the access model would silently stop
+// being cluster-wide the moment the replica count changed.
+// @scenario "Access configuration does not depend on the replica identity"
+func TestRenderAll_AccessStorageIndependentOfReplicaIdentity(t *testing.T) {
+	renderFor := func(t *testing.T, replica, node string) map[string][]byte {
+		t.Helper()
+		dir := t.TempDir()
+		input := replicatedInput()
+		input.Replica = replica
+		input.DataNodes = node
+		computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+		if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+			t.Fatalf("RenderAll: %v", err)
+		}
+
+		rendered := make(map[string][]byte)
+		for _, name := range []string{
+			"config.d/user-directories.yaml",
+			"config.d/named-collections-storage.yaml",
+		} {
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatalf("read %s: %v", name, err)
+			}
+			rendered[name] = data
+		}
+		return rendered
+	}
+
+	first := renderFor(t, "node-0", "ch-0.ch-headless")
+	second := renderFor(t, "node-2", "ch-2.ch-headless")
+
+	for name, want := range first {
+		got := second[name]
+		if !bytes.Equal(want, got) {
+			t.Errorf("%s differs between replica identities\n--- node-0 ---\n%s\n--- node-2 ---\n%s", name, want, got)
 		}
 	}
 }

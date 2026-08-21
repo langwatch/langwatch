@@ -793,6 +793,40 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the table-function and SSRF policy is looked up
     Then a dedicated ADR documents why user-supplied table functions remain blocked via AST and grants
 
+  # --- Self-provisioning and cluster topology ---
+  # Chart-managed ClickHouse self-provisioning (issue #7331)
+
+  @e2e
+  Scenario: Self-provisioning is enabled for chart-managed ClickHouse at any replica count
+    Given the chart is rendered with chart-managed ClickHouse at three replicas
+    Then the application container carries the LangWatchQL self-provisioning environment variable enabled
+    And rendering at one replica carries it enabled as well
+
+  @e2e
+  Scenario: A ClickHouse mode transition rolls the application automatically
+    Given the chart is rendered with chart-managed ClickHouse at one replica and at three replicas
+    Then the application pod template differs between the two renders
+
+  @e2e
+  Scenario: A single-replica deployment provisions LangWatchQL unchanged
+    Given the chart is installed with chart-managed ClickHouse at one replica
+    Then the ClickHouse server starts
+    And the restricted identity, its row policies and its named collection all exist
+
+  @e2e @unimplemented
+  Scenario: Clustered chart-managed ClickHouse provisions the full LangWatchQL access model
+    Given the chart is installed with chart-managed ClickHouse at three replicas
+    When the application boots
+    Then the restricted identity, its settings profile, its grants, its row policies, its named collection and its engine tables all exist
+    # Tracking issue #7387 — covering test coming in follow-up batch
+
+  @integration
+  Scenario: Provisioning does not alter the migrated database
+    Given the ClickHouse migrations have created the application database
+    When LangWatchQL provisioning runs
+    Then the database engine is unchanged
+    And provisioning against a database name that differs from the connection URL's is refused
+
 # --- AC Coverage Map ---
 # Issue #6480 ACs → scenarios (grouped as in the issue body).
 #
