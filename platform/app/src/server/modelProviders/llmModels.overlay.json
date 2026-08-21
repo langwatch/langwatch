@@ -529,6 +529,78 @@
 			"supportsAudioInput": false,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": false
+		},
+		"orcarouter/auto": {
+			"id": "orcarouter/auto",
+			"name": "OrcaRouter: Auto Router",
+			"provider": "orcarouter",
+			"pricing": {
+				"inputCostPerToken": -1,
+				"outputCostPerToken": -1
+			},
+			"contextLength": 1000000,
+			"maxCompletionTokens": null,
+			"supportedParameters": ["frequency_penalty", "include_reasoning", "logit_bias", "logprobs", "max_completion_tokens", "max_tokens", "min_p", "presence_penalty", "reasoning", "reasoning_effort", "repetition_penalty", "response_format", "seed", "stop", "structured_outputs", "temperature", "tool_choice", "tools", "top_k", "top_logprobs", "top_p"],
+			"defaultParameters": {
+				"temperature": null,
+				"topP": null,
+				"frequencyPenalty": null
+			},
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "OrcaRouter's adaptive gateway alias: routes each request to the best model for the task across 200+ frontier and open-weight models through a single OpenAI-compatible endpoint.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"orcarouter/fusion": {
+			"id": "orcarouter/fusion",
+			"name": "OrcaRouter: Fusion",
+			"provider": "orcarouter",
+			"pricing": {
+				"inputCostPerToken": -1,
+				"outputCostPerToken": -1
+			},
+			"contextLength": 1000000,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": {
+				"temperature": null,
+				"topP": null,
+				"frequencyPenalty": null
+			},
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "OrcaRouter's fast multi-model deliberation alias: a panel of expert models analyzes the prompt in parallel and the best answer wins.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"orcarouter/free": {
+			"id": "orcarouter/free",
+			"name": "OrcaRouter: Free",
+			"provider": "orcarouter",
+			"pricing": {
+				"inputCostPerToken": -1,
+				"outputCostPerToken": -1
+			},
+			"contextLength": 200000,
+			"maxCompletionTokens": null,
+			"supportedParameters": ["frequency_penalty", "include_reasoning", "logprobs", "max_completion_tokens", "max_tokens", "min_p", "presence_penalty", "reasoning", "reasoning_effort", "repetition_penalty", "response_format", "seed", "stop", "structured_outputs", "temperature", "tool_choice", "tools", "top_k", "top_logprobs", "top_p"],
+			"defaultParameters": {
+				"temperature": null,
+				"topP": null,
+				"frequencyPenalty": null
+			},
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "OrcaRouter's free-tier alias: a free rate-limited lane for experimentation and light workloads.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
 		}
 	}
 }

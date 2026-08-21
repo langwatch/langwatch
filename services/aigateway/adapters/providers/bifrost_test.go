@@ -567,6 +567,7 @@ func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
 		{"groq is bifrost-native", domain.Credential{ProviderID: domain.ProviderGroq}, bfschemas.Groq},
 		{"cerebras is bifrost-native", domain.Credential{ProviderID: domain.ProviderCerebras}, bfschemas.Cerebras},
 		{"deepseek maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderDeepSeek}, bfschemas.VLLM},
+		{"orcarouter maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderOrcaRouter}, bfschemas.VLLM},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -622,6 +623,28 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 		t.Fatalf("VLLMKeyConfig.URL = %q, want DeepSeek public endpoint", got)
 	}
 	if key.Value.Val != "sk-ds" {
+		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
+	}
+}
+
+// OrcaRouter rides the same vLLM (openai-compat) path as DeepSeek and is
+// a hosted API too, so a key without an explicit base URL must default to
+// OrcaRouter's public endpoint. The endpoint carries the /v1 segment, so
+// normalizeOpenAICompatBaseURL strips it before dispatch.
+func TestCredentialToBifrostKey_OrcaRouterDefaultsBaseURL(t *testing.T) {
+	key := credentialToBifrostKey(domain.Credential{
+		ID:         "mp-orca",
+		ProviderID: domain.ProviderOrcaRouter,
+		APIKey:     "sk-orca-test",
+	}, bfschemas.VLLM)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
+	}
+	if got := key.VLLMKeyConfig.URL.Val; got != "https://api.orcarouter.ai" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want OrcaRouter public endpoint (normalized)", got)
+	}
+	if key.Value.Val != "sk-orca-test" {
 		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
 	}
 }

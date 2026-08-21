@@ -25,6 +25,11 @@ const (
 	// (openai-compat) provider with DeepSeek's public endpoint as the
 	// default base URL.
 	ProviderDeepSeek ProviderID = "deepseek"
+	// OrcaRouter is not in Bifrost's ModelProvider enum either. Its API
+	// is OpenAI-compatible, so the gateway routes it through Bifrost's
+	// vLLM (openai-compat) provider with OrcaRouter's public endpoint as
+	// the default base URL — same shape as DeepSeek.
+	ProviderOrcaRouter ProviderID = "orcarouter"
 	// Voyage is direct-API only. Bifrost has no Voyage ModelProvider
 	// enum; the gateway proxies Voyage embeddings via a thin direct
 	// HTTP path. Voyage's wire format is OpenAI-compatible so no body

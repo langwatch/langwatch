@@ -13,6 +13,7 @@ import { Gemini } from "../icons/Gemini";
 import { GoogleCloud } from "../icons/GoogleCloud";
 import { Groq } from "../icons/Groq";
 import { OpenAI } from "../icons/OpenAI";
+import { OrcaRouter } from "../icons/OrcaRouter";
 import { Voyage } from "../icons/Voyage";
 import { Xai } from "../icons/Xai";
 import { IconGlyph } from "../ui/IconGlyph";
@@ -34,6 +35,7 @@ export const modelProviderIcons: Record<
   google_agent_platform: <GoogleCloud />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
+  orcarouter: <OrcaRouter />,
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,

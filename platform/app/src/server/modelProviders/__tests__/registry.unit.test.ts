@@ -387,6 +387,7 @@ describe("Model Provider Definitions", () => {
     expect(modelProviders).toHaveProperty("gemini");
     expect(modelProviders).toHaveProperty("azure");
     expect(modelProviders).toHaveProperty("bedrock");
+    expect(modelProviders).toHaveProperty("orcarouter");
   });
 
   it("each provider has required fields", () => {
