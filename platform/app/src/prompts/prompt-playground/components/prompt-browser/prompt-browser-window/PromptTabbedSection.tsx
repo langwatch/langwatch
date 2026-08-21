@@ -156,7 +156,13 @@ export function PromptTabbedSection({
       flexDirection="column"
       flex={1}
       width="full"
-      variant="subtle"
+      // `line` + a colour palette is what the rest of the product uses for an
+      // inline tab strip, and it is the pair the app theme extends: the
+      // selected trigger takes the palette colour and the strip's indicator
+      // underlines it. `subtle` without a palette resolved to a grey fill on a
+      // grey surface, so nothing marked which tab you were on.
+      variant="line"
+      colorPalette="orange"
       size="sm"
       minHeight={0}
       paddingTop={1}

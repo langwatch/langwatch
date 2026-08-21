@@ -265,7 +265,11 @@ function PromptBrowserWindowInner(props: {
             gap={0}
             alignItems="stretch"
           >
-            {/* Left panel: Header + Prompt */}
+            {/* Left panel: Header + Prompt. A panel surface with a hairline
+                border, the way the traces workspace separates its panes —
+                the drop shadow it used to carry was the only place in the
+                product doing that, and it still left the toolbar and the
+                editor reading as one undifferentiated column. */}
             <Box
               display="flex"
               flexDirection="column"
@@ -274,18 +278,18 @@ function PromptBrowserWindowInner(props: {
               maxWidth="600px"
               borderRight="1px solid"
               borderColor="border.muted"
+              backgroundColor="bg.panel"
               overflow="hidden"
-              boxShadow="md"
             >
               <Box
                 ref={headerRef}
                 flexShrink={0}
-                paddingTop={3}
-                paddingBottom={3}
+                paddingX={3}
+                paddingY={2}
+                borderBottom="1px solid"
+                borderColor="border.muted"
               >
-                <Box width="full" paddingX={3}>
-                  <PromptBrowserHeader />
-                </Box>
+                <PromptBrowserHeader />
               </Box>
               <Box
                 flex={1}
@@ -338,8 +342,16 @@ function PromptBrowserWindowInner(props: {
           flexDirection="column"
           overflow="hidden"
         >
-          {/* Header - always visible, with bottom padding for spacing from tabs when collapsed */}
-          <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
+          {/* Header - always visible, on the same hairline-separated toolbar
+              as the side-by-side layout so the two layouts do not disagree
+              about where the controls end and the prompt begins. */}
+          <Box
+            ref={headerRef}
+            flexShrink={0}
+            paddingY={2}
+            borderBottom="1px solid"
+            borderColor="border.muted"
+          >
             <Box width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
               <PromptBrowserHeader />
             </Box>
@@ -361,6 +373,7 @@ function PromptBrowserWindowInner(props: {
             transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
           >
             <Box
+              paddingTop={2}
               paddingBottom={2}
               width="full"
               maxWidth="768px"
