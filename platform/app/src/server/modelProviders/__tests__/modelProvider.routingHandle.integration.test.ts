@@ -18,6 +18,8 @@ import {
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
+import { GatewayConfigMaterialiser } from "../../gateway/config.materialiser";
+import { VirtualKeyRepository } from "../../gateway/virtualKey.repository";
 import { ModelProviderService } from "../modelProvider.service";
 
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
@@ -96,6 +98,7 @@ describe.skipIf(!hasCredentialsSecret)(
 
     afterAll(async () => {
       await cleanupTestRows(prisma, [
+        ["virtualKey", { organizationId }],
         ["modelProvider", { organizationId }],
         ["modelProvider", { organizationId: otherOrganizationId }],
         ["roleBinding", { organizationId }],
@@ -250,6 +253,47 @@ describe.skipIf(!hasCredentialsSecret)(
       });
     });
 
+    /**
+     * The handles the gateway would actually receive for this organization.
+     *
+     * The change event proves the cache was told to refresh; it does not prove
+     * the refreshed config carries the new name. This reads the materialised
+     * bundle, which is the payload a running gateway fetches, so a handle that
+     * never reaches the wire fails the lifecycle scenarios rather than passing
+     * on the eviction alone.
+     */
+    async function materialisedHandles(): Promise<
+      Map<string, string | undefined>
+    > {
+      const key = await prisma.virtualKey.create({
+        data: {
+          organizationId,
+          name: `vk-${nanoid(6)}`,
+          hashedSecret: `hash-${nanoid(10)}`,
+          displayPrefix: "lw_vk_live_xxx",
+          principalUserId: adminUserId,
+          createdById: adminUserId,
+          traceProjectId: projectId,
+          scopes: {
+            create: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
+        },
+      });
+      try {
+        const vk = await new VirtualKeyRepository(prisma).findById(
+          key.id,
+          organizationId,
+        );
+        const bundle = await new GatewayConfigMaterialiser(
+          prisma,
+          null,
+        ).materialise(vk!);
+        return new Map(bundle.providers.map((slot) => [slot.id, slot.handle]));
+      } finally {
+        await prisma.virtualKey.delete({ where: { id: key.id } });
+      }
+    }
+
     describe("when a handle is renamed", () => {
       /** @scenario "A renamed handle no longer resolves under its old name" */
       it("stops answering to the old name and evicts the gateway config", async () => {
@@ -284,6 +328,14 @@ describe.skipIf(!hasCredentialsSecret)(
           where: { organizationId, kind: "MODEL_PROVIDER_UPDATED" },
         });
         expect(eventsAfter).toBeGreaterThan(eventsBefore);
+
+        // The config the gateway fetches carries the new name for THIS row,
+        // which is what "the old spelling stops resolving" means on the wire.
+        // Keyed by provider id rather than by name, because the released name
+        // is legitimately back in the bundle on the row that took it.
+        const handles = await materialisedHandles();
+        expect(handles.get(provider.id)).toBe("after");
+        expect(handles.get(reuser.id)).toBe("before");
       });
     });
 
@@ -313,6 +365,12 @@ describe.skipIf(!hasCredentialsSecret)(
           },
         });
         expect(event).not.toBeNull();
+
+        // The handle reaches the wire on the same terms as one set later: a
+        // config materialised now already carries it.
+        expect((await materialisedHandles()).get(created.id)).toBe(
+          "created-evicts",
+        );
       });
     });
 

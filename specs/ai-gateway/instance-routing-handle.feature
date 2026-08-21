@@ -135,6 +135,7 @@ Feature: AI Gateway — a routing handle names one provider instance
       Given a provider with handle "eu" reached as "eu/claude-sonnet-5"
       When an administrator renames the handle to "europe"
       Then the gateway configuration is evicted
+      And the configuration the gateway fetches carries "europe" for that provider
       And the change is recorded in the audit log
 
   Rule: A handle works as soon as the provider exists
@@ -150,6 +151,7 @@ Feature: AI Gateway — a routing handle names one provider instance
     Scenario: Creating a provider evicts the gateway configuration
       When an administrator creates a provider with the handle "eu"
       Then the gateway configuration is evicted
+      And the configuration the gateway fetches carries "eu" for that provider
 
   Rule: The gateway config carries the handle
 
