@@ -32074,6 +32074,20 @@ Open your personal page at `/me`, or open the project you pinned Claude Code to.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
 
+### Attribute sessions to pull requests
+
+LangWatch joins a session to a pull request through the repository and branch the session reports. The session reports the directory it is working in, read at the start of the session and again after every turn. Two rules follow from how Claude Code tracks that directory:
+
+- A `cd` inside the Bash tool does not move the session. The session still reports the directory it was launched in.
+- A native switch with the EnterWorktree tool does move the session. From then on it reports the repository and branch of the worktree it entered.
+
+So to get a session attributed to the pull request it works on, either start Claude Code inside a checkout of that branch, or have the session switch natively:
+
+1. Create a worktree for the branch: `git -C <repo> fetch origin <branch> && git -C <repo> worktree add .claude/worktrees/<name> <branch>`
+2. Ask the session to call the EnterWorktree tool with that worktree's path.
+
+A long-lived session that picks up several pull requests should switch this way each time it moves to the next one. Work done from a directory outside any checkout, for example reviewing with `gh` commands from a home directory, attaches to no repository and no pull request, and its token cost cannot be attributed. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
+
 ## Content and privacy
 
 The setup that `langwatch claude` and `langwatch instrument claude` write turns on the four Claude Code content flags, because the content is what makes a trace worth reading:
@@ -32642,6 +32656,10 @@ Open your personal page at `/me`, or open the project you pinned Codex to.
 - **Content**: the prompt of each turn, each tool call with its result, and the answer of the model.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+
+### Attribute sessions to pull requests
+
+LangWatch joins a session to a pull request through the repository and branch the session reports. Codex records the directory once, when the session starts, so the attribution follows the directory `codex` was started in. A `cd` inside the session does not change it. To get a session attributed to the pull request it works on, start `codex` inside a checkout of that branch. A session started outside any checkout, for example a home directory, attaches to no repository and no pull request. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
 
 ## Content and privacy
 
