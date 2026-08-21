@@ -18,12 +18,17 @@ type ImperativeContext = {
   app?: App;
 };
 
-async function decide(
-  ctx: ImperativeContext,
-  tier: "project" | "team" | "organization",
-  id: string,
-  permission: AuthzPermission,
-): Promise<boolean> {
+async function decide({
+  ctx,
+  tier,
+  id,
+  permission,
+}: {
+  ctx: ImperativeContext;
+  tier: "project" | "team" | "organization";
+  id: string;
+  permission: AuthzPermission;
+}): Promise<boolean> {
   if (!ctx.session?.user) return false;
   const { permitted } = await (ctx.app ?? getApp()).permissions.getDecision({
     userId: ctx.session.user.id,
@@ -39,7 +44,7 @@ export async function hasProjectPermission(
   projectId: string,
   permission: AuthzPermission,
 ): Promise<boolean> {
-  return decide(ctx, "project", projectId, permission);
+  return decide({ ctx, tier: "project", id: projectId, permission });
 }
 
 /** Whether the context's user holds `permission` on the team. */
@@ -48,7 +53,7 @@ export async function hasTeamPermission(
   teamId: string,
   permission: AuthzPermission,
 ): Promise<boolean> {
-  return decide(ctx, "team", teamId, permission);
+  return decide({ ctx, tier: "team", id: teamId, permission });
 }
 
 /** Whether the context's user holds `permission` on the organization. */
@@ -57,5 +62,5 @@ export async function hasOrganizationPermission(
   organizationId: string,
   permission: AuthzPermission,
 ): Promise<boolean> {
-  return decide(ctx, "organization", organizationId, permission);
+  return decide({ ctx, tier: "organization", id: organizationId, permission });
 }

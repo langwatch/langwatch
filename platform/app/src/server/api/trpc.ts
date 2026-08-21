@@ -1393,6 +1393,19 @@ const permissionProcedureBuilder = <
   TOutputOut,
   TCaller
 > => {
+  /** The builder this call returns, named once rather than spelled out at
+   *  every cast below — the instantiation is identical in all of them. */
+  type Pending = PendingPermissionProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+
   /**
    * The one chain both entry points build: the surrounding middlewares are
    * identical and only the permission check in the middle differs, so
@@ -1412,16 +1425,7 @@ const permissionProcedureBuilder = <
   return {
     input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
-    }) as PendingPermissionProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >["input"],
+    }) as Pending["input"],
     use: (middleware) => withPermissionCheck(middleware),
     permission: ((
       permission: AuthzPermission,
@@ -1429,45 +1433,18 @@ const permissionProcedureBuilder = <
     ) =>
       withPermissionCheck(
         checkDeclaredPermission({ permission, via: options?.via }),
-      )) as PendingPermissionProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >["permission"],
+      )) as Pending["permission"],
     permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
       withPermissionCheck(
         checkDeclaredPermissionAny(permissions),
-      )) as PendingPermissionProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >["permissionAny"],
+      )) as Pending["permissionAny"],
     noPermission: ((options: {
       reason: string;
       allow?: Record<string, string>;
     }) =>
       withPermissionCheck(
         declaredNoPermission(options),
-      )) as PendingPermissionProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >["noPermission"],
+      )) as Pending["noPermission"],
     authorizeInService: (options) =>
       withPermissionCheck(declaredServiceAuthorization(options)),
   };

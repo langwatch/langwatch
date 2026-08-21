@@ -657,44 +657,56 @@ export async function enforceApiKeyCeiling({
     permission,
   });
 
-  if (!allowed) {
-    // A Langy session key is refused for two different reasons that look
-    // identical from here: the human it mirrors does not hold the permission,
-    // or Langy is never delegated it at all. Only the first one is fixed by a
-    // wider key, so the policy that decides the second gets to say so.
-    const langyVerdict = resolved.isLangySessionKey
-      ? classifyForLangy(permission)
-      : undefined;
-    const notDelegableReason =
-      langyVerdict?.disposition === "excluded"
-        ? langyVerdict.reason
-        : undefined;
+  if (!allowed) refuseApiKeyCeiling({ resolved, permission });
+}
 
-    permissionLogger.warn(
-      {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-        permission,
-        // The policy's own words, which name the constants a reader of the
-        // rule needs and a customer must never see.
-        ...(notDelegableReason ? { notDelegableReason } : {}),
-      },
-      "API key ceiling check failed",
-    );
-    const meta = {
-      apiKeyId: resolved.apiKeyId,
-      userId: resolved.userId,
-      projectId: resolved.project.id,
-    };
-    if (notDelegableReason) {
-      throw new ApiKeyPermissionNotDelegableError(permission, {
-        subject: "Langy",
-        meta,
-      });
-    }
-    throw new ApiKeyPermissionDeniedError(permission, { meta });
+/**
+ * The refusal, which is two refusals wearing the same face.
+ *
+ * A Langy session key is denied for one of two reasons that are identical from
+ * the ceiling's point of view: the human it mirrors does not hold the
+ * permission, or Langy is never delegated it at all. Only the first is fixed
+ * by widening the key, so telling a customer to widen it for the second sends
+ * them to a door that does not open — which is exactly what Langy did with
+ * `triggers:create`, offering to retry once the user "granted the permission".
+ */
+function refuseApiKeyCeiling({
+  resolved,
+  permission,
+}: {
+  resolved: Extract<ResolvedToken, { type: "apiKey" }>;
+  permission: Permission;
+}): never {
+  const langyVerdict = resolved.isLangySessionKey
+    ? classifyForLangy(permission)
+    : undefined;
+  const notDelegableReason =
+    langyVerdict?.disposition === "excluded" ? langyVerdict.reason : undefined;
+
+  const meta = {
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    projectId: resolved.project.id,
+  };
+
+  permissionLogger.warn(
+    {
+      ...meta,
+      permission,
+      // The policy's own words, which name the constants a reader of the rule
+      // needs and a customer must never see.
+      ...(notDelegableReason ? { notDelegableReason } : {}),
+    },
+    "API key ceiling check failed",
+  );
+
+  if (notDelegableReason) {
+    throw new ApiKeyPermissionNotDelegableError(permission, {
+      subject: "Langy",
+      meta,
+    });
   }
+  throw new ApiKeyPermissionDeniedError(permission, { meta });
 }
 
 /**
