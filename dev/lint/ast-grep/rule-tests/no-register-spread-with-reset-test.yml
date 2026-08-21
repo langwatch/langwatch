@@ -29,6 +29,36 @@ valid:
       useEffect(() => reset({}), [reset]);
       return <Controller name="a" control={control} render={() => <Input />} />;
     }
+  # Two independent forms reached through their own objects: formB's reset
+  # cannot un-register formA's fields, so this is not the bug.
+  - |
+    function Independent({ formA, formB }: Props) {
+      return (
+        <>
+          <Input {...formA.register("name")} />
+          <button onClick={() => formB.reset({})}>reset</button>
+        </>
+      );
+    }
+  # Two independent forms destructured separately: reset() empties formB's
+  # registry, not the one register() writes to.
+  - |
+    function IndependentDestructured() {
+      const formA = useForm<Values>();
+      const formB = useForm<Values>();
+      const { register } = formA;
+      const { reset } = formB;
+      useEffect(() => reset({}), [reset]);
+      return <Input {...register("name")} />;
+    }
+  # Local functions that merely share react-hook-form's names.
+  - |
+    function Unrelated() {
+      function register(name: string) { return { name }; }
+      function reset() {}
+      useEffect(() => reset(), []);
+      return <Input {...register("name")} />;
+    }
 invalid:
   # The failing shape: a destructured register() spread into props, in a
   # component that resets. This is the ScenarioForm bug.

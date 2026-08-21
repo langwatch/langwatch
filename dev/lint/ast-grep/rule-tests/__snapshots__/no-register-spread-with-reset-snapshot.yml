@@ -21,6 +21,22 @@ snapshots:
       style: secondary
       start: 112
       end: 134
+    - source: register
+      style: secondary
+      start: 49
+      end: 57
+    - source: reset
+      style: secondary
+      start: 59
+      end: 64
+    - source: '{ register, reset }'
+      style: secondary
+      start: 47
+      end: 66
+    - source: '{ register, reset } = useForm<Values>()'
+      style: secondary
+      start: 47
+      end: 86
     - source: |-
         function Hazard({ defaults }: Props) {
           const { register, reset } = useForm<Values>();
