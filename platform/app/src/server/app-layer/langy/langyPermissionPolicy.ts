@@ -1,9 +1,6 @@
-import {
-  Actions,
-  isOrgExclusivePermission,
-  type Permission,
-  Resources,
-} from "~/server/api/rbac";
+import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+// #7358 moved the vocabulary consts out of rbac.ts into their own module.
+import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 /**
  * WHY THIS FILE EXISTS

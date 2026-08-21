@@ -145,6 +145,12 @@ export async function ensureEvaluator({
   });
 }
 
+/**
+ * Deletes an evaluator by id. Already-gone (404) is the desired end state, not
+ * a failure — the callers are cleanup paths that run precisely when a run went
+ * wrong, so the resource being absent already is success. Everything else
+ * throws; swallowing the error would hide the leak this exists to prevent.
+ */
 export async function deleteEvaluator(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
     method: "DELETE",
@@ -230,24 +236,6 @@ export async function createEvaluator(
     path: "/api/evaluators",
     body: { name, config: { evaluatorType: "langevals/exact_match" } },
   });
-}
-
-/**
- * Teardown for the delete scenario's seeded evaluator, for the runs where
- * Langy failed to delete it (which is exactly the failing case, so the leak
- * happens precisely when the suite is red). Already-gone is the desired end
- * state — on a passing run Langy removed it during the scenario.
- */
-export async function deleteEvaluator(id: string): Promise<void> {
-  const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
-    method: "DELETE",
-    headers: { "X-Auth-Token": LW_KEY },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (response.ok || response.status === 404) return;
-  throw new Error(
-    `Failed to delete seeded evaluator ${id}: ${response.status} ${response.statusText}`,
-  );
 }
 
 /**

@@ -369,7 +369,7 @@ describe("Langy session key (caller-scoped)", () => {
           "evaluations:delete",
         ] as const) {
           await expect(
-            enforceApiKeyCeiling({ prisma, resolved: resolved!, permission }),
+            enforceApiKeyCeiling({ resolved: resolved!, permission }),
             `${permission} cleared the ceiling for a caller whose role does ` +
               `not hold it — the owner-intersection clamp is not holding`,
           ).rejects.toThrow();

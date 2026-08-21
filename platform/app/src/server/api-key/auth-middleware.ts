@@ -688,28 +688,6 @@ export async function enforceApiKeyCeiling({
 }
 
 /**
- * A Langy session key is refused for two different reasons that look
- * identical from the ceiling check: the human it mirrors does not hold the
- * permission, or Langy is never delegated it at all. Only the first one is
- * fixed by a wider key, so the policy that decides the second gets to say so.
- *
- * `excluded` (policy refusal) and `unreachable` (org-tier grain on a
- * project-scoped key) both mean no grant anyone can make will help, so both
- * get the not-delegable message instead of "widen your key".
- */
-function langyNotDelegableReason({
-  resolved,
-  permission,
-}: {
-  resolved: ResolvedToken & { type: "apiKey" };
-  permission: Permission;
-}): string | undefined {
-  if (!resolved.isLangySessionKey) return undefined;
-  const verdict = classifyForLangy(permission);
-  return verdict.disposition !== "granted" ? verdict.reason : undefined;
-}
-
-/**
  * The refusal, which is two refusals wearing the same face.
  *
  * A Langy session key is denied for one of two reasons that are identical from
