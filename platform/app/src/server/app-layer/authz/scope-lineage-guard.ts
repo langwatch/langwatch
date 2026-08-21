@@ -34,7 +34,7 @@ const logger = createLogger("langwatch:authz:scope-lineage");
  * belongs to. The real cause goes to the log line.
  */
 
-type LineagePrisma = Pick<PrismaClient, "team" | "project">;
+export type LineagePrisma = Pick<PrismaClient, "team" | "project">;
 
 type LineageMiddlewareParams = {
   ctx: { prisma: LineagePrisma };

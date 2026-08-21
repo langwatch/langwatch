@@ -8,6 +8,7 @@
  * @see specs/rbac/typed-permission-declarations.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LineagePrisma } from "../scope-lineage-guard";
 import { scopeLineageGuard } from "../scope-lineage-guard";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
@@ -54,11 +55,18 @@ async function run({
     kind: "permission",
     permission: "auditLog:view",
   });
-  const result = guard({ ctx: { prisma }, input, next });
+  // The mock carries only the two `findUnique`s the guard reads; cast to the
+  // delegate shape it declares, keeping the raw mock for the assertions.
+  const result = guard({
+    ctx: { prisma: prisma as unknown as LineagePrisma },
+    input,
+    next,
+  });
   return { prisma, next, result };
 }
 
 const expectPermissionDenied = async (result: Promise<unknown>) => {
+  // biome-ignore lint/suspicious/noMisplacedAssertion: one shared shape for every cross-tenant refusal; the assertion belongs with the shape it checks
   await expect(result).rejects.toMatchObject({
     code: "UNAUTHORIZED",
     cause: expect.objectContaining({

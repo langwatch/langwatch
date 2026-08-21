@@ -143,11 +143,16 @@ export class PermissionsService {
       scope,
     });
     if (permitted) {
+      // `scope.tier` is the wide `BindingScopeTier` union; the check's own
+      // arg proves it is `TierOfScopeArg<A>` here. Narrow at the mint so the
+      // witness carries both the tier AND the permission (`Authorized<Tier,
+      // P>`) rather than casting the whole witness after the fact — a
+      // post-hoc cast no longer overlaps now the type is two-parameter.
       return mintWitness({
-        tier: scope.tier,
+        tier: scope.tier as TierOfScopeArg<A>,
         id: scope.id,
         permission: check.permission,
-      }) as Authorized<TierOfScopeArg<A>>;
+      });
     }
     if (organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(

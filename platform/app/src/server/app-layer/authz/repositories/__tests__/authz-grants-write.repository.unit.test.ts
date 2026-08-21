@@ -224,8 +224,10 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       // The guard matched no row (0): this older attach lost to a newer state.
       executeRaw.mockResolvedValue(0);
       // The authoritative row it lost to is revoked.
+      // `grantRow()` is typed `never` for the mock signatures it feeds, which
+      // is not spreadable; widen it here where the spread needs an object.
       prisma.grant.findUnique.mockResolvedValue({
-        ...grantRow(),
+        ...(grantRow() as Record<string, unknown>),
         revokedAt: new Date(5),
       });
 
