@@ -21,13 +21,18 @@ let capturedItems: CapturedItem[] = [];
 const harness = vi.hoisted(() => ({
   /** Flags the useFeatureFlag mock reports enabled. */
   enabledFlags: [] as string[],
+  /** Options each useFeatureFlag call received, keyed by flag name. */
+  flagCallOptions: {} as Record<string, unknown>,
 }));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: (flag: string) => ({
-    enabled: harness.enabledFlags.includes(flag),
-    isLoading: false,
-  }),
+  useFeatureFlag: (flag: string, options?: unknown) => {
+    harness.flagCallOptions[flag] = options;
+    return {
+      enabled: harness.enabledFlags.includes(flag),
+      isLoading: false,
+    };
+  },
 }));
 
 // useVisibleSectionNavItems resolves flags with org context; give it one.
@@ -101,6 +106,7 @@ describe("given the gateway section navigation data", () => {
 describe("given the governance section navigation data", () => {
   beforeEach(() => {
     harness.enabledFlags = [];
+    harness.flagCallOptions = {};
   });
 
   describe("when the governance layout renders with the billed-cost flag off", () => {
@@ -135,6 +141,12 @@ describe("given the governance section navigation data", () => {
         { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
         { label: "People", href: "/governance/people" },
       ]);
+
+      // The flag must resolve in organization context, gated on the org
+      // being loaded — flags resolved without it silently read as off.
+      expect(
+        harness.flagCallOptions["release_ui_governance_billed_cost_enabled"],
+      ).toEqual({ organizationId: "org-1", enabled: true });
     });
   });
 });
