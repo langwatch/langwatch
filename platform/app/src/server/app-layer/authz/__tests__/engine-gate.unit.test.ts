@@ -170,7 +170,7 @@ describe("the authz engine gate", () => {
   });
 
   describe("when the operator flips the row after it was cached", () => {
-    /** @scenario "The operator rollback returns an organization's writes to the legacy path without a deploy" */
+    /** @scenario "Rolling back returns an organization to the legacy path within the gate's cache window" */
     it("returns to the legacy path once the cached answer expires, with no restart", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));

@@ -39,7 +39,7 @@ function attachedEvent(overrides: Record<string, unknown> = {}) {
 
 describe("AuthzGrantsWriteProjection", () => {
   describe("given a grant attached", () => {
-    /** @scenario "A grant event writes one row and reads nothing" */
+    /** @scenario "One grant's projection write reads only its own row" */
     it("takes the owning organization from the event's tenant", () => {
       const write = projection.mapAuthzGrantAttached(attachedEvent());
 

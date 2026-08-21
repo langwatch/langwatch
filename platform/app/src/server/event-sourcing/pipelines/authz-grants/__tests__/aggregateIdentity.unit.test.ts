@@ -62,7 +62,7 @@ async function emit(
 
 describe("authz command aggregate identity", () => {
   describe("given a command about one grant", () => {
-    /** @scenario "A grant command names its own grant as the aggregate" */
+    /** @scenario "A grant's aggregate is the grant" */
     it.each([
       ["attach", new AttachGrantCommand(), { ...identity, grant: GRANT }],
       [
@@ -97,7 +97,7 @@ describe("authz command aggregate identity", () => {
   });
 
   describe("given a command about one role", () => {
-    /** @scenario "A role command names its own role as the aggregate" */
+    /** @scenario "A role's aggregate is the role" */
     it.each([
       [
         "define",

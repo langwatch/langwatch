@@ -64,7 +64,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     "pending",
     "parked",
   ] as const)("when the organization's migration is %s", (status) => {
-    /** @scenario "The legacy team rows keep answering until the migration finishes" */
+    /** @scenario "An organization that has not finalized reads from legacy" */
     it("answers from the legacy row, whatever the migration is doing", async () => {
       mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
         status === "pending" ? null : { status },

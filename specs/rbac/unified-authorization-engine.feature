@@ -303,12 +303,8 @@ Feature: Unified authorization engine
     Then the check is granted on the engine's answer
     And the answer does not wait for the legacy resolver
 
-  @unit
-  Scenario: Legacy runs behind the engine as the reverse-shadow comparison
-    Given "acme" has been cut over to the engine
-    When a check runs that the legacy resolver would have answered differently
-    Then the disagreement is logged as a warning naming the engine as primary
-    And the answer the caller received is unaffected
+  # The reverse-shadow comparison retired with the fork: the engine is the
+  # only resolver, so there is no legacy answer left to compare against.
 
   @unit
   Scenario: An organization that has not cut over is unchanged

@@ -171,7 +171,7 @@ describe("RoleBindingService create", () => {
       expect(attachBindings).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A grant write states a fact instead of writing the table" */
+    /** @scenario "Every write goes through the group queue" */
     it("stores the binding against the key", async () => {
       await service.create({ ...bindingInput, apiKeyId: "key_1" });
 
