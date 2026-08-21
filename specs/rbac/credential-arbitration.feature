@@ -72,6 +72,14 @@ Feature: Credential arbitration
     And the session authenticates it rather than the two contesting
 
   @unit
+  Scenario: A legacy prefix-less project key with no session still authenticates
+    Given a request carrying a project key minted before LangWatch key prefixes
+    And the request carries no session
+    When the request is arbitrated
+    Then the key claims the request
+    And the stored-key lookup decides whether it authenticates
+
+  @unit
   Scenario: An invalid API key is refused without falling back to the session
     Given a request whose API key credentials do not resolve
     When the request is arbitrated

@@ -1749,20 +1749,26 @@ function grantWhereFromBindingWhere(
   }
 
   if (where.customRoleId != null) {
-    const value = where.customRoleId;
-    if (typeof value === "string") {
-      grantWhere.roleKey = `custom:${value}`;
-    } else if (Array.isArray((value as { in?: unknown }).in)) {
-      grantWhere.roleKey = {
-        in: (value as { in: string[] }).in.map((id) => `custom:${id}`),
-      };
-    } else {
-      return null;
-    }
+    const roleKey = roleKeyFromCustomRoleFilter(where.customRoleId);
+    if (roleKey === null) return null;
+    grantWhere.roleKey = roleKey;
   }
 
   if (where.id != null)
     grantWhere.id = where.id as Prisma.GrantWhereInput["id"];
 
   return grantWhere;
+}
+
+/** A `customRoleId` filter as the `custom:<id>` roleKey predicate it names —
+ *  a plain string or an `in` list; any other operator shape is outside the
+ *  caller vocabulary, so null and the caller bails. */
+function roleKeyFromCustomRoleFilter(
+  value: NonNullable<Prisma.RoleBindingWhereInput["customRoleId"]>,
+): Prisma.GrantWhereInput["roleKey"] | null {
+  if (typeof value === "string") return `custom:${value}`;
+  if (Array.isArray((value as { in?: unknown }).in)) {
+    return { in: (value as { in: string[] }).in.map((id) => `custom:${id}`) };
+  }
+  return null;
 }

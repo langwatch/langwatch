@@ -150,6 +150,28 @@ describe("dualAuth", () => {
     });
   });
 
+  describe("given a legacy prefix-less project key and no session", () => {
+    /** @scenario "A legacy prefix-less project key with no session still authenticates" */
+    it("claims the request and lets the stored-key lookup decide", async () => {
+      acceptingAuthMiddleware();
+      const { app } = appWithDualAuth();
+
+      // A project key minted before the `sk-lw-` prefix existed: no LangWatch
+      // prefix, but a stored key the legacy lookup resolves. With no session
+      // to defer to, the abstention that protects proxy-fronted media fetches
+      // must not apply — refusing here would lock every pre-prefix key out.
+      const res = await app.request("/", {
+        headers: { authorization: "Bearer test-api-key-legacy" },
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        userId: null,
+        apiKeyProjectId: PROJECT_ID,
+      });
+    });
+  });
+
   describe("given API key credentials that do not resolve", () => {
     /** @scenario "An invalid API key is refused without falling back to the session" */
     it("answers the API key's own refusal with no fallback", async () => {
