@@ -127,6 +127,13 @@ export function createLangyChatTransport(
           })
         : await trpcClient.langy.createConversation.mutate({
             ...turnInput,
+            // A create carries only the user's own messages. The useChat state
+            // can still hold the PREVIOUS conversation's assistant reply when
+            // the user starts a new chat mid-stream, and sending it would seed
+            // the new conversation (and its title) with the old answer.
+            messages: options.messages.filter(
+              (message) => message.role === "user",
+            ),
             // Adopt the warmed conversation when the panel holds one, so the
             // first turn reuses the worker the panel open already booted.
             ...(ctx.pendingConversationId

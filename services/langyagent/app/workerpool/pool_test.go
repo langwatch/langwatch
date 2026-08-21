@@ -255,18 +255,63 @@ func TestWorker_ClaimTurn_SerialisesConcurrentTurns(t *testing.T) {
 	}
 }
 
-func TestPool_Acquire_AtCapacityReturnsErrMaxWorkers(t *testing.T) {
+// @scenario "A real turn's spawn evicts an idle worker at capacity"
+func TestPool_Acquire_AtCapacityEvictsIdleWorkerForATurn(t *testing.T) {
 	p := newTestPool(1)
-	// One worker already occupies the single slot.
-	p.workers["existing"] = &Worker{}
+	// One IDLE worker (a pre-warm nobody messaged, or a leftover between turns)
+	// occupies the single slot.
+	p.workers["existing"] = &Worker{conversationID: "existing"}
+	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	// The spawn itself fails in this environment (no sessions root); what the
+	// eviction contract promises is that capacity was NOT the refusal and the
+	// idle worker gave up its slot.
+	if herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("a turn acquire must evict an idle worker instead of refusing at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if stillThere {
+		t.Fatalf("the idle worker should have been evicted to free the slot")
+	}
+}
+
+// @scenario "A turn waits only when every worker is genuinely busy"
+func TestPool_Acquire_AtCapacityAllBusyReturnsErrMaxWorkers(t *testing.T) {
+	p := newTestPool(1)
+	busy := &Worker{conversationID: "existing"}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["existing"] = busy
 	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
 	if err == nil {
-		t.Fatalf("expected ErrMaxWorkers when the pool is full")
+		t.Fatalf("expected ErrMaxWorkers when every worker is busy")
 	}
 	if !herr.IsCode(err, domain.ErrMaxWorkers) {
 		t.Fatalf("expected herr(ErrMaxWorkers), got %v", err)
+	}
+}
+
+// @scenario "A warm never evicts anyone to make room for itself"
+func TestPool_AcquireWarm_AtCapacityRefusesWithoutEvicting(t *testing.T) {
+	p := newTestPool(1)
+	p.workers["existing"] = &Worker{conversationID: "existing"}
+	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	if !herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("expected herr(ErrMaxWorkers) for a warm at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if !stillThere {
+		t.Fatalf("a warm must not evict the idle worker")
 	}
 }
 

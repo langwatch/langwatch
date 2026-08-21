@@ -108,6 +108,50 @@ Feature: Langy worker pre-warm on panel open
       And no error reaches the panel
       And the first message cold-starts the worker as if no warm existed
 
+  Rule: A warm worker never starves a real turn
+
+    # A pre-warm fills pool slots with workers that may never see a message. A
+    # real turn's spawn takes priority: it evicts the least-recently-active
+    # IDLE worker rather than queueing behind one. Warms stay best-effort: at
+    # capacity they refuse rather than evict, because warm-evicting-warm only
+    # churns subprocesses. Seen live on a two-slot pool: one abandoned fresh
+    # warm plus one conversation wedged every later message into an outbox
+    # retry loop.
+    @unit
+    Scenario: A real turn's spawn evicts an idle worker at capacity
+      Given the pool is at its worker cap
+      And at least one worker has no turn in flight
+      When a turn needs a worker for a new conversation
+      Then the least-recently-active idle worker is killed
+      And the turn's worker takes the freed slot
+
+    @unit
+    Scenario: A turn waits only when every worker is genuinely busy
+      Given the pool is at its worker cap
+      And every worker has a turn in flight
+      When a turn needs a worker for a new conversation
+      Then the pool refuses with the capacity error
+      And the outbox redelivers the turn when a slot frees
+
+    @unit
+    Scenario: A warm never evicts anyone to make room for itself
+      Given the pool is at its worker cap
+      And at least one worker has no turn in flight
+      When a warm request needs a worker for a new conversation
+      Then the pool refuses with the capacity error
+      And every running worker is left alone
+
+    # The panel half of the same rule: one fresh-chat warm per open used to be
+    # the cap, so the new-chat button after a first warm sent no warm at all,
+    # and the first message cold-started while the earlier warm worker sat
+    # idle, occupying the slot the turn then needed.
+    @unit
+    Scenario: Starting a new chat after a conversation warms again
+      Given the panel warmed a fresh chat and a conversation then took over
+      When the user starts a new chat while the panel stays open
+      Then the panel warms the fresh chat again
+      And the new warm's minted id becomes the pending conversation id
+
   Rule: An unused warm worker is reaped and its key dies with it
 
     # The reap itself is the manager's idle sweep, and the revoke-on-death plus

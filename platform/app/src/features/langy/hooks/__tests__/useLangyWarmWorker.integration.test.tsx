@@ -136,6 +136,31 @@ describe("useLangyWarmWorker", () => {
 
       expect(useLangyStore.getState().pendingConversationId).toBeNull();
     });
+
+    /** @scenario Starting a new chat after a conversation warms again */
+    it("re-arms the fresh warm once a conversation takes over", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      // Open on a fresh chat: fresh warm 1 fires.
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate.mock.calls[0]![0]).toEqual({
+        projectId: "proj-1",
+        modelOverride: "openai/gpt-5-mini",
+      });
+
+      // A conversation takes the panel over (a send adopted the fresh chat).
+      rerender(props({ conversationId: "conv-adopted" }));
+      expect(mutate).toHaveBeenCalledTimes(2);
+
+      // New chat: the fresh warm must fire AGAIN, minting a new pending id.
+      rerender(props({ conversationId: null }));
+      expect(mutate).toHaveBeenCalledTimes(3);
+      expect(mutate.mock.calls[2]![0]).toEqual({
+        projectId: "proj-1",
+        modelOverride: "openai/gpt-5-mini",
+      });
+    });
   });
 
   describe("when the panel is closed or the model has not settled", () => {

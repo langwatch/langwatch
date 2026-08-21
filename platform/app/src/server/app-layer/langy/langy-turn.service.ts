@@ -838,8 +838,14 @@ export class LangyTurnService {
 
     try {
       const questionParts = lastUserMessage?.parts ?? [];
+      // The FIRST USER message names the conversation, never messages[0]
+      // verbatim: a client can send assistant parts it still held (a new chat
+      // started while the previous reply streamed), and those must not become
+      // the title.
       const title =
-        extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
+        extractTextFromParts(
+          messages.find((message) => message.role === "user")?.parts,
+        ).slice(0, 80) || null;
 
       // The per-conversation frame-signing key is created from resolved
       // conversation state, never from a caller-supplied "new" flag.

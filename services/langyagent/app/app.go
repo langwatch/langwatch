@@ -173,8 +173,10 @@ type ChatRequest struct {
 // warming only once its credentials are final.
 //
 // At capacity is not an error worth surfacing: the turn itself will report it.
+// AcquireWarm rather than Acquire, because a warm must never evict a worker to
+// make room for itself — only a real turn's spawn earns that.
 func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Credentials) error {
-	worker, err := a.pool.Acquire(ctx, conversationID, creds)
+	worker, err := a.pool.AcquireWarm(ctx, conversationID, creds)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			return nil

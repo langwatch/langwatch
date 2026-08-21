@@ -133,6 +133,15 @@ func (w *Worker) shouldReap(cutoff time.Duration) bool {
 	return !w.inFlight && time.Since(w.lastSeen) > cutoff
 }
 
+// idleSince reports the worker's idle state for capacity eviction: whether no
+// turn is in flight, and when it was last active. Callers rank idle workers by
+// lastSeen and take the least-recently-active one first.
+func (w *Worker) idleSince() (idle bool, lastSeen time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return !w.inFlight, w.lastSeen
+}
+
 // ClaimTurn takes turnId-idempotent ownership for one turn — the caller MUST call
 // Release() when the turn is done (success or error) after a granted claim. See
 // app.ClaimOutcome: the SAME turnId in flight or recently completed is a benign

@@ -422,7 +422,24 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 // If an existing worker's CredentialSignature differs from the caller's (model
 // changed, GitHub token added/removed) the existing worker is killed and a
 // fresh one is spawned with the new capability set.
+//
+// A turn's spawn at capacity evicts the least-recently-active IDLE worker
+// instead of failing: pre-warm fills the pool with workers that may never see
+// a message, and a real turn must never queue behind one of those (a two-slot
+// local pool wedged exactly that way). Warm spawns go through AcquireWarm,
+// which refuses at capacity rather than evicting — warm-evicting-warm would
+// only churn subprocesses.
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, creds, true)
+}
+
+// AcquireWarm is Acquire for a pre-warm: best-effort, so at capacity it fails
+// with ErrMaxWorkers instead of evicting anyone.
+func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, creds, false)
+}
+
+func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, evictIdleAtCapacity bool) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
@@ -483,10 +500,21 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 
 	// Atomic capacity reservation. Increment BEFORE releasing the registry lock
 	// so concurrent first-turns for N distinct conversations can't observe
-	// len(workers)==0 and all pass the cap check.
-	if len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
+	// len(workers)==0 and all pass the cap check. At capacity, a turn's spawn
+	// evicts idle workers (the reaper's own pick order) until a slot opens; the
+	// loop re-checks because a concurrent spawner can take the freed slot first.
+	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
+		victim, found := "", false
+		if evictIdleAtCapacity {
+			victim, found = p.idleVictimLocked()
+		}
+		if !found {
+			p.mu.Unlock()
+			return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
+		}
 		p.mu.Unlock()
-		return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
+		p.kill(victim, "evicted: capacity needed for a turn's worker")
+		p.mu.Lock()
 	}
 	atomic.AddInt32(&p.pendingSpawns, 1)
 	ch := make(chan struct{})
@@ -509,6 +537,23 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 	p.workers[conversationID] = w
 	p.mu.Unlock()
 	return w, nil
+}
+
+// idleVictimLocked picks the least-recently-active idle worker, the same one
+// the reaper would take first. Caller holds p.mu; the p.mu -> w.mu lock order
+// matches reapIdle.
+func (p *Pool) idleVictimLocked() (conversationID string, found bool) {
+	var oldest time.Time
+	for id, w := range p.workers {
+		idle, seen := w.idleSince()
+		if !idle {
+			continue
+		}
+		if !found || seen.Before(oldest) {
+			conversationID, oldest, found = id, seen, true
+		}
+	}
+	return conversationID, found
 }
 
 // Status returns a live worker count and the configured cap (used by /health).

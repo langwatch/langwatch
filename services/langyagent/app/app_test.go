@@ -35,6 +35,9 @@ func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (W
 	}
 	return f.worker, nil
 }
+func (f *fakePool) AcquireWarm(ctx context.Context, id string, creds domain.Credentials) (Worker, error) {
+	return f.Acquire(ctx, id, creds)
+}
 func (f *fakePool) Status() (int, int)            { return 0, 0 }
 func (f *fakePool) KillSessionVanished(id string) { f.killed = append(f.killed, id) }
 func (f *fakePool) CancelTurn(conversationID, turnID string) {

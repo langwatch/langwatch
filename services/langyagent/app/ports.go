@@ -29,11 +29,16 @@ var ErrRelayDisabled = errors.New("langyagent: relay push disabled (missing secr
 // WorkerPool is the driven port the app uses to get a worker for a
 // conversation. Implemented by app/workerpool.Pool.
 type WorkerPool interface {
-	// Acquire returns the worker for conversationID, spawning one if needed. A
-	// herr(domain.ErrMaxWorkers) is returned at capacity. A herr with
+	// Acquire returns the worker for conversationID, spawning one if needed.
+	// This is the TURN path: at capacity it evicts the least-recently-active
+	// idle worker (a pre-warmed pool must never starve a real turn) and only
+	// returns herr(domain.ErrMaxWorkers) when every worker is busy. A herr with
 	// domain.ErrCredentialsRequired is returned when a spawn is needed but the
 	// credentials carry no session key — see HasLiveWorker.
 	Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (Worker, error)
+	// AcquireWarm is Acquire for a pre-warm: best-effort by contract, so at
+	// capacity it returns herr(domain.ErrMaxWorkers) instead of evicting.
+	AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (Worker, error)
 	// HasLiveWorker reports whether a worker matching `sig` is already running for
 	// this conversation. The control plane calls this BEFORE a turn to decide
 	// whether it needs to mint a session key at all: a reused worker already

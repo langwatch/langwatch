@@ -66,6 +66,12 @@ export function useLangyWarmWorker({
       return;
     }
     if (!projectId || !model) return;
+    // A conversation taking over (a send adopted the fresh chat, or the user
+    // opened an existing one) consumes the fresh warm, so re-arm it: the next
+    // fresh chat in this open is a NEW conversation with a new mint. Without
+    // this, the new-chat button after a first warm sent no warm at all, and the
+    // first message cold-started while the earlier warm worker sat idle.
+    if (conversationId) firedRef.current.delete(`${projectId}:`);
     const key = `${projectId}:${conversationId ?? ""}`;
     if (firedRef.current.has(key)) return;
     firedRef.current.add(key);

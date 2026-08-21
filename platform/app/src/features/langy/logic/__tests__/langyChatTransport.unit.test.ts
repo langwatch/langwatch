@@ -94,6 +94,30 @@ describe("createLangyChatTransport", () => {
       });
     });
 
+    it("sends only the user's own messages on a create", async () => {
+      // Starting a new chat while the previous reply streams leaves the old
+      // assistant message in useChat state; a create must not seed the new
+      // conversation (or its title) with it.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ role: string }> }).messages).toEqual(
+        [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+      );
+    });
+
     it("mints a fresh idempotency key for each logical send", async () => {
       const { transport } = makeTransport({ conversationId: null });
 
