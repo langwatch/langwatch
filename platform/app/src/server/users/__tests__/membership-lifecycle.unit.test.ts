@@ -268,7 +268,7 @@ describe("MembershipLifecycleService", () => {
   });
 
   describe("when a directory sends a DELETE rather than active:false", () => {
-    it("removes the membership and its role bindings in the same transaction as the closing rows", async () => {
+    it("removes the membership in the same transaction as the closing rows", async () => {
       const prisma = seedTwoOrgs();
 
       const outcome = await serviceFor(prisma).onMembershipDeactivated({
@@ -282,6 +282,28 @@ describe("MembershipLifecycleService", () => {
       expect(
         prisma.organizationUser.rows.map((row) => row.organizationId),
       ).toEqual(["org-b"]);
+    });
+
+    it("leaves the person's grants alone — the grants ledger revokes them", async () => {
+      const prisma = seedTwoOrgs();
+      prisma.roleBinding.rows.push({
+        id: "binding-1",
+        userId: "alice",
+        organizationId: "org-a",
+      });
+
+      await serviceFor(prisma).onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        membershipChange: "remove",
+        now: OFFBOARDED_AT,
+      });
+
+      // ADR-092 decision 18 (ADR-094 v9): the ledger is the only writer of
+      // grants, and the caller offboards through it before calling in here —
+      // its fold sweeps grants this transaction could not even see. A delete
+      // here would be a second writer racing that sweep.
+      expect(prisma.roleBinding.rows).toHaveLength(1);
     });
   });
 
