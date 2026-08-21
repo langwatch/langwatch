@@ -1,12 +1,5 @@
-import { Box, type BoxProps, HStack, IconButton } from "@chakra-ui/react";
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-} from "react";
+import { Box, type BoxProps, HStack, IconButton, Text } from "@chakra-ui/react";
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
 import { LuCopy, LuTrash2 } from "react-icons/lu";
 import type { z } from "zod";
 import { ConversationThread } from "~/components/conversation/ConversationThread";
@@ -24,6 +17,7 @@ import {
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { playgroundConversationLabels } from "./conversationLabels";
+import { renderPromptInstructions } from "./renderPromptInstructions";
 import { SyncedChatInput } from "./SyncedChatInput";
 
 interface PromptPlaygroundChatProps extends BoxProps {
@@ -117,6 +111,25 @@ const PromptPlaygroundChat = forwardRef<
   const { messages, errors, isRunning, send, stop, reset, deleteMessage } =
     execution;
 
+  const renderedInstructions = useMemo(() => {
+    const template =
+      formValues.version.configData.messages?.find(
+        (message) => message.role === "system",
+      )?.content ?? "";
+    const latestInput = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "user" && typeof message.content === "string",
+      )?.content as string | undefined;
+
+    return renderPromptInstructions({
+      template,
+      variables: variables ?? [],
+      latestInput,
+    });
+  }, [formValues.version.configData.messages, messages, variables]);
+
   useImperativeHandle(ref, () => ({
     resetChat: reset,
     focusInput: () => {
@@ -157,19 +170,60 @@ const PromptPlaygroundChat = forwardRef<
     >
       {/* Full width, so the thread's own scrollbar rides the panel edge; the
           messages are centred inside it by `panel.contentMaxWidth`. */}
-      <Box flex={1} minHeight={0} width="full">
-        <ConversationThread
-          parts={parts}
-          labels={labels}
-          projectId={project?.id ?? ""}
-          renderPartActions={renderPartActions}
-          structuredOutput
-          panel={{ contentMaxWidth: "768px" }}
-          live
-          // The gap between sending and the first token belongs to the thread,
-          // where the reply will land — not to the send button going quiet.
-          pendingReply={isRunning && !hasStreamingReply}
-        />
+      <Box
+        flex={1}
+        minHeight={0}
+        width="full"
+        display="flex"
+        flexDirection="column"
+      >
+        {renderedInstructions.trim() && (
+          <Box flexShrink={0} paddingX={4} paddingTop={4}>
+            <Box
+              width="full"
+              maxWidth="768px"
+              marginX="auto"
+              paddingX={3}
+              paddingY={2.5}
+              borderWidth="1px"
+              borderColor="purple.muted"
+              borderRadius="lg"
+              background="purple.subtle"
+            >
+              <Text
+                textStyle="2xs"
+                fontWeight="semibold"
+                color="purple.fg"
+                marginBottom={1}
+              >
+                Rendered instructions
+              </Text>
+              <Text
+                fontSize="xs"
+                color="fg.muted"
+                whiteSpace="pre-wrap"
+                maxHeight="88px"
+                overflowY="auto"
+              >
+                {renderedInstructions}
+              </Text>
+            </Box>
+          </Box>
+        )}
+        <Box flex={1} minHeight={0} width="full">
+          <ConversationThread
+            parts={parts}
+            labels={labels}
+            projectId={project?.id ?? ""}
+            renderPartActions={renderPartActions}
+            structuredOutput
+            panel={{ contentMaxWidth: "768px" }}
+            live
+            // The gap between sending and the first token belongs to the thread,
+            // where the reply will land — not to the send button going quiet.
+            pendingReply={isRunning && !hasStreamingReply}
+          />
+        </Box>
       </Box>
       <SyncedChatInput inProgress={isRunning} onSend={send} onStop={stop} />
     </Box>
@@ -191,27 +245,15 @@ function MessageActions({
   onDelete: () => void;
 }) {
   const text = part.kind === "text" ? part.content : undefined;
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Revealed on hover of the message, not of the row itself — a row that only
-  // appears once you find it is not an affordance.
-  useEffect(() => {
-    const container = containerRef.current?.parentElement;
-    if (!container) return;
-    const show = () => containerRef.current?.style.setProperty("opacity", "1");
-    const hide = () => containerRef.current?.style.setProperty("opacity", "0");
-    container.addEventListener("mouseenter", show);
-    container.addEventListener("mouseleave", hide);
-    container.addEventListener("focusin", show);
-    return () => {
-      container.removeEventListener("mouseenter", show);
-      container.removeEventListener("mouseleave", hide);
-      container.removeEventListener("focusin", show);
-    };
-  }, []);
 
   return (
-    <HStack ref={containerRef} gap={0.5} opacity={0} transition="opacity 0.15s">
+    <HStack
+      gap={0.5}
+      opacity={0}
+      transition="opacity 0.15s"
+      _groupHover={{ opacity: 1 }}
+      _focusWithin={{ opacity: 1 }}
+    >
       {text && (
         <Tooltip content="Copy message">
           <IconButton

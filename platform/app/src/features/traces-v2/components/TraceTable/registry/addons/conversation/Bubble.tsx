@@ -98,6 +98,8 @@ interface BubbleProps {
    * Owned by the host, which holds the text and swaps it.
    */
   translate?: MessageTranslation;
+  /** Compact controls belonging to this message, rendered inside its bubble. */
+  actions?: React.ReactNode;
 }
 
 const DEFAULT_MAX_CHARS = 320;
@@ -138,6 +140,7 @@ export const Bubble: React.FC<BubbleProps> = ({
   annotation,
   annotate,
   translate,
+  actions,
 }) => {
   const palette = BUBBLE_TONES[tone];
   const compact = size === "compact";
@@ -295,6 +298,16 @@ export const Bubble: React.FC<BubbleProps> = ({
             expanded={expanded}
             onToggle={() => setExpanded((v) => !v)}
           />
+        )}
+        {actions && (
+          <HStack
+            justify="flex-end"
+            paddingTop={1.5}
+            marginBottom={-1}
+            marginRight={-1}
+          >
+            {actions}
+          </HStack>
         )}
       </Box>
     </Flex>

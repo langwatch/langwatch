@@ -1,4 +1,4 @@
-import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
@@ -136,18 +136,34 @@ export function GenerateApiSnippetDialog({
       <Dialog.Root
         open={open}
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
-        size="xl"
+        size="lg"
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content
+          bg="bg.panel"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="xl"
+          boxShadow="xl"
+          width="calc(100vw - 32px)"
+          maxWidth="960px"
+          maxHeight="calc(100dvh - 48px)"
+          overflow="hidden"
+        >
           <Dialog.CloseTrigger />
-          <Dialog.Header width="100%" marginTop={4}>
+          <Dialog.Header
+            width="100%"
+            paddingLeft={5}
+            paddingRight={12}
+            paddingTop={5}
+            paddingBottom={3}
+          >
             <VStack alignItems="stretch" gap={3} width="100%">
               <HStack
                 justifyContent="space-between"
                 width="100%"
                 alignItems="flex-start"
               >
-                <VStack alignItems="flex-start" gap={2}>
+                <VStack alignItems="flex-start" gap={1} paddingRight={8}>
                   <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
                   <Dialog.Description>{description}</Dialog.Description>
                 </VStack>
@@ -174,29 +190,41 @@ export function GenerateApiSnippetDialog({
               {useTabs && controls ? <HStack>{controls}</HStack> : null}
             </VStack>
           </Dialog.Header>
-          <Dialog.Body>
-            <RenderCode
-              code={
-                useTabs
-                  ? (activeTab?.content ?? "")
-                  : (selectedSnippet?.content ?? "")
-              }
-              language={
-                useTabs
-                  ? (activeTab?.language ?? "bash")
-                  : SnippetTargetToPrismLanguageMap[selectedTarget]
-              }
-              style={{
-                fontSize: "12px",
-                lineHeight: "1.5",
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-                padding: "20px",
-                borderRadius: "5px",
-              }}
-            />
+          <Dialog.Body
+            paddingX={5}
+            paddingTop={2}
+            paddingBottom={5}
+            overflowY="auto"
+          >
+            <Box
+              maxHeight="min(460px, 58dvh)"
+              overflow="auto"
+              borderRadius="lg"
+              borderWidth="1px"
+              borderColor="border.muted"
+            >
+              <RenderCode
+                code={
+                  useTabs
+                    ? (activeTab?.content ?? "")
+                    : (selectedSnippet?.content ?? "")
+                }
+                language={
+                  useTabs
+                    ? (activeTab?.language ?? "bash")
+                    : SnippetTargetToPrismLanguageMap[selectedTarget]
+                }
+                style={{
+                  fontSize: "12px",
+                  lineHeight: "1.5",
+                  fontFamily: "monospace",
+                  whiteSpace: "pre-wrap",
+                  padding: "16px",
+                  borderRadius: "8px",
+                }}
+              />
+            </Box>
           </Dialog.Body>
-          <Dialog.Footer></Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
     </ApiSnippetDialogContext.Provider>

@@ -27,7 +27,7 @@ export type SavePromptButtonProps = {
  * - "Save changes" when the editor holds edits, which become a new version
  * - "Make this the latest version" when there are no edits but an older
  *   version is loaded, which republishes that version as the latest one
- * - "Saved" when there is nothing to do
+ * - "No changes to save" when there is nothing to do
  * - "Save" for a prompt that has no versions yet
  *
  * Button is enabled when:
@@ -65,8 +65,7 @@ export function SavePromptButton({
   const canSave = hasUnsavedChanges || !isAtLatestVersion;
 
   const getButtonLabel = () => {
-    // Show "Saved" only when no changes AND at latest version
-    if (!hasUnsavedChanges && isAtLatestVersion) return "Saved";
+    if (!hasUnsavedChanges && isAtLatestVersion) return "No changes to save";
     // A prompt with no versions yet has nothing to be the latest of.
     if (nextVersion === undefined) return "Save";
     if (hasUnsavedChanges) return "Save changes";

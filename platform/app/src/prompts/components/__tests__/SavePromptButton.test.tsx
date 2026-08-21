@@ -56,7 +56,7 @@ function TestWrapper({
 describe("SavePromptButton", () => {
   describe("when at latest version with no changes", () => {
     /** @scenario "The save button is quiet when there is nothing to save" */
-    it("shows 'Saved' and is disabled", () => {
+    it("says there are no changes to save and is disabled", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 5,
         latestVersion: 5,
@@ -80,7 +80,7 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Saved");
+      expect(button).toHaveTextContent("No changes to save");
       expect(button).toBeDisabled();
     });
   });

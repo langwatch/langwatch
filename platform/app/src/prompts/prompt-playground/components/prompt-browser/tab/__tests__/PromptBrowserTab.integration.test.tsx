@@ -36,7 +36,13 @@ function givenTabTitled(title: string) {
   } as unknown as ReturnType<typeof usePromptBrowserTabController>);
 }
 
-function renderTab(props: { isActive?: boolean; isCrowded?: boolean } = {}) {
+function renderTab(
+  props: {
+    isActive?: boolean;
+    isCrowded?: boolean;
+    hideCloseButton?: boolean;
+  } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TabIdProvider tabId="tab-1">
@@ -151,6 +157,15 @@ describe("PromptBrowserTab", () => {
       renderTab({ isActive: false, isCrowded: false });
 
       expect(closeAction()).toBeInTheDocument();
+    });
+  });
+
+  describe("given it is the only tab in its card", () => {
+    it("leaves its close action to the far side of the card", () => {
+      givenTabTitled("classifier");
+      renderTab({ isActive: true, hideCloseButton: true });
+
+      expect(closeAction()).not.toBeInTheDocument();
     });
   });
 });
