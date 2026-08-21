@@ -321,6 +321,13 @@ Feature: Unified authorization engine
     And nothing is deployed or restarted for that to hold
 
   @unit
+  Scenario: A failed migration-state read is reported
+    Given the gate cannot read an organization's migration state
+    When a check runs for that organization
+    Then the answer falls back to the legacy path for the cache window
+    And the failure is reported with the organization and the window it reopened
+
+  @unit
   Scenario: A cut-over organization's checks read the ledger's own head
     Given "acme" has been cut over to the engine
     When grants are collected for a member of "acme"

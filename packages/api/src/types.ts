@@ -1,4 +1,7 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type {
+  AccessDeclaration,
+  AuthzPermission,
+} from "@langwatch/authz";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -110,9 +113,18 @@ export interface EndpointDocs {
  * `v.get(path, config, handler)`.
  *
  * Merges schema declarations (input, output, params, query) with per-endpoint
- * options (auth, resourceLimit, middleware, etc.).
+ * options (auth, resourceLimit, middleware, etc.) and the mandatory
+ * {@link AccessDeclaration}.
  */
-export interface EndpointConfig<
+export type EndpointConfig<
+  TInput extends ZodType = ZodType,
+  TOutput extends ZodType = ZodType,
+  TParams extends ZodType = ZodType,
+  TQuery extends ZodType = ZodType,
+> = BaseEndpointConfig<TInput, TOutput, TParams, TQuery> & AccessDeclaration;
+
+/** The access-independent half of {@link EndpointConfig}. */
+export interface BaseEndpointConfig<
   TInput extends ZodType = ZodType,
   TOutput extends ZodType = ZodType,
   TParams extends ZodType = ZodType,
@@ -148,15 +160,11 @@ export interface EndpointConfig<
    * - A `MiddlewareHandler` -- use a custom auth middleware for this endpoint.
    */
   auth?: "default" | "none" | MiddlewareHandler;
-  /**
-   * The permission this endpoint requires, in the authz registry vocabulary.
-   * Enforced by the FRAMEWORK: the service's `permissionEnforcer` middleware
-   * is mounted between auth and the endpoint's own `middleware`, so a custom
-   * middleware array can never displace the check while the declared
-   * permission still reads as guarded. Requires `permissionEnforcer` on the
-   * service config — declaring one without the other fails `build()`.
-   */
-  permission?: AuthzPermission;
+  // The permission itself lives on {@link AccessDeclaration}, intersected into
+  // EndpointConfig: it is enforced by the FRAMEWORK (the service's
+  // `permissionEnforcer` middleware mounts between auth and the endpoint's
+  // own `middleware`, so a custom middleware array can never displace the
+  // check), and declaring one without an enforcer fails `build()`.
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */
   resourceLimit?: string;
   /** Additional middleware to run for this endpoint (after auth, before handler). */

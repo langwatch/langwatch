@@ -10,6 +10,7 @@
  * specs/rbac/typed-permission-declarations.feature is the behavioural
  * contract these pin.
  */
+import type { EndpointConfig } from "@langwatch/api";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { requires } from "../security";
@@ -186,6 +187,34 @@ describe("typed permission declarations", () => {
         serviceAuthorized,
       ]) {
         expect(procedure).toBeDefined();
+      }
+    });
+  });
+
+  describe("given a @langwatch/api service endpoint", () => {
+    /**
+     * The framework side of the same contract: an endpoint config carries
+     * exactly one of a registry permission or a written opt-out
+     * (AccessDeclaration, @langwatch/authz). `build()` re-checks at boot.
+     */
+    /** @scenario "A service endpoint that declares no access fails to compile" */
+    it("cannot be configured without an access declaration", () => {
+      const declared: EndpointConfig = { permission: "organization:manage" };
+      const optedOutEndpoint: EndpointConfig = {
+        noPermission: { reason: "health probe; response carries no data" },
+      };
+      // @ts-expect-error — an endpoint declaring neither a permission nor an opt-out does not compile
+      const bare: EndpointConfig = { description: "no access declaration" };
+      // @ts-expect-error — declaring both is as wrong as declaring neither
+      const both: EndpointConfig = {
+        permission: "organization:manage",
+        noPermission: { reason: "contradiction" },
+      };
+      // @ts-expect-error — the permission vocabulary is the registry's, here too
+      const offRegistry: EndpointConfig = { permission: "traces:rotate" };
+
+      for (const config of [declared, optedOutEndpoint, bare, both, offRegistry]) {
+        expect(config).toBeDefined();
       }
     });
   });

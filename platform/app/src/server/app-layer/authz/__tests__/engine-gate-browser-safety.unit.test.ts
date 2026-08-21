@@ -67,8 +67,8 @@ describe("the authz engine gate's browser safety", () => {
      * Naming the installer is not enough — one that is defined and never
      * called is exactly as silent as no installer at all.
      *
-     * @scenario "A failed migration-state read is reported"
      */
+    /** @scenario "A failed migration-state read is reported" */
     it("installs the real failure reporter rather than leaving the no-op", () => {
       const presets = readFileSync(join(AUTHZ_DIR, "..", "presets.ts"), "utf8");
 

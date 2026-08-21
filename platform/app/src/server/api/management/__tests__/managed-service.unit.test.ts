@@ -194,11 +194,14 @@ describe("createManagementService", () => {
       expect(() =>
         service
           .version(MANAGEMENT_API_VERSION, (v) => {
-            v.get(
+            // Cast: the AccessDeclaration types refuse this shape outright;
+            // the runtime cross-check is the layer under test.
+            (v.get as (p: string, c: unknown, h: unknown) => void)(
               "/things",
               {
                 ...guard("organization:manage"),
                 permission: undefined,
+                noPermission: { reason: "policy/permission mismatch probe" },
                 output: z.object({ ok: z.boolean() }),
               },
               async () => ({ ok: true }),
@@ -220,9 +223,34 @@ describe("createManagementService", () => {
       expect(() =>
         service
           .version(MANAGEMENT_API_VERSION, (v) => {
-            v.get(
+            // Cast: an endpoint with no access declaration no longer compiles;
+            // this pins the framework's boot check behind the types.
+            (v.get as (p: string, c: unknown, h: unknown) => void)(
               "/things",
               { output: z.object({ ok: z.boolean() }) },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/must declare exactly one of/);
+    });
+
+    it("refuses an opt-out that carries no registered policy", () => {
+      const { service } = createManagementService({
+        name: "toy-policyless",
+        basePath: "/api/toy-policyless",
+        feature: "MANAGEMENT_API",
+      });
+
+      expect(() =>
+        service
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.get(
+              "/things",
+              {
+                noPermission: { reason: "management routes always guard" },
+                output: z.object({ ok: z.boolean() }),
+              },
               async () => ({ ok: true }),
             );
           })

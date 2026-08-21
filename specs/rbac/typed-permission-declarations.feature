@@ -183,6 +183,25 @@ Feature: Typed permission declarations
     When the service builds
     Then the build fails naming both halves of the declaration
 
+  @unit
+  Scenario: A service endpoint that declares no access fails to compile
+    Given a service endpoint configuration
+    When it names neither a permission nor a written opt-out
+    Then the registration does not compile
+    And naming both does not compile either
+
+  @unit
+  Scenario: A service endpoint without an access declaration refuses to boot
+    Given an endpoint that bypassed the types and declares no access
+    When the service builds
+    Then the build fails naming the endpoint
+
+  @unit
+  Scenario: A service endpoint opting out of its permission check carries a written reason
+    Given an endpoint opting out with a blank reason
+    When the service builds
+    Then the build fails
+
   # ============================================================================
   # The CI sweep: what the types cannot reach
   # ============================================================================

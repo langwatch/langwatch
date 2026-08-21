@@ -56,6 +56,7 @@ export {
   SCOPE_TIER_FIELDS,
 } from "./declaration";
 export type {
+  AccessDeclaration,
   DeclaredScopeId,
   NoPermissionOptions,
   DeclarationError,

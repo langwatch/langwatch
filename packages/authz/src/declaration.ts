@@ -134,6 +134,25 @@ export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [
  * field the input carries must be individually allowed with a written
  * reason — the compile-time form of the legacy `skipPermissionCheck` guard.
  */
+/**
+ * The access declaration any HTTP-surface endpoint must carry: exactly one
+ * of a registry permission or an explicit opt-out with a written reason.
+ *
+ * The `undefined` counterkeys make the union exclusive, and a config
+ * carrying neither matches neither arm — so "forgot to declare" is a compile
+ * error at the registration call, not a route that mounts with service-level
+ * auth only and reads as guarded. Frameworks that adopt it re-check at boot
+ * (`@langwatch/api` refuses to build on a bare or blank-reason endpoint), so
+ * a JS-level bypass of the types refuses to start.
+ */
+export type AccessDeclaration =
+  | { permission: AuthzPermission; noPermission?: undefined }
+  | {
+      permission?: undefined;
+      /** Why this endpoint deliberately runs without a permission check. */
+      noPermission: { reason: string };
+    };
+
 export type NoPermissionOptions<I> = I extends unknown
   ? [FieldsIn<I>] extends [never]
     ? { reason: string; allow?: undefined }
