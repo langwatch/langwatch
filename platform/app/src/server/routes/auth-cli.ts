@@ -64,6 +64,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -1230,6 +1231,39 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
     budgetRepository: getApp().gateway.budgets,
   });
   const result = await service.resolve({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget-overview
+// ---------------------------------------------------------------------------
+// Every budget that binds the caller's own keys, labelled per scope, for
+// the `langwatch login` epilogue. Wire shape matches the tRPC
+// `api.user.budgetOverview` procedure byte-for-byte (both surfaces share
+// BudgetOverviewService), replacing the collapsed single number the
+// /bootstrap `budget` field carries for older CLIs.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = BudgetOverviewService.create(
+    prisma,
+    getApp().gateway.budgets,
+  );
+  const result = await service.overviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });

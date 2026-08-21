@@ -35,6 +35,7 @@ import {
   scopeReachableModelProvidersForVk,
   traceProjectFor,
 } from "./scopeResolver";
+import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -451,11 +452,10 @@ export class GatewayConfigMaterialiser {
       return new Map();
     }
     try {
-      const orgProjects = await this.prisma.project.findMany({
-        where: { team: { organizationId: vk.organizationId } },
-        select: { id: true },
-      });
-      const tenantIds = orgProjects.map((p) => p.id);
+      const tenantIds = await organizationSpendTenantIds(
+        this.prisma,
+        vk.organizationId,
+      );
       if (tenantIds.length === 0) return new Map();
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the

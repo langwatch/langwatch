@@ -17,6 +17,7 @@ import {
 } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
@@ -854,6 +855,42 @@ export const userRouter = createTRPCRouter({
         }),
         adminEmail,
       };
+    }),
+
+  /**
+   * Every budget that binds the caller's own keys in this organization,
+   * each labelled with its scope ("whole organization budget", "team
+   * budget (Core)", "personal budget"), most binding first. One source:
+   * the same BudgetOverviewService the CLI's
+   * `GET /api/auth/cli/budget-overview` serves, so /me and the login
+   * epilogue can never report different numbers for the same budget.
+   *
+   * `gatewayAccess: false` (governance flag off for the org, or caller
+   * not a member) means the consumer renders nothing budget-related.
+   *
+   * Authorization: members read their OWN overview only - the userId is
+   * always the session's. organization:view is the entry gate; the
+   * service re-checks membership itself, fail closed.
+   */
+  budgetOverview: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        includeTopModels: z.boolean().optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const service = BudgetOverviewService.create(
+        ctx.prisma,
+        getApp().gateway.budgets,
+        getApp().governance.personalUsage,
+      );
+      return await service.overviewForUser({
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+        includeTopModels: input.includeTopModels,
+      });
     }),
 
   /**
