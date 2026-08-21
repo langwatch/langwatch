@@ -31,7 +31,7 @@ func stubPiBinary(t *testing.T) string {
 // removal is enough for a test scratch root.
 func tolerantTempDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "harness")
+	dir, err := os.MkdirTemp("", "harness") //nolint:usetesting // t.TempDir's strict cleanup is the race this helper works around
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)

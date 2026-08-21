@@ -746,7 +746,14 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 // Reusing the registered value is what makes the assignment stable across
 // restarts: the slug's hash is only a starting point, so a stack that had to
 // probe away from it once must not drift back on the next `up`.
+//
+// An explicit LANGWATCH_HAVEN_REDIS_DB wins over both: the allocator can only
+// see haven-managed stacks, so a plain-`pnpm dev` neighbor holding a database
+// is invisible to it, and the operator's pin is the way around that neighbor.
 func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
+	if db := o.cfg.RedisDBOverride; db >= 0 && db < domain.RedisDBCount {
+		return db, true
+	}
 	taken := map[int]bool{}
 	stacks := o.store.Stacks()
 	for i := range stacks {

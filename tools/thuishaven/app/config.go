@@ -37,6 +37,13 @@ type Config struct {
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
 	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
 	ShouldManageRedis        bool          // haven ensures a shared brew-services Redis is running
+	// RedisDBOverride pins this worktree's Redis DB index (LANGWATCH_HAVEN_REDIS_DB,
+	// -1 = unset). The allocator's collision avoidance only sees haven-managed
+	// stacks; a plain `pnpm dev` process from another worktree sits on its .env
+	// db invisibly and shares the job queue, which lands work in the wrong
+	// stack's database. The override makes the assignment deterministic for a
+	// worktree that has to route around such a neighbor.
+	RedisDBOverride int
 	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
 	// default: it shares ClickHouse's colima VM, so the VM is already paying for
 	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
