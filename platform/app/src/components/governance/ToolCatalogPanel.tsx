@@ -10,9 +10,7 @@ import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogE
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
- * The tool-catalog editor body — the Catalog pane of the inventory page,
- * formerly the whole /governance/tool-catalog page. The composition is
- * unchanged from that page: two inner tabs per the
+ * The two inner tabs of the Catalog pane, per the
  * `ingestion-templates-catalog.feature` @admin-readonly scenario:
  *   - Tool Tiles: AiToolEntry catalog (drag-reorder + add/edit). Coding-
  *     assistant tiles also carry the CLI path policy (gateway / OTLP
@@ -20,6 +18,67 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  *   - Ingestion Templates: READ-ONLY catalog of platform-published
  *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
  *     transparency. No edit/disable/fork v1; admin authoring lands v2.
+ *
+ * The tile drawer lives with the panel, not here, so opening it does not
+ * re-render the strip: this component only reports which tile was asked
+ * for.
+ */
+function CatalogTabs({
+  organizationId,
+  onAddTile,
+  onEditTile,
+}: {
+  organizationId: string;
+  onAddTile: (type: AiToolEntry["type"]) => void;
+  onEditTile: (entry: AiToolEntry) => void;
+}) {
+  return (
+    <Tabs.Root
+      variant="line"
+      defaultValue="tool-tiles"
+      // lazyMount only (no unmountOnExit): the Ingestion Templates tab
+      // renders drawers (EditOttlDrawer, CreateTemplateDrawer) with
+      // their own local form state (OTTL statements, new-template
+      // fields). Unmounting that tab while a drawer is open would
+      // destroy in-progress edits, so we avoid unmountOnExit for the
+      // whole Root and only skip mounting tabs that were never opened.
+      lazyMount
+    >
+      <Tabs.List>
+        <Tabs.Trigger
+          value="tool-tiles"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          Tool Tiles
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="ingestion-templates"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          Ingestion Templates
+        </Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value="tool-tiles" paddingTop={4}>
+        <ToolCatalogEditor
+          organizationId={organizationId}
+          onAddTile={onAddTile}
+          onEditTile={onEditTile}
+        />
+      </Tabs.Content>
+      <Tabs.Content value="ingestion-templates" paddingTop={4}>
+        <IngestionTemplatesEditor organizationId={organizationId} />
+      </Tabs.Content>
+    </Tabs.Root>
+  );
+}
+
+/**
+ * The tool-catalog editor body — the Catalog pane of the inventory page,
+ * formerly the whole /governance/tool-catalog page. The composition is
+ * unchanged from that page: it gates on the catalog's own grant, owns the
+ * tile drawer's state, and delegates the tab strip to `CatalogTabs`.
  *
  * Both tabs read through `aiTools:manage`, the catalog's own grant. The
  * hosting page opens on `governance:view`, so a delegated viewer reaches
@@ -54,44 +113,11 @@ export function ToolCatalogPanel() {
 
   return (
     <VStack align="stretch" gap={6} width="full">
-      <Tabs.Root
-        variant="line"
-        defaultValue="tool-tiles"
-        // lazyMount only (no unmountOnExit): the Ingestion Templates tab
-        // renders drawers (EditOttlDrawer, CreateTemplateDrawer) with
-        // their own local form state (OTTL statements, new-template
-        // fields). Unmounting that tab while a drawer is open would
-        // destroy in-progress edits, so we avoid unmountOnExit for the
-        // whole Root and only skip mounting tabs that were never opened.
-        lazyMount
-      >
-        <Tabs.List>
-          <Tabs.Trigger
-            value="tool-tiles"
-            color="fg.muted"
-            _selected={{ color: "fg", fontWeight: "semibold" }}
-          >
-            Tool Tiles
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            value="ingestion-templates"
-            color="fg.muted"
-            _selected={{ color: "fg", fontWeight: "semibold" }}
-          >
-            Ingestion Templates
-          </Tabs.Trigger>
-        </Tabs.List>
-        <Tabs.Content value="tool-tiles" paddingTop={4}>
-          <ToolCatalogEditor
-            organizationId={organization.id}
-            onAddTile={(type) => setDrawerState({ mode: "create", type })}
-            onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
-          />
-        </Tabs.Content>
-        <Tabs.Content value="ingestion-templates" paddingTop={4}>
-          <IngestionTemplatesEditor organizationId={organization.id} />
-        </Tabs.Content>
-      </Tabs.Root>
+      <CatalogTabs
+        organizationId={organization.id}
+        onAddTile={(type) => setDrawerState({ mode: "create", type })}
+        onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
+      />
 
       <AiToolEntryDrawer
         organizationId={organization.id}
