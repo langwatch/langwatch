@@ -63,6 +63,10 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
   describe.each([
     "pending",
     "parked",
+    // Held: the work landed but the proof found the projection behind or
+    // disagreeing. The ops page promises such an organization behaves
+    // exactly as before, so it reads legacy like the others.
+    "migrated",
   ] as const)("when the organization's migration is %s", (status) => {
     /** @scenario "An organization that has not finalized reads from legacy" */
     it("answers from the legacy row, whatever the migration is doing", async () => {
@@ -81,15 +85,14 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     });
   });
 
-  describe("when the migration has finished", () => {
+  describe("when the migration has finalized", () => {
     // Finishing IS the switch (ADR-110), so the engine answers and the legacy
-    // rows are not consulted at all. This is the half the old four-state
-    // matrix could not express: it predated a world where any status moved the
-    // organization off this path.
+    // rows are not consulted at all. Only `finalized` finishes: `migrated`
+    // is the held state and reads legacy above.
     /** @scenario "A cut-over organization is decided by the engine" */
     it("stops consulting the legacy row", async () => {
       mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue({
-        status: "migrated",
+        status: "finalized",
       });
 
       await resolveTeamPermission(

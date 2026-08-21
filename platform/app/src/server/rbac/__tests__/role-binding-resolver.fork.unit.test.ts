@@ -57,7 +57,7 @@ function buildPrisma({
     systemMigrationTenantState: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({

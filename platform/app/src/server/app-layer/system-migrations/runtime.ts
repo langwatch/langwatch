@@ -19,6 +19,12 @@ import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
 import {
+  type AuthzEngineLedger,
+  AuthzEngineMigration,
+} from "../authz/authz-engine.migration";
+import { authzGrantsCommands } from "../authz/ledger";
+import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./cohort";
@@ -84,14 +90,102 @@ export const systemMigrationsService = new SystemMigrationsService({
  * ADR-110 replaced the team-user backfill, the genesis import and the
  * cutover with a single migration: it streams an organization's existing
  * grants in as events, proves the projection agrees, and the moment it
- * finishes that organization is on the engine. That migration is not
- * written yet, so nothing is registered and no organization moves — the
- * correct behaviour in the meantime, since every gate ships closed and
- * every organization stays on the legacy path.
+ * finishes that organization is on the engine
+ * (platform/app/src/server/app-layer/authz/authz-engine.migration.ts).
+ * Composed per call so each pass carries a fresh emitter over the shared
+ * lazy senders — a send while the App is still composing waits; an App
+ * without the event-sourcing stack refuses loudly, and the migration then
+ * parks its organization with an honest report.
  */
 export function registeredMigrations(): SystemMigration[] {
-  return [];
+  return [
+    new AuthzEngineMigration({
+      store: new PrismaAuthzMigrationRepository(prisma),
+      ledger: authzEngineLedger,
+      now: () => Date.now(),
+    }),
+  ];
 }
+
+const senders = async () => (await authzGrantsCommands()).commands;
+
+/** The migration's door into the grants ledger — one command, one entity
+ *  (ADR-110), over the same lazy senders every live write uses. Stateless:
+ *  every method resolves the senders at send time, so one module-level
+ *  object serves every pass. */
+const authzEngineLedger: AuthzEngineLedger = {
+  attachGrant: async ({ organizationId, commandId, grant }) => {
+    await (await senders()).attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grant,
+    });
+  },
+  defineRole: async ({ organizationId, commandId, role, actor }) => {
+    await (await senders()).defineRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      role,
+      actor,
+    });
+  },
+  changeGrantRole: async ({
+    organizationId,
+    commandId,
+    grantId,
+    from,
+    to,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).changeGrantRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grantId,
+      from,
+      to,
+      actor,
+      occurredAtMs,
+    });
+  },
+  revokeGrant: async ({
+    organizationId,
+    commandId,
+    grantId,
+    reason,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).revokeGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grantId,
+      reason,
+      actor,
+      occurredAtMs,
+    });
+  },
+  deleteRole: async ({
+    organizationId,
+    commandId,
+    roleId,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).deleteRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      roleId,
+      actor,
+      occurredAtMs,
+    });
+  },
+};
 
 /**
  * The runner's cohort for one pass, per (tenant, migration). On cloud every

@@ -57,7 +57,7 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
   const roleBindingFindMany = vi.fn().mockResolvedValue([]);
   const migrationStateFindUnique = vi
     .fn()
-    .mockResolvedValue(onEngine ? { status: "migrated" } : null);
+    .mockResolvedValue(onEngine ? { status: "finalized" } : null);
 
   const prisma = {
     project: {

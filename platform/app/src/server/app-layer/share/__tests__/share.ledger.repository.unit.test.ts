@@ -106,7 +106,7 @@ function buildRepository({
   );
   const cutoverFindUnique = vi
     .fn()
-    .mockResolvedValue(onEngine ? { status: "migrated" } : null);
+    .mockResolvedValue(onEngine ? { status: "finalized" } : null);
   const prisma = {
     systemMigrationTenantState: { findUnique: cutoverFindUnique },
     project: {
@@ -380,7 +380,7 @@ describe("LedgerShareRepository", () => {
           maxViews: null,
         });
         expect(legacy.consumeView).toHaveBeenCalledTimes(1);
-        cutoverFindUnique.mockResolvedValue({ status: "migrated" });
+        cutoverFindUnique.mockResolvedValue({ status: "finalized" });
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 

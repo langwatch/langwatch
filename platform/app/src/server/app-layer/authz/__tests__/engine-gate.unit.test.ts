@@ -42,7 +42,7 @@ describe("the authz engine gate", () => {
 
   describe("when the organization has an authz migration state row", () => {
     it("asks about the authz migration, not any other", async () => {
-      const { findUnique, prisma } = stateTable("migrated");
+      const { findUnique, prisma } = stateTable("finalized");
 
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
 
@@ -55,7 +55,7 @@ describe("the authz engine gate", () => {
     });
 
     it.each([
-      ["migrated", true],
+      ["migrated", false],
       ["finalized", true],
       ["pending", false],
       ["parked", false],
@@ -143,7 +143,7 @@ describe("the authz engine gate", () => {
 
   describe("when the same organization is asked about repeatedly", () => {
     it("reads the row once inside the cache window", async () => {
-      const { findUnique, prisma } = stateTable("migrated");
+      const { findUnique, prisma } = stateTable("finalized");
 
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
       await organizationOnAuthzEngine({ organizationId: ORG_ID, prisma });
@@ -153,13 +153,13 @@ describe("the authz engine gate", () => {
     });
 
     it("keeps one organization's answer out of another's", async () => {
-      const { prisma: migrated } = stateTable("migrated");
+      const { prisma: finalized } = stateTable("finalized");
       const { prisma: pending } = stateTable("pending");
 
       await expect(
         organizationOnAuthzEngine({
           organizationId: "org_a",
-          prisma: migrated,
+          prisma: finalized,
         }),
       ).resolves.toBe(true);
       await expect(
@@ -175,7 +175,7 @@ describe("the authz engine gate", () => {
       vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ status: "migrated" })
+        .mockResolvedValueOnce({ status: "finalized" })
         .mockResolvedValue({ status: "rolled_back" });
       const prisma = {
         systemMigrationTenantState: { findUnique },
@@ -205,7 +205,7 @@ describe("the authz engine gate", () => {
       const findUnique = vi
         .fn()
         .mockResolvedValueOnce(null)
-        .mockResolvedValue({ status: "migrated" });
+        .mockResolvedValue({ status: "finalized" });
       const prisma = {
         systemMigrationTenantState: { findUnique },
       } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
