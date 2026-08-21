@@ -69,6 +69,47 @@ Feature: Prompt Playground conversation
     When the playground renders the conversation
     Then the turn separator offers no trace affordance
 
+  # ── Who is speaking ─────────────────────────────────────────────────
+  #
+  # The playground is the one conversation surface where the reader is one of
+  # the two speakers and the other is the model they are iterating on, so the
+  # generic "User" and "Assistant" name neither party.
+
+  @unit
+  Scenario: The two sides are named after the person and the model
+    Given my profile carries my name
+    And the prompt is set to run a model
+    When the playground names the sides of the conversation
+    Then my side is named with my first name
+    And the replying side is named with the model, without its provider prefix
+
+  @unit
+  Scenario: A profile with no usable name leaves my side unnamed
+    Given my profile carries only my email address in place of a name
+    When the playground names the sides of the conversation
+    Then my side is left unnamed
+    And the replying side is still named with the model
+
+  @integration
+  Scenario: Named sides replace the generic message labels
+    Given the playground has named the person and the model
+    When the playground renders the conversation
+    Then each message is labelled with the name of the side that sent it
+    And neither generic role label is shown
+
+  @integration
+  Scenario: An unnamed side keeps its generic label
+    Given the playground has named the model but not the person
+    When the playground renders the conversation
+    Then the replies are labelled with the model
+    And my messages are still labelled "User"
+
+  @integration
+  Scenario: A simulation transcript keeps its own role labels
+    Given a scenario run is rendered through the same conversation renderer
+    When the transcript is rendered
+    Then the simulated user and the agent under test keep their own labels
+
   # ── Execution transport ─────────────────────────────────────────────
 
   @integration

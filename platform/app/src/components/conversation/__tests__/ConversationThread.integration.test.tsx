@@ -75,13 +75,19 @@ const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
  */
 function renderConversation(
   messages: Record<string, unknown>[],
-  options: { structuredOutput?: boolean } = {},
+  options: {
+    structuredOutput?: boolean;
+    labels?: { user?: string; assistant?: string };
+    roleMode?: "chat" | "scenario";
+  } = {},
 ): ReturnType<typeof render> {
   const ui: ReactElement = (
     <ConversationThread
       parts={flattenMessages({ messages: messages.map(message) })}
       projectId="proj-1"
       structuredOutput={options.structuredOutput ?? true}
+      labels={options.labels}
+      roleMode={options.roleMode ?? "chat"}
     />
   );
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -332,6 +338,23 @@ describe("<ConversationThread />", () => {
     });
   });
 
+  describe("given the thread is rendered beside other scrolling content", () => {
+    it("scrolls its own box rather than every ancestor", () => {
+      const scrollTo = vi.fn();
+      // jsdom implements neither, so both are observed rather than measured.
+      Element.prototype.scrollTo = scrollTo as unknown as Element["scrollTo"];
+
+      renderConversation([{ id: "m1", role: "user", content: "hello" }]);
+
+      // `scrollIntoView` walks up and scrolls EVERY ancestor scroll container
+      // it finds. The playground puts this thread beside the prompt editor, so
+      // the thread re-mounting on a tab change dragged the editor to the top
+      // and back down again. Scrolling its own box cannot reach a sibling.
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect(scrollTo).toHaveBeenCalled();
+    });
+  });
+
   describe("given a conversation whose trace no longer exists", () => {
     beforeEach(() => {
       tracesGetByIdQuery.mockReturnValue(traceGone());
@@ -392,6 +415,56 @@ describe("<ConversationThread />", () => {
       expect(container.textContent).toContain(prose);
       expect(container.querySelector("[data-align]")).toBeInTheDocument();
       expect(container.querySelector("pre")).toBeNull();
+    });
+  });
+
+  describe("given the caller names the sides of the conversation", () => {
+    const exchange = [
+      { id: "m1", role: "user", content: "hello" },
+      { id: "m2", role: "assistant", content: "hi there" },
+    ];
+
+    /** @scenario Named sides replace the generic message labels */
+    it("labels each message with the name of the side that sent it", () => {
+      renderConversation(exchange, {
+        labels: { user: "Ada", assistant: "gpt-5-mini" },
+      });
+
+      expect(screen.getByText("Ada")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
+      // The names replace the generic labels rather than joining them, or the
+      // bubble would say who is speaking twice.
+      expect(screen.queryByText("User")).toBeNull();
+      expect(screen.queryByText("Assistant")).toBeNull();
+    });
+
+    /** @scenario An unnamed side keeps its generic label */
+    it("leaves a side the caller could not name on its role label", () => {
+      // The profile has no name to show yet. A blank chip is worse than the
+      // generic word, so the unnamed side keeps what it already had.
+      renderConversation(exchange, { labels: { assistant: "gpt-5-mini" } });
+
+      expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
+      expect(screen.getByText("User")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run rendered through the same thread", () => {
+    /** @scenario A simulation transcript keeps its own role labels */
+    it("keeps the simulator and the agent under test on their own labels", () => {
+      // Simulations name no sides, and must not inherit the playground's
+      // naming: their roles are inverted, and "Agent" is the subject of the
+      // run rather than a generic assistant.
+      renderConversation(
+        [
+          { id: "m1", role: "user", content: "hello" },
+          { id: "m2", role: "assistant", content: "hi there" },
+        ],
+        { roleMode: "scenario" },
+      );
+
+      expect(screen.getByText("User Simulator")).toBeInTheDocument();
+      expect(screen.getByText("Agent")).toBeInTheDocument();
     });
   });
 });
