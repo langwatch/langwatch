@@ -38,9 +38,10 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/server/app-layer/permissions/imperative")
-  >();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
   return { ...actual, probeProjectPermission: mockHasSetupPermission };
 });
 

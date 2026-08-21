@@ -2,6 +2,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   SCOPE_TIERS,
   type ScopeAssignment,
@@ -38,7 +39,6 @@ import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "../../modelProviders/providerValidation";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {

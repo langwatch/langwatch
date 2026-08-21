@@ -8,13 +8,13 @@ import {
   httpComponentSchema,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   type AgentComponentConfig,
   type AgentType,
   agentTypeSchema,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,

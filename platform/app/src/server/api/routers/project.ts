@@ -7,6 +7,7 @@ import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
@@ -18,7 +19,6 @@ import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 

@@ -98,7 +98,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         principalUserId = callerId;
       } else {
         const canViewOthers = await probeOrganizationPermission(
-          { prisma: ctx.prisma, session: ctx.session },
+          ctx,
           input.organizationId,
           "virtualKeys:viewOtherPersonal",
         );

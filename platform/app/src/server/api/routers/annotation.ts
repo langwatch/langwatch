@@ -16,6 +16,7 @@ import {
   withReadableAnnotationAnchor,
 } from "~/server/annotations/annotationAnchor";
 import { getApp } from "~/server/app-layer/app";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
@@ -23,7 +24,6 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 

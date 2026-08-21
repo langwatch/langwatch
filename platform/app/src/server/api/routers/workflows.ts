@@ -13,6 +13,7 @@ import type {
   PrismaClient,
   WorkflowVersion,
 } from "~/generated/prisma/client";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
@@ -33,7 +34,6 @@ import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");

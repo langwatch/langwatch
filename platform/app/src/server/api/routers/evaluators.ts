@@ -2,11 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 

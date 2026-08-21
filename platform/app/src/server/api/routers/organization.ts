@@ -16,6 +16,7 @@ import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
@@ -48,7 +49,6 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import {
   batchScopePermissions,
   checkOrganizationPermission,

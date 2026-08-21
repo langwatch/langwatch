@@ -12,9 +12,9 @@ import {
   responseFormatSchema,
   runtimeParametersSchema,
 } from "~/prompts/schemas";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**

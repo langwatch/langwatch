@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PERSONAL_TEAM_ARCHIVE_REFUSAL } from "~/server/app-layer/teams/team.service";
 import { TeamService } from "~/server/teams/team.service";
 import {
@@ -9,7 +10,6 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z

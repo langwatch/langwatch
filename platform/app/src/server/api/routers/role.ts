@@ -3,11 +3,11 @@ import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const permissionSchema = permissionFormatSchema;
@@ -49,7 +49,11 @@ const roleOrganizationPermission = ({
     }) => {
       const role = await new RoleService(ctx.prisma).getRoleById(input.roleId);
       if (
-        !(await probeOrganizationPermission(ctx, role.organizationId, permission))
+        !(await probeOrganizationPermission(
+          ctx,
+          role.organizationId,
+          permission,
+        ))
       ) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
