@@ -70,7 +70,10 @@ export const spansRouter = createTRPCRouter({
         projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const result = await traceService.getSpanForPromptStudio(
         projectId,
         spanId,
