@@ -31,20 +31,10 @@ import {
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { authorizeInResolver } from "../rbac";
 import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
-
-/**
- * Empty, and required to stay empty: every scope id a procedure accepts is
- * checked at its own tier, covered by the organization-tier rule in
- * `coveredScopeFields` (the lineage guard anchors narrower ids), or
- * carries a per-field `enforces` claim naming what the resolver does. There
- * is no allowlist any more — a new endpoint accepting a caller-supplied id
- * nothing proves belongs to them fails CI, and the fix is a real check or a
- * reviewable claim, never an entry here.
- */
-const UNCHECKED_SCOPE_IDS: readonly string[] = [];
 
 /**
  * Procedures whose declared permission resolves no scope from their input,
@@ -296,7 +286,13 @@ describe("tRPC authz declaration sweep", () => {
         })
         .sort();
 
-      expect(unchecked).toEqual(UNCHECKED_SCOPE_IDS);
+      // No allowlist. Every scope id is checked at its own tier, covered by
+      // the organization-tier rule (the lineage guard anchors narrower ids),
+      // or carries a per-field `enforces` claim naming what the resolver
+      // does. A new endpoint accepting a caller-supplied id nothing proves
+      // belongs to them fails here, and the fix is a real check or a
+      // reviewable claim — never an exception list.
+      expect(unchecked).toEqual([]);
     });
 
     /** A claim about a field the input does not carry is rot: the field was
@@ -390,6 +386,74 @@ describe("tRPC authz declaration sweep", () => {
       });
 
       expect(covered).toEqual(["organizationId"]);
+    });
+  });
+
+  describe("given a check resolved at the organization tier", () => {
+    /** The lineage guard refuses any request whose scope ids resolve to more
+     *  than one organization, so an org-tier check covers the narrower ids
+     *  the input carries — the departments.assignTeam class.
+     *  @scenario "Every scope id a procedure accepts is checked or explicitly allowed" */
+    it("covers the narrower ids the lineage guard anchors to that organization", () => {
+      const covered = coveredScopeFields({
+        declaration: { kind: "permission", permission: "governance:manage" },
+        required: ["organizationId", "teamId"],
+        accepted: ["organizationId", "teamId"],
+      });
+
+      expect(covered).toEqual(expect.arrayContaining(["teamId"]));
+    });
+
+    /** The rule must not leak below the organization: a check the runtime
+     *  resolves at a narrower tier covers only the id it resolved from —
+     *  same-organization (which the lineage guard does prove) is not
+     *  same-team, so the sibling id stays uncovered and the sweep reports
+     *  it. */
+    it("does not extend a narrower-tier check the same way", () => {
+      const covered = coveredScopeFields({
+        declaration: { kind: "permission", permission: "team:manage" },
+        required: ["teamId", "projectId"],
+        accepted: ["teamId", "projectId"],
+      });
+
+      expect(covered).toHaveLength(1);
+      expect(covered).not.toEqual(
+        expect.arrayContaining(["teamId", "projectId"]),
+      );
+    });
+  });
+
+  describe("given a resolver-authorized declaration with enforces claims", () => {
+    /** @scenario "Every scope id a procedure accepts is checked or explicitly allowed" */
+    it("covers exactly the claimed fields and nothing more", () => {
+      const covered = coveredScopeFields({
+        declaration: {
+          kind: "service-authorized",
+          reason: "membership filter in the resolver",
+          permissions: [],
+          enforces: { organizationId: "membership-set visibility filter" },
+        },
+        required: ["organizationId", "projectId"],
+        accepted: ["organizationId", "projectId"],
+      });
+
+      expect(covered).toEqual(["organizationId"]);
+    });
+
+    /** The factory is the only way to build one, and it must carry the
+     *  claims through to the declaration the sweep reads — a factory that
+     *  dropped them would quietly re-create the rubber stamp this replaced.
+     *  @scenario "Every scope id a procedure accepts is checked or explicitly allowed" */
+    it("reads the claims off the middleware authorizeInResolver builds", () => {
+      const middleware = authorizeInResolver({
+        organizationId: "claimed for this sentinel",
+      });
+
+      const declaration = authzDeclarationOf(middleware);
+      expect(declaration).toMatchObject({
+        kind: "service-authorized",
+        enforces: { organizationId: "claimed for this sentinel" },
+      });
     });
   });
 
