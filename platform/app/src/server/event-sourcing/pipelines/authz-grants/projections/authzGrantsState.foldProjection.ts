@@ -7,7 +7,10 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
+import type {
+  StateProjectionOptions,
+  StateProjectionStore,
+} from "../../../projections/stateProjection.types";
 import {
   type AuthzGrantsEvent,
   authzGrantsEventSchema,
@@ -37,6 +40,18 @@ import {
 import { wireEventToFact } from "./wireToFact";
 
 export const AUTHZ_GRANTS_PROJECTION_VERSION = "2026-08-17";
+
+/**
+ * The state-projection lane dispatches ONE event per queue job unless a
+ * projection opts into coalescing, and under fair dispatch on a loaded
+ * queue one dispatch per fact is seconds per fact - a genesis import's few
+ * hundred facts took the whole convergence budget to fold, parking the
+ * organization on every pass (observed in production, 2026-08-20). The fold
+ * is a pure reducer and the store writes once per batch, so draining a
+ * backed-up organization in one load/apply/store cycle is strictly cheaper.
+ * Matches the genesis import's own append chunk size.
+ */
+export const AUTHZ_GRANTS_COALESCE_MAX_BATCH = 500;
 
 const authzGrantsEvents = [
   grantAttachedEventSchema,
@@ -91,6 +106,10 @@ export class AuthzGrantsStateFoldProjection
   readonly name = "authzGrantsState";
   readonly version = AUTHZ_GRANTS_PROJECTION_VERSION;
   readonly store: StateProjectionStore<AuthzGrantsFoldState>;
+
+  override options: StateProjectionOptions = {
+    coalesceMaxBatch: AUTHZ_GRANTS_COALESCE_MAX_BATCH,
+  };
 
   protected readonly events = authzGrantsEvents;
 

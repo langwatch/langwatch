@@ -10,6 +10,7 @@ import {
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
 import type { ProductId } from "./products";
+import { useLlmOpsProjectSlug } from "./useLlmOpsProjectSlug";
 import { useNavigationMode } from "./useNavigationMode";
 import { useReachableProducts } from "./useReachableProducts";
 
@@ -203,6 +204,7 @@ export function useLandingRedirect(): void {
   // flag queries behind it.
   const { reachableProducts, isLoading: isReachableLoading } =
     useReachableProducts({ enabled: isV2 });
+  const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
 
   useEffect(() => {
@@ -217,7 +219,7 @@ export function useLandingRedirect(): void {
           ? readLastVisitedProduct({ organizationId: organization.id })
           : null,
         projectSlug: project?.slug ?? null,
-        projectHomeSlug: project && !project.isPersonal ? project.slug : null,
+        projectHomeSlug: llmOpsProjectSlug,
         isOrgless:
           !isLoading && !organization && (organizations?.length ?? 0) === 0,
         lastVisitedHomeKind,
@@ -236,5 +238,6 @@ export function useLandingRedirect(): void {
     isV2,
     isReachableLoading,
     reachableProducts,
+    llmOpsProjectSlug,
   ]);
 }

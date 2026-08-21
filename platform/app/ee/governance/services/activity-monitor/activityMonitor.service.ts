@@ -31,7 +31,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { tryGetApp } from "~/server/app-layer/app";
 import {
   nanoUsdToDecimalString,
   usdToNanoUsd,
@@ -457,7 +457,9 @@ export class ActivityMonitorService {
   private async getClickhouse(
     organizationId: string,
   ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
+    const app = tryGetApp();
+    if (!app?.clickhouse.enabled) return null;
+    return app.clickhouse.resolveOrganizationClient(organizationId);
   }
 
   async summary(input: {

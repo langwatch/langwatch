@@ -8,6 +8,15 @@
  * service classes. Grant identity derivation is not (`node:crypto`, KSUID),
  * so the migration that needs it lives behind this server-only subpath.
  */
+export { GRANTS_CUTOVER_MIGRATION_NAME } from "./cutover.name";
+export {
+  CUTOVER_WAITING_REPORT_KINDS,
+  GrantsCutoverMigration,
+} from "./cutover.migration";
+export type {
+  CutoverDeps,
+  CutoverResourceDiff,
+} from "./cutover.migration";
 export { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 export {
   GENESIS_ACTOR_ID,

@@ -73,6 +73,11 @@ import type {
   OrganizationMemberFact,
   RoleHeadRow,
 } from "./authz-migration.repository";
+import {
+  type ConvergencePoll,
+  convergenceTimeoutMs,
+  DEFAULT_CONVERGENCE_POLL,
+} from "./convergence-poll";
 import { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
 import { deriveGrantId } from "./ledger/grant-identity";
 import type {
@@ -104,8 +109,6 @@ const GENESIS_CHUNK = 500;
 /** Reports stay bounded however far the projection has drifted. */
 const MAX_REPORTED_DIFFS = 50;
 
-const DEFAULT_POLL = { intervalMs: 500, timeoutMs: 120_000 };
-
 /** One way the projection failed to reproduce a legacy row - the ALLOW
  *  direction (`binding_missing`, `binding_changed`, `role_missing`,
  *  `role_changed`) - or a way it holds a fact the legacy side no longer
@@ -132,11 +135,23 @@ export type GenesisImportDeps = {
   ledger: GrantsLedgerEmitter;
   now: () => number;
   /** How long to wait for the projection to land the import before parking. */
-  poll?: { intervalMs: number; timeoutMs: number };
+  poll?: ConvergencePoll;
 };
 
 export class GrantsGenesisImportMigration implements SystemMigration {
   readonly name = GRANTS_GENESIS_IMPORT_MIGRATION_NAME;
+  readonly title = "Grants ledger import";
+  readonly description =
+    "Copies every existing grant into the authorization ledger, which " +
+    "becomes the system of record for grant changes. Permission checks " +
+    "still answer from the legacy path.";
+  // Dark: the import states facts without changing who decides, so no typed
+  // confirmation stands in the way.
+  readonly requiresOperatorConfirmation = false;
+  // Dark by construction - the import states facts and proves them against
+  // the rows it started from without changing who decides - so self-hosted
+  // runs it automatically, as it has since it shipped.
+  readonly runsAutomaticallyOnSelfHosted = true;
 
   constructor(private readonly deps: GenesisImportDeps) {}
 
@@ -372,8 +387,12 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<void> {
     if (staleGrantIds.length === 0 && staleRoleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
+    const timeoutMs = convergenceTimeoutMs({
+      poll,
+      factCount: staleGrantIds.length + staleRoleIds.length,
+    });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       this.assertNotAborted(signal);
       const [genesisGrantIds, roleHeads] = await Promise.all([
@@ -390,7 +409,7 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       }
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not clear ${staleGrantIds.length + staleRoleIds.length} stale genesis fact(s) for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
@@ -415,8 +434,12 @@ export class GrantsGenesisImportMigration implements SystemMigration {
     signal?: AbortSignal;
   }): Promise<void> {
     if (grantIds.length === 0 && roleIds.length === 0) return;
-    const poll = this.deps.poll ?? DEFAULT_POLL;
-    const deadline = this.deps.now() + poll.timeoutMs;
+    const poll = this.deps.poll ?? DEFAULT_CONVERGENCE_POLL;
+    const timeoutMs = convergenceTimeoutMs({
+      poll,
+      factCount: grantIds.length + roleIds.length,
+    });
+    const deadline = this.deps.now() + timeoutMs;
     for (;;) {
       this.assertNotAborted(signal);
       const [presentGrantIds, roleHeads] = await Promise.all([
@@ -433,7 +456,7 @@ export class GrantsGenesisImportMigration implements SystemMigration {
       }
       if (this.deps.now() >= deadline) {
         throw new Error(
-          `grants projection did not land the genesis import for ${organizationId} within ${poll.timeoutMs}ms; tenant parked for retry`,
+          `grants projection did not land the genesis import for ${organizationId} within ${timeoutMs}ms; tenant parked for retry`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
@@ -654,9 +677,19 @@ function organizationFacts({
   }
 
   // Decision 20: an ADMIN with no binding ANYWHERE is served today by the
-  // legacy admin fallback, which reads the membership row. That inference
-  // becomes an explicit org-scoped grant; an admin who also holds bindings
-  // is already represented by them.
+  // legacy admin fallback. That inference becomes a stored org-scoped fact;
+  // an admin who also holds bindings is already represented by them.
+  //
+  // `legacy-admin`, NOT `admin`, and the difference is load-bearing: the
+  // collector translates `admin` into a live ORGANIZATION-scope binding, and
+  // the legacy heads have no counterpart row (this fact is Grant-head-only
+  // by design) — so an `admin` key made the engine grant the full admin bag
+  // where the legacy resolver grants the fallback's much narrower one, and
+  // the cutover parity proof rightly refused every organization holding such
+  // an admin. An untranslatable key is how this family stays dormant (the
+  // same mechanism as `lite-member`): the fact is stored with its own
+  // business time, today's collector skips it, and contract gives it the
+  // bag the fallback actually grants when the fallback retires.
   const boundUserIds = new Set(
     bindingRows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
   );
@@ -673,7 +706,7 @@ function organizationFacts({
         occurredAtMs: member.createdAtMs,
       }),
       principal,
-      roleKey: "admin",
+      roleKey: "legacy-admin",
       scope,
       source: "genesis-import",
       occurredAtMs: member.createdAtMs,

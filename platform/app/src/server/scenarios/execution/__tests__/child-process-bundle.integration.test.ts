@@ -66,6 +66,38 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(stderr).not.toContain("Cannot find module");
     });
 
+    /** @scenario 'An inlined dependency binds only exports the external OTEL packages still have' */
+    it("evaluates its whole module graph against the installed OpenTelemetry", () => {
+      // The SDK is inlined but @opentelemetry/* is not, so every OTEL binding
+      // the inlined code reads is resolved against whatever version the app
+      // depends on. api-logs 0.221 dropped `NoopLoggerProvider`, the inlined
+      // SDK still constructed it, and the child died at module scope on every
+      // single run.
+      //
+      // The require-resolution test above cannot see this: nothing is missing
+      // a MODULE, only an export, so it fails as a TypeError instead. Nor can
+      // the exit code, which is 1 whether the child crashed at module scope or
+      // reached main() and rejected the empty input. Only the parse failure on
+      // stdout proves the graph evaluated end to end.
+      const boot = spawnSync("node", [BUNDLE_PATH], {
+        cwd: path.dirname(BUNDLE_PATH),
+        input: "{}",
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          NODE_ENV: "production",
+          SKIP_ENV_VALIDATION: "1",
+          LANGWATCH_API_KEY: "test-key",
+          LANGWATCH_ENDPOINT: "http://localhost:9999",
+        },
+        timeout: 30000,
+      });
+
+      expect(boot.stdout?.toString() ?? "").toContain(
+        "Failed to parse job data",
+      );
+    }, 35000);
+
     /** @scenario 'A simulation still reports its spans' */
     it("keeps OpenTelemetry external so exactly one API instance exists", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
@@ -89,6 +121,29 @@ describe("Pre-compiled Scenario Child Process", () => {
       // across the pnpm tree on every spawn — and the child is a fresh process
       // per scenario run, so that cost was paid every time.
       expect(content).not.toContain('require("@langwatch/scenario")');
+    });
+
+    /** @scenario 'The vendored SDK can act on the remote-trace configuration' */
+    it("bundles an SDK that can act on the remote-trace run configuration", () => {
+      // The platform's half of remote-trace judging is configuration only
+      // (remote-trace-run-config.ts): it sets `fetchRemoteTraces` and the wait
+      // budgets and trusts the SDK to do the fetching. The SDK's run-config
+      // schema treats unknown keys as optional, so a vendored SDK from before
+      // the capability existed accepts the exact same configuration and
+      // silently ignores it — no type error, no runtime error, every http
+      // target's judge just goes blind to the agent's reported spans. The
+      // 1.2.0 re-vendor did precisely that: the judge kept asking for turns a
+      // conversation that had already ended, or failed runs claiming the
+      // agent "hallucinated" tool calls whose spans were sitting in the span
+      // store the whole time.
+      //
+      // `wait_for_traces` is the judge's verdict-time extension tool and
+      // exists only in SDK builds that carry the capability; it is a tool
+      // *name*, so it survives bundling as a string literal. Its presence is
+      // the cheapest end-to-end proof that the inlined SDK can consume what
+      // remote-trace-run-config.ts produces.
+      const content = fs.readFileSync(BUNDLE_PATH, "utf8");
+      expect(content).toContain("wait_for_traces");
     });
 
     /** @scenario 'Configuring log output does not stop a simulation starting' */

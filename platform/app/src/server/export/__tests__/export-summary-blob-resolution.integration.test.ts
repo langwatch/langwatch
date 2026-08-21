@@ -89,7 +89,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     await importOriginal<
       typeof import("~/server/clickhouse/clickhouseClient")
     >();
-  return { ...actual, getClickHouseClientForProject: vi.fn() };
+  return { ...actual, getClickHouseClientForTenant: vi.fn() };
 });
 
 vi.mock("~/server/db", () => ({
@@ -248,11 +248,11 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
 
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  vi.mocked(chModule.getClickHouseClientForProject).mockResolvedValue(ch);
+  vi.mocked(chModule.getClickHouseClientForTenant).mockResolvedValue(ch);
 
   // ExportService reaches buildTraceBlobResolutionDeps() with no override,
   // which now takes its default resolver from getApp().clickhouse rather
-  // than isClickHouseEnabled()/getClickHouseClientForProject directly — so
+  // than isClickHouseEnabled()/getClickHouseClientForTenant directly — so
   // the production wiring this test wants to exercise needs a real App
   // singleton whose resolver dials the same (mocked) testcontainer client.
   await resetApp();
@@ -260,12 +260,16 @@ beforeAll(async () => {
     clickhouse: {
       enabled: true,
       resolveClient: async (tenantId: string) => {
-        const resolved = await chModule.getClickHouseClientForProject(tenantId);
+        const resolved = await chModule.getClickHouseClientForTenant(tenantId);
         if (!resolved) {
           throw new Error(`ClickHouse not available for tenant ${tenantId}`);
         }
         return resolved;
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
     },
   });
 

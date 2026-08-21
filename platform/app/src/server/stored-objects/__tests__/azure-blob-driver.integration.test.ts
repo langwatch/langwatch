@@ -28,7 +28,6 @@ import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
   stopTestContainers,
@@ -54,10 +53,22 @@ vi.mock("~/env.mjs", () => ({
   env: { S3_BUCKET_NAME: "" },
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-  getSharedClickHouseClient: vi.fn(),
-}));
+const resolveClientMock = vi.fn();
+// The repository reads `getApp().clickhouse.resolveClient` (two-door access);
+// the actual client reference lands in beforeAll once the container starts.
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (...args: unknown[]) => resolveClientMock(...args),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -129,12 +140,7 @@ beforeAll(async () => {
 
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
-  ).mockResolvedValue(ch);
-  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
-    ch,
-  );
+  resolveClientMock.mockResolvedValue(ch);
 }, 120_000);
 
 afterAll(async () => {

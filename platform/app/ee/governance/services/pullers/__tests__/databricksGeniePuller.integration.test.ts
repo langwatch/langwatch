@@ -515,6 +515,21 @@ async function startFixtureServer(params: {
    * prove the walk imposes its own.
    */
   spacesOrder?: (spaceIds: string[]) => string[];
+  /**
+   * How the workspace answers a client-credentials sign-in. Absent means the
+   * fixture has no token endpoint at all, which is what every pasted-token
+   * test wants: an unrouted 404 makes an unexpected sign-in loud.
+   */
+  oauth?: {
+    /** The token handed back on a successful sign-in. */
+    accessToken?: string;
+    /** Forced status, for the refused-credentials path. */
+    status?: number;
+    /** Replaces the whole 200 body, for the answered-without-a-token path. */
+    body?: unknown;
+    /** Never answers, for the deadline path. */
+    hang?: boolean;
+  };
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
@@ -524,6 +539,10 @@ async function startFixtureServer(params: {
   spacesServed: string[];
   /** Requests per path prefix, for asserting a walk did not spin. */
   requestCounts: Map<string, number>;
+  /** Decoded `clientId:clientSecret` per sign-in, in order. */
+  oauthBasic: string[];
+  /** Bearer tokens presented on Genie calls, in order. */
+  bearersSeen: string[];
   close: () => Promise<void>;
 }> {
   const { workspace } = params;
@@ -532,6 +551,8 @@ async function startFixtureServer(params: {
   const conversationSpaceIds: string[] = [];
   const spacesServed: string[] = [];
   const requestCounts = new Map<string, number>();
+  const oauthBasic: string[] = [];
+  const bearersSeen: string[] = [];
   /** One conversation per page, so paging is exercised with tiny fixtures. */
   const CONVERSATION_PAGE = 1;
   const MESSAGE_PAGE = 1;
@@ -558,6 +579,39 @@ async function startFixtureServer(params: {
     res.setHeader("content-type", "application/json");
     res.statusCode = 200;
     const send = (body: unknown) => res.end(JSON.stringify(body));
+
+    if (url.pathname === "/oidc/v1/token") {
+      const oauth = params.oauth;
+      if (!oauth) {
+        // No token endpoint configured: an unrouted 404 rather than a silent
+        // success, so a run that signs in when it should not is visible.
+        res.statusCode = 404;
+        send({ error: "no token endpoint" });
+        return;
+      }
+      const header = req.headers.authorization ?? "";
+      const basic = /^Basic (.+)$/.exec(header);
+      if (basic) {
+        oauthBasic.push(Buffer.from(basic[1]!, "base64").toString("utf8"));
+      }
+      if (oauth.hang) return; // never answers; the socket stays open
+      if (oauth.status && oauth.status !== 200) {
+        res.statusCode = oauth.status;
+        send({ error: "invalid_client", error_description: "refused" });
+        return;
+      }
+      send(
+        oauth.body ?? {
+          access_token: oauth.accessToken ?? "minted-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+        },
+      );
+      return;
+    }
+
+    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
+    if (bearer) bearersSeen.push(bearer[1]!);
 
     if (url.pathname === "/api/2.0/genie/spaces") {
       const ids = params.spacesOrder
@@ -675,6 +729,8 @@ async function startFixtureServer(params: {
     conversationSpaceIds,
     spacesServed,
     requestCounts,
+    oauthBasic,
+    bearersSeen,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
@@ -683,6 +739,8 @@ function genieConfig(params: {
   baseUrl: string;
   spaceIds: string[];
   startingAt: string;
+  /** Overrides the pasted token, for the sign-in tests. */
+  credentials?: Record<string, string>;
 }): Prisma.InputJsonObject {
   return {
     adapter: DATABRICKS_GENIE_ADAPTER_ID,
@@ -690,7 +748,7 @@ function genieConfig(params: {
     spaceIds: params.spaceIds,
     startingAt: params.startingAt,
     schedule: "*/15 * * * *",
-    credentials: { token: "fixture-token" },
+    credentials: params.credentials ?? { token: "fixture-token" },
   };
 }
 
@@ -796,7 +854,7 @@ describe("given a Genie workspace the credential can fully read", () => {
       expect(row.ActorEmail).toBe("priya.nair@acme.test");
     });
 
-    /** @scenario "A question costs nothing and is never priced" */
+    /** @scenario "A question costs nothing when no warehouse is named" */
     it("records the questions with no cost attached", async () => {
       const totals = await pulledTotalsFor({
         tenantId: seeded.govProjectId,
@@ -2100,3 +2158,255 @@ describe.skipIf(!liveToken || !liveUrl)(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// @rule A source can sign in for itself, so a schedule outlives a pasted token
+//
+// A Databricks token expires about an hour after it is issued, so a source
+// configured by pasting one is dead by the next morning. These cover the
+// service-principal path that keeps a schedule running unattended.
+// ---------------------------------------------------------------------------
+
+/** A pull that only needs to be observed for its outcome, not its records. */
+async function pullExpectingOutcome(params: {
+  sourceId: string;
+  cursor: string | null;
+}) {
+  const pulledUsage: PulledUsageDispatcher = {
+    recordPulledUsage: async () => {
+      // The credential tests assert on the run's outcome, not the ledger, and
+      // standing up EventSourcing per case would add ten seconds each.
+    },
+  };
+  return runIngestionPull({ ...params, pulledUsage });
+}
+
+describe("given a source that signs in with a service principal", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({
+      workspace,
+      oauth: { accessToken: "minted-token" },
+    });
+    seeded = await seedSource({
+      slug: `sp-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha", "space-beta"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        credentials: {
+          clientId: "sp-client-id",
+          clientSecret: "sp-client-secret",
+        },
+      }),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when a run starts", () => {
+    let outcome: Awaited<ReturnType<typeof pullThroughTheRealPipeline>>;
+
+    beforeAll(async () => {
+      outcome = await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: null,
+      });
+    }, 120_000);
+
+    /** @scenario "A source given a client id and secret signs in for itself" */
+    it("asks the workspace for a token with the client id and secret", () => {
+      expect(fixture.oauthBasic).toEqual(["sp-client-id:sp-client-secret"]);
+    });
+
+    it("records the workspace's Genie activity", () => {
+      expect(outcome.eventCount).toBeGreaterThan(0);
+    });
+
+    /** @scenario "Signing in happens once a run, not once a request" */
+    it("signs in once a run, not once a request", () => {
+      // The sweep reads several pages across several spaces; a token minted
+      // per request would multiply this by the whole walk.
+      expect(fixture.requestCounts.get("/oidc/v1/token")).toBe(1);
+      expect(
+        fixture.requestCounts.get("/api/2.0/genie/spaces") ?? 0,
+      ).toBeGreaterThan(0);
+    });
+
+    it("presents the minted token on the Genie calls", () => {
+      expect(new Set(fixture.bearersSeen)).toEqual(new Set(["minted-token"]));
+    });
+  });
+});
+
+describe("given a source holding a pasted token", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    // No `oauth` block at all: a sign-in would 404 and be impossible to miss.
+    fixture = await startFixtureServer({ workspace });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  /** @scenario "A pasted token is still honoured" */
+  it("does not ask the workspace for a token", async () => {
+    const seeded = await seedSource({
+      slug: `pasted-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+      }),
+    });
+    try {
+      await pullExpectingOutcome({ sourceId: seeded.sourceId, cursor: null });
+      expect(fixture.requestCounts.get("/oidc/v1/token")).toBeUndefined();
+      expect(new Set(fixture.bearersSeen)).toEqual(new Set(["fixture-token"]));
+    } finally {
+      await dropTenant(seeded.govProjectId);
+      await cleanupOrg(seeded.organizationId);
+    }
+  }, 120_000);
+
+  /** @scenario "A pasted token wins over a client secret" */
+  it("prefers a pasted token over a client secret", async () => {
+    // Someone pasting a token into a source that already had a secret is
+    // rotating by hand, usually because the secret stopped working.
+    const seeded = await seedSource({
+      slug: `both-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        credentials: {
+          token: "fixture-token",
+          clientId: "sp-client-id",
+          clientSecret: "sp-client-secret",
+        },
+      }),
+    });
+    try {
+      await pullExpectingOutcome({ sourceId: seeded.sourceId, cursor: null });
+      expect(fixture.requestCounts.get("/oidc/v1/token")).toBeUndefined();
+    } finally {
+      await dropTenant(seeded.govProjectId);
+      await cleanupOrg(seeded.organizationId);
+    }
+  }, 120_000);
+});
+
+describe("given a source that cannot sign in", () => {
+  let workspace: FixtureWorkspace;
+
+  beforeAll(() => {
+    workspace = createFixtureWorkspace();
+  });
+
+  /** Seeds, runs, and reports how the run ended. */
+  async function runWith(params: {
+    slug: string;
+    credentials: Record<string, string>;
+    oauth?: Parameters<typeof startFixtureServer>[0]["oauth"];
+  }): Promise<{ error: Error | null; elapsedMs: number }> {
+    const fixture = await startFixtureServer({
+      workspace,
+      oauth: params.oauth,
+    });
+    const seeded = await seedSource({
+      slug: `${params.slug}-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        credentials: params.credentials,
+      }),
+    });
+    const startedAt = performance.now();
+    let error: Error | null = null;
+    try {
+      await pullExpectingOutcome({ sourceId: seeded.sourceId, cursor: null });
+    } catch (caught) {
+      error = caught as Error;
+    }
+    const elapsedMs = performance.now() - startedAt;
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+    return { error, elapsedMs };
+  }
+
+  /** @scenario "A source with no way to sign in says so" */
+  it("fails naming what it needs when given neither a token nor a secret", async () => {
+    const { error } = await runWith({ slug: "none", credentials: {} });
+    expect(error).not.toBeNull();
+    expect(error?.message).toMatch(/token/i);
+    expect(error?.message).toMatch(/client/i);
+  }, 120_000);
+
+  /** @scenario "Credentials the workspace rejects fail the run rather than emptying it" */
+  it("fails the run when the workspace refuses the credentials", async () => {
+    // A refused sign-in that returned no records would look identical to a
+    // workspace where nobody asked Genie anything.
+    const { error } = await runWith({
+      slug: "refused",
+      credentials: { clientId: "sp-client-id", clientSecret: "wrong" },
+      oauth: { status: 401 },
+    });
+    expect(error).not.toBeNull();
+    expect(error?.message).toMatch(/sign|token|auth/i);
+  }, 120_000);
+
+  /** @scenario "A refused sign-in does not put the secret in the reason" */
+  it("does not put the client secret in the reason", async () => {
+    const { error } = await runWith({
+      slug: "leak",
+      credentials: {
+        clientId: "sp-client-id",
+        clientSecret: "super-secret-value",
+      },
+      oauth: { status: 401 },
+    });
+    expect(error).not.toBeNull();
+    expect(
+      JSON.stringify(error, Object.getOwnPropertyNames(error)),
+    ).not.toContain("super-secret-value");
+  }, 120_000);
+
+  /** @scenario "A sign-in answered with no token fails the run" */
+  it("fails when the sign-in is answered without a token", async () => {
+    // A proxy answering 200 with something that is not a token must not be
+    // carried forward as one and re-surface later as a permissions problem.
+    const { error } = await runWith({
+      slug: "notoken",
+      credentials: { clientId: "sp-client-id", clientSecret: "sp-secret" },
+      oauth: { body: { message: "hello from a captive portal" } },
+    });
+    expect(error).not.toBeNull();
+  }, 120_000);
+
+  /** @scenario "A sign-in that hangs does not consume the whole run" */
+  it("abandons a hanging sign-in well before the run's own deadline", async () => {
+    // The job has five minutes for everything. A sign-in with no bound of its
+    // own would spend all of it and report nothing.
+    const { error, elapsedMs } = await runWith({
+      slug: "hang",
+      credentials: { clientId: "sp-client-id", clientSecret: "sp-secret" },
+      oauth: { hang: true },
+    });
+    expect(error).not.toBeNull();
+    expect(elapsedMs).toBeLessThan(60_000);
+  }, 180_000);
+});

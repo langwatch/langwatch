@@ -56,6 +56,61 @@ const TIMEOUT_EXCEEDED: ServerError = {
 const TOO_MANY_ROWS: ServerError = { code: "158", name: "TOO_MANY_ROWS" };
 const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 
+// The three shapes of "the object this query names is not there for you":
+// missing table, missing database, and an RBAC refusal. Grouped because a
+// caller cannot tell them apart and must not be able to — which of the three
+// fired describes the server's internals, not the query.
+const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
+const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
+const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
+
+/**
+ * Whether `error` is one of `variants`, by any of the three forms a server
+ * error arrives in: the driver's `code` property, its `type` property, or the
+ * `Code: <n>.` prefix the engine writes at the head of a raw HTTP body.
+ *
+ * The prefix is anchored, and the symbolic name is never searched for in the
+ * message: the message echoes the submitted query, so a table or alias named
+ * after a variant would otherwise let the caller choose its own error.
+ */
+function raisedServerError({
+  error,
+  variants,
+}: {
+  error: Error;
+  variants: readonly ServerError[];
+}): boolean {
+  const type = (error as { type?: string }).type;
+  const code = String((error as { code?: unknown }).code ?? "");
+  const messageCode = /^Code:\s*(\d+)/.exec(error.message)?.[1] ?? "";
+  return variants.some(
+    (variant) =>
+      code === variant.code ||
+      type === variant.name ||
+      (messageCode !== "" && messageCode === variant.code),
+  );
+}
+
+/**
+ * True when the server refused because an object the query names does not
+ * exist or the connecting identity is not allowed to read it — UNKNOWN_TABLE
+ * (60), UNKNOWN_DATABASE (81), ACCESS_DENIED (497).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}: on the
+ * application's own connection these are plain bugs and must degrade to
+ * "unknown" (ADR-045). Exported for the one caller with a stronger invariant —
+ * the LangWatchQL executor, whose validator only lets catalog-approved names
+ * through, so any of the three there means the deployment's provisioning is
+ * incomplete rather than anything about the submitted query.
+ */
+export function isClickHouseObjectUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({
+    error,
+    variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
+  });
+}
+
 /**
  * Translates a raw ClickHouse driver error into a typed `HandledError` for the
  * read path, after the resilient client's retries are exhausted. The raw error
@@ -85,25 +140,11 @@ export function translateClickHouseQueryError(
 ): unknown {
   if (!(error instanceof Error)) return error;
 
-  const type = (error as { type?: string }).type;
-  const code = String((error as { code?: unknown }).code ?? "");
-  const message = error.message;
-  // The engine writes its numeric code at the head of the message. Reading it
-  // from there — anchored — rather than searching the whole message for the
-  // variant's name keeps classification out of the caller's hands: the message
-  // echoes the submitted query, so a table or alias named after a variant
-  // would otherwise choose which error the caller gets back.
-  //
-  // When the prefix is absent the fallback simply does not fire and the error
-  // degrades to "unknown", which is the documented safe outcome (ADR-045).
-  const messageCode = /^Code:\s*(\d+)/.exec(message)?.[1] ?? "";
+  // When no code form is present the matchers simply do not fire and the
+  // error degrades to "unknown", which is the documented safe outcome
+  // (ADR-045). Matching rules live on `raisedServerError`.
   const raised = (...variants: ServerError[]): boolean =>
-    variants.some(
-      (variant) =>
-        code === variant.code ||
-        type === variant.name ||
-        (messageCode !== "" && messageCode === variant.code),
-    );
+    raisedServerError({ error, variants });
 
   if (raised(MEMORY_LIMIT_EXCEEDED)) {
     return new QueryMemoryExceededError({ reasons: [toError(error)] });
@@ -117,10 +158,11 @@ export function translateClickHouseQueryError(
     return new QueryScanLimitExceededError({ reasons: [toError(error)] });
   }
 
+  const errno = String((error as { code?: unknown }).code ?? "");
   const status =
     (error as { statusCode?: number }).statusCode ??
     (error as { status?: number }).status;
-  if (TRANSIENT_NETWORK_CODES.has(code) || status === 502 || status === 503) {
+  if (TRANSIENT_NETWORK_CODES.has(errno) || status === 502 || status === 503) {
     return new ClickHouseUnavailableError({ reasons: [toError(error)] });
   }
 

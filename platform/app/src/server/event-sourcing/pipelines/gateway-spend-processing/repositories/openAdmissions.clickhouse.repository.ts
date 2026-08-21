@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 // The cap belongs to the sweep that reports on it, not to the query it
 // bounds. One-way edge: the process imports only TYPES from here, so this
 // does not put the ClickHouse client on the process's module graph.
@@ -135,7 +135,7 @@ export class ClickHouseOpenAdmissionFinder implements OpenAdmissionFinder {
 export async function getOpenAdmissionFindersByInstance(): Promise<
   Array<{ target: "shared" | string; finder: OpenAdmissionFinder }>
 > {
-  const instances = await getAllClickHouseInstances();
+  const instances = await getApp().clickhouse.allInstances();
   return instances.map(({ target, client }) => ({
     target,
     finder: new ClickHouseOpenAdmissionFinder(client),

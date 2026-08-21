@@ -18,6 +18,12 @@ Feature: Product sidebars in the new navigation modes
   the column, and the scrollbar sits against the content panel with no
   gap.
 
+  The rule above the bottom block is the bottom edge of the part that
+  scrolls: it keeps the same distance from both edges of the column, and
+  the entries pass under it and are cut there. The space between the
+  last entry and the rule belongs to the scrolling part, so it is there
+  when the menu rests and the entries travel through it as it moves.
+
   @integration
   Scenario: Quick Search sits first and opens the command bar
     Given a product sidebar in a new navigation mode
@@ -88,9 +94,35 @@ Feature: Product sidebars in the new navigation modes
     Then a rule runs above the bottom block
 
   @integration
+  Scenario: The rule keeps the same distance from both edges of the column
+    Given a product sidebar in a new navigation mode
+    Then the rule starts as far from the left edge as it ends from the right
+    And the entries of the bottom block line up with the entries above it
+
+  @integration
+  Scenario: The entries are cut at the rule as they scroll under it
+    Given a product sidebar in a new navigation mode
+    Then the part that scrolls ends at the rule
+    And the space above the rule scrolls with the entries
+
+  @integration
   Scenario: Opening a page by its address reveals its sidebar entry
     Given I open a product page by its address
     Then the sidebar brings that page's entry into view
+    And the entry sits as near the top of the menu as the menu allows
+
+  @integration
+  Scenario: Moving inside the menu leaves the scroll where it is
+    Given a page is open and its entry is already in view
+    When I open another page from the same menu
+    Then the menu does not scroll
+
+  @integration
+  Scenario: A reader who scrolls the menu keeps the position they chose
+    Given I open a product page by its address
+    When I scroll the menu myself
+    And the menu keeps growing while its remaining groups arrive
+    Then the menu stays where I put it
 
   @integration
   Scenario: Closing the Support menu with the pointer leaves no focus ring

@@ -18,7 +18,7 @@
 
 import { Button, Input, Stack, Text } from "@chakra-ui/react";
 import { ChevronDown, FolderOpen, MoreVertical, Save } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Dialog } from "~/components/ui/dialog";
@@ -67,6 +67,7 @@ function NameDialog({
   onSubmit: (name: string) => void;
 }) {
   const [name, setName] = useState(initialName);
+  const field = useRef<HTMLInputElement>(null);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -76,7 +77,14 @@ function NameDialog({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(event) => onOpenChange(event.open)}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(event) => onOpenChange(event.open)}
+      // The dialog parks focus on its own content by default, and takes it back
+      // on the first re-render, so a typed name lost every character after the
+      // first. Naming the field is what holds focus where the member is typing.
+      initialFocusEl={() => field.current}
+    >
       <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
@@ -87,7 +95,7 @@ function NameDialog({
               Name
             </Text>
             <Input
-              autoFocus
+              ref={field}
               value={name}
               aria-label="Chart name"
               onChange={(event) => setName(event.target.value)}

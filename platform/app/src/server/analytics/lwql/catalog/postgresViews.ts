@@ -8,13 +8,13 @@
  * PostgreSQL-engine table in the LangWatchQL database, its row policy, and the
  * LangWatchQL view a caller names.
  *
- * ## Why these six datasets and no others
+ * ## Why these five datasets and no others
  *
  * They are what the three question classes the catalog could not answer need,
  * and nothing else. Cost by *name* needs `projects`, `prompts` and
  * `prompt_versions`, because the fact tables carry only the identifiers.
- * Annotation-versus-evaluation agreement needs `annotations`. Experiment run
- * comparisons need `experiments` and `experiment_runs`. Models are already
+ * Annotation-versus-evaluation agreement needs `annotations`. Naming an
+ * experiment needs `experiments`. Models are already
  * names on the fact tables (`traces.Models` carries `openai/gpt-5-mini`, not an
  * id), so no dimension is mapped for them — mapping one would put load on the
  * primary to resolve a name ClickHouse already has.
@@ -26,13 +26,13 @@
  * out, on the same reasoning the ClickHouse half applies:
  *
  *  - **Free-text carriers with no gate in the canonical visibility policy** —
- *    `Annotation.comment` and `expectedOutput`, `LlmPromptConfigVersion.commitMessage`,
- *    `BatchEvaluation.details`. Each routinely quotes the payload it describes,
+ *    `Annotation.comment` and `expectedOutput`, `LlmPromptConfigVersion.commitMessage`.
+ *    Each routinely quotes the payload it describes,
  *    and no rule in the visibility policy gates them, so exposing them would
  *    mean inventing a gate rather than deriving one.
  *  - **JSON blobs carrying captured content** — `Annotation.scoreOptions`,
  *    `LlmPromptConfigVersion.configData` (the prompt text itself),
- *    `BatchEvaluation.data` (the evaluated rows), `Experiment.workbenchState`.
+ *    `Experiment.workbenchState`.
  *  - **Person-identifying columns** — `Annotation.userId` and `email`,
  *    `LlmPromptConfigVersion.authorId`. Analytics answers questions about
  *    traffic, not about named colleagues, and the API has no permission that
@@ -345,7 +345,8 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
     {
       name: "ExperimentId",
       type: "String",
-      description: "Experiment identifier. Join key to `experiment_runs`.",
+      description:
+        "Experiment identifier, as carried by the fact tables that reference it.",
       gates: [],
       sourceColumns: ["id"],
     },
@@ -389,113 +390,6 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
   ],
 };
 
-/** Experiment runs: one row per batch evaluation of an experiment. */
-const EXPERIMENT_RUNS: LangWatchQLViewDefinition = {
-  name: "experiment_runs",
-  sourceTable: "experiment_runs_pg",
-  postgres: {
-    baseRelation: "BatchEvaluation",
-    approvedView: "lwql_experiment_runs",
-    tenantSourceColumn: "projectId",
-  },
-  description:
-    "One row per run of an experiment, with the score, verdict and cost it recorded.",
-  gates: [],
-  grain: "one row per ExperimentRunId",
-  joinKeys: ["TenantId", "ExperimentRunId", "ExperimentId"],
-  timeColumn: "CreatedAt",
-  freshness: LIVE_FRESHNESS,
-  dedup: { keyColumns: ["ExperimentRunId"] },
-  columns: [
-    {
-      name: TENANT_COLUMN,
-      type: "String",
-      description: "Project the run belongs to.",
-      gates: [],
-      sourceColumns: ["projectId"],
-    },
-    {
-      name: "ExperimentRunId",
-      type: "String",
-      description: "Run identifier, unique within the project.",
-      gates: [],
-      sourceColumns: ["id"],
-    },
-    {
-      name: "ExperimentId",
-      type: "String",
-      description: "Experiment this run belongs to. Join key to `experiments`.",
-      gates: [],
-      sourceColumns: ["experimentId"],
-    },
-    {
-      name: "EvaluationName",
-      type: "String",
-      description: "Evaluator the run was scored by.",
-      gates: [],
-      sourceColumns: ["evaluation"],
-    },
-    {
-      name: "Status",
-      type: "String",
-      description: "How the run ended, as the application records it.",
-      gates: [],
-      sourceColumns: ["status"],
-    },
-    {
-      name: "Score",
-      type: "Float64",
-      description: "Score the evaluator returned for the run.",
-      gates: [],
-      sourceColumns: ["score"],
-    },
-    {
-      name: "Label",
-      type: "Nullable(String)",
-      description:
-        "Categorical verdict the evaluator returned, null when it returned none.",
-      gates: [],
-      sourceColumns: ["label"],
-    },
-    {
-      name: "Passed",
-      type: "Bool",
-      description: "Whether the run met the evaluator's bar.",
-      gates: [],
-      sourceColumns: ["passed"],
-    },
-    {
-      name: "Cost",
-      type: "Float64",
-      unit: "USD",
-      description: "What the run cost to execute.",
-      gates: ["costs"],
-      sourceColumns: ["cost"],
-    },
-    {
-      name: "DatasetId",
-      type: "String",
-      description: "Dataset the run evaluated.",
-      gates: [],
-      sourceColumns: ["datasetId"],
-    },
-    {
-      name: "DatasetSlug",
-      type: "String",
-      description: "URL-safe name of the dataset the run evaluated.",
-      gates: [],
-      sourceColumns: ["datasetSlug"],
-    },
-    {
-      name: "CreatedAt",
-      type: "DateTime64(3)",
-      description: "When the run was recorded.",
-      gates: [],
-      sourceColumns: ["createdAt"],
-    },
-  ],
-};
-
 /**
  * The PostgreSQL-resident datasets, in the order the schema endpoint lists
  * them: the entity a question is about, then the dimensions that name it.
@@ -503,7 +397,6 @@ const EXPERIMENT_RUNS: LangWatchQLViewDefinition = {
 export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
   ANNOTATIONS,
   EXPERIMENTS,
-  EXPERIMENT_RUNS,
   PROJECTS,
   PROMPTS,
   PROMPT_VERSIONS,

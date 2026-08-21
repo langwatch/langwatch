@@ -162,6 +162,10 @@ class FakeLedger implements GrantsLedgerEmitter {
   async proveMigrationParity(): Promise<void> {
     throw new Error("the genesis import proves nothing to the ledger");
   }
+
+  async completeCutover(): Promise<void> {
+    throw new Error("the genesis import cuts nothing over");
+  }
 }
 
 function bindingRow(overrides: Partial<LegacyBindingRow> = {}): LegacyBindingRow {
@@ -447,7 +451,12 @@ describe("GrantsGenesisImportMigration", () => {
       expect(orgScoped).toEqual([
         expect.objectContaining({
           principal: { type: "user", id: "user_robin" },
-          roleKey: "admin",
+          // Dormant by vocabulary: `legacy-admin` translates into no binding,
+          // so the fact is stored without changing a single decision until
+          // contract gives it the fallback's actual bag. A translatable
+          // `admin` key here made the engine out-grant the legacy resolver
+          // and fail the cutover parity proof for every such organization.
+          roleKey: "legacy-admin",
           occurredAtMs: ROW_CREATED_AT_MS,
         }),
       ]);
@@ -613,6 +622,35 @@ describe("GrantsGenesisImportMigration", () => {
       await expect(
         migration().migrateTenant({ tenantId: ORG }),
       ).rejects.toThrow(/did not land the genesis import/);
+    });
+  });
+
+  describe("when the import is larger than the base wait could fold", () => {
+    /** @scenario "The convergence wait grows with the size of the import" */
+    it("waits a deadline scaled by the number of facts, not the base alone", async () => {
+      repository.bindingRows = [bindingRow()];
+      ledger.projectionConverges = false;
+
+      const scaled = new GrantsGenesisImportMigration({
+        repository,
+        ledger,
+        now: () => Date.now(),
+        poll: { intervalMs: 1, timeoutMs: 5, perFactMs: 10 },
+      });
+
+      // The park message names the deadline it enforced. With the per-fact
+      // budget wired through, that deadline is base + facts x perFact - so a
+      // regression that stops passing the fact count (waiting the base alone)
+      // reports 5ms here and fails.
+      await expect(scaled.migrateTenant({ tenantId: ORG })).rejects.toThrow(
+        /did not land the genesis import/,
+      );
+      const failure = await scaled
+        .migrateTenant({ tenantId: ORG })
+        .catch((error: Error) => error.message);
+      const reported = Number(/within (\d+)ms/.exec(failure as string)?.[1]);
+      expect(reported).toBeGreaterThan(5);
+      expect((reported - 5) % 10).toBe(0);
     });
   });
 

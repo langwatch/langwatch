@@ -28,6 +28,7 @@ Feature: Machine-wide slots for whole-repo checks
   #
   # Knobs, all optional:
   #   CHECK_SLOTS=N            how many may run at once (0 disables the gate)
+  #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
   #   CHECK_QUEUE_DIR=<path>   where the shared state lives
   #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
   #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
@@ -143,6 +144,114 @@ Feature: Machine-wide slots for whole-repo checks
     Given CI is set and CHECK_SLOTS is not
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
+
+  # --- Memory pressure: the machine says the formula's assumption is false ---
+
+  # The derived limit and the 6 GiB memory ceiling both assume an otherwise
+  # idle machine. A machine that is already compressing and swapping is the
+  # machine saying that assumption is false: its RAM is spoken for, and every
+  # gigabyte a check takes is paid by evicting someone else's pages. Under
+  # pressure the check runs in its smallest shape, so the check pays for the
+  # shortage in its own time instead of everything else paying in swap.
+  # The level and its thresholds are ADR-090's (domain/pressure.go): either
+  # swap fill or compressor occupancy alone can raise it. A machine the queue
+  # cannot read is green, because a governor that cannot see must not throttle.
+
+  @unit
+  Scenario: Memory pressure narrows the queue to one run
+    Given the machine reports amber or red memory pressure
+    And CHECK_SLOTS is not set
+    When the limit is resolved
+    Then it is one, whatever the formula would have said
+    And an explicit CHECK_SLOTS still wins, because it is the operator's call
+
+  @unit
+  Scenario: Memory pressure lowers the memory ceiling to the floor
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMEMLIMIT is the 3 GiB floor, whatever the machine's size
+    And an operator's explicit GOMEMLIMIT still reaches it unchanged
+
+  @unit
+  Scenario: Memory pressure halves the compiler's parallelism
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMAXPROCS is half the cores, never below two
+    And a green machine sets no GOMAXPROCS at all
+    And an operator's explicit GOMAXPROCS still wins
+
+  @unit
+  Scenario: A forced pressure level overrides the measurement
+    Given CHECK_PRESSURE is set to green, amber or red
+    When the level is resolved
+    Then the forced level is used instead of measuring the machine
+    And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
+
+  # CI already runs one check per job on a machine of its own, which is why it
+  # gets no queue. The same reasoning retires the pressure policy there: nobody
+  # is typing on a runner, so buying back an interactive machine buys nothing
+  # and only makes the job slower, and a swap figure read inside a container
+  # describes the host rather than the job.
+
+  @unit
+  Scenario: CI keeps the runtime limits it had before the pressure policy
+    Given the run is under CI
+    When the level is resolved
+    Then it is green whatever the machine measures
+    And the check runs with the same memory ceiling and parallelism it had before
+    And an explicitly forced level still wins, for a test that needs one
+
+  # --- A killed run must not read as the queue's doing ---
+
+  # Observed in the wild: a whole-tree typecheck ended in a bare exit 137, and
+  # the agent driving it concluded the queue had killed it and re-ran with
+  # CHECK_SLOTS=0, removing the machine-wide serialization for everyone. The
+  # queue never kills runs; a signal death it did not forward is an operator
+  # kill or the OS reclaiming memory, and the wrapper now says so at the
+  # moment it happens, where the next reader of the transcript will see it.
+
+  @unit
+  Scenario: A run killed from outside is reported as not the queue's doing
+    Given a check is running through the queue
+    When the command dies by a signal the wrapper did not forward
+    Then the wrapper says the queue never kills runs and names the likely causes
+    And it says to re-run the same command rather than set CHECK_SLOTS=0
+    And a signal the wrapper itself forwarded, like Ctrl-C, is not reported
+    And a command that fails on its own is not reported
+
+  @unit
+  Scenario: An interrupted run killed from outside is still reported
+    Given a check was interrupted and the command ignored the forwarded signal
+    When the command is then killed by a signal the wrapper did not forward
+    Then the wrapper still reports the kill, because the earlier interrupt did not cause it
+    And a run the wrapper itself canceled is not reported
+
+  # A Ctrl-C at a terminal reaches the wrapper and the command together, so the
+  # command can be gone before the wrapper has handled its own copy of the
+  # signal. Reading the record at that moment would accuse the operator of a
+  # kill from outside for their own interrupt, which is the exact mistake the
+  # report exists to prevent.
+
+  @unit
+  Scenario: A signal delivered to the whole process group still counts as forwarded
+    Given a check is running through the queue
+    When the whole process group is signalled at once
+    Then the wrapper counts the signal as one it forwarded
+    And it reports no kill from outside
+
+  # A signal keeps its default disposition until the wrapper is listening for
+  # it, so the order of starting the command and listening decides what a
+  # Ctrl-C at that instant does. In the wrong order the machine kills the
+  # wrapper outright: the interrupt reaches nobody and the command keeps
+  # running with no parent. A slot is counted for as long as its wrapper
+  # lives, so the queue then makes that slot free and can start another check
+  # on top of a run that is still using the machine.
+
+  @unit
+  Scenario: An interrupt that arrives as the command starts is forwarded
+    Given a contributor interrupts a check in the instant its command starts
+    Then the interrupt reaches the command
+    And the check still reports how the command ended
 
   # --- The bin shims: the package scripts are not the only way in ---
 

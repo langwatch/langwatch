@@ -8,8 +8,12 @@
  * that escapes as a raw Prisma error degrades to an unknown 500 at the
  * boundary, which silently breaks the REST contract's 409 and 404 — so every
  * mapping is asserted here, by `code`, because that is how callers match.
+ *
+ * Offboarding rides along: it is the one write whose correctness is a
+ * POSTCONDITION rather than a shape, so what it enumerates and what it proves
+ * against are the two things worth pinning.
  */
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { AuthzReadRepository, LedgerActor } from "@langwatch/authz-server";
 import {
   BindingMissingError,
   DuplicateBindingError,
@@ -23,6 +27,7 @@ import {
 } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "../../ledger";
 import { LedgerAuthzGrantsRepository } from "../authz-grants.ledger.repository";
+import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repository";
 
 const ORG_ID = "org_ledger";
 const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
@@ -223,6 +228,183 @@ describe("given a write that failed for a reason the caller cannot act on", () =
       expect(error).not.toBeInstanceOf(DuplicateBindingError);
       expect(error).not.toBeInstanceOf(BindingMissingError);
       expect((error as { code?: string }).code).toBeUndefined();
+    });
+  });
+});
+
+const OFFBOARD_ORG_ID = "organization_offboard_1";
+const OFFBOARD_USER_ID = "user_offboard_1";
+
+function buildRepository({
+  bindingIds,
+  grantIds,
+  survivingGrantRows = 0,
+  survivingBindingRows = 0,
+}: {
+  bindingIds: string[];
+  grantIds: string[];
+  /** Grant-head rows still present INSIDE the transaction - the shape of a
+   *  revocation that never actually landed. */
+  survivingGrantRows?: number;
+  survivingBindingRows?: number;
+}) {
+  const tx = {
+    groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    teamUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    organizationUser: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ email: "gone@example.com" }),
+    },
+    organizationInvite: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    grant: { count: vi.fn().mockResolvedValue(survivingGrantRows) },
+    roleBinding: { count: vi.fn().mockResolvedValue(survivingBindingRows) },
+  };
+  const roleBindingFindMany = vi
+    .fn()
+    .mockResolvedValue(bindingIds.map((id) => ({ id })));
+  const grantFindMany = vi
+    .fn()
+    .mockResolvedValue(grantIds.map((id) => ({ id })));
+  const prisma = {
+    roleBinding: { findMany: roleBindingFindMany },
+    grant: { findMany: grantFindMany },
+    $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
+  } as unknown as PrismaClient;
+  const offboardMember = vi.fn().mockResolvedValue(undefined);
+  const writer = { offboardMember } as unknown as GrantsLedgerWriter;
+  return {
+    repository: new LedgerAuthzGrantsRepository(prisma, writer),
+    offboardMember,
+    grantFindMany,
+    tx,
+  };
+}
+
+describe("given a member being offboarded", () => {
+  describe("when the user holds facts on both heads", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
+    it("revokes the union of compat rows and grant-head rows, once each", async () => {
+      const { repository, offboardMember, grantFindMany } = buildRepository({
+        bindingIds: ["shared-1", "compat-only-2"],
+        // "shared-1" is the same fact seen through the other head; the
+        // lite-member row exists ONLY as a grant, which is exactly the
+        // class a compat-only enumeration used to leave resolving.
+        grantIds: ["shared-1", "lite-member-3"],
+      });
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(grantFindMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: OFFBOARD_ORG_ID,
+          principalType: "USER",
+          principalId: OFFBOARD_USER_ID,
+        },
+        select: { id: true },
+      });
+      expect(offboardMember).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: OFFBOARD_ORG_ID,
+          userId: OFFBOARD_USER_ID,
+          revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
+        }),
+      );
+    });
+  });
+
+  describe("when the proof runs", () => {
+    it("reads through the head the organization is served from", async () => {
+      const { repository } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+      });
+      const seen: AuthzReadRepository[] = [];
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async (reader) => {
+          seen.push(reader);
+        },
+      });
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBeInstanceOf(CutoverAwareAuthzReadRepository);
+    });
+  });
+
+  describe("when grant rows keyed to the user survive the revocation", () => {
+    it("fails the offboarding even though the membership-gated proof passes", async () => {
+      const { repository } = buildRepository({
+        bindingIds: [],
+        grantIds: ["survivor-1"],
+        survivingGrantRows: 1,
+      });
+      // The collector-shaped proof is VACUOUS here by construction: both
+      // heads' user reads gate on the organization membership this very
+      // transaction deleted, so it resolves nothing whether or not the
+      // revocations landed. A prove stub that swears everything is fine is
+      // exactly what the direct row assertion must not be fooled by.
+      const prove = vi.fn(async () => undefined);
+
+      const attempt = repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove,
+      });
+
+      await expect(attempt).rejects.toMatchObject({
+        code: "offboard_incomplete",
+      });
+    });
+
+    it("fails on surviving compat rows the same way", async () => {
+      const { repository } = buildRepository({
+        bindingIds: ["rb-stuck"],
+        grantIds: [],
+        survivingBindingRows: 1,
+      });
+
+      await expect(
+        repository.offboardUser({
+          userId: OFFBOARD_USER_ID,
+          organizationId: OFFBOARD_ORG_ID,
+          actor: ACTOR,
+          prove: async () => undefined,
+        }),
+      ).rejects.toMatchObject({ code: "offboard_incomplete" });
+    });
+
+    it("scopes the direct assertion to the user's principal in this organization", async () => {
+      const { repository, tx } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+      });
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(tx.grant.count).toHaveBeenCalledWith({
+        where: {
+          organizationId: OFFBOARD_ORG_ID,
+          principalType: "USER",
+          principalId: OFFBOARD_USER_ID,
+        },
+      });
+      expect(tx.roleBinding.count).toHaveBeenCalledWith({
+        where: { organizationId: OFFBOARD_ORG_ID, userId: OFFBOARD_USER_ID },
+      });
     });
   });
 });

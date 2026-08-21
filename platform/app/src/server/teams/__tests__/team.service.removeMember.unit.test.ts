@@ -74,11 +74,11 @@ beforeEach(() => {
   groupMembershipFindMany.mockResolvedValue([]);
   teamUserDeleteMany.mockResolvedValue({ count: 1 });
   revokeBindings.mockResolvedValue(undefined);
-  service = new TeamService(
+  service = new TeamService({
     prisma,
-    {} as never,
-    { revokeBindings } as unknown as GrantsLedgerWriter,
-  );
+    roleBindingRepo: {} as never,
+    writer: { revokeBindings } as unknown as GrantsLedgerWriter,
+  });
 });
 
 describe("given a team with two admins", () => {

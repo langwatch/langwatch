@@ -26,12 +26,39 @@
  * environment.
  */
 
-/** ClickHouse's own `max_concurrent_queries` when the deployment says nothing. */
+/**
+ * ClickHouse's own `max_concurrent_queries` when the deployment says nothing.
+ *
+ * This is a PER-NODE allowance — it is what one ClickHouse server admits, not
+ * what the cluster admits. Multiply by {@link PoolSizingInput.serverNodes} for
+ * the fleet's real budget.
+ */
 export const DEFAULT_SERVER_MAX_CONCURRENT_QUERIES = 300;
+
+/**
+ * Nodes in the ClickHouse cluster when the deployment says nothing.
+ *
+ * One, because that is what the derivation assumed before it could be told
+ * otherwise: a deployment that says nothing keeps the sizing it already had.
+ *
+ * It matters because `max_concurrent_queries` is enforced per server while a
+ * fleet's statements spread across every replica. Reading the per-node number
+ * as the whole cluster's budget understates the real capacity by the node
+ * count, and the platform then throttles itself — queueing for seconds and
+ * shedding statements — against a cluster that is mostly idle and rejecting
+ * nothing. Measured on prod 2026-08-18: three nodes at 74/60/70 concurrent
+ * queries against 300 each, zero `TOO_MANY_SIMULTANEOUS_QUERIES`, while the
+ * client-side limiter shed ~1,057 statements an hour.
+ */
+export const DEFAULT_SERVER_NODES = 1;
 
 /**
  * Headroom left for everything the derivation cannot see: ad-hoc queries, ops
  * tooling, migrations, and the burst a retry storm adds on top of steady state.
+ *
+ * It also absorbs the per-user shares carved out of the server budget — on prod
+ * the platform user holds 270 of the 300, so 0.7 stays inside the platform's
+ * own allowance without needing a separate knob for it.
  */
 export const FLEET_SAFETY_FACTOR = 0.7;
 
@@ -63,8 +90,14 @@ export interface PoolSizingInput {
   override?: number | undefined;
   /** Replicas of this deployment. Unknown or zero disables derivation. */
   replicas?: number | undefined;
-  /** The server's `max_concurrent_queries`. */
+  /** The server's `max_concurrent_queries`. Per NODE, not per cluster. */
   serverMaxConcurrentQueries?: number | undefined;
+  /**
+   * Nodes in the ClickHouse cluster the fleet spreads its statements across.
+   * Unknown or not a positive integer means one, preserving the pre-cluster
+   * sizing.
+   */
+  serverNodes?: number | undefined;
   /** Client instances this process constructs. */
   clientsPerProcess?: number | undefined;
 }
@@ -136,8 +169,13 @@ function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
     input.clientsPerProcess,
     DEFAULT_CLIENTS_PER_PROCESS,
   );
+  const nodes = positiveIntegerOr(input.serverNodes, DEFAULT_SERVER_NODES);
 
-  return Math.floor((serverMax * FLEET_SAFETY_FACTOR) / (replicas * clients));
+  // serverMax is per node, so the cluster's budget is the per-node allowance
+  // times the nodes the fleet can reach.
+  return Math.floor(
+    (serverMax * nodes * FLEET_SAFETY_FACTOR) / (replicas * clients),
+  );
 }
 
 /**
@@ -223,6 +261,7 @@ export function poolSizingFromEnv(
     override: int("CLICKHOUSE_MAX_OPEN_CONNECTIONS"),
     replicas: int("CLICKHOUSE_CLIENT_REPLICAS"),
     serverMaxConcurrentQueries: int("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"),
+    serverNodes: int("CLICKHOUSE_SERVER_NODES"),
     clientsPerProcess: int("CLICKHOUSE_CLIENTS_PER_PROCESS"),
   };
 }

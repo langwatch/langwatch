@@ -84,6 +84,10 @@ export function harness({
       // about the stranded-row adoption path (`changeBindingRole`) keeps
       // taking the ordinary `changeGrantRole` branch.
       findFirst: vi.fn().mockResolvedValue({ id: "known" }),
+      // Enforcement reads the revoked rows' projectIds before deleting them
+      // (the resource tier's compat ShareLink head is scoped by project);
+      // none here, so no share delete follows.
+      findMany: vi.fn().mockResolvedValue([]),
     },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };

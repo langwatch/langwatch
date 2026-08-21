@@ -84,6 +84,58 @@ export class PrismaSystemMigrationStateRepository
     });
   }
 
+  /**
+   * The runner's compare-and-set (see the port's own doc): the update is
+   * guarded on `status != rolled_back` in the same statement, so an
+   * operator's pin written between the pass's read and this write can never
+   * be overwritten - the guarded UPDATE simply matches nothing. A row that
+   * does not exist yet is created; a create that collides on the unique key
+   * means the row appeared since the guarded update ran, and the only
+   * writer that creates nothing-to-rolled_back transitions is nobody (the
+   * operator can only pin an EXISTING record), so the collision is read as
+   * the pin standing and answered `false`.
+   */
+  async upsertRecordUnlessRolledBack(
+    record: TenantMigrationRecord,
+  ): Promise<boolean> {
+    const report =
+      record.report == null
+        ? Prisma.DbNull
+        : (record.report as Prisma.InputJsonValue);
+    const occurredAt = new Date();
+    const updated = await this.prisma.systemMigrationTenantState.updateMany({
+      where: {
+        migrationName: record.migrationName,
+        tenantId: record.tenantId,
+        NOT: { status: "rolled_back" },
+      },
+      data: { status: record.status, report, occurredAt },
+    });
+    if (updated.count > 0) return true;
+    try {
+      await this.prisma.systemMigrationTenantState.create({
+        data: {
+          migrationName: record.migrationName,
+          tenantId: record.tenantId,
+          status: record.status,
+          report,
+          occurredAt,
+        },
+      });
+      return true;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // The row exists and the guarded update matched nothing: the stored
+        // status is `rolled_back`, and the pin wins.
+        return false;
+      }
+      throw error;
+    }
+  }
+
   /** Ops rollup: how many tenants sit in each status for one migration. */
   async findStatusCounts({
     migrationName,

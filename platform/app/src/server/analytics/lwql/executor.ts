@@ -33,7 +33,13 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
-import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
+import {
+  isClickHouseObjectUnavailableError,
+  translateClickHouseQueryError,
+} from "~/server/app-layer/clients/clickhouse/translate-query-error";
+import { toError } from "~/utils/posthogErrorCapture";
+
+import { LangWatchQLUnavailableError } from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
@@ -250,6 +256,15 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
+        // An unknown table/database or an access refusal cannot be the
+        // caller's SQL: the validator only lets catalog-approved names reach
+        // this point. It is a deployment whose LangWatchQL objects or grants
+        // are missing — the same "not provisioned here" condition as a null
+        // executor, and it gets the same answer. The raw error rides in
+        // `reasons` for the operator's logs and never in the response.
+        if (isClickHouseObjectUnavailableError(error)) {
+          throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+        }
         // Reuses the read path's translation, so the two resource ceilings a
         // caller can act on arrive as the platform's existing codes rather than
         // as a second vocabulary for the same two failures. Anything it does

@@ -7,9 +7,10 @@ export {
 export type { SystemMigrationStateRepository } from "./state.repository";
 export type { SystemMigration } from "./system-migration";
 export type { TenantSource } from "./tenant-source";
-export type {
-  MigrationPassSummary,
-  TenantMigrationOutcome,
-  TenantMigrationRecord,
-  TenantMigrationStatus,
+export {
+  isTerminalTenantStatus,
+  type MigrationPassSummary,
+  type TenantMigrationOutcome,
+  type TenantMigrationRecord,
+  type TenantMigrationStatus,
 } from "./types";

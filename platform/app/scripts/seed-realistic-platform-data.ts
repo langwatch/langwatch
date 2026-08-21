@@ -12,7 +12,7 @@ import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
-import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
@@ -393,7 +393,7 @@ interface ProjectionCounts {
 }
 
 async function projectionCounts(): Promise<ProjectionCounts> {
-  const client = await getClickHouseClientForProject(PROJECT_ID);
+  const client = await getClickHouseClientForTenant(PROJECT_ID);
   if (!client) throw new Error("ClickHouse client is unavailable");
   const result = await client.query({
     query: `

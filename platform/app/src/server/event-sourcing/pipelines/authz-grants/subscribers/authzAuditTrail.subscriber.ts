@@ -74,6 +74,7 @@ const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
   "genesis-import",
   "backfill-b",
   "read-through-mint",
+  "cutover-import",
 ];
 
 /** The audit row, in the existing `AuditLog` shape. The store never sees a

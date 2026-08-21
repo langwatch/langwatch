@@ -342,8 +342,14 @@ export class GroupRestService {
     await this.repo.removeMember({ groupId, userId });
   }
 
-  async getBindings({ groupId }: { groupId: string }) {
-    return this.repo.findBindings({ groupId });
+  async getBindings({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }) {
+    return this.repo.findBindings({ organizationId, groupId });
   }
 
   async addBinding({

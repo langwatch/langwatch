@@ -22,7 +22,6 @@ import type {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { legacyTeamFallbackDisabled } from "../legacy-fallback-gate";
 
 export class PrismaAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -129,15 +128,12 @@ export class PrismaAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<LegacyTeamMembership[]> {
-    // Stage B's per-organization switch: once the in-place migration
-    // finalized this organization, the legacy rows stop participating here
-    // too, so the engine (and the shadow comparison it powers) agrees with
-    // the gated legacy path.
-    if (
-      await legacyTeamFallbackDisabled({ prisma: this.prisma, organizationId })
-    ) {
-      return [];
-    }
+    // No per-organization switch: the rows participate for EVERY
+    // organization until contract deletes them. Stage B's finalization
+    // proves the promoted bindings answer identically at the scopes they
+    // replace; the org-level union quirk keeps inferring from these rows on
+    // both heads until its replacement (the genesis-minted floor grant)
+    // becomes load-bearing at contract.
     const rows = await this.prisma.teamUser.findMany({
       // A stale cross-org TeamUser row must not confer access any more than a
       // stale RoleBinding: the team belongs to the organization AND the user

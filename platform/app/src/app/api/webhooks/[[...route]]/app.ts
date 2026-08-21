@@ -16,8 +16,7 @@ import {
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
 import {

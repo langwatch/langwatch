@@ -119,6 +119,11 @@ class FakeLedger implements GrantsLedgerEmitter {
   }): Promise<void> {
     this.parityCalls.push(args);
   }
+
+  /** The cutover's verb; the backfill never flips anything itself. */
+  async completeCutover(): Promise<void> {
+    throw new Error("the backfill completes no cutover");
+  }
 }
 
 /** Grants as the real collector would assemble them AFTER the backfill:
@@ -130,7 +135,9 @@ function grantsFor({
   orgAdminBinding,
   legacy,
 }: {
-  repository: FakeMigrationRepository;
+  /** Only the promoted rows are read - narrowed so a stale-snapshot case
+   *  can hand in a view with fewer bindings, no cast needed. */
+  repository: Pick<FakeMigrationRepository, "bindings">;
   userId: string;
   organizationRole: "ADMIN" | "MEMBER";
   orgAdminBinding: boolean;
@@ -609,8 +616,8 @@ describe("TeamUserBackfillMigration", () => {
   });
 
   describe("when a legacy row grants an organization-level answer no binding grants", () => {
-    /** @scenario "An organization relying on the legacy org-level union is held, not broken" */
-    it("holds the organization as migrated with the disagreements in its report", async () => {
+    /** @scenario "The legacy org-level union keeps working through finalization" */
+    it("finalizes anyway - the union's replacement arrives at cutover, not here", async () => {
       repository.legacyRows = [
         {
           userId: SAM,
@@ -621,7 +628,12 @@ describe("TeamUserBackfillMigration", () => {
         },
       ];
       // No ORGANIZATION-scoped binding: the legacy org-level union is the
-      // only source of this user's org-scope answers.
+      // only source of this user's org-scope answers. The sweep does not
+      // cover the organization scope - the rows stay live there until
+      // contract, and the genesis-minted floor grant is what replaces the
+      // union - so this must NOT hold the organization. It once did, which
+      // parked every organization holding an ordinary member and deadlocked
+      // the cutover waiting on a finalization that could never come.
       const migration = migrationWith(async ({ principal }) =>
         grantsFor({
           repository,
@@ -636,30 +648,13 @@ describe("TeamUserBackfillMigration", () => {
 
       const outcome = await migration.migrateTenant({ tenantId: ORG });
 
-      expect(outcome.status).toBe("migrated");
-      expect(outcome.report).toMatchObject({ kind: "parity_diff" });
-      const report = outcome.report as {
-        totalDiffs: number;
-        diffs: Array<{
-          userId: string;
-          scopeType: string;
-          allowedWithLegacy: boolean;
-          allowedWithoutLegacy: boolean;
-        }>;
-      };
-      expect(report.totalDiffs).toBeGreaterThan(0);
-      expect(report.diffs[0]).toMatchObject({
-        userId: SAM,
-        scopeType: "organization",
-        allowedWithLegacy: true,
-        allowedWithoutLegacy: false,
-      });
-      // No proof fact for an unfinished argument.
-      expect(ledger.parityCalls).toHaveLength(0);
+      expect(outcome.status).toBe("finalized");
+      expect(outcome.report).toMatchObject({ kind: "parity_clean" });
+      expect(ledger.parityCalls).toHaveLength(1);
     });
 
-    /** @scenario "A held organization heals itself once the gap is granted" */
-    it("finalizes on a later pass once an organization-scoped binding closes the gap", async () => {
+    /** @scenario "A held organization heals itself on a later pass" */
+    it("finalizes on a later pass once the promoted binding reaches the snapshot", async () => {
       repository.legacyRows = [
         {
           userId: SAM,
@@ -669,13 +664,19 @@ describe("TeamUserBackfillMigration", () => {
           createdAtMs: CREATED_AT_MS,
         },
       ];
-      let orgAdminBinding = false;
+      // First pass: the collected snapshot is STALE - it carries the legacy
+      // row but not the binding the backfill just promoted it to, so the
+      // team-scope decisions genuinely disagree and the organization is
+      // held. Second pass: the snapshot caught up, the sweep is clean.
+      let snapshotSeesPromotedBindings = false;
       const migration = migrationWith(async ({ principal }) =>
         grantsFor({
-          repository,
+          repository: snapshotSeesPromotedBindings
+            ? repository
+            : { bindings: [] },
           userId: principal.id,
-          organizationRole: orgAdminBinding ? "ADMIN" : "MEMBER",
-          orgAdminBinding,
+          organizationRole: "MEMBER",
+          orgAdminBinding: false,
           legacy: [
             { teamId: TEAM, role: "ADMIN", customRoleId: null, isPersonal: false },
           ],
@@ -684,8 +685,18 @@ describe("TeamUserBackfillMigration", () => {
 
       const held = await migration.migrateTenant({ tenantId: ORG });
       expect(held.status).toBe("migrated");
+      expect(held.report).toMatchObject({ kind: "parity_diff" });
+      const report = held.report as {
+        diffs: Array<{ scopeType: string; allowedWithLegacy: boolean }>;
+      };
+      expect(report.diffs[0]).toMatchObject({
+        userId: SAM,
+        scopeType: "team",
+        allowedWithLegacy: true,
+        allowedWithoutLegacy: false,
+      });
 
-      orgAdminBinding = true;
+      snapshotSeesPromotedBindings = true;
       const healed = await migration.migrateTenant({ tenantId: ORG });
       expect(healed.status).toBe("finalized");
     });

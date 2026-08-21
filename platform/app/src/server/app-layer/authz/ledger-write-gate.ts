@@ -20,7 +20,7 @@
  * own id as the fact's id), which is what makes flip → rollback → re-flip
  * safe rather than a divergence each time.
  *
- * Modelled on ./legacy-fallback-gate.ts (same shape of question for the
+ * Modelled on ./cutover-gate.ts (same shape of question for the
  * READ fork: short-TTL in-process cache, fail-safe direction, test seam).
  * Server-only, like ./ledger.ts, its only production caller — it defaults
  * to the app's Prisma singleton so verbs need not thread a client.

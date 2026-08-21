@@ -58,7 +58,7 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
-      const service = new TeamService(ctx.prisma);
+      const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamBySlugForUser({
         slug: input.slug,
         organizationId: input.organizationId,
@@ -82,7 +82,7 @@ export const teamRouter = createTRPCRouter({
         "organization:manage",
       );
 
-      const service = new TeamService(ctx.prisma);
+      const service = new TeamService({ prisma: ctx.prisma });
       const teams = await service.getTeamsWithMembers({
         organizationId: input.organizationId,
         callerId,
@@ -119,7 +119,7 @@ export const teamRouter = createTRPCRouter({
     // settings/teams.tsx, an admin-only page.
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
-      const service = new TeamService(ctx.prisma);
+      const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamsWithRoleBindings({
         organizationId: input.organizationId,
       });
@@ -141,7 +141,7 @@ export const teamRouter = createTRPCRouter({
         "organization:manage",
       );
 
-      const service = new TeamService(ctx.prisma);
+      const service = new TeamService({ prisma: ctx.prisma });
       const team = await service.getTeamWithMembers({
         slug: input.slug,
         organizationId: input.organizationId,
@@ -205,7 +205,7 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      return new TeamService(ctx.prisma).updateWithMembers({
+      return new TeamService({ prisma: ctx.prisma }).updateWithMembers({
         teamId: input.teamId,
         name: input.name,
         members: input.members,
@@ -233,7 +233,7 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      return new TeamService(ctx.prisma).createWithMembers({
+      return new TeamService({ prisma: ctx.prisma }).createWithMembers({
         organizationId: input.organizationId,
         name: input.name,
         members: input.members,
@@ -283,7 +283,7 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
-      const service = new TeamService(ctx.prisma);
+      const service = new TeamService({ prisma: ctx.prisma });
       return service.removeMember({
         teamId: input.teamId,
         userId: input.userId,

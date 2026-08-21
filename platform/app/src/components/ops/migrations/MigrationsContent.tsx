@@ -12,8 +12,9 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Play, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { Play, Undo2, UserPlus, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ListTable } from "~/components/ui/ListTable";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -35,6 +36,59 @@ const STATUS_LABEL: Record<string, string> = {
   rolled_back: "Rolled back",
 };
 
+/**
+ * How a targeted run's outcome reads in the toast, per resulting status.
+ * `migrated` here always means HELD - a step that merely waited reports
+ * `migrated` too, and the server flags that separately (see the waiting
+ * copy below), because telling an operator a parity proof found
+ * disagreements when nothing ran sends them looking for a problem that does
+ * not exist.
+ */
+const RUN_OUTCOME_LABEL: Record<string, string> = {
+  finalized: "The organization finalized: it is fully on the new behavior.",
+  migrated:
+    "The organization is held: the work ran but the parity proof found disagreements to resolve. See its report below.",
+  parked:
+    "The organization parked on an error and will be retried. See its report below.",
+  rolled_back:
+    "The organization is pinned rolled back, so the run left it alone.",
+};
+
+/**
+ * What a targeted run's toast says. `waiting` comes first because it
+ * overrides the status: a waiting step records `migrated` exactly as a held
+ * one does, and reading it as held would tell the operator a parity proof
+ * found disagreements when nothing ran at all.
+ */
+function runOutcomeToast({
+  status,
+  waiting,
+}: {
+  status: string | null;
+  waiting: boolean;
+}): { title: string; description: string; type: "success" | "info" } {
+  if (waiting) {
+    return {
+      title: "Run finished: waiting",
+      description:
+        "This step is waiting on the earlier steps to finalize for this organization. Nothing ran and nothing changed - run the earlier steps first.",
+      type: "info",
+    };
+  }
+  return {
+    title: `Run finished: ${STATUS_LABEL[status ?? ""] ?? "no state recorded"}`,
+    description:
+      (status ? RUN_OUTCOME_LABEL[status] : undefined) ??
+      "The run recorded no state for this organization.",
+    type: status === "finalized" ? "success" : "info",
+  };
+}
+
+type MigrationListing = RouterOutputs["ops"]["listSystemMigrations"][number];
+type EnrollmentListing = RouterOutputs["ops"]["listMigrationEnrollments"];
+type EnrollmentRecord = EnrollmentListing["enrollments"][number];
+type PickedOrganization = { id: string; name: string };
+
 export function MigrationsContent() {
   const { scope } = useOpsPermission();
   const canManage = scope?.kind === "platform";
@@ -42,13 +96,17 @@ export function MigrationsContent() {
   const query = api.ops.listSystemMigrations.useQuery(undefined, {
     refetchInterval: 30_000,
   });
+  const enrollmentsQuery = api.ops.listMigrationEnrollments.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
   const utils = api.useUtils();
   const runPass = api.ops.runSystemMigrationPass.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Migration pass started",
         description:
-          "The pass runs in the background under the fleet-wide lease. This page refreshes as organizations move.",
+          "The pass runs in the background, several organizations at a time. This page refreshes as organizations move.",
         type: "success",
       });
       await utils.ops.listSystemMigrations.invalidate();
@@ -79,17 +137,40 @@ export function MigrationsContent() {
     );
   }
 
+  const isSaaS = enrollmentsQuery.data?.isSaaS ?? false;
+  const enrollments = enrollmentsQuery.data?.enrollments ?? [];
+
   return (
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <HStack alignItems="flex-start">
-        <Text fontSize="sm" color="fg.muted" maxWidth="720px">
-          One-time data migrations the system performs on itself, organization
-          by organization, at worker boot. Held organizations finished the work
-          but failed the parity proof - they stay on their legacy path, behaving
-          exactly as before, until the disagreement in their report is resolved
-          and a later pass re-verifies them. Parked organizations hit an error
-          and are retried automatically.
-        </Text>
+        <Stack gap={2} maxWidth="720px">
+          <Text fontSize="sm" color="fg.muted">
+            One-time data migrations the system performs on itself, organization
+            by organization, at worker boot. They run as an ordered pipeline:
+            each step starts only after the previous steps finalized for that
+            organization. Held organizations finished the work but failed the
+            parity proof - they stay on their legacy path, behaving exactly as
+            before, until the disagreement in their report is resolved and a
+            later pass re-verifies them. Parked organizations hit an error and
+            are retried automatically.
+          </Text>
+          {enrollmentsQuery.data && !isSaaS && (
+            <Text fontSize="sm" color="fg.muted">
+              This installation runs released migrations automatically for every
+              organization, so there is nothing to enroll.
+            </Text>
+          )}
+          {enrollmentsQuery.error && !enrollmentsQuery.data && (
+            // The enrollment actions hide themselves when this read fails,
+            // which is the safe direction but an unexplained one: without
+            // this line a cloud operator sees a page that looks like a
+            // self-hosted installation.
+            <Text fontSize="sm" color="fg.muted">
+              Enrollment could not be read just now, so the enrollment actions
+              are hidden. The page retries every 30 seconds.
+            </Text>
+          )}
+        </Stack>
         <Spacer />
         <Button
           size="sm"
@@ -101,10 +182,16 @@ export function MigrationsContent() {
         </Button>
       </HStack>
 
-      {(query.data ?? []).map((migration) => (
+      {(query.data ?? []).map((migration, index) => (
         <MigrationSection
           key={migration.name}
+          step={index + 1}
           migration={migration}
+          previousMigrationTitle={query.data?.[index - 1]?.title}
+          enrollments={enrollments.filter(
+            (enrollment) => enrollment.migrationName === migration.name,
+          )}
+          isSaaS={isSaaS}
           canManage={canManage}
         />
       ))}
@@ -112,71 +199,532 @@ export function MigrationsContent() {
   );
 }
 
-type MigrationListing = RouterOutputs["ops"]["listSystemMigrations"][number];
-
-function MigrationSection({
-  migration,
-  canManage,
+/**
+ * One status figure. A zero is fine and stays gray and quiet; a non-zero
+ * count takes its palette, so the eye lands only on what moved.
+ */
+function CountBadge({
+  label,
+  count,
+  palette,
 }: {
-  migration: MigrationListing;
-  canManage: boolean;
+  label: string;
+  count: number;
+  palette: string;
 }) {
   return (
-    <Box>
-      <HStack marginBottom={3}>
-        <Heading size="md" fontFamily="mono">
-          {migration.name}
-        </Heading>
-        <Badge colorPalette="green">
-          Finalized {migration.counts.finalized}
-        </Badge>
-        <Badge colorPalette="orange">Held {migration.counts.migrated}</Badge>
-        <Badge colorPalette="red">Parked {migration.counts.parked}</Badge>
-        {migration.counts.rolled_back > 0 && (
-          <Badge colorPalette="gray">
-            Rolled back {migration.counts.rolled_back}
+    <Badge
+      colorPalette={count === 0 ? "gray" : palette}
+      variant={count === 0 ? "subtle" : "solid"}
+    >
+      {label} {count}
+    </Badge>
+  );
+}
+
+/** Space proportional to trouble: a zero reads as one quiet gray chip,
+ *  a non-zero Held or Parked is the loud one. */
+function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
+  return (
+    <HStack marginBottom={4} flexWrap="wrap" gap={2}>
+      <CountBadge
+        label="Finalized"
+        count={migration.counts.finalized}
+        palette="green"
+      />
+      <CountBadge
+        label="Held"
+        count={migration.counts.migrated}
+        palette="orange"
+      />
+      <CountBadge
+        label="Parked"
+        count={migration.counts.parked}
+        palette="red"
+      />
+      {migration.counts.rolled_back > 0 && (
+        <CountBadge
+          label="Rolled back"
+          count={migration.counts.rolled_back}
+          palette="gray"
+        />
+      )}
+      {migration.enrollment && (
+        <>
+          <CountBadge
+            label="Enrolled"
+            count={migration.enrollment.enrolledCount}
+            palette="blue"
+          />
+          <Badge colorPalette="gray" variant="subtle">
+            Not enrolled {migration.enrollment.notEnrolledCount}
           </Badge>
-        )}
+        </>
+      )}
+    </HStack>
+  );
+}
+
+function MigrationSection({
+  step,
+  migration,
+  previousMigrationTitle,
+  enrollments,
+  isSaaS,
+  canManage,
+}: {
+  step: number;
+  migration: MigrationListing;
+  previousMigrationTitle?: string;
+  enrollments: EnrollmentRecord[];
+  isSaaS: boolean;
+  canManage: boolean;
+}) {
+  // Which steps take a typed confirmation is the server's call, declared by
+  // the migration itself - the page asks for it exactly where the server
+  // requires it rather than recognising a step by its name.
+  const requiresConfirmation = migration.requiresOperatorConfirmation;
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="lg"
+      padding={5}
+    >
+      <HStack marginBottom={1} flexWrap="wrap" gap={3}>
+        <Heading size="md">
+          Step {step} · {migration.title}
+        </Heading>
+        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          {migration.name}
+        </Text>
         <Spacer />
-        {canManage && <RollBackAction migrationName={migration.name} />}
+        {canManage && migration.availableOnThisInstallation && (
+          <HStack>
+            {isSaaS && (
+              <>
+                <EnrollAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  requiresConfirmation={requiresConfirmation}
+                />
+                <EnrollCohortAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  previousMigrationTitle={previousMigrationTitle}
+                  requiresConfirmation={requiresConfirmation}
+                />
+              </>
+            )}
+            <RunForOrganizationAction
+              migrationName={migration.name}
+              migrationTitle={migration.title}
+              requiresConfirmation={requiresConfirmation}
+            />
+            <RollBackAction
+              migrationName={migration.name}
+              migrationTitle={migration.title}
+            />
+          </HStack>
+        )}
       </HStack>
-      {migration.attention.length === 0 ? (
+      <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={3}>
+        {migration.description}
+      </Text>
+      <MigrationStatusBadges migration={migration} />
+      {!migration.availableOnThisInstallation ? (
         <Text fontSize="sm" color="fg.muted">
-          No organizations need attention.
+          Not yet available for self-hosted installations. It will run
+          automatically, for every organization, in a later release - nothing to
+          do until then.
         </Text>
       ) : (
-        <Table.Root size="sm">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Organization</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader>Last movement</Table.ColumnHeader>
-              <Table.ColumnHeader>Report</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {migration.attention.map((record) => (
-              <AttentionRow
-                key={`${record.migrationName}:${record.tenantId}`}
-                record={record}
-              />
-            ))}
-          </Table.Body>
-        </Table.Root>
+        <Stack gap={4}>
+          {isSaaS && (
+            <EnrollmentTable enrollments={enrollments} canManage={canManage} />
+          )}
+          {migration.attention.length === 0 ? (
+            <Text fontSize="sm" color="fg.muted">
+              No organizations need attention.
+            </Text>
+          ) : (
+            <ListTable size="sm">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Organization</Table.ColumnHeader>
+                  <Table.ColumnHeader>Status</Table.ColumnHeader>
+                  <Table.ColumnHeader>Last movement</Table.ColumnHeader>
+                  <Table.ColumnHeader>Report</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {migration.attention.map((record) => (
+                  <AttentionRow
+                    key={`${record.migrationName}:${record.tenantId}`}
+                    record={record}
+                  />
+                ))}
+              </Table.Body>
+            </ListTable>
+          )}
+        </Stack>
       )}
     </Box>
   );
 }
 
 /**
- * The state machine's one human-driven edge: finalized → rolled_back.
- * Finalized organizations are a count rather than a listing, so the
- * operator names the organization instead of picking a row — they arrive
- * here knowing exactly which organization needs to go back.
+ * The organization lookup every action dialog shares: search by name (or
+ * paste an exact id - the search matches that too), pick from the results.
+ * Selection is the only way to proceed, so an action can never fire against
+ * a typo.
  */
-function RollBackAction({ migrationName }: { migrationName: string }) {
+function OrganizationPicker({
+  value,
+  onChange,
+}: {
+  value: PickedOrganization | null;
+  onChange: (organization: PickedOrganization | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const search = api.ops.searchMigrationOrganizations.useQuery(
+    { query: debouncedQuery },
+    { enabled: debouncedQuery.trim().length >= 2 },
+  );
+
+  if (value) {
+    return (
+      <HStack marginTop={3}>
+        <Box>
+          <Text fontSize="sm">{value.name}</Text>
+          <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+            {value.id}
+          </Text>
+        </Box>
+        <Spacer />
+        <Button size="xs" variant="outline" onClick={() => onChange(null)}>
+          Change
+        </Button>
+      </HStack>
+    );
+  }
+
+  return (
+    <Stack gap={2} marginTop={3}>
+      <Input
+        size="sm"
+        aria-label="Search organizations"
+        placeholder="Search organizations by name or paste an id"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      {search.isFetching && (
+        <Text fontSize="xs" color="fg.muted">
+          Searching…
+        </Text>
+      )}
+      {search.data?.length === 0 && !search.isFetching && (
+        <Text fontSize="xs" color="fg.muted">
+          No organizations match.
+        </Text>
+      )}
+      {(search.data ?? []).map((organization) => (
+        <Button
+          key={organization.id}
+          size="xs"
+          variant="ghost"
+          justifyContent="flex-start"
+          onClick={() => onChange(organization)}
+        >
+          <Text as="span">{organization.name}</Text>
+          <Text as="span" fontFamily="mono" fontSize="xs" color="fg.muted">
+            {organization.id}
+          </Text>
+        </Button>
+      ))}
+    </Stack>
+  );
+}
+
+/**
+ * Enroll one organization for THIS migration. The preparation migrations
+ * enroll on a plain confirm; the cutover is what lets the next pass change
+ * which tables answer the organization's permission checks, so its dialog
+ * says so and the mutation carries the typed confirmation.
+ */
+function EnrollAction({
+  migrationName,
+  migrationTitle,
+  requiresConfirmation,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  requiresConfirmation: boolean;
+}) {
   const [open, setOpen] = useState(false);
-  const [tenantId, setTenantId] = useState("");
+  const [organization, setOrganization] = useState<PickedOrganization | null>(
+    null,
+  );
+  const utils = api.useUtils();
+  const enroll = api.ops.enrollMigrationTenant.useMutation({
+    onSuccess: async () => {
+      toaster.create({
+        title: "Organization enrolled",
+        description:
+          "The next migration pass picks the enrollment up automatically.",
+        type: "success",
+      });
+      setOpen(false);
+      setOrganization(null);
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't enroll" }),
+  });
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <UserPlus size={13} /> Enroll…
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setOrganization(null);
+        }}
+        onConfirm={() => {
+          if (!organization) return;
+          enroll.mutate({
+            organizationId: organization.id,
+            migrationName,
+            ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
+          });
+        }}
+        title={`Enroll an organization for the ${migrationTitle.toLowerCase()}`}
+        description={
+          requiresConfirmation
+            ? "Once its earlier steps finish, the next pass proves parity and moves this organization's permission checks onto the new engine. Rolling that back afterwards is an operator action of its own."
+            : "The next pass runs this step for the organization. It changes nothing about who answers permission checks, and withdrawing later stops future passes without undoing anything."
+        }
+        isLoading={enroll.isPending}
+        confirmDisabled={organization === null}
+      >
+        <OrganizationPicker value={organization} onChange={setOrganization} />
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
+ * Enroll a sampled cohort for THIS migration in one action. The first
+ * step's sample is drawn from organizations not yet enrolled; a later
+ * step's from the step before it. The platform excludes the ones it
+ * already knows to leave alone by data: an active enterprise
+ * subscription, or a dedicated data plane configured in the environment.
+ * No organization is ever named in code to exclude it.
+ */
+function cohortDialogDescription({
+  previousMigrationTitle,
+  requiresConfirmation,
+}: {
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+}): string {
+  const pool = previousMigrationTitle
+    ? `Enrolls a random sample of organizations enrolled for the ${previousMigrationTitle.toLowerCase()} but not yet for this step. `
+    : "Enrolls a random sample of organizations not yet enrolled for this step. ";
+  const consequence = requiresConfirmation
+    ? "Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. Organizations on an enterprise plan or with a dedicated data plane are always left out."
+    : "It changes nothing about who answers permission checks. Organizations on an enterprise plan or with a dedicated data plane are always left out.";
+  return pool + consequence;
+}
+
+function EnrollCohortAction({
+  migrationName,
+  migrationTitle,
+  previousMigrationTitle,
+  requiresConfirmation,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  /** The step before this one; a later step's cohort samples from it. */
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [sampleSizeText, setSampleSizeText] = useState("50");
+  // Number, not parseInt: "1e3" and "50.5" must disable Confirm rather than
+  // be silently reinterpreted as 1 and 50.
+  const sampleSize = Number(sampleSizeText);
+  const sampleSizeValid =
+    Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
+  const utils = api.useUtils();
+  const enrollCohort = api.ops.enrollMigrationCohort.useMutation({
+    onSuccess: async (result) => {
+      toaster.create(
+        result.enrolled.length === 0
+          ? {
+              title: "No organizations enrolled",
+              description:
+                "No eligible organizations remained to enroll for this step.",
+              type: "info",
+            }
+          : {
+              title:
+                result.enrolled.length === 1
+                  ? "1 organization enrolled"
+                  : `${result.enrolled.length} organizations enrolled`,
+              description:
+                result.enrolled.length < sampleSize
+                  ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
+                  : "The next migration pass picks the cohort up automatically.",
+              type: "success",
+            },
+      );
+      setOpen(false);
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't enroll the cohort" }),
+  });
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Users size={13} /> Enroll cohort…
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() => {
+          if (!sampleSizeValid) return;
+          enrollCohort.mutate({
+            migrationName,
+            sampleSize,
+            ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
+          });
+        }}
+        title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
+        description={cohortDialogDescription({
+          previousMigrationTitle,
+          requiresConfirmation,
+        })}
+        isLoading={enrollCohort.isPending}
+        confirmDisabled={!sampleSizeValid}
+      >
+        <Stack gap={1}>
+          <Text fontSize="sm">How many organizations to enroll</Text>
+          <Input
+            size="sm"
+            type="number"
+            min={1}
+            max={1000}
+            step={1}
+            value={sampleSizeText}
+            onChange={(event) => setSampleSizeText(event.target.value)}
+          />
+        </Stack>
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
+ * Run THIS migration for one organization, now, without waiting for the
+ * next boot's pass. The result toast reports the status the organization
+ * ended the run in - the operator asked about one organization and gets its
+ * answer, not a fleet summary.
+ */
+function RunForOrganizationAction({
+  migrationName,
+  migrationTitle,
+  requiresConfirmation,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  requiresConfirmation: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [organization, setOrganization] = useState<PickedOrganization | null>(
+    null,
+  );
+  const utils = api.useUtils();
+  const run = api.ops.runSystemMigrationForOrganization.useMutation({
+    onSuccess: async ({ status, waiting }) => {
+      toaster.create(runOutcomeToast({ status, waiting }));
+      setOpen(false);
+      setOrganization(null);
+      await utils.ops.listSystemMigrations.invalidate();
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't run the migration" }),
+  });
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Play size={13} /> Run for organization…
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setOrganization(null);
+        }}
+        onConfirm={() => {
+          if (!organization) return;
+          run.mutate({
+            organizationId: organization.id,
+            migrationName,
+            ...(requiresConfirmation ? { confirm: "RUN" as const } : {}),
+          });
+        }}
+        title={`Run the ${migrationTitle.toLowerCase()} for one organization`}
+        description={
+          requiresConfirmation
+            ? "If parity proves clean, this moves the organization's permission checks onto the new engine right now. The organization must already be enrolled for this step."
+            : "Runs this step for the organization right now and reports how it ended. The organization must already be enrolled for this step."
+        }
+        isLoading={run.isPending}
+        confirmDisabled={organization === null}
+      >
+        <OrganizationPicker value={organization} onChange={setOrganization} />
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
+ * The state machine's one human-driven edge: finalized → rolled_back. The
+ * operator names the organization through the same picker as every other
+ * action - finalized organizations are a count rather than a listing, so
+ * they arrive here knowing which organization needs to go back.
+ */
+function RollBackAction({
+  migrationName,
+  migrationTitle,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [organization, setOrganization] = useState<PickedOrganization | null>(
+    null,
+  );
   const utils = api.useUtils();
   const rollBack = api.ops.rollBackSystemMigrationTenant.useMutation({
     onSuccess: async () => {
@@ -187,7 +735,7 @@ function RollBackAction({ migrationName }: { migrationName: string }) {
         type: "success",
       });
       setOpen(false);
-      setTenantId("");
+      setOrganization(null);
       await utils.ops.listSystemMigrations.invalidate();
     },
     onError: (error) =>
@@ -203,33 +751,154 @@ function RollBackAction({ migrationName }: { migrationName: string }) {
         open={open}
         onClose={() => {
           setOpen(false);
-          // Drop the typed id with the dialog. Reopening for a DIFFERENT
-          // organization must not arrive pre-filled with the last one and
-          // the confirm button already live.
-          setTenantId("");
+          // Drop the picked organization with the dialog. Reopening for a
+          // DIFFERENT organization must not arrive pre-filled with the last
+          // one and the confirm button already live.
+          setOrganization(null);
         }}
-        onConfirm={() =>
+        onConfirm={() => {
+          if (!organization) return;
           rollBack.mutate({
             migrationName,
-            tenantId: tenantId.trim(),
+            tenantId: organization.id,
             confirm: "ROLL BACK",
-          })
-        }
-        title="Roll an organization back to its legacy path"
-        description="The organization returns to the behavior it had before this migration finalized, and stays there until an operator intervenes again. Only finalized organizations can be rolled back. Enter the organization id."
+          });
+        }}
+        title={`Roll an organization back from the ${migrationTitle.toLowerCase()}`}
+        description="The organization returns to the behavior it had before this step finalized, and stays there until an operator intervenes again. Only migrated or finalized organizations can be rolled back."
         isLoading={rollBack.isPending}
-        confirmDisabled={tenantId.trim().length === 0}
+        confirmDisabled={organization === null}
       >
-        <Input
-          marginTop={3}
-          size="sm"
-          fontFamily="mono"
-          placeholder="organization id"
-          value={tenantId}
-          onChange={(event) => setTenantId(event.target.value)}
-        />
+        <OrganizationPicker value={organization} onChange={setOrganization} />
       </ConfirmDialog>
     </>
+  );
+}
+
+/** Enrolled-and-fine rows are fine, so past a handful they fold away behind
+ *  a count - a cohort of hundreds must not turn the page into a scroll. */
+const ENROLLMENT_PREVIEW_ROWS = 8;
+
+function EnrollmentTable({
+  enrollments,
+  canManage,
+}: {
+  enrollments: EnrollmentRecord[];
+  canManage: boolean;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  if (enrollments.length === 0) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        No organizations are enrolled for this step yet.
+      </Text>
+    );
+  }
+  const visible = showAll
+    ? enrollments
+    : enrollments.slice(0, ENROLLMENT_PREVIEW_ROWS);
+  const hiddenCount = enrollments.length - visible.length;
+  return (
+    <Stack gap={2}>
+      <ListTable size="sm">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
+            {canManage && <Table.ColumnHeader />}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {visible.map((enrollment) => (
+            <EnrollmentRow
+              key={`${enrollment.organizationId}:${enrollment.migrationName}`}
+              enrollment={enrollment}
+              canManage={canManage}
+            />
+          ))}
+        </Table.Body>
+      </ListTable>
+      {(hiddenCount > 0 || showAll) &&
+        enrollments.length > ENROLLMENT_PREVIEW_ROWS && (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll
+              ? "Show fewer"
+              : `Show all ${enrollments.length} enrolled organizations`}
+          </Button>
+        )}
+    </Stack>
+  );
+}
+
+function EnrollmentRow({
+  enrollment,
+  canManage,
+}: {
+  enrollment: EnrollmentRecord;
+  canManage: boolean;
+}) {
+  const utils = api.useUtils();
+  const withdraw = api.ops.withdrawMigrationTenant.useMutation({
+    onSuccess: async () => {
+      toaster.create({
+        title: "Enrollment withdrawn",
+        description:
+          "Later passes leave this organization alone for that step. Nothing already done is undone.",
+        type: "success",
+      });
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't withdraw" }),
+  });
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        {enrollment.organizationName ? (
+          <Text>{enrollment.organizationName}</Text>
+        ) : (
+          <Text color="fg.muted">Deleted organization</Text>
+        )}
+        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          {enrollment.organizationId}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        {enrollment.enrolledByLabel ?? (
+          <Text as="span" fontFamily="mono" fontSize="xs">
+            {enrollment.enrolledByUserId}
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell>{new Date(enrollment.createdAt).toLocaleString()}</Table.Cell>
+      {canManage && (
+        <Table.Cell textAlign="right">
+          <Button
+            size="xs"
+            variant="outline"
+            loading={withdraw.isPending}
+            onClick={() =>
+              withdraw.mutate({
+                organizationId: enrollment.organizationId,
+                migrationName: enrollment.migrationName,
+              })
+            }
+          >
+            Withdraw
+          </Button>
+        </Table.Cell>
+      )}
+    </Table.Row>
   );
 }
 

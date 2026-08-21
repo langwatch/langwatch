@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";

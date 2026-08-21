@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
   checkOrganizationPermission,
@@ -19,6 +20,9 @@ import {
 
 // Mock Prisma client
 const mockPrisma = {
+  authzCutoverProjection: {
+    findUnique: vi.fn(),
+  },
   project: {
     findUnique: vi.fn(),
   },
@@ -58,6 +62,13 @@ const mockSession = {
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A cold, explicit "not on the engine" answer, so the resolvers stay on
+    // the legacy path these tests pin instead of the gate caching a failed
+    // read of a missing delegate.
+    resetCutoverGateForTesting();
+    mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
+      onEngine: false,
+    });
     // Default: the caller IS a current member of the owning org — scoped
     // resolution fails closed on membership, so every test that exercises a
     // binding/group path needs one. Tests about non-members override this with
