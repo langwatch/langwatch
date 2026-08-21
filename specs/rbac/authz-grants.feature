@@ -359,6 +359,21 @@ Feature: Authorization grants
     And the compat binding is not rebuilt from the stale event
     And it is removed rather than resurrected
 
+  @unit
+  Scenario: A filtered revoke reaches Grant-head rows with no compat binding
+    Given a filtered revoke naming a principal
+    And that principal holds a Grant-head row the compat head cannot express
+    When the revoke runs on the ledger fork
+    Then the revoked set is the union of the compat ids and the Grant ids
+    And the row with no compat binding is revoked, not left resolving
+
+  @unit
+  Scenario: A filter the vocabulary cannot translate falls back to the compat ids
+    Given a filtered revoke whose shape the Grant translation does not cover
+    When the revoke runs on the ledger fork
+    Then only the compat ids are revoked
+    And the Grant head is not queried with a guessed predicate
+
   # ═══ Share links and the compat heads ═════════════════════════════════
   # Share links live on both heads until every organization has moved:
   # the projection decides, the legacy ShareLink row keeps old readers and

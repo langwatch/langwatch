@@ -723,9 +723,10 @@ export class GrantsLedgerWriter {
    * the name the resource tier calls it by — revocation is keyed on grant
    * ids and knows nothing about tiers, so the command, the synchronous
    * enforcement (decision 7) and the epoch bump are literally the same ones.
-   * What the enforcement additionally does for a resource id is delete the
-   * compat `ShareLink` head, which is why a revoked link stops resolving
-   * before this returns, queue running or not.
+   * The synchronous enforcement marks the authoritative `Grant` row; the
+   * compat `ShareLink` head is deleted by the caller
+   * (`share.ledger.repository`, before it returns), not by this enforcement,
+   * so a revoked link stops resolving on both heads without the fold running.
    *
    * NO `onLedger` gate, like `attachResourceGrant` and for a stronger
    * reason: the caller (`share.ledger.repository`) has already routed here
@@ -1066,9 +1067,14 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * DELETE binding facts — revocation-class (decision 7): the deny effect is
-   * applied synchronously on this path after the append, so it holds before
-   * the call returns even with the queue stopped. Absent ids are no-ops.
+   * DELETE binding facts — revocation-class (decision 7): the deny is applied
+   * synchronously on this path after the append, by marking the authoritative
+   * `Grant` row `revokedAt`. That is the head every migrated organization
+   * decides from, so the deny holds before the call returns even with the
+   * queue stopped. The compat `RoleBinding` is NOT deleted here — the fold
+   * sweeps it when the queue runs — so an organization rolled back to legacy
+   * inside a queue-stopped window can still read the stale binding until the
+   * projection catches up. Absent ids are no-ops.
    */
   async revokeBindings({
     organizationId,
@@ -1137,16 +1143,11 @@ export class GrantsLedgerWriter {
     where,
     actor,
     reason,
-    skipAppendWhenNoMatches,
   }: {
     organizationId: string;
     where: Prisma.RoleBindingWhereInput;
     actor: LedgerActor;
     reason?: string;
-    /** See `revokeBindings`' parameter of the same name. Only meaningful on
-     *  the ledger fork — the legacy fork below never appends a selector-only
-     *  fact in the first place. */
-    skipAppendWhenNoMatches?: boolean;
   }): Promise<number> {
     if (!organizationId) {
       throw new Error(
@@ -1181,20 +1182,41 @@ export class GrantsLedgerWriter {
       return count;
     }
 
-    const rows = await this.prisma.roleBinding.findMany({
-      where: legacyWhere,
-      select: { id: true },
-    });
+    // The compat head is not the whole head. A Grant-head row a custom-role
+    // import wrote (roleKey with no compat binding), a PLATFORM-tier row, or
+    // one whose compat write hit a swallowed conflict has no RoleBinding to
+    // enumerate, so revoking only the ids `roleBinding.findMany` returns would
+    // leave those resolving. Mirror `offboardMember`: union the compat ids
+    // with the Grant-head rows the same filter names.
+    const [bindingRows, grantWhere] = [
+      await this.prisma.roleBinding.findMany({
+        where: legacyWhere,
+        select: { id: true },
+      }),
+      grantWhereFromBindingWhere(where, organizationId),
+    ];
+    const grantRows = grantWhere
+      ? await this.prisma.grant.findMany({
+          where: grantWhere,
+          select: { id: true },
+        })
+      : [];
+    const bindingIds = [
+      ...new Set([
+        ...bindingRows.map((row) => row.id),
+        ...grantRows.map((row) => row.id),
+      ]),
+    ];
+    // revokeBindings early-returns on an empty id list, so no selector-only
+    // fact is appended when nothing matched — the behaviour the old
+    // skipAppendWhenNoMatches flag stood in for, now intrinsic.
     await this.revokeBindings({
       organizationId,
-      bindingIds: rows.map((row) => row.id),
+      bindingIds,
       actor,
       ...(reason ? { reason } : {}),
-      ...(skipAppendWhenNoMatches !== undefined
-        ? { skipAppendWhenNoMatches }
-        : {}),
     });
-    return rows.length;
+    return bindingIds.length;
   }
 
   /**
@@ -1682,4 +1704,67 @@ function bindingIdentityWhere({
       ? { role: binding.role, customRoleId: null }
       : { customRoleId: binding.customRoleId }),
   };
+}
+
+/**
+ * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head
+ * predicate, so a filtered revoke reaches Grant rows the compat head never
+ * represented (a `roleKey`-only import, a PLATFORM-tier row).
+ *
+ * A bounded translation over exactly the columns the callers filter on
+ * (`apiKeyId` / `groupId` / `userId` → principal; `customRoleId` → the
+ * `custom:<id>` roleKey; `id` shared by construction). Any other shape returns
+ * null and the caller falls back to the compat ids alone — the pre-existing
+ * behaviour, never a wrong revoke. This is the interim until the filter
+ * becomes the closed vocabulary `revokeBindingsWhere` documents.
+ */
+function grantWhereFromBindingWhere(
+  where: Prisma.RoleBindingWhereInput,
+  organizationId: string,
+): Prisma.GrantWhereInput | null {
+  const known = new Set([
+    "apiKeyId",
+    "groupId",
+    "userId",
+    "customRoleId",
+    "id",
+    "organizationId",
+  ]);
+  if (Object.keys(where).some((key) => !known.has(key))) return null;
+
+  const grantWhere: Prisma.GrantWhereInput = { organizationId };
+
+  const principal = (
+    [
+      ["apiKeyId", "API_KEY"],
+      ["groupId", "GROUP"],
+      ["userId", "USER"],
+    ] as const
+  ).find(([field]) => where[field] != null);
+  if (principal) {
+    const value = where[principal[0]];
+    // Only a plain-string principal id is translated; an operator shape here
+    // is outside the caller vocabulary, so bail rather than guess.
+    if (typeof value !== "string") return null;
+    grantWhere.principalType = principal[1];
+    grantWhere.principalId = value;
+  }
+
+  if (where.customRoleId != null) {
+    const value = where.customRoleId;
+    if (typeof value === "string") {
+      grantWhere.roleKey = `custom:${value}`;
+    } else if (Array.isArray((value as { in?: unknown }).in)) {
+      grantWhere.roleKey = {
+        in: (value as { in: string[] }).in.map((id) => `custom:${id}`),
+      };
+    } else {
+      return null;
+    }
+  }
+
+  if (where.id != null)
+    grantWhere.id = where.id as Prisma.GrantWhereInput["id"];
+
+  return grantWhere;
 }

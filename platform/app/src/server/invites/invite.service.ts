@@ -1360,7 +1360,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's organization role",
-        skipAppendWhenNoMatches: true,
       });
       await writer.attachBindings({
         organizationId: invite.organizationId,
@@ -1429,7 +1428,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's team role",
-        skipAppendWhenNoMatches: true,
       });
     }
     if (teamMembershipData.length > 0) {
