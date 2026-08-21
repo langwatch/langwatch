@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, auth0, oauth2, client credentials, code 
 description: Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
 ---
 
-# Testing Agents Behind Authentication
+## Static credential or token exchange
 
 Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 

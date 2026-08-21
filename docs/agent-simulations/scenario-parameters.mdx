@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, scenario parameters, run parameters, par
 description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 ---
 
-# Scenario Run Parameters
+## What are Run Parameters
 
 A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter, with an optional default value. The scenario text and the target configuration read it as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
 
@@ -88,7 +88,7 @@ https://api.your-company.internal/{{ params.region }}/chat
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-simulations/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Remote traces](/agent-simulations/remote-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-simulations/remote-traces) for what the trace variables carry.
 
 ### Prompt targets
 

@@ -16800,7 +16800,7 @@ description: Connect Claude Code, Cursor, and other tool-specific telemetry to y
 ---
 
 
-# Ingestion Templates
+## What an ingestion template is
 
 > **Status:** v1, push-mode templates only. OAuth-redirect and pull-mode (S3, API) shapes are reserved for a future iteration.
 
@@ -18325,7 +18325,7 @@ title: Personas and default landing
 description: LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
 ---
 
-# Personas and default landing
+## How the default landing is picked
 
 LangWatch supports four distinct work patterns and routes each to its
 natural home page on first paint after sign-in. The detection is signal-
@@ -27257,7 +27257,7 @@ description: Debug TypeScript SDK integrations with LangWatch to fix tracing gap
 sidebarTitle: Debugging
 ---
 
-# Debugging and Troubleshooting
+## Troubleshooting Tools
 
 The LangWatch TypeScript SDK has console tracing, a custom logger hook, and error-handling options for troubleshooting an integration.
 
@@ -27598,7 +27598,7 @@ sidebarTitle: "Manual Control"
 description: "Use LangWatch TypeScript manual instrumentation for fine-grained tracing control during AI agent testing."
 ---
 
-# Manual Instrumentation
+## In This Guide
 
 Manual span management gives TypeScript and JavaScript applications fine-grained control over observability, beyond what the automatic `withActiveSpan` method provides.
 
@@ -28142,7 +28142,7 @@ title: OpenTelemetry Migration
 description: "Migrate from OpenTelemetry to LangWatch while preserving custom tracing to support more advanced AI agent testing."
 ---
 
-# OpenTelemetry Migration
+## In This Guide
 
 You can migrate an existing OpenTelemetry setup to LangWatch and keep your custom configurations, instrumentations, and advanced features.
 
@@ -28600,7 +28600,7 @@ description: "Learn about OpenTelemetry semantic conventions and LangWatch's cus
 keywords: langwatch, typescript, sdk, guide, observability, attributes, semantic conventions, opentelemetry, standards, naming
 ---
 
-# Semantic Conventions
+## In This Guide
 
 LangWatch follows the OpenTelemetry semantic conventions and adds its own attributes for LLM-specific observability.
 
@@ -33948,7 +33948,7 @@ keywords: langwatch, agent simulations, auth0, oauth2, client credentials, code 
 description: Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
 ---
 
-# Testing Agents Behind Authentication
+## Static credential or token exchange
 
 Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 
@@ -34092,7 +34092,7 @@ keywords: langwatch, agent simulations, http agent, black box testing, tracepare
 description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
 
-# Connect Your Agent
+## Getting Started
 
 The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first suite:
 
@@ -34386,7 +34386,7 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
 | `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Remote traces](/agent-simulations/remote-traces) |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
 
 The URL and the header values render the same variables.
 
@@ -34434,7 +34434,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge.
 
 <Note>
-  **Also check:** [Remote traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
+  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
 </Note>
 
 ## 5. Register the agent and run the first scenario
@@ -34759,7 +34759,7 @@ While optional, we strongly recommend setting stable identifiers for your scenar
 
 ## 5. Let the Judge Read Your Traces
 
-When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on remote trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
+When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
 
 
   ### Python
@@ -34784,7 +34784,7 @@ When your adapter calls an agent that runs as a separate service, the judge cann
 
 
 
-Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Remote traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
+Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
 
 ---
 
@@ -34905,7 +34905,7 @@ script=[
 
 - **Simulations** - Test real agent behavior by simulating users in different scenarios and edge cases
 - **Flexible evaluations** - Judge agent behavior at any point in conversations, combine with evals, test error recovery, and complex workflows
-- **Trace-informed judging** - The judge reads your agent's own traces before its verdict, so it verifies tool calls and writes as evidence. [See Remote Traces](/agent-simulations/remote-traces)
+- **Trace-informed judging** - The judge reads your agent's own traces before its verdict, so it verifies tool calls and writes as evidence. [See Linking Your Traces](/agent-simulations/remote-traces)
 - **Voice testing** - Test voice agents end-to-end over real audio (ElevenLabs, OpenAI Realtime, Twilio, Pipecat). [See Voice Agents](/agent-simulations/voice-agents)
 - **Red teaming** - Run multi-turn adversarial attacks to uncover security vulnerabilities. [See Red Teaming](/agent-simulations/red-teaming)
 - **Framework agnostic** - Works with any AI agent framework
@@ -34933,7 +34933,7 @@ See [the LangWatch Simulations visualizer](https://langwatch.ai/scenario/visuali
 
 - [Connect your agent](/agent-simulations/connect-your-agent) - Run scenario suites from the platform against your agent's HTTP endpoint
 - [Write scenarios in code](/agent-simulations/getting-started) - Set up your first code-first simulation
-- [Remote traces](/agent-simulations/remote-traces) - How the judge reads your agent's traces
+- [Linking your traces](/agent-simulations/remote-traces) - How the judge reads your agent's traces
 - [Voice Agents](/agent-simulations/voice-agents) - Test voice agents end-to-end over real audio
 - [Red Teaming](/agent-simulations/red-teaming) - Run adversarial attacks against your agent
 - [Scenario Documentation](https://langwatch.ai/scenario/) - Deep dive into the testing framework
@@ -34949,7 +34949,7 @@ keywords: langwatch, agent simulations, local development, tunnel, langwatch age
 description: Run platform scenario suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
 ---
 
-# Local Development
+## Start the tunnel
 
 `langwatch agent dev` starts a tunnel in front of a local port, points the chosen registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
 
@@ -35171,15 +35171,15 @@ New to Scenario? Start with [Getting Started](/agent-simulations/getting-started
 # FILE: ./agent-simulations/remote-traces.mdx
 
 ---
-title: Remote Traces
-sidebarTitle: Remote traces
-keywords: langwatch, agent simulations, remote traces, traceparent, trace propagation, judge, tool calls, opentelemetry
+title: Linking Your Traces
+sidebarTitle: Linking your traces
+keywords: langwatch, agent simulations, linked traces, traceparent, trace propagation, judge, tool calls, opentelemetry
 description: Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
 ---
 
-# Remote Traces
+## Connecting your agent traces to the scenario run
 
-Remote traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
 
 For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
 
@@ -35241,9 +35241,9 @@ Write the criterion about the action, in your system's own vocabulary, and the j
 
 A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
 
-## Remote traces in code-first scenarios
+## Linked traces in code-first scenarios
 
-The Scenario SDKs fetch remote traces from LangWatch with a flag on the run or on the global configuration:
+The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run or on the global configuration:
 
 
   ### Python
@@ -35326,6 +35326,97 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
 
 ---
 
+# FILE: ./agent-simulations/run-suites-from-ci.mdx
+
+---
+title: Run Suites from CI
+sidebarTitle: Run from CI
+keywords: langwatch, agent simulations, ci, suite run, batch, batchRunId, isComplete, poll, wait
+description: Start a suite from a CI job and wait for every run of the batch to finish.
+---
+
+## How it works
+
+A CI job starts a suite over the API, keeps the batch id from the response, then polls that batch until every run is finished.
+
+## Start the run
+
+`POST /api/suites/{id}/run` schedules one run for each scenario of the suite:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/suites/suite_abc123/run" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+The response carries the two values the CI job needs:
+
+```json
+{
+  "scheduled": true,
+  "batchRunId": "batch_xyz789",
+  "setId": "set_abc123",
+  "jobCount": 2,
+  "skippedArchived": { "scenarios": [], "targets": [] },
+  "items": [
+    { "scenarioRunId": "run_1", "scenarioId": "scn_1", "name": "Cancel on the free plan" },
+    { "scenarioRunId": "run_2", "scenarioId": "scn_2", "name": "Cancel on the enterprise plan" }
+  ]
+}
+```
+
+`batchRunId` addresses the batch. `jobCount` is the number of runs the batch gets.
+
+## Poll the batch
+
+`GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
+
+```bash
+curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
+```
+
+```json
+{
+  "batchRunId": "batch_xyz789",
+  "totalCount": 2,
+  "passCount": 1,
+  "failCount": 0,
+  "runningCount": 1,
+  "settledCount": 1,
+  "stalledCount": 0,
+  "lastRunAt": 1755691200000,
+  "lastUpdatedAt": 1755691260000,
+  "firstCompletedAt": 1755691230000,
+  "allCompletedAt": null,
+  "isComplete": false
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `totalCount` | Runs the batch holds now. |
+| `runningCount` | Runs that are queued or in progress. |
+| `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
+| `isComplete` | True when `settledCount` equals `totalCount`. |
+
+Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
+
+The batch is finished when the counts settle. Read `failCount` to decide the exit code of the CI job, and open the batch in the platform for the run details.
+
+## Or let the CLI wait
+
+The CLI does the same poll:
+
+```bash
+langwatch suite run suite_abc123 --wait
+```
+
+The command exits when the batch is complete, and its exit code follows the results.
+
+---
+
 # FILE: ./agent-simulations/scenario-parameters.mdx
 
 ---
@@ -35335,7 +35426,7 @@ keywords: langwatch, agent simulations, scenario parameters, run parameters, par
 description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 ---
 
-# Scenario Run Parameters
+## What are Run Parameters
 
 A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter, with an optional default value. The scenario text and the target configuration read it as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
 
@@ -35418,7 +35509,7 @@ https://api.your-company.internal/{{ params.region }}/chat
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-simulations/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Remote traces](/agent-simulations/remote-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-simulations/remote-traces) for what the trace variables carry.
 
 ### Prompt targets
 
@@ -35602,7 +35693,7 @@ keywords: langwatch, agent simulations, scenarios, run plans, product managers, 
 description: Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
 ---
 
-# Testing Your Agent
+## What this guide covers
 
 This guide shows how to test your AI agent with simulations, entirely from the LangWatch interface. You write scenarios that describe real situations, run them against your agent, and read a clear verdict for each one. No code is involved in any step.
 
@@ -37491,7 +37582,7 @@ title: "Runtime Parameters"
 description: "Version arbitrary application settings alongside your prompts and fetch them via the SDK or REST API."
 ---
 
-# Runtime Parameters
+## What they are
 
 Every prompt version can carry a `parameters` object: arbitrary JSON that is versioned, tagged, and fetched together with the prompt itself. Use it for application settings that should change in lockstep with the prompt: search iteration limits, confidence thresholds, structured output schemas, metadata field lists, feature switches.
 
@@ -48039,7 +48130,7 @@ title: "Better Agents"
 description: "Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development"
 ---
 
-# Better Agents
+## The Reliability Layer
 
 Better Agents is a CLI tool and a set of standards for building **reliable, testable, production-grade agents**, independent of which framework you use. It gives your coding assistant (Kilocode, Claude Code, Cursor, etc.) knowledge of any agent framework you choose (Agno, Mastra, LangGraph, etc.) and all their best practices.
 
@@ -63590,7 +63681,7 @@ title: Hybrid Setup
 description: Use LangWatch Cloud with your own data plane, keep full data ownership while using LangWatch's managed control plane.
 ---
 
-# Hybrid Setup
+## Control Plane and Data Plane
 
 The hybrid setup splits the deployment: LangWatch manages the **control plane** (application, UI, evaluations, prompt management), while your sensitive data stays in **your own infrastructure**.
 
