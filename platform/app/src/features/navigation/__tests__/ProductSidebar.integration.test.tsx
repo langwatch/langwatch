@@ -331,10 +331,15 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
-      expect(screen.getByText("Catalog")).toBeInTheDocument();
+      expect(screen.getByText("Inventory")).toBeInTheDocument();
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
-      expect(screen.getByText("Tool Tiles")).toBeInTheDocument();
-      expect(screen.getByText("Departments")).toBeInTheDocument();
+      expect(screen.getByText("People")).toBeInTheDocument();
+      // The flag mock reports every flag enabled, so the billed-cost
+      // placeholders are visible here too.
+      expect(screen.getByText("Costs")).toBeInTheDocument();
+      expect(screen.getByText("Billed")).toBeInTheDocument();
+      // Tool Tiles folded into Inventory's Catalog tab.
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
     });
   });
 

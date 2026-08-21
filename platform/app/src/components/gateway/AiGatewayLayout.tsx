@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { gatewayNavItems } from "~/features/navigation/sectionNavItems";
+import { useVisibleSectionNavItems } from "~/features/navigation/useVisibleSectionNavItems";
 
 /**
  * Layout for `/gateway/*`. Mirrors the GovernanceLayout pattern:
@@ -22,13 +23,14 @@ export default function AiGatewayLayout({
   children,
   pageTitle,
 }: PropsWithChildren<{ pageTitle?: string }>) {
+  const visibleItems = useVisibleSectionNavItems(gatewayNavItems);
   return (
     <SectionNavigationLayout
       sectionLabel="AI Gateway"
       orgScope
       pageTitle={pageTitle}
       standDownRailInProductShell
-      navigationItems={gatewayNavItems.map((item) => ({
+      navigationItems={visibleItems.map((item) => ({
         label: item.label,
         href: item.href,
         includePath: item.includePath,

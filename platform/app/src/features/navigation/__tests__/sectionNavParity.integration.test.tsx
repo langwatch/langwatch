@@ -9,7 +9,7 @@
  */
 
 import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface CapturedItem {
   label: string;
@@ -17,6 +17,31 @@ interface CapturedItem {
   target?: string;
 }
 let capturedItems: CapturedItem[] = [];
+
+const harness = vi.hoisted(() => ({
+  /** Flags the useFeatureFlag mock reports enabled. */
+  enabledFlags: [] as string[],
+  /** Options each useFeatureFlag call received, keyed by flag name. */
+  flagCallOptions: {} as Record<string, unknown>,
+}));
+
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: (flag: string, options?: unknown) => {
+    harness.flagCallOptions[flag] = options;
+    return {
+      enabled: harness.enabledFlags.includes(flag),
+      isLoading: false,
+    };
+  },
+}));
+
+// useVisibleSectionNavItems resolves flags with org context; give it one.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    isLoading: false,
+    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
+  }),
+}));
 
 vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
   SectionNavigationLayout: ({
@@ -79,19 +104,49 @@ describe("given the gateway section navigation data", () => {
 });
 
 describe("given the governance section navigation data", () => {
-  describe("when the governance layout renders", () => {
-    it("renders the pinned item list from the shared data", () => {
+  beforeEach(() => {
+    harness.enabledFlags = [];
+    harness.flagCallOptions = {};
+  });
+
+  describe("when the governance layout renders with the billed-cost flag off", () => {
+    /** @scenario With the billed-cost flag off, Costs and Billed do not exist */
+    it("renders the pinned item list without Costs and Billed", () => {
       render(<GovernanceLayout>x</GovernanceLayout>);
 
       expect(
         capturedItems.map((item) => ({ label: item.label, href: item.href })),
       ).toEqual([
         { label: "Overview", href: "/governance" },
-        { label: "Catalog", href: "/governance/catalog" },
+        { label: "Inventory", href: "/governance/inventory" },
         { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
-        { label: "Tool Tiles", href: "/governance/tool-catalog" },
-        { label: "Departments", href: "/governance/departments" },
+        { label: "People", href: "/governance/people" },
       ]);
+    });
+  });
+
+  describe("when the governance layout renders with the billed-cost flag on", () => {
+    /** @scenario With the billed-cost flag on, Costs and Billed appear as placeholders */
+    it("lists Costs and Billed between Overview and Inventory", () => {
+      harness.enabledFlags = ["release_ui_governance_billed_cost_enabled"];
+      render(<GovernanceLayout>x</GovernanceLayout>);
+
+      expect(
+        capturedItems.map((item) => ({ label: item.label, href: item.href })),
+      ).toEqual([
+        { label: "Overview", href: "/governance" },
+        { label: "Costs", href: "/governance/costs" },
+        { label: "Billed", href: "/governance/billed" },
+        { label: "Inventory", href: "/governance/inventory" },
+        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
+        { label: "People", href: "/governance/people" },
+      ]);
+
+      // The flag must resolve in organization context, gated on the org
+      // being loaded — flags resolved without it silently read as off.
+      expect(
+        harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
+      ).toEqual({ organizationId: "org-1", enabled: true });
     });
   });
 });

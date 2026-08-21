@@ -14,8 +14,8 @@
  * integration tests can stay about rendering.
  */
 import { describe, expect, it } from "vitest";
-import type { ComposerState } from "../ingestion-sources";
-import { buildCreateInput, PARSER_FIELDS } from "../ingestion-sources";
+import type { ComposerState } from "../inventory";
+import { buildCreateInput, PARSER_FIELDS } from "../inventory";
 
 const genieFields = PARSER_FIELDS.databricks_genie;
 const keysInOrder = genieFields.map((f) => f.key);

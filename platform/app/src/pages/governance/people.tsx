@@ -26,13 +26,15 @@ import { api, type RouterOutputs } from "~/utils/api";
 type Department = RouterOutputs["departments"]["list"][number];
 
 /**
- * Departments are read with `governance:view` and written with
- * `governance:manage`. The page opens on the read grant, and the create box
- * plus the per-row actions appear only for a viewer who holds the write one.
+ * The People page (nee Departments — the page identity renamed, the
+ * department entity did not). Departments are read with `governance:view`
+ * and written with `governance:manage`. The page opens on the read grant,
+ * and the create box plus the per-row actions appear only for a viewer
+ * who holds the write one.
  *
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
-function DepartmentsPage() {
+function PeoplePage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -53,9 +55,9 @@ function DepartmentsPage() {
   const hasDepartments = departments.length > 0;
 
   return (
-    <GovernanceLayout pageTitle="Departments · AI Governance · LangWatch">
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <Heading size="md">Departments</Heading>
+        <Heading size="md">People</Heading>
 
         <HandledErrorAlert
           error={listQuery.error}
@@ -380,5 +382,5 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
 })(
   withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
-  })(DepartmentsPage),
+  })(PeoplePage),
 );

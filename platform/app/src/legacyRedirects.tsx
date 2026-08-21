@@ -12,12 +12,20 @@ import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
  * ingestion-sources prefix).
  */
 export const legacyRedirectRoutes: RouteObject[] = [
+  // The sources surface has had three addresses: ingestion-sources →
+  // catalog (PR-renamed) → the inventory Sources tab. Every retired
+  // address maps STRAIGHT to its final home — no chaining through the
+  // also-retired middle name. The bare forms pin ?tab=sources, overriding
+  // any tab the old address carried: they served one pane, so every value
+  // they ever took rendered the sources list, while the inventory default
+  // is Catalog. The deep-link forms go to the detail page, which has no
+  // tabs.
   {
     path: "/governance/ingestion-sources/*",
     element: (
       <LegacyPrefixRedirect
         from="/governance/ingestion-sources"
-        to="/governance/catalog"
+        to="/governance/inventory"
       />
     ),
   },
@@ -26,7 +34,48 @@ export const legacyRedirectRoutes: RouteObject[] = [
     element: (
       <LegacyPrefixRedirect
         from="/governance/ingestion-sources"
-        to="/governance/catalog"
+        to="/governance/inventory"
+        pinParams={{ tab: "sources" }}
+      />
+    ),
+  },
+  {
+    path: "/governance/catalog/*",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/catalog"
+        to="/governance/inventory"
+      />
+    ),
+  },
+  {
+    path: "/governance/catalog",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/catalog"
+        to="/governance/inventory"
+        pinParams={{ tab: "sources" }}
+      />
+    ),
+  },
+  {
+    // Bare, no ?tab=: the bare inventory address resolves to the Catalog
+    // tab for the aiTools:manage admins this page served, and to Sources
+    // for viewers — the pane they can actually read.
+    path: "/governance/tool-catalog",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/tool-catalog"
+        to="/governance/inventory"
+      />
+    ),
+  },
+  {
+    path: "/governance/departments",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/departments"
+        to="/governance/people"
       />
     ),
   },
