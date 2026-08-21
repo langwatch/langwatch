@@ -158,16 +158,15 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   Scenario: Govern sub-nav stays put across every governance sub-route
     Given user is Persona 4 (governance admin) with both FFs on
     And the user is on "/governance" with the Govern sub-nav visible in
-        the left rail (Overview / Catalog / Anomaly Rules /
-        Tool Tiles / Departments)
+        the left rail (Overview / Inventory / Anomaly Rules / People —
+        plus Costs and Billed when the billed-cost flag is on)
     When the user clicks a sub-nav link, or drills into a governance
         sub-route from the Overview, and lands on:
       | route                                              |
-      | /governance/catalog             |
-      | /governance/catalog/<id>        |
+      | /governance/inventory           |
+      | /governance/inventory/<id>      |
       | /governance/anomaly-rules                 |
-      | /governance/tool-catalog                  |
-      | /governance/departments                   |
+      | /governance/people                        |
       | /governance/teams                         |
       | /governance/teams/<id>                    |
       | /governance/users                         |
@@ -184,11 +183,11 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     And the user can return to the Overview via the sub-nav itself
         without needing a fallback "Back to governance" link in the
         page body (regression caught by Ariana QA G17 against
-        `ee/governance/dashboard/pages/{ingestion-sources,
+        `ee/governance/dashboard/pages/{inventory,
         ingestion-source-detail, anomaly-rules}.tsx` rendering under
         the legacy `<SettingsLayout>` instead of `<GovernanceLayout>`;
         fixed by `a8f2342c8`. Sibling regression on
-        `/governance/tool-catalog` flagged separately as
+        the tool-catalog page (now the inventory Catalog tab) flagged separately as
         Ariana QA G43; same fix shape — swap layout)
 
   @bdd @ui @persona-chrome @persona-4 @ff-off-regression

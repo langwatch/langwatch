@@ -10,19 +10,32 @@ import { Navigate, useLocation } from "react-router";
 export function LegacyPrefixRedirect({
   from,
   to,
+  ensureParams,
 }: {
   from: string;
   to: string;
+  /**
+   * Query params guaranteed on the destination, set only when the old
+   * address does not already carry the key. Used when the old address's
+   * bare form had a meaning the new address's default changed — e.g.
+   * `/governance/catalog` always meant the sources surface, so its
+   * redirect pins `?tab=sources` on the tabbed inventory page.
+   */
+  ensureParams?: Record<string, string>;
 }) {
   const location = useLocation();
   const suffix = location.pathname.startsWith(from)
     ? location.pathname.slice(from.length)
     : "";
+  const search = new URLSearchParams(location.search);
+  for (const [key, value] of Object.entries(ensureParams ?? {})) {
+    if (!search.has(key)) search.set(key, value);
+  }
   return (
     <Navigate
       to={{
         pathname: to + suffix,
-        search: location.search,
+        search: search.toString(),
         hash: location.hash,
       }}
       replace

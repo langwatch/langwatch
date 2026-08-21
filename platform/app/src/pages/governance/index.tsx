@@ -235,7 +235,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/governance/tool-catalog"
+                href="/governance/inventory?tab=catalog"
                 ctaLabel={
                   hasCatalogTiles
                     ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
@@ -263,7 +263,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/catalog"
+                href="/governance/inventory?tab=sources"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -445,7 +445,7 @@ function GovernanceOverviewPage() {
               subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
               actions={
                 <Link
-                  href="/governance/departments"
+                  href="/governance/people"
                   color="blue.600"
                   fontSize="sm"
                 >
@@ -502,7 +502,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/catalog" color="blue.600">
+                    <Link href="/governance/inventory?tab=sources" color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -878,7 +878,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
     ] ?? "fg.muted";
 
   return (
-    <Link href="/governance/catalog" _hover={{ textDecoration: "none" }}>
+    <Link href="/governance/inventory?tab=sources" _hover={{ textDecoration: "none" }}>
       <HStack
         borderWidth="1px"
         borderColor="border.muted"

@@ -18,7 +18,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the admin has ingestionSources:manage permission
 
   Scenario: Admin lands on the IngestionSources index
-    When the admin navigates to "/governance/catalog"
+    When the admin navigates to "/governance/inventory?tab=sources"
     Then a list shows every configured source with: name, source type,
       last event timestamp, status
     And each row links to a per-source detail page with health metrics

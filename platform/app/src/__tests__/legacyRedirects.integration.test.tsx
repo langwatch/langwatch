@@ -55,17 +55,22 @@ function renderRouterAt(initialEntries: string[]) {
       element: <div>routing policies</div>,
     },
     {
+      // Mirrors the routes.tsx stanza: retargeted straight to People so the
+      // departments rename never adds a hop.
       path: "/governance/cost-centers",
       element: (
         <LegacyPrefixRedirect
           from="/governance/cost-centers"
-          to="/governance/departments"
+          to="/governance/people"
         />
       ),
     },
-    { path: "/governance/departments", element: <div>departments</div> },
-    { path: "/governance/catalog", element: <div>catalog page</div> },
-    { path: "/governance/catalog/:id", element: <div>catalog detail</div> },
+    { path: "/governance/people", element: <div>people</div> },
+    { path: "/governance/inventory", element: <div>inventory page</div> },
+    {
+      path: "/governance/inventory/:id",
+      element: <div>inventory detail</div>,
+    },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -194,16 +199,17 @@ describe("legacy governance redirects", () => {
   });
 
   describe("when the retired ingestion sources address is cold-loaded", () => {
-    /** @scenario The retired ingestion sources address lands on the catalog */
-    it("lands on the catalog and replaces the history entry", async () => {
+    /** @scenario The retired ingestion sources address lands on the inventory Sources tab */
+    it("lands on the inventory Sources tab and replaces the history entry", async () => {
       const router = renderRouterAt([
         "/start",
         "/governance/ingestion-sources",
       ]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe("/governance/catalog");
+        expect(router.state.location.pathname).toBe("/governance/inventory");
       });
+      expect(router.state.location.search).toBe("?tab=sources");
 
       await act(async () => {
         await router.navigate(-1);
@@ -211,28 +217,96 @@ describe("legacy governance redirects", () => {
       expect(router.state.location.pathname).toBe("/start");
     });
 
-    /** @scenario An old ingestion source deep link lands on the catalog detail page */
-    it("lands on the catalog detail page with the query intact", async () => {
+    /** @scenario An old ingestion source deep link lands on the inventory detail page */
+    it("lands on the inventory detail page with the query intact", async () => {
       const router = renderRouterAt([
         "/governance/ingestion-sources/src_123?range=30d",
       ]);
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe(
-          "/governance/catalog/src_123",
+          "/governance/inventory/src_123",
         );
       });
       expect(router.state.location.search).toBe("?range=30d");
     });
   });
 
+  describe("when the retired catalog address is cold-loaded", () => {
+    /** @scenario The retired catalog address keeps meaning the sources surface */
+    it("lands on the inventory Sources tab, not the new default tab", async () => {
+      const router = renderRouterAt(["/governance/catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+    });
+
+    /** @scenario The retired catalog address keeps meaning the sources surface */
+    it("keeps an existing query while pinning the sources tab", async () => {
+      const router = renderRouterAt(["/governance/catalog?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get("tab")).toBe("sources");
+      expect(params.get("range")).toBe("30d");
+    });
+
+    /** @scenario An old catalog detail deep link lands on the inventory detail page */
+    it("lands on the inventory detail page with the query intact", async () => {
+      const router = renderRouterAt(["/governance/catalog/src_123?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/inventory/src_123",
+        );
+      });
+      expect(router.state.location.search).toBe("?range=30d");
+    });
+  });
+
+  describe("when the retired tool-catalog address is cold-loaded", () => {
+    /** @scenario The retired tool-catalog address lands on the inventory page */
+    it("lands on the bare inventory address", async () => {
+      const router = renderRouterAt(["/governance/tool-catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("");
+    });
+  });
+
+  describe("when the retired departments address is cold-loaded", () => {
+    /** @scenario The retired departments address lands on People */
+    it("lands on the people page", async () => {
+      const router = renderRouterAt(["/governance/departments"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+    });
+  });
+
   describe("when the retired cost centers address is cold-loaded", () => {
-    /** @scenario The retired cost centers address lands on departments */
-    it("chains through to the departments page", async () => {
+    /** @scenario The cost-centers redirect is retargeted to People in one hop */
+    it("lands on the people page without chaining through departments", async () => {
+      const router = renderRouterAt(["/governance/cost-centers"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+    });
+
+    /** @scenario The retired cost centers address lands on People */
+    it("lands on the people page from the legacy settings prefix too", async () => {
       const router = renderRouterAt(["/settings/governance/cost-centers"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe("/governance/departments");
+        expect(router.state.location.pathname).toBe("/governance/people");
       });
     });
   });

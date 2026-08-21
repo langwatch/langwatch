@@ -129,24 +129,24 @@ vi.mock("~/utils/api", () => {
 
 import AnomalyRulesPage from "@ee/governance/dashboard/pages/anomaly-rules";
 import IngestionSourceDetailPage from "@ee/governance/dashboard/pages/ingestion-source-detail";
-import IngestionSourcesPage from "@ee/governance/dashboard/pages/ingestion-sources";
+import InventoryPage from "@ee/governance/dashboard/pages/inventory";
 
-import DepartmentsPage from "../departments";
 import GovernanceOverviewPage from "../index";
+import PeoplePage from "../people";
 import TeamsListPage from "../teams";
 import TeamDetailPage from "../teams/[id]";
-import ToolCatalogPage from "../tool-catalog";
 import UsersListPage from "../users";
 import UserDetailPage from "../users/[id]";
 
 /** Every page the Governance section navigation lists, plus its drill-ins. */
 const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [
   ["/governance", GovernanceOverviewPage],
-  ["/governance/catalog", IngestionSourcesPage],
-  ["/governance/catalog/:id", IngestionSourceDetailPage],
+  // The inventory carries both the Sources tab (the old catalog page) and
+  // the Catalog tab (the old tool-catalog page) — one entry covers both.
+  ["/governance/inventory", InventoryPage],
+  ["/governance/inventory/:id", IngestionSourceDetailPage],
   ["/governance/anomaly-rules", AnomalyRulesPage],
-  ["/governance/tool-catalog", ToolCatalogPage],
-  ["/governance/departments", DepartmentsPage],
+  ["/governance/people", PeoplePage],
   ["/governance/teams", TeamsListPage],
   ["/governance/teams/:id", TeamDetailPage],
   ["/governance/users", UsersListPage],
@@ -183,13 +183,13 @@ const ORGANIZATION_ADMIN: string[] = [
   ),
 ];
 
-function renderPage(Page: React.ComponentType) {
-  // The catalog page reads its ?tab= from the router's search params, so
+function renderPage(Page: React.ComponentType, initialEntry = "/governance") {
+  // The inventory page reads its ?tab= from the router's search params, so
   // every page mounts inside a memory router; the compat next-router stays
   // mocked above.
   return render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={["/governance"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Page />
       </MemoryRouter>
     </ChakraProvider>,
@@ -238,7 +238,7 @@ describe("governance pages for a delegated viewer", () => {
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
     it("offers no department controls without governance:manage", () => {
-      renderPage(DepartmentsPage);
+      renderPage(PeoplePage);
 
       expect(screen.queryByText("Create a department")).not.toBeInTheDocument();
       expect(
@@ -247,9 +247,9 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
 
-    /** @scenario "The tool tiles page names its own grant" */
-    it("names aiTools:manage on the tool tiles page and renders no editor", () => {
-      renderPage(ToolCatalogPage);
+    /** @scenario "The inventory Catalog pane names its own grant" */
+    it("names aiTools:manage on the inventory Catalog pane and renders no editor", () => {
+      renderPage(InventoryPage, "/governance/inventory?tab=catalog");
 
       expect(screen.getByText(/aiTools:manage/)).toBeInTheDocument();
       expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
@@ -271,10 +271,10 @@ describe("governance pages for a delegated viewer", () => {
   });
 
   describe("when the viewer can read ingestion sources but not manage them", () => {
-    /** @scenario "The catalog offers no controls a viewer cannot use" */
+    /** @scenario "The sources tab offers no controls a viewer cannot use" */
     it("offers no source authoring controls", () => {
       harness.permissions = [...DELEGATED_VIEWER, "ingestionSources:view"];
-      renderPage(IngestionSourcesPage);
+      renderPage(InventoryPage);
 
       expect(
         screen.queryByRole("button", { name: /Add source/ }),
@@ -316,7 +316,7 @@ describe("governance pages for a delegated viewer", () => {
     /** @scenario "An org admin still sees the department write controls" */
     it("offers the department write controls", () => {
       harness.permissions = ORGANIZATION_ADMIN;
-      renderPage(DepartmentsPage);
+      renderPage(PeoplePage);
 
       expect(screen.getByText("Create a department")).toBeInTheDocument();
       expect(
