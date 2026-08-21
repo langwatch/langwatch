@@ -27,15 +27,21 @@ export function LegacyPrefixRedirect({
   const suffix = location.pathname.startsWith(from)
     ? location.pathname.slice(from.length)
     : "";
-  const search = new URLSearchParams(location.search);
-  for (const [key, value] of Object.entries(ensureParams ?? {})) {
-    if (!search.has(key)) search.set(key, value);
+  // Only the ensureParams path re-serializes the query; without it the
+  // original search travels byte-for-byte, as it always has.
+  let search = location.search;
+  if (ensureParams) {
+    const params = new URLSearchParams(location.search);
+    for (const [key, value] of Object.entries(ensureParams)) {
+      if (!params.has(key)) params.set(key, value);
+    }
+    search = params.toString();
   }
   return (
     <Navigate
       to={{
         pathname: to + suffix,
-        search: search.toString(),
+        search,
         hash: location.hash,
       }}
       replace
