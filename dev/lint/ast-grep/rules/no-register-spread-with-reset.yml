@@ -9,6 +9,13 @@ message: >
   compiler cannot elide. See specs/setup/react-compiler.feature.
 severity: warning
 language: Tsx
+# The receiver must look like a react-hook-form form object. ast-grep cannot
+# see types, and the repo names these `form`/`formA`/`scenarioForm` without
+# exception, so the name is the provenance check — a `registry` or `api`
+# object that happens to carry register()/reset() methods stays quiet.
+constraints:
+  FORM:
+    regex: "[Ff]orm"
 rule:
   any:
     # Reached through the form object: `form.register(...)` spread into JSX

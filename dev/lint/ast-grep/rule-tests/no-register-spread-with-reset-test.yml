@@ -59,6 +59,21 @@ valid:
       useEffect(() => reset(), []);
       return <Input {...register("name")} />;
     }
+  # A non-form API that happens to carry register()/reset() methods on one
+  # receiver: the receiver is not named like a form, so it is not this bug.
+  - |
+    function UnrelatedApi() {
+      const registry = {
+        register(name: string) { return { name }; },
+        reset() {},
+      };
+      return (
+        <>
+          <Input {...registry.register("name")} />
+          <button onClick={() => registry.reset()}>reset</button>
+        </>
+      );
+    }
 invalid:
   # The failing shape: a destructured register() spread into props, in a
   # component that resets. This is the ScenarioForm bug.
