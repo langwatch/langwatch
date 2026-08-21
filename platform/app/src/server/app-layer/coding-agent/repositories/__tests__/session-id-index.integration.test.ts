@@ -35,6 +35,29 @@ import {
 let ch: ClickHouseClient;
 const tag = `t${nanoid(8)}`;
 
+/**
+ * Session ids are FIXED, not derived from `tag`, while tenant ids stay unique.
+ *
+ * A bloom filter can report a value as possibly-present when it is absent. With
+ * ids that changed every run, "reads zero rows" would roll a fresh false-positive
+ * chance each time and fail rarely and unreproducibly. Fixed values make the
+ * outcome the same on every run: if these three ever collide in the filter the
+ * suite fails consistently and is fixed by changing them, which is a far better
+ * failure than an occasional red build.
+ *
+ * BRACKET_LOW and BRACKET_HIGH sort either side of ABSENT_SESSION on purpose.
+ * SessionId is the last sort-key column, so an id outside the granule's key
+ * range is excluded by the primary key on min/max alone, and the assertion would
+ * hold with no skip index at all.
+ */
+const TENANTS = ["a", "b", "c", "d"] as const;
+const tenantIdFor = (suffix: (typeof TENANTS)[number]) =>
+  `${tag}-tenant-${suffix}`;
+
+const BRACKET_LOW = "aaaa-session-low";
+const ABSENT_SESSION = "mmmm-session-absent";
+const BRACKET_HIGH = "zzzz-session-high";
+
 async function insertSession({
   tenantId,
   sessionId,
@@ -74,10 +97,13 @@ async function insertSession({
  * time-leading primary key cannot, and a granule that is read still counts here
  * even though the row is filtered out afterwards.
  */
-async function rowsReadForSessionLookup(
-  tenantId: string,
-  sessionId: string,
-): Promise<number> {
+async function rowsReadForSessionLookup({
+  tenantId,
+  sessionId,
+}: {
+  tenantId: string;
+  sessionId: string;
+}): Promise<number> {
   const result = await ch.query({
     query: `
       SELECT TenantId, SessionId, max(UpdatedAt) AS UpdatedAt
@@ -95,7 +121,13 @@ async function rowsReadForSessionLookup(
 }
 
 /** The latest-version read the repository performs, reduced to its essentials. */
-async function latestVersion(tenantId: string, sessionId: string) {
+async function latestVersion({
+  tenantId,
+  sessionId,
+}: {
+  tenantId: string;
+  sessionId: string;
+}) {
   const rows = await (
     await ch.query({
       query: `
@@ -126,10 +158,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    await ch.exec({
-      query: `ALTER TABLE coding_agent_sessions DELETE WHERE startsWith(TenantId, {tag:String})`,
-      query_params: { tag },
-    });
+    // Delete each tenant this suite created by exact id. A prefix match could
+    // reach a tenant belonging to another suite that happened to share it.
+    for (const suffix of TENANTS) {
+      await ch.exec({
+        query: `ALTER TABLE coding_agent_sessions DELETE WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: tenantIdFor(suffix) },
+      });
+    }
   }
   await stopTestContainers();
 });
@@ -148,31 +184,26 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
 
   describe("when looking up a session that does not exist", () => {
     it("reads no rows at all", async () => {
-      const tenantId = `${tag}-tenant-a`;
+      const tenantId = tenantIdFor("a");
       // Sessions spread across partitions, so a time-unbounded lookup would
       // otherwise have a candidate granule in each one.
       //
-      // The probed id sorts BETWEEN the two that exist, deliberately. SessionId
-      // is the last sort-key column, so for an id outside the granule's key
-      // range the primary index can exclude it on min/max alone and this would
-      // pass with no skip index at all. Only an id inside the range forces the
-      // bloom filter to be the thing that skips the granule.
       await insertSession({
         tenantId,
-        sessionId: `${tag}-a-session`,
+        sessionId: BRACKET_LOW,
         startedAt: new Date("2026-01-05T00:00:00.000Z"),
         updatedAt: new Date("2026-01-05T00:00:01.000Z"),
       });
       await insertSession({
         tenantId,
-        sessionId: `${tag}-z-session`,
+        sessionId: BRACKET_HIGH,
         startedAt: new Date("2026-02-09T00:00:00.000Z"),
         updatedAt: new Date("2026-02-09T00:00:01.000Z"),
       });
 
-      expect(await rowsReadForSessionLookup(tenantId, `${tag}-m-absent`)).toBe(
-        0,
-      );
+      expect(
+        await rowsReadForSessionLookup({ tenantId, sessionId: ABSENT_SESSION }),
+      ).toBe(0);
     });
   });
 
@@ -182,7 +213,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // sort key, so an absent value cannot be skipped and the rows must be
       // read and filtered. If this ever returns 0 as well, the zero above has
       // stopped meaning "the bloom filter skipped the granule".
-      const tenantId = `${tag}-tenant-a`;
+      const tenantId = tenantIdFor("a");
       const result = await ch.query({
         query: `
           SELECT count() FROM coding_agent_sessions
@@ -200,7 +231,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
 
   describe("when the session exists", () => {
     it("returns the version that folded the most, unchanged by the index", async () => {
-      const tenantId = `${tag}-tenant-b`;
+      const tenantId = tenantIdFor("b");
       const sessionId = `${tag}-s3`;
       // Same UpdatedAt on both versions, so the tiebreak decides. The index
       // must not disturb which version wins.
@@ -220,7 +251,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         modelCalls: 7,
       });
 
-      expect(await latestVersion(tenantId, sessionId)).toEqual({
+      expect(await latestVersion({ tenantId, sessionId })).toEqual({
         SessionId: sessionId,
         ModelCalls: 7,
       });
@@ -231,25 +262,29 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
     it("keeps the lookup scoped to the requesting tenant", async () => {
       const sessionId = `${tag}-shared`;
       await insertSession({
-        tenantId: `${tag}-tenant-c`,
+        tenantId: tenantIdFor("c"),
         sessionId,
         startedAt: new Date("2026-04-06T00:00:00.000Z"),
         updatedAt: new Date("2026-04-06T00:00:01.000Z"),
         modelCalls: 3,
       });
       await insertSession({
-        tenantId: `${tag}-tenant-d`,
+        tenantId: tenantIdFor("d"),
         sessionId,
         startedAt: new Date("2026-05-04T00:00:00.000Z"),
         updatedAt: new Date("2026-05-04T00:00:01.000Z"),
         modelCalls: 9,
       });
 
-      expect(await latestVersion(`${tag}-tenant-c`, sessionId)).toEqual({
+      expect(
+        await latestVersion({ tenantId: tenantIdFor("c"), sessionId }),
+      ).toEqual({
         SessionId: sessionId,
         ModelCalls: 3,
       });
-      expect(await latestVersion(`${tag}-tenant-d`, sessionId)).toEqual({
+      expect(
+        await latestVersion({ tenantId: tenantIdFor("d"), sessionId }),
+      ).toEqual({
         SessionId: sessionId,
         ModelCalls: 9,
       });
