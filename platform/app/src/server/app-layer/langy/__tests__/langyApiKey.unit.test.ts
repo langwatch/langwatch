@@ -234,7 +234,6 @@ describe("mintLangySessionApiKey", () => {
                 "organization",
                 "team",
                 "project",
-                "virtualKeys",
                 "gatewayProviders",
                 "webhookEndpoints",
                 "auditLog",
@@ -297,7 +296,6 @@ describe("mintLangySessionApiKey", () => {
         for (const family of [
           "organization",
           "team",
-          "virtualKeys",
           "gatewayProviders",
           "auditLog",
         ]) {
@@ -313,6 +311,9 @@ describe("mintLangySessionApiKey", () => {
         // And the widening is real, not vacuous: full CRUD arrived.
         expect(permissions).toContain("traces:manage");
         expect(permissions).toContain("gatewayBudgets:manage");
+        // Including virtual keys: gateway-driving callers mint keys through
+        // Langy (owner decision, 2026-08-21), rotate alone stays withheld.
+        expect(permissions).toContain("virtualKeys:create");
       });
 
       // `project` is the one family Langy reaches outside its nine, and only to

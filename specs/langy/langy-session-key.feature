@@ -54,7 +54,9 @@ Feature: Per-session caller-scoped Langy key
   # The line, as the owner drew it (2026-08-21): Langy does everything on the
   # project's data — create, update, delete, manage — and never WRITES the auth
   # scope (members and roles, credentials, the org's billing). Auth-scope reads
-  # are allowed; secrets have no safe read at all. The user's own permissions
+  # are allowed; secrets have no safe read at all. One credential family is
+  # carved back IN (owner decision, 2026-08-21): gateway virtual keys — minting
+  # them is driving the gateway, and the caller's own grant bounds it. The user's own permissions
   # remain the ceiling for all of it.
   Scenario: Langy can delete my work, because I can
     Given I can delete my own prompts

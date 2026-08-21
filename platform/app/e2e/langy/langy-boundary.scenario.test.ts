@@ -25,8 +25,9 @@
  * `LANGY_CANDIDATE_PERMISSIONS` (`langyApiKey.ts`) intersected with the
  * requesting user's own permissions, and `langyPermissionPolicy.ts` withholds
  * every write on the auth-scope families (`organization`, `team`, `project`,
- * `virtualKeys`, `gatewayProviders`, `webhookEndpoints`, `auditLog`,
- * `complianceExport`) and every grain of `secrets`. So the admin calls 403 at
+ * `gatewayProviders`, `webhookEndpoints`, `auditLog`, `complianceExport`)
+ * and every grain of `secrets`. (`virtualKeys` is full-access — owner
+ * decision, 2026-08-21 — so gateway key requests are NOT boundary cases.) So the admin calls 403 at
  * the door whatever Langy attempts, and those scenarios ask what the USER
  * sees when that happens. The delete scenario is the other half: a permission
  * Langy now HOLDS, graded on whether it uses it.
@@ -69,8 +70,10 @@ const LOOKS_LIKE_AN_API_KEY = /sk-lw-|sk-proj-|lw_[A-Za-z0-9]{16}/;
 
 describe("Langy's boundaries", () => {
   /**
-   * Issuing credentials is administration, and the `secrets`/`virtualKeys`
-   * families are off-limits to Langy's key entirely. The interesting failure is
+   * A key that pushes traces is the project's own API key — `project:manage`
+   * regenerates it, and that family's writes are off-limits to Langy's key.
+   * (Gateway `virtualKeys` are different: those Langy may mint — but they
+   * cannot ingest traces, so they are no answer here.) The interesting failure is
    * not the refusal — it is a refusal that helpfully demonstrates the shape of
    * a key, which reads as a real credential to anyone scanning the transcript.
    */

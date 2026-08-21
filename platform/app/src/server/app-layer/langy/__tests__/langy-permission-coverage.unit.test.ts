@@ -210,7 +210,6 @@ describe("Langy permission coverage", () => {
               "organization",
               "team",
               "project",
-              "virtualKeys",
               "gatewayProviders",
               "webhookEndpoints",
               "auditLog",
@@ -223,6 +222,12 @@ describe("Langy permission coverage", () => {
         // The other half of the rule — "auth scope read is okay" — so that
         // tightening the line above cannot quietly take the reads with it.
         expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:view");
+        // virtualKeys is the one gateway-credential family with full writes
+        // (owner decision, 2026-08-21) — pin it so a tightening of the list
+        // above cannot quietly reclassify it.
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:create");
+        expect(LANGY_CANDIDATE_PERMISSIONS).toContain("virtualKeys:manage");
+        expect(LANGY_CANDIDATE_PERMISSIONS).not.toContain("virtualKeys:rotate");
         expect(LANGY_CANDIDATE_PERMISSIONS).toContain("auditLog:view");
         expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
       });

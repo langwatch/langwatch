@@ -307,7 +307,7 @@ describe("Langy session key (caller-scoped)", () => {
         }
       });
 
-      it("is still refused the destructive grains the caller's role does grant", async () => {
+      it("now reaches the destructive grains the caller's role grants (owner decision, 2026-08-21)", async () => {
         const { token } = await mintLangySessionApiKey({
           prisma,
           session: sessionFor(experimenterUserId),
@@ -321,15 +321,17 @@ describe("Langy session key (caller-scoped)", () => {
         });
 
         // The human holds `evaluations:manage`, which implies the delete. The
-        // key deliberately stops at view/create/update, so Langy cannot reach
-        // the delete even though the person who asked for it could.
+        // widened policy delegates both: destruction is bounded by the caller,
+        // who could have deleted it by hand. This inverts the pre-widening
+        // assertion that stopped the key at view/create/update.
         for (const permission of [
           "evaluations:delete",
           "evaluations:manage",
         ] as const) {
           await expect(
             enforceApiKeyCeiling({ resolved: resolved!, permission }),
-          ).rejects.toThrow();
+            `Langy was refused ${permission}, which the caller's own role grants`,
+          ).resolves.toBeUndefined();
         }
       });
     });
