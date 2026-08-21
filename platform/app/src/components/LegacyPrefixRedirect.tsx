@@ -16,7 +16,9 @@ export function LegacyPrefixRedirect({
   to: string;
   /**
    * Query params forced onto the destination, overriding whatever the old
-   * address carried under those keys and leaving every other key alone.
+   * address carried under those keys. Every other key keeps its value and
+   * position, though the query is re-serialized, so an encoding variant
+   * may normalize (`%20` arrives as `+`); the decoded value is unchanged.
    * Used when the old address's meaning is not expressible on the new one
    * by default — `/governance/catalog` served exactly one pane, so every
    * `?tab=` value it ever carried rendered the sources list, and the
