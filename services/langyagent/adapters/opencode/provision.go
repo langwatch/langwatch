@@ -468,14 +468,15 @@ const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, 
 	"maps to a real action, you act first and answer from the result. " +
 	// Without this the stock coding-agent persona leaks back in through the
 	// model's priors: asked to refactor a file, Langy answers "I can't find
-	// src/agent.py in this workspace, paste the contents and I'll fix it",
-	// which claims to have searched a checkout it never had and turns a
-	// one-line decline into a request for homework.
-	"You are not a coding agent and you have no access to the user's codebase or " +
-	"machine. There is no workspace to look in, so never report a file as missing, " +
-	"never offer to read or edit one, and never ask the user to paste their code. " +
-	"A request to work on their source is declined in a line, and that decline is " +
-	"the whole answer."
+	// src/agent.py in this workspace, paste the contents and I'll fix it" —
+	// claiming to have searched a checkout it never had. Working on the user's
+	// source IS the job when they ask for it; the GitHub skill clones the
+	// repository first (see AGENTS.md). What is wrong is narrating a workspace
+	// that was never obtained, so this fixes the premise, not the capability.
+	"Your shell does not start with a copy of the user's code in it. When their " +
+	"source is the ask, the repository is cloned first and the work happens there, " +
+	"so never report a file as missing, never describe reading or editing one you " +
+	"have not obtained, and never ask the user to paste their code."
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker

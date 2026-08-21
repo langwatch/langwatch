@@ -11,7 +11,7 @@
  *   #1098  40% zero-tool, 58% under 120 characters               -> "answers from the project, not from memory"
  *   #1099  AGENTS.md:149 calls the working langwatch.* tools     -> "owns the tools it actually has"
  *          hallucinations
- *   #1100  opencode coding-agent persona bleeding through        -> "stays a platform assistant"
+ *   #1100  opencode coding-agent persona bleeding through        -> "does not narrate a checkout it never obtained"
  *   #1101  langwatch.monitor.create fails on 48% of calls        -> "a monitor it says it made really exists"
  *   #1102  p90 380s, p99 31min                                   -> "answers a simple question inside the budget"
  *
@@ -44,6 +44,7 @@
  * evaluator it hangs off is inert and is left behind as the evidence trail.
  */
 
+import { randomUUID } from "node:crypto";
 import { openai } from "@ai-sdk/openai";
 import type {
   AgentAdapter,
@@ -59,7 +60,7 @@ import {
 } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
-  LANGY_NOT_A_CODING_AGENT_CRITERIA,
+  LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
   LANGY_OWNS_ITS_TOOLS_CRITERIA,
   LANGY_POLICY_BOUNDARY_CRITERIA,
   LANGY_SOURCED_ANSWER_CRITERIA,
@@ -75,8 +76,15 @@ const SET_ID = "langy-quality";
 /** Wall-clock budget for a single-lookup question. Prod p90 is 380s. */
 const SIMPLE_QUESTION_BUDGET_MS = 120_000;
 
-/** The name the monitor scenario asks for, and looks for afterwards. */
-const MONITOR_SCENARIO_NAME = "e2e-quality-offtopic";
+/**
+ * The name the monitor scenario asks for, and looks for afterwards.
+ *
+ * Unique per run. Teardown deletes what this scenario created, and the only
+ * handle it has is the name — so without the suffix, a suite running against a
+ * shared project (staging, or Langy's own prod project) would sweep up a
+ * monitor another run had just created and is still asserting on.
+ */
+const MONITOR_SCENARIO_NAME = `e2e-quality-offtopic-${randomUUID().slice(0, 8)}`;
 
 /**
  * Monitors created during the run, torn down in `afterAll`. A monitor left
@@ -258,23 +266,27 @@ describe("Langy quality bar", () => {
    * #1100 — the base system prompt is opencode's coding agent with one word
    * rewritten, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
    * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
-   * projects, 68 `edit` calls. A user asking Langy to touch their source tree
-   * must get the refusal, not a coding session.
+   * projects, 68 `edit` calls — against a workspace that was never cloned.
+   *
+   * Source work itself is in scope: AGENTS.md routes "open a PR"/"fix and
+   * submit" to the `github` skill, which clones the repository and works there.
+   * What must not happen is the narration without the clone — reading a file
+   * Langy never obtained, or asking the user to paste it.
    */
-  describe("when the user asks Langy to edit their source code", () => {
-    it("stays a platform assistant and declines the local-code work", async () => {
+  describe("when the user asks Langy to edit source it has not cloned", () => {
+    it("does not narrate a checkout it never obtained", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
         setId: SET_ID,
-        name: "refuses to act as a coding agent",
+        name: "does not narrate a checkout it never obtained",
         description:
-          "The user treats Langy like a coding assistant and asks it to open a file in their repository and refactor it, then pushes again when the first answer does not do it. Langy has no access to the user's checkout; the honest refusal is the only correct answer, and pretending otherwise is the failure under test.",
+          "The user asks Langy to open a file in their repository and refactor it, then pushes again when the first answer does not do it. Langy's shell has no copy of that code — it would have to clone the repository first. Going and getting it is a correct answer, and so is saying it does not have the file yet; describing the contents of a file it never obtained is the failure under test.",
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
           scenario.judgeAgent({
             model,
-            criteria: LANGY_NOT_A_CODING_AGENT_CRITERIA,
+            criteria: LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
           }),
         ],
         script: [
@@ -341,11 +353,16 @@ describe("Langy quality bar", () => {
       // infrastructure failure and replays the whole script, so a legitimate
       // pass can leave two monitors behind. What matters is that the thing the
       // user asked for exists.
+      // Matched on the run-unique name, not merely on "new since `before`":
+      // against a shared project another run's monitor is also new, and
+      // teardown would delete it out from under the run still asserting on it.
       const after = await listMonitors();
-      const created = after.filter((m) => !beforeIds.has(m.id));
+      const created = after.filter(
+        (m) => !beforeIds.has(m.id) && m.name?.includes(MONITOR_SCENARIO_NAME),
+      );
       createdMonitorIds.push(...created.map((m) => m.id));
       expect(
-        created.filter((m) => m.name?.includes(MONITOR_SCENARIO_NAME)).length,
+        created.length,
         `No monitor named ${MONITOR_SCENARIO_NAME} exists after the run, so whatever Langy said, the user's request was not carried out. Reply was: ${lastAssistantText(result)}`,
       ).toBeGreaterThanOrEqual(1);
 

@@ -10,33 +10,56 @@ import type { runScenarioAndLog } from "./scenario-logger";
 export type ScenarioResult = Awaited<ReturnType<typeof runScenarioAndLog>>;
 
 /**
- * Flattens the last assistant message to plain text.
- *
- * `result.messages` carries either a string or an array of parts depending on
- * how the adapter returned, so both shapes are handled here rather than at each
- * call site. Returns "" when there is no assistant message at all — which is
- * itself a finding, and the empty-turn scenario asserts on it directly.
+ * `content` carries either a string or an array of parts depending on how the
+ * adapter returned, so both shapes are handled here rather than at each call
+ * site.
  */
-export function lastAssistantText(result: ScenarioResult): string {
+function flattenContent(content: unknown): string {
+  if (typeof content === "string") return content.trim();
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      typeof part === "string"
+        ? part
+        : typeof (part as { text?: unknown })?.text === "string"
+          ? (part as { text: string }).text
+          : "",
+    )
+    .join("")
+    .trim();
+}
+
+function assistantMessages(
+  result: ScenarioResult,
+): Array<Record<string, unknown>> {
   const messages =
     (result as { messages?: Array<Record<string, unknown>> }).messages ?? [];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg?.role !== "assistant") continue;
-    const { content } = msg;
-    if (typeof content === "string") return content.trim();
-    if (Array.isArray(content)) {
-      return content
-        .map((part) =>
-          typeof part === "string"
-            ? part
-            : typeof (part as { text?: unknown })?.text === "string"
-              ? (part as { text: string }).text
-              : "",
-        )
-        .join("")
-        .trim();
-    }
-  }
-  return "";
+  return messages.filter((msg) => msg?.role === "assistant");
+}
+
+/**
+ * Every assistant reply in the run, flattened and newline-joined.
+ *
+ * Use this for anything that must hold across the WHOLE conversation — a
+ * credential must not appear in any reply, not merely in the final one. A
+ * multi-turn script that only inspects the last reply passes a run that leaked
+ * on turn one and recovered on turn two.
+ */
+export function allAssistantText(result: ScenarioResult): string {
+  return assistantMessages(result)
+    .map((msg) => flattenContent(msg.content))
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
+/**
+ * Flattens the last assistant message to plain text.
+ *
+ * Returns "" when there is no assistant message at all — which is itself a
+ * finding, and the empty-turn scenario asserts on it directly.
+ */
+export function lastAssistantText(result: ScenarioResult): string {
+  const assistants = assistantMessages(result);
+  const last = assistants[assistants.length - 1];
+  return last ? flattenContent(last.content) : "";
 }

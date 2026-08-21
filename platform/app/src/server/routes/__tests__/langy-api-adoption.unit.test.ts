@@ -140,7 +140,7 @@ describe("/api/langy conversation-id adoption", () => {
     });
   });
 
-  describe("given a request that asks to adopt the id in the path", () => {
+  describe("when a request asks to adopt the id in the path", () => {
     it("forwards the flag to the turn service alongside that id", async () => {
       const res = await postTurn({
         path: `/${ADOPTED_ID}/messages`,
@@ -161,7 +161,7 @@ describe("/api/langy conversation-id adoption", () => {
     });
   });
 
-  describe("given a request that does not mention adoption", () => {
+  describe("when a request does not mention adoption", () => {
     it("does not turn it on underneath, so the flag stays opt-in", async () => {
       const res = await postTurn({
         path: `/${ADOPTED_ID}/messages`,
@@ -176,7 +176,7 @@ describe("/api/langy conversation-id adoption", () => {
     });
   });
 
-  describe("given adoption asked for on the route with no id in the path", () => {
+  describe("when adoption is asked for on the route with no id in the path", () => {
     it("rejects the request instead of quietly minting a fresh conversation", async () => {
       const res = await postTurn({
         body: {

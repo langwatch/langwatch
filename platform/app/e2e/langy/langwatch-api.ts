@@ -101,19 +101,23 @@ export async function listMonitors(): Promise<
  * that grain is withheld from it on purpose — but the suite runs with a full
  * project key, so the test can tidy up after itself.
  *
- * Best-effort: a monitor that is already gone (404) is the desired end state,
- * not a failure, and a cleanup error must never fail a scenario that passed.
+ * A monitor that is already gone (404) is the desired end state, not a failure.
+ * Everything else throws. Swallowing the error would be worse than a noisy
+ * teardown: the monitor stays live on the project's traffic, evaluating every
+ * ingested trace and spending real money, and the run that leaked it reports
+ * success. A failed cleanup has to be visible to be fixed.
  */
 export async function deleteMonitor(id: string): Promise<void> {
-  try {
-    await fetch(`${LW_BASE}/api/monitors/${id}`, {
-      method: "DELETE",
-      headers: { "X-Auth-Token": LW_KEY },
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
-    // Ignored on purpose — see the doc comment.
-  }
+  const response = await fetch(`${LW_BASE}/api/monitors/${id}`, {
+    method: "DELETE",
+    headers: { "X-Auth-Token": LW_KEY },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.ok || response.status === 404) return;
+  throw new Error(
+    `Failed to delete monitor ${id}: ${response.status} ${response.statusText}. ` +
+      "It is still live on the project and will keep evaluating traffic until removed.",
+  );
 }
 
 export async function listDashboards(): Promise<
@@ -249,13 +253,14 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   });
   await Promise.all(posts);
 
-  // Poll the newest and oldest seeded ids rather than all of them: they bracket
-  // the batch, so both being queryable means indexing has caught up with the
-  // whole write.
-  const bracket = [traceIds[0]!, traceIds[traceIds.length - 1]!];
+  // Poll every seeded id, not a first/last bracket. The posts above go out
+  // concurrently, so the order they were generated in says nothing about the
+  // order they are indexed in: both ends can be queryable while a trace in the
+  // middle is still missing, and the data scenarios would then read a short
+  // batch as the ground truth.
   const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const visible = await Promise.all(bracket.map(traceExists));
+    const visible = await Promise.all(traceIds.map(traceExists));
     if (visible.every(Boolean)) return;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }

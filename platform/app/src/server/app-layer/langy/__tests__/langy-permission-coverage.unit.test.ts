@@ -153,7 +153,19 @@ describe("Langy permission coverage", () => {
         ).toBe(true);
 
         // Deletion is where the destructive line sits, and it keeps `:manage`.
-        // Every other verb must stay reachable by a key that holds no `:manage`.
+        // Asserted positively as well as negatively: the exclusion below is
+        // also satisfied by a monitors surface where NOTHING demands `:manage`,
+        // so on its own it would go quietly green if someone widened DELETE to
+        // `:create` too. That is the one change this pin exists to catch.
+        expect(
+          monitorRoutes("evaluations:manage").filter((route) =>
+            route.startsWith("DELETE "),
+          ),
+          "No monitor DELETE route demands evaluations:manage. Destroying a " +
+            "monitor is the destructive grain and must stay behind :manage, " +
+            "which no least-privilege key — Langy's included — can hold",
+        ).not.toEqual([]);
+
         expect(
           monitorRoutes("evaluations:manage").filter(
             (route) => !route.startsWith("DELETE "),
