@@ -39,6 +39,26 @@ Feature: Langy can run a conversation on the pi harness
     Then the answer compares the running worker's harness too
     And a harness change is a miss, so the turn replaces the worker instead of reusing it
 
+  # The wrapper generates pi's model registry from the manager's config. That
+  # entry must not LOSE what pi's own catalog knows about the model: Claude 5
+  # models need the adaptive thinking request shape, which pi selects from its
+  # catalog's compat flags, so a registry built from the manager's config alone
+  # sent the legacy shape and every turn on those models failed on the first
+  # call.
+  @unit
+  Scenario: A known model's registry entry keeps pi's own catalog knowledge
+    Given the manager configures a model pi's own catalog lists for the same API dialect
+    When the wrapper generates the model registry
+    Then the entry carries the catalog's request-shape flags and thinking levels
+    And the manager's explicit settings win over the catalog where both name the same field
+    And the entry still routes through the mediated gateway URL, never the catalog's own endpoint
+
+  @unit
+  Scenario: A model pi's catalog does not know is written from config alone
+    Given the manager configures a model id pi's catalog does not list for that API dialect
+    When the wrapper generates the model registry
+    Then the entry is exactly the manager's config
+
   @unit
   Scenario: A cancel reaches the worker running the named turn
     Given a worker is running a turn the user asked to stop

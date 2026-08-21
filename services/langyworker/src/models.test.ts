@@ -54,4 +54,85 @@ describe("buildModelsJson", () => {
       );
     });
   });
+
+  describe("given a model pi's own catalog lists for the same API dialect", () => {
+    const claude: LangyWorkerModelConfig = {
+      id: "anthropic/claude-opus-5",
+      api: "anthropic-messages",
+      baseUrlEnv: "ANTHROPIC_BASE_URL",
+      apiKeyEnv: "ANTHROPIC_API_KEY",
+      reasoning: true,
+    };
+    const env = { ANTHROPIC_BASE_URL: "http://127.0.0.1:41234", ANTHROPIC_API_KEY: "k" };
+
+    const entryOf = (config: LangyWorkerModelConfig) => {
+      const provider = buildModelsJson(config, env).providers[PROVIDER_ID] as {
+        baseUrl: string;
+        models: Record<string, unknown>[];
+      };
+      return { provider, entry: provider.models[0] as Record<string, unknown> };
+    };
+
+    /** @scenario A known model's registry entry keeps pi's own catalog knowledge */
+    it("carries the catalog's request-shape flags and thinking levels under our id", () => {
+      const { entry } = entryOf(claude);
+      // Claude 5 rejects the legacy thinking request shape; pi switches to the
+      // adaptive shape only when the model entry carries this catalog flag.
+      expect(entry.compat).toMatchObject({ forceAdaptiveThinking: true });
+      expect(entry.thinkingLevelMap).toMatchObject({ xhigh: "xhigh", max: "max" });
+      expect(entry.contextWindow).toBeGreaterThan(0);
+      expect(entry.maxTokens).toBeGreaterThan(0);
+      // The id stays provider-prefixed: the gateway routes on the prefix.
+      expect(entry.id).toBe("anthropic/claude-opus-5");
+    });
+
+    /** @scenario A known model's registry entry keeps pi's own catalog knowledge */
+    it("routes through the mediated gateway URL, never the catalog's own endpoint", () => {
+      const { provider, entry } = entryOf(claude);
+      expect(provider.baseUrl).toBe("http://127.0.0.1:41234");
+      expect(entry.baseUrl).toBeUndefined();
+      expect(entry.provider).toBeUndefined();
+      expect(JSON.stringify(buildModelsJson(claude, env))).not.toContain("api.anthropic.com");
+    });
+
+    /** @scenario A known model's registry entry keeps pi's own catalog knowledge */
+    it("lets the manager's explicit fields win over the catalog, key by key", () => {
+      const { entry } = entryOf({
+        ...claude,
+        maxTokens: 9000,
+        compat: { forceAdaptiveThinking: false },
+      });
+      expect(entry.maxTokens).toBe(9000);
+      const compat = entry.compat as Record<string, unknown>;
+      expect(compat.forceAdaptiveThinking).toBe(false);
+      // Catalog compat keys the config does not name survive the override.
+      expect(compat.supportsTemperature).toBe(false);
+    });
+
+    it("skips the catalog when the manager chose a different API dialect for the same id", () => {
+      const { entry } = entryOf({ ...claude, api: "openai-completions" });
+      expect(entry.compat).toBeUndefined();
+      expect(entry.thinkingLevelMap).toBeUndefined();
+    });
+  });
+
+  describe("given a model pi's catalog does not know", () => {
+    /** @scenario A model pi's catalog does not know is written from config alone */
+    it("writes exactly the manager's config, for unknown ids and unprefixed ids alike", () => {
+      const env = { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" };
+      for (const id of ["anthropic/claude-acme-1", "gpt-5-mini"]) {
+        const provider = buildModelsJson({ ...model, id }, env).providers[PROVIDER_ID] as {
+          models: Record<string, unknown>[];
+        };
+        expect(provider.models[0]).toEqual({
+          id,
+          api: "openai-responses",
+          reasoning: true,
+          contextWindow: 272000,
+          maxTokens: 32000,
+          compat: { supportsStore: false },
+        });
+      }
+    });
+  });
 });
