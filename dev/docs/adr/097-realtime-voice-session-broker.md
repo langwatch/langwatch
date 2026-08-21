@@ -153,6 +153,8 @@ Measured against the live API on 2026-08-16. An `ek_` client secret opens a serv
 
 The negative consequence recorded above, that OpenAI usage under a broker depends on the vendor's usage API or the SDK, is narrower as built. The client posts what its own socket reported in `response.done` to `POST /v1/realtime/sessions/{id}/usage`, and that closes the session's spend record.
 
+That figure is taken as reported. The report is bound to the session's own project and virtual key and a second report on a closed session is a no-op, so it cannot be replayed or written by another key, but nothing checks it against the vendor. An OpenAI session bills what its client says it used, and a session that reports nothing settles as cost unknown at the grace. The socket does not pass through the gateway, so there is no second reading to compare against until OpenAI exposes one.
+
 ### The webhook signature is checked against the vendor's published verifier, and never against a live delivery
 
 The ElevenLabs workspace key available for this work lacks the `webhooks_write` scope, so no webhook could be registered and no vendor-signed delivery was ever received. The implementation was read against the verifier ElevenLabs ships in `@elevenlabs/elevenlabs-js@2.64.0` and matches it on every point that decides accept or reject: `t=<unix>,v0=<hex>`, HMAC-SHA256 over the timestamp, a literal dot, then the raw body, in lowercase hex. Our tolerance is two-sided over 30 minutes where the vendor's bounds only the past.
@@ -161,7 +163,7 @@ Read that as verified against the vendor's code. It is weaker evidence than a li
 
 ### The reconciler makes the webhook optional
 
-A control-plane worker polls sessions still open two minutes after their mint, at most 25 per tick on a 60 second tick, and reads each conversation back from the vendor by the id recorded at the mint.
+A control-plane worker polls sessions still open two minutes after their mint, at most 25 per tick on a 60-second tick, and reads each conversation back from the vendor by the id recorded at the mint.
 
 The ElevenLabs post-call webhook is one slot per workspace, and a customer may already be using it for something else. Without the poller, giving up that slot would be a precondition for billing voice at all. With it, the webhook is an optimization: a fully private install with no inbound path still bills every call, because the poller is outbound only.
 
@@ -175,7 +177,7 @@ The settlement now writes a `realtime.session.settled` span into the trace the m
 
 Emission is gated on the conditional close. The session row moves to CLOSED only while it is still open, and the span is written only by the update that won that move. A resent webhook, a retried client report, and a late confirmation superseding a settled record all find the row closed and add nothing. The span id is derived from the session id, so a write that got past the gate would land on the same span rather than a second one. A settlement with an unknown cost writes no span, so a call never appears at zero.
 
-### Further decisions the build had to make
+### Properties of the broker the design did not state
 
 **The mint admits and does not confirm.** The spend interceptor confirms on any successful dispatch for every other request type. For a mint that would close the record at zero dollars before the call started, and leave the settlement sweeper nothing to settle, so `realtime_session` defers its outcome. A refused or errored mint still emits a failure, because a session that never opened has no later report coming.
 
@@ -187,22 +189,19 @@ Emission is gated on the conditional close. The session row moves to CLOSED only
 
 **Regional residency is preserved.** A customer on an ElevenLabs residency endpoint sets `ELEVENLABS_BASE_URL` on the provider, and both the mint and the reconciler go there. The value is restricted to HTTPS on `elevenlabs.io` on write and again on read, because both paths send the customer's `xi-api-key` to that host.
 
-**Adapter support.** `langwatch/scenario#935` teaches the two realtime voice adapters to mint through the gateway, using the environment variables they already read for chat.
-
-**Doc changes.** The `docs/ai-gateway/api/audio.mdx` block this ADR listed no longer tells customers to connect directly to the provider. Realtime voice has its own page at `docs/ai-gateway/api/realtime.mdx`.
-
 ## References
 
 - Related Nexus pages (internal wiki): `gateway-spend-command-pipeline-adr`, `skai-gateway-replacement-adr`, `bench-gateway-kong`, `feature-ai-gateway`, `feature-gateway-virtual-keys`, `feature-voice-agent-testing`, `pain-voice-agent-testing-cost`
 - Repo ADRs: [053-tenant-aware-egress-and-workload-isolation.md](./053-tenant-aware-egress-and-workload-isolation.md) (Proposed), [017-gateway-trace-payload-capture.md](./017-gateway-trace-payload-capture.md) (Accepted, and not the regime running in code), [016-scoped-model-providers.md](./016-scoped-model-providers.md), [021-multi-scope-targeting-and-tenancy.md](./021-multi-scope-targeting-and-tenancy.md), [018-governance-unified-observability-substrate.md](./018-governance-unified-observability-substrate.md)
 - Scenario ADRs, in the `langwatch/scenario` repository: [docs/adr/002-voice-provider-state.md](https://github.com/langwatch/scenario/blob/main/docs/adr/002-voice-provider-state.md) (Proposed), [docs/adr/003-voice-internal-design.md](https://github.com/langwatch/scenario/blob/main/docs/adr/003-voice-internal-design.md) (Accepted)
 - Shipped audio support: `langwatch/langwatch#6168`, [specs/ai-gateway/audio-endpoints.feature](../../../specs/ai-gateway/audio-endpoints.feature), [docs/ai-gateway/api/audio.mdx](../../../docs/ai-gateway/api/audio.mdx)
+- The broker as built: `langwatch/langwatch#7066`, [specs/ai-gateway/realtime-sessions.feature](../../../specs/ai-gateway/realtime-sessions.feature), [docs/ai-gateway/api/realtime.mdx](../../../docs/ai-gateway/api/realtime.mdx), and `langwatch/scenario#935` for the two voice adapters that mint through it
 - Vendor documentation: OpenAI Realtime websocket and costs guides, ElevenLabs Conversational AI websocket and authentication references, Google Gemini Live API and session management, Deepgram Voice Agent reference, Azure Voice Live how-to
 - Competitor realtime support: Cloudflare AI Gateway realtime websockets, LiteLLM `/v1/realtime`, Portkey realtime API, Helicone realtime integration, Kong voice AI observability cookbook
 
 ### Doc changes this decision requires when it lands
 
-- `docs/ai-gateway/api/audio.mdx`, the "Not yet supported" block, currently tells customers to connect directly to the provider.
+- `docs/ai-gateway/api/audio.mdx`, the "Not yet supported" block, currently tells customers to connect directly to the provider. Done on 2026-08-21: the block now points at `docs/ai-gateway/api/realtime.mdx`.
 - `bench-gateway-kong`, whose LangWatch route-type column predates `#6168`.
 
 ### Resolutions (2026-08-14)
