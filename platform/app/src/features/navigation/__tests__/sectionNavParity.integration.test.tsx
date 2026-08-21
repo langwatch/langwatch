@@ -145,7 +145,7 @@ describe("given the governance section navigation data", () => {
       // The flag must resolve in organization context, gated on the org
       // being loaded — flags resolved without it silently read as off.
       expect(
-        harness.flagCallOptions["release_ui_governance_billed_cost_enabled"],
+        harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
       ).toEqual({ organizationId: "org-1", enabled: true });
     });
   });
