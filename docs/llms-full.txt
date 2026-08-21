@@ -1532,7 +1532,7 @@ For additional help, contact us at [support@langwatch.ai](mailto:support@langwat
 
 ---
 title: POST /v1/audio/*
-description: OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+description: Text to speech and transcription through the LangWatch AI Gateway, on OpenAI's wire and on ElevenLabs' own.
 sidebarTitle: Audio (TTS + STT)
 ---
 
@@ -1603,6 +1603,41 @@ print(transcript.text)
 ```
 
 The response is the standard JSON transcript with `text`, plus whatever the provider reports (duration, segments, token usage).
+
+## ElevenLabs' own audio paths
+
+The two routes above take OpenAI's request shape. If your code already uses the ElevenLabs SDK, you do not have to rewrite it: the gateway also serves that vendor's own paths, so changing the base URL is the whole change.
+
+```
+POST /v1/text-to-speech/{voice_id}
+POST /v1/speech-to-text
+xi-api-key: vk-lw-<ULID>
+```
+
+The virtual key goes in the `xi-api-key` header the SDK already sends. Bodies, form parts and query parameters reach ElevenLabs as you wrote them, so voice settings, `output_format`, diarization, timestamp granularity and the rest keep working. The model comes from `model_id`, and the virtual key's aliases and allowlist apply to it exactly as they do on every other route. A synthesis request that names no `model_id` bills and gates under `eleven_multilingual_v2`, which is what the vendor would have used.
+
+```python
+from elevenlabs import ElevenLabs
+
+client = ElevenLabs(
+    base_url="https://gateway.langwatch.ai",
+    api_key="vk-lw-...",
+)
+audio = client.text_to_speech.convert(
+    voice_id="EXAVITQu4vr4xnSDxMaL",
+    text="Hello from the gateway.",
+    model_id="eleven_flash_v2_5",
+    output_format="mp3_44100_128",
+)
+```
+
+These routes need an ElevenLabs key on the virtual key. They carry that vendor's own request shape, so the gateway will not fall back to another provider for them.
+
+Transcription accepts a `file` part, or a `cloud_storage_url` part for ElevenLabs to fetch the audio itself. Uploads through the gateway are capped by the deployment's request size limit (32 MB by default); use `cloud_storage_url` for anything larger.
+
+Metering is the same as on the OpenAI-shaped routes: synthesis is billed by the characters of `text`, transcription by the duration the vendor reports. A call costs the same whichever of the two wires it arrives on.
+
+Streaming (`/v1/text-to-speech/{voice_id}/stream`) is not served yet.
 
 ## Observability and cost measures
 

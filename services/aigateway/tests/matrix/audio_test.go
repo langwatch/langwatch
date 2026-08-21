@@ -229,3 +229,130 @@ func TestAudio_ElevenLabs_Transcription(t *testing.T) {
 	t.Logf("openai->elevenlabs transcript: %q", transcript)
 	assertHeardTheFox(t, transcript)
 }
+
+// --- ElevenLabs native cells ---
+//
+// The vendor's own paths, mirrored by the gateway. These prove the two things
+// a unit test cannot: that a real ElevenLabs account answers the request the
+// gateway builds, and that the audio survives a round trip through both new
+// routes.
+//
+//	TEST_VK_ELEVENLABS=vk-lw-... \
+//	ELEVENLABS_VOICE_ID=EXAVITQu4vr4xnSDxMaL \
+//	  go test -tags=live_audio -run TestAudio_ElevenLabsNative ./services/aigateway/tests/matrix/... -v
+
+// speakNative fires the vendor's own synthesis path and returns the audio.
+func speakNative(t *testing.T, vk, voice, model string) []byte {
+	t.Helper()
+	body := fmt.Sprintf(`{"text":%q,"model_id":%q}`, spokenLine, model)
+	url := fmt.Sprintf("%s/v1/text-to-speech/%s?output_format=mp3_44100_128", gatewayURL(), voice)
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("build native speech request: %v", err)
+	}
+	// The vendor's own auth header, which is the whole point of mirroring the
+	// path: an ElevenLabs SDK changes its base URL and nothing else.
+	req.Header.Set("xi-api-key", vk)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := audioHTTPClient().Do(req)
+	if err != nil {
+		t.Fatalf("native speech request: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	audio, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read native speech response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("native speech returned %d: %s", resp.StatusCode, truncate(audio, 500))
+	}
+	if len(audio) < 1024 {
+		t.Fatalf("native speech returned implausibly small audio (%d bytes): %s",
+			len(audio), truncate(audio, 200))
+	}
+	if json.Valid(audio) {
+		t.Fatalf("native speech response is JSON, expected raw audio: %s", truncate(audio, 300))
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "audio/") {
+		t.Fatalf("native speech Content-Type = %q, want audio/*", ct)
+	}
+	return audio
+}
+
+// transcribeNative fires the vendor's own transcription path and returns the
+// whole answer, which carries the duration the call is billed by.
+func transcribeNative(t *testing.T, vk, model, filename string, file []byte) (string, float64) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	w := multipart.NewWriter(buf)
+	fw, err := w.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := fw.Write(file); err != nil {
+		t.Fatalf("write form file: %v", err)
+	}
+	if err := w.WriteField("model_id", model); err != nil {
+		t.Fatalf("write model_id field: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, gatewayURL()+"/v1/speech-to-text", buf)
+	if err != nil {
+		t.Fatalf("build native transcription request: %v", err)
+	}
+	req.Header.Set("xi-api-key", vk)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := audioHTTPClient().Do(req)
+	if err != nil {
+		t.Fatalf("native transcription request: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read native transcription response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("native transcription returned %d: %s", resp.StatusCode, truncate(body, 500))
+	}
+	var parsed struct {
+		Text     string  `json:"text"`
+		Duration float64 `json:"audio_duration_secs"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		t.Fatalf("native transcription answer is not the vendor's JSON shape: %v; body: %s",
+			err, truncate(body, 300))
+	}
+	if parsed.Text == "" {
+		t.Fatalf("native transcription returned empty text: %s", truncate(body, 300))
+	}
+	return parsed.Text, parsed.Duration
+}
+
+// @scenario "A native ElevenLabs synthesis call bills the characters it spoke"
+// @scenario "A native ElevenLabs transcription call bills the seconds it heard"
+func TestAudio_ElevenLabsNative_SpeechToTranscriptionRoundTrip(t *testing.T) {
+	vk := requireEnv(t, "TEST_VK_ELEVENLABS")
+	voice := os.Getenv("ELEVENLABS_VOICE_ID")
+	if voice == "" {
+		t.Skip("ELEVENLABS_VOICE_ID not set")
+	}
+	ttsModel := os.Getenv("ELEVENLABS_TTS_MODEL")
+	if ttsModel == "" {
+		ttsModel = "eleven_flash_v2_5"
+	}
+
+	audio := speakNative(t, vk, voice, ttsModel)
+	t.Logf("native TTS produced %d bytes of mp3 for %d characters", len(audio), len(spokenLine))
+
+	transcript, duration := transcribeNative(t, vk, "scribe_v1", "native.mp3", audio)
+	t.Logf("native STT transcript: %q over %.4f seconds", transcript, duration)
+	assertHeardTheFox(t, transcript)
+	if duration <= 0 {
+		t.Fatalf("the vendor stated no audio duration, so the call would bill nothing")
+	}
+}

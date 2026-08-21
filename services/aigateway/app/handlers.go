@@ -82,6 +82,49 @@ func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, up
 	})
 }
 
+// HandleElevenLabsSpeech dispatches POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path. Same request type, pipeline and metering as
+// the OpenAI-wire TTS route: only the wire differs, and the vendor reads that
+// wire directly. The response body is binary audio.
+func (a *App) HandleElevenLabsSpeech(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:       domain.RequestTypeSpeech,
+		Model:      in.Model,
+		Body:       in.Body,
+		ElevenLabs: &route,
+		Surface:    domain.ElevenLabsSpeechSurface(),
+	})
+}
+
+// HandleElevenLabsTranscription dispatches POST /v1/speech-to-text,
+// ElevenLabs' own transcription path. The router parsed the multipart form,
+// so the upload rides on req.Transcription and Body carries the synthesized
+// JSON summary the body-reading pipeline stages need, exactly as the
+// OpenAI-wire transcription route does.
+func (a *App) HandleElevenLabsTranscription(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	body := []byte(`{"` + domain.ElevenLabsModelField + `":` + strconv.Quote(in.Model) + `}`)
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         in.Model,
+		Body:          body,
+		Transcription: in.Upload,
+		ElevenLabs:    &route,
+		Surface:       domain.ElevenLabsTranscriptionSurface(),
+	})
+}
+
+// ElevenLabsAudioDispatch is one ElevenLabs-native audio call: the model it
+// bills under, the vendor-shaped body or upload, and the URL-level parameters
+// the vendor's own path carries.
+type ElevenLabsAudioDispatch struct {
+	Model  string
+	Body   []byte
+	Upload *domain.TranscriptionUpload
+	Route  domain.ElevenLabsAudioRequest
+}
+
 // HandlePassthrough dispatches a provider-native request whose wire shape
 // the gateway doesn't translate (e.g. Gemini /v1beta/models/{m}:generateContent).
 // Body, path, method, query, and forwarded headers ride on req.Passthrough;

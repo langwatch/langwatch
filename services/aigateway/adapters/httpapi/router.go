@@ -188,6 +188,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// credential opens goes client to vendor and never comes here.
 			v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
 			v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+			// ElevenLabs' own audio paths, mirrored for the same reason the
+			// mint above is: an ElevenLabs SDK reaches them by base URL alone,
+			// so a customer already using that SDK gets metering, budgets and
+			// traces without rewriting their calls into the OpenAI shape the
+			// /v1/audio routes take.
+			v1.Post("/text-to-speech/{voice_id}", elevenLabsSpeechHandler(deps))
+			v1.Post("/speech-to-text", elevenLabsTranscriptionHandler(deps))
 			// The OpenAI socket reports its usage to the client, not to us, so
 			// the client posts it back to close the session's spend record.
 			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
@@ -609,6 +616,180 @@ func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
 		setMetaHeaders(w, result.Meta)
 		writeJSONResponse(w, result.Response)
 	}
+}
+
+// maxElevenLabsSpeechBodyBytes caps a native synthesis body. The vendor's own
+// text limit is tens of thousands of characters, and the rest of the body is
+// voice settings, so a megabyte is far past any real request and well short of
+// a payload worth forwarding by mistake.
+const maxElevenLabsSpeechBodyBytes = 1 << 20
+
+// elevenLabsSpeechHandler terminates POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path.
+//
+// The body reaches the vendor as the caller wrote it. Only the model is read
+// here, so the virtual key's aliases, allowlist, budgets and spend record all
+// apply to it, and the response is the vendor's audio bytes unchanged.
+func elevenLabsSpeechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, maxElevenLabsSpeechBodyBytes)
+		if !ok {
+			return
+		}
+		if gjson.GetBytes(body, "text").String() == "" {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `text is required: ElevenLabs synthesis takes the text to speak in a top-level "text" field`,
+				"fault":   "customer",
+			}))
+			return
+		}
+		// Absent means the vendor's own default, so the gateway names that
+		// model rather than leaving the request unmetered and ungated.
+		model := gjson.GetBytes(body, domain.ElevenLabsModelField).String()
+		if model == "" {
+			model = domain.ElevenLabsDefaultSpeechModel
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsSpeech(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model: model,
+				Body:  body,
+				Route: domain.ElevenLabsAudioRequest{
+					VoiceID:  chi.URLParam(r, "voice_id"),
+					RawQuery: r.URL.RawQuery,
+				},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// elevenLabsTranscriptionHandler terminates POST /v1/speech-to-text,
+// ElevenLabs' own transcription path.
+//
+// Multipart like the OpenAI-wire transcription route, and parsed here for the
+// same reason: this is the only layer holding the *http.Request. Every text
+// part is carried through to the vendor rather than filtered to a known list,
+// because on a route that mirrors a vendor's own path the caller's settings
+// are the request.
+func elevenLabsTranscriptionHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		upload, ok := parseElevenLabsUpload(deps, w, r)
+		if !ok {
+			return
+		}
+		// Not defaulted: ElevenLabs has no default transcription model, so a
+		// request without one is incomplete and guessing would bill a model
+		// the caller never chose. An empty value is refused by the resolver,
+		// which is the one place that says where each surface names its model.
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsTranscription(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model:  upload.Params[domain.ElevenLabsModelField],
+				Upload: upload,
+				Route:  domain.ElevenLabsAudioRequest{RawQuery: r.URL.RawQuery},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// parseElevenLabsUpload reads the native transcription form into the shared
+// upload shape.
+//
+// The audio part is optional, because this vendor also accepts a
+// cloud_storage_url it fetches itself; a request with neither is refused here
+// rather than at the vendor. The size cap is the gateway's own request
+// ceiling: the vendor accepts far larger files through that URL, and a
+// multi-gigabyte upload through this process is not something to hold in
+// memory.
+func parseElevenLabsUpload(deps RouterDeps, w http.ResponseWriter, r *http.Request) (*domain.TranscriptionUpload, bool) {
+	if err := readElevenLabsForm(deps, w, r); err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	upload, err := elevenLabsUploadFromForm(r)
+	if err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	return upload, true
+}
+
+// readElevenLabsForm caps the body and parses the multipart envelope.
+func readElevenLabsForm(deps RouterDeps, w http.ResponseWriter, r *http.Request) error {
+	maxBytes := deps.MaxRequestBodyBytes
+	if maxBytes <= 0 {
+		maxBytes = config.DefaultMaxRequestBodyBytes
+	}
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		return err
+	}
+	// Memory threshold: parts up to 10 MB stay in memory, larger ones spill to
+	// a temp file ParseMultipartForm cleans up on r.Body close.
+	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxBytes
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+			return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+				"message": fmt.Sprintf(
+					"the audio upload exceeds this gateway's %d byte request limit; "+
+						"send a cloud_storage_url part instead for a file this large", maxBytes),
+			})
+		}
+		return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "malformed multipart/form-data body: " + err.Error(),
+		})
+	}
+	return nil
+}
+
+// elevenLabsUploadFromForm lifts the parsed form into the shared upload shape.
+func elevenLabsUploadFromForm(r *http.Request) (*domain.TranscriptionUpload, error) {
+	upload := &domain.TranscriptionUpload{Params: map[string]string{}}
+	if r.MultipartForm != nil {
+		for name, values := range r.MultipartForm.Value {
+			if len(values) > 0 {
+				upload.Params[name] = values[0]
+			}
+		}
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		if upload.Params["cloud_storage_url"] != "" {
+			return upload, nil
+		}
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing audio: send a "file" part, or a "cloud_storage_url" part for the provider to fetch`,
+			"fault":   "customer",
+		})
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "failed reading uploaded file: " + err.Error(),
+		})
+	}
+	upload.File = data
+	upload.Filename = header.Filename
+	return upload, nil
 }
 
 // maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
