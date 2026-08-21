@@ -25,7 +25,11 @@ import type { LangyMessagePart } from "@langwatch/langy";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import type {
+  LangyCredentialService,
+  LangyCredentials,
+} from "~/server/app-layer/langy/LangyCredentialService";
+import { stripGithubCredentials } from "~/server/app-layer/langy/LangyCredentialService";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -33,6 +37,7 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
+import type { LangyHarness } from "~/server/app-layer/langy/langyHarness";
 import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
@@ -303,8 +308,13 @@ export interface LangyTurnServiceDeps {
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
-   * is the best-effort worker abort behind a user Stop (ADR-078). */
-  worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
+   * is the best-effort worker abort behind a user Stop (ADR-078); `warm` is
+   * the fire-and-forget panel-open pre-boot
+   * (specs/langy/langy-worker-prewarm.feature). */
+  worker: Pick<
+    LangyWorkerPort,
+    "probe" | "dispatch" | "cancel" | "warm"
+  > | null;
   /**
    * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
    * reconstruct the partial answer as the source of truth, then `markEnd`s it so
@@ -317,6 +327,25 @@ export interface LangyTurnServiceDeps {
     resetAt: number;
   }>;
   releasePermit: (args: { userId: string }) => Promise<void>;
+  /**
+   * Check-only view of the per-day PR cap, no permit is reserved. The warm
+   * path uses it for signature parity with the turn (which strips the GitHub
+   * token when the cap is reached) without spending PR budget on a panel
+   * open. Optional: absent means the warm assumes the cap is not reached.
+   */
+  checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
+  /**
+   * Which worker harness serves this turn (`release_langy_pi_harness`),
+   * resolved once per turn in the base-dependency phase. Contract:
+   * never throws (see `resolveLangyHarness`). Optional: absent (tests,
+   * minimal compositions) leaves `credentials.harness` unset, which the
+   * manager treats as its default harness.
+   */
+  resolveHarness?: (args: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }) => Promise<LangyHarness>;
   perDayPrCap: number;
   /** Mint the per-turn session key (prisma pre-bound at composition). */
   mintSessionKey: (args: {
@@ -339,6 +368,46 @@ export interface LangyTurnServiceDeps {
    * a turn without its memory is degraded, not broken.
    */
   messages: Pick<LangyMessageRepository, "findAllByConversation"> | null;
+}
+
+/**
+ * The probe payload for the worker this credential bundle + model would spawn.
+ * ONE definition, shared by the turn path and the panel-open warm
+ * (specs/langy/langy-worker-prewarm.feature): the manager canonicalises these
+ * capability fields into the worker signature, so any drift between the two
+ * callers would make every warm boot a worker the turn cannot reuse. The model
+ * is part of the signature (a model change is a probe MISS and the worker
+ * re-provisions), as are the GitHub scope, the egress list, the ADR-061 mirror
+ * tier and the harness.
+ */
+function buildWorkerProbeArgs({
+  projectId,
+  actorUserId,
+  conversationId,
+  model,
+  credentials,
+}: {
+  projectId: string;
+  actorUserId: string;
+  conversationId: string;
+  model: string;
+  credentials: LangyCredentials;
+}): Parameters<LangyWorkerPort["probe"]>[0] {
+  return {
+    projectId,
+    actorUserId,
+    conversationId,
+    model,
+    hasGithubAuth: !!credentials.githubToken,
+    ...(credentials.githubRepoScopeKey
+      ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
+      : {}),
+    ...(credentials.egressAllowlist
+      ? { egressAllowlist: credentials.egressAllowlist }
+      : {}),
+    ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
+    ...(credentials.harness ? { harness: credentials.harness } : {}),
+  };
 }
 
 /**
@@ -462,6 +531,173 @@ export class LangyTurnService {
       worker?.cancel({ conversationId, turnId, projectId }) ??
         Promise.resolve(),
     ]);
+  }
+
+  /**
+   * Pre-boot the conversation's worker on panel open, BEFORE the first message
+   * (specs/langy/langy-worker-prewarm.feature). Resolves the SAME credential
+   * surface a turn would, the worker signature is made of exactly those parts,
+   * so any divergence boots a worker the first turn cannot reuse, then probes,
+   * mints a session key only on a probe miss (a warm IS a spawn, and the
+   * manager refuses a keyless spawn), and fires the manager's warm without
+   * waiting on the boot.
+   *
+   * Returns the conversation id (server-minted when none was given) so the
+   * first message can adopt the warmed conversation, plus whether a worker is
+   * warm or warming. NEVER throws: a warm is an optimisation, every failure
+   * degrades to the cold start the user would have had anyway, and the first
+   * real message is where errors get their proper surfacing, a warm error
+   * card would only front-run it.
+   *
+   * Key lifecycle on this path, spelled out because there is no turn attempt
+   * holding a rollback: the minted key's id rides the credentials so the
+   * manager can revoke it on worker death (idle reap included), and the
+   * key's own expiry is the backstop for a warm that never reaches the
+   * manager (the warm port is fire-and-forget and swallows transport
+   * failures), see specs/langy/langy-session-key-lifecycle.feature.
+   */
+  async warmConversationWorker(args: {
+    projectId: string;
+    session: Session;
+    /**
+     * Warm an EXISTING conversation's worker, or null to mint the id the first
+     * message will adopt. An unknown id is ADOPTED (same semantics the first
+     * message applies via `ensureConversation(adoptUnknownId)`), so warm and
+     * turn agree on the aggregate key; an unadoptable id warms nothing.
+     */
+    requestedConversationId: string | null;
+    modelOverride?: string;
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
+    // Written by resolveAndWarm as soon as the id exists, so a later failure
+    // still hands the caller the id the first message could adopt.
+    const progress: { conversationId: string | null } = {
+      conversationId: null,
+    };
+    try {
+      return await this.resolveAndWarm(args, progress);
+    } catch (error) {
+      const { projectId } = args;
+      const conversationId = progress.conversationId;
+      if (error instanceof LangySessionKeyScopeError) {
+        // A user whose role carries no Langy scope gets the proper refusal on
+        // the first real message; the warm stays silent on purpose.
+        logger.debug(
+          { error, projectId, conversationId },
+          "langy warm skipped, session key scope refusal, first message will surface it",
+        );
+      } else {
+        logger.warn(
+          { error, projectId, conversationId },
+          "langy warm failed, the first message cold-starts the worker",
+        );
+      }
+      return { conversationId, warmed: false };
+    }
+  }
+
+  /**
+   * The warm happy path, throws freely; `warmConversationWorker` is the one
+   * catch that turns every failure into a silent cold start.
+   */
+  private async resolveAndWarm(
+    {
+      projectId,
+      session,
+      requestedConversationId,
+      modelOverride,
+    }: {
+      projectId: string;
+      session: Session;
+      requestedConversationId: string | null;
+      modelOverride?: string;
+    },
+    progress: { conversationId: string | null },
+  ): Promise<{ conversationId: string | null; warmed: boolean }> {
+    const { worker } = this.deps;
+    const userId = session.user.id;
+    const { speculativeConversation, credentials, resolvedModel } =
+      await resolveLangyTurnBaseDependencies({
+        deps: this.deps,
+        projectId,
+        userId,
+        session,
+        requestedConversationId,
+        ...(requestedConversationId ? { adoptConversationId: true } : {}),
+        ...(modelOverride ? { modelOverride } : {}),
+      });
+    const conversationId = speculativeConversation.id;
+    progress.conversationId = conversationId;
+
+    const warmModel = modelOverride ?? resolvedModel;
+    if (!worker || !warmModel) {
+      return { conversationId, warmed: false };
+    }
+
+    // Allowlist parity with the turn: warming on a model the turn would
+    // reject boots a worker the turn can never reuse.
+    const modelsAllowed = await this.deps.credentials.getModelsAllowed({
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    if (modelsAllowed && !modelsAllowed.includes(warmModel)) {
+      return { conversationId, warmed: false };
+    }
+
+    await this.applyWarmPrCapParity({ credentials, userId });
+
+    const alive = await worker.probe(
+      buildWorkerProbeArgs({
+        projectId,
+        actorUserId: userId,
+        conversationId,
+        model: warmModel,
+        credentials,
+      }),
+    );
+    if (alive) {
+      // Already warm. The probe is what keeps this path inside the
+      // key-lifecycle rule: never mint a key a running worker would discard.
+      return { conversationId, warmed: true };
+    }
+
+    const minted = await this.deps.mintSessionKey({
+      session,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    credentials.langwatchApiKey = minted.token;
+    credentials.langwatchApiKeyId = minted.apiKeyId;
+
+    // Fire-and-forget: the port never throws and the panel is not waiting on
+    // the boot, only on the id above.
+    void worker.warm({
+      projectId,
+      actorUserId: userId,
+      conversationId,
+      credentials,
+      modelOverride: warmModel,
+    });
+    return { conversationId, warmed: true };
+  }
+
+  /**
+   * GitHub PR-cap parity for the warm, WITHOUT reserving: the turn strips the
+   * token when the cap is reached, so the warm must produce the same worker
+   * signature, but a panel open must never spend a PR permit, so it only
+   * peeks through the check-only `checkPermit` view.
+   */
+  private async applyWarmPrCapParity({
+    credentials,
+    userId,
+  }: {
+    credentials: LangyCredentials;
+    userId: string;
+  }): Promise<void> {
+    if (!credentials.githubToken || !this.deps.checkPermit) return;
+    const { allowed } = await this.deps.checkPermit({ userId });
+    if (!allowed) {
+      stripGithubCredentials(credentials);
+    }
   }
 
   /**
@@ -610,27 +846,15 @@ export class LangyTurnService {
       const mintedRunToken = conversation.isNew ? mintRunToken() : null;
 
       const probeWorker = () =>
-        worker.probe({
-          projectId,
-          actorUserId: userId,
-          conversationId: conversation.id,
-          // The model is part of the worker signature, so a model change —
-          // override or configured default — is a probe MISS and the worker
-          // re-provisions rather than running on the model it booted with.
-          model: turnModel,
-          hasGithubAuth: !!credentials.githubToken,
-          ...(credentials.githubRepoScopeKey
-            ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
-            : {}),
-          ...(credentials.egressAllowlist
-            ? { egressAllowlist: credentials.egressAllowlist }
-            : {}),
-          // ADR-061 mirror tier is part of the worker signature, so a tier
-          // change must be a probe MISS (re-warm) rather than a stale mirror.
-          ...(credentials.mirrorTier
-            ? { mirrorTier: credentials.mirrorTier }
-            : {}),
-        });
+        worker.probe(
+          buildWorkerProbeArgs({
+            projectId,
+            actorUserId: userId,
+            conversationId: conversation.id,
+            model: turnModel,
+            credentials,
+          }),
+        );
 
       // With no GitHub capability, the signature is already final; overlap the
       // cheap probe with the conversation-scoped reads.
@@ -784,8 +1008,7 @@ export class LangyTurnService {
           ].join(" ")
         : "";
       if (!permit.allowed) {
-        delete (credentials as { githubToken?: string }).githubToken;
-        delete (credentials as { githubLogin?: string }).githubLogin;
+        stripGithubCredentials(credentials);
       }
 
       const workerIsLive = await (earlyWorkerProbe ?? probeWorker());

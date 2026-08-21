@@ -124,6 +124,33 @@ describe("createLangyChatTransport", () => {
       expect(path).toBe("langy.continueConversation");
       expect(input).toMatchObject({ conversationId: "conv-active" });
     });
+
+    it("ignores a pending warm id once a conversation is active", async () => {
+      const { transport } = makeTransport({
+        conversationId: "conv-active",
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.continueConversation");
+      expect(input).toMatchObject({ conversationId: "conv-active" });
+    });
+  });
+
+  describe("given a pending conversation id from a panel-open warm", () => {
+    /** @scenario The first message adopts the warmed conversation */
+    it("creates the conversation under the warmed id so the turn reuses the warm worker", async () => {
+      const { transport } = makeTransport({
+        conversationId: null,
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.createConversation");
+      expect(input).toMatchObject({ conversationId: "conv-warmed" });
+    });
   });
 
   describe("given per-send context (model override + composer chips)", () => {

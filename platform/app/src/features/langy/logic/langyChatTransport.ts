@@ -16,6 +16,14 @@ import { trpcClient } from "~/utils/api";
 export interface LangyTurnRequestContext {
   projectId: string;
   conversationId: string | null;
+  /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). Only consulted when there is
+   * no active conversation: the create call adopts it so the first turn lands
+   * on the worker the warm already booted, instead of spawning under a fresh
+   * server-minted id.
+   */
+  pendingConversationId?: string | null;
   modelOverride?: string;
   pageContext?: LangyResourceContext[];
   skills?: LangySkillContext[];
@@ -117,7 +125,14 @@ export function createLangyChatTransport(
             ...turnInput,
             conversationId: ctx.conversationId,
           })
-        : await trpcClient.langy.createConversation.mutate(turnInput);
+        : await trpcClient.langy.createConversation.mutate({
+            ...turnInput,
+            // Adopt the warmed conversation when the panel holds one, so the
+            // first turn reuses the worker the panel open already booted.
+            ...(ctx.pendingConversationId
+              ? { conversationId: ctx.pendingConversationId }
+              : {}),
+          });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({

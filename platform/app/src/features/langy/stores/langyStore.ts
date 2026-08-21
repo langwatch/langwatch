@@ -274,6 +274,17 @@ interface LangyState extends TurnPhaseState {
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). NOT the active conversation,
+   * nothing durable exists under it yet; the first send adopts it (the
+   * transport passes it to `createConversation`) so the turn lands on the
+   * worker the warm already booted. Cleared whenever the panel points at a
+   * different chat (new conversation, ask handoff, selection, scope change).
+   */
+  pendingConversationId: string | null;
+  /** The warm hook stores the id its mutation returned; null clears it. */
+  setPendingConversationId: (id: string | null) => void;
+  /**
    * The conversation whose durable server history should hydrate the chat
    * engine. Set only when the USER selects a conversation; cleared once the
    * panel has applied it. Deliberately NOT set on `adoptConversation`: a turn
@@ -578,6 +589,10 @@ const emptyConversationState = () => ({
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  // A conversation change also drops the id a panel-open warm minted: the
+  // pending id belongs to the fresh chat the warm was fired for, and the warm
+  // hook re-warms (and re-mints) for whatever the panel points at next.
+  pendingConversationId: null as string | null,
 });
 
 /**
@@ -714,6 +729,8 @@ export const useLangyStore = create<LangyState>()(
       scopeAnnounced: false,
       conversationEpoch: 0,
       historyLoadConversationId: null,
+      pendingConversationId: null,
+      setPendingConversationId: (id) => set({ pendingConversationId: id }),
       selectConversation: (id) =>
         set({
           activeConversationId: id,
@@ -725,7 +742,10 @@ export const useLangyStore = create<LangyState>()(
           modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
-      adoptConversation: (id) => set({ activeConversationId: id }),
+      // The pending id is retired either way: adopted (the send used it and it
+      // just became the active id) or superseded (the server minted its own).
+      adoptConversation: (id) =>
+        set({ activeConversationId: id, pendingConversationId: null }),
       startNewConversation: () =>
         set((state) => ({
           activeConversationId: null,

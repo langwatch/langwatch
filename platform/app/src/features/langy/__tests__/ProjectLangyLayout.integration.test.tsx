@@ -239,6 +239,9 @@ describe("ProjectLangyLayout", () => {
 
     describe("when the rollout flag is off", () => {
       /** @scenario "The visibility gate is not widened" */
+      // The pre-warm hook lives inside the sidecar, so a user without Langy
+      // never mounts it and no warm request can fire.
+      /** @scenario "A user without Langy never triggers a warm" */
       it("hides Langy for a team member", () => {
         gate.flagEnabled = false;
         renderAt("/demo/traces");

@@ -208,7 +208,7 @@ function newConversationId(): string {
  * accidental cross-caller collisions implausible, short enough for every index
  * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
  */
-const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
+export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
 /**
  * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id

@@ -491,6 +491,9 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
       stopTurn: {
         useMutation: () => ({
           mutateAsync: async (variables: {

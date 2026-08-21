@@ -83,6 +83,7 @@ import {
   useLangyTurnRecovery,
 } from "../hooks/useLangyTurnRecovery";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
@@ -471,6 +472,7 @@ function LangyPanel({
   const interruptedConversationId = useLangyStore(
     (s) => s.interruptedConversationId,
   );
+  const pendingConversationId = useLangyStore((s) => s.pendingConversationId);
   const historyLoadConversationId = useLangyStore(
     (s) => s.historyLoadConversationId,
   );
@@ -968,6 +970,23 @@ function LangyPanel({
     }
     setMakeDefaultPlan(null);
   };
+
+  // Pre-warm the worker on panel open and on conversation change, so the first
+  // message finds it booted (specs/langy/langy-worker-prewarm.feature). The
+  // model is passed only after both model queries settle, the picker's value
+  // is what the turn will carry, and warming before the allowlist could snap
+  // it away would boot a worker the turn cannot reuse. Fire-and-forget: the
+  // hook surfaces nothing.
+  const modelQueriesSettled =
+    !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
+  useLangyWarmWorker({
+    projectId,
+    isOpen,
+    conversationId: activeConversationId,
+    model: modelQueriesSettled
+      ? modelOverride || langyDefaultModel || null
+      : null,
+  });
 
   const {
     messages,
@@ -1525,6 +1544,9 @@ function LangyPanel({
   turnContextRef.current = {
     projectId: projectId ?? "",
     conversationId: activeConversationId,
+    // The id a panel-open warm minted, for the create path to adopt so the
+    // first turn reuses the worker the warm already booted.
+    pendingConversationId,
     ...(modelOverride ? { modelOverride } : {}),
     ...(allContextChips.length > 0
       ? {

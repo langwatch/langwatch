@@ -26,6 +26,7 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
+import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -57,6 +58,7 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
+  getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
@@ -1356,6 +1358,12 @@ export function initializeDefaultApp(options?: {
     tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,
+    // Check-only cap view for the panel-open warm: signature parity with the
+    // turn's token strip, without spending a PR permit on a panel open.
+    checkPermit: getLangyGithubPrUsage,
+    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
+    // and riding `credentials.harness` into probe, stash and dispatch.
+    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),

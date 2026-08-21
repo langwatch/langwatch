@@ -192,6 +192,9 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
