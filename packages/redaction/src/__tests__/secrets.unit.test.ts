@@ -91,6 +91,44 @@ describe("redactSecretsInText", () => {
       const { text } = redact("postgres://app:hunter2@db.internal:5432/app");
       expect(text).toBe("postgres://app:[SECRET]@db.internal:5432/app");
     });
+
+    /** @scenario "A connection URL keeps its scheme whatever shape the scheme has" */
+    it("keeps every shape of scheme and redacts only the password", () => {
+      const cases: Array<[string, string]> = [
+        [
+          "redis://default:Ab3xY9zQ@cache-01:6379",
+          "redis://default:[SECRET]@cache-01:6379",
+        ],
+        [
+          "mongodb+srv://admin:p%40ss@cluster0.mongodb.net",
+          "mongodb+srv://admin:[SECRET]@cluster0.mongodb.net",
+        ],
+        [
+          "git+ssh://git:token123@github.com/langwatch/langwatch.git",
+          "git+ssh://git:[SECRET]@github.com/langwatch/langwatch.git",
+        ],
+        [
+          "jdbc:postgresql://svc:9f8e7d6c@10.0.0.4:5432/app",
+          "jdbc:postgresql://svc:[SECRET]@10.0.0.4:5432/app",
+        ],
+        ["HTTPS://USER:PASS@EXAMPLE.COM", "HTTPS://USER:[SECRET]@EXAMPLE.COM"],
+      ];
+      for (const [input, expected] of cases) {
+        expect(redact(input).text).toBe(expected);
+      }
+    });
+
+    /** @scenario "Text that only looks like a connection URL is left alone" */
+    it("leaves alone a colon-slash-slash with no scheme in front of it", () => {
+      for (const input of [
+        "://user:password@host",
+        "no scheme here: user:password@host",
+        "See https://app.langwatch.ai/api/trace/abc123?include=spans",
+        "mail someone@example.com and read @langwatch/redaction",
+      ]) {
+        expect(redact(input).text).toBe(input);
+      }
+    });
   });
 
   describe("given a bearer authorization header value", () => {
@@ -670,6 +708,12 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
       ["a keyword followed by filler", `api_key: ${"a".repeat(100_000)}`],
       ["repeated keywords", "password=".repeat(20_000)],
       ["repeated open quotes", `${'api_key:"'.repeat(20_000)}x`],
+      // Lowercase prose is the worst case for the connection-URL rule, whose
+      // scheme is a run of letters. With the scheme leading the match every
+      // letter in the text started a scan for a "://" that is not there.
+      ["lowercase prose with no URL in it", "the dashboard stopped loading ".repeat(8_000)],
+      ["one URL per line", "postgres://svc:pw@10.0.0.4:5432/app\n".repeat(6_000)],
+      ["a scheme-shaped run with no separator", `${"a".repeat(100_000)}://`],
     ];
 
     for (const [label, input] of adversarial) {
