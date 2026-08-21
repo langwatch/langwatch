@@ -96,6 +96,10 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write(body)
 		return
 	}
+	// pi workers export no OTLP of their own: the relay retells each mediated
+	// LLM call as one gen_ai span into the customer's trace (see genai.go).
+	// nil for every other harness, and for calls with no turn to parent under.
+	genAI := newGenAICall(r, entry, req)
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay llm target resolution failed",
@@ -113,6 +117,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
+			// The Anthropic-native dialect (pi's anthropic-messages lane)
+			// authenticates with x-api-key instead of a Bearer header, and the
+			// gateway's /v1/messages accepts the virtual key there. Replace the
+			// placeholder wherever the client put it, so it never travels.
+			if pr.In.Header.Get("x-api-key") != "" {
+				pr.Out.Header.Set("x-api-key", entry.info.LLMVirtualKey)
+			}
 			// Codex turns run opencode's NATIVE openai provider (the Responses
 			// dialect the codex backend speaks), so the worker's request says
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
@@ -159,7 +170,15 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// status, and body kind), never provider prose. The body is restored
 		// untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
-			return r.captureLLMFailure(entry, resp)
+			if err := r.captureLLMFailure(entry, resp); err != nil {
+				return err
+			}
+			// Wraps OUTSIDE the failure capture's own body wrapping, so both
+			// observations ride the same untouched pass-through.
+			if genAI != nil {
+				genAI.observeResponse(resp)
+			}
+			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			clog.Get(r.baseCtx).Warn("otelrelay llm proxy error",
@@ -318,6 +337,13 @@ func (r *Relay) cutRetryLoopOnHardLimit(entry *workerEntry, resp *http.Response,
 // conversation's gateway base URL, preserving the query string. The base URL's
 // own path (e.g. /openai/v1) is kept, so SDK-relative paths land where the
 // direct OPENAI_BASE_URL wiring used to send them.
+//
+// One join rule beyond concatenation: a client speaking a version-rooted
+// dialect (pi's anthropic-messages lane appends /v1/messages to its base URL)
+// sends a path that starts with /v1 while the gateway base URL already ends in
+// /v1, the segment is deduplicated so the forward lands on the gateway's
+// /v1/messages, not /v1/v1/messages. The OpenAI-relative dialects
+// (/chat/completions, /responses) never start with /v1 and are unaffected.
 func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, error) {
 	base, err := url.Parse(gatewayBaseURL)
 	if err != nil {
@@ -328,8 +354,12 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 	}
 	prefix := "/w/" + token + llmPrefix
 	rest := strings.TrimPrefix(reqURL.Path, prefix)
+	basePath := strings.TrimRight(base.Path, "/")
+	if strings.HasSuffix(basePath, "/v1") && strings.HasPrefix(rest, "/v1/") {
+		rest = strings.TrimPrefix(rest, "/v1")
+	}
 	out := *base
-	out.Path = strings.TrimRight(base.Path, "/") + rest
+	out.Path = basePath + rest
 	out.RawQuery = reqURL.RawQuery
 	return &out, nil
 }

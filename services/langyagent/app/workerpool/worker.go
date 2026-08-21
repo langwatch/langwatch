@@ -247,8 +247,12 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, r
 	if !w.promptDelivered && historySeed != "" {
 		prompt = historySeed + "\n\n" + prompt
 	}
+	// The claimed turn's id rides the Turn so an agent whose wire protocol names
+	// turns (pi) tags this exact turn, the id a later AbortTurn will name.
+	turnID := w.currentTurnID
 	w.mu.Unlock()
 	err := w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
+		TurnID:      turnID,
 		System:      system,
 		Prompt:      prompt,
 		ResumeToken: resumeToken,

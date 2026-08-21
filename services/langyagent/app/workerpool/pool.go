@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/otelrelay"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/pi"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -45,6 +46,10 @@ type Options struct {
 	SessionsRoot       string
 	WorkspaceRoot      string
 	OpenCodeBinaryPath string
+	// PiBinaryPath is the langy-worker executable the pi harness spawns
+	// (resolved via PATH when bare). Selected per conversation by
+	// credentials.harness; the opencode path is untouched by it.
+	PiBinaryPath string
 	// Runner is the isolation substrate for worker subprocesses — the ADR-033
 	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/localunsafe),
 	// chosen once at the composition root. nil defaults to the sandboxed (secure)
@@ -102,6 +107,7 @@ type Pool struct {
 	sessionsRoot       string
 	workspaceRoot      string
 	openCodeBinaryPath string
+	piBinaryPath       string
 	runner             app.Runner
 	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
 	// spawn only does the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll and never a
@@ -187,6 +193,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		sessionsRoot:       opts.SessionsRoot,
 		workspaceRoot:      opts.WorkspaceRoot,
 		openCodeBinaryPath: opts.OpenCodeBinaryPath,
+		piBinaryPath:       opts.PiBinaryPath,
 		runner:             runner,
 		agentsTemplate:     agentsTemplate,
 		telemetry:          tel,
@@ -694,6 +701,11 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 			MirrorTier:           creds.MirrorTier,
 			SourceOrganizationID: creds.OrganizationID,
 			SourceProjectID:      creds.ProjectID,
+			// The harness gates the relay's LLM-call span synthesis: a pi
+			// worker exports no OTLP of its own, so the relay retells its
+			// mediated LLM calls as gen_ai spans; opencode workers keep
+			// exporting their own.
+			Harness: domain.NormalizeHarness(creds.Harness),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("register worker telemetry relay: %w", err)
@@ -709,130 +721,197 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}
 
-	// The coding agent (adapters/opencode) provisions its own home, spawns its own
-	// process, and is driven through the endpoint below — the pool orchestrates
-	// but never speaks opencode's wire protocol. Constructed here so Provision and
-	// Spawn share the one instance the Worker later keeps for the drive methods.
-	agent := opencode.NewAgent(p.readinessTimeout)
-	if err := agent.Provision(opencode.ProvisionInput{
-		Home:                workerHome,
-		WorkspaceRoot:       p.workspaceRoot,
-		Creds:               creds,
-		UID:                 uid,
-		AgentsTemplate:      p.agentsTemplate,
-		Runner:              p.runner,
-		EnableOpenTelemetry: mediation.OTLPEndpoint != "",
-	}); err != nil {
-		provSpan.RecordError(err)
-		provSpan.SetStatus(codes.Error, "provision worker home")
-		provSpan.End()
-		return nil, err
-	}
-	provSpan.End()
+	// The coding agent provisions its own home, spawns its own process, and is
+	// driven through the app.CodingAgent port: the pool orchestrates but never
+	// speaks either agent's wire protocol. Which adapter runs is the credential
+	// envelope's harness: pi is the langy-worker wrapper driven over stdio
+	// pipes, the default is opencode driven over its loopback HTTP API. The
+	// agent instance is shared between Provision/Spawn here and the Worker's
+	// drive methods.
+	var agent app.CodingAgent
+	var endpoint app.Endpoint
+	var proxy *opencode.AuthProxy
+	var cmd *exec.Cmd
 
-	// Two ports per worker:
-	//   - externalPort: the authProxy listens here, requires Bearer auth.
-	//     handlers always dial this one (worker.port).
-	//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
-	//     Never exposed to callers; the proxy is the only consumer.
-	externalPort, err := opencode.GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-	// Any free port works: sibling isolation is enforced by opencode's own
-	// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
-	// into an iptables-locked range. opencode.GetFreePort closes its listener before
-	// returning, so two independent calls can (rarely) hand back the SAME
-	// ephemeral port — which would make the proxy bind externalPort first and
-	// opencode then fail to listen, burning the whole readiness timeout. Re-roll
-	// until the internal port differs from the external one.
-	var internalPort int
-	for attempt := 0; attempt < 8; attempt++ {
-		internalPort, err = opencode.GetFreePort()
+	switch domain.NormalizeHarness(creds.Harness) {
+	case domain.HarnessPi:
+		piAgent := pi.NewAgent(p.readinessTimeout)
+		if err := piAgent.Provision(pi.ProvisionInput{
+			Home:           workerHome,
+			WorkspaceRoot:  p.workspaceRoot,
+			Creds:          creds,
+			UID:            uid,
+			AgentsTemplate: p.agentsTemplate,
+			Runner:         p.runner,
+		}); err != nil {
+			provSpan.RecordError(err)
+			provSpan.SetStatus(codes.Error, "provision worker home")
+			provSpan.End()
+			return nil, err
+		}
+		provSpan.End()
+
+		// A pi worker has no listener and no authproxy: the stdio pipes are
+		// its only control surface, so the zero Endpoint is correct and proxy
+		// stays nil (every touch point is nil-guarded). Its LLM traffic still
+		// routes through the relay's mediated loopback URL when the relay runs.
+		llmBaseURL := ""
+		if p.otelRelay != nil {
+			llmBaseURL = p.otelRelay.LLMBaseURLFor(otelToken)
+		}
+		// baseCtx (not ctx) binds the subprocess, which outlives the request;
+		// the span hangs off the spawn span so the fork shows up in the
+		// waterfall, tagged with the isolation substrate.
+		_, piSpan := p.telemetry.StartPhase(ctx, "langy.pi.spawn")
+		piSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
+		piCmd, err := piAgent.Spawn(p.baseCtx, pi.SpawnInput{
+			BinaryPath:     p.piBinaryPath,
+			ConversationID: conversationID,
+			Home:           workerHome,
+			UID:            uid,
+			Creds:          creds,
+			EgressPort:     we.ProxyPort,
+			Runner:         p.runner,
+			LLMBaseURL:     llmBaseURL,
+			// The turn's capabilities fold their own env into the worker: the
+			// SAME set that produced this worker's credential signature.
+			Capabilities: capabilitiesFor(creds),
+		})
+		if err != nil {
+			piSpan.RecordError(err)
+			piSpan.SetStatus(codes.Error, "spawn langy-worker")
+			piSpan.End()
+			return nil, err
+		}
+		piSpan.End()
+		agent, cmd = piAgent, piCmd
+
+	default:
+		ocAgent := opencode.NewAgent(p.readinessTimeout)
+		if err := ocAgent.Provision(opencode.ProvisionInput{
+			Home:                workerHome,
+			WorkspaceRoot:       p.workspaceRoot,
+			Creds:               creds,
+			UID:                 uid,
+			AgentsTemplate:      p.agentsTemplate,
+			Runner:              p.runner,
+			EnableOpenTelemetry: mediation.OTLPEndpoint != "",
+		}); err != nil {
+			provSpan.RecordError(err)
+			provSpan.SetStatus(codes.Error, "provision worker home")
+			provSpan.End()
+			return nil, err
+		}
+		provSpan.End()
+
+		// Two ports per worker:
+		//   - externalPort: the authProxy listens here, requires Bearer auth.
+		//     handlers always dial this one (worker.port).
+		//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
+		//     Never exposed to callers; the proxy is the only consumer.
+		externalPort, err := opencode.GetFreePort()
 		if err != nil {
 			return nil, err
 		}
-		if internalPort != externalPort {
-			break
+		// Any free port works: sibling isolation is enforced by opencode's own
+		// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
+		// into an iptables-locked range. opencode.GetFreePort closes its listener before
+		// returning, so two independent calls can (rarely) hand back the SAME
+		// ephemeral port, which would make the proxy bind externalPort first and
+		// opencode then fail to listen, burning the whole readiness timeout. Re-roll
+		// until the internal port differs from the external one.
+		var internalPort int
+		for attempt := 0; attempt < 8; attempt++ {
+			internalPort, err = opencode.GetFreePort()
+			if err != nil {
+				return nil, err
+			}
+			if internalPort != externalPort {
+				break
+			}
 		}
-	}
-	if internalPort == externalPort {
-		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
-	}
+		if internalPort == externalPort {
+			return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
+		}
 
-	bearerToken, err := opencode.GenerateBearerToken()
-	if err != nil {
-		return nil, err
-	}
+		bearerToken, err := opencode.GenerateBearerToken()
+		if err != nil {
+			return nil, err
+		}
 
-	// Distinct per-worker secret opencode itself enforces (ADR-033 Fix A′) —
-	// deliberately generated separately from bearerToken above: bearerToken
-	// gates the external port (caller <-> authProxy), openCodePassword gates the
-	// internal port (authProxy <-> opencode). Reusing one secret for both would
-	// mean any caller holding the external bearer token could also derive the
-	// internal credential.
-	openCodePassword, err := opencode.GenerateBearerToken()
-	if err != nil {
-		return nil, err
-	}
+		// Distinct per-worker secret opencode itself enforces (ADR-033 Fix A′),
+		// deliberately generated separately from bearerToken above: bearerToken
+		// gates the external port (caller <-> authProxy), openCodePassword gates the
+		// internal port (authProxy <-> opencode). Reusing one secret for both would
+		// mean any caller holding the external bearer token could also derive the
+		// internal credential.
+		openCodePassword, err := opencode.GenerateBearerToken()
+		if err != nil {
+			return nil, err
+		}
 
-	// The endpoint the sandbox exposes for this worker's coding-agent process:
-	// the authproxy-fronted external port callers dial, opencode's own internal
-	// control port (checked directly by the readiness probe, never exposed), and
-	// the per-worker bearer. agent (adapters/opencode) drives readiness, session,
-	// and every turn through it — the pool never speaks the agent's wire protocol.
-	endpoint := app.Endpoint{
-		BaseURL:      "http://127.0.0.1:" + strconv.Itoa(externalPort),
-		ExternalPort: externalPort,
-		InternalPort: internalPort,
-		BearerToken:  bearerToken,
-	}
+		// The endpoint the sandbox exposes for this worker's coding-agent process:
+		// the authproxy-fronted external port callers dial, opencode's own internal
+		// control port (checked directly by the readiness probe, never exposed), and
+		// the per-worker bearer. agent (adapters/opencode) drives readiness, session,
+		// and every turn through it, the pool never speaks the agent's wire protocol.
+		endpoint = app.Endpoint{
+			BaseURL:      "http://127.0.0.1:" + strconv.Itoa(externalPort),
+			ExternalPort: externalPort,
+			InternalPort: internalPort,
+			BearerToken:  bearerToken,
+		}
 
-	// authProxy binds the pool-lifetime context so its serve goroutine logs and
-	// lifetime follow the pool, not a single request.
-	proxy, err := opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
-	if err != nil {
-		return nil, fmt.Errorf("start authproxy: %w", err)
+		// authProxy binds the pool-lifetime context so its serve goroutine logs and
+		// lifetime follow the pool, not a single request.
+		proxy, err = opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
+		if err != nil {
+			return nil, fmt.Errorf("start authproxy: %w", err)
+		}
+
+		// The worker subprocess is bound to the POOL-lifetime context, the
+		// per-request context controls a single chat turn, but the worker stays
+		// alive across turns and only dies on idle/shutdown. Binding to baseCtx
+		// (rather than context.Background, as the flat manager did) means a pool
+		// Shutdown / deadline propagates to the subprocess.
+		// The opencode fork itself. baseCtx (not ctx) binds the subprocess, it outlives
+		// the request, but the span hangs off the spawn span so the fork shows up in the
+		// waterfall, tagged with the isolation substrate (sandboxed vs local) that set
+		// its SysProcAttr.
+		_, ocSpan := p.telemetry.StartPhase(ctx, "langy.opencode.spawn")
+		ocSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
+		ocCmd, err := ocAgent.Spawn(p.baseCtx, opencode.SpawnInput{
+			BinaryPath:       p.openCodeBinaryPath,
+			ConversationID:   conversationID,
+			Home:             workerHome,
+			UID:              uid,
+			Port:             internalPort,
+			Creds:            creds,
+			OpenCodePassword: openCodePassword,
+			EgressPort:       we.ProxyPort,
+			Runner:           p.runner,
+			Mediation:        mediation,
+			// The turn's capabilities fold their own env into the worker, the SAME set
+			// that produced this worker's credential signature (see capabilitiesFor).
+			Capabilities: capabilitiesFor(creds),
+		})
+		if err != nil {
+			ocSpan.RecordError(err)
+			ocSpan.SetStatus(codes.Error, "spawn opencode")
+			ocSpan.End()
+			return nil, err
+		}
+		ocSpan.End()
+		agent, cmd = ocAgent, ocCmd
 	}
+	// The authproxy rollback registers AFTER the branch (defers registered
+	// inside a switch case still run at function exit, but keeping it here
+	// makes the rollback stack read top to bottom). nil for pi, nil-guarded.
 	defer func() {
-		if !success {
+		if !success && proxy != nil {
 			proxy.Shutdown()
 		}
 	}()
-
-	// The worker subprocess is bound to the POOL-lifetime context — the
-	// per-request context controls a single chat turn, but the worker stays
-	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
-	// (rather than context.Background, as the flat manager did) means a pool
-	// Shutdown / deadline propagates to the subprocess.
-	// The opencode fork itself. baseCtx (not ctx) binds the subprocess — it outlives
-	// the request — but the span hangs off the spawn span so the fork shows up in the
-	// waterfall, tagged with the isolation substrate (sandboxed vs local) that set
-	// its SysProcAttr.
-	_, ocSpan := p.telemetry.StartPhase(ctx, "langy.opencode.spawn")
-	ocSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
-	cmd, err := agent.Spawn(p.baseCtx, opencode.SpawnInput{
-		BinaryPath:       p.openCodeBinaryPath,
-		ConversationID:   conversationID,
-		Home:             workerHome,
-		UID:              uid,
-		Port:             internalPort,
-		Creds:            creds,
-		OpenCodePassword: openCodePassword,
-		EgressPort:       we.ProxyPort,
-		Runner:           p.runner,
-		Mediation:        mediation,
-		// The turn's capabilities fold their own env into the worker — the SAME set
-		// that produced this worker's credential signature (see capabilitiesFor).
-		Capabilities: capabilitiesFor(creds),
-	})
-	if err != nil {
-		ocSpan.RecordError(err)
-		ocSpan.SetStatus(codes.Error, "spawn opencode")
-		ocSpan.End()
-		return nil, err
-	}
-	ocSpan.End()
 	// The exit watcher goroutine is NOT started until success below, so this undo
 	// owns cmd.Wait() without a race: on a readiness/session failure it kills the
 	// process and drains its exit, and the rollbacks above shut the proxy, wipe
@@ -882,8 +961,10 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 
 	log.Info("worker ready",
 		zap.String("conversation", conversationID),
-		zap.Int("port", externalPort),
-		zap.Int("internalPort", internalPort),
+		zap.String("harness", domain.NormalizeHarness(creds.Harness)),
+		// Ports are zero on the pi harness (stdio, no listener).
+		zap.Int("port", endpoint.ExternalPort),
+		zap.Int("internalPort", endpoint.InternalPort),
 		zap.String("session", sessionID),
 		zap.Bool("resumedSession", resumedSession),
 		zap.Uint32("uid", uid),

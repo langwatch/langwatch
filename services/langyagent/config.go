@@ -148,6 +148,12 @@ type Config struct {
 	// env-configurable in the original; kept as a fixed default so behaviour is
 	// unchanged, but overridable in tests.
 	OpenCodeBinaryPath string
+
+	// PiWorkerBinaryPath is the langy-worker executable the pi harness spawns
+	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
+	// can point at a locally built binary (services/langyworker/out) without
+	// installing it on PATH.
+	PiWorkerBinaryPath string `env:"LANGY_PI_WORKER_BINARY_PATH"`
 }
 
 const (
@@ -186,6 +192,7 @@ func defaultConfig() Config {
 		SessionsRoot:              defaultSessionsRoot,
 		WorkspaceRoot:             defaultWorkspaceRoot,
 		OpenCodeBinaryPath:        "opencode",
+		PiWorkerBinaryPath:        "langy-worker",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
 		// ADR-076 rung 1a + SNI cross-check are the always-safe rungs; both

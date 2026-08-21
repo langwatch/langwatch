@@ -235,7 +235,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// itself stays enabled and every skill we ship still reaches the prompt.
 		"agent": map[string]any{
 			"build": map[string]any{
-				"prompt": langyAgentPrompt,
+				"prompt": LangyAgentPrompt,
 				"permission": map[string]any{
 					"task":     "deny",
 					"question": "deny",
@@ -455,13 +455,15 @@ const mediatedLLMPlaceholderKey = "langy-mediated"
 // The name has no models.dev catalog entry, so nothing merges over it.
 const gatewayProviderID = "langwatch"
 
-// langyAgentPrompt is the build agent's own system prompt. Setting a prompt on
+// LangyAgentPrompt is the build agent's own system prompt. Setting a prompt on
 // an agent makes opencode drop its per-model coding-agent prompt entirely (the
 // "You are OpenCode, …" text) instead of appending to it, so this short block
 // is the whole persona slot. The operating contract stays in AGENTS.md, which
 // opencode appends as an instructions file regardless of the agent prompt —
-// keep the two non-overlapping: persona here, rules there.
-const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
+// keep the two non-overlapping: persona here, rules there. Exported because it
+// is the ONE Langy persona: the pi adapter writes the same text as its
+// wrapper's personaPrompt, so the persona cannot drift between harnesses.
+const LangyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
 	"LangWatch project from inside the product. You work by running the `langwatch` " +
 	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
 	"document is your operating contract and applies to every reply. When a request " +

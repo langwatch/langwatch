@@ -19,6 +19,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
 func portOf(t *testing.T, serverURL string) int {
@@ -865,7 +866,7 @@ func TestToolCallTracker_StructuredOutputIsStringified(t *testing.T) {
 // A tool can return megabytes. The stream must not carry it — cap, mark, move on.
 func TestToolCallTracker_CapsHugeOutput(t *testing.T) {
 	tracker := newToolCallTracker()
-	huge, err := json.Marshal(strings.Repeat("a", 5*maxToolOutputBytes))
+	huge, err := json.Marshal(strings.Repeat("a", 5*toolmap.MaxToolOutputBytes))
 	if err != nil {
 		t.Fatalf("marshal huge output: %v", err)
 	}
@@ -877,8 +878,8 @@ func TestToolCallTracker_CapsHugeOutput(t *testing.T) {
 		t.Fatalf("expected an output on the end frame")
 	}
 	got := *end.Output
-	if len(got) > maxToolOutputBytes+len("…") {
-		t.Errorf("output was not capped: %d bytes, cap is %d", len(got), maxToolOutputBytes)
+	if len(got) > toolmap.MaxToolOutputBytes+len("…") {
+		t.Errorf("output was not capped: %d bytes, cap is %d", len(got), toolmap.MaxToolOutputBytes)
 	}
 	if !strings.HasSuffix(got, "…") {
 		t.Errorf("a truncated output must be marked with a trailing ellipsis, got %q", got[len(got)-8:])
@@ -997,94 +998,6 @@ func TestRequireOpenCodeAuthEnforced_TransportErrorIsRetryable(t *testing.T) {
 	}
 	if !errors.Is(err, errAuthProbeUnreachable) {
 		t.Fatalf("transport failure must be classified retryable (errAuthProbeUnreachable), got %v", err)
-	}
-}
-
-// truncateToolOutput must NEVER hand downstream half a JSON document. A CLI
-// result over the cap is reduced structurally (arrays capped, long strings
-// clipped) and stays parseable — the exact property whose absence rendered
-// every oversized `langwatch trace search` as an unreadable card.
-func TestTruncateToolOutput_ReducesJSONStructurally(t *testing.T) {
-	traces := make([]map[string]any, 40)
-	long := strings.Repeat("x", 2_000)
-	for i := range traces {
-		traces[i] = map[string]any{
-			"trace_id": fmt.Sprintf("trace_%02d", i),
-			"input":    map[string]any{"value": long},
-			"output":   map[string]any{"value": long},
-		}
-	}
-	doc, err := json.Marshal(map[string]any{
-		"traces":     traces,
-		"pagination": map[string]any{"totalHits": 40},
-	})
-	if err != nil {
-		t.Fatalf("marshal fixture: %v", err)
-	}
-	if len(doc) <= maxToolOutputBytes {
-		t.Fatalf("fixture must exceed the cap, got %d bytes", len(doc))
-	}
-
-	out := truncateToolOutput(string(doc))
-
-	if len(out) > maxToolOutputBytes {
-		t.Fatalf("reduced output = %d bytes, want <= %d", len(out), maxToolOutputBytes)
-	}
-	var parsed struct {
-		Traces     []any `json:"traces"`
-		Pagination struct {
-			TotalHits int `json:"totalHits"`
-		} `json:"pagination"`
-	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("reduced output must stay valid JSON, got %v\n%s", err, out)
-	}
-	if parsed.Pagination.TotalHits != 40 {
-		t.Errorf("scalar fields must survive the reduction, totalHits = %d", parsed.Pagination.TotalHits)
-	}
-	if len(parsed.Traces) < 2 {
-		t.Errorf("a sample of the array must survive, got %d items", len(parsed.Traces))
-	}
-	// The clip marker rides IN the array, shape intact.
-	last, _ := parsed.Traces[len(parsed.Traces)-1].(string)
-	if !strings.Contains(last, "more items truncated") {
-		t.Errorf("clipped array must carry the in-band marker, tail = %v", parsed.Traces[len(parsed.Traces)-1])
-	}
-}
-
-func TestTruncateToolOutput_SmallAndNonJSON(t *testing.T) {
-	if got := truncateToolOutput("short"); got != "short" {
-		t.Errorf("under-cap output must pass through, got %q", got)
-	}
-
-	big := strings.Repeat("plain text log line\n", 1_000)
-	out := truncateToolOutput(big)
-	if len(out) > maxToolOutputBytes+len("…") {
-		t.Errorf("non-JSON falls back to the byte cut, got %d bytes", len(out))
-	}
-	if !strings.HasSuffix(out, "…") {
-		t.Errorf("byte cut must be marked, tail = %q", out[len(out)-8:])
-	}
-}
-
-func TestTruncateToolOutput_JSONBehindSpinnerNoise(t *testing.T) {
-	// The langwatch CLI prints spinner noise before its JSON document; the
-	// reducer must find and preserve the document anyway.
-	long := strings.Repeat("y", 3_000)
-	doc, _ := json.Marshal(map[string]any{
-		"traces":     []any{map[string]any{"trace_id": "tr_1", "input": long}},
-		"pagination": map[string]any{"totalHits": 12},
-	})
-	noisy := "- Searching traces...\n✔ Found 12 traces (showing 12)\n" + string(doc) + strings.Repeat(" ", 9_000)
-
-	out := truncateToolOutput(noisy)
-
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("document behind noise must survive as valid JSON: %v\n%s", err, out)
-	}
-	if _, ok := parsed["pagination"]; !ok {
-		t.Errorf("document fields must survive, got keys %v", parsed)
 	}
 }
 
@@ -1272,38 +1185,6 @@ func TestToolCallTracker_TodoWriteMalformedEmitsNoPlan(t *testing.T) {
 	}
 }
 
-// The plan is capped at 30 items and each item's text truncated, never dropped.
-func TestPlanItemsFromInput_CapsAndTruncates(t *testing.T) {
-	var sb strings.Builder
-	sb.WriteString(`{"todos":[`)
-	for i := 0; i < 40; i++ {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString(fmt.Sprintf(`{"content":"%s","status":"pending"}`, strings.Repeat("x", 300)))
-	}
-	sb.WriteString(`]}`)
-
-	items, ok := planItemsFromInput(json.RawMessage(sb.String()))
-	if !ok {
-		t.Fatalf("expected a plan from 40 items")
-	}
-	if len(items) != maxPlanItems {
-		t.Fatalf("item count = %d, want it capped at %d", len(items), maxPlanItems)
-	}
-	if r := []rune(items[0].Content); len(r) != maxPlanContentChars+1 {
-		t.Errorf("content len = %d runes, want %d capped + 1 ellipsis", len(r), maxPlanContentChars)
-	}
-}
-
-// The bare-array shape is accepted too, not only { todos: [...] }.
-func TestPlanItemsFromInput_AcceptsBareArray(t *testing.T) {
-	items, ok := planItemsFromInput(json.RawMessage(`[{"content":"Only step","status":"in_progress"}]`))
-	if !ok || len(items) != 1 || items[0].Content != "Only step" {
-		t.Fatalf("bare array must parse, got ok=%v items=%+v", ok, items)
-	}
-}
-
 // A failed LangWatch CLI command writes its failure DOCUMENT to stdout and a
 // one-line human summary to stderr. Overwriting stdout with the summary threw
 // away the code, the meta and the platform's own next steps at the first hop,
@@ -1355,28 +1236,5 @@ func TestToolEndFrame_UsesTheErrorMessageWhenStdoutHasNoDocument(t *testing.T) {
 	}
 	if decoded.Output != "command not found: langwatch" {
 		t.Fatalf("expected the error message, got %q", decoded.Output)
-	}
-}
-
-func TestCarriesFailureDocument(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		output string
-		want   bool
-	}{
-		{"a failure document", `{"ok":false,"error":{"code":"not_found"}}`, true},
-		{"a failure document after console noise", "- Creating...\n" + `{"ok":false,"error":{"code":"not_found"}}`, true},
-		{"a successful result", `{"id":"scenario_1"}`, false},
-		{"an ok-true document", `{"ok":true}`, false},
-		{"a document with no error", `{"ok":false}`, false},
-		{"a human table", "ID   NAME\n1    Support", false},
-		{"empty output", "", false},
-		{"truncated JSON", `{"ok":false,"error":{"code":"not_`, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := carriesFailureDocument(tc.output); got != tc.want {
-				t.Fatalf("carriesFailureDocument(%q) = %v, want %v", tc.output, got, tc.want)
-			}
-		})
 	}
 }
