@@ -44,7 +44,7 @@ describe("IngestionKeyService.ensureForProject", () => {
     vi.clearAllMocks();
     service = IngestionKeyService.create({} as never);
     apiKeys.create.mockResolvedValue({
-      token: "ik-lw-fresh1234567890_secret",
+      token: "ik-lw-fake-token",
       apiKey: { id: "ak_new" },
     });
   });

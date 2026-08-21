@@ -253,7 +253,7 @@ export class RoleRepository {
   async create({
     params,
     actor,
-    awaitProjection,
+    awaitProjection = true,
   }: {
     params: CreateRoleParams;
     actor: LedgerActor;
@@ -283,7 +283,7 @@ export class RoleRepository {
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
-      ...(awaitProjection !== undefined ? { awaitProjection } : {}),
+      awaitProjection,
     });
     const now = new Date();
     return {
@@ -406,7 +406,7 @@ export class RoleRepository {
     apiKeyId,
     organizationId,
     actor,
-    awaitProjection,
+    awaitProjection = true,
   }: {
     roleIds: string[];
     apiKeyId: string;
@@ -451,7 +451,7 @@ export class RoleRepository {
         organizationId,
         roleId,
         actor,
-        ...(awaitProjection !== undefined ? { awaitProjection } : {}),
+        awaitProjection,
       });
     }
   }

@@ -973,7 +973,7 @@ export class ApiKeyService {
     callerUserId,
     callerIsAdmin,
     organizationId,
-    awaitProjection,
+    awaitProjection = true,
   }: {
     id: string;
     /**
@@ -1025,7 +1025,7 @@ export class ApiKeyService {
           userId: callerUserId,
           fallback: "apiKeyService",
         }),
-        ...(awaitProjection !== undefined ? { awaitProjection } : {}),
+        awaitProjection,
       });
     }
 
