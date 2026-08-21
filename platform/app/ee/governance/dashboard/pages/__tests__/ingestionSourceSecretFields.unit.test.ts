@@ -46,19 +46,23 @@ describe("given the ingestion-sources field definitions", () => {
 });
 
 describe("given a composer state with both secret and non-secret values set", () => {
-  // copilot_studio (rather than databricks_genie) on purpose: none of its
-  // parser fields are adapter-owned (see PULL_CONFIG_OWNED_FIELDS), so a
-  // non-secret field set here is expected to survive into parserConfig
-  // purely on the secrecy decision under test, with nothing else filtering
-  // it out first.
+  // http_custom (rather than databricks_genie) on purpose: none of its parser
+  // fields are adapter-owned (see PULL_CONFIG_OWNED_FIELDS), so a non-secret
+  // field set here is expected to survive into parserConfig purely on the
+  // secrecy decision under test, with nothing else filtering it out first.
+  //
+  // This was copilot_studio until that source type was retired. Note the
+  // constraint the choice has to satisfy — a source type whose fields ARE
+  // adapter-owned would make the second assertion pass or fail for the wrong
+  // reason. microsoft_365_audit is exactly such a type and is not a drop-in.
   const composerState = {
-    sourceType: "copilot_studio" as const,
+    sourceType: "http_custom" as const,
     name: "test source",
     description: "",
     parserConfig: {
-      tenantId: "00000000-0000-0000-0000-000000000000",
-      clientId: "00000000-0000-0000-0000-000000000001",
-      clientSecret: "super-secret-client-secret-value",
+      url: "https://audit.example.test/v1/events",
+      authHeaderName: "Authorization",
+      credentialsToken: "super-secret-client-secret-value",
     },
     ottlStatements: [],
     pullSchedule: "",
@@ -67,7 +71,7 @@ describe("given a composer state with both secret and non-secret values set", ()
   describe("when building the persisted parserConfig", () => {
     it("keeps secrets out of the persisted config", () => {
       const built = buildParserConfig(composerState);
-      expect(built).not.toHaveProperty("clientSecret");
+      expect(built).not.toHaveProperty("credentialsToken");
       expect(Object.values(built)).not.toContain(
         "super-secret-client-secret-value",
       );
@@ -75,7 +79,7 @@ describe("given a composer state with both secret and non-secret values set", ()
 
     it("persists a non-secret field with a value", () => {
       const built = buildParserConfig(composerState);
-      expect(built.tenantId).toBe("00000000-0000-0000-0000-000000000000");
+      expect(built.url).toBe("https://audit.example.test/v1/events");
     });
   });
 });

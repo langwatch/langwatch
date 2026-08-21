@@ -64,6 +64,7 @@ function toDto(row: {
   parserConfig: unknown;
   status: string;
   lastEventAt: Date | null;
+  errorCount: number;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -85,6 +86,10 @@ function toDto(row: {
     parserConfig: safeParser,
     status: row.status,
     lastEventAt: row.lastEventAt,
+    // Consecutive failed pull runs. The list view derives an "erroring" health
+    // state from it; without it on the wire that state can never be reached,
+    // and a source failing every run reads exactly like a healthy one.
+    errorCount: row.errorCount,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

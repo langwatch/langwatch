@@ -1,0 +1,63 @@
+---
+title: Microsoft 365 audit (Microsoft Copilot)
+description: Pulls Microsoft Copilot interactions from the Office 365 Management Activity API.
+sidebarTitle: Microsoft 365 audit
+---
+
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Replaces the earlier `copilot_studio` source.</Info>
+
+`microsoft_365_audit` pulls Microsoft Copilot interaction records from the Office 365 Management Activity API on a schedule. `RecordType: 261` is `CopilotInteraction`, which covers Microsoft Copilot surfaces generally rather than Copilot Studio alone. It subscribes to the `Audit.General` content type, lists the content blobs published for each window, and drains them.
+
+<Warning>
+**If you configured the earlier `copilot_studio` source, it has been disabled and you need to re-create it here.**
+
+That source polled `auditLogs/directoryAudits`, an Entra directory-change feed that never contained a Copilot interaction. It sat at `awaiting_first_event` indefinitely without ever surfacing a failure.
+
+It was not repointed automatically: this source needs a different API permission (`ActivityFeed.Read` on the Management Activity API, not `AuditLog.Read.All` on Graph) and a client secret that the old source never persisted. Rewriting it silently would have produced a source that looks configured and fails to authenticate. Your old tenant and client ids are preserved on the disabled row so you can copy them across.
+</Warning>
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| Microsoft Entra tenant ID | yes | `parserConfig.credentials.tenantId` | the puller |
+| App registration client ID | yes | `parserConfig.credentials.clientId` | the puller |
+| App registration client secret | yes | `parserConfig.credentials.clientSecret`, encrypted at rest | the puller |
+| Polling cadence | no | `pullSchedule`, default every 15 minutes | the worker dispatcher |
+
+The client secret is encrypted, not hashed — the puller has to present the real value to Microsoft, so it must be recoverable. It is never returned by the API and never rendered back into the composer.
+
+In the Azure portal:
+
+1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
+2. **API permissions → Add → Office 365 Management APIs → Application permissions → `ActivityFeed.Read`**, then **Grant admin consent**.
+3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
+
+There is no LangWatch-side URL or bearer secret to paste back into Microsoft. LangWatch calls `manage.office.com` on a schedule using the app registration above.
+
+## What the puller does
+
+1. **Subscribe.** `POST /api/v1.0/{tenantId}/activity/feed/subscriptions/start?contentType=Audit.General`, once. A subscription that has lapsed is restarted, and the resulting gap is surfaced rather than hidden.
+2. **List.** `GET /api/v1.0/{tenantId}/activity/feed/subscriptions/content?contentType=Audit.General&startTime=…&endTime=…` for the window.
+3. **Drain.** `GET {contentUri}` for each blob in the listing, filtering to `RecordType: 261`.
+
+Progress is carried in the source's cursor, so a run cut short by its deadline resumes from where it stopped. Re-reading a blob after a crash is safe: events deduplicate on a key derived only from record content.
+
+<Warning>
+**The audit feed does not backfill.** Content is available only from the moment the subscription starts. Enabling this source does not import last month's activity, and if a subscription lapses, the gap for that period is not recoverable.
+</Warning>
+
+## What this source cannot tell you
+
+- **Cost and token counts are always zero.** Copilot is seat-licensed rather than metered per interaction, the audit record's `Messages[].Size` field is documented as unused, and Copilot Studio credit consumption is exposed only as a CSV in the Power Platform admin centre. These fields are reported as `0` rather than estimated.
+- **Prompt and response text is not included.** Audit records describe that an interaction happened, not what was said.
+- **There is no Entra object id on the record.** Records carry `UserId` (a UPN) and `UserKey` (a PUID), which are different identifiers and not interchangeable with the object id you would see in Entra.
+- **Some records have no human actor.** `UserType` 5 and 6 mean an application or service principal acted; these are not attributed to a person.
+
+## Why not Microsoft Graph
+
+Graph exposes an audit-query API that would allow server-side filtering, which would be preferable. Microsoft documents `auditLogQuery` and its records endpoint under `v1.0`, but two things stop us relying on it. Tenants continue to report that the documented `v1.0` route does not resolve for them, answering `Resource not found for the segment 'auditLog'` while the same tenant and permissions work against `beta`. And the same completed query paginated twice within ten minutes has been observed returning materially different record counts, with large non-overlapping subsets in each. Duplicate records are harmless here — they collapse on ingest — but missing records are not, and a short feed would look identical to a quiet one.
+
+Graph is the migration target for this source, not a rejected option. When the `v1.0` route resolves reliably and pagination is stable, the adapter can swap its transport without changing what this page describes.

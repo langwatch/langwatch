@@ -4,7 +4,7 @@ import { decrypt, encrypt } from "~/utils/encryption";
  * Pull-mode ingestion sources carry live upstream secrets under
  * `parserConfig.credentials` (AWS access keys for s3_polling, a Bearer
  * token for http_polling, the Anthropic workspace key for
- * claude_compliance, the Microsoft client secret for copilot_studio).
+ * claude_compliance, the Microsoft client secret for microsoft_365_audit).
  * Those must never sit in the JSONB column as plaintext, so the subtree
  * is wrapped in a single AES-256-GCM envelope (the shared
  * `~/utils/encryption` app-key helper) before persistence and unwrapped

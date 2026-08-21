@@ -10,9 +10,9 @@
  */
 import { AnthropicAdminPuller } from "./anthropicAdmin.puller";
 import { ClaudeComplianceReferencePuller } from "./claudeCompliance.puller";
-import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
 import { DatabricksGeniePuller } from "./databricksGenie.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
+import { Microsoft365AuditPuller } from "./microsoft365Audit.puller";
 import { OpenAiComplianceReferencePuller } from "./openaiCompliance.puller";
 import { pullerAdapterRegistry } from "./pullerAdapter";
 import { S3PollingPullerAdapter } from "./s3PollingPullerAdapter";
@@ -23,7 +23,7 @@ export function registerBuiltInPullers(): void {
   if (registered) return;
   pullerAdapterRegistry.register(new HttpPollingPullerAdapter());
   pullerAdapterRegistry.register(new S3PollingPullerAdapter());
-  pullerAdapterRegistry.register(new CopilotStudioReferencePuller());
+  pullerAdapterRegistry.register(new Microsoft365AuditPuller());
   pullerAdapterRegistry.register(new OpenAiComplianceReferencePuller());
   pullerAdapterRegistry.register(new ClaudeComplianceReferencePuller());
   pullerAdapterRegistry.register(new AnthropicAdminPuller());
@@ -37,13 +37,13 @@ export {
   anthropicAdminPullConfigSchema,
 } from "./anthropicAdmin.puller";
 export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
-export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
 export {
   DATABRICKS_GENIE_ADAPTER_ID,
   type DatabricksGeniePullConfig,
   databricksGeniePullConfigSchema,
 } from "./databricksGenie.puller";
 export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
+export type { Microsoft365AuditConfig } from "./microsoft365Audit.puller";
 export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
 export type {
   NormalizedPullEvent,
@@ -55,9 +55,9 @@ export type { S3PollingConfig } from "./s3PollingPullerAdapter";
 export {
   AnthropicAdminPuller,
   ClaudeComplianceReferencePuller,
-  CopilotStudioReferencePuller,
   DatabricksGeniePuller,
   HttpPollingPullerAdapter,
+  Microsoft365AuditPuller,
   OpenAiComplianceReferencePuller,
   pullerAdapterRegistry,
   S3PollingPullerAdapter,

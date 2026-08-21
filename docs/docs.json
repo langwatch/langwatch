@@ -758,7 +758,7 @@
               "ai-governance/ingestion-sources/claude-cowork",
               "ai-governance/ingestion-sources/workato",
               "ai-governance/ingestion-sources/s3-custom",
-              "ai-governance/ingestion-sources/copilot-studio",
+              "ai-governance/ingestion-sources/microsoft-365-audit",
               "ai-governance/ingestion-sources/openai-compliance",
               "ai-governance/ingestion-sources/claude-compliance"
             ]
@@ -1767,7 +1767,11 @@
     },
     {
       "source": "/ai-gateway/governance/ingestion-sources/copilot-studio",
-      "destination": "/ai-governance/ingestion-sources/copilot-studio"
+      "destination": "/ai-governance/ingestion-sources/microsoft-365-audit"
+    },
+    {
+      "source": "/ai-governance/ingestion-sources/copilot-studio",
+      "destination": "/ai-governance/ingestion-sources/microsoft-365-audit"
     },
     {
       "source": "/ai-gateway/governance/ingestion-sources/openai-compliance",

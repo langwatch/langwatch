@@ -13,14 +13,13 @@ import { createLogger } from "@langwatch/observability";
  * either (a) configure this adapter from the admin UI with the right
  * pullConfig, or (b) extend a thin wrapper that locks the URL + auth
  * shape and only exposes credentials (see
- * `copilotStudio.puller.ts` for the reference impl).
+ * `claudeCompliance.puller.ts` for the reference impl).
  *
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
   NormalizedPullEvent,
@@ -28,13 +27,12 @@ import type {
   PullResult,
   PullRunOptions,
 } from "./pullerAdapter";
+import { fetchWithRetry } from "./shared/httpRetry";
 
 const logger = createLogger("langwatch:puller:http_polling");
 
 const TEMPLATE_PATTERN = /\$\{\{([\w.]+)\}\}/g;
-const RETRY_DELAYS_MS = [250, 500] as const;
 const MAX_PAGES_PER_RUN = 50; // safety cap so a misconfigured cursor doesn't loop forever
-const REQUEST_TIMEOUT_MS = 30_000;
 
 const eventMappingSchema = z.object({
   source_event_id: z.string().min(1),
@@ -180,53 +178,19 @@ export class HttpPollingPullerAdapter
           })
         : undefined;
 
-    let lastError: Error | undefined;
-    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
-      try {
-        // Two independent bounds: this request's own timeout, and the run's
-        // deadline. Either one firing must unwind the call.
-        const signal = options.signal
-          ? AbortSignal.any([
-              options.signal,
-              AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-            ])
-          : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-        const response = await ssrfSafeFetch(url, {
-          method: config.method,
-          headers,
-          body,
-          signal,
-        });
-        if (response.status >= 500) {
-          // Retryable — fall through to the retry-delay branch
-          lastError = new Error(
-            `HTTP ${response.status} ${response.statusText}`,
-          );
-        } else if (response.status >= 400) {
-          // 4xx fails fast — no retry
-          throw new Error(
-            `HTTP ${response.status} ${response.statusText} (${url})`,
-          );
-        } else {
-          return response;
-        }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        // 4xx errors land here too (re-thrown above); only retry on
-        // network/transport errors and 5xx
-        if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
-          throw error;
-        }
-      }
-      // Retrying past the run's deadline just burns time the scheduler has
-      // already given up waiting for.
-      if (options.signal?.aborted) break;
-      const delay = RETRY_DELAYS_MS[attempt];
-      if (delay !== undefined && attempt < RETRY_DELAYS_MS.length) {
-        await new Promise<void>((resolve) => setTimeout(resolve, delay));
-      }
-    }
-    throw lastError ?? new Error("HttpPollingPullerAdapter: unknown error");
+    // Retry, backoff, and the deadline guard live in shared/httpRetry so the
+    // Management Activity API adapter can reuse them without extending this
+    // class. Behaviour is unchanged here except that 429 is now retried
+    // honouring Retry-After, where it previously fell into the fail-fast 4xx
+    // branch — which affects `http_custom` and `claude_compliance` too.
+    return await fetchWithRetry({
+      url,
+      method: config.method,
+      headers,
+      body,
+      signal: options.signal,
+      deadlineAtMs: options.deadlineMs,
+    });
   }
 
   private buildUrl({

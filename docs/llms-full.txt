@@ -7974,7 +7974,7 @@ OCSF events are derived from `recorded_spans` + `log_records` via the `governanc
 | `claude_cowork` | `user.email` attribute | `agent.action.name` (e.g. `tool_call`) | `agent.tool.name` |
 | `workato` | Webhook envelope `actor` field | Webhook envelope `event_type` | Webhook envelope `target` field |
 | `s3_custom` | Per-customer DSL mapping | Per-customer DSL mapping | Per-customer DSL mapping |
-| `copilot_studio` | Microsoft Copilot Studio audit `actor.email` | Microsoft Copilot Studio audit `event_type` | Microsoft Copilot Studio audit `target` |
+| `microsoft_365_audit` | Management Activity API `UserId` (a UPN; `UserKey` is a PUID and is carried separately) | Management Activity API `Operation` | Management Activity API `AgentId` |
 | `openai_compliance` | OpenAI Compliance API `user.email` | OpenAI Compliance API `event_type` | OpenAI Compliance API `model` |
 | `claude_compliance` | Anthropic Compliance API `user.email` | Anthropic Compliance API `event_type` | Anthropic Compliance API `model` |
 
@@ -15059,9 +15059,12 @@ tagged by `SourceType` so dashboards can union or filter at will.
 Per-platform mode (matching the seven `IngestionSource.sourceType`
 values shipped on this branch):
 
-- **`copilot_studio`**, Microsoft Purview pull every 1-5 min via
-  the Office 365 Management Activity API. `parserConfig`:
-  `{ tenantId, clientId, clientSecretHash, pollEverySec }`.
+- **`microsoft_365_audit`**, pull every 15 min from the Office 365
+  Management Activity API. `parserConfig`:
+  `{ credentials: { tenantId, clientId, clientSecret } }`, the secret
+  encrypted at rest rather than hashed — the puller has to present the
+  real value to Microsoft. Replaces `copilot_studio`, which polled an
+  Entra directory-change feed that returned no Copilot interactions.
 - **`claude_compliance`**, pull from the Claude Compliance API.
   `parserConfig`: `{ workspaceApiKeyHash, pollEverySec }`.
 - **`claude_cowork`**, OTel push (Tier 4), admin pastes the
@@ -16209,73 +16212,6 @@ You should see Cowork events landing as `tool.invocation` and `api.call`. If eve
 
 ---
 
-# FILE: ./ai-governance/ingestion-sources/copilot-studio.mdx
-
----
-title: Microsoft Copilot Studio (Purview)
-description: Setup contract only, Azure AD app registration is captured; the Purview Audit poller is pending.
-sidebarTitle: Microsoft Copilot Studio
----
-
-<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
-
-`copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped, events do not flow yet.
-
-The configuration contract below lets admins pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
-
-## Currently implemented
-
-- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
-- **Poller:** none.
-- **Normaliser:** none.
-- **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
-
-## What the admin configures upstream
-
-The composer collects:
-
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| Azure AD tenant ID | yes | `IngestionSource.payloadConfig.tenantId` | (future poller) |
-| App registration client ID | yes | `payloadConfig.clientId` | (future poller) |
-| App registration client secret | yes | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
-
-In the Azure portal:
-
-1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
-2. **API permissions → Add → Microsoft Graph → Application permissions → `AuditLog.Read.All`**, then **Grant admin consent**.
-3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
-4. Optionally restrict the app to specific Azure subscriptions, regions per your security policy.
-
-There is no LangWatch-side URL or bearer secret to paste back into Microsoft. The future poller will hold the relationship: LangWatch calls Purview's `manage.office.com` Audit API on a schedule using the app registration above.
-
-## What event shape we accept today
-
-None, no events flow until the poller ships. `langwatch ingest tail <sourceId>` prints:
-
-```text
-No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
-secret, events will land here.
-```
-
-(The hint mentions `/api/ingest/*` because that's the universal advice for push-mode sources; for `copilot_studio` specifically, no push endpoint exists. Once the poller lands, this empty-state hint will be replaced with poller-specific guidance.)
-
-## What is still envelope-only, follow-up work
-
-Everything below is the adapter slice that has not yet shipped:
-
-- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
-- **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor, Action, Target, `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
-- **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
-- **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.
-
-When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.
-
----
-
 # FILE: ./ai-governance/ingestion-sources/index.mdx
 
 ---
@@ -16302,7 +16238,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | Pull (Purview Audit API) | Logs | `log_records` | **Setup-contract-only**: Azure AD app config persisted, puller worker pending |
+| [`microsoft_365_audit`](/ai-governance/ingestion-sources/microsoft-365-audit) | Pull (Office 365 Management Activity API) | Logs | `log_records` | **Puller ships**: subscribes, drains content blobs, filters to Copilot interactions. Replaces `copilot_studio` |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
 
@@ -16317,7 +16253,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 Different upstreams emit different event shapes:
 
 - **Span-shaped sources** (`otel_generic`, `claude_cowork`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
-- **Flat-event sources** (`workato`, `s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
+- **Flat-event sources** (`workato`, `s3_custom`, `microsoft_365_audit`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
 
 **One internal pipeline either way**: both shapes pass through the same hardened OTLP parser (`parseOtlpBody.ts`) and the same trace pipeline downstream. Both are queryable from the same governance dashboard, both pull into the OCSF v1.1 read API, both honour the per-origin retention class.
 
@@ -16373,7 +16309,7 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
+3. **Microsoft 365 audit puller**: shipped. See [`microsoft_365_audit`](/ai-governance/ingestion-sources/microsoft-365-audit).
 4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
 5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
@@ -16386,6 +16322,74 @@ If you need an unwired adapter, file an issue tagged `governance/ingestion/adapt
 - [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept
 - [OCSF, SIEM export](/ai-gateway/governance/ocsf-export): pulling governance events into Splunk, Datadog Security, etc.
 - [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest list/health/tail` commands
+
+---
+
+# FILE: ./ai-governance/ingestion-sources/microsoft-365-audit.mdx
+
+---
+title: Microsoft 365 audit (Microsoft Copilot)
+description: Pulls Microsoft Copilot interactions from the Office 365 Management Activity API.
+sidebarTitle: Microsoft 365 audit
+---
+
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Replaces the earlier `copilot_studio` source.</Info>
+
+`microsoft_365_audit` pulls Microsoft Copilot interaction records from the Office 365 Management Activity API on a schedule. `RecordType: 261` is `CopilotInteraction`, which covers Microsoft Copilot surfaces generally rather than Copilot Studio alone. It subscribes to the `Audit.General` content type, lists the content blobs published for each window, and drains them.
+
+<Warning>
+**If you configured the earlier `copilot_studio` source, it has been disabled and you need to re-create it here.**
+
+That source polled `auditLogs/directoryAudits`, an Entra directory-change feed that never contained a Copilot interaction. It sat at `awaiting_first_event` indefinitely without ever surfacing a failure.
+
+It was not repointed automatically: this source needs a different API permission (`ActivityFeed.Read` on the Management Activity API, not `AuditLog.Read.All` on Graph) and a client secret that the old source never persisted. Rewriting it silently would have produced a source that looks configured and fails to authenticate. Your old tenant and client ids are preserved on the disabled row so you can copy them across.
+</Warning>
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| Microsoft Entra tenant ID | yes | `parserConfig.credentials.tenantId` | the puller |
+| App registration client ID | yes | `parserConfig.credentials.clientId` | the puller |
+| App registration client secret | yes | `parserConfig.credentials.clientSecret`, encrypted at rest | the puller |
+| Polling cadence | no | `pullSchedule`, default every 15 minutes | the worker dispatcher |
+
+The client secret is encrypted, not hashed — the puller has to present the real value to Microsoft, so it must be recoverable. It is never returned by the API and never rendered back into the composer.
+
+In the Azure portal:
+
+1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
+2. **API permissions → Add → Office 365 Management APIs → Application permissions → `ActivityFeed.Read`**, then **Grant admin consent**.
+3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
+
+There is no LangWatch-side URL or bearer secret to paste back into Microsoft. LangWatch calls `manage.office.com` on a schedule using the app registration above.
+
+## What the puller does
+
+1. **Subscribe.** `POST /api/v1.0/{tenantId}/activity/feed/subscriptions/start?contentType=Audit.General`, once. A subscription that has lapsed is restarted, and the resulting gap is surfaced rather than hidden.
+2. **List.** `GET /api/v1.0/{tenantId}/activity/feed/subscriptions/content?contentType=Audit.General&startTime=…&endTime=…` for the window.
+3. **Drain.** `GET {contentUri}` for each blob in the listing, filtering to `RecordType: 261`.
+
+Progress is carried in the source's cursor, so a run cut short by its deadline resumes from where it stopped. Re-reading a blob after a crash is safe: events deduplicate on a key derived only from record content.
+
+<Warning>
+**The audit feed does not backfill.** Content is available only from the moment the subscription starts. Enabling this source does not import last month's activity, and if a subscription lapses, the gap for that period is not recoverable.
+</Warning>
+
+## What this source cannot tell you
+
+- **Cost and token counts are always zero.** Copilot is seat-licensed rather than metered per interaction, the audit record's `Messages[].Size` field is documented as unused, and Copilot Studio credit consumption is exposed only as a CSV in the Power Platform admin centre. These fields are reported as `0` rather than estimated.
+- **Prompt and response text is not included.** Audit records describe that an interaction happened, not what was said.
+- **There is no Entra object id on the record.** Records carry `UserId` (a UPN) and `UserKey` (a PUID), which are different identifiers and not interchangeable with the object id you would see in Entra.
+- **Some records have no human actor.** `UserType` 5 and 6 mean an application or service principal acted; these are not attributed to a person.
+
+## Why not Microsoft Graph
+
+Graph exposes an audit-query API that would allow server-side filtering, which would be preferable. Microsoft documents `auditLogQuery` and its records endpoint under `v1.0`, but two things stop us relying on it. Tenants continue to report that the documented `v1.0` route does not resolve for them, answering `Resource not found for the segment 'auditLog'` while the same tenant and permissions work against `beta`. And the same completed query paginated twice within ten minutes has been observed returning materially different record counts, with large non-overlapping subsets in each. Duplicate records are harmless here — they collapse on ingest — but missing records are not, and a short feed would look identical to a quiet one.
+
+Graph is the migration target for this source, not a rejected option. When the `v1.0` route resolves reliably and pagination is stable, the adapter can swap its transport without changing what this page describes.
 
 ---
 

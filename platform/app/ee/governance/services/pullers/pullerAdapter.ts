@@ -172,7 +172,7 @@ export interface PullRunOptions {
 export interface PullerAdapter<Config = unknown> {
   /**
    * Stable adapter id (e.g. "http_polling", "s3_polling",
-   * "copilot_studio"). Persisted in pullConfig as `adapter`. The
+   * "microsoft_365_audit"). Persisted in pullConfig as `adapter`. The
    * registry maps id → adapter instance.
    */
   readonly id: string;

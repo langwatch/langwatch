@@ -22,7 +22,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | Pull (Purview Audit API) | Logs | `log_records` | **Setup-contract-only**: Azure AD app config persisted, puller worker pending |
+| [`microsoft_365_audit`](/ai-governance/ingestion-sources/microsoft-365-audit) | Pull (Office 365 Management Activity API) | Logs | `log_records` | **Puller ships**: subscribes, drains content blobs, filters to Copilot interactions. Replaces `copilot_studio` |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
 
@@ -37,7 +37,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 Different upstreams emit different event shapes:
 
 - **Span-shaped sources** (`otel_generic`, `claude_cowork`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
-- **Flat-event sources** (`workato`, `s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
+- **Flat-event sources** (`workato`, `s3_custom`, `microsoft_365_audit`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
 
 **One internal pipeline either way**: both shapes pass through the same hardened OTLP parser (`parseOtlpBody.ts`) and the same trace pipeline downstream. Both are queryable from the same governance dashboard, both pull into the OCSF v1.1 read API, both honour the per-origin retention class.
 
@@ -93,7 +93,7 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
+3. **Microsoft 365 audit puller**: shipped. See [`microsoft_365_audit`](/ai-governance/ingestion-sources/microsoft-365-audit).
 4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
 5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 

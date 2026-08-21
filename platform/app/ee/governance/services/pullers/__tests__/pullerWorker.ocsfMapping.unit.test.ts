@@ -80,10 +80,10 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
         event: baseEvent,
         tenantId: "gov-proj-1",
         ingestionSourceId: "src-1",
-        sourceType: "copilot_studio",
+        sourceType: "microsoft_365_audit",
       });
-      expect(row.eventId).toBe("copilot_studio:src-1:evt-123");
-      expect(row.traceId).toBe("pull:copilot_studio:src-1:evt-123");
+      expect(row.eventId).toBe("microsoft_365_audit:src-1:evt-123");
+      expect(row.traceId).toBe("pull:microsoft_365_audit:src-1:evt-123");
     });
 
     it("uses the org's hidden internal_governance Project ID as tenantId", () => {
@@ -94,7 +94,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
         event: baseEvent,
         tenantId: "gov-proj-acme-42",
         ingestionSourceId: "src-1",
-        sourceType: "copilot_studio",
+        sourceType: "microsoft_365_audit",
       });
       expect(row.tenantId).toBe("gov-proj-acme-42");
     });
