@@ -226,6 +226,21 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/python/tutorials/capturing-metadata.md): The LangWatch Python SDK attaches custom metadata and attributes to traces and spans.
 - [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-metadata.md): The LangWatch TypeScript SDK attaches custom metadata and attributes to traces and spans.
 
+#### Capturing Images
+
+- [Capturing Images](https://langwatch.ai/docs/integration/python/tutorials/capturing-images.md): LangWatch captures the images your Python application sends to a model and shows them on the trace.
+- [Capturing Images](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-images.md): LangWatch captures the images your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Documents
+
+- [Capturing Documents](https://langwatch.ai/docs/integration/python/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your Python application sends to a model and shows them on the trace.
+- [Capturing Documents](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Audio and Voice
+
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/python/tutorials/capturing-audio.md): LangWatch captures the audio your Python application sends to a model and plays it back on the trace.
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-audio.md): LangWatch captures the audio your TypeScript application sends to a model and plays it back on the trace.
+
 #### Tracking LLM Costs
 
 - [Tracking LLM Costs and Tokens](https://langwatch.ai/docs/integration/python/tutorials/tracking-llm-costs.md): How LangWatch counts input, output, cached, and reasoning tokens, calculates costs from a daily-updated price registry of 350+ models, and how to adjust any of it manually.

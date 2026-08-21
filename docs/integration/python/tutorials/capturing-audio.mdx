@@ -1,0 +1,164 @@
+---
+title: Capturing Audio and Voice
+sidebarTitle: Python
+description: LangWatch captures the audio your Python application sends to a model and plays it back on the trace.
+icon: python
+keywords: langwatch, python, audio, voice, realtime, speech, multimodal, tracing
+---
+
+LangWatch captures a recording as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the audio the way your model provider expects, keep the call inside a trace, and the recording plays on the trace.
+
+This page lists the audio shapes LangWatch understands, what happens to the bytes, and where the player appears in the product.
+
+## Send the audio with the model call
+
+The example below uses `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+
+### OpenAI
+
+A recording rides an `input_audio` part carrying raw base64 and a format.
+
+```python
+import base64
+import langwatch
+from openai import OpenAI
+
+langwatch.setup()
+
+
+@langwatch.trace(name="transcribe call")
+def transcribe(prompt: str, path: str) -> str:
+    client = OpenAI()
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
+    encoded = base64.b64encode(open(path, "rb").read()).decode("utf-8")
+    completion = client.chat.completions.create(
+        model="gpt-4o-audio-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "input_audio",
+                        "input_audio": {"data": encoded, "format": "wav"},
+                    },
+                ],
+            }
+        ],
+    )
+    return completion.choices[0].message.content or ""
+
+
+transcribe("What does the caller ask for?", "call.wav")
+```
+
+### Google Gemini and Vertex
+
+A recording rides an inline data part with an audio media type. The rest of the agent setup does not change.
+
+```python
+import asyncio
+
+import langwatch
+from google.adk import Agent, Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+from openinference.instrumentation.google_adk import GoogleADKInstrumentor
+
+langwatch.setup(instrumentors=[GoogleADKInstrumentor()])
+
+APP_NAME = "call-reader"
+USER_ID = "caller-1"
+SESSION_ID = "session-1"
+
+
+def transcribe(prompt: str, path: str) -> str:
+    agent = Agent(
+        name="call_agent",
+        model="gemini-2.5-flash",
+        instruction="Answer the user's question about the attached recording directly.",
+    )
+    session_service = InMemorySessionService()
+    asyncio.run(
+        session_service.create_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        )
+    )
+    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
+
+    message = types.Content(
+        role="user",
+        parts=[
+            types.Part(text=prompt),
+            types.Part.from_bytes(
+                data=open(path, "rb").read(), mime_type="audio/wav"
+            ),
+        ],
+    )
+
+    for event in runner.run(
+        user_id=USER_ID, session_id=SESSION_ID, new_message=message
+    ):
+        if event.is_final_response():
+            return event.content.parts[0].text
+    return ""
+
+
+transcribe("What does the caller ask for?", "call.wav")
+```
+
+<Note>
+  The instrumentor makes the trace for this call. Do not add a
+  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
+  sync-to-async boundary that does not carry the trace context, so the
+  wrapper lands in a separate trace.
+</Note>
+
+
+## Audio shapes LangWatch understands
+
+Send any of these and the recording is captured.
+
+| Source | Shape |
+|---|---|
+| OpenAI Realtime | `{"type": "input_audio", "input_audio": {"data": "<base64>", "format": "wav"}}` |
+| OpenAI | `{"type": "file", "file": {"filename": "call.wav", "file_data": "<base64>"}}` |
+| Google Gemini and Vertex | `{"inline_data": {"mime_type": "audio/wav", "data": "..."}}` |
+| AG-UI | `{"type": "audio", "source": {"type": "data", "value": "...", "mimeType": "audio/wav"}}` |
+
+The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
+
+When a message carries both a recording and text, the text is treated as the transcript of that recording and the two are shown as one unit.
+
+## What happens to the bytes
+
+LangWatch moves the recording out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+
+Storage is addressed by SHA-256, so identical bytes are stored once. A recording captured by a simulation and by the trace of the same call is one stored object, not two.
+
+Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
+
+## Where the audio appears
+
+Open the trace and the Summary tab shows a player under the input. The Conversation tab shows a player in the message it belongs to, next to the transcript. A turn that recorded no transcript still shows its player. The Trace tab shows the full message payload.
+
+<Note>
+Attachment capture is enabled per project. If your traces show the message text but no player, ask LangWatch to turn it on for your project.
+</Note>
+
+## Testing voice agents
+
+Capturing the audio of a live call tells you what happened. To drive a call on purpose, and score it, use Scenario. It synthesizes a caller, speaks to your agent over its real transport, and judges the conversation with the same `scenario.run()` and the same judge you use for text.
+
+<Frame caption="Voice agent testing in Scenario, with the simulated call, its per-turn audio and the judge verdict">
+  <img src="/images/scenario-voice.webp" alt="LangWatch voice agent testing" />
+</Frame>
+
+Scenario carries adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can inject background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
+
+## Related
+
+- [Capturing Images](/integration/python/tutorials/capturing-images), for pictures and screenshots
+- [Capturing Documents](/integration/python/tutorials/capturing-documents), for PDF files and other attachments
+- [Voice Agent Testing](/agent-simulations/voice-agents), to run and score real-audio calls
