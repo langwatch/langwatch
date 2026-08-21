@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.3.0...clickhouse-serverless@v0.3.1) (2026-08-20)
+
+
+### Miscellaneous
+
+* **deps-dev:** bump litellm ([40168ab](https://github.com/langwatch/langwatch/commit/40168abd6707ab550eb403b981efe03371cf2b86))
+* **deps-dev:** bump litellm from 1.96.0 to 1.96.2 in /sdks/python in the minor-and-patch group across 1 directory ([#7295](https://github.com/langwatch/langwatch/issues/7295)) ([40168ab](https://github.com/langwatch/langwatch/commit/40168abd6707ab550eb403b981efe03371cf2b86))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-0.2.0...clickhouse-serverless@v0.3.0) (2026-08-07)
 
 
