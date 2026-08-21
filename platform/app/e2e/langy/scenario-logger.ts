@@ -21,7 +21,7 @@ type Result = Awaited<ReturnType<typeof scenario.run>>;
 export type BrowserQAOptions = Partial<BrowserQACheck>;
 
 /**
- * Second-argument options bag. `browserQA` overrides the QA pass; `beforeRetry`
+ * Options accepted alongside `config`. `browserQA` overrides the QA pass; `beforeRetry`
  * makes a scenario whose write CANNOT simply be repeated safe under the
  * whole-scenario replay (see `runScenarioAndLog`).
  */
@@ -53,17 +53,15 @@ export type RunOptions = BrowserQAOptions & {
  * result itself — the judge verdict is what the suite asserts on, and a
  * verification aid or a disk write should never mask a real pass/fail.
  *
- * `config` stays a single positional argument (not `{ config, ... }`) by
- * design — this wraps `scenario.run(config)`, an external library call that
- * itself takes one positional config object, and every one of this
- * function's 50+ existing call sites already passes `config` as an inline
- * object literal. `browserQAOptions` is the one true second argument, and it
- * was already an options object, not a bag of positional values.
+ * Takes named parameters (`{ config, ... }`) per the house rule in CLAUDE.md.
+ * `config` is passed straight through to `scenario.run`, so it stays a single
+ * nested object rather than being spread into loose fields.
  */
-export async function runScenarioAndLog(
-  config: RunConfig,
-  browserQAOptions?: RunOptions,
-): Promise<Result> {
+export async function runScenarioAndLog({
+  config,
+  beforeRetry,
+  ...browserQAOptions
+}: { config: RunConfig } & RunOptions): Promise<Result> {
   // Two transients get one retry, both infrastructure rather than agent
   // behaviour: langy_worker_stopped (the worker died mid-reply, server-side
   // recovery already exhausted — the panel offers the user a retry too), and a
@@ -88,7 +86,7 @@ export async function runScenarioAndLog(
   } catch (error) {
     if (!isTransientInfrastructureError(error)) throw error;
     console.log(`[scenario] transient infrastructure failure, retrying once`);
-    await browserQAOptions?.beforeRetry?.();
+    await beforeRetry?.();
     result = await scenario.run(config);
   }
   const testName =
@@ -99,9 +97,9 @@ export async function runScenarioAndLog(
   let qa: BrowserQAResult | null = null;
   try {
     qa = await browserQA({
-      label: browserQAOptions?.label ?? testName,
-      path: browserQAOptions?.path,
-      verify: browserQAOptions?.verify,
+      label: browserQAOptions.label ?? testName,
+      path: browserQAOptions.path,
+      verify: browserQAOptions.verify,
     });
   } catch {
     // intentionally silent — see jsdoc above.
