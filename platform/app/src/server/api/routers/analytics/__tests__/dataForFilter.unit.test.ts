@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext, createTRPCRouter } from "../../../trpc";
 import { dataForFilter } from "../dataForFilter";
 
@@ -8,23 +9,25 @@ vi.mock("../../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
 // The route reaches ClickHouse the only way it may: a repository the App
 // hands out. Mocking `getApp` is therefore what standing in for the store
 // looks like from here.
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: vi.fn(),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: vi.fn(() => ({ permissions: appPermissionsService() })),
+  };
+});
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -59,6 +62,7 @@ describe("dataForFilter", () => {
       { field: "opt", label: "Opt", count: 1 },
     ]);
     mockedGetApp.mockReturnValue({
+      permissions: appPermissionsService(),
       filters: { options: { getFilterOptions } },
     } as any);
   });

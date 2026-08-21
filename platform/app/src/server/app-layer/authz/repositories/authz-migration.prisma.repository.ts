@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import { queryCutoverOnEngine } from "../cutover-gate";
+import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**
  * How many guarded budget raises are in flight at once while seeding an
@@ -265,7 +265,7 @@ export class PrismaAuthzMigrationRepository
       select: { migrationName: true, status: true },
     });
     // `status` is a plain Prisma string column (no DB enum) - wider than the
-    // union the port is pinned to, same reasoning as ledger-write-gate.ts's
+    // union the port is pinned to, same reasoning as engine-gate.ts's
     // own read of this table. The cast is on this map's values, not on the
     // port's declared type, so a rename of the union still catches every
     // caller.
@@ -519,7 +519,7 @@ export class PrismaAuthzMigrationRepository
   }
 
   /** The same query the request-path gate's own cache miss runs
-   *  (cutover-gate.ts's `queryCutoverOnEngine`) - one predicate, so the
+   *  (engine-gate.ts's `queryOrganizationOnAuthzEngine`) - one predicate, so the
    *  migration awaiting its own flip and the gate serving it can never
    *  drift onto different answers. */
   async findCutoverOnEngine({
@@ -527,6 +527,9 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    return queryCutoverOnEngine({ prisma: this.prisma, organizationId });
+    return queryOrganizationOnAuthzEngine({
+      prisma: this.prisma,
+      organizationId,
+    });
   }
 }

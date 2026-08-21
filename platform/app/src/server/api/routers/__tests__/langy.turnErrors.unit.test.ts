@@ -29,11 +29,19 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
   LANGY_MESSAGES_PER_MINUTE: 30,
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({ langy: { turns: { startConversationTurn } } }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      langy: { turns: { startConversationTurn } },
+    }),
+  };
+});
 
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 
@@ -49,11 +57,12 @@ vi.mock("../langyAccessMiddleware", () => ({
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
-  const passthrough = async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
+  return {
+    ...actual,
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
-  return { ...actual, checkProjectPermission: () => passthrough };
 });
 
 import { LangyRateLimitedError } from "~/server/app-layer/langy/errors";

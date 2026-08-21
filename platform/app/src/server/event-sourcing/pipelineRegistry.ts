@@ -98,7 +98,7 @@ import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
-import type { AuthzGrantsFoldState } from "./pipelines/authz-grants/projections/authzGrantsState.foldProjection";
+import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
@@ -348,8 +348,8 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
-  /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
-  authzGrantsProjection: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Where the grants pipeline's write instructions land (ADR-110). */
+  authzGrantsWrite: GrantProjectionWriteStore;
   /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
   authzAuditTrail: AuthzAuditTrailStore;
 }
@@ -637,14 +637,13 @@ export class PipelineRegistry {
     // The grants ledger (ADR-092 §13). The write paths emit through the
     // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
     // organization whose genesis import has landed (its
-    // SystemMigrationTenantState row, read by the ledger-write-gate) sends
+    // SystemMigrationTenantState row, read by the engine gate) sends
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.
     this.deps.eventSourcing.register(
       createAuthzGrantsPipeline({
-        authzGrantsProjectionStore:
-          this.deps.repositories.authzGrantsProjection,
+        authzGrantsWriteStore: this.deps.repositories.authzGrantsWrite,
         authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
       }),
     );

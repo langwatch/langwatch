@@ -19,8 +19,8 @@
  * row, and the compat column is a mirror this repository maintains so an
  * organization rolled back to legacy keeps counting from where it got to.
  */
+import type { LedgerActor } from "@langwatch/actor";
 import {
-  type LedgerActor,
   SHARE_LINK_PERMISSION,
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
@@ -31,10 +31,11 @@ import type {
   ShareLink,
 } from "~/generated/prisma/client";
 import {
-  cutoverOnEngine,
-  queryCutoverOnEngine,
-} from "../../authz/cutover-gate";
+  organizationOnAuthzEngine,
+  readOrganizationOnAuthzEngine,
+} from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
+import { liveGrants } from "../../authz/repositories/live-rows";
 import type {
   CreateShareLinkParams,
   ShareRepository,
@@ -519,7 +520,7 @@ export class LedgerShareRepository implements ShareRepository {
     resourceKind?: ShareResourceType;
     resourceId?: string;
   }): Promise<string[]> {
-    const rows = await this.prisma.grant.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         // organizationId on every grant read (the org guard's requirement,
         // and the tenancy the lineage read already established).
@@ -550,7 +551,7 @@ export class LedgerShareRepository implements ShareRepository {
     });
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
-    const onEngine = await cutoverOnEngine({
+    const onEngine = await organizationOnAuthzEngine({
       prisma: this.prisma,
       organizationId,
     });
@@ -561,8 +562,8 @@ export class LedgerShareRepository implements ShareRepository {
    * The organization a REVOCATION is about, or null when the delete belongs
    * to legacy. Deliberately NOT `ledgerOrganizationFor`: revocation is
    * instant-enforcement class (decision 7) and must never come undone, so
-   * its routing cannot ride `cutoverOnEngine` — a 60-second-TTL cache that
-   * also answers false (and caches it) when the projection read throws. Any
+   * its routing cannot ride `organizationOnAuthzEngine` — a 60-second-TTL cache
+   * that also answers false (and caches it) when the state read throws. Any
    * false window routes a cut-over organization's revoke to the legacy-only
    * branch: the compat row is deleted with no fact appended, the Grant head
    * keeps the grant, and the fold's next run re-projects the "revoked"
@@ -570,12 +571,14 @@ export class LedgerShareRepository implements ShareRepository {
    * a legacy-authored row the next genesis pass adopts, never access that
    * was explicitly taken away.
    *
-   * So: one UNCACHED projection read per revocation, and a FAILED read
-   * fails toward the ledger branch — the path that deletes both heads and
-   * appends the fact. That direction is harmless when the organization
-   * turns out to be on legacy (the sweep still deletes the plain rows, and
-   * a fact no mint stands behind folds as a no-op) and is the only correct
-   * one when it is not.
+   * So: one UNCACHED state read per revocation, through
+   * `readOrganizationOnAuthzEngine`, which raises rather than failing safe
+   * because the safe direction here is the opposite one — a FAILED read
+   * routes toward the ledger branch, which writes both heads and appends the
+   * fact. That direction is harmless when the organization turns out to be
+   * on legacy (the sweep still deletes the plain rows, and a fact no mint
+   * stands behind changes nothing) and is the only correct one when it is
+   * not.
    */
   private async revocationOrganizationFor(
     projectId: string,
@@ -587,7 +590,7 @@ export class LedgerShareRepository implements ShareRepository {
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
     try {
-      const onEngine = await queryCutoverOnEngine({
+      const onEngine = await readOrganizationOnAuthzEngine({
         prisma: this.prisma,
         organizationId,
       });

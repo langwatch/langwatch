@@ -1,6 +1,6 @@
 /**
  * The per-tenant state machine for one in-place migration
- * (specs/rbac/in-place-authz-migration.feature):
+ * (specs/migration/system-migrations-runner.feature):
  *
  *   pending ──► migrated ──► finalized ──► rolled_back
  *     │             ▲                          (operator only)

@@ -132,7 +132,7 @@ const LANGY_SESSION_KEY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
  *
  * Rehydrating a session object from that id grants NOTHING. Every permission
  * decision `mintLangySessionApiKey` makes is resolved against the database:
- * `hasProjectPermission` reads `session.user.id` and looks up the rest. So the
+ * `probeProjectPermission` reads `session.user.id` and looks up the rest. So the
  * minted key is still exactly the intersection of what this user genuinely holds.
  * We are re-stating WHO the caller is, never asserting what they may do.
  */
@@ -325,7 +325,7 @@ export class LangySessionKeyScopeError extends Error {
  *
  * Identity source: this keys off the CALLER'S user identity, not a browser
  * session per se — it only reads `session.user.id` (to own the key) and passes
- * the session to `hasProjectPermission` (to intersect the caller's own
+ * the session to `probeProjectPermission` (to intersect the caller's own
  * permissions). Langy chat is session-gated today, so `session` always comes
  * from a logged-in user. If/when Langy is exposed to programmatic (API-key)
  * callers, the route resolves the API key to its owning user and passes THAT

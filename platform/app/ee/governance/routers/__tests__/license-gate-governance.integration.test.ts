@@ -259,7 +259,7 @@ describe("license-gate on governance backend", () => {
         // never fires for a caller without permission.
         await expect(
           callerFor(memberUserId).anomalyRules.list({ organizationId }),
-        ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
       });
     });
 

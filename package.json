@@ -32,6 +32,7 @@
   },
   "files": [
     "packages/server/dist/",
+    "packages/actor/",
     "packages/api/",
     "packages/authz/",
     "packages/authz-server/",

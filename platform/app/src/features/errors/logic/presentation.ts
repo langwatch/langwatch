@@ -165,9 +165,7 @@ const MIGRATION_STATUS_LABELS: Record<string, string> = {
  * sentence rather than leaking the identifier.
  */
 const MIGRATION_NAME_LABELS: Record<string, string> = {
-  "authz-team-user-backfill": "the team membership backfill",
-  "authz-grants-genesis-import": "the grants ledger import",
-  "authz-grants-cutover": "the authorization engine cutover",
+  "authz-engine": "the authorization upgrade",
 };
 
 /**
@@ -1372,6 +1370,11 @@ const presentations = {
     title: "This request carried no API key",
     describe: () =>
       "Send an organization API key as Authorization: Bearer <api-key>.",
+  },
+  contested_credentials: {
+    title: "This request carried more than one credential",
+    describe: () =>
+      "Send exactly one: either an API key or a signed-in session, not both.",
   },
   invalid_credentials: {
     // Deliberately says nothing about which credential class the route

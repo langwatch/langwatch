@@ -3,13 +3,13 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "../api/rbac";
 import { isRootPrismaClient } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import {
@@ -57,7 +57,7 @@ export async function assertCanWriteScope(
   }
   if (scopeType === "ORGANIZATION") {
     if (
-      !(await hasOrganizationPermission(
+      !(await probeOrganizationPermission(
         ctx as { prisma: PrismaClient; session: Session },
         scopeId,
         "organization:manage",
@@ -71,7 +71,7 @@ export async function assertCanWriteScope(
     return;
   }
   if (scopeType === "TEAM") {
-    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
+    if (!(await probeTeamPermission(ctx, scopeId, "team:manage"))) {
       throw new ModelDefaultScopeForbiddenError({
         scopeType,
         requiredPermission: "team:manage",
@@ -79,7 +79,7 @@ export async function assertCanWriteScope(
     }
     return;
   }
-  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
+  if (!(await probeProjectPermission(ctx, scopeId, "project:update"))) {
     throw new ModelDefaultScopeForbiddenError({
       scopeType,
       requiredPermission: "project:update",

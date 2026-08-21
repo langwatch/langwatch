@@ -15,13 +15,12 @@
  */
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const sessionPolicyRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const org = await ctx.prisma.organization.findUnique({
         where: { id: input.organizationId },
@@ -45,7 +44,7 @@ export const sessionPolicyRouter = createTRPCRouter({
         maxSessionDurationDays: z.number().int().min(0).max(365),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.organization.update({
         where: { id: input.organizationId },

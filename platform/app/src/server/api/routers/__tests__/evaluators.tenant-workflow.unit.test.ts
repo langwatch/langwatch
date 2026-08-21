@@ -5,6 +5,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 
@@ -62,6 +63,7 @@ const createCaller = () => {
     permissionChecked: true,
   });
   ctx.prisma = prisma;
+  ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
   return evaluatorsRouter.createCaller(ctx);
 };
 

@@ -27,7 +27,7 @@ describe("endpoint success status", () => {
         buildTestService().version("2025-03-15", (v) => {
           v.get(
             "/maybe",
-            { output: z.object({ id: z.string() }).optional() },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }).optional() },
             async () => undefined,
           );
         }),
@@ -39,7 +39,7 @@ describe("endpoint success status", () => {
         buildTestService().version("2025-03-15", (v) => {
           v.post(
             "/maybe",
-            { output: z.string().optional(), status: 201 },
+            { noPermission: { reason: "framework test endpoint" }, output: z.string().optional(), status: 201 },
             async () => undefined,
           );
         }),
@@ -49,7 +49,7 @@ describe("endpoint success status", () => {
     it("refuses an unchecked z.any() output, which accepts both too", () => {
       expect(() =>
         buildTestService().version("2025-03-15", (v) => {
-          v.get("/any", { output: z.any() }, async () => undefined);
+          v.get("/any", { noPermission: { reason: "framework test endpoint" }, output: z.any() }, async () => undefined);
         }),
       ).toThrow(/accepts undefined as well as a value/);
     });
@@ -59,7 +59,7 @@ describe("endpoint success status", () => {
         buildTestService().version("2025-03-15", (v) => {
           v.rpc(
             "/things.maybe",
-            { output: z.object({ id: z.string() }).optional() },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }).optional() },
             async () => undefined,
           );
         }),
@@ -78,7 +78,7 @@ describe("endpoint success status", () => {
     it("admits a defaulted output and always answers with the default", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/defaulted", { output: z.string().default("filled") }, () =>
+          v.get("/defaulted", { noPermission: { reason: "framework test endpoint" }, output: z.string().default("filled") }, () =>
             // biome-ignore lint/suspicious/noExplicitAny: the handler returning undefined is the case under test; the type correctly forbids it.
             (undefined as any),
           );
@@ -94,7 +94,7 @@ describe("endpoint success status", () => {
     it("admits a caught output at registration", () => {
       expect(() =>
         buildTestService().version("2025-03-15", (v) => {
-          v.get("/caught", { output: z.string().catch("fallback") }, () => "x");
+          v.get("/caught", { noPermission: { reason: "framework test endpoint" }, output: z.string().catch("fallback") }, () => "x");
         }),
       ).not.toThrow();
     });
@@ -104,7 +104,7 @@ describe("endpoint success status", () => {
     it("admits z.void() and always answers 204", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/void", { output: z.void() }, async () => undefined);
+          v.get("/void", { noPermission: { reason: "framework test endpoint" }, output: z.void() }, async () => undefined);
         })
         .build();
 
@@ -116,7 +116,7 @@ describe("endpoint success status", () => {
     it("admits z.undefined() and always answers 204", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/nothing", { output: z.undefined() }, async () => undefined);
+          v.get("/nothing", { noPermission: { reason: "framework test endpoint" }, output: z.undefined() }, async () => undefined);
         })
         .build();
 
@@ -148,7 +148,7 @@ describe("endpoint success status", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/v4-void",
-            { output: z4.void() as unknown as ZodType },
+            { noPermission: { reason: "framework test endpoint" }, output: z4.void() as unknown as ZodType },
             async () => undefined,
           );
         })
@@ -165,7 +165,7 @@ describe("endpoint success status", () => {
         buildTestService().version("2025-03-15", (v) => {
           v.get(
             "/v4-nothing",
-            { output: z4.undefined() as unknown as ZodType },
+            { noPermission: { reason: "framework test endpoint" }, output: z4.undefined() as unknown as ZodType },
             async () => undefined,
           );
         }),
@@ -181,7 +181,7 @@ describe("endpoint success status", () => {
         buildTestService().version("2025-03-15", (v) => {
           v.get(
             "/v4-maybe",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               output: z4
                 .object({ id: z4.string() })
                 .optional() as unknown as ZodType,
@@ -199,7 +199,7 @@ describe("endpoint success status", () => {
         .version("2025-03-15", (v) => {
           v.post(
             "/created",
-            { output: z.object({ id: z.string() }), status: 201 },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }), status: 201 },
             async () => ({ id: "a" }),
           );
         })
@@ -225,7 +225,7 @@ describe("endpoint success status", () => {
         .version("2025-03-15", (v) => {
           v.post(
             "/created",
-            { output: z.object({ id: z.string() }), status: 201 },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }), status: 201 },
             // The cast is the point: a handler that returns nothing where a
             // body is declared.
             async () => undefined as unknown as { id: string },
@@ -251,7 +251,7 @@ describe("endpoint success status", () => {
     it("sends no body, whatever the handler returned", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/bare", {}, (async () => ({ leaked: "secret" })) as never);
+          v.get("/bare", { noPermission: { reason: "framework test endpoint" } }, (async () => ({ leaked: "secret" })) as never);
         })
         .build();
 

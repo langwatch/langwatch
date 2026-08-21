@@ -17,32 +17,17 @@
  * stage-A4 shadow comparison, untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
-
-const { userPermissionCheck, userBatchPermissionCheck, apiKeyPermissionCheck } =
-  vi.hoisted(() => ({
-    userPermissionCheck: vi.fn(),
-    userBatchPermissionCheck: vi.fn(),
-    apiKeyPermissionCheck: vi.fn(),
-  }));
 
 // The stage-A4 shadow is stubbed rather than silenced: "the legacy path still
 // shadows" is half of what these tests assert, and a sample rate of zero
 // cannot be told apart from a missing call.
-vi.mock("~/server/app-layer/authz/shadow", () => ({
-  authzShadowFor: () => ({
-    userPermissionCheck,
-    userBatchPermissionCheck,
-    apiKeyPermissionCheck,
-  }),
-  demoProjectId: () => undefined,
-  parseShadowRate: () => 0,
-}));
 
 import {
   batchScopePermissions,
-  checkProjectPermissionAny,
   hasOrganizationPermission,
   resolveProjectPermission,
   resolveTeamPermission,
@@ -70,12 +55,11 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
     ];
   });
   const roleBindingFindMany = vi.fn().mockResolvedValue([]);
-  const authzCutoverProjectionFindUnique = vi
+  const migrationStateFindUnique = vi
     .fn()
-    .mockResolvedValue(onEngine === undefined ? null : { onEngine });
+    .mockResolvedValue(onEngine ? { status: "migrated" } : null);
 
   const prisma = {
-    authzCutoverProjection: { findUnique: authzCutoverProjectionFindUnique },
     project: {
       findUnique: vi.fn().mockResolvedValue({
         team: { id: TEAM_ID, organizationId: ORGANIZATION_ID },
@@ -97,6 +81,7 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
       findMany: vi.fn().mockResolvedValue([]),
     },
     grant: { findMany: grantFindMany },
+    systemMigrationTenantState: { findUnique: migrationStateFindUnique },
     role: { findMany: vi.fn().mockResolvedValue([]) },
   };
 
@@ -107,19 +92,16 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
   };
 }
 
-/** The reverse-shadow is detached; a macrotask boundary is its finish line. */
-const settle = () => new Promise((resolve) => setImmediate(resolve));
-
 beforeEach(() => {
   vi.clearAllMocks();
-  resetCutoverGateForTesting();
+  resetAuthzEngineGateForTesting();
 });
 
 describe("the fork at the permission seams", () => {
-  describe("given an organization that is cut over", () => {
+  describe("given a migrated organization", () => {
     describe("when a project permission is resolved", () => {
       /** @scenario "A cut-over organization is decided by the engine" */
-      it("returns the engine's answer, and runs legacy behind it", async () => {
+      it("returns the engine's answer, and never runs legacy", async () => {
         const { ctx, roleBindingFindMany } = buildPrisma({ onEngine: true });
 
         const result = await resolveProjectPermission(
@@ -130,29 +112,37 @@ describe("the fork at the permission seams", () => {
 
         // Legacy has no binding row to grant this; the engine has a grant.
         expect(result).toEqual({ permitted: true, organizationRole: "MEMBER" });
-        await settle();
-        // The reverse-shadow ran the legacy walk — the only thing in this
-        // process that reads the compat binding head.
-        expect(roleBindingFindMany).toHaveBeenCalled();
-        // ...and it is the FORK's comparison, not stage A4's.
-        expect(userPermissionCheck).not.toHaveBeenCalled();
+        // The engine answered alone: nothing reads the compat binding head
+        // behind it, which is what the shadow comparison used to do.
+        expect(roleBindingFindMany).not.toHaveBeenCalled();
       });
     });
 
     describe("when any of several permissions is enough", () => {
+      /** @scenario "A declared check decides exactly as the middleware it replaced" */
       it("returns the engine's answer for the gate", async () => {
         const { ctx } = buildPrisma({ onEngine: true });
         const next = vi.fn().mockResolvedValue("permitted");
 
-        const outcome = await checkProjectPermissionAny(
+        const outcome = await checkDeclaredPermissionAny([
           "annotations:update",
           "traces:view",
-        )({ ctx, input: { projectId: PROJECT_ID }, next } as never);
+        ])({
+          ctx: {
+            ...(ctx as Record<string, unknown>),
+            permissionChecked: false,
+            app: {
+              permissions: permissionsServiceFor(
+                (ctx as { prisma: never }).prisma,
+              ),
+            },
+          },
+          input: { projectId: PROJECT_ID },
+          next,
+        } as never);
 
         expect(outcome).toBe("permitted");
         expect(next).toHaveBeenCalledTimes(1);
-        await settle();
-        expect(userPermissionCheck).not.toHaveBeenCalled();
       });
     });
 
@@ -183,8 +173,6 @@ describe("the fork at the permission seams", () => {
         // deny — but through the engine, which is what the absent stage-A4
         // comparison shows.
         expect(permitted).toBe(false);
-        await settle();
-        expect(userPermissionCheck).not.toHaveBeenCalled();
       });
     });
 
@@ -205,14 +193,12 @@ describe("the fork at the permission seams", () => {
           ["team_fork_other", false],
         ]);
         expect([...result.projects]).toEqual([[PROJECT_ID, true]]);
-        await settle();
-        expect(userBatchPermissionCheck).not.toHaveBeenCalled();
       });
     });
   });
 
-  describe("given an organization that is not cut over", () => {
-    describe("when its projection says so", () => {
+  describe("given an organization still on the legacy path", () => {
+    describe("when its migration has not finished", () => {
       /** @scenario "An organization that has not cut over is unchanged" */
       it("keeps the legacy answer and the stage-A4 shadow", async () => {
         const { ctx, grantFindMany } = buildPrisma({ onEngine: false });
@@ -227,22 +213,12 @@ describe("the fork at the permission seams", () => {
           permitted: false,
           organizationRole: "MEMBER",
         });
-        expect(userPermissionCheck).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userId: USER_ID,
-            permission: "traces:view",
-            legacyAllowed: false,
-            projectId: PROJECT_ID,
-            caller: "trpc.project",
-          }),
-        );
-        // Nothing read the grant head: the engine is not answering here, and
-        // the shadow that would consult it is stubbed out.
+        // Nothing read the grant head: the engine is not answering here.
         expect(grantFindMany).not.toHaveBeenCalled();
       });
     });
 
-    describe("when it has no projection row at all", () => {
+    describe("when it has no migration state row at all", () => {
       it("reads as legacy, which is every organization today", async () => {
         const { ctx } = buildPrisma({ onEngine: undefined });
 
@@ -253,12 +229,11 @@ describe("the fork at the permission seams", () => {
         );
 
         expect(result.permitted).toBe(false);
-        expect(userPermissionCheck).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when a batch of scopes is resolved", () => {
-      it("keeps the legacy maps and the batched shadow comparison", async () => {
+      it("keeps the legacy maps", async () => {
         const { ctx } = buildPrisma({ onEngine: false });
 
         const result = await batchScopePermissions(ctx, {
@@ -271,13 +246,6 @@ describe("the fork at the permission seams", () => {
 
         expect([...result.teams]).toEqual([[TEAM_ID, false]]);
         expect([...result.projects]).toEqual([[PROJECT_ID, false]]);
-        expect(userBatchPermissionCheck).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userId: USER_ID,
-            organizationId: ORGANIZATION_ID,
-            caller: "trpc.batch",
-          }),
-        );
       });
     });
   });

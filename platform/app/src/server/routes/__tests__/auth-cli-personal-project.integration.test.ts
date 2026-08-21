@@ -42,12 +42,18 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The approval route reads probeProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/api/rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -59,8 +65,11 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+
+wireDefaultTestApp();
 
 /** The container's connection, handed to the test App the CLI routes read. */
 let redisConnection: Redis | null = null;
@@ -533,7 +542,7 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
   /** @scenario the project-key endpoint refuses a project the caller cannot write to */
   it("denies a project the caller cannot write, without leaking the key", async () => {
-    vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
       exchange.access_token,

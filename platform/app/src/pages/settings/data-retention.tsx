@@ -26,8 +26,8 @@ import {
 } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
 import {
+  BINDING_SCOPE_TIERS,
   SCOPE_ICON,
-  SCOPE_TIER_ORDER,
 } from "~/components/data-retention/constants";
 import { formatDays } from "~/components/data-retention/format";
 import {
@@ -331,7 +331,7 @@ function DataRetentionPage({
   );
   const scopeGroups = groupRulesByScope(filteredRules).sort(
     (a, b) =>
-      SCOPE_TIER_ORDER[a.scopeType] - SCOPE_TIER_ORDER[b.scopeType] ||
+      BINDING_SCOPE_TIERS[a.scopeType] - BINDING_SCOPE_TIERS[b.scopeType] ||
       a.name.localeCompare(b.name),
   );
 

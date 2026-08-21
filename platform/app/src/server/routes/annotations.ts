@@ -80,7 +80,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     return {

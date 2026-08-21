@@ -138,9 +138,10 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
-import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -275,6 +276,7 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -381,6 +383,8 @@ export function initializeDefaultApp(options?: {
   processRole?: ProcessRole;
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
+
+  installAuthzEngineGateReporting();
 
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
@@ -879,7 +883,7 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
-    authzGrantsProjection: new PrismaAuthzGrantsProjectionRepository(prisma),
+    authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
@@ -1815,6 +1819,7 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
+    permissions: permissionsServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -2181,6 +2186,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: nullOrganizations,
     projects: nullProjects,
+    permissions: permissionsServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,

@@ -1,5 +1,5 @@
 /**
- * Who migrates when (specs/rbac/in-place-authz-migration.feature).
+ * Who migrates when (specs/migration/system-migrations-runner.feature).
  *
  * The environment knobs are gone. `SYSTEM_MIGRATIONS_COHORT` and
  * `AUTHZ_CUTOVER_COHORT` used to pace the rollout as process-env strings

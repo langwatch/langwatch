@@ -4,7 +4,6 @@ import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 import { requireProjectPermission } from "~/server/auth/permissions";
-import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
 import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
@@ -110,7 +109,6 @@ async function authorizeFileRead({
           userId,
           projectId: ownerProjectId,
           permission,
-          prisma,
         });
         return;
       } catch (err) {
@@ -146,7 +144,6 @@ async function authorizeFilePurpose({
       userId,
       projectId: ownerProjectId,
       permission: requiredPermissionForPurpose(purpose),
-      prisma,
     });
   } catch (err) {
     if (!isPermissionDenial(err)) throw err;

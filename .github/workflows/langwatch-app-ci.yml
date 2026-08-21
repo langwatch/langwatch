@@ -390,6 +390,12 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz run test
 
+      # @langwatch/actor is the actor vocabulary (who caused an action) —
+      # dependency-free raw TypeScript, same shard-1 arrangement.
+      - name: Run @langwatch/actor unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/actor run test
+
       - name: Run @langwatch/authz-server unit tests
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz-server run test

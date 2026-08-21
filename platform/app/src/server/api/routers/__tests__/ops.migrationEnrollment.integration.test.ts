@@ -5,7 +5,7 @@
  * router names the migration at the boundary, stamps the acting
  * user from the session, and delegates everything else to
  * `systemMigrationsService`. Corresponds to
- * specs/rbac/in-place-authz-migration.feature (the enrollment scenarios).
+ * specs/migration/authz-grants-rollout.feature (the enrollment scenarios).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
@@ -196,7 +196,7 @@ describe("ops migration enrollment procedures", () => {
   });
 
   describe("when an operator runs one migration for one organization", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("delegates to the service and demands ops:manage", async () => {
       service.runForOrganization.mockResolvedValue({
         status: "finalized",
