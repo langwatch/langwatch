@@ -17,7 +17,7 @@
  * stage-A4 shadow comparison, untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
 import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
