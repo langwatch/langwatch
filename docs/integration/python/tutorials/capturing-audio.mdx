@@ -6,9 +6,7 @@ icon: python
 keywords: langwatch, python, audio, voice, realtime, speech, multimodal, tracing
 ---
 
-LangWatch captures a recording as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the audio the way your model provider expects, keep the call inside a trace, and the recording plays on the trace.
-
-This page lists the audio shapes LangWatch understands, what happens to the bytes, and where the player appears in the product.
+Send the audio the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the recording out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the audio with the model call
 
@@ -16,7 +14,7 @@ The example below uses `langwatch.setup()` and a `@langwatch.trace()` entry poin
 
 ### OpenAI
 
-A recording rides an `input_audio` part carrying raw base64 and a format.
+Put the recording in an `input_audio` part, as raw base64 with a format.
 
 ```python
 import base64
@@ -33,7 +31,7 @@ def transcribe(prompt: str, path: str) -> str:
 
     encoded = base64.b64encode(open(path, "rb").read()).decode("utf-8")
     completion = client.chat.completions.create(
-        model="gpt-4o-audio-preview",
+        model="gpt-audio-mini",
         messages=[
             {
                 "role": "user",
@@ -55,7 +53,7 @@ transcribe("What does the caller ask for?", "call.wav")
 
 ### Google Gemini and Vertex
 
-A recording rides an inline data part with an audio media type. The rest of the agent setup does not change.
+Put the recording in an inline data part with an audio media type. The rest of the agent setup does not change.
 
 ```python
 import asyncio
@@ -109,10 +107,11 @@ transcribe("What does the caller ask for?", "call.wav")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call. Do not add a
-  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
-  sync-to-async boundary that does not carry the trace context, so the
-  wrapper lands in a separate trace.
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()`
+  wrapper is needed. If you add one to attach metadata, switch the run to
+  `Runner.run_async`: the synchronous `Runner.run` starts its own thread, which
+  begins with an empty OpenTelemetry context, and the agent spans open a second
+  trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 
@@ -129,13 +128,13 @@ Send any of these and the recording is captured.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 
-When a message carries both a recording and text, the text is treated as the transcript of that recording and the two are shown as one unit.
+When a message holds both a recording and text, LangWatch treats the text as the transcript of that recording and shows the two together.
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. A recording captured by a simulation and by the trace of the same call is one stored object, not two.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -143,19 +142,15 @@ Raw, header-less audio does not play in a browser on its own. LangWatch wraps `p
 
 Open the trace and the Summary tab shows a player under the input. The Conversation tab shows a player in the message it belongs to, next to the transcript. A turn that recorded no transcript still shows its player. The Trace tab shows the full message payload.
 
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no player, ask LangWatch to turn it on for your project.
-</Note>
-
 ## Testing voice agents
 
-Capturing the audio of a live call tells you what happened. To drive a call on purpose, and score it, use Scenario. It synthesizes a caller, speaks to your agent over its real transport, and judges the conversation with the same `scenario.run()` and the same judge you use for text.
+You see what happened on a call once it has run. To drive a call on purpose and score it, use Scenario: it synthesizes a caller, speaks to your agent over its real transport, and scores the conversation with `scenario.run()`.
 
 <Frame caption="Voice agent testing in Scenario, with the simulated call, its per-turn audio and the judge verdict">
   <img src="/images/scenario-voice.webp" alt="LangWatch voice agent testing" />
 </Frame>
 
-Scenario carries adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can inject background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
+Scenario has adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can add background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
 
 ## Related
 
