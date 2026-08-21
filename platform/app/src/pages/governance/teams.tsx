@@ -122,19 +122,7 @@ function GovernanceTeamsListPage() {
     <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <Text fontSize="xs" color="fg.muted">
-              <Link href="/governance" color="blue.600">
-                ← AI Governance
-              </Link>{" "}
-              · All teams
-            </Text>
-            <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Every team that reported activity in the last 30 days. Click a row
-              to drill into a single team.
-            </Text>
-          </VStack>
+          <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
         </HStack>
 
         {canReadActivity ? (

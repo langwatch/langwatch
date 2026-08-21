@@ -195,18 +195,12 @@ function GovernanceOverviewPage() {
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading size="md">AI Governance</Heading>
-              <Badge colorPalette="purple" variant="subtle">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted" fontSize="sm">
-              Spend, users, anomalies, and ingestion-source health for the
-              organization. Window: last 30 days.
-            </Text>
-          </VStack>
+          <HStack gap={2}>
+            <Heading size="md">AI Governance</Heading>
+            <Badge colorPalette="purple" variant="subtle">
+              Preview
+            </Badge>
+          </HStack>
           <Spacer />
         </HStack>
 

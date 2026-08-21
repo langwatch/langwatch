@@ -206,23 +206,12 @@ function IngestionSourcesHeader({
 }) {
   return (
     <HStack alignItems="end">
-      <VStack align="start" gap={0}>
-        <HStack gap={2}>
-          <Heading size="md">Catalog</Heading>
-          <Badge colorPalette="purple" size="sm" variant="surface">
-            Preview
-          </Badge>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Configure cross-platform feeds for the activity monitor. Each source
-          maps an external AI platform into the normalised activity stream via
-          OTel push, webhook, or S3 audit drops.{" "}
-          <Link href="/governance" color="blue.600">
-            Back to governance
-          </Link>
-          .
-        </Text>
-      </VStack>
+      <HStack gap={2}>
+        <Heading size="md">Catalog</Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+      </HStack>
       <Spacer />
       {/* The writes are all `ingestionSources:manage`. A viewer who only
           reads is not offered a composer the server refuses. */}
@@ -613,7 +602,13 @@ function CatalogTabs({ children }: { children: ReactNode }) {
       lazyMount
     >
       <Tabs.List>
-        <Tabs.Trigger value="sources">Sources</Tabs.Trigger>
+        <Tabs.Trigger
+          value="sources"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          Sources
+        </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="sources">{children}</Tabs.Content>
     </Tabs.Root>
