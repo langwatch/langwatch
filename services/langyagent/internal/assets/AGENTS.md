@@ -56,7 +56,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
-| "show me traces", "recent activity", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (an error lives on the span, so no text query finds one), `langwatch trace get <traceId>` |
+| "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (errors live on spans, not text), `langwatch trace get <traceId>` |
 | "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
 | "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
 | "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |
@@ -74,7 +74,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "test compliance / regulated boundaries" | `test-compliance` | `langwatch scenario create`, `langwatch suite run <id>` |
 | "test my CLI's usability" | `test-cli-usability` | scenario tests |
 | "open a PR", "fix and submit", "send a patch" | `github` | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create` |
-| "agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
+| "configured agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
 | "dashboards" | direct CLI | `langwatch dashboard list`, `langwatch dashboard create` |
 | "alerts", "triggers" | direct CLI | `langwatch trigger list`, `langwatch trigger create` |
 | "workflows" | direct CLI | `langwatch workflow list`, `langwatch workflow run <id>` |
