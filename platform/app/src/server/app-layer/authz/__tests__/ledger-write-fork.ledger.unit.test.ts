@@ -50,7 +50,9 @@ describe("given an organization past the genesis import", () => {
         select: { id: true },
       });
       // Both ids are revoked, the shared one only once, via the synchronous
-      // deny (decision 7): a tenant-scoped mark of the authoritative rows.
+      // deny (decision 7): a tenant-scoped mark of the authoritative rows,
+      // carrying the caller's authored reason — the queued write's
+      // `revokedAt: null` guard makes this mark the durable audit record.
       expect(count).toBe(2);
       expect(db.grant.updateMany).toHaveBeenCalledWith({
         where: {
@@ -58,8 +60,41 @@ describe("given an organization past the genesis import", () => {
           id: { in: ["grant_compat", "grant_no_compat"] },
           revokedAt: null,
         },
-        data: expect.objectContaining({ revokedReason: "revocation" }),
+        data: expect.objectContaining({
+          revokedReason: "api key grants replaced",
+        }),
       });
+    });
+  });
+
+  describe("when a filtered revoke names a principal at one scope", () => {
+    /** The invite-replacement and team-removal shape: without the scope
+     *  translation these callers revoked only the compat ids, and a migrated
+     *  organization kept a live Grant-only row after the role was replaced.
+     *  @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
+    it("translates the scope onto the Grant predicate and reaches Grant-only rows", async () => {
+      const { writer, db } = harness({ onLedger: true });
+      db.roleBinding.findMany.mockResolvedValue([]);
+      db.grant.findMany.mockResolvedValue([{ id: "grant_no_compat" }]);
+
+      const count = await writer.revokeBindingsWhere({
+        organizationId: ORG_ID,
+        where: { userId: "user_1", scopeType: "TEAM", scopeId: "team_1" },
+        actor: ACTOR,
+        reason: "team role replaced",
+      });
+
+      expect(db.grant.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: "user_1",
+          scopeType: "TEAM",
+          scopeId: "team_1",
+        },
+        select: { id: true },
+      });
+      expect(count).toBe(1);
     });
   });
 
@@ -71,10 +106,12 @@ describe("given an organization past the genesis import", () => {
 
       const count = await writer.revokeBindingsWhere({
         organizationId: ORG_ID,
-        // `scopeType` is not in the translatable key set.
-        where: { scopeType: "PROJECT" },
+        // `role` is not in the translatable key set: a role filter has no
+        // single Grant-head predicate (roleKey vs legacyRole), so the
+        // translation bails rather than guessing one.
+        where: { role: "ADMIN" },
         actor: ACTOR,
-        reason: "scoped revoke",
+        reason: "role-filtered revoke",
       });
 
       expect(db.grant.findMany).not.toHaveBeenCalled();

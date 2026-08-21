@@ -794,6 +794,11 @@ export class GrantsLedgerWriter {
       organizationId,
       grantIds: bindingIds,
       reason: "revocation",
+      // The same instant and reason the events above carry, so the row the
+      // deny marks is byte-identical to what the queued write would state —
+      // the queue's `revokedAt: null` guard makes this mark the durable one.
+      revokedAt: new Date(revokedAtMs),
+      revokedReason: reason ?? null,
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -1278,6 +1283,9 @@ export class GrantsLedgerWriter {
       organizationId,
       grantIds: revokedGrantIds,
       reason: "offboard",
+      // Same instant and reason as the events above — see appendGrantRevocation.
+      revokedAt: new Date(offboardedAtMs),
+      revokedReason: `offboarded:${userId}`,
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -1711,7 +1719,8 @@ function bindingIdentityWhere({
  *
  * A bounded translation over exactly the columns the callers filter on
  * (`apiKeyId` / `groupId` / `userId` → principal; `customRoleId` → the
- * `custom:<id>` roleKey; `id` shared by construction). Any other shape returns
+ * `custom:<id>` roleKey; `scopeType` / `scopeId` → the same tier and id on
+ * the Grant head; `id` shared by construction). Any other shape returns
  * null and the caller falls back to the compat ids alone — the pre-existing
  * behaviour, never a wrong revoke. This is the interim until the filter
  * becomes the closed vocabulary `revokeBindingsWhere` documents.
@@ -1725,12 +1734,18 @@ function grantWhereFromBindingWhere(
     "groupId",
     "userId",
     "customRoleId",
+    "scopeType",
+    "scopeId",
     "id",
     "organizationId",
   ]);
   if (Object.keys(where).some((key) => !known.has(key))) return null;
 
   const grantWhere: Prisma.GrantWhereInput = { organizationId };
+
+  const scope = scopeFromBindingFilter(where);
+  if (scope === null) return null;
+  Object.assign(grantWhere, scope);
 
   const principal = (
     [
@@ -1758,6 +1773,30 @@ function grantWhereFromBindingWhere(
     grantWhere.id = where.id as Prisma.GrantWhereInput["id"];
 
   return grantWhere;
+}
+
+/**
+ * A scoped filter names the SAME tier and id on the Grant head — the three
+ * compat tiers spell identically in `GrantScopeType`. This is what lets a
+ * scoped replacement revoke (team member removal, invite replacement,
+ * team-role replacement) reach a Grant-only row: without it those callers
+ * fell back to the compat ids and a migrated organization kept a live
+ * roleKey-only grant after the role was replaced. Operator shapes are
+ * outside the caller vocabulary, so null and the caller bails.
+ */
+function scopeFromBindingFilter(
+  where: Prisma.RoleBindingWhereInput,
+): Pick<Prisma.GrantWhereInput, "scopeType" | "scopeId"> | null {
+  const scope: Pick<Prisma.GrantWhereInput, "scopeType" | "scopeId"> = {};
+  if (where.scopeType != null) {
+    if (typeof where.scopeType !== "string") return null;
+    scope.scopeType = where.scopeType;
+  }
+  if (where.scopeId != null) {
+    if (typeof where.scopeId !== "string") return null;
+    scope.scopeId = where.scopeId;
+  }
+  return scope;
 }
 
 /** A `customRoleId` filter as the `custom:<id>` roleKey predicate it names —

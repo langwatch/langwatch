@@ -27,6 +27,7 @@ export class PrismaAuthzRevocationRepository {
     grantIds,
     reason,
     revokedAt = new Date(),
+    revokedReason = null,
   }: {
     organizationId: string;
     grantIds: string[];
@@ -34,7 +35,15 @@ export class PrismaAuthzRevocationRepository {
      *  on — the write is identical either way; this is only how an operator
      *  finds these afterwards. */
     reason: "revocation" | "offboard";
+    /** The event's authored timestamp. The queue's `grant_revoked` write
+     *  guards on `revokedAt: null`, so whatever this mark stamps is what the
+     *  row keeps — it must be the SAME instant the event carries, or the
+     *  audit answer to "when did access end" is the bypass's clock. */
     revokedAt?: Date;
+    /** The caller's authored reason, exactly as the event carries it — same
+     *  convergence argument as `revokedAt`. Null when the caller gave none;
+     *  the bypass label above is telemetry, never row data. */
+    revokedReason?: string | null;
   }): Promise<void> {
     if (grantIds.length === 0) return;
 
@@ -51,7 +60,7 @@ export class PrismaAuthzRevocationRepository {
     // timestamp, and means re-running it is free.
     await this.prisma.grant.updateMany({
       where: { organizationId, id: { in: grantIds }, revokedAt: null },
-      data: { revokedAt, revokedReason: reason },
+      data: { revokedAt, revokedReason },
     });
   }
 }

@@ -326,7 +326,9 @@ describe("given an organization the genesis import has not reached", () => {
           id: { in: ["share_1"] },
           revokedAt: null,
         },
-        data: { revokedAt: expect.any(Date), revokedReason: "revocation" },
+        // null, not a placeholder: the caller gave no reason and the mark
+        // writes only authored facts — the bypass label lives in telemetry.
+        data: { revokedAt: expect.any(Date), revokedReason: null },
       });
       expect(db.auditLog.createMany).not.toHaveBeenCalled();
     });

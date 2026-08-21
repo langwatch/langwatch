@@ -203,10 +203,12 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
       select: { revokedAt: true, revokedReason: true },
     });
     expect(revoked?.revokedAt).not.toBeNull();
-    // The direct write records the bypass vocabulary ("revocation" |
-    // "offboard"), not the caller's free-text reason — that one travels on
-    // the event and lands when the projection write catches up.
-    expect(revoked?.revokedReason).toBe("revocation");
+    // The synchronous mark writes the AUTHORED reason — the same string the
+    // event carries. The projection's later `grant.revoke` guards on
+    // `revokedAt: null` and so never rewrites this row; if the mark wrote a
+    // placeholder instead, the placeholder would be what the audit record
+    // kept forever.
+    expect(revoked?.revokedReason).toBe("offboarded");
 
     expect(await liveGrantIds()).toEqual([survivingGrantId]);
   });
