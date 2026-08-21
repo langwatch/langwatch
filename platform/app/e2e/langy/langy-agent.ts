@@ -197,12 +197,22 @@ async function trpcMutateWithTurnLockRetry<T>({
  * A property rather than a message match. The two markers used to be found by
  * substring on `String(error)`, which reads a code out of prose and breaks the
  * moment the wording moves.
+ *
+ * Walks the cause chain: the scenario library rethrows adapter errors as
+ * `new Error(..., { cause: error })`, so the marker arrives one level down.
  */
 export function isTransientInfrastructureError(error: unknown): boolean {
-  return (
-    (error as { transientInfrastructure?: boolean } | null)
-      ?.transientInfrastructure === true
-  );
+  let current: unknown = error;
+  for (let hops = 0; current && hops < 8; hops++) {
+    if (
+      (current as { transientInfrastructure?: boolean })
+        .transientInfrastructure === true
+    ) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function transientInfrastructureError(message: string): Error {
