@@ -5,20 +5,37 @@ import {
   Box,
   Button,
   Code,
+  Collapsible,
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
+import {
+  groupForMode,
+  SOURCE_GROUP_META,
+  SOURCE_TYPE_LABEL,
+  SOURCE_TYPE_OPTIONS,
+  type SourceGroup,
+  type SourceType,
+  SourceTypeIconGlyph,
+} from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
+import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
+import {
+  composerCadenceError,
+  PULL_ADAPTER_FOR_SOURCE,
+  PULL_SCHEDULE_DEFAULTS,
+} from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {
+  ChevronRight,
   CircleCheck,
   CircleDashed,
   CircleX,
@@ -69,107 +86,6 @@ type SecretDetails = {
   sourceName: string;
   sourceType: SourceType;
 };
-type SourceType =
-  | "otel_generic"
-  | "claude_code"
-  | "claude_cowork"
-  | "workato"
-  | "copilot_studio"
-  | "openai_compliance"
-  | "claude_compliance"
-  | "anthropic_admin"
-  | "databricks_genie"
-  | "s3_custom"
-  | "http_custom";
-
-const SOURCE_TYPE_OPTIONS: Array<{
-  value: SourceType;
-  label: string;
-  mode: "push" | "pull" | "s3";
-  blurb: string;
-}> = [
-  {
-    value: "otel_generic",
-    label: "Generic OTel",
-    mode: "push",
-    blurb:
-      "Anything that speaks OTLP/HTTP. Simplest setup - paste an OTLP URL + bearer token into the upstream agent's exporter config.",
-  },
-  {
-    value: "claude_code",
-    label: "Claude Code (Anthropic OAuth)",
-    mode: "push",
-    blurb:
-      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat - distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
-  },
-  {
-    value: "claude_cowork",
-    label: "Anthropic Claude (Cowork)",
-    mode: "push",
-    blurb:
-      "Claude Cowork pushes telemetry via OTLP. Configure under Anthropic Admin Console → Cowork → Telemetry.",
-  },
-  {
-    value: "workato",
-    label: "Workato",
-    mode: "push",
-    blurb:
-      "Workato pushes job-completed webhooks. Generate an HMAC shared secret, paste into Workato → Connection Profile → Webhook destination.",
-  },
-  {
-    value: "copilot_studio",
-    label: "Microsoft Copilot Studio (Purview)",
-    mode: "pull",
-    blurb:
-      "Polls Microsoft Purview Audit API for Copilot Studio activity. Needs an Azure AD app registration with `AuditLog.Read.All` permission.",
-  },
-  {
-    value: "openai_compliance",
-    label: "OpenAI Enterprise Compliance",
-    mode: "s3",
-    blurb:
-      "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
-  },
-  {
-    value: "claude_compliance",
-    label: "Anthropic Claude Enterprise Compliance",
-    mode: "pull",
-    blurb: "Polls Anthropic's compliance API with a workspace API key.",
-  },
-  {
-    value: "anthropic_admin",
-    label: "Anthropic Admin API (usage & cost)",
-    mode: "pull",
-    blurb:
-      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
-  },
-  {
-    value: "databricks_genie",
-    label: "Databricks AI/BI Genie",
-    mode: "pull",
-    blurb:
-      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
-  },
-  {
-    value: "s3_custom",
-    label: "Custom S3 audit log",
-    mode: "s3",
-    blurb:
-      "For homegrown agent systems writing audit logs to S3. Provide a parser DSL describing how each line maps to OCSF ActivityEvent fields.",
-  },
-  {
-    value: "http_custom",
-    label: "Custom HTTP audit-log API",
-    mode: "pull",
-    blurb:
-      "Bring-your-own paginated REST audit-log API. Declare URL + auth + cursor + JSON-path field mappings; the universal HTTP-polling adapter handles paging + retries + OCSF fold.",
-  },
-];
-
-const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
-  SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
-) as Record<SourceType, string>;
-
 const STATUS_META: Record<
   string,
   { icon: typeof CircleCheck; label: string; color: string }
@@ -196,61 +112,14 @@ export interface ComposerState {
    */
   ottlStatements: string[];
   /**
-   * Phase 10: optional cron override for puller-mode sources. When the
-   * source-type maps to a registered PullerAdapter, the composer
-   * auto-fills this with the adapter's locked default schedule (15min
-   * for copilot_studio); admins can edit before save. Ignored for
-   * push/webhook source types.
+   * Cron override for puller-mode sources. Stays "" while the admin
+   * leaves the Cadence picker untouched — meaning "the recommended
+   * schedule", which `buildCreateInput` resolves to an explicit cron at
+   * create (a stored null would mean the source never runs). Ignored
+   * for push/webhook source types.
    */
   pullSchedule: string;
 }
-
-/**
- * Maps user-facing pull-mode source-types onto the PullerAdapter id
- * registered server-side (`pullerAdapterRegistry.ids()`). Hardcoded
- * curated list per @ai_gateway_sergey_2's directive - keeps the UI
- * free of a round-trip enumeration call. Entries land in lockstep
- * with the reference adapters Sergey ships in `services/pullers/`.
- */
-const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
-  copilot_studio: "copilot_studio",
-  openai_compliance: "openai_compliance",
-  claude_compliance: "claude_compliance",
-  anthropic_admin: "anthropic_admin",
-  databricks_genie: "databricks_genie",
-  http_custom: "http_polling",
-};
-
-/**
- * Default cron schedule per puller adapter - mirrors the locked
- * `*_PULL_CONFIG.schedule` from the reference impl. Keeps the UI in
- * sync without a server round-trip; if the locked default ever
- * diverges, update both ends.
- */
-const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
-  copilot_studio: "*/15 * * * *",
-  openai_compliance: "*/15 * * * *",
-  claude_compliance: "*/15 * * * *",
-  anthropic_admin: "0 * * * *",
-  databricks_genie: "*/15 * * * *",
-  http_polling: "*/15 * * * *",
-};
-
-/** The three delivery modes the list groups sources under. */
-const MODE_META = {
-  push: {
-    title: "Push (OTLP / webhooks)",
-    blurb: "Upstream pushes events to LangWatch in near-real-time.",
-  },
-  pull: {
-    title: "Pull (admin API polling)",
-    blurb: "LangWatch polls upstream's admin API on a cadence.",
-  },
-  s3: {
-    title: "S3 audit drops",
-    blurb: "LangWatch reads JSONL drops from an S3 bucket.",
-  },
-} as const;
 
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
@@ -300,7 +169,7 @@ function resolvePullConfig(
     databricks_genie: [
       () => buildDatabricksGeniePullConfig(composer),
       "Missing required Databricks fields",
-      "Workspace URL and workspace token are both required.",
+      "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     anthropic_admin: [
       () => buildAnthropicAdminPullConfig(composer),
@@ -331,13 +200,13 @@ function IngestionSourcesHeader({
   isEnterprise: boolean;
   sourceCount: number;
   canManage: boolean;
-  onAdd: () => void;
+  onAdd: (sourceType: SourceType) => void;
 }) {
   return (
     <HStack alignItems="end">
       <VStack align="start" gap={0}>
         <HStack gap={2}>
-          <Heading size="md">Ingestion Sources</Heading>
+          <Heading size="md">Catalog</Heading>
           <Badge colorPalette="purple" size="sm" variant="surface">
             Preview
           </Badge>
@@ -377,8 +246,8 @@ function pendingId(mutation: {
   return mutation.isPending ? (mutation.variables?.id ?? null) : null;
 }
 
-function SourceModeSection({
-  mode,
+function SourceGroupSection({
+  group,
   sources,
   knowsFleetIsEmpty,
   rotatingId,
@@ -388,7 +257,7 @@ function SourceModeSection({
   onRotate,
   onArchive,
 }: {
-  mode: "push" | "pull" | "s3";
+  group: SourceGroup;
   sources: Source[];
   knowsFleetIsEmpty: boolean;
   rotatingId: string | null;
@@ -398,7 +267,7 @@ function SourceModeSection({
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
 }) {
-  const { title, blurb } = MODE_META[mode];
+  const { title, blurb } = SOURCE_GROUP_META[group];
   return (
     <Box
       borderWidth="1px"
@@ -420,7 +289,7 @@ function SourceModeSection({
       <VStack align="stretch" gap={2}>
         {sources.length === 0 && knowsFleetIsEmpty && (
           <Text fontSize="sm" color="fg.muted">
-            No {mode}-mode sources configured.
+            No sources configured here yet.
           </Text>
         )}
         {sources.map((source) => (
@@ -442,7 +311,7 @@ function SourceModeSection({
 
 /**
  * The source list: what the viewer may read, what went wrong when it could
- * not be read, the three delivery-mode sections, and the note naming the
+ * not be read, the two delivery-group sections, and the note naming the
  * grant that unlocks the writes.
  */
 function IngestionSourceList({
@@ -461,7 +330,7 @@ function IngestionSourceList({
   canManage: boolean;
   isLoading: boolean;
   error: unknown;
-  grouped: Record<"push" | "pull" | "s3", Source[]>;
+  grouped: Record<SourceGroup, Source[]>;
   rotatingId: string | null;
   archivingId: string | null;
   onEdit: (id: string) => void;
@@ -479,8 +348,8 @@ function IngestionSourceList({
 
       {isLoading && <Spinner size="sm" />}
 
-      {/* The list is the page. Without this the three mode sections below
-          render "No push-mode sources configured." off an empty `?? []`,
+      {/* The list is the page. Without this the group sections below
+          render "No sources configured here yet." off an empty `?? []`,
           which tells an admin their entire ingest fleet is gone when all
           that actually happened was a 403 or a DB blip. */}
       <HandledErrorAlert
@@ -489,11 +358,11 @@ function IngestionSourceList({
       />
 
       {canRead &&
-        (["push", "pull", "s3"] as const).map((mode) => (
-          <SourceModeSection
-            key={mode}
-            mode={mode}
-            sources={grouped[mode]}
+        (["realtime", "scheduled"] as const).map((group) => (
+          <SourceGroupSection
+            key={group}
+            group={group}
+            sources={grouped[group]}
             // Only claim "none configured" when we actually know: on a load
             // failure the alert above says what went wrong instead.
             knowsFleetIsEmpty={!error}
@@ -521,7 +390,13 @@ function IngestionSourceList({
  * either unnamed, or carrying a pull config the adapter cannot honour (which
  * `resolvePullConfig` has already toasted about).
  */
-function buildCreateInput(composer: ComposerState, organizationId: string) {
+export function buildCreateInput({
+  composer,
+  organizationId,
+}: {
+  composer: ComposerState;
+  organizationId: string;
+}) {
   if (!composer.name.trim()) return null;
   const resolved = resolvePullConfig(composer);
   if (!resolved) return null;
@@ -541,17 +416,16 @@ function buildCreateInput(composer: ComposerState, organizationId: string) {
   };
 }
 
-/** Sources split into the three sections the page renders. */
+/** Sources split into the two group sections the page renders. */
 function useGroupedSources(sources: Source[] | undefined) {
   return useMemo(() => {
-    const out: Record<"push" | "pull" | "s3", Source[]> = {
-      push: [],
-      pull: [],
-      s3: [],
+    const out: Record<SourceGroup, Source[]> = {
+      realtime: [],
+      scheduled: [],
     };
     for (const s of sources ?? []) {
       const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      out[meta?.mode ?? "push"].push(s);
+      out[groupForMode(meta?.mode ?? "push")].push(s);
     }
     return out;
   }, [sources]);
@@ -664,7 +538,7 @@ function useIngestionSourcesPage() {
   });
 
   const onSubmit = () => {
-    const input = buildCreateInput(composer, orgId);
+    const input = buildCreateInput({ composer, organizationId: orgId });
     // A null input means a required field is missing or malformed;
     // resolvePullConfig has already said which, and the drawer stays open so
     // the user can fix it.
@@ -712,14 +586,17 @@ function IngestionSourcesPage() {
   } = useIngestionSourcesPage();
 
   return (
-    <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Catalog · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <IngestionSourcesHeader
           isEnterprise={isEnterprise}
           sourceCount={sourcesQuery.data?.length ?? 0}
           canManage={canManage}
-          onAdd={() => {
-            setComposer(blankComposer());
+          onAdd={(sourceType) => {
+            // Always start from a blank composer for the picked type — a
+            // draft left over from a different type must never leak its
+            // parser or OTTL state into this one.
+            setComposer({ ...blankComposer(), sourceType });
             setComposing(true);
           }}
         />
@@ -780,27 +657,29 @@ function AddSourceControl({
 }: {
   isEnterprise: boolean;
   sourceCount: number;
-  onAdd: () => void;
+  onAdd: (sourceType: SourceType) => void;
 }) {
+  const atCap =
+    !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
   return (
-    <VStack align="end" gap={1}>
-      <Button
-        size="sm"
-        colorPalette="blue"
-        disabled={
-          !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
-        }
-        onClick={onAdd}
-      >
+    <AddIngestionSourceMenu
+      isEnterprise={isEnterprise}
+      disabledReason={
+        atCap
+          ? "Source limit reached. Upgrade to Enterprise for unlimited sources."
+          : undefined
+      }
+      hint={
+        !isEnterprise
+          ? `Your plan includes up to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources. Upgrade to Enterprise for unlimited.`
+          : undefined
+      }
+      onPick={onAdd}
+    >
+      <Button variant="outline" size="sm" disabled={atCap}>
         <Plus size={14} /> Add source
       </Button>
-      {!isEnterprise && (
-        <Text fontSize="xs" color="fg.muted">
-          {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
-          Upgrade to Enterprise for unlimited.
-        </Text>
-      )}
-    </VStack>
+    </AddIngestionSourceMenu>
   );
 }
 
@@ -921,14 +800,10 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
-  // 4b-3 license gate: non-enterprise plans see only otel_generic.
-  // Surfaces the available-tier list in the dropdown so the upsell
-  // narrative aligns with the EnterpriseLockedSurface page-level gate
-  // already shipped in 4b-2.
-  const { isEnterprise } = useActivePlan();
-  const sourceTypeOptions = isEnterprise
-    ? SOURCE_TYPE_OPTIONS
-    : SOURCE_TYPE_OPTIONS.filter((o) => o.value === "otel_generic");
+  // The type was picked from the Add source menu, which is where the plan
+  // gate lives (see gatedSourceTypeOptions) — the composer is committed to
+  // it. Changing type means closing and picking again, exactly like the
+  // model-provider drawer.
   return (
     <Drawer.Root
       open={isOpen}
@@ -941,57 +816,28 @@ function SourceComposerDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading as="h2" size="md">
-            Add ingestion source
-          </Heading>
+          <HStack gap={3}>
+            <SourceTypeIconGlyph sourceType={composer.sourceType} size="24px" />
+            <Heading as="h2" size="md">
+              Add {meta?.label ?? "ingestion source"}
+            </Heading>
+          </HStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <VStack align="stretch" gap={1} flex={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Source type
-                </Text>
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value={composer.sourceType}
-                    onChange={(e) =>
-                      setComposer({
-                        ...composer,
-                        sourceType: e.target.value as SourceType,
-                        parserConfig: {},
-                        ottlStatements: [],
-                      })
-                    }
-                  >
-                    {sourceTypeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label} · {o.mode}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                {!isEnterprise && (
-                  <Text fontSize="xs" color="fg.muted">
-                    Other source types are available on Enterprise plans.
-                  </Text>
-                )}
-              </VStack>
-              <VStack align="stretch" gap={1} flex={2}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Display name
-                </Text>
-                <Input
-                  size="sm"
-                  value={composer.name}
-                  onChange={(e) =>
-                    setComposer({ ...composer, name: e.target.value })
-                  }
-                  placeholder="Display name for this source"
-                />
-              </VStack>
-            </HStack>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Display name
+              </Text>
+              <Input
+                size="sm"
+                value={composer.name}
+                onChange={(e) =>
+                  setComposer({ ...composer, name: e.target.value })
+                }
+                placeholder="Display name for this source"
+              />
+            </VStack>
             {meta && (
               <Text fontSize="xs" color="fg.muted">
                 {meta.blurb}
@@ -1030,7 +876,7 @@ function SourceComposerDrawer({
               enabled={isOttlEnabledSourceType(composer.sourceType)}
             />
 
-            <PullScheduleField
+            <PullCadenceField
               sourceType={composer.sourceType}
               value={composer.pullSchedule}
               onChange={(pullSchedule) =>
@@ -1050,7 +896,13 @@ function SourceComposerDrawer({
               colorPalette="blue"
               onClick={onSubmit}
               loading={isPending}
-              disabled={!composer.name.trim()}
+              disabled={
+                !composer.name.trim() ||
+                composerCadenceError({
+                  sourceType: composer.sourceType,
+                  pullSchedule: composer.pullSchedule,
+                }) !== null
+              }
             >
               Create source
             </Button>
@@ -1232,6 +1084,12 @@ interface FieldDef {
    * that matters.
    */
   secret?: boolean;
+  /**
+   * True for fields most admins never need: rendered inside a collapsed
+   * "Advanced" group so the form leads with the required path. Leaving
+   * every advanced field untouched must always produce a working source.
+   */
+  advanced?: boolean;
 }
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
@@ -1347,7 +1205,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "report",
       label: "Report (usage or cost)",
       placeholder: "cost",
-      hint: "Exactly one per source. `cost` carries Anthropic's invoice amounts verbatim; `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
+      hint: "Exactly one per source. `cost` carries Anthropic's own reported spend (Priority Tier usage is excluded, so it is close to but not the invoice); `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
       required: true,
     },
     {
@@ -1371,22 +1229,44 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
     {
-      // Named `credentialsToken` on purpose: `buildParserConfig` routes every
+      // Named `credentials*` on purpose: `buildParserConfig` routes every
       // `credentials*` field into the `credentials` subtree, which is the ONLY
       // part of parserConfig the server encrypts before it reaches the
-      // database. A field named `token` would sit in the JSONB in plaintext.
+      // database. A field named `clientId` would sit in the JSONB in plaintext.
+      key: "credentialsClientId",
+      label: "Service principal client ID",
+      placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      hint: "The source signs in with this service principal at the start of every run. It needs Can Manage on every Genie space you want covered — read access is not enough. Databricks only returns other people's conversations to an identity that can manage the space, so a weaker one records nothing and reports no error.",
+      secret: true,
+    },
+    {
+      key: "credentialsClientSecret",
+      label: "Service principal secret",
+      placeholder: "dose...",
+      hint: "The OAuth secret for that service principal. We encrypt this server-side.",
+      secret: true,
+    },
+    {
       key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
-      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
-      required: true,
+      hint: "A personal access token, pasted instead of the service principal client ID and secret; when both are given, the token wins. Databricks expires these about an hour after issuing them, so a source that runs on a schedule is dead by the next morning — only use a token for a one-off backfill. It needs the same Can Manage on every Genie space. We encrypt this server-side.",
       secret: true,
+      advanced: true,
     },
     {
       key: "spaceIds",
       label: "Genie space IDs (optional)",
-      placeholder: "Leave empty to cover every space the token can see",
-      hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
+      placeholder: "Leave empty to cover every space the credential can see",
+      hint: "Comma-separated. Empty is the usual setting — every space the credential can see is covered, including spaces created later.",
+      advanced: true,
+    },
+    {
+      key: "warehouseId",
+      label: "SQL warehouse ID (optional)",
+      advanced: true,
+      placeholder: "095eb666b2ed2762",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
     },
   ],
   s3_custom: [
@@ -1696,8 +1576,9 @@ function buildDatabricksGeniePullConfig(
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
-  const token = (p.credentialsToken ?? "").trim();
-  if (!workspaceUrl || !token) return null;
+  const credentials = genieCredentialsFrom(p);
+  const warehouseId = (p.warehouseId ?? "").trim();
+  if (!workspaceUrl || !credentials) return null;
 
   return {
     adapter: "databricks_genie",
@@ -1712,11 +1593,84 @@ function buildDatabricksGeniePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.databricks_genie ||
       "*/15 * * * *",
-    credentials: { token },
+    // Omitted rather than sent empty: the adapter reads "no warehouse named" as
+    // "do not price these questions", and an empty string is a warehouse id it
+    // would then ask the workspace about.
+    ...(warehouseId ? { warehouseId } : {}),
+    credentials,
   };
 }
 
-function ParserConfigFields({
+/**
+ * The credential subtree for a Genie source, holding only what was actually
+ * given: an empty string is not a credential, and sending one would make the
+ * adapter prefer a token that does not exist. Null when neither way of
+ * signing in is complete — half of the service principal pair is not one,
+ * and accepting it would save a source that cannot run.
+ */
+function genieCredentialsFrom(
+  p: Record<string, string>,
+): Record<string, string> | null {
+  const token = (p.credentialsToken ?? "").trim();
+  const clientId = (p.credentialsClientId ?? "").trim();
+  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+
+  const credentials: Record<string, string> = {};
+  if (token) credentials.token = token;
+  if (clientId && clientSecret) {
+    credentials.clientId = clientId;
+    credentials.clientSecret = clientSecret;
+  }
+  return Object.keys(credentials).length > 0 ? credentials : null;
+}
+
+function ParserConfigField({
+  field,
+  values,
+  onChange,
+}: {
+  field: FieldDef;
+  values: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="medium">
+        {field.label}
+        {field.required && (
+          <Text as="span" color="red.500" marginLeft={1}>
+            *
+          </Text>
+        )}
+      </Text>
+      {field.key === "parserDsl" || field.key === "eventMappingDsl" ? (
+        <Textarea
+          size="sm"
+          rows={6}
+          value={values[field.key] ?? ""}
+          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
+          placeholder={field.placeholder}
+          fontFamily="mono"
+        />
+      ) : (
+        <Input
+          size="sm"
+          type={isSecretFieldKey(field.key) ? "password" : "text"}
+          value={values[field.key] ?? ""}
+          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
+          placeholder={field.placeholder}
+        />
+      )}
+      {field.hint && (
+        <Text fontSize="xs" color="fg.muted">
+          {field.hint}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+export function ParserConfigFields({
   sourceType,
   values,
   onChange,
@@ -1726,80 +1680,46 @@ function ParserConfigFields({
   onChange: (next: Record<string, string>) => void;
 }) {
   const fields = PARSER_FIELDS[sourceType];
+  const primaryFields = fields.filter((f) => !f.advanced);
+  const advancedFields = fields.filter((f) => f.advanced);
   if (fields.length === 0) return null;
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Source-specific configuration
       </Text>
-      {fields.map((f) => (
-        <VStack key={f.key} align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="medium">
-            {f.label}
-            {f.required && (
-              <Text as="span" color="red.500" marginLeft={1}>
-                *
-              </Text>
-            )}
-          </Text>
-          {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
-            <Textarea
-              size="sm"
-              rows={6}
-              value={values[f.key] ?? ""}
-              onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
-              placeholder={f.placeholder}
-              fontFamily="mono"
-            />
-          ) : (
-            <Input
-              size="sm"
-              type={isSecretFieldKey(f.key) ? "password" : "text"}
-              value={values[f.key] ?? ""}
-              onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
-              placeholder={f.placeholder}
-            />
-          )}
-          {f.hint && (
-            <Text fontSize="xs" color="fg.muted">
-              {f.hint}
-            </Text>
-          )}
-        </VStack>
+      {primaryFields.map((f) => (
+        <ParserConfigField
+          key={f.key}
+          field={f}
+          values={values}
+          onChange={onChange}
+        />
       ))}
-    </VStack>
-  );
-}
-
-function PullScheduleField({
-  sourceType,
-  value,
-  onChange,
-}: {
-  sourceType: SourceType;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  const adapter = PULL_ADAPTER_FOR_SOURCE[sourceType];
-  if (!adapter) return null;
-  const defaultSchedule = PULL_SCHEDULE_DEFAULTS[adapter] ?? "";
-  return (
-    <VStack align="stretch" gap={1}>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Polling schedule
-      </Text>
-      <Input
-        size="sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={defaultSchedule}
-        fontFamily="mono"
-      />
-      <Text fontSize="xs" color="fg.muted">
-        Standard 5-field cron. Leave blank to use the adapter default (
-        <code>{defaultSchedule}</code>). The puller worker honors this on the
-        next BullMQ tick after save.
-      </Text>
+      {advancedFields.length > 0 && (
+        // Unmounted while closed so the collapsed state genuinely holds
+        // nothing the admin needs: create must work without ever opening it.
+        <Collapsible.Root lazyMount unmountOnExit>
+          <Collapsible.Trigger asChild>
+            <Button size="xs" variant="ghost" color="fg.muted">
+              <ChevronRight />
+              Advanced
+            </Button>
+          </Collapsible.Trigger>
+          <Collapsible.Content>
+            <VStack align="stretch" gap={3} paddingTop={2}>
+              {advancedFields.map((f) => (
+                <ParserConfigField
+                  key={f.key}
+                  field={f}
+                  values={values}
+                  onChange={onChange}
+                />
+              ))}
+            </VStack>
+          </Collapsible.Content>
+        </Collapsible.Root>
+      )}
     </VStack>
   );
 }
@@ -1822,7 +1742,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would fail the adapter's `.datetime()` check at
     // pull time.
     anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    databricks_genie: ["workspaceUrl", "spaceIds"],
+    // `warehouseId` is here because the builder DROPS it when empty. Left to
+    // the merge, the raw form value would persist `warehouseId: ""`, which the
+    // adapter reads as a warehouse to go ask the workspace about.
+    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

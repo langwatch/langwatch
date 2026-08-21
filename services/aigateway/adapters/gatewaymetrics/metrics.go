@@ -115,6 +115,9 @@ type Recorder struct {
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
 	clientRejects  *prometheus.CounterVec
+	realtimeMints  *prometheus.CounterVec
+	realtimeLimits *prometheus.CounterVec
+	realtimeErrors *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -205,6 +208,21 @@ func New() *Recorder {
 		Help: "Requests rejected by budget precheck, labeled by the scope whose limit was breached.",
 	}, []string{"scope"})
 
+	r.realtimeMints = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_mints_total",
+		Help: "Realtime voice session mint attempts, by vendor and outcome (minted, session_limit, registry_unavailable, provider_error). outcome=\"minted\" counts sessions admitted at mint, not billable usage: what a session costs is decided later by the vendor's report, and a session that never reports settles as unknown rather than zero.",
+	}, []string{"vendor", "outcome"})
+
+	r.realtimeLimits = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_session_limit_blocks_total",
+		Help: "Mints refused because a virtual key already held its maximum open voice sessions. A rise means some key's cap is too low for its traffic, or that its sessions are not being closed. Which key is in the trace and the structured log; it is not a label, because virtual keys are tenant-created and unbounded.",
+	}, []string{})
+
+	r.realtimeErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_registry_errors_total",
+		Help: "Failed calls to the control plane's voice-session record, by operation (reserve, correlate, release, usage). A reserve failure refuses the mint; a correlate failure costs the session its exact join key to the vendor's report.",
+	}, []string{"operation"})
+
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_hits_total",
 		Help: "Prompt-cache effectiveness by outcome: hit when the provider reported cache-read tokens, miss otherwise.",
@@ -272,6 +290,7 @@ func New() *Recorder {
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
 		r.clientRejects,
+		r.realtimeMints, r.realtimeLimits, r.realtimeErrors,
 	)
 	return r
 }
@@ -522,6 +541,40 @@ func (r *Recorder) RecordBudgetBlock(scope string) {
 		return
 	}
 	r.budgetBlocks.WithLabelValues(orUnknown(scope)).Inc()
+}
+
+// RecordRealtimeMint exists because a voice session leaves no other trace at
+// the moment it opens. Media never crosses the gateway, so this counter and
+// the session row are the only evidence a mint happened, and the outcome split
+// is what separates "the vendor refused" from "we refused" during an incident.
+func (r *Recorder) RecordRealtimeMint(vendor, outcome string) {
+	if r == nil {
+		return
+	}
+	r.realtimeMints.WithLabelValues(orUnknown(vendor), orUnknown(outcome)).Inc()
+}
+
+// RecordRealtimeSessionLimitBlock is kept apart from the mint counter because
+// it is the one refusal an operator can fix from the dashboard. A customer
+// reporting that voice "randomly stops working" is answered by this line
+// moving, and no query over the mint counter's outcome label is as direct.
+func (r *Recorder) RecordRealtimeSessionLimitBlock() {
+	if r == nil {
+		return
+	}
+	r.realtimeLimits.WithLabelValues().Inc()
+}
+
+// RecordRealtimeRegistryError is the alarm for the failure mode that costs
+// money silently. A reserve failure refuses the mint and the caller sees it; a
+// correlate or release failure returns 200 to a caller who will never know the
+// session lost its join key to the vendor's bill, or that it still counts
+// against the key's cap. Nothing downstream of those two reports them.
+func (r *Recorder) RecordRealtimeRegistryError(operation string) {
+	if r == nil {
+		return
+	}
+	r.realtimeErrors.WithLabelValues(orUnknown(operation)).Inc()
 }
 
 // RecordCacheOutcome counts prompt-cache effectiveness for one response.

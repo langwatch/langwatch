@@ -1,6 +1,6 @@
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
-import { ArrowLeft, ExternalLink, Search } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Search } from "lucide-react";
+import { useRef, useState } from "react";
 import { MainMenuSections } from "~/components/MainMenu";
 import { PersonalSidebarLinks } from "~/components/PersonalSidebar";
 import { SidebarSection } from "~/components/sidebar/SidebarSection";
@@ -9,11 +9,12 @@ import { SupportMenu } from "~/components/sidebar/SupportMenu";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { ThemeToggle } from "~/components/sidebar/ThemeToggle";
 import { UsageIndicator } from "~/components/sidebar/UsageIndicator";
+import { useMenuScrollPosition } from "~/components/sidebar/useMenuScrollPosition";
 import { useCommandBar } from "~/features/command-bar";
 import { getCommandBarShortcut } from "~/features/command-bar/utils/platform";
 import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRouter } from "~/utils/compat/next-router";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { featureIcons } from "~/utils/featureIcons";
 import { readLastVisitedProduct } from "../logic/productMemory";
 import { resolveSettingsBackTarget } from "../logic/resolveSettingsBackTarget";
@@ -23,8 +24,9 @@ import {
   governanceNavItems,
   type SectionNavItemData,
 } from "../sectionNavItems";
+import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
-import { useSettingsMenu } from "../useSettingsMenu";
+import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
@@ -83,7 +85,7 @@ function SidebarBottomBlock({
   showExpanded: boolean;
   shouldIncludeSettingsLink: boolean;
 }) {
-  const router = useRouter();
+  const pathname = usePathname();
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -98,11 +100,11 @@ function SidebarBottomBlock({
       borderTopWidth="1px"
       borderTopColor="border"
       paddingTop={2}
-      marginTop={2}
-      // The rule reads as the edge of the block, so it runs a little
-      // wider than the items it separates.
-      marginX="-4px"
-      paddingX="4px"
+      // The rule is the block's top edge, so it runs a step wider than the
+      // entries it separates. That step is padding, not a negative margin:
+      // the box already fills the column, so a negative margin would move
+      // its left edge and leave the right one where it was.
+      paddingX={1}
     >
       <UsageIndicator showLabel={showExpanded} />
       {shouldIncludeSettingsLink && hasPermission("organization:view") && (
@@ -110,10 +112,7 @@ function SidebarBottomBlock({
           icon={featureIcons.settings.icon}
           label="Settings"
           href="/settings"
-          isActive={isPathUnder({
-            pathname: router.pathname,
-            base: "/settings",
-          })}
+          isActive={isPathUnder({ pathname, base: "/settings" })}
           showLabel={showExpanded}
         />
       )}
@@ -131,27 +130,28 @@ function SidebarBottomBlock({
  * Spec: specs/navigation/settings-shell-v2.feature
  */
 function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const { reachableProducts } = useReachableProducts();
+  const projectSlug = useLlmOpsProjectSlug();
   const target = resolveSettingsBackTarget({
     organizationId: organization?.id ?? null,
     rememberedProduct: organization
       ? readLastVisitedProduct({ organizationId: organization.id })
       : null,
     reachableProducts,
-    projectSlug: project && !project.isPersonal ? project.slug : null,
+    projectSlug,
   });
 
   return (
     <Box
       width="full"
+      paddingX={1}
       borderBottomWidth="1px"
       borderBottomColor="border"
       paddingBottom={2.5}
-      marginBottom={1.5}
     >
       <SideMenuLink
         icon={ArrowLeft}
@@ -169,7 +169,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
  * entries carry the quiet grey pill.
  */
 function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
-  const router = useRouter();
+  const pathname = usePathname();
   const groups = useSettingsMenu();
 
   return (
@@ -187,12 +187,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               icon={item.icon}
               label={item.label}
               href={item.href}
-              isActive={
-                (item.alsoActiveAt?.includes(router.pathname) ?? false) ||
-                (item.isExactMatch
-                  ? router.pathname === item.href
-                  : router.pathname.startsWith(item.includePath ?? item.href))
-              }
+              isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
               rightElement={
                 item.isEnterprise ? (
@@ -228,7 +223,7 @@ function SectionItemsNav({
   items: readonly SectionNavItemData[];
   showExpanded: boolean;
 }) {
-  const router = useRouter();
+  const pathname = usePathname();
   return (
     <>
       {items.map((item) => (
@@ -239,14 +234,10 @@ function SectionItemsNav({
           href={item.href}
           isActive={
             item.includePath
-              ? router.pathname.startsWith(item.includePath)
-              : router.pathname === item.href
+              ? isPathUnder({ pathname, base: item.includePath })
+              : pathname === item.href
           }
           showLabel={showExpanded}
-          isExternal={item.isExternal}
-          rightElement={
-            item.isExternal ? <ExternalLink size={12} aria-hidden /> : undefined
-          }
         />
       ))}
     </>
@@ -304,6 +295,11 @@ function SidebarContent({
   surface: SidebarSurface;
   showExpanded: boolean;
 }) {
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
+  // Keyed by surface: each product's menu keeps its own place, and moving
+  // between products never restores the place of the menu left behind.
+  useMenuScrollPosition({ regionRef: scrollRegionRef, menuKey: surface });
+
   return (
     <VStack
       paddingTop={2}
@@ -314,12 +310,29 @@ function SidebarContent({
       width={SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
+      {/* The way back out of Settings sits above the scroll region, so a
+          long settings menu never scrolls it out of the column. */}
+      {surface === "settings" && (
+        <Box width="full" paddingX={2}>
+          <SettingsBackEntry showLabel={showExpanded} />
+        </Box>
+      )}
+
       {/* The scroll region spans the full column and carries the
           horizontal inset itself, so its scrollbar runs against the
-          content panel instead of floating a padding away from it. */}
+          content panel instead of floating a padding away from it.
+
+          Its edges meet the rules above and below it, so the entries are
+          cut exactly at a line rather than a few pixels before it. The
+          space that holds them off those lines is padding in here, which
+          the entries travel through as the menu moves. */}
       <VStack
+        ref={scrollRegionRef}
+        data-testid="sidebar-scroll-region"
         width="full"
         paddingX={3}
+        paddingTop={surface === "settings" ? 1.5 : 0}
+        paddingBottom={2}
         gap={0.5}
         align="start"
         flex={1}
@@ -339,15 +352,12 @@ function SidebarContent({
           "&::-webkit-scrollbar-track": { background: "transparent" },
         }}
       >
-        {surface === "settings" && (
-          <SettingsBackEntry showLabel={showExpanded} />
-        )}
         <QuickSearchMenuItem showLabel={showExpanded} />
         <Box height={2} width="full" flexShrink={0} />
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
       </VStack>
 
-      <Box width="full" paddingX={3}>
+      <Box width="full" paddingX={2}>
         <SidebarBottomBlock
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}

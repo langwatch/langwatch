@@ -69,6 +69,15 @@ Feature: Per-session caller-scoped Langy key
     Then Langy cannot, and says so
     And no secret value appears in its answer
 
+  @unit
+  Scenario: A permission Langy is never delegated says so
+    Given an action the platform never delegates to Langy, whoever asks
+    When Langy tries it on my behalf and is refused
+    Then the refusal says the permission is not one Langy can be given
+    And it does not tell me to widen a key or to ask an admin, which would
+      leave me waiting for a grant nobody can make
+    And it points me at making the change in LangWatch myself
+
   # ---------------------------------------------------------------------------
   # Guardrails
   # ---------------------------------------------------------------------------

@@ -449,6 +449,28 @@
 					}
 				}
 			}
+		},
+		{
+			// One test is skipped on purpose, not forgotten. It pins that the
+			// cohort's private-dataplane exclusion is actually wired in the
+			// composition root — the guard that keeps enterprise organizations
+			// out of a migration cohort. Enrolling a cohort needs a REGISTERED
+			// migration to enroll into, and ADR-110 replaced the three old
+			// migrations with one that is not written yet, so the service
+			// refuses before it ever reads the eligible pool. Deleting the test
+			// would drop the guard silently; the skip keeps it findable, and
+			// its docblock says to un-skip rather than rewrite once a migration
+			// is registered.
+			"includes": [
+				"**/system-migrations/__tests__/runtime-cohort-wiring.unit.test.ts"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noSkippedTests": "off"
+					}
+				}
+			}
 		}
 	],
 	"assist": {

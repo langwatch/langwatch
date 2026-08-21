@@ -32,7 +32,6 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -67,7 +66,7 @@ const logger = createLogger("langwatch:langy:router");
 /**
  * Builds a Langy procedure gated on one `langy:*` permission, with three
  * gates in order:
- *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *  1. `.permission(permission)` — may the caller do THIS to the
  *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
  *     because it provisions credentials, spawns a worker and spends the
  *     project's model budget — not something a read grant should buy.
@@ -78,15 +77,17 @@ const logger = createLogger("langwatch:langy:router");
  *     the `langyEgress` router uses. Last, so membership is always proven
  *     before the flag is read.
  *
- * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * The permission declaration comes before any `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyProcedure = (permission: Permission) =>
+const langyProcedure = (
+  permission: "langy:view" | "langy:create" | "langy:update" | "langy:delete",
+) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
@@ -129,11 +130,20 @@ const langyTurnMessageSchema = z.object({
 /**
  * Per-send model override from the sidebar picker. Shape-validated here;
  * the value is checked against the project's Langy VK allowlist in the service.
+ *
+ * The provider segment ends at the FIRST slash; the model half may contain
+ * slashes and colons of its own, because custom OpenAI-compatible providers
+ * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
+ * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);

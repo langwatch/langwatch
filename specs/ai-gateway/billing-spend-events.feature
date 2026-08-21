@@ -298,6 +298,17 @@ Feature: Billing spend events, one durable record per gateway request
       Then the status stays confirmed and the attribution fills in
 
     @unit
+    Scenario: An outcome states the attribution its admission has not delivered
+      Given an outcome that carries its own attribution and no admission yet
+      When it folds
+      Then the record names the organization and the key from the outcome
+      And a later admission still wins wherever it states a value
+      # A brokered voice session is admitted by the gateway and confirmed by
+      # the control plane. Two emitters on two paths means the confirmation
+      # can fold first, and a priced row naming no organization is spend that
+      # belongs to nobody.
+
+    @unit
     Scenario: A settled request is its own event type with unknown cost
       Given a settled spend record
       When it is mapped to its wire envelope

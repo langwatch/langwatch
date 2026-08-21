@@ -572,6 +572,71 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
 });
 
 /**
+ * The log and metric pipelines flatten a decoded OTLP tree into one record
+ * keyed by a JSON path, because two attributes may share a name and each value
+ * still needs its own address. A path can never satisfy a sensitive-NAME rule,
+ * so before `attributeNames` those rules never fired here at all: an
+ * `authorization` attribute was left to the value-shape rules, and a plain-text
+ * one survived them. The name travels beside the path now.
+ */
+describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
+  const pathKeyed = () => ({
+    body: "",
+    attributes: {
+      "log.0.value.stringValue": "key_abc123def456",
+      "log.1.value.stringValue": "plain text value",
+      "log.2.value.stringValue": "api_request",
+    },
+    resourceAttributes: {},
+    attributeNames: {
+      "log.0.value.stringValue": "langwatch.api_key.id",
+      "log.1.value.stringValue": "authorization",
+      "log.2.value.stringValue": "event.name",
+    },
+  });
+
+  describe("when redactLog runs", () => {
+    /** @scenario "A credential-named log attribute is redacted by name" */
+    it("applies the sensitive-name rule to the attribute's real name", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.1.value.stringValue"]).toBe("[SECRET]");
+    });
+
+    /** @scenario "The receiver-written API key id survives redaction on the log path" */
+    it("keeps the receiver-written key id readable, as on the span path", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.0.value.stringValue"]).toBe(
+        "key_abc123def456",
+      );
+    });
+
+    it("leaves an ordinary attribute alone", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.2.value.stringValue"]).toBe("api_request");
+    });
+  });
+
+  describe("when no name is carried for a key", () => {
+    it("falls back to the key itself", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = {
+        body: "",
+        attributes: { authorization: "plain text value" },
+        resourceAttributes: {},
+      };
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes.authorization).toBe("[SECRET]");
+    });
+  });
+});
+
+/**
  * A resolved policy's PII exceptions are honored wherever the NATIVE pass
  * runs (secrets, and every essential-level entity, including under strict —
  * see the block above and applyContentRedaction.unit.test.ts). They are NOT

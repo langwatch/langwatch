@@ -54,16 +54,17 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-} from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -378,11 +379,10 @@ async function refuseProjectKeyHandout(
       400,
     );
   }
-  const canWriteProject = await hasProjectPermission(
+  const canWriteProject = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: userId } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "project:update",
   );
@@ -1237,6 +1237,39 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget-overview
+// ---------------------------------------------------------------------------
+// Every budget that binds the caller's own keys, labelled per scope, for
+// the `langwatch login` epilogue. Wire shape matches the tRPC
+// `api.user.budgetOverview` procedure byte-for-byte (both surfaces share
+// BudgetOverviewService), replacing the collapsed single number the
+// /bootstrap `budget` field carries for older CLIs.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = BudgetOverviewService.create(
+    prisma,
+    getApp().gateway.budgets,
+  );
+  const result = await service.overviewForUser({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/personal-project
 // ---------------------------------------------------------------------------
 // Lazy personal-key exchange for device sessions minted before /exchange
@@ -1627,8 +1660,8 @@ async function ensureGovernancePermissionOr403(
   tokenRecord: { user_id: string; organization_id: string },
   permission: Permission,
 ): Promise<Response | null> {
-  const allowed = await hasOrganizationPermission(
-    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+  const allowed = await probeOrganizationPermission(
+    { session: { user: { id: tokenRecord.user_id } } } as any,
     tokenRecord.organization_id,
     permission,
   );
@@ -2031,11 +2064,10 @@ async function mintProjectIngestionKey(
     );
   }
 
-  const allowed = await hasProjectPermission(
+  const allowed = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: tokenRecord.user_id } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "traces:create",
   );
@@ -2453,7 +2485,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     // Resolve the picked project: it must live in the chosen org and not be
     // archived. Authorization is NOT decided by this lookup. The
-    // `hasProjectPermission(..., "project:update")` check below is the source
+    // `probeProjectPermission(..., "project:update")` check below is the source
     // of truth, and it re-derives the org from the project id and inspects
     // project-, team- and org-scoped role bindings plus the org role. So an
     // org-level admin (or an org/team-scoped role-binding admin) who sees the

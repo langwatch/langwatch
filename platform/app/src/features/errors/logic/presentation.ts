@@ -159,6 +159,27 @@ const MIGRATION_STATUS_LABELS: Record<string, string> = {
 };
 
 /**
+ * Registered migration names, in the operator's words rather than the
+ * column's. Stable identifiers (renaming one orphans its state rows), so
+ * keying copy on them is safe; an unmapped name falls back to the generic
+ * sentence rather than leaking the identifier.
+ */
+const MIGRATION_NAME_LABELS: Record<string, string> = {
+  "authz-engine": "the authorization upgrade",
+};
+
+/**
+ * The migrations another migration's rollback can be blocked by, as the
+ * operator should read them. Registered migration names are stable
+ * identifiers (renaming one orphans its state rows), so keying copy on them
+ * is safe; an unmapped name falls back to the generic sentence rather than
+ * leaking the identifier.
+ */
+const BLOCKING_MIGRATION_LABELS: Record<string, string> = {
+  "authz-grants-cutover": "authorization cutover",
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -518,6 +539,11 @@ const presentations = {
     title: "You don't have permission to manage API keys",
     describe: () => "Ask an admin on your team for access.",
   },
+  api_key_permission_not_delegable: {
+    title: "This is not something the assistant can do for you",
+    describe: () =>
+      "A wider key or a higher role will not change it. Make this change in LangWatch yourself.",
+  },
   api_key_reserved_name: {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
@@ -621,6 +647,11 @@ const presentations = {
     title: "Choose where this provider applies",
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
+  },
+  model_provider_credentials_unreadable: {
+    title: "This provider needs its credentials again",
+    describe: () =>
+      "The ones it has can no longer be used, and saving without new ones would take them away. Type the credentials again, then save.",
   },
   model_provider_credentials_would_be_dropped: {
     title: "That save would delete the stored credentials",
@@ -999,10 +1030,83 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  migration_enrollment_already_exists: {
+    title: "This organization is already enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `It is already enrolled for ${migration}, so the next pass will process it. Nothing to do.`
+        : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
+    },
+  },
+  migration_enrollment_cloud_only: {
+    title: "Enrollment does not apply to this installation",
+    describe: () =>
+      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
+  },
+  migration_enrollment_not_found: {
+    title: "This organization is not enrolled",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `There is no enrollment for ${migration} for this organization to withdraw. Check the organization and the migration.`
+        : "There is no enrollment for this organization to withdraw. Check the organization and the migration.";
+    },
+  },
+  migration_unknown: {
+    title: "No migration exists with that name",
+    describe: () =>
+      "Pick one of the migrations listed on the page — the name may have come from an older link or a typo.",
+  },
+  migration_run_requires_enrollment: {
+    title: "Enroll this organization first",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `Targeted runs follow enrollment: enroll the organization for ${migration}, then run it.`
+        : "Targeted runs follow enrollment: enroll the organization for the migration, then run it.";
+    },
+  },
+  migration_pass_already_running: {
+    title: "This organization appears to be mid-migration",
+    describe: () =>
+      "The migration cannot start for this organization right now — another pass appears to be working it. Wait a moment, then retry.",
+  },
+  migration_not_available_on_installation: {
+    title: "This migration is not available here yet",
+    describe: () =>
+      "It arrives in a later release and will run automatically then — nothing to do until that release.",
+  },
   migration_state_not_found: {
     title: "No migration state for that organization",
     describe: () =>
       "Check the organization id — only organizations a migration has already processed have state to act on.",
+  },
+  migration_rollback_blocked_by_dependent: {
+    title: "Another migration still stands on this one",
+    describe: (error) => {
+      const blocking = label(
+        BLOCKING_MIGRATION_LABELS,
+        str(error, "blockingMigration", ""),
+      );
+      return blocking
+        ? `This organization's ${blocking} is still in force and depends on this migration's data. Roll the ${blocking} back first, then retry.`
+        : "A migration that depends on this one is still in force. Roll that one back first, then retry.";
+    },
+  },
+  migration_rollback_cutover_not_started: {
+    title: "This organization has not been cut over",
+    describe: () =>
+      "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
   },
   migration_rollback_requires_migrated_or_finalized: {
     title: "Only a migrated or finalized organization can be rolled back",
@@ -1266,6 +1370,11 @@ const presentations = {
     title: "This request carried no API key",
     describe: () =>
       "Send an organization API key as Authorization: Bearer <api-key>.",
+  },
+  contested_credentials: {
+    title: "This request carried more than one credential",
+    describe: () =>
+      "Send exactly one: either an API key or a signed-in session, not both.",
   },
   invalid_credentials: {
     // Deliberately says nothing about which credential class the route
@@ -1640,6 +1749,17 @@ const presentations = {
   // and "a network policy an admin must fix" there, and only one of them was
   // true. One code, one set of words.
   // ==========================================================================
+  langy_conversation_id_unadoptable: {
+    title: "That conversation id can't be used",
+    // The two reasons need different words because they need different fixes:
+    // one is the caller's id to correct, the other is a conversation that is
+    // over. Collapsing them into one sentence would tell half the readers to
+    // change something that is already fine.
+    describe: (error) =>
+      str(error, "reason", "") === "archived"
+        ? "That conversation is archived, and archived conversations can't be reopened. Start a new one."
+        : "Conversation ids are 6-120 characters, using letters, numbers, dashes and underscores.",
+  },
   langy_conversation_not_found: {
     title: "Conversation not found",
     describe: () =>
@@ -1938,6 +2058,20 @@ const presentations = {
     title: "That provider isn't bound to this key",
     describe: () =>
       "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+  },
+  realtime_session_limit: {
+    // The request-rate limits do not bound voice: one mint opens a call that
+    // bills for as long as it runs. What frees a slot is a call ending, so
+    // the copy says that rather than "slow down".
+    title: "This key has all its voice calls open",
+    describe: () =>
+      "Wait for a call to end, or raise the key's max open sessions in settings.",
+  },
+  realtime_registry_unavailable: {
+    // Nothing was minted, so the reader is not holding a half-open session.
+    // Saying so is what stops them looking for one.
+    title: "Couldn't start the voice session",
+    describe: () => "No session was created. Try again in a moment.",
   },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
@@ -2572,6 +2706,7 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   url: "the URL",
   prompt: "the prompt",
   model: "the model",
+  modelOverride: "the model",
   value: "the value",
   label: "the label",
   title: "the title",

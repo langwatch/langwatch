@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Resources } from "../../api/rbac";
+import { Resources } from "~/utils/rbacVocabulary";
 import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
 import {
   categoryPermissions,

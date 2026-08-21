@@ -83,7 +83,7 @@ vi.mock("../../tracing", () => ({
 
 vi.mock("../../../clickhouse/clickhouseClient", () => ({
   isClickHouseEnabled: () => false,
-  getClickHouseClientForProject: () => Promise.resolve(null),
+  getClickHouseClientForTenant: () => Promise.resolve(null),
 }));
 
 const { mockEnv } = vi.hoisted(() => {
@@ -283,6 +283,13 @@ describe("UsageService", () => {
           "upgrade your plan at https://app.langwatch.ai/settings/subscription",
         );
       });
+
+      it("reports the unit the cap is metered in", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        assertExceeded(result);
+        expect(result.usageUnit).toBe("traces");
+      });
     });
 
     describe("when paid TIERED org exceeds limit on self-hosted", () => {
@@ -338,6 +345,13 @@ describe("UsageService", () => {
         expect(result.count).toBe(1000);
         expect(result.maxMessagesPerMonth).toBe(1000);
         expect(result.planName).toBe("Free");
+      });
+
+      it("reports the unit the cap is metered in", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        assertExceeded(result);
+        expect(result.usageUnit).toBe("events");
       });
 
       it("calls planResolver with organizationId", async () => {

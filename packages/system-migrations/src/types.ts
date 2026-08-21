@@ -1,6 +1,6 @@
 /**
  * The per-tenant state machine for one in-place migration
- * (specs/rbac/in-place-authz-migration.feature):
+ * (specs/migration/system-migrations-runner.feature):
  *
  *   pending ──► migrated ──► finalized ──► rolled_back
  *     │             ▲                          (operator only)
@@ -24,6 +24,18 @@ export type TenantMigrationStatus =
   | "finalized"
   | "parked"
   | "rolled_back";
+
+/**
+ * The two terminal states the runner never re-runs: `finalized` is the
+ * one-way latch and `rolled_back` is the operator's pin. One predicate, so
+ * the runner and any harness composing a pass around the same state table
+ * can never drift onto different skip rules.
+ */
+export function isTerminalTenantStatus(
+  status: TenantMigrationStatus | undefined,
+): boolean {
+  return status === "finalized" || status === "rolled_back";
+}
 
 export type TenantMigrationRecord = {
   migrationName: string;
@@ -56,4 +68,6 @@ export type MigrationPassSummary = {
   parked: number;
   /** Finalized or rolled back before this pass, or outside the cohort. */
   skipped: number;
+  /** Claimed by another process's pass, so left to that process. */
+  claimed: number;
 };

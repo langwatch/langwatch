@@ -4,11 +4,12 @@
  * shape: service CLASSES over repository INTERFACES.
  *
  *   AuthzCollectorService   COLLECT policies over AuthzReadRepository
- *   AuthzService            can / check / authorize / effectivePermissions
- *                           (+ the §9 owner ceiling and the §12 epoch cache
- *                           inside the instance)
+ *   AuthzService            can / check / authorize / effectivePermissions,
+ *                           plus the id-shaped checkByIds / canAnyByIds /
+ *                           canBatchByIds for callers holding ids rather
+ *                           than a resolved scope (+ the §9 owner ceiling
+ *                           and the §12 epoch cache inside the instance)
  *   GrantsService           the one write surface, over AuthzGrantsRepository
- *   AuthzShadowService      the legacy resolvers' engine comparison
  *
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
@@ -24,7 +25,6 @@ export {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
-  type LedgerActor,
   type OffboardCounts,
   type RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -36,19 +36,24 @@ export type {
   ShareLinkRow,
 } from "./authz-read.repository";
 export type {
+  AuthzCutoverRepository,
   AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
   OrganizationMemberFact,
   OrganizationScopeInventory,
+  ProjectCredentialFact,
+  ResourceGrantRow,
+  ResourceGrantUsageSeed,
   RoleHeadRow,
+  ShareLinkFactRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
-export { AuthzShadowService } from "./authz-shadow.service";
-export type { AuthzShadowOptions } from "./authz-shadow.service";
 export { AuthzService } from "./authz.service";
 export type {
   AuthzEpochReader,
@@ -65,20 +70,29 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
-export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
   grantFactToCompatBinding,
+  grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
+  PRINCIPAL_TO_DB,
+  RESOURCE_KIND_TO_DB,
   roleFactToRow,
   roleRowToFact,
+  SHARE_LINK_PERMISSION,
+  SHARE_VISIBILITY_BY_PRINCIPAL,
+  SHARE_VISIBILITY_BY_PRINCIPAL_DB,
+  shareVisibilityAudience,
 } from "./ledger/projection-mapping";
 export type {
   CompatBindingRowShape,
+  CompatShareLinkRowShape,
   GrantPrincipalTypeDb,
+  GrantResourceKindDb,
   GrantRowShape,
   GrantScopeTypeDb,
   RoleRowShape,
+  ShareLinkAudience,
 } from "./ledger/projection-mapping";
 // Grant identity derivation is deliberately NOT re-exported here: it imports
 // `node:crypto`, and this root entry is browser-evaluable by construction
@@ -89,24 +103,18 @@ export type {
   BindingIdentityPrincipal,
 } from "./ledger/grant-identity";
 export {
-  emptyGrantsLedgerState,
-  reduceGrantsLedger,
-} from "./ledger/grants-ledger.reducer";
+} from "./ledger/facts";
+export { GRANT_EVENT_SOURCES } from "./ledger/facts";
 export type {
   GrantEventSource,
   GrantFact,
-  GrantRevocationSelector,
   GrantsLedgerActor,
-  GrantsLedgerCutover,
-  GrantsLedgerEvent,
-  GrantsLedgerState,
-  LedgerMigrationStatus,
-  LedgerMigrationTenantState,
   LedgerPrincipal,
+  MigrationTenantStatus,
   LedgerPrincipalType,
   LedgerScope,
   LedgerScopeType,
   LegacyBindingRole,
   ResourceGrantTerms,
   RoleFact,
-} from "./ledger/grants-ledger.reducer";
+} from "./ledger/facts";

@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,
@@ -11,6 +11,8 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
@@ -43,6 +45,9 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
   ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
@@ -490,16 +495,20 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }) {
-    return this.prisma.roleBinding.findMany({
-      where: { userId, organizationId },
-      select: {
-        id: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's key drawer is served from the
+    // ledger's own head.
+    const rows = await this.accessListing.findUserBindings({
+      organizationId,
+      userId,
     });
+    return rows.map((row) => ({
+      id: row.id,
+      role: row.role,
+      customRoleId: row.customRoleId,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+    }));
   }
 
   async findOrgsByIds(ids: string[]) {

@@ -13,6 +13,10 @@ import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import {
+  LwqlKeyMapClickHouseRepository,
+  NullLwqlKeyMapRepository,
+} from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -33,11 +37,13 @@ import {
   clearCustomClientCache,
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
-  getClickHouseClientForProject,
-  getSharedClickHouseClient,
+  getClickHouseClientForTenant,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { closeClickHouseClient } from "~/server/clickhouse/client";
+import {
+  _getSharedClickHouseClient,
+  closeClickHouseClient,
+} from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
@@ -132,8 +138,10 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
+import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
-import { PrismaAuthzGrantsProjectionRepository } from "./authz/repositories/authz-grants-projection.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -268,6 +276,7 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -283,6 +292,7 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
@@ -374,6 +384,8 @@ export function initializeDefaultApp(options?: {
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
+  installAuthzEngineGateReporting();
+
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
@@ -383,7 +395,7 @@ export function initializeDefaultApp(options?: {
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
   ): Promise<ClickHouseClient> => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client)
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
@@ -412,7 +424,10 @@ export function initializeDefaultApp(options?: {
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(
@@ -722,7 +737,14 @@ export function initializeDefaultApp(options?: {
   // service can ask "is this trace still shared?" without depending on
   // ShareService — that would close the cycle: ShareService already depends
   // on PinnedTraceService for auto(un)pin.
-  const shareRepo = new PrismaShareRepository(prisma);
+  // A cut-over organization's links are written through the grants ledger and
+  // read off the same compat row as ever (ADR-092 PR 3); everyone else gets
+  // the Prisma repository byte for byte.
+  const shareRepo = new LedgerShareRepository({
+    legacy: new PrismaShareRepository(prisma),
+    prisma,
+    writer: () => grantsLedgerWriter(),
+  });
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
@@ -861,7 +883,7 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
-    authzGrantsProjection: new PrismaAuthzGrantsProjectionRepository(prisma),
+    authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
@@ -1635,7 +1657,7 @@ export function initializeDefaultApp(options?: {
   // One snapshot store shared by this pod's writer and its reader: the writer
   // publishes only while it holds the lease, the reader always reads.
   const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
-  const sharedCh = getSharedClickHouseClient();
+  const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
@@ -1727,6 +1749,8 @@ export function initializeDefaultApp(options?: {
     clickhouse: {
       enabled: clickhouseEnabled,
       resolveClient: resolveClickHouseClient,
+      resolveOrganizationClient: getClickHouseClientForOrganization,
+      allInstances: getAllClickHouseInstances,
     },
     redis,
     billing: {
@@ -1771,7 +1795,11 @@ export function initializeDefaultApp(options?: {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({
+          fallbackClient: _getSharedClickHouseClient,
+        }),
+      ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1791,6 +1819,7 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
+    permissions: permissionsServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -1855,7 +1884,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "OrganizationService",
   );
   const nullProjects = traced(
-    new ProjectService(new NullProjectRepository()),
+    new ProjectService(
+      new NullProjectRepository(),
+      new NullLwqlKeyMapRepository(),
+    ),
     "ProjectService",
   );
 
@@ -2048,6 +2080,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       resolveClient: async () => {
         throw new Error("ClickHouse is not available in the test app");
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+      allInstances: async () => [],
     },
     // No Redis in the test preset; a test that needs one passes it as an
     // override, or injects a double into the unit directly.
@@ -2091,7 +2127,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(
@@ -2148,6 +2186,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: nullOrganizations,
     projects: nullProjects,
+    permissions: permissionsServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,
@@ -2283,7 +2322,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
-      new PrismaShareRepository(testPrisma),
+      // The same repository the real preset wires, so a test organization
+      // that has been cut over exercises the ledger path rather than a shape
+      // only tests see. The writer is built over `testPrisma` explicitly
+      // (rather than `grantsLedgerWriter()`, which always reaches for the
+      // app's Prisma singleton) - today the two are the same client
+      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
+      // should say what it depends on rather than rely on that coincidence.
+      new LedgerShareRepository({
+        legacy: new PrismaShareRepository(testPrisma),
+        prisma: testPrisma,
+        writer: () => new GrantsLedgerWriter(testPrisma),
+      }),
       testPinnedTraceService,
       {
         isTraceSharingEnabled: async (projectId) => {

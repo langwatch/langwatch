@@ -24,7 +24,7 @@ import {
   replayGooseMigrationUp,
   replayRollupRebuild,
 } from "~/server/clickhouse/__tests__/migrationReplay";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -184,7 +184,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     });
 
     const resolveClient = async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     };
@@ -384,7 +384,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         },
       });
 
-      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      const client = await getClickHouseClientForTenant(PRE_PROJECT_ID);
       if (!client) throw new Error("no ClickHouse client in test environment");
 
       // Pre-rebuild state: the 00055 view truncates periods in the server
@@ -446,7 +446,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       // Re-apply the current migration unconditionally so a failure
       // anywhere in this describe can never leave later suites running
       // against the 00055 view. Idempotent by the migration's own design.
-      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      const client = await getClickHouseClientForTenant(PRE_PROJECT_ID);
       await replayRollupRebuild(client!);
     }, 120_000);
 

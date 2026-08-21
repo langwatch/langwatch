@@ -219,6 +219,36 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         );
       });
+
+      /** @scenario "A new restricted key is usable the moment it is returned" */
+      it("finishes the role definition before attaching the binding", async () => {
+        const order: string[] = [];
+        ledger.defineRole.mockImplementation(async () => {
+          // The writer holds for the role projection inside this call.
+          await Promise.resolve();
+          order.push("defineRole");
+        });
+        ledger.attachBindings.mockImplementation(async () => {
+          order.push("attachBindings");
+          return { attached: [], duplicates: [] };
+        });
+
+        await service.create({
+          name: "Restricted Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        });
+
+        // The binding row carries a foreign key to the role row, so the role
+        // has to be projected first. Command jobs are grouped per command
+        // name, so the attach cannot stand in for the definition's hold.
+        expect(order).toEqual(["defineRole", "attachBindings"]);
+      });
     });
 
     describe("when permissions arrive in arbitrary order", () => {

@@ -1,5 +1,6 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -14,7 +15,6 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";

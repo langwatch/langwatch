@@ -35,6 +35,40 @@ Feature: Langy runs on the model the project chose
     Then the turn is accepted rather than refused
     And the model reaches the worker with its provider-prefixed id intact
 
+  # Custom OpenAI-compatible providers accept any model id, and ids from
+  # aggregators such as OpenRouter contain a slash of their own
+  # ("stealth/ox-alpha"), so the full reference carries two: the provider
+  # segment ends at the FIRST slash and the rest is the model.
+  @unit
+  Scenario: A model id that itself contains a slash is accepted
+    Given the project's model is a custom provider model named "stealth/ox-alpha"
+    When the composer sends a turn with the full id "custom/stealth/ox-alpha"
+    Then the turn is accepted rather than rejected as invalid input
+    And the full id reaches the app layer unchanged
+
+  # A project that keeps several credentials for one provider picks the row it
+  # wants, so the composer sends the row id in front of the model reference and
+  # the whole thing carries two slashes.
+  @unit
+  Scenario: A model from a named provider row is accepted with the row id in front
+    Given the project's model comes from a named provider row rather than the provider default
+    When the composer sends a turn with the row id in front of a slash-containing model id
+    Then the turn is accepted rather than rejected as invalid input
+    And the full id reaches the app layer unchanged
+
+  @unit
+  Scenario: A model reference without a provider segment is rejected as invalid input
+    When the composer sends a turn with the model "gpt-5-mini"
+    Then the turn is rejected as invalid input
+    And the rejection names the model field
+
+  @unit
+  Scenario: A model reference with an empty segment is rejected as invalid input
+    When the composer sends a turn with the model "custom//stealth"
+    Then the turn is rejected as invalid input
+    And the rejection names the model field
+    And no turn is dispatched to the worker
+
   @unit
   Scenario: Switching models mid-conversation keeps the conversation
     Given a conversation with earlier turns on one model

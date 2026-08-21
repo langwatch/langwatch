@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.7.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.6.0...typescript-sdk@v1.7.0) (2026-08-21)
+
+
+### Features
+
+* **cli:** create the HTTP agent on the spot when agent dev finds none ([#7156](https://github.com/langwatch/langwatch/issues/7156)) ([13b40a8](https://github.com/langwatch/langwatch/commit/13b40a8509a3eafbb49449fc58d1227f3359cccb))
+* **gateway:** one budget-overview service for /me, the CLI epilogue, and budgets surfaces ([#6420](https://github.com/langwatch/langwatch/issues/6420)) ([7dcd14d](https://github.com/langwatch/langwatch/commit/7dcd14d9389824c6a114d333ecdec1ad364ff873))
+* **langy:** minimal harness, own system prompt, scoped tools, outcome-based judge, overfit-resistant skills ([#7266](https://github.com/langwatch/langwatch/issues/7266)) ([084324f](https://github.com/langwatch/langwatch/commit/084324f9db077cdaea0cc822ff505485b593d278))
+* **navigation:** product switcher and icon rail behind one flag, gateway/governance URL moves ([#7076](https://github.com/langwatch/langwatch/issues/7076)) ([aadd411](https://github.com/langwatch/langwatch/commit/aadd4112e6a92e3a50f7db8b34a3f4dd376efefd))
+
+
+### Bug Fixes
+
+* **coding-agent:** a row exists once the session says something, and its orchestrator can name it ([#7197](https://github.com/langwatch/langwatch/issues/7197)) ([52df144](https://github.com/langwatch/langwatch/commit/52df144ee06d86c25403ca094d2005c448a89799))
+* **data-privacy:** catch vendor API keys the allow-list missed, and stop custom patterns erasing trace text ([#6816](https://github.com/langwatch/langwatch/issues/6816)) ([8668f2c](https://github.com/langwatch/langwatch/commit/8668f2c4eb2d5e9ed72b564caf7f6e0512bb4aee))
+* **governance:** the codex harvest caps a long conversation in one pass ([#7336](https://github.com/langwatch/langwatch/issues/7336)) ([4b032cd](https://github.com/langwatch/langwatch/commit/4b032cd4f617fb86565ae68613acedf07181ec7a))
+* **sdk-ts:** migrate to the OpenTelemetry logs SDK 0.221 API surface ([#7274](https://github.com/langwatch/langwatch/issues/7274)) ([dc60f46](https://github.com/langwatch/langwatch/commit/dc60f46eb127513e9af34a3a8f450b88df71417b))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
+* **deps:** bump chalk from 5.6.2 to 6.0.0 ([#6803](https://github.com/langwatch/langwatch/issues/6803)) ([82c62ea](https://github.com/langwatch/langwatch/commit/82c62eacb15d9a9ae33e5f4a14da82feaf1de033))
+
+
+### Code Refactoring
+
+* **api:** migrate hono-openapi 0.4.8 -&gt; 1.3.1 ([#7286](https://github.com/langwatch/langwatch/issues/7286)) ([f814e42](https://github.com/langwatch/langwatch/commit/f814e42612ed86650dfd0014df3be70bf0e42b8c))
+
 ## [1.6.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.5.0...typescript-sdk@v1.6.0) (2026-08-18)
 
 

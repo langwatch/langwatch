@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import {
@@ -17,6 +17,8 @@ import {
   type LedgerBindingAttach,
   ledgerPrincipal,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
@@ -103,22 +105,30 @@ export class RoleBindingService {
   // Every binding write on this service is a grants-ledger command; the
   // RoleBinding table is a projection fed by the fold, never written here.
   private readonly writer: GrantsLedgerWriter;
+  // Listing reads go through the per-organization fork: a cut-over
+  // organization's Access pages are served from the ledger's own head, so
+  // what people see and what the engine decides from can never be different
+  // heads (ADR-092, delivery-plan PR 3 follow-up).
+  private readonly accessListing: AccessListingRepository;
 
   constructor({
     prisma,
     repo,
     roleService,
     writer = grantsLedgerWriter(),
+    accessListing = new CutoverAwareAccessListingRepository(prisma),
   }: {
     prisma: PrismaClient;
     repo: RoleBindingRepository;
     roleService: RoleService;
     writer?: GrantsLedgerWriter;
+    accessListing?: AccessListingRepository;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleService = roleService;
     this.writer = writer;
+    this.accessListing = accessListing;
   }
 
   /**
@@ -366,7 +376,7 @@ export class RoleBindingService {
     const [orgs, teams, projects] = await Promise.all([
       orgIds.length > 0
         ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
+            where: { id: { in: orgIds.filter((id) => id === organizationId) } },
             select: { id: true, name: true },
           })
         : [],
@@ -399,12 +409,9 @@ export class RoleBindingService {
     organizationId: string;
     userId: string;
   }) {
-    const bindings = await this.prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      include: {
-        customRole: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "asc" },
+    const bindings = await this.accessListing.findUserBindings({
+      organizationId,
+      userId,
     });
 
     const { scopeNames, personalScopeIds } = await this.resolveScopes({
@@ -428,25 +435,8 @@ export class RoleBindingService {
   }
 
   async listForOrg({ organizationId }: { organizationId: string }) {
-    const bindings = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        OR: [
-          {
-            userId: { not: null },
-            user: { orgMemberships: { some: { organizationId } } },
-          },
-          { groupId: { not: null }, group: { organizationId } },
-          { apiKeyId: { not: null }, apiKey: { organizationId } },
-        ],
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true, image: true } },
-        group: { select: { id: true, name: true, scimSource: true } },
-        apiKey: { select: { id: true, name: true } },
-        customRole: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "asc" },
+    const bindings = await this.accessListing.findOrganizationBindings({
+      organizationId,
     });
 
     const { scopeNames, personalScopeIds } = await this.resolveScopes({
@@ -527,19 +517,10 @@ export class RoleBindingService {
 
     const groupIds = groupMemberships.map((gm) => gm.groupId);
 
-    const allBindings = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        OR: [
-          { userId },
-          ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
-        ],
-      },
-      include: {
-        customRole: { select: { id: true, name: true, permissions: true } },
-        group: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "asc" },
+    const allBindings = await this.accessListing.findUserAndGroupBindings({
+      organizationId,
+      userId,
+      groupIds,
     });
 
     const orgScopeIds = allBindings

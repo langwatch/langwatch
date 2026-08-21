@@ -27,6 +27,12 @@ interface CommandBarResultsProps {
   easterEggItem: ListItem | null;
   askLangyItem: ListItem | null;
   isLoading: boolean;
+  /**
+   * Whether a line marks the boundary with the field above the list. True
+   * where the field and the list share one card, false where the list is its
+   * own panel and already carries an edge of its own.
+   */
+  showTopDivider: boolean;
 }
 
 interface GroupConfig {
@@ -62,6 +68,7 @@ export const CommandBarResults = forwardRef<
     easterEggItem,
     askLangyItem,
     isLoading,
+    showTopDivider,
   },
   ref,
 ) {
@@ -244,11 +251,13 @@ export const CommandBarResults = forwardRef<
   return (
     <Box
       ref={ref}
+      data-testid="command-bar-results"
       maxHeight={COMMAND_BAR_MAX_HEIGHT}
       overflowY="auto"
       paddingBottom={2.5}
-      borderTop="1px solid"
-      borderColor="border.subtle"
+      {...(showTopDivider
+        ? { borderTop: "1px solid", borderColor: "border.subtle" }
+        : {})}
     >
       <VStack align="stretch" gap={0}>
         {renderGroups()}

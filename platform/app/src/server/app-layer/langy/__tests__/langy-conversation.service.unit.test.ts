@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
+  LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "../errors";
@@ -369,6 +370,101 @@ describe("LangyConversationService", () => {
       });
       expect(result.id).not.toBe("archived-id");
       expect(result.id).toBeTruthy();
+    });
+
+    it("mints a fresh conversation id when the projection row is archived", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "archived-id",
+      });
+      expect(result.id).not.toBe("archived-id");
+      expect(result.id).toBeTruthy();
+    });
+  });
+
+  describe("when ensureConversation is asked to adopt an unknown id", () => {
+    it("adopts the caller-chosen id as a new conversation", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: true,
+      });
+    });
+
+    it("reuses an already-adopted id on later turns without re-adopting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("owned"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: false,
+      });
+    });
+
+    it("still refuses an id owned by another user", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("other"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "c1",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+    });
+
+    it("throws loudly on an archived collision instead of resurrecting or minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "archived-id",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
+    });
+
+    it("throws loudly on an id that fails the shape gate instead of minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "bad id!", // space and punctuation
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
     });
   });
 

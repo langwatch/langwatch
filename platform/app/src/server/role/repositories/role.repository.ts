@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -12,6 +12,8 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
@@ -49,6 +51,12 @@ export class RoleRepository {
      * transaction client.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    // Listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up): a cut-over organization's role editor
+    // lists from the ledger's own Role head.
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
   ) {}
 
   async findAllByOrganization(organizationId: string) {
@@ -59,13 +67,10 @@ export class RoleRepository {
   }
 
   async findUserCreatedByOrganization(organizationId: string) {
-    return this.prisma.customRole.findMany({
-      where: {
-        organizationId,
-        kind: CUSTOM_ROLE_KIND.CUSTOM,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's role editor is served from the
+    // ledger's own Role head.
+    return this.accessListing.findUserCreatedRoles({ organizationId });
   }
 
   async findById(roleId: string) {
@@ -393,11 +398,14 @@ export class RoleRepository {
     apiKeyId,
     organizationId,
     actor,
+    awaitProjection = true,
   }: {
     roleIds: string[];
     apiKeyId: string;
     organizationId: string;
     actor: LedgerActor;
+    /** Same contract as `GrantsLedgerWriter.deleteRole`'s parameter of this name. */
+    awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;
     // Revoke this api key's CUSTOM grants on these roles FIRST. The
@@ -431,7 +439,12 @@ export class RoleRepository {
         this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
       ]);
       if (holders > 0 || assignedUsers > 0) continue;
-      await this.writer.deleteRole({ organizationId, roleId, actor });
+      await this.writer.deleteRole({
+        organizationId,
+        roleId,
+        actor,
+        awaitProjection,
+      });
     }
   }
 

@@ -27,8 +27,6 @@ export interface SectionNavItemData {
   href: string;
   includePath?: string;
   icon: LucideIcon;
-  /** Opens in a new tab with an external-link marker. */
-  isExternal?: boolean;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -43,7 +41,6 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
-    isExternal: true,
   },
   {
     label: "Budgets",
@@ -96,7 +93,7 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: Eye,
   },
   {
-    label: "Ingestion Sources",
+    label: "Catalog",
     href: "/governance/ingestion-sources",
     includePath: "/governance/ingestion-sources",
     icon: PlugZap,
@@ -108,7 +105,7 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: AlertTriangle,
   },
   {
-    label: "Tool Catalog",
+    label: "Tool Tiles",
     href: "/governance/tool-catalog",
     includePath: "/governance/tool-catalog",
     icon: PackageOpen,

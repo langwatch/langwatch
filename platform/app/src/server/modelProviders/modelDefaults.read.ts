@@ -2,14 +2,14 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
-import {
-  batchScopePermissions,
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "../api/rbac";
+import { batchScopePermissions } from "../api/rbac";
 import {
   allFeatures,
   featureByKey,
@@ -181,7 +181,7 @@ export async function getDefaultModelsSnapshot(
   let writableTeams: { id: string; name: string }[] = [];
   let writableProjects: { id: string; name: string; teamId: string }[] = [];
   if (organizationId) {
-    canWriteOrg = await hasOrganizationPermission(
+    canWriteOrg = await probeOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:manage",
@@ -222,7 +222,7 @@ export async function getDefaultModelsSnapshot(
       .map(({ id, name, teamId: tid }) => ({ id, name, teamId: tid }));
   } else {
     // Personal-account project (no org/team): only project scope.
-    const writable = await hasProjectPermission(
+    const writable = await probeProjectPermission(
       ctx,
       projectId,
       "project:update",
@@ -255,7 +255,7 @@ export async function getDefaultModelsSnapshot(
   // permission on — that would leak the org-wide policy landscape.
   const canReadOrg =
     !!organizationId &&
-    (await hasOrganizationPermission(
+    (await probeOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:view",
@@ -298,7 +298,7 @@ export async function getDefaultModelsSnapshot(
       .filter((p) => projectReadBatch.projects.get(p.id))
       .map((p) => p.id);
   } else if (teamId) {
-    const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
+    const teamReadable = await probeTeamPermission(ctx, teamId, "team:view");
     if (teamReadable) readableTeamIds = [teamId];
   }
 

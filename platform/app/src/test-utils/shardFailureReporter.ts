@@ -34,6 +34,7 @@ const MODULE_TALLY = "__langwatchShardTestModuleTally";
 
 interface ModuleTally {
   selected: number;
+  shardSelected: number | null;
   started: number;
   reported: number;
   inFlight: Set<string>;
@@ -56,11 +57,27 @@ function moduleTally(): ModuleTally {
   const carrier = globalThis as StateCarrier;
   carrier[MODULE_TALLY] ??= {
     selected: 0,
+    shardSelected: null,
     started: 0,
     reported: 0,
     inFlight: new Set<string>(),
   };
   return carrier[MODULE_TALLY];
+}
+
+/**
+ * How many files this shard was given, which only the sequencer knows.
+ *
+ * The reporter is handed the whole suite's file list, before the sequencer
+ * splits it, so its own `selected` is the same number on all four shards.
+ * Comparing a shard's progress against that says "still had files to start"
+ * on every sharded run, whatever the shard was doing.
+ *
+ * Recorded rather than read back later because the sequencer runs once, in the
+ * same process, and nothing else is in a position to say.
+ */
+export function recordShardSelection(count: number): void {
+  moduleTally().shardSelected = count;
 }
 
 /**
@@ -88,6 +105,7 @@ export function resetShardState(): void {
  */
 export function shardModuleTally(): {
   selected: number;
+  shardSelected: number | null;
   started: number;
   reported: number;
   unreportedFiles: string[];
@@ -95,6 +113,7 @@ export function shardModuleTally(): {
   const tally = moduleTally();
   return {
     selected: tally.selected,
+    shardSelected: tally.shardSelected,
     started: tally.started,
     reported: tally.reported,
     unreportedFiles: [...tally.inFlight].sort(),
@@ -129,6 +148,8 @@ export default class ShardFailureReporter {
     tally.started = 0;
     tally.reported = 0;
     tally.inFlight.clear();
+    // `shardSelected` is deliberately left alone: the sequencer sets it, and
+    // the two run in an order vitest does not promise.
   }
 
   /**

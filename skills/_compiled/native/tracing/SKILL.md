@@ -26,36 +26,6 @@ This skill is code-only: there is no platform path for tracing. If the user has 
 
 ## Step 1: Read the Integration Docs
 
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
-
-**Projects and API keys: target a real project, not a personal one.**
-
-LangWatch has two kinds of project:
-
-- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only, and you can mistake it for a real project.
-
-And two ways to authenticate:
-
-- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
-- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
-
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
-
 Then fetch the integration guide for this project's framework:
 
 ```bash

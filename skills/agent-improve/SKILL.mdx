@@ -9,6 +9,7 @@ compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Wo
 import CliSetup from '../_shared/cli-setup.mdx'
 import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
 import PlanLimits from '../_shared/plan-limits.mdx'
+import ImprovingTheAgent from '../_shared/improving-the-agent.mdx'
 
 # Improve Your Agent, Hypothesis by Hypothesis
 
@@ -65,6 +66,10 @@ Sanitize before you commit: production traces can carry names, emails, account d
 ### Change prompts and code as a reviewable PR
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
 
+Pick the layer before you edit, and report the prompt's size change in the PR:
+
+<ImprovingTheAgent />
+
 ### Capture production signals with evaluators and monitors
 When a hypothesis needs more production data, or a fixed issue must stay fixed, add detection:
 
@@ -98,3 +103,4 @@ After executing:
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals no one will act on; every artifact needs an owner and a purpose
+- Do NOT grow the system prompt one rule per fixed failure; a prompt that only ever grows is accumulating patches, and it overfits to the tests it was patched against

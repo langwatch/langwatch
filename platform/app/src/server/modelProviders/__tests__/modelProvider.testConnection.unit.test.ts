@@ -24,11 +24,11 @@ vi.mock("../../rateLimit", () => ({
   rateLimit: (...args: unknown[]) => rateLimitMock(...args),
 }));
 
-vi.mock("../../api/rbac", () => ({
-  hasOrganizationPermission: (...args: unknown[]) =>
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
+  probeOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
-  hasTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
-  hasProjectPermission: (...args: unknown[]) =>
+  probeTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
+  probeProjectPermission: (...args: unknown[]) =>
     hasProjectPermissionMock(...args),
 }));
 

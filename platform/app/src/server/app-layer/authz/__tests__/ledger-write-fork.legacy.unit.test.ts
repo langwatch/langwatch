@@ -6,7 +6,7 @@
  * to write — and emits nothing, so the deploy is inert until the flip. The
  * ledger side lives in `ledger-write-fork.ledger.unit.test.ts`.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
 import {
   BindingMissingError,
@@ -296,6 +296,44 @@ describe("given an organization the genesis import has not reached", () => {
     });
   });
 
+  describe("when a RESOURCE grant is revoked", () => {
+    /**
+     * The one revocation verb that ignores this fork entirely. Were the
+     * gate's `false` honored here, the "revocation" would delete only the
+     * `RoleBinding` row: no fact appended, the `Grant` head still holding a
+     * live grant, and the share link still resolving. Revocation must never
+     * come undone, so the fact appends and enforcement runs whichever way
+     * the gate answers.
+     */
+    it("appends the fact even when the write gate answers legacy", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
+
+      await writer.revokeResourceGrants({
+        organizationId: ORG_ID,
+        grantIds: ["share_1"],
+        actor: ACTOR,
+      });
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]!.verb).toBe("revokeGrant");
+      expect(sent[0]!.data).toMatchObject({ grantId: "share_1" });
+      // Enforcement, not the legacy imperative branch: the row is MARKED
+      // (the legacy branch never touches the Grant head at all), and no
+      // legacy audit row is written - the fact IS the audit trail here.
+      expect(db.grant.updateMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: ORG_ID,
+          id: { in: ["share_1"] },
+          revokedAt: null,
+        },
+        // null, not a placeholder: the caller gave no reason and the mark
+        // writes only authored facts — the bypass label lives in telemetry.
+        data: { revokedAt: expect.any(Date), revokedReason: null },
+      });
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a member is offboarded", () => {
     /** @scenario "An organization that has not completed the genesis import keeps writing legacy rows imperatively" */
     it("deletes the member's grant rows and leaves membership to the caller", async () => {
@@ -312,9 +350,14 @@ describe("given an organization the genesis import has not reached", () => {
       expect(db.roleBinding.deleteMany).toHaveBeenCalledWith({
         where: { organizationId: ORG_ID, id: { in: ["rb_1"] } },
       });
+      // `revoke`, not an `offboard` verb of its own: offboarding is N
+      // revocations sharing one reason on both heads (ADR-110), so a verb
+      // only the legacy side wrote would make the two heads' audit trails
+      // disagree about the same operation. The departing user is still named
+      // in the metadata, which is what an operator searches on.
       expect(auditRows(db)).toMatchObject([
         {
-          action: "authz.grants.offboard",
+          action: "authz.grants.revoke",
           metadata: { userId: "user_sam", revokedGrantIds: ["rb_1"] },
         },
       ]);

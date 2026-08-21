@@ -32,6 +32,7 @@
 //
 // Spec: specs/ci/deployment-impact-check.feature
 
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -83,19 +84,55 @@ export interface Classification {
 }
 
 /**
+ * Names arrive exactly as the API reported them — no trimming. A path may end
+ * in a space, and `"charts/x/Chart.lock "` is a DIFFERENT file from
+ * `"charts/x/Chart.lock"`; normalising the two together would let an
+ * unrecognised file borrow a lockfile's exemption.
+ *
  * An empty change set is neither: with nothing to inspect there is nothing to
  * base an exemption on, so it falls through to requiring the writeup rather
  * than passing vacuously.
  */
 export const classify = (files: readonly string[]): Classification => {
-  const paths = files.map((f) => f.trim()).filter((f) => f !== "");
-  if (paths.length === 0) return { onlyLockfiles: false, onlyManifests: false };
+  if (files.length === 0) return { onlyLockfiles: false, onlyManifests: false };
 
-  const kinds = paths.map(kindOf);
+  const kinds = files.map(kindOf);
   return {
     onlyLockfiles: kinds.every((k) => k === "lockfile"),
     onlyManifests: kinds.every((k) => k === "lockfile" || k === "manifest"),
   };
+};
+
+/**
+ * Filenames out of `gh api --paginate --slurp`: an array of pages, each an
+ * array of file objects. JSON rather than newline-delimited text because a
+ * path may legally contain a newline, and line-splitting would turn one such
+ * path into two records that classify independently.
+ *
+ * Fails closed. A guard that cannot read its input must say so rather than
+ * wave the pull request through, matching rule R3 in guard-path-filters.ts.
+ */
+export const parseChangedFiles = (json: string): string[] => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch (cause) {
+    throw new Error(`changed-files JSON did not parse: ${String(cause)}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("changed-files JSON is not an array of pages");
+  }
+
+  const entries = parsed.flatMap((page) => (Array.isArray(page) ? page : [page]));
+  return entries.map((entry) => {
+    const filename = (entry as { filename?: unknown } | null)?.filename;
+    if (typeof filename !== "string" || filename === "") {
+      throw new Error(
+        `changed-files entry has no usable filename: ${JSON.stringify(entry)}`,
+      );
+    }
+    return filename;
+  });
 };
 
 export const isDependencyBot = (author: string): boolean =>
@@ -135,8 +172,13 @@ const isEntrypoint = (): boolean =>
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
-  const author = process.env.PR_AUTHOR ?? "";
-  const files = (process.env.CHANGED_FILES ?? "").split("\n");
-  const outputs = main({ files, author });
+  const path = process.argv[2];
+  if (path === undefined) {
+    throw new Error(
+      "usage: guard-deployment-impact.ts <changed-files.json>  (PR_AUTHOR in env)",
+    );
+  }
+  const files = parseChangedFiles(readFileSync(path, "utf8"));
+  const outputs = main({ files, author: process.env.PR_AUTHOR ?? "" });
   for (const line of outputs) console.log(line);
 }

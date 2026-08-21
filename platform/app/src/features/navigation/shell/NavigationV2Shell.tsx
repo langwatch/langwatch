@@ -12,6 +12,7 @@ import Head from "~/utils/compat/next-head";
 import { ICON_RAIL_WIDTH, IconRail } from "./IconRail";
 import { ProductSidebar } from "./ProductSidebar";
 import { ShellTopBar } from "./ShellTopBar";
+import { shellContentMaxWidth } from "./shellLayout";
 import {
   type NavigationV2ShellReadyState,
   useNavigationV2ShellState,
@@ -128,11 +129,12 @@ function ShellContentRow({
 }) {
   const { activeProductId, isCompactSidebar, langyDockInset, menuWidth } =
     state;
-  // The rail is a sibling of this column, so its width is already gone from
-  // the space the content can use. The cap subtracts both it and the sidebar.
-  const contentInsetWidth = isIconRail
-    ? `${menuWidth} + ${ICON_RAIL_WIDTH}`
-    : menuWidth;
+  // The rail is a sibling of this column, so its width is room the page does
+  // not have, the same as the sidebar's.
+  const contentMaxWidth = shellContentMaxWidth({
+    menuWidth,
+    railWidth: isIconRail ? ICON_RAIL_WIDTH : null,
+  });
 
   return (
     <HStack
@@ -153,7 +155,7 @@ function ShellContentRow({
         background="bg.page"
         minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
         maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-        maxWidth={`calc(100vw - ${contentInsetWidth})`}
+        maxWidth={contentMaxWidth}
         paddingRight={`${langyDockInset}px`}
         transition={`padding-right ${LANGY_TRANSITION}`}
       >

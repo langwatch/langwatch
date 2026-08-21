@@ -18,7 +18,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -47,6 +47,19 @@ Best practices:
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
 
+## Improving the Agent When a Scenario Fails
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
 ## Plan Limits
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
@@ -63,36 +76,6 @@ How to handle:
 ## Code Approach: Scenario SDK
 
 ### Step 1: Read the Scenario Docs
-
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
-
-**Projects and API keys: target a real project, not a personal one.**
-
-LangWatch has two kinds of project:
-
-- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only, and you can mistake it for a real project.
-
-And two ways to authenticate:
-
-- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
-- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
-
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -724,22 +707,6 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 Use this when the user has no codebase. NOTE: If you have a codebase and want test files, use the Code Approach above instead.
 
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
-
 Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. What follows is the surface as it actually is; `--help` is the live source when in doubt.
 
 ### Three nouns, and mixing them up is what makes this API feel confusing
@@ -882,7 +849,7 @@ After delivering initial results, transition to consultant mode to help the user
 
 **Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run the tests and iterate, but stop after two attempts at the same failure and report what is blocking it rather than repeating the run. Show the user what works.
 
 **Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
@@ -897,6 +864,8 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
+- Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
 - Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)

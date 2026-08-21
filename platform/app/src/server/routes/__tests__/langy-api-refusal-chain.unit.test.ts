@@ -96,6 +96,7 @@ vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
 const mockStartConversationTurn = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     langy: { turns: { startConversationTurn: mockStartConversationTurn } },
   })),

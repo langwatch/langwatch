@@ -60,11 +60,13 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
+
+wireDefaultTestApp();
 
 type Caller = ReturnType<typeof savedWorkbenchChartsRouter.createCaller>;
 
@@ -312,7 +314,7 @@ describe("the saved workbench chart router", () => {
               definition: DEFINITION,
             }),
           ),
-        ).toBe("project_permission_denied");
+        ).toBe("permission_denied");
         expect(
           await refusalOf(() =>
             reader.update({
@@ -321,12 +323,12 @@ describe("the saved workbench chart router", () => {
               name: "Renamed",
             }),
           ),
-        ).toBe("project_permission_denied");
+        ).toBe("permission_denied");
         expect(
           await refusalOf(() =>
             reader.delete({ projectId: PROJECT, id: saved.id }),
           ),
-        ).toBe("project_permission_denied");
+        ).toBe("permission_denied");
 
         // Nothing the refused writes attempted actually happened.
         const after = await author.getById({

@@ -107,7 +107,7 @@ test("complex product areas share one local navigation layout", async ({
     name: "AI Governance navigation",
   });
   await governanceNavigation
-    .getByRole("link", { name: "Ingestion Sources", exact: true })
+    .getByRole("link", { name: "Catalog", exact: true })
     .click();
   await expect(page).toHaveURL("/governance/ingestion-sources");
 
@@ -120,7 +120,7 @@ test("complex product areas share one local navigation layout", async ({
       .getByRole("link", { name: "Overview", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     const activeBackground = await governanceNavigation
-      .getByRole("link", { name: "Ingestion Sources", exact: true })
+      .getByRole("link", { name: "Catalog", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(overviewBackground).not.toBe(activeBackground);
   }).toPass({ timeout: 15_000 });

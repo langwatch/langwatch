@@ -141,12 +141,12 @@ Feature: Governance home — route, nav promotion, persona detection
       sub-routes:
       | label             | href                                          |
       | Overview          | /governance                                   |
-      | Ingestion Sources | /governance/ingestion-sources                 |
+      | Catalog           | /governance/ingestion-sources                 |
       | Anomaly Rules     | /governance/anomaly-rules                     |
 
   @bdd @ui @governance-home @layout @sub-routes
   Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
-    When the admin clicks "Ingestion Sources" in the GovernanceLayout
+    When the admin clicks "Catalog" in the GovernanceLayout
       left rail and lands on "/governance/ingestion-sources"
     Then the page renders inside GovernanceLayout, the same chrome as
       the daily-use home

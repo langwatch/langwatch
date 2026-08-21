@@ -261,3 +261,24 @@ Feature: Redacting personal data from traces
   Scenario: A long value holding no personal data is returned unchanged
     When a trace is ingested whose input is a long opaque token
     Then the stored input is byte-for-byte what was sent
+
+  # Phone numbers are the same idea again, counted in digits rather than in
+  # characters: text whose longest run of digits is shorter than any phone
+  # number is skipped. A trace full of version numbers, token counts and
+  # timestamps is the ordinary case, and it used to cost more than the rest of
+  # redaction together.
+  #
+  # A phone number is redacted wherever its country writes it, so the shortest
+  # number in use anywhere stays above the length that decides the skip.
+
+  @unit
+  Scenario: A phone number is redacted whatever country it belongs to
+    When a trace is ingested whose input contains phone numbers from every
+      country, written the way each country writes them
+    Then every one of them is redacted
+
+  @unit
+  Scenario: Numeric text that is no phone number is left alone
+    When a trace is ingested whose input carries version numbers and counts but
+      no run of digits long enough to be a phone number
+    Then the stored input is unchanged

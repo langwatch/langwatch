@@ -39,6 +39,7 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   getTestClickHouseClient,
@@ -47,6 +48,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;
@@ -141,7 +144,7 @@ describe("user.cliBootstrap integration", () => {
     it("rejects via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.cliBootstrap({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
