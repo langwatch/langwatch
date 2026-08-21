@@ -1,0 +1,26 @@
+{
+  "name": "@langwatch/langyworker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Langy's pi harness: a thin wrapper around the pi coding-agent SDK that speaks the langy-worker stdio JSONL protocol (PROTOCOL.md) to the langyagent manager. Compiled to a single `langy-worker` binary for the worker image; runs under plain `node dist/src/main.js` as the fallback runtime path.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/src/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "build:binary": "bun run scripts/build-binary.ts",
+    "smoke": "bun run scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "typebox": "1.3.7",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}
