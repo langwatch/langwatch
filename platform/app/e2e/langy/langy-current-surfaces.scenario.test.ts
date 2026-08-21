@@ -37,7 +37,7 @@ describe("Langy current-surfaces coverage", () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog(
         {
-          name: "virtual keys permission boundary",
+          name: "virtual keys read capability",
           description:
             "The user wants to see the virtual keys configured on their AI Gateway, a surface Langy can read and administer on the caller's behalf.",
           agents: [

@@ -12,6 +12,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Namespace alias for the partial mock's `importOriginal` type argument. A
+// top-level `import type` rather than an inline `import()` query, per the
+// repo's TypeScript guidelines; erased at compile time, so it does not
+// perturb the hoisted `vi.mock` below.
+import type * as RbacModule from "~/server/api/rbac";
+
 vi.mock("~/utils/encryption", () => ({
   encrypt: vi.fn((value: string) => `enc:${value}`),
   decrypt: vi.fn((value: string) => value.replace(/^enc:/, "")),
@@ -23,7 +29,7 @@ const batchProjectPermissions = vi.fn();
 // `langyPermissionPolicy.ts` derives the candidate list from them at import
 // time — a stub there would silently shrink the very list this file tests.
 vi.mock("~/server/api/rbac", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/api/rbac")>()),
+  ...(await importOriginal<typeof RbacModule>()),
   batchProjectPermissions: (...args: unknown[]) =>
     batchProjectPermissions(...args),
 }));

@@ -304,8 +304,10 @@ describe("Langy permission coverage", () => {
         // folds `:rotate` into EVERY family's `:manage` as a string
         // (`analytics:rotate` is well-typed and enforced nowhere).
         const excludedSuffixes = [":share", ":rotate", ":viewOtherPersonal"];
+        let checked = 0;
         for (const [permission] of permissionsDemandedByRoutes()) {
           if (!excludedSuffixes.some((s) => permission.endsWith(s))) continue;
+          checked++;
           expect(
             hasPermissionWithHierarchy(
               [...LANGY_CANDIDATE_PERMISSIONS],
@@ -314,6 +316,15 @@ describe("Langy permission coverage", () => {
             `${permission} is reachable through the hierarchy`,
           ).toBe(false);
         }
+        // Scoping the loop to route-demanded grains bought precision at the
+        // cost of a vacuity risk: rename or re-gate every such route and the
+        // body runs zero times while the test stays green. Pin that it saw
+        // work, so the coverage disappearing is itself a failure.
+        expect(
+          checked,
+          "No route demands an excluded grain any more, so the hierarchy " +
+            "check above ran on nothing. Re-point it or delete it.",
+        ).toBeGreaterThan(0);
       });
     });
 
