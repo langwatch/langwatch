@@ -161,7 +161,7 @@ export interface LangWatchQLTenantFixture {
    * substring.
    */
   rawSecret: string;
-  /** `sha256(rawSecret)`, the only form that travels to ClickHouse. */
+  /** `sha512(rawSecret)`, the only form that travels to ClickHouse. */
   keyHash: string;
 }
 
@@ -177,7 +177,7 @@ function tenantFixture(
     // own copy of the algorithm would drift into seeding a digest production
     // never computes — surfacing as every LangWatchQL read returning zero rows,
     // which is indistinguishable from a tenant that simply has no data. What
-    // pins the digest to SHA-256 is a known-answer assertion, in
+    // pins the digest to SHA-512 is a known-answer assertion, in
     // `tenantIsolation.integration.test.ts`.
     keyHash: lwqlTenantCapability({ secret: rawSecret }),
   };

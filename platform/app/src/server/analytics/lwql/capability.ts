@@ -25,7 +25,7 @@
  *
  * ## Why a fast hash, and why a slow KDF would be wrong here
  *
- * Static analysis reads `sha256` over a secret as password storage and asks
+ * Static analysis reads `sha512` over a secret as password storage and asks
  * for bcrypt or Argon2 (CodeQL `js/insufficient-password-hash`). Neither
  * applies. This is not a verifier for a human-chosen secret; it is the
  * join key ClickHouse looks up in the key map, so it has to be deterministic —
@@ -67,5 +67,5 @@ export function lwqlTenantCapability({ secret }: { secret: string }): string {
       "LangWatchQL tenant capability requires a non-empty secret",
     );
   }
-  return createHash("sha256").update(secret).digest("hex");
+  return createHash("sha512").update(secret).digest("hex");
 }
