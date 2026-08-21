@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
 export const queueRunCommandDataSchema = z.object({
@@ -10,6 +11,11 @@ export const queueRunCommandDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * The run's secret parameter values, encrypted, keyed by name. A sibling of
+   * `metadata` so the fold projection cannot copy it into the runs store.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
   /** Target for execution. Used by the process manager's execute intent to spawn the right adapter. */
   target: z
     .object({

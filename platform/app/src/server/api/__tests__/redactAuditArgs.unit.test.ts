@@ -6,7 +6,8 @@
  * gone in alongside.
  *
  * Covers @unit scenarios from
- * specs/model-providers/credential-validation.feature.
+ * specs/model-providers/credential-validation.feature and
+ * specs/scenarios/secret-run-parameters.feature.
  */
 import { describe, expect, it } from "vitest";
 
@@ -127,6 +128,58 @@ describe("redactAuditArgs", () => {
       it("leaves a non-array extraHeaders alone", () => {
         const input = { extraHeaders: null };
 
+        expect(redactAuditArgs(input)).toBe(input);
+      });
+    });
+  });
+
+  describe("given a run started with parameter values", () => {
+    describe("when the action is one that can carry a secret parameter", () => {
+      /** @scenario "Audit log entries never record a secret value" */
+      it.each([
+        "suites.run",
+        "scenarios.run",
+      ])("keeps the names and drops every value on %s", (action) => {
+        const redacted = redactAuditArgs(
+          {
+            projectId: "proj-1",
+            parameters: { api_token: "tok-live-1", region: "eu-central" },
+          },
+          action,
+        ) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+        expect(redacted.parameters).toEqual({
+          api_token: "[redacted]",
+          region: "[redacted]",
+        });
+        expect(redacted.projectId).toBe("proj-1");
+      });
+
+      /** @scenario "Audit log entries never record a secret value" */
+      it("redacts the values typed into the http test button", () => {
+        const redacted = redactAuditArgs(
+          {
+            projectId: "proj-1",
+            url: "https://api.example.com/chat",
+            templateVariables: { token: "tok-live-1" },
+          },
+          "httpProxy.execute",
+        ) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+        expect(redacted.templateVariables).toEqual({ token: "[redacted]" });
+        expect(redacted.url).toBe("https://api.example.com/chat");
+      });
+    });
+
+    describe("when the action is any other one", () => {
+      // `parameters` is an ordinary word: a code agent's config carries one,
+      // and its contents are the agent's own code, not a credential.
+      it("leaves a parameters field on an unrelated action alone", () => {
+        const input = { parameters: { region: "eu-central" } };
+
+        expect(redactAuditArgs(input, "agents.update")).toBe(input);
         expect(redactAuditArgs(input)).toBe(input);
       });
     });

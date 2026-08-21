@@ -304,6 +304,7 @@ export async function executeScenarioRun(
         batchRunId: jobData.batchRunId,
         scenarioRunId: jobData.scenarioRunId,
         parameters: jobData.parameters,
+        secretParameters: jobData.secretParameters,
       },
       target: jobData.target,
       deps: prefetchDeps,

@@ -326,6 +326,67 @@ describe("SuiteService", () => {
         });
       });
 
+      describe("when a scenario declares one of them secret", () => {
+        const declaringSecret = {
+          findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+            ids.map((id) => ({
+              id,
+              name: id,
+              situation: "A {{ params.account_tier }} customer asks for help",
+              criteria: ["Answers the question"],
+              parameters: [
+                { name: "account_tier", defaultValue: "gold" },
+                { name: "api_token", secret: true },
+              ],
+            })),
+          ),
+        };
+
+        /** @scenario "A secret value is never written to the simulation runs store" */
+        it("hands the secret to suiteRunService encrypted and out of the plain values", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"] }),
+            ...RUN_DEFAULTS,
+            parameters: { api_token: "tok-live-1" },
+          });
+
+          const { parametersByScenarioId, secretParametersByScenarioId } =
+            suiteRunService.startRun.mock.calls[0]?.[0] as {
+              parametersByScenarioId: Map<string, Record<string, unknown>>;
+              secretParametersByScenarioId: Map<string, Record<string, string>>;
+            };
+
+          expect(parametersByScenarioId.get("scen_1")).toEqual({
+            account_tier: "gold",
+          });
+          const stamped = secretParametersByScenarioId.get("scen_1");
+          expect(Object.keys(stamped!)).toEqual(["api_token"]);
+          expect(stamped!.api_token).not.toContain("tok-live-1");
+        });
+
+        /** @scenario "A secret parameter value must be supplied when the run starts" */
+        it("rejects the run when the secret has no value", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({ scenarioIds: ["scen_1"] }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "scenario_secret_parameter_missing",
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+      });
+
       describe("when the scenario reads a parameter nothing resolves", () => {
         it("rejects with scenario_parameter_missing before anything is scheduled", async () => {
           const { service, suiteRunService } = createService({

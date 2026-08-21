@@ -443,7 +443,10 @@ const auditLogTRPCErrors = t.middleware(
         organizationId: (input as any)?.organizationId,
         projectId: (input as any)?.projectId,
         action: path,
-        args: input,
+        // Through the same redaction as the success path. This middleware
+        // records the calls the other one does not, so it must not be able to
+        // store in clear what the other one takes out.
+        args: redactAuditArgs(input, path),
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
@@ -584,6 +587,25 @@ function isAuditLogExempt(path: string): boolean {
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
+/**
+ * Action paths whose input carries values a person typed for one run, keyed by
+ * the field that holds them.
+ *
+ * `parameters` on a run can hold a credential: a scenario can declare a
+ * parameter secret, and the value is supplied when the run starts.
+ * `templateVariables` on the http test button is where the same person types a
+ * test token. Both field names are ordinary words other mutations use for
+ * harmless things, so the rule is bound to the action rather than to the name.
+ *
+ * The names are kept: "which parameters did this run set" is the part of the
+ * record worth having.
+ */
+const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "suites.run": ["parameters"],
+  "scenarios.run": ["parameters"],
+  "httpProxy.execute": ["templateVariables"],
+};
+
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
@@ -599,8 +621,11 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
  * key out of a URL. A secret in a durable, queryable table is worse than one
  * in a request line, so the values go. The field names stay, because "which
  * credentials were set" is the part of the record worth having.
+ *
+ * `action` is the tRPC path. It selects the rules that only apply to one
+ * mutation, such as a run's parameter values.
  */
-export function redactAuditArgs(input: unknown): unknown {
+export function redactAuditArgs(input: unknown, action?: string): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
@@ -613,7 +638,12 @@ export function redactAuditArgs(input: unknown): unknown {
     redacted[field] = value;
   };
 
-  for (const field of CREDENTIAL_OBJECT_FIELDS) {
+  const objectFields = [
+    ...CREDENTIAL_OBJECT_FIELDS,
+    ...(action ? (REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []) : []),
+  ];
+
+  for (const field of objectFields) {
     const value = record[field];
     if (typeof value !== "object" || value === null) continue;
 
@@ -659,7 +689,7 @@ const auditLogMutations = t.middleware(
       organizationId: (input as any)?.organizationId,
       projectId: (input as any)?.projectId,
       action: path,
-      args: redactAuditArgs(input),
+      args: redactAuditArgs(input, path),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,

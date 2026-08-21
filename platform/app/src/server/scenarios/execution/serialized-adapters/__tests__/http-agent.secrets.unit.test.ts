@@ -5,6 +5,7 @@
  *
  * @see specs/scenarios/http-agent-secret-references.feature
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
@@ -423,6 +424,80 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await expect(adapter.call(input)).rejects.toBe(thrown);
       expect(thrown.message).toBe("fetch failed");
+    });
+  });
+});
+
+describe("SerializedHttpAgentAdapter run secret parameters", () => {
+  // A run secret arrives merged into the same map the project's secrets use,
+  // so the adapter needs no knowledge of where a value came from. These pin
+  // that the merged map behaves the same way for both.
+  const RUN_SECRET = "run-tok-987";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSsrfSafeFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: vi.fn().mockResolvedValue({ response: "ok" }),
+      text: vi.fn().mockResolvedValue("ok"),
+    } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
+  });
+
+  describe("given a run secret merged over the project's secrets", () => {
+    /** @scenario "A secret value reaches targets through the secrets namespace" */
+    it("carries the run's value in the header", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          headers: [{ key: "X-Agent-Key", value: "{{ secrets.api_token }}" }],
+          secrets: { AGENT_TOKEN: SECRET_VALUE, api_token: RUN_SECRET },
+        }),
+      });
+
+      await adapter.call(input);
+
+      expect(requestedHeaders()["X-Agent-Key"]).toBe(RUN_SECRET);
+    });
+
+    /** @scenario "A run value overrides a project secret with the same name for that run" */
+    it("reads the run's value where a project secret has the same name", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.API_TOKEN }}",
+          // The prefetch merged the run's value over the project's, so only
+          // one value for the name reaches the adapter.
+          secrets: { API_TOKEN: RUN_SECRET },
+        }),
+      });
+
+      await adapter.call(input);
+
+      expect(requestedUrl()).toBe(`https://api.example.com/${RUN_SECRET}`);
+    });
+
+    /** @scenario "Error messages never contain a secret value" */
+    it("scrubs the run's value out of an upstream failure", async () => {
+      mockSsrfSafeFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(`{"error":"bad token ${RUN_SECRET}"}`),
+        json: vi.fn(),
+      } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
+
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.api_token }}",
+          secrets: { api_token: RUN_SECRET },
+        }),
+      });
+
+      await expect(adapter.call(input)).rejects.toThrow(/HTTP 401/);
+      await expect(adapter.call(input)).rejects.not.toThrow(
+        new RegExp(RUN_SECRET),
+      );
     });
   });
 });

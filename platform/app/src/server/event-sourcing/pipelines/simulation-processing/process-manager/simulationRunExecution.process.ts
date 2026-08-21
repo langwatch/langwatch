@@ -4,6 +4,7 @@ import type {
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
@@ -86,6 +87,17 @@ export function buildSimulationRunEventView(
     parsedParameters.success && Object.keys(parsedParameters.data).length > 0
       ? parsedParameters.data
       : null;
+  // Encrypted, and kept encrypted: this view is persisted verbatim into inbox
+  // and outbox rows. It rides beside the metadata rather than inside it, so an
+  // event written by a build that did not have it simply has nothing here.
+  const parsedSecretParameters = runSecretCiphertextSchema.safeParse(
+    data.secretParameters,
+  );
+  const secretParameters =
+    parsedSecretParameters.success &&
+    Object.keys(parsedSecretParameters.data).length > 0
+      ? parsedSecretParameters.data
+      : null;
   return {
     eventType: event.type,
     occurredAt: event.occurredAt,
@@ -96,6 +108,7 @@ export function buildSimulationRunEventView(
     name: str(data.name),
     target,
     parameters,
+    secretParameters,
   };
 }
 
@@ -215,6 +228,9 @@ export const handleRunQueued: EventHandler<
         ...(view.name !== null ? { name: view.name } : {}),
         target: view.target,
         ...(view.parameters !== null ? { parameters: view.parameters } : {}),
+        ...(view.secretParameters !== null
+          ? { secretParameters: view.secretParameters }
+          : {}),
       }),
     ],
   };
