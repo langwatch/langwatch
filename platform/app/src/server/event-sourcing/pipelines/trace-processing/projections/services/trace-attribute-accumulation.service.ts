@@ -29,6 +29,46 @@ const VERCEL_RESERVED_METADATA: Readonly<Record<string, string>> = {
   customerId: "langwatch.customer_id",
 };
 
+/** The metadata name behind a Vercel telemetry key, or null for any other key. */
+const vercelMetadataName = (key: string): string | null =>
+  key.startsWith(VERCEL_METADATA_PREFIX)
+    ? key.slice(VERCEL_METADATA_PREFIX.length) || null
+    : null;
+
+/** Labels as an array, whether they arrive as one or as a JSON string. */
+const labelList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((label): label is string => typeof label === "string")
+    : parseJsonStringArray(typeof value === "string" ? value : void 0);
+
+const unionLabelsInto = (
+  result: Record<string, string>,
+  labels: string[],
+): void => {
+  if (labels.length === 0) return;
+  const existing = parseJsonStringArray(result[ATTR_KEYS.LANGWATCH_LABELS]);
+  result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([
+    ...new Set([...existing, ...labels]),
+  ]);
+};
+
+/** Writes the value only when the key has no value yet, so an explicit one wins. */
+const fillIfEmpty = (
+  result: Record<string, string>,
+  key: string,
+  value: unknown,
+): void => {
+  if (result[key]) return;
+  if (typeof value === "string" && value.length > 0) result[key] = value;
+};
+
+const attributeText = (value: unknown): string =>
+  typeof value === "string"
+    ? value
+    : typeof value === "object"
+      ? JSON.stringify(value)
+      : String(value);
+
 export const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.name", "sdk.name"],
   ["telemetry.sdk.version", "sdk.version"],
@@ -313,41 +353,21 @@ export class TraceAttributeAccumulationService {
     result: Record<string, string>,
   ): void {
     for (const [key, value] of Object.entries(spanAttrs)) {
-      if (!key.startsWith(VERCEL_METADATA_PREFIX)) continue;
-      if (value === null || value === undefined) continue;
-
-      const name = key.slice(VERCEL_METADATA_PREFIX.length);
-      if (!name) continue;
+      const name = vercelMetadataName(key);
+      if (!name || value === null || value === undefined) continue;
 
       if (name === "labels" || name === "tags") {
-        const labels = Array.isArray(value)
-          ? value.filter((label): label is string => typeof label === "string")
-          : parseJsonStringArray(typeof value === "string" ? value : void 0);
-        if (labels.length === 0) continue;
-        const existing = parseJsonStringArray(
-          result[ATTR_KEYS.LANGWATCH_LABELS],
-        );
-        result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([
-          ...new Set([...existing, ...labels]),
-        ]);
+        unionLabelsInto(result, labelList(value));
         continue;
       }
 
       const reserved = VERCEL_RESERVED_METADATA[name];
       if (reserved) {
-        if (result[reserved]) continue;
-        if (typeof value === "string" && value.length > 0) {
-          result[reserved] = value;
-        }
+        fillIfEmpty(result, reserved, value);
         continue;
       }
 
-      result[`metadata.${name}`] =
-        typeof value === "string"
-          ? value
-          : typeof value === "object"
-            ? JSON.stringify(value)
-            : String(value);
+      result[`metadata.${name}`] = attributeText(value);
     }
   }
 
