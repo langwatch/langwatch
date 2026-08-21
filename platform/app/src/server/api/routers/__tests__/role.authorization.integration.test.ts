@@ -176,13 +176,17 @@ describe("Feature: role router caller authorization", () => {
     });
 
     it("refuses to assign a role to a user", async () => {
+      // FORBIDDEN, not UNAUTHORIZED: the declared check
+      // (`.permission("organization:manage", { via: "teamId" })`) derives its
+      // wire code from the engine denial's 403, where the old hand-rolled
+      // middleware threw a bare UNAUTHORIZED.
       await expect(
         memberCaller.role.assignToUser({
           userId: memberUserId,
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to remove a role from a user", async () => {
