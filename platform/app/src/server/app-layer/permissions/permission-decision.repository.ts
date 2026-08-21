@@ -5,10 +5,10 @@
  * service.
  *
  * The implementation delegates to the fork-aware resolvers in `rbac.ts`:
- * a not-yet-cut-over organization is decided by the legacy walk with the
- * engine shadowing, a cut-over one by the engine with legacy as
- * reverse-shadow. The contract PR rewires ONLY this class onto the engine —
- * nothing above it learns.
+ * a not-yet-migrated organization is decided by the legacy walk and a
+ * migrated one by the engine, chosen by the organization's migration status
+ * alone — no shadow or reverse-shadow comparison at request time. The contract
+ * PR rewires ONLY this class onto the engine — nothing above it learns.
  */
 import type { AuthzPermission } from "@langwatch/authz";
 import type {

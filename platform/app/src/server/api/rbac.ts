@@ -1675,11 +1675,11 @@ export async function batchProjectPermissions(
 }
 
 /**
- * The legacy batch resolution, as ONE implementation both paths run: the
- * answering path in `batchScopePermissions` when the organization is still on
- * legacy, and the fork's reverse-shadow thunk when it is not. It builds its
- * own maps per call, so the two paths can never hand out the same mutable
- * pair.
+ * The legacy batch resolution — the answering path in `batchScopePermissions`
+ * when the organization is still on legacy. (It was also the fork's
+ * reverse-shadow thunk before the shadow comparison was removed; the engine
+ * now answers a migrated organization outright.) It builds its own maps per
+ * call, so no two callers can hand out the same mutable pair.
  */
 async function legacyBatchScopePermissions(
   ctx: { prisma: PrismaClient; session: Session | null },

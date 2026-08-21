@@ -6,9 +6,12 @@
 
 **Partially superseded:** §13's aggregate choice — one aggregate per
 organization, `aggregateId = organizationId` — is replaced by
-[ADR-110](110-grant-aggregates-are-grants.md), which makes a grant its own
-aggregate and leaves only roles, the cutover flag and migration tenant state
-on the organization. Everything else here stands.
+[ADR-110](110-grant-aggregates-are-grants.md), which makes a grant and a role
+each their own aggregate. The organization is the tenant of every event and the
+aggregate of nothing; there is no cutover flag (ADR-110 deletes it and the
+`AuthzCutoverProjection` table), and rollout state moves off the authorization
+aggregates entirely onto `SystemMigrationTenantState`. Everything else here
+stands.
 
 ## Decision, in one paragraph
 

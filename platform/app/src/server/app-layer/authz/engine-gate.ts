@@ -154,11 +154,14 @@ export async function organizationOnAuthzEngine({
 }
 
 /**
- * Drop one organization's cached answer, so the next check re-reads. The
- * migration calls this the moment it finishes, which is what makes the
- * switch immediate on the pod that ran it; every other pod converges on the
- * TTL. Pod-local by design — cross-pod invalidation would need a bus and
- * would buy sixty seconds.
+ * Drop one organization's cached answer, so the next check re-reads. Intended
+ * to be called the moment a migration finalizes an organization, so the switch
+ * is immediate on the pod that ran it while every other pod converges on the
+ * TTL. NOT wired yet: the ADR-110 one-shot migration is not registered
+ * (`registeredMigrations()` is empty), so nothing calls this today — until it
+ * lands, a finalized organization waits out the full TTL even on its own pod.
+ * Pod-local by design — cross-pod invalidation would need a bus and would buy
+ * sixty seconds.
  */
 export function invalidateAuthzEngineGate({
   organizationId,

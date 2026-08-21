@@ -142,8 +142,9 @@ export class PrismaAuthzGrantsWriteRepository
   constructor(private readonly prisma: PrismaLike) {}
 
   async append(write: GrantProjectionWrite): Promise<void> {
-    reportMissedRow(write, await this.statementFor(write));
-    await this.writeCompatHeads([write]);
+    const result = await this.statementFor(write);
+    reportMissedRow(write, result);
+    await this.writeCompatHeads([{ write, result }]);
   }
 
   async bulkAppend(writes: GrantProjectionWrite[]): Promise<void> {
@@ -154,7 +155,9 @@ export class PrismaAuthzGrantsWriteRepository
       writes.map((write) => this.statementFor(write)),
     );
     writes.forEach((write, index) => reportMissedRow(write, results[index]));
-    await this.writeCompatHeads(writes);
+    await this.writeCompatHeads(
+      writes.map((write, index) => ({ write, result: results[index] })),
+    );
   }
 
   /**
@@ -179,11 +182,11 @@ export class PrismaAuthzGrantsWriteRepository
    * delete can only ever remove a row the ledger itself authored.
    */
   private async writeCompatHeads(
-    writes: GrantProjectionWrite[],
+    entries: Array<{ write: GrantProjectionWrite; result: unknown }>,
   ): Promise<void> {
-    for (const write of writes) {
+    for (const { write, result } of entries) {
       try {
-        await this.writeCompatHead(write);
+        await this.writeCompatHead(write, result);
       } catch (error) {
         if (!isCompatConflict(error)) throw error;
         logger.warn(
@@ -194,10 +197,18 @@ export class PrismaAuthzGrantsWriteRepository
     }
   }
 
-  private async writeCompatHead(write: GrantProjectionWrite): Promise<void> {
+  private async writeCompatHead(
+    write: GrantProjectionWrite,
+    result: unknown,
+  ): Promise<void> {
     switch (write.kind) {
       case "grant.upsert":
-        return this.compatForGrant(write.row);
+        // The guard returns the affected-row count. > 0 means this event won
+        // and the row now IS its state, so the compat head can be derived from
+        // the event with no re-read. 0 means it lost to a newer state already
+        // present (a redelivered older attach) — only then must the row be
+        // re-read to avoid rebuilding compat from the stale event.
+        return this.compatForGrant(write.row, (result as number) > 0);
       case "grant.setRole":
         return this.compatForRoleChange(write.grantId);
       case "grant.revoke":
@@ -230,31 +241,48 @@ export class PrismaAuthzGrantsWriteRepository
    *  the row is re-read here — the same shape `compatForRoleChange` uses — and
    *  a grant that is absent or revoked has its compat rows removed rather than
    *  written. */
-  private async compatForGrant(row: GrantRow): Promise<void> {
+  private async compatForGrant(
+    row: GrantRow,
+    guardWon: boolean,
+  ): Promise<void> {
     const organizationId = row.organizationId;
-    const authoritative = await this.prisma.grant.findUnique({
-      where: { id: row.id },
-      select: { ...GRANT_FACT_COLUMNS, revokedAt: true },
-    });
 
-    if (!authoritative || authoritative.revokedAt) {
-      // The grant is not live — a newer revoke won the guard, or the row is
-      // gone. Neither compat head may stand; drop whatever a prior apply left
-      // (idempotent when the revoke already deleted it).
-      await this.prisma.roleBinding.deleteMany({
-        where: { organizationId, id: row.id },
+    // Common path: this event won the guard, so its own row is the
+    // authoritative state — derive compat from it directly, no re-read.
+    // Only a lost guard (a redelivered older attach) needs the authoritative
+    // row read back, because rebuilding compat from the stale event would
+    // resurrect a binding a newer revoke deleted.
+    if (!guardWon) {
+      const authoritative = await this.prisma.grant.findUnique({
+        where: { id: row.id },
+        select: { ...GRANT_FACT_COLUMNS, revokedAt: true },
       });
-      if (row.projectId) {
-        await this.prisma.shareLink.deleteMany({
-          where: { projectId: row.projectId, id: row.id },
+      if (!authoritative || authoritative.revokedAt) {
+        // Not live — a newer revoke won, or the row is gone. Neither compat
+        // head may stand; drop whatever a prior apply left (idempotent when
+        // the revoke already deleted it).
+        await this.prisma.roleBinding.deleteMany({
+          where: { organizationId, id: row.id },
         });
+        if (row.projectId) {
+          await this.prisma.shareLink.deleteMany({
+            where: { projectId: row.projectId, id: row.id },
+          });
+        }
+        return;
       }
-      return;
+      const { revokedAt: _revokedAt, ...factRow } = authoritative;
+      return this.upsertCompatForGrant(grantRowToFact(factRow), organizationId);
     }
 
-    const { revokedAt: _revokedAt, ...factRow } = authoritative;
-    const grant = grantRowToFact(factRow);
+    return this.upsertCompatForGrant(grantRowToFact(row), organizationId);
+  }
 
+  /** Write the binding and share-link compat heads for a live grant fact. */
+  private async upsertCompatForGrant(
+    grant: ReturnType<typeof grantRowToFact>,
+    organizationId: string,
+  ): Promise<void> {
     const binding = grantFactToCompatBinding({ grant, organizationId });
     if (binding) {
       const { id, ...rest } = binding;

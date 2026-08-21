@@ -238,6 +238,10 @@ export const teamRouter = createTRPCRouter({
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string() }))
+    // Deliberate tightening from the pre-declaration `team:delete`: that is not
+    // a registry permission (it can only exist in a hand-authored custom role),
+    // and archiving a team is a manage action. A tenant holding a custom role
+    // that granted `team:delete` without `team:manage` loses this one action.
     .permission("team:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;

@@ -220,7 +220,10 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
     // removes the compat binding rather than upserting it.
     /** @scenario "A redelivered attach after a revoke leaves no compat binding" */
     it("removes the compat binding when the re-read grant is revoked", async () => {
-      const { repository, prisma } = build();
+      const { repository, prisma, executeRaw } = build();
+      // The guard matched no row (0): this older attach lost to a newer state.
+      executeRaw.mockResolvedValue(0);
+      // The authoritative row it lost to is revoked.
       prisma.grant.findUnique.mockResolvedValue({
         ...grantRow(),
         revokedAt: new Date(5),
@@ -235,6 +238,22 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
         where: { organizationId: ORG, id: "grant_1" },
       });
+    });
+
+    // When the guard wins (the common path), the event's own row is the
+    // authoritative state, so no re-read is issued — the compat binding is
+    // written straight from the event.
+    /** @scenario "A grant written to the projection is readable on the legacy head" */
+    it("skips the re-read when the guard won and writes compat from the event", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+      } as GrantProjectionWrite);
+
+      expect(prisma.grant.findUnique).not.toHaveBeenCalled();
+      expect(prisma.roleBinding.upsert).toHaveBeenCalled();
     });
 
     /**

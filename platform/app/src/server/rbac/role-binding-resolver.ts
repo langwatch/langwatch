@@ -584,13 +584,14 @@ export async function resolveApiKeyPermission({
   /** See checkRoleBindingPermission - the per-permission mint loops opt out. */
 }): Promise<boolean> {
   /**
-   * Steps 1-4 of the legacy ceiling, as ONE implementation both paths run:
-   * the answering path below when the organization is still on legacy, and
-   * the fork's reverse-shadow thunk when it is not.
+   * Steps 1-4 of the legacy ceiling — the answering path below when the
+   * organization is still on legacy. (It was also the fork's reverse-shadow
+   * thunk before the shadow comparison was removed; a migrated organization is
+   * now answered by the engine outright.)
    */
   const legacyPermitted = async (): Promise<boolean> => {
-    // 1. Check API key's own bindings (inner variant: the composite shadow
-    // below covers this path, so the per-leg wrapper shadow is skipped)
+    // 1. Check API key's own bindings (inner variant: the composite check
+    // below covers this path, so the per-leg wrapper is skipped)
     const apiKeyAllowed = await checkRoleBindingPermissionInner({
       prisma,
       principal: { type: "apiKey", id: apiKeyId },

@@ -172,9 +172,11 @@ argument cannot disagree with itself.
 
 ## Imperative checks
 
-Two families, named for what they return. There is deliberately no function
-called `has*Permission` anywhere any more — that name existed in two modules
-with identical signatures, and a test mock could silently bind the wrong one.
+Two families, named for what they return. The name is deliberately not
+`has*Permission`: the legacy `has{Project,Team,Organization}Permission` twins
+still live in `server/api/rbac.ts` for the tRPC routers not yet migrated off
+them, so a new `has*` here would be a name collision a test mock could bind the
+wrong one of. Those twins are being retired; new code uses this facade.
 
 ### `require*` — the default
 

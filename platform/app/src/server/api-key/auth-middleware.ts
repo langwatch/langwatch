@@ -643,6 +643,11 @@ export async function enforceApiKeyCeiling({
    */
   app?: App;
 }): Promise<void> {
+  // A legacy project key has no per-permission ceiling: it passes every gate,
+  // including a `permission`-kind policy, because project keys predate RBAC and
+  // carry full project access by design (decision 1: no legacy-key sunset). So
+  // a route's declared permission is decorative for that credential class —
+  // intended, not a gap. Only scoped API keys are checked below.
   if (resolved.type !== "apiKey") return;
 
   const allowed = await (app ?? getApp()).permissions.hasApiKeyPermission({

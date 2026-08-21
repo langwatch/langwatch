@@ -8,12 +8,13 @@
  * `PermissionsService`, which takes the
  * `ForkAwarePermissionDecisionRepository`, which owns the client and
  * delegates to the same fork-aware resolvers the legacy
- * `checkXxxPermission` middlewares ran (`rbac.ts`) — so a not-yet-cut-over
- * organization is still decided by the legacy walk with the engine shadowing
- * it, and a cut-over organization by the engine with legacy as
- * reverse-shadow. Deploying the codemod changes no decision anywhere; the
- * contract PR later rewires only the repository — one file, not four hundred
- * call sites.
+ * `checkXxxPermission` middlewares ran (`rbac.ts`) — so a not-yet-migrated
+ * organization is decided by the legacy walk and a migrated one by the engine,
+ * chosen by the organization's migration status alone. There is no shadow or
+ * reverse-shadow comparison at request time (that path was removed with
+ * `shadow.ts`); the fork is a plain if/else on the gate. Deploying the codemod
+ * changes no decision anywhere; the contract PR later rewires only the
+ * repository — one file, not four hundred call sites.
  *
  * What IS deliberately new here is the denial shape: every tier's refusal now
  * carries the engine's one handled code (`permission_denied`, with the
