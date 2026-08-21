@@ -129,11 +129,20 @@ const langyTurnMessageSchema = z.object({
 /**
  * Per-send model override from the sidebar picker. Shape-validated here;
  * the value is checked against the project's Langy VK allowlist in the service.
+ *
+ * The provider segment ends at the FIRST slash; the model half may contain
+ * slashes and colons of its own, because custom OpenAI-compatible providers
+ * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
+ * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);

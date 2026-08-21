@@ -2696,6 +2696,7 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   url: "the URL",
   prompt: "the prompt",
   model: "the model",
+  modelOverride: "the model",
   value: "the value",
   label: "the label",
   title: "the title",
