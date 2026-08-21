@@ -200,7 +200,7 @@ function stubMenuLayout({
   entryOffsets: Record<string, number>;
   menuHeight: number;
 }) {
-  const rectAt = (top: number, height: number) => ({
+  const rectAt = ({ top, height }: { top: number; height: number }) => ({
     ...EMPTY_RECT,
     top,
     y: top,
@@ -211,16 +211,16 @@ function stubMenuLayout({
     this: HTMLElement,
   ) {
     if (this.dataset.testid === "sidebar-scroll-region")
-      return rectAt(0, menuHeight);
+      return rectAt({ top: 0, height: menuHeight });
     const label = this.getAttribute("aria-label");
     const scrolled =
       document.querySelector<HTMLElement>(
         '[data-testid="sidebar-scroll-region"]',
       )?.scrollTop ?? 0;
-    return rectAt(
-      ((label ? entryOffsets[label] : undefined) ?? 0) - scrolled,
-      MENU_ENTRY_HEIGHT,
-    );
+    return rectAt({
+      top: ((label ? entryOffsets[label] : undefined) ?? 0) - scrolled,
+      height: MENU_ENTRY_HEIGHT,
+    });
   } as HTMLElement["getBoundingClientRect"];
 }
 
@@ -369,7 +369,7 @@ describe("the product sidebar", () => {
   });
 
   describe("when a page is opened by its address", () => {
-    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
     it("brings that page's entry into view", async () => {
       const scrolls = recordScrollIntoView();
 
