@@ -30,6 +30,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { usePromptTags } from "~/prompts/hooks/usePromptTags";
+import type { PromptSnippetVariable } from "~/prompts/utils/snippets/getGetPromptSnippets";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -38,6 +39,8 @@ interface DeployPromptDialogProps {
   configId: string;
   handle: string;
   projectId: string;
+  /** The variables the prompt declares, shown in each tag's code snippet. */
+  variables?: PromptSnippetVariable[];
 }
 
 export function DeployPromptDialog({
@@ -46,6 +49,7 @@ export function DeployPromptDialog({
   configId,
   handle,
   projectId,
+  variables,
 }: DeployPromptDialogProps) {
   const { project } = useOrganizationTeamProject();
 
@@ -233,10 +237,10 @@ export function DeployPromptDialog({
 
   const nonLatestTags = allTags.filter((t) => t.name !== "latest");
   const hasPendingTagChanges = nonLatestTags.some((tagDef) => {
-    const assigned = (tagsQuery.data ?? []).find(
-      (tag) => tag.tagId === tagDef.id,
-    );
-    return (tagSelections[tagDef.name] ?? "") !== (assigned?.versionId ?? "");
+    const currentTag = tagDef.id
+      ? (tagsQuery.data ?? []).find((tag) => tag.tagId === tagDef.id)
+      : undefined;
+    return (tagSelections[tagDef.name] ?? "") !== (currentTag?.versionId ?? "");
   });
 
   return (
@@ -246,50 +250,49 @@ export function DeployPromptDialog({
       size="md"
     >
       <DialogContent
-        bg="bg.panel"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="xl"
-        boxShadow="xl"
-        width="calc(100vw - 32px)"
+        width={{ base: "calc(100vw - 24px)", md: "calc(100vw - 48px)" }}
         maxWidth="640px"
         maxHeight="calc(100dvh - 48px)"
         overflow="hidden"
       >
-        <DialogHeader padding={5} paddingBottom={3}>
+        <DialogHeader paddingX={5} paddingTop={5} paddingBottom={2}>
           <DialogTitle>Deploy prompt</DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
-        <DialogBody paddingX={5} paddingBottom={5} overflowY="auto">
+        <DialogBody paddingX={5} paddingTop={1} overflowY="auto" minHeight={0}>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt versions via the SDK and API.
-              Point a stable tag at a version, then use that tag from the SDK or
-              API without changing your integration when a new version ships.
+              Tags let SDK and API callers select a prompt version. The
+              production tag is used when no tag is specified.
             </Text>
 
-            <HStack gap={2} justify="space-between">
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            <VStack align="stretch" gap={1}>
+              <Text
+                fontSize="xs"
+                fontWeight="medium"
+                color="fg.muted"
+                textTransform="uppercase"
+              >
                 Prompt slug
               </Text>
-              <Box
+              <HStack
+                justify="space-between"
+                gap={3}
                 borderWidth="1px"
-                borderColor="border"
-                borderRadius="full"
+                borderColor="border.muted"
+                borderRadius="md"
+                background="bg.subtle"
                 paddingX={3}
-                paddingY={1}
+                minHeight="40px"
               >
-                <HStack gap={2}>
-                  <Text fontSize="sm" color="fg.muted">
-                    Handle:
-                  </Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {handle}
-                  </Text>
+                <Text fontSize="sm" fontFamily="mono" truncate>
+                  {handle}
+                </Text>
+                <Box flexShrink={0}>
                   <CopyButton value={handle} label="Prompt slug" />
-                </HStack>
-              </Box>
-            </HStack>
+                </Box>
+              </HStack>
+            </VStack>
 
             {/* Tag rows */}
             <VStack align="stretch" gap={3}>
@@ -298,9 +301,9 @@ export function DeployPromptDialog({
                 borderWidth="1px"
                 borderColor="border.muted"
                 borderRadius="md"
+                background="bg.subtle"
                 paddingX={3}
                 paddingY={2.5}
-                background="bg.subtle"
               >
                 <HStack justify="space-between">
                   <HStack gap={3}>
@@ -308,7 +311,7 @@ export function DeployPromptDialog({
                       width="10px"
                       height="10px"
                       borderRadius="full"
-                      bg="green.400"
+                      bg={latestVersion ? "green.400" : "fg.subtle"}
                       flexShrink={0}
                     />
                     <Text fontWeight="medium" fontSize="sm">
@@ -316,26 +319,26 @@ export function DeployPromptDialog({
                     </Text>
                   </HStack>
                   <HStack gap={2}>
-                    <Text
-                      fontSize="sm"
-                      color="fg.muted"
-                      data-testid="latest-version"
-                    >
-                      {versionsQuery.isLoading ? (
-                        <Skeleton width="32px" height="12px" />
-                      ) : latestVersion ? (
-                        `v${latestVersion.version}`
-                      ) : (
-                        "No versions yet"
-                      )}
-                    </Text>
+                    {versionsQuery.isLoading ? (
+                      <Skeleton width="36px" height="16px" />
+                    ) : (
+                      <Text
+                        fontSize="sm"
+                        color="fg.muted"
+                        data-testid="latest-version"
+                      >
+                        {latestVersion
+                          ? `v${latestVersion.version}`
+                          : "No versions yet"}
+                      </Text>
+                    )}
                     <Tooltip content="Automatically points to the latest version number.">
                       <Box
                         as="span"
                         color="fg.muted"
                         cursor="help"
                         tabIndex={0}
-                        aria-label="About the latest tag"
+                        aria-label="Latest always points to the newest prompt version"
                       >
                         <Info size={14} />
                       </Box>
@@ -355,7 +358,6 @@ export function DeployPromptDialog({
                     borderRadius="md"
                     paddingX={3}
                     paddingY={2.5}
-                    background="bg.subtle"
                   >
                     <HStack justify="space-between" gap={3}>
                       <HStack gap={3} flexShrink={0}>
@@ -464,6 +466,7 @@ export function DeployPromptDialog({
                           promptHandle={handle}
                           apiKey={project?.apiKey}
                           label={tagDef.name}
+                          variables={variables}
                         >
                           <GeneratePromptApiSnippetDialog.Trigger>
                             <IconButton
@@ -559,7 +562,8 @@ export function DeployPromptDialog({
         </DialogBody>
         <DialogFooter
           paddingX={5}
-          paddingY={4}
+          paddingTop={3}
+          paddingBottom={5}
           borderTopWidth="1px"
           borderColor="border.muted"
         >

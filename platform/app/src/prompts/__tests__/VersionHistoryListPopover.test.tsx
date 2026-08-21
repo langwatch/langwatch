@@ -346,6 +346,9 @@ describe("VersionHistoryListPopover", () => {
           expect.objectContaining({ versionId: "version-3" }),
         );
       });
+      expect(toaster.info).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Discarded changes" }),
+      );
     });
 
     /** @scenario "The panel is quiet when there is nothing unsaved" */

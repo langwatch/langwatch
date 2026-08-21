@@ -75,7 +75,7 @@ export function SavePromptButton({
   const button = (
     <Button
       {...(variant === "primary"
-        ? { colorPalette: "blue" }
+        ? { colorPalette: "orange" }
         : { variant: "outline" })}
       size={size}
       onClick={onSave}

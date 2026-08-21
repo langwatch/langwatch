@@ -70,6 +70,8 @@ interface CodePreviewProps {
    * surface (banner / panel) instead.
    */
   disableActions?: boolean;
+  /** Caps tall snippets while keeping the code header and actions visible. */
+  maxHeight?: string;
 }
 
 export function CodePreview({
@@ -85,6 +87,7 @@ export function CodePreview({
   llmPrompt,
   copyText,
   disableActions,
+  maxHeight,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
@@ -173,11 +176,19 @@ export function CodePreview({
             backdropFilter="blur(20px) saturate(1.3)"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             overflow="hidden"
+            maxHeight={maxHeight}
+            display={maxHeight ? "flex" : undefined}
+            flexDirection={maxHeight ? "column" : undefined}
           >
             <CodeBlock.Header
               display="flex"
               justifyContent="space-between"
               borderColor="gray.200"
+              flexShrink={maxHeight ? 0 : undefined}
+              position={maxHeight ? "sticky" : undefined}
+              top={maxHeight ? 0 : undefined}
+              zIndex={maxHeight ? 1 : undefined}
+              background={maxHeight ? "bg.subtle" : undefined}
             >
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
@@ -248,7 +259,8 @@ export function CodePreview({
                   transition: "background-color 0.3s ease, color 0.3s ease",
                 },
               }}
-              overflow="scroll"
+              overflow={maxHeight ? "auto" : "scroll"}
+              minHeight={maxHeight ? 0 : undefined}
             >
               <CodeBlock.Code>
                 <CodeBlock.CodeText />

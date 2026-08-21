@@ -348,6 +348,8 @@ function DraggableTabsTabBar({
 interface DraggableTabTriggerProps extends BoxProps {
   children: React.ReactNode;
   id: string;
+  /** A lone tab grows into the space before its joined action cluster. */
+  fillAvailableWidth?: boolean;
 }
 
 /**
@@ -368,9 +370,12 @@ export const TAB_MAX_WIDTH = "180px";
 function DraggableBrowserTabTrigger({
   value,
   children,
+  joinedTrailingActions = false,
 }: {
   value: string;
   children: React.ReactNode;
+  /** The action cluster beside this trigger continues the same tab surface. */
+  joinedTrailingActions?: boolean;
 }) {
   return (
     <Tabs.Trigger
@@ -379,7 +384,7 @@ function DraggableBrowserTabTrigger({
       // trigger to its content and stop the tab from ever shrinking.
       minWidth={0}
       width="full"
-      height="full"
+      height="calc(100% - 1px)"
       overflow="hidden"
       cursor="pointer"
       transition="background 0.15s ease-in-out, color 0.15s ease-in-out"
@@ -387,6 +392,7 @@ function DraggableBrowserTabTrigger({
       // card. A tab rounded on all four corners is a pill sitting near the card
       // rather than the top edge of it.
       borderTopRadius={CARD_RADIUS}
+      borderTopRightRadius={joinedTrailingActions ? 0 : CARD_RADIUS}
       borderBottomRadius={0}
       background="transparent"
       color="fg.muted"
@@ -395,6 +401,7 @@ function DraggableBrowserTabTrigger({
       // time the selection moved.
       borderWidth={CARD_BORDER_WIDTH}
       borderBottomWidth={0}
+      borderRightWidth={joinedTrailingActions ? 0 : CARD_BORDER_WIDTH}
       borderColor="transparent"
       // The `enclosed` variant lifts the selected trigger with a drop shadow,
       // which reads as a raised control — a combo box — rather than as a tab.
@@ -408,6 +415,8 @@ function DraggableBrowserTabTrigger({
         color: "fg",
         borderColor: CARD_BORDER_COLOR,
         boxShadow: "none",
+        height: "full",
+        _hover: { background: "bg.panel" },
       }}
     >
       {children}
@@ -422,7 +431,12 @@ function DraggableBrowserTabTrigger({
  * @param children - Tab content/trigger
  * @param rest - Additional box props
  */
-function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
+function DraggableTab({
+  id,
+  children,
+  fillAvailableWidth = false,
+  ...rest
+}: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
 
   const {
@@ -461,9 +475,9 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       // it belongs to. They are never hidden — a hidden element has a zero-size
       // rect, which would corrupt @dnd-kit's drop-index math for these
       // sortables.
-      flex="0 1 auto"
+      flex={fillAvailableWidth ? "1 1 0" : "0 1 auto"}
       minWidth={TAB_MIN_WIDTH}
-      maxWidth={TAB_MAX_WIDTH}
+      maxWidth={fillAvailableWidth ? "none" : TAB_MAX_WIDTH}
       alignItems="stretch"
       cursor={isDragging ? "grabbing" : "grab"}
       transform={CSS.Transform.toString(transform)}

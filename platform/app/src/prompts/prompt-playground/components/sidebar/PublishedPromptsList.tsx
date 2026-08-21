@@ -138,7 +138,7 @@ export function PublishedPromptsList() {
 
   return (
     <VStack align="stretch" gap={2} paddingBottom={2}>
-      <HStack paddingX={2} gap={1.5}>
+      <HStack paddingX={2} paddingY={1} gap={1.5}>
         <InputGroup
           startElement={<Search size={13} />}
           startOffset="0px"
@@ -163,14 +163,6 @@ export function PublishedPromptsList() {
             <X size={13} />
           </IconButton>
         )}
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          minWidth="18px"
-          textAlign="right"
-        >
-          {visiblePrompts.length}
-        </Text>
       </HStack>
 
       {groups.length === 0 ? (
