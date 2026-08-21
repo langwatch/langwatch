@@ -90,7 +90,7 @@ func TestLLMProxy_MessagesLaneInjectsXAPIKey(t *testing.T) {
 }
 
 // piWorkerInfo registers a pi-harness worker whose customer ingest is the
-// signalling fake, and arms the turn context.
+// signaling fake, and arms the turn context.
 func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) string {
 	t.Helper()
 	token, err := relay.Register(WorkerInfo{

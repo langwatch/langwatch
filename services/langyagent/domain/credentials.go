@@ -38,9 +38,9 @@ type Credentials struct {
 	// it was given, and the worst a compromised manager can do with this handle is
 	// destroy its own access.
 	LangwatchAPIKeyID string `json:"langwatchApiKeyId,omitempty"`
-	LLMVirtualKey     string `json:"llmVirtualKey" validate:"required"`
-	GatewayBaseURL    string `json:"gatewayBaseUrl" validate:"required"`
-	LangwatchEndpoint string `json:"langwatchEndpoint" validate:"required"`
+	LLMVirtualKey     string `json:"llmVirtualKey"               validate:"required"`
+	GatewayBaseURL    string `json:"gatewayBaseUrl"              validate:"required"`
+	LangwatchEndpoint string `json:"langwatchEndpoint"           validate:"required"`
 	Model             string `json:"model,omitempty"`
 	GithubToken       string `json:"githubToken,omitempty"`
 	GithubLogin       string `json:"githubLogin,omitempty"`
@@ -82,7 +82,7 @@ type Credentials struct {
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
 // organization by the control plane and threaded through the credentials
-// envelope. A closed vocabulary; anything unrecognised normalises to skip.
+// envelope. A closed vocabulary; anything unrecognized normalises to skip.
 type MirrorTier string
 
 const (
@@ -96,7 +96,7 @@ const (
 )
 
 // NormalizeMirrorTier maps an envelope value to a known tier. An empty or
-// unrecognised value normalises to skip — fail-safe: a version skew (a manager
+// unrecognized value normalises to skip, fail-safe: a version skew (a manager
 // with a mirror configured but a control plane not yet sending the tier) never
 // leaks a turn LangWatch was not told it could see.
 func NormalizeMirrorTier(v string) MirrorTier {
@@ -238,7 +238,7 @@ var hostPatternPattern = regexp.MustCompile(`^(\*\.)?([a-z0-9-]+\.)*[a-z0-9-]+$`
 // case-insensitive fingerprint so semantically-equal lists (reordered, mixed
 // case, trailing dots) do not spuriously recycle the worker, while any real
 // membership change does. Entries that are not clean host patterns are DROPPED
-// (defence in depth): the control plane already Zod-validates on write, so this
+// (defense in depth): the control plane already Zod-validates on write, so this
 // only fires on a drifted or hostile envelope — but the manager still refuses to
 // fold a URL, an authority with a port/userinfo, or a path-traversal like
 // "../../etc" into an allow rule. Kept in step with the Go matcher's

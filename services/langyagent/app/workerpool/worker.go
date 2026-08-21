@@ -83,7 +83,7 @@ type Worker struct {
 	mu sync.Mutex
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
-	// inFlight serialises turns on the same conversation. Two simultaneous
+	// inFlight serializes turns on the same conversation. Two simultaneous
 	// /worker requests for one conversationID would otherwise both subscribe to
 	// the same /event stream and each terminate on the other's terminal event,
 	// splicing replies. ClaimTurn/Release wrap it.
@@ -318,7 +318,7 @@ func (w *Worker) isInFlight() bool {
 
 // StreamEvents tails the worker's /event stream and forwards this session's
 // events as ndjson into the sink until a terminal event lands or ctx is
-// cancelled.
+// canceled.
 func (w *Worker) StreamEvents(ctx context.Context, sink app.ChatSink) error {
 	return w.agent.Stream(ctx, w.endpoint, w.openCodeSessionID, sink)
 }

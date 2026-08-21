@@ -222,7 +222,7 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 		io.Closer
 	}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
 	if err != nil {
-		return nil // capture is best-effort; the proxied response stands.
+		return nil //nolint:nilerr // capture is best-effort; the proxied response stands.
 	}
 	e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
 		handledCode: resp.Header.Get(herr.HandledErrorHeader),

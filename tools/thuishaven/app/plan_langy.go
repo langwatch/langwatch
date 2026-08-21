@@ -11,7 +11,7 @@ import (
 )
 
 // langyImage is the tag haven builds and runs the langyagent worker under in its
-// container tiers. Local-only (never pushed/pulled) — built from Dockerfile.langyagent.
+// container tiers. Local-only (never pushed/pulled), built from infra/docker/Dockerfile.langyagent.
 const langyImage = "langyagent:dev"
 
 // Langy is intentionally constrained in local development. OpenCode workers are
@@ -248,7 +248,7 @@ func langyContainerShell(o langyContainerOpts) string {
 // hatch when the hash lies (or you just want fresh bytes). Runs from the repo
 // root (the build context).
 func langyImageEnsureShell(image string, forceRebuild bool, pullRef string) string {
-	build := fmt.Sprintf("docker build -f Dockerfile.langyagent -t %s .", shQuote(image))
+	build := fmt.Sprintf("docker build -f infra/docker/Dockerfile.langyagent -t %s .", shQuote(image))
 	if forceRebuild {
 		return build
 	}

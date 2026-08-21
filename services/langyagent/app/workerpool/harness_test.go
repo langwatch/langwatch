@@ -25,6 +25,21 @@ func stubPiBinary(t *testing.T) string {
 	return bin
 }
 
+// tolerantTempDir is t.TempDir without the strict cleanup: the pool's shutdown
+// tears worker homes down asynchronously, and t.TempDir's RemoveAll fails the
+// whole test when it races that teardown (directory not empty). Best-effort
+// removal is enough for a test scratch root.
+func tolerantTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "harness")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+	})
+	return dir
+}
+
 func newHarnessPool(t *testing.T, piBinary string, rev CredentialRevoker) *Pool {
 	t.Helper()
 	runner, err := localunsafe.New("test")
@@ -34,8 +49,8 @@ func newHarnessPool(t *testing.T, piBinary string, rev CredentialRevoker) *Pool 
 		WorkerIdle:       time.Minute,
 		ReadinessTimeout: 5 * time.Second,
 		ReaperInterval:   time.Minute,
-		SessionsRoot:     t.TempDir(),
-		WorkspaceRoot:    t.TempDir(),
+		SessionsRoot:     tolerantTempDir(t),
+		WorkspaceRoot:    tolerantTempDir(t),
 		PiBinaryPath:     piBinary,
 		Runner:           runner,
 		Revoker:          rev,

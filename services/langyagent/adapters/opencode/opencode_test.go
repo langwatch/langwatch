@@ -621,7 +621,7 @@ func toolEvent(session, callID, tool, state string) string {
 }
 
 // emitFrames runs one raw opencode event through the tracker and returns the
-// frames AS THEY GO ON THE WIRE — marshalled and decoded back — so the
+// frames AS THEY GO ON THE WIRE, marshaled and decoded back, so the
 // assertions cover the real ndjson contract (which optional fields are omitted),
 // not just the in-memory struct.
 func emitFrames(t *testing.T, tracker *toolCallTracker, payload string) []toolFrame {
@@ -1096,7 +1096,7 @@ func framesByType(t *testing.T, tracker *toolCallTracker, payload string) (tools
 // for the durable audit trail.
 func TestToolCallTracker_TodoWriteEmitsPlanAlongsideToolFrame(t *testing.T) {
 	tracker := newToolCallTracker()
-	input := `{"todos":[{"content":"Find the slow traces","status":"completed"},{"content":"Summarise them","status":"in_progress"},{"content":"Open a fix","status":"pending"}]}`
+	input := `{"todos":[{"content":"Find the slow traces","status":"completed"},{"content":"Summarize them","status":"in_progress"},{"content":"Open a fix","status":"pending"}]}`
 	tools, plans := framesByType(t, tracker, toolEvent("s1", "call_1", "todowrite",
 		fmt.Sprintf(`{"status":"completed","input":%s,"output":"ok"}`, input)))
 
@@ -1132,7 +1132,7 @@ func TestToolCallTracker_TodoWriteEmitsMeasuredBatchProgress(t *testing.T) {
 	tracker.framesFor(decodeSSE(t, toolEvent("s1", "fetch_1", "bash",
 		`{"status":"completed","input":{"command":"fetch batch"},"output":"ok"}`)))
 
-	input := `{"todos":[{"content":"Analysing traces — 25/100","status":"in_progress"}]}`
+	input := `{"todos":[{"content":"Analyzing traces — 25/100","status":"in_progress"}]}`
 	produced := tracker.framesFor(decodeSSE(t, toolEvent("s1", "progress_1", "todowrite",
 		fmt.Sprintf(`{"status":"completed","input":%s,"output":"ok"}`, input))))
 
@@ -1158,7 +1158,7 @@ func TestToolCallTracker_TodoWriteEmitsMeasuredBatchProgress(t *testing.T) {
 	if !found {
 		t.Fatalf("expected a progress frame, got %v", produced)
 	}
-	if got.Message != "Analysing traces — 25/100" || got.Progress != 0.25 ||
+	if got.Message != "Analyzing traces — 25/100" || got.Progress != 0.25 ||
 		got.Current != 25 || got.Total != 100 || got.BatchItems != 25 || got.BatchDurationMs != 1250 {
 		t.Fatalf("unexpected measured progress: %+v", got)
 	}

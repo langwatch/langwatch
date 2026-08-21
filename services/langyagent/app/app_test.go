@@ -539,7 +539,7 @@ func statusOf(fs []frames.Frame) string {
 }
 
 // A worker that has never answered says Langy is waking up — one of the
-// wake-flavoured lines, never a warm reaching line.
+// wake-flavored lines, never a warm reaching line.
 func TestApp_Turn_NeverServedWorkerEmitsWakingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}

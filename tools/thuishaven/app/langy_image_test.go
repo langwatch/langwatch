@@ -15,6 +15,9 @@ func writeLangyFixture(t *testing.T) string {
 		"COPY package.json pnpm-lock.yaml ./\n" +
 		"COPY services/langyagent services/langyagent\n" +
 		"COPY --from=deps /app/node_modules ./node_modules\n"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, langyDockerfile)), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, langyDockerfile), []byte(dockerfile), 0o644); err != nil {
 		t.Fatal(err)
 	}

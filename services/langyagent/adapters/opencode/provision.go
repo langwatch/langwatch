@@ -385,7 +385,7 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd := in.Runner.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(in.ConversationID, in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
+	cmd.Env = buildWorkerEnv(in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
@@ -494,7 +494,7 @@ const LangyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, 
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
-func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
+func buildWorkerEnv(workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
 	env := workerBaseEnv()
 
 	// LLM wiring. Mediated (phase 2): OPENAI_BASE_URL points at the manager's
@@ -586,7 +586,7 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 
 // noProxyHosts is the NO_PROXY list for a worker: loopback plus the in-cluster
 // control-plane and gateway hosts, which egress via their own explicit
-// NetworkPolicy rules and must NOT be funnelled through the per-worker egress
+// NetworkPolicy rules and must NOT be funneled through the per-worker egress
 // adapter (ADR-076: "loopback and the in-cluster control-plane/gateway paths
 // are unaffected").
 func noProxyHosts(creds domain.Credentials) string {

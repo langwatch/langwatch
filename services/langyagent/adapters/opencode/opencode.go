@@ -144,7 +144,9 @@ func addBearer(req *http.Request, bearerToken string) {
 // opencode binding the port, but it is short enough in practice (and opencode's
 // listen() retries the SO_REUSEADDR socket).
 func GetFreePort() (int, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	// The bind/close pair completes in microseconds; there is no cancellation
+	// to thread, so Background keeps noctx satisfied without changing callers.
+	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, err
 	}
@@ -291,7 +293,7 @@ func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		// Listener not up yet / reset — retryable, not a security verdict.
-		return fmt.Errorf("%w: %v", errAuthProbeUnreachable, err)
+		return fmt.Errorf("%w: %w", errAuthProbeUnreachable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -455,7 +457,7 @@ func PostMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 // must checkpoint before — strictly inside the graceful window (see the ADR-048
 // deadline math). Best-effort: a non-2xx or transport error is returned to the
 // caller, which logs and proceeds with the drain (a worker that cannot be
-// notified simply cold-starts on its next turn, today's behaviour). opencode is
+// notified simply cold-starts on its next turn, today's behavior). opencode is
 // expected to answer 2xx/204; a 404 means the session already vanished.
 func NotifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID string, deadline time.Time) error {
 	body := bytes.NewBufferString(fmt.Sprintf(`{"deadline":%d}`, deadline.UnixMilli()))
@@ -583,7 +585,7 @@ func recordPartType(partTypes map[string]string, ev *sseEvent) {
 // opencode's `part.type` for a tool call, and the `state.status` values a tool
 // part transitions through. `completed` and `error` are the settle transitions.
 // `failed` is not a shape opencode is known to emit — it is tolerated as an
-// error alias purely so an unrecognised settle status can never strand a card
+// error alias purely so an unrecognized settle status can never strand a card
 // spinning forever with no `end`.
 const (
 	toolPartType        = "tool"
@@ -668,7 +670,7 @@ func toolStartFrame(id string, part *ssePart) (frames.Frame, bool) {
 // with the start frame: it makes each event self-describing, so "what command
 // was this, and how did it end?" is answerable from the end event alone — by the
 // card, by the durable event log, and by anyone debugging a turn after the fact.
-// It also means a call whose start went out before its arguments materialised is
+// It also means a call whose start went out before its arguments materialized is
 // still correctly identified when it settles, rather than being permanently
 // anonymous because of the transition it happened to open on.
 func toolEndFrame(id string, part *ssePart, isError bool) (frames.Frame, bool) {
@@ -768,7 +770,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 
 // StreamSession tails /event from the worker and maps every event belonging to
 // sessionID onto typed internal/frames values, handing each to emit. Returns when
-// a terminal event lands or the context is cancelled — nil on a clean completion,
+// a terminal event lands or the context is canceled, nil on a clean completion,
 // domain.ErrTurnHandedOff on an ADR-048 handoff, an error for an opencode `error`
 // event or a transport failure. The fetch carries the same ctx so a cancel aborts
 // the upstream socket immediately — opencode would otherwise hold it open until it
@@ -779,7 +781,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 // sees: a text delta becomes frames.Delta, the tool lifecycle frames.ToolStart/
 // ToolEnd, the keep-alive frames.Heartbeat. The verbatim opencode line is NOT
 // forwarded — the relay speaks only the frames union; app.Chat assembles the
-// durable final from the emitted frames. emit is serialised by a single mutex so
+// durable final from the emitted frames. emit is serialized by a single mutex so
 // the concurrent heartbeat ticker never interleaves with the scan loop.
 func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, emit func(frames.Frame) error) error {
 	url := baseURL + "/event"
@@ -803,7 +805,7 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 
 	// All emits go through emitFrame so the concurrent heartbeat ticker can never
 	// interleave with the scan loop: the relay push is ONE ordered stream, so a
-	// single mutex serialises frame writes exactly like the old in-band writeMu (and
+	// single mutex serializes frame writes exactly like the old in-band writeMu (and
 	// keeps the durable-final accumulator, fed inside emit, free of a data race).
 	// Returns false on an emit error (the relay push broke) so callers stop.
 	var emitMu sync.Mutex
@@ -949,7 +951,7 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		if !eventBelongsToSession(&ev, sessionID) {
 			// Error events without a session id still terminate this turn: the
 			// worker serves one conversation, so an unrouted error can only be ours.
-			if !(isErrorEventType(ev.Type) && !eventCarriesSession(&ev)) {
+			if !isErrorEventType(ev.Type) || eventCarriesSession(&ev) {
 				continue
 			}
 		}

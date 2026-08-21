@@ -181,6 +181,41 @@ linters:
           - testifylint
         text: "float-compare"
 
+      # langyagent: per-worker home directories are chmodded 0700 on purpose.
+      # A directory needs the x bit to be traversable, so 0700 is the tightest
+      # possible private-dir mode and gosec's <=0600 rule (G302) cannot apply.
+      # The sessions root is 0755 (G301) so per-conversation worker UIDs can
+      # reach their own 0700 subdir under a root-owned parent.
+      - path: services/langyagent/
+        linters:
+          - gosec
+        text: "G30[12]"
+
+      # langyagent tests spin up loopback fixture servers and on-disk fixture
+      # trees: InsecureSkipVerify (G402) against a self-signed test listener,
+      # no ReadHeaderTimeout (G112) on a short-lived httptest-style server, and
+      # 0755 fixture dirs/scripts (G301/G306, a fake worker script needs the
+      # exec bit). None of it ships.
+      - path: services/langyagent/.*_test\.go
+        linters:
+          - gosec
+
+      # langyagent carries a pre-linting baseline: the streaming/provisioning
+      # state machines (opencode + pi Stream, Provision, the pool spawn path)
+      # are event loops whose length and complexity are inherent to the
+      # protocol they drive, and the argument-limit hits are
+      # interface-mandated signatures (app ports, frames, telemetry) shared by
+      # both harness adapters. Scoped here so the rest of the repo keeps these
+      # rules at full strength.
+      - path: services/langyagent/
+        linters:
+          - gocognit
+          - funlen
+      - path: services/langyagent/
+        linters:
+          - revive
+        text: "argument-limit:"
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

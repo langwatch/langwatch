@@ -62,7 +62,7 @@ func readyStatusFor(req ChatRequest, worker Worker) string {
 func statusIndexOf(turnID string, n int) int {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(turnID))
-	return int(h.Sum32() % uint32(n)) //nolint:gosec // bounded by n
+	return int(h.Sum32() % uint32(n))
 }
 
 // App is the langyagent application. It composes the worker pool and the
@@ -145,7 +145,7 @@ type ChatRequest struct {
 	UserID string
 	// Intent is the caller's worker-turn label (create/revive/continue), a
 	// semantic hint the transport derives from the route. Recorded on the turn
-	// span + duration metric so per-intent behaviour is visible; it does NOT change
+	// span + duration metric so per-intent behavior is visible; it does NOT change
 	// how the turn runs (Acquire reconciles the real state).
 	Intent string
 }
@@ -251,6 +251,8 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
 		return nil, herr.NewLight(ctx, domain.ErrConversationBusy, nil)
+	case ClaimGranted:
+		// Fall through to drive the turn below.
 	}
 	worker.Touch()
 	return func(runCtx context.Context) { a.driveTurn(runCtx, req, worker) }, nil
@@ -369,7 +371,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	}
 
 	streamErr := <-errCh
-	// The GitHub gate preempts every other outcome: a trip means WE cancelled
+	// The GitHub gate preempts every other outcome: a trip means WE canceled
 	// the stream deliberately (so streamErr is a benign nil/cancellation, and
 	// letting it fall through would emit a SUCCESS final for a turn we stopped).
 	if message, code, tripped := githubGate.Tripped(); tripped {

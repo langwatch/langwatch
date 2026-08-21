@@ -85,7 +85,7 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, domain.ErrCredentialsRequired),
+	assert.ErrorIs(t, err, domain.ErrCredentialsRequired,
 		"a keyless spawn must ask the control plane to mint and retry, got: %v", err)
 }
 

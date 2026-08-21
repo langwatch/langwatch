@@ -45,7 +45,7 @@ type WorkerPool interface {
 	// that cannot reach LangWatch.
 	HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool
 	// Status returns the live worker count and the configured cap.
-	Status() (active, max int)
+	Status() (active, capacity int)
 	// KillSessionVanished recycles a worker whose opencode session disappeared.
 	KillSessionVanished(conversationID string)
 	// CancelTurn asks the conversation's live worker to abort the named
@@ -82,14 +82,14 @@ type TurnAborter interface {
 type ClaimOutcome int
 
 const (
-	// ClaimGranted: the worker is now driving THIS turn (a fresh claim).
+	// ClaimGranted means the worker is now driving THIS turn (a fresh claim).
 	ClaimGranted ClaimOutcome = iota
-	// ClaimAlreadyHandled: this exact turnId is already in flight on this worker,
+	// ClaimAlreadyHandled means this exact turnId is already in flight on this worker,
 	// OR was recently completed on it — a redundant dispatch, which is exactly what
 	// the self-retry re-drive of a merely-slow worker produces. A BENIGN no-op: the
 	// caller answers 2xx and drives nothing, so the turn never double-runs.
 	ClaimAlreadyHandled
-	// ClaimBusy: a DIFFERENT turn holds the worker's single-stream session (the
+	// ClaimBusy means a DIFFERENT turn holds the worker's single-stream session (the
 	// orchestrator returns conversation-busy → 409).
 	ClaimBusy
 )

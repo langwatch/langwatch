@@ -247,7 +247,7 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
 
 go-lint:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION)"

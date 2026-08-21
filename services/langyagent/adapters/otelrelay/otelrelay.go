@@ -307,7 +307,7 @@ type Options struct {
 // ctx is the manager-lifetime context (carries the logger); Shutdown stops the
 // listener.
 func New(ctx context.Context, opts Options) (*Relay, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("otelrelay listen: %w", err)
 	}

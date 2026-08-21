@@ -314,8 +314,8 @@ func TestPool_SurvivesPanicInBackgroundGoroutine(t *testing.T) {
 
 	// The manager is still alive and responsive after the panic: Status takes the
 	// pool lock and returns, which a dead process could never do.
-	if active, max := p.Status(); active != 0 || max != 4 {
-		t.Fatalf("pool Status after a background panic = (%d,%d), want (0,4)", active, max)
+	if active, capacity := p.Status(); active != 0 || capacity != 4 {
+		t.Fatalf("pool Status after a background panic = (%d,%d), want (0,4)", active, capacity)
 	}
 	// And the pool's internal sweep machinery still runs without deadlock.
 	p.reapIdle()

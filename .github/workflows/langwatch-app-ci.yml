@@ -182,6 +182,9 @@ jobs:
               # Root workspace members the app's `...` closure installs from
               # source — a change there is a change to the app.
               - 'packages/**'
+              # @langwatch/langyworker tests + typecheck run on unit shard 1;
+              # without this a wrapper-only change runs zero app CI.
+              - 'services/langyworker/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config all live at the repo root since ADR-076. A PR that
               # bumps a dependency or adds a security override touches ONLY
@@ -412,6 +415,19 @@ jobs:
       - name: Typecheck @langwatch/system-migrations
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/system-migrations run typecheck
+
+      # @langwatch/langyworker is the langy-worker pi-harness wrapper
+      # (services/langyworker) the langyagent image compiles into the worker
+      # binary. It sits outside platform/app, so the root typecheck and the
+      # sharded app suite never see it, same raw-TypeScript, shard-1
+      # arrangement as the packages above.
+      - name: Run @langwatch/langyworker unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run test
+
+      - name: Typecheck @langwatch/langyworker
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run typecheck
 
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests

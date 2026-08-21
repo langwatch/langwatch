@@ -21,7 +21,7 @@ func TestFinalizer_PostsTurnResultWithAuthAndPath(t *testing.T) {
 		gotContentType = r.Header.Get("Content-Type")
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &gotBody)
-		w.WriteHeader(202)
+		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer srv.Close()
 
@@ -54,10 +54,10 @@ func TestFinalizer_RetriesOn5xxThenSucceeds(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt32(&calls, 1) == 1 {
-			w.WriteHeader(503) // transient — retryable
+			w.WriteHeader(http.StatusServiceUnavailable) // transient, retryable
 			return
 		}
-		w.WriteHeader(202)
+		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer srv.Close()
 
@@ -79,7 +79,7 @@ func TestFinalizer_DoesNotRetryOn4xx(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
-		w.WriteHeader(400) // our own bug — never succeeds on retry
+		w.WriteHeader(http.StatusBadRequest) // our own bug, never succeeds on retry
 	}))
 	defer srv.Close()
 
@@ -101,7 +101,7 @@ func TestFinalizer_NoOpWhenMissingRequiredArgs(t *testing.T) {
 	var called int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&called, 1)
-		w.WriteHeader(202)
+		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer srv.Close()
 

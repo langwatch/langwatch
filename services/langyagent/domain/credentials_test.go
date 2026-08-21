@@ -151,11 +151,11 @@ func TestSignatureOf_MirrorTierChangeRecyclesWorker(t *testing.T) {
 		t.Fatalf("an empty tier must fingerprint as skip (empty=%+v skip=%+v)", empty, skip)
 	}
 
-	// An unrecognised tier is fail-safe: it normalises to skip, never to a
+	// An unrecognized tier is fail-safe: it normalises to skip, never to a
 	// content-bearing tier.
 	garbage := SignatureOf("project-1", "user-1", "m", nil, nil, "wide-open", "")
 	if garbage != skip {
-		t.Fatalf("an unrecognised tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
+		t.Fatalf("an unrecognized tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
 	}
 }
 

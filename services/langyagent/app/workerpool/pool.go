@@ -120,7 +120,7 @@ type Pool struct {
 	revoker   CredentialRevoker
 	otelRelay *otelrelay.Relay
 
-	// baseCtx is the pool-lifetime context (carries the logger; cancelled on
+	// baseCtx is the pool-lifetime context (carries the logger; canceled on
 	// Shutdown). Worker subprocesses bind to it via spawnOpenCode so a pool
 	// shutdown / deadline propagates to them — the flat manager used
 	// context.Background here and dropped that propagation.
@@ -174,7 +174,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	if tel == nil {
 		tel = telemetry.New()
 	}
-	var guard egress.Guard = opts.Egress
+	var guard = opts.Egress
 	if guard == nil {
 		guard = egress.NewPassThrough()
 	}
@@ -348,13 +348,6 @@ func (p *Pool) countInFlight(workers []*Worker) int {
 	return n
 }
 
-// Acquire returns the worker for conversationID, spawning one if needed. Two
-// concurrent callers for the same conversationID share the same spawn promise —
-// only one subprocess is ever created.
-//
-// If an existing worker's CredentialSignature differs from the caller's (model
-// changed, GitHub token added/removed) the existing worker is killed and a
-// fresh one is spawned with the new capability set.
 // HasLiveWorker reports whether a worker is already running for this
 // conversation whose capabilities match `sig`.
 //
@@ -380,7 +373,7 @@ func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignatu
 //
 // Fire-and-forget on the pool's base context, NOT the caller's: the caller is
 // usually kill(), which may be running under a request that is about to return,
-// and a revocation must not be cancelled just because the turn finished. It must
+// and a revocation must not be canceled just because the turn finished. It must
 // also never block a kill — a dead worker's cleanup cannot wait on an HTTP call
 // to a control plane that might be down.
 //
@@ -422,6 +415,13 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin, creds.GithubRepoScope)}
 }
 
+// Acquire returns the worker for conversationID, spawning one if needed. Two
+// concurrent callers for the same conversationID share the same spawn promise,
+// only one subprocess is ever created.
+//
+// If an existing worker's CredentialSignature differs from the caller's (model
+// changed, GitHub token added/removed) the existing worker is killed and a
+// fresh one is spawned with the new capability set.
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
@@ -512,7 +512,7 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 }
 
 // Status returns a live worker count and the configured cap (used by /health).
-func (p *Pool) Status() (active, max int) {
+func (p *Pool) Status() (active, capacity int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return len(p.workers), p.maxWorkers
