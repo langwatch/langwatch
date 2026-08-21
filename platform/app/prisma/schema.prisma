@@ -1438,6 +1438,8 @@ model LangyConversationProjection {
   /// The turn in flight, or null when idle (busy guard reads this).
   CurrentTurnId        String?                    @map("currentTurnId")
   LastError            String?                    @map("lastError")
+  /// The model the latest accepted turn ran on; reopening seeds the picker from it.
+  LastModel            String?                    @map("lastModel")
   /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
   PendingHandoffToken  String?                    @map("pendingHandoffToken")
   PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")

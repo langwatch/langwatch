@@ -149,6 +149,12 @@ export type ConversationDetail = ConversationListItem & {
    */
   lastError: string | null;
   /**
+   * The model the latest accepted turn ran on, or null before any turn
+   * recorded one. Reopening the conversation seeds the composer's picker
+   * from it, so a conversation keeps the model it was last used with.
+   */
+  lastModel: string | null;
+  /**
    * The projection's event cursor (ADR-059): the snapshot position the client
    * seeds its local fold from before folding the durable tail.
    */
@@ -361,6 +367,7 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      lastModel: row.lastModel,
       eventCursor: row.eventCursor ?? null,
     };
   }
@@ -777,6 +784,7 @@ export class LangyConversationService {
     conversationId,
     turnId = crypto.randomUUID(),
     questionParts,
+    model,
     conversationStart,
     userMessage,
     consumeHandoffTurnId,
@@ -786,6 +794,8 @@ export class LangyConversationService {
     turnId?: string;
     /** The user's question that opened the turn — folded into the turn document. */
     questionParts?: LangyMessagePart[];
+    /** The model this turn runs on — the fold keeps the latest as `LastModel`. */
+    model?: string;
     /** Optional first-event marker, committed atomically before acceptance. */
     conversationStart?: Omit<
       LangyConversationStartedEventData,
@@ -802,6 +812,7 @@ export class LangyConversationService {
       conversationId,
       turnId,
       ...(questionParts !== undefined ? { questionParts } : {}),
+      ...(model !== undefined ? { model } : {}),
       ...(conversationStart ? { conversationStart } : {}),
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),
