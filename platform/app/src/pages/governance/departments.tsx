@@ -55,21 +55,7 @@ function DepartmentsPage() {
   return (
     <GovernanceLayout pageTitle="Departments · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <VStack align="start" gap={1}>
-          <Text fontSize="xs" color="fg.muted">
-            <Link href="/governance" color="blue.600">
-              ← AI Governance
-            </Link>{" "}
-            · Departments
-          </Text>
-          <Heading size="md">Departments</Heading>
-          <Text color="fg.muted" fontSize="sm" maxW="2xl">
-            A department is an accounting label for spend. Assign people, teams,
-            and projects to one, and spend rolls up by department across the
-            org, including personal AI use. Departments never grant or restrict
-            access.
-          </Text>
-        </VStack>
+        <Heading size="md">Departments</Heading>
 
         <HandledErrorAlert
           error={listQuery.error}
