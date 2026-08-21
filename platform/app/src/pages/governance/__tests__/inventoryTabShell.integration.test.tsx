@@ -214,12 +214,12 @@ describe("the inventory tab shell", () => {
       const catalogTab = screen.getByRole("tab", { name: "Catalog" });
       fireEvent.click(catalogTab);
 
-      // Selection round-trips through the router (?tab=catalog), so the
-      // re-render is async.
+      // Selection round-trips through the router (?tab=catalog), and the
+      // pane mounts a tick after the trigger's aria state flips.
       await waitFor(() =>
         expect(catalogTab).toHaveAttribute("aria-selected", "true"),
       );
-      expect(screen.getByText(/aiTools:manage/)).toBeVisible();
+      expect(await screen.findByText(/aiTools:manage/)).toBeVisible();
     });
   });
 
