@@ -309,7 +309,7 @@ Feature: Authorization grants
   Scenario: The projection is written by the pipeline alone
     When application code attempts to write a grant row directly
     Then it cannot
-    And the only direct writes are the three deny-only paths
+    And the only direct writes are the two deny-only paths
 
   @unit @unimplemented
   Scenario: A write never removes a row its own events do not name
@@ -343,6 +343,21 @@ Feature: Authorization grants
     When a grant lands in the projection
     Then the compat head shows the equivalent legacy row
     And readers of the legacy tables keep answering correctly
+
+  @unit
+  Scenario: A revoked grant is gone from the legacy head
+    Given a grant with a compat binding on the legacy head
+    When the grant is revoked
+    Then the compat binding is removed
+    And the legacy resolver no longer answers yes to that access
+
+  @unit
+  Scenario: A redelivered attach after a revoke leaves no compat binding
+    Given a grant that was attached and then revoked
+    When an older attach event for it is delivered again
+    Then the authoritative row stays revoked
+    And the compat binding is not rebuilt from the stale event
+    And it is removed rather than resurrected
 
   # ═══ Share links and the compat heads ═════════════════════════════════
   # Share links live on both heads until every organization has moved:

@@ -92,15 +92,12 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe("given a write that states the whole row", () => {
-    /**
-     * Two writes can share a millisecond — a whole attach batch is stamped
-     * with one `occurredAtMs` — and a full-row write restates every column.
-     * Admitting it on equality lets a redelivered `attached` revert a
-     * same-millisecond `role_changed` and put `legacyRole` back, which is a
-     * privilege escalation, not a lost update.
-     *
-     * @scenario "A redelivered grant event cannot revert a newer one"
-     */
+    // Two writes can share a millisecond — a whole attach batch is stamped
+    // with one `occurredAtMs` — and a full-row write restates every column.
+    // Admitting it on equality lets a redelivered `attached` revert a
+    // same-millisecond `role_changed` and put `legacyRole` back, which is a
+    // privilege escalation, not a lost update.
+    /** @scenario "A redelivered grant event cannot revert a newer one" */
     it("refuses an equal timestamp, not just an older one", async () => {
       const { repository, executeRaw } = build();
 
@@ -197,13 +194,10 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       );
     });
 
-    /**
-     * The authoritative row is MARKED and the compat row is REMOVED. The
-     * legacy tables have nowhere to record "ended", so a surviving row would
-     * leave the legacy resolver answering yes to access that has ended.
-     *
-     * @scenario "A revoked grant is gone from the legacy head"
-     */
+    // The authoritative row is MARKED and the compat row is REMOVED. The
+    // legacy tables have nowhere to record "ended", so a surviving row would
+    // leave the legacy resolver answering yes to access that has ended.
+    /** @scenario "A revoked grant is gone from the legacy head" */
     it("removes the compat binding when the grant is revoked", async () => {
       const { repository, prisma } = build();
 
@@ -214,6 +208,30 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
         occurredAt: new Date(9),
       } as GrantProjectionWrite);
 
+      expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG, id: "grant_1" },
+      });
+    });
+
+    // A redelivered older `attached` loses the occurredAt guard on the
+    // authoritative row, which stays revoked. The compat head must follow the
+    // authoritative row, not the event: rebuilding the binding from the event
+    // would resurrect access the revoke deleted. So a re-read revoked row
+    // removes the compat binding rather than upserting it.
+    /** @scenario "A redelivered attach after a revoke leaves no compat binding" */
+    it("removes the compat binding when the re-read grant is revoked", async () => {
+      const { repository, prisma } = build();
+      prisma.grant.findUnique.mockResolvedValue({
+        ...grantRow(),
+        revokedAt: new Date(5),
+      });
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+      } as GrantProjectionWrite);
+
+      expect(prisma.roleBinding.upsert).not.toHaveBeenCalled();
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
         where: { organizationId: ORG, id: "grant_1" },
       });

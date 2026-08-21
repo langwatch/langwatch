@@ -106,7 +106,22 @@ const GRANT_FACT_COLUMNS = {
  * rather than silent.
  */
 function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
-  if (write.kind === "grant.upsert" || write.kind === "role.upsert") return;
+  // Upserts create their own row, so a 0-count is not a miss. A revoke is
+  // also skipped, but for a different reason: `appendGrantRevocation` enforces
+  // the deny synchronously (enforceGrantRevocation sets `revokedAt` before the
+  // event is even queued), so by the time the projection replays the same
+  // revoke its `revokedAt: null` guard matches 0 rows on EVERY ordinary
+  // revoke — the row is already in the intended state. Reporting that would
+  // fire the alarm on every revoke and bury the case it exists for. A
+  // genuinely absent revoke is a harmless no-op anyway: the attach that would
+  // have created the row is itself an upsert, which this already tolerates.
+  if (
+    write.kind === "grant.upsert" ||
+    write.kind === "role.upsert" ||
+    write.kind === "grant.revoke"
+  ) {
+    return;
+  }
   const count = (result as { count?: unknown } | null)?.count;
   if (count !== 0) return;
   logger.warn(
@@ -205,10 +220,40 @@ export class PrismaAuthzGrantsWriteRepository
 
   /** A grant reaches whichever legacy head can express it — a binding, a
    *  share link, or neither. The mappers decide; `null` means the legacy
-   *  tables never represented this shape and their silence is correct. */
+   *  tables never represented this shape and their silence is correct.
+   *
+   *  The compat heads are derived from the AUTHORITATIVE row as it stands
+   *  after the guarded write, never from the event. A redelivered older
+   *  `attached` loses the `occurredAt` guard and leaves the Grant marked
+   *  revoked; rebuilding compat from the event would then re-insert the very
+   *  binding the revoke deleted, resurrecting access on the legacy head. So
+   *  the row is re-read here — the same shape `compatForRoleChange` uses — and
+   *  a grant that is absent or revoked has its compat rows removed rather than
+   *  written. */
   private async compatForGrant(row: GrantRow): Promise<void> {
     const organizationId = row.organizationId;
-    const grant = grantRowToFact(row);
+    const authoritative = await this.prisma.grant.findUnique({
+      where: { id: row.id },
+      select: { ...GRANT_FACT_COLUMNS, revokedAt: true },
+    });
+
+    if (!authoritative || authoritative.revokedAt) {
+      // The grant is not live — a newer revoke won the guard, or the row is
+      // gone. Neither compat head may stand; drop whatever a prior apply left
+      // (idempotent when the revoke already deleted it).
+      await this.prisma.roleBinding.deleteMany({
+        where: { organizationId, id: row.id },
+      });
+      if (row.projectId) {
+        await this.prisma.shareLink.deleteMany({
+          where: { projectId: row.projectId, id: row.id },
+        });
+      }
+      return;
+    }
+
+    const { revokedAt: _revokedAt, ...factRow } = authoritative;
+    const grant = grantRowToFact(factRow);
 
     const binding = grantFactToCompatBinding({ grant, organizationId });
     if (binding) {
