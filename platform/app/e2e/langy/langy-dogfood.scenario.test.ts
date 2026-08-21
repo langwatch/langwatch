@@ -601,7 +601,7 @@ describe("Langy dogfood: named flows", () => {
             criteria: [
               "Langy takes the user to the prompts area (a navigate command ran) or names the Prompts page it is opening, and confirms it in one short line.",
               "Langy does not ask which project.",
-              "The reply contains no worker-side address: no localhost, no 127.0.0.1, no container port, no raw environment-variable placeholder standing in for a host.",
+              "Langy's own prose contains no worker-side address: no localhost, no 127.0.0.1, no container port, no raw environment-variable placeholder standing in for a host. Judge only the assistant's text against this. A tool result showing such an address is correct behavior (on a local stack the product's own URLs are localhost URLs) and never fails this criterion.",
             ],
           }),
         ],

@@ -38,15 +38,13 @@ function assistantMessages(
 }
 
 /**
- * Command cards the adapter mirrors off the turn stream (langy-agent.ts) —
- * product UI included so the judge sees the command results, stripped here so
- * structural assertions grade only Langy's own prose. Agent-authored
- * ```langy-card blocks stay: those are part of the reply the model wrote.
+ * The prose view of one assistant message. Tool traffic never rides in
+ * assistant text (langy-agent.ts returns it as role:"tool" messages), and a
+ * tool-call-only assistant message flattens to "" here, so these helpers see
+ * only what Langy itself said.
  */
-const TOOL_CARD_BLOCKS = /```langy-tool-card\n[\s\S]*?```\n?/g;
-
 function proseOf(content: unknown): string {
-  return flattenContent(content).replace(TOOL_CARD_BLOCKS, "").trim();
+  return flattenContent(content).trim();
 }
 
 /**

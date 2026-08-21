@@ -11,17 +11,39 @@ const LW_KEY = LANGWATCH_API_KEY;
 /** How long seeded traces get to become queryable before the suite gives up. */
 const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
 
-async function lwGet(path: string): Promise<any> {
-  const res = await fetch(`${LW_BASE}${path}`, {
-    headers: { "X-Auth-Token": LW_KEY },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `GET ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+/**
+ * Retried fetch for the verification helpers: on a loaded machine a single
+ * request has stalled in front of the app past any sane one-shot budget while
+ * a fresh attempt answered instantly, so three short attempts beat one long
+ * wait. Only timeouts and network errors retry — an HTTP error status is a
+ * real answer and throws straight away.
+ */
+async function lwFetch(path: string, init: RequestInit): Promise<any> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${LW_BASE}${path}`, {
+        ...init,
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) {
+        throw new Error(
+          `${init.method ?? "GET"} ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
+        );
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes(`${path} -> `)) {
+        throw error;
+      }
+      lastError = error;
+    }
   }
-  return res.json();
+  throw lastError;
+}
+
+async function lwGet(path: string): Promise<any> {
+  return lwFetch(path, { headers: { "X-Auth-Token": LW_KEY } });
 }
 
 async function lwPost({
@@ -31,18 +53,11 @@ async function lwPost({
   path: string;
   body: unknown;
 }): Promise<any> {
-  const res = await fetch(`${LW_BASE}${path}`, {
+  return lwFetch(path, {
     method: "POST",
     headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) {
-    throw new Error(
-      `POST ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
-  }
-  return res.json();
 }
 
 // Normalize the various list payload shapes ({ data: [...] }, a bare array, or
