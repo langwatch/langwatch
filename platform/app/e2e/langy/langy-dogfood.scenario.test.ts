@@ -537,4 +537,42 @@ describe("Langy dogfood: named flows", () => {
       expect(result.success).toBe(true);
     });
   });
+
+  describe("when the user asks to be taken to their prompts", () => {
+    /** @scenario A "take me to" request lands a navigate instruction on the turn stream */
+    it("lands a navigate instruction for the prompts page on the turn stream", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        name: "take me to my prompts navigates in place",
+        description:
+          "The user asks to be taken to the prompt playground. Navigation is agent-driven: the model runs `langwatch navigate open <id>` (often chained onto its lookup) and the relay resolves the platform's own address onto the live turn stream. The reply also says in words where the user was taken.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy takes the user to the prompts area (a navigate command ran) or names the Prompts page it is opening, and confirms it in one short line.",
+              "Langy does not ask which project.",
+              "The reply contains no worker-side address: no localhost, no 127.0.0.1, no container port, no raw environment-variable placeholder standing in for a host.",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user("take me to the prompt playground"),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      // Layer 2, the hard fact this scenario exists for: a navigate entry
+      // really landed on the turn stream, addressing the prompts page. Words
+      // alone (the old silent-drop failure) do not pass this.
+      expect(
+        langy.state.navigateHrefs.some((href) => href.includes("/prompts")),
+      ).toBe(true);
+    });
+  });
 });

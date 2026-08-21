@@ -1,7 +1,7 @@
 /**
  * The verified server-side fallback for a navigate id the conversation never
  * cached a link for. Prod wires this as the relay's `resolveResourceUrl`, but
- * the relay tests inject a stub for it — so this is where its real contract is
+ * the relay tests inject a stub for it: so this is where its real contract is
  * pinned: the prefix-keyed resolver table, the tenancy-scoped lookup through
  * the platform's own services, null-on-miss (unknown resource OR unresolvable
  * project), and the fact that the address is PLATFORM-computed, never
@@ -112,9 +112,9 @@ describe("resolveNavigateFallbackUrl", () => {
     });
   });
 
-  /** @scenario "The platform fallback resolves every resource surface Langy opens" */
   describe("given a prompt id the project can see", () => {
-    it("resolves the prompts page with that prompt's editor drawer open — the reported chained-navigate case", async () => {
+    /** @scenario "The platform fallback resolves every resource surface Langy opens" */
+    it("resolves the prompts page with that prompt's editor drawer open: the reported chained-navigate case", async () => {
       getPromptByIdOrHandle.mockResolvedValue({ id: "prompt_abc" });
 
       expect(await resolve("prompt_abc")).toBe(
@@ -175,7 +175,7 @@ describe("resolveNavigateFallbackUrl", () => {
   });
 
   describe("given an experiment id the project can see", () => {
-    it("resolves the experiment's page by its slug — the address the app's own links use", async () => {
+    it("resolves the experiment's page by its slug: the address the app's own links use", async () => {
       findExperimentById.mockResolvedValue({
         id: "experiment_1",
         slug: "my-batch-eval",
@@ -250,7 +250,7 @@ describe("resolveNavigateFallbackUrl", () => {
       });
     });
 
-    it("resolves the code editor drawer for any non-http agent — the REST API's own mapping", async () => {
+    it("resolves the code editor drawer for any non-http agent: the REST API's own mapping", async () => {
       getAgentByIdOrThrow.mockResolvedValue({ id: "agent_2", type: "code" });
 
       expect(await resolve("agent_2")).toBe(
@@ -265,8 +265,8 @@ describe("resolveNavigateFallbackUrl", () => {
     });
   });
 
-  /** @scenario "An id the project cannot resolve drops silently" */
   describe("given the run does not resolve in this project", () => {
+    /** @scenario "An id the project cannot resolve drops silently" */
     it("returns null when the run is not found, and never asks for the project", async () => {
       getScenarioRunData.mockResolvedValue(null);
 

@@ -164,6 +164,34 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the browser navigates to that link
       And asking to open the batch the lookup named navigates to the same link
 
+  Rule: An id the conversation never surfaced still resolves through the platform
+
+    # The link store is an optimization, not the source of truth. The model
+    # often chains its lookup and the open into ONE compound command, and
+    # compound stdout never seeds the store (stdout provenance), so the
+    # platform's own verified lookup must resolve the id, for every resource
+    # surface Langy opens, not only scenario runs.
+
+    @unit
+    Scenario: A chained lookup-and-open compound resolves through the platform fallback
+      Given the model chained its lookup and the open into one compound command
+      And the conversation never remembered a link for the resource
+      When the navigate instruction names a resource in this project
+      Then the platform looks the id up with the project's own access
+      And the browser navigates to the platform's own address for it
+
+    @unit
+    Scenario: The platform fallback resolves every resource surface Langy opens
+      When the agent asks to open a prompt, dataset, workflow, experiment, monitor, evaluator or agent the project can see
+      Then the platform computes that resource's own address
+      And the address is the one the platform's public API or its own UI produces for it
+
+    @unit
+    Scenario: An id the project cannot resolve drops silently
+      When a navigate instruction names an id that does not resolve in this project
+      Then no navigation happens
+      And the turn continues unaffected
+
   Rule: Navigation is a live-edge instruction, fired at most once
 
     @integration

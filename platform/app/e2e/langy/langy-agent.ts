@@ -28,6 +28,10 @@ interface TurnMessage {
 }
 interface LangySessionState {
   conversationId: string | null;
+  /** Every navigate instruction observed on this session's turn streams, in
+   * order. Navigation scenarios assert on these: the href is the hard fact
+   * that the agent-driven navigate actually landed on the stream. */
+  navigateHrefs: string[];
 }
 
 let cachedCookie: Promise<string> | null = null;
@@ -237,9 +241,12 @@ function parseHandledStreamError(entry: {
 async function streamTurnText({
   cookie,
   params,
+  onNavigate,
 }: {
   cookie: string;
   params: { projectId: string; conversationId: string; turnId: string };
+  /** Called for each navigate entry on the stream (live-only, never durable). */
+  onNavigate?: (href: string) => void;
 }): Promise<string> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
   const res = await fetch(
@@ -309,6 +316,9 @@ async function streamTurnText({
           streamErrorCode = parsed?.code ?? null;
         }
       }
+      if (entry.type === "navigate" && typeof entry.href === "string") {
+        onNavigate?.(entry.href);
+      }
       if (entry.type === "end") sawTerminal = true;
       // "complete" (SSE stream finished) / "connected" / "status" carry no
       // assistant text — nothing further to accumulate.
@@ -373,7 +383,7 @@ async function streamTurnText({
 export function makeLangyAdapter(): AgentAdapter & {
   state: LangySessionState;
 } {
-  const state: LangySessionState = { conversationId: null };
+  const state: LangySessionState = { conversationId: null, navigateHrefs: [] };
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -400,6 +410,7 @@ export function makeLangyAdapter(): AgentAdapter & {
       const text = await streamTurnText({
         cookie,
         params: { projectId: PROJECT_ID, conversationId, turnId },
+        onNavigate: (href) => state.navigateHrefs.push(href),
       });
       return { role: "assistant", content: text };
     },
