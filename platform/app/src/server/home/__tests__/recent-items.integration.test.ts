@@ -9,6 +9,9 @@ import { getTestUser } from "../../../utils/testUtils";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("Recent Items Integration", () => {
   const projectId = "test-project-id";

@@ -74,6 +74,9 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { lwqlRouter } from "../analytics/lwql";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const mockPrismaClient = {
   project: {

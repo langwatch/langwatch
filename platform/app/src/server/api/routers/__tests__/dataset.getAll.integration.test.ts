@@ -19,6 +19,9 @@ import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const PROJECT_ID = "test-project-id";
 

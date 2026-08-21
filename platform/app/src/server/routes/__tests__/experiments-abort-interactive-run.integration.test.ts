@@ -12,6 +12,9 @@
  * running-owner that the orchestrator records.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),

@@ -51,13 +51,19 @@ vi.mock("~/server/auth", () => ({
 }));
 // The picked shared project's key requires project:update; that RBAC decision
 // is covered elsewhere. Grant it so the gate logic is what's under test.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
+// The approval route reads hasProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
   return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 import type { Redis } from "ioredis";
-import { hasProjectPermission } from "~/server/api/rbac";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";

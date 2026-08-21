@@ -28,6 +28,9 @@ import {
   mintLangySessionApiKey,
 } from "../langyApiKey";
 import { experimentRoutePermissions } from "./helpers/routePermissions";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 // This suite only needs Postgres — every harness (CI's testcontainers, native
 // local services) provides that, so it runs unconditionally. It used to carry

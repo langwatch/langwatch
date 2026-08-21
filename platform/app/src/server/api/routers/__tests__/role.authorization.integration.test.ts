@@ -25,6 +25,9 @@ import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const ns = `role-authz-${nanoid(8)}`;
 
@@ -152,7 +155,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list the organization's roles", async () => {
       await expect(
         memberCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     /** A member who could mint roles could mint themselves any permission. */
@@ -163,7 +166,7 @@ describe("Feature: role router caller authorization", () => {
           name: `Escalated ${ns}`,
           permissions: ["organization:manage"],
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to delete a role", async () => {
@@ -189,7 +192,7 @@ describe("Feature: role router caller authorization", () => {
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("leaves the role untouched after the refused calls", async () => {
@@ -206,7 +209,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list this organization's roles", async () => {
       await expect(
         outsiderAdminCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to read one of its roles by id", async () => {

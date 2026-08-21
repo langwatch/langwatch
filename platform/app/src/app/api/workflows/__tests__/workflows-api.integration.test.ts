@@ -27,6 +27,9 @@ vi.mock("~/optimization_studio/server/loadDatasets", () => ({
 }));
 
 import { app } from "../[[...route]]/app";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("Workflows REST API", () => {
   let testApiKey: string;

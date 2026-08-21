@@ -47,6 +47,9 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;
@@ -141,7 +144,7 @@ describe("user.cliBootstrap integration", () => {
     it("rejects via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.cliBootstrap({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

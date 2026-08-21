@@ -23,6 +23,9 @@ import { getTestProject } from "../../../utils/testUtils";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../db";
 import { getUserProtectionsForProject } from "../utils";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const NAMESPACE = "dataprivacy-visibility";
 

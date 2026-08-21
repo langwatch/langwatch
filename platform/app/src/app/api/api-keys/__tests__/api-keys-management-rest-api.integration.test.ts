@@ -26,6 +26,9 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("Feature: API keys management REST API", () => {
   const ns = `api-keys-mgmt-${nanoid(8)}`;

@@ -14,6 +14,9 @@ import type {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("Prompt Tags REST API (/api/prompts/tags)", () => {
   let testOrganization: Organization;

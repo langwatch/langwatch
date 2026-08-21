@@ -37,6 +37,9 @@ import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("workflow.create node LLM materialization", () => {
   const testNamespace = `wf-node-llm-${nanoid(8)}`;

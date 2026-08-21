@@ -24,6 +24,9 @@ import {
   updateConfig,
 } from "../modelDefaults.service";
 import { resolveModelForFeature } from "../resolveModelForFeature";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("given default-model configs with scope attachments (real DB)", () => {
   const ns = `mdcfg-excl-${nanoid(8)}`;

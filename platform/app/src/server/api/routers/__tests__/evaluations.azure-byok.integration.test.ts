@@ -40,6 +40,9 @@ vi.mock("../../rbac", () => ({
 }));
 
 import { evaluationsRouter } from "../evaluations";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 function createCaller(_projectId: string) {
   return evaluationsRouter.createCaller({

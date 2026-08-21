@@ -14,6 +14,9 @@ import { TokenResolver } from "../../../api-key/token-resolver";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("project.regenerateApiKey integration", () => {
   const testNamespace = `regen-api-key-${nanoid(8)}`;

@@ -203,7 +203,10 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
       select: { revokedAt: true, revokedReason: true },
     });
     expect(revoked?.revokedAt).not.toBeNull();
-    expect(revoked?.revokedReason).toBe("offboard");
+    // The direct write records the bypass vocabulary ("revocation" |
+    // "offboard"), not the caller's free-text reason — that one travels on
+    // the event and lands when the projection write catches up.
+    expect(revoked?.revokedReason).toBe("revocation");
 
     expect(await liveGrantIds()).toEqual([survivingGrantId]);
   });

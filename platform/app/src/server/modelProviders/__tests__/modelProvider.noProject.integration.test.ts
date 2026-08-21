@@ -63,6 +63,9 @@ import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("ModelProviderService on an organization with no project (real DB)", () => {
   const ns = `mp-noproj-${nanoid(8)}`;

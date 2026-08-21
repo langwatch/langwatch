@@ -14,6 +14,9 @@ import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { engineRepliesWith } from "./agentTestEngine";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const mockPostEvent = vi.fn();
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({

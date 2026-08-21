@@ -20,6 +20,9 @@
  */
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const TEST_SIGNING_KEY = "x".repeat(64);
 process.env.CREDENTIALS_SECRET = TEST_SIGNING_KEY;

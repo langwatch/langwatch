@@ -7,6 +7,9 @@ import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.r
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("Model Providers API", () => {
   let testApiKey: string;

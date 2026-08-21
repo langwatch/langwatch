@@ -32,6 +32,9 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 const ns = `secured-rbac-${nanoid(8)}`;
 

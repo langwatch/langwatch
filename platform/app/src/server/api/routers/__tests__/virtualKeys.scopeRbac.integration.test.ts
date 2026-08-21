@@ -32,6 +32,9 @@ import {
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 

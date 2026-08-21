@@ -15,6 +15,13 @@ const PROJECT_ID = "project_1";
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
 
+// A denied query flows through auditLogTRPCErrors, whose real implementation
+// writes prisma.auditLog — no database in a unit test, and its crash would
+// replace the denial this file asserts on.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {

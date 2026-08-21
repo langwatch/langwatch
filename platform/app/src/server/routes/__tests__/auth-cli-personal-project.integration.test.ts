@@ -42,12 +42,18 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
+// The approval route reads hasProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
   return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/api/rbac";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -61,6 +67,9 @@ import {
 } from "~/test-utils/clickhouseTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 /** The container's connection, handed to the test App the CLI routes read. */
 let redisConnection: Redis | null = null;

@@ -34,6 +34,9 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+wireDefaultTestApp();
+
 
 describe("user.personalBudget integration", () => {
   const ns = `pbudget-${nanoid(8)}`;
@@ -117,7 +120,7 @@ describe("user.personalBudget integration", () => {
     it("rejects with UNAUTHORIZED via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.personalBudget({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
