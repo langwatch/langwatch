@@ -1,6 +1,7 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuX } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import { withController } from "~/utils/withControllerHOC";
@@ -83,9 +84,15 @@ function PromptBrowserTabView({
           {name}
         </Text>
         {hasUnsavedChanges && (
-          <Box flexShrink={0}>
-            <Circle size="10px" bg="orange.solid" />
-          </Box>
+          <Tooltip content="This prompt has unsaved changes">
+            <Box
+              flexShrink={0}
+              aria-label="This prompt has unsaved changes"
+              tabIndex={0}
+            >
+              <Circle size="10px" bg="orange.solid" />
+            </Box>
+          </Tooltip>
         )}
         {showVersionBadge && versionNumber != null && (
           <Box flexShrink={0}>

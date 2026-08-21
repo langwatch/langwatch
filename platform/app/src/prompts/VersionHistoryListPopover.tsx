@@ -33,6 +33,11 @@ import { VersionChanges } from "./version-history/VersionChanges";
 
 const logger = createLogger("VersionHistoryListPopover");
 
+type VersionLoadRequest = {
+  versionId: string;
+  intent?: "load" | "discard";
+};
+
 /**
  * The fields of a prompt version this panel reads: what the version says, when
  * it was written, by whom, and enough of its content to diff it against the
@@ -375,7 +380,7 @@ function VersionHistoryList({
   currentVersionId,
 }: {
   versions: VersionHistoryItemData[];
-  onLoad: (params: { versionId: string }) => void;
+  onLoad: (params: VersionLoadRequest) => void;
   isLoading: boolean;
   /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
   currentVersionId?: string;
@@ -473,7 +478,7 @@ function VersionHistoryContent({
   hasUnsavedChanges,
   currentVersionId,
 }: {
-  onLoad: (params: { versionId: string }) => void;
+  onLoad: (params: VersionLoadRequest) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
   hasUnsavedChanges?: boolean;
@@ -501,7 +506,12 @@ function VersionHistoryContent({
       <Popover.Body padding={0}>
         {hasUnsavedChanges && currentVersion && (
           <UnsavedChangesStrip
-            onDiscard={() => onLoad({ versionId: currentVersion.versionId })}
+            onDiscard={() =>
+              onLoad({
+                versionId: currentVersion.versionId,
+                intent: "discard",
+              })
+            }
           />
         )}
         <VersionHistoryList
@@ -531,7 +541,7 @@ function VersionHistoryPopover({
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onLoad: (params: { versionId: string }) => void;
+  onLoad: (params: VersionLoadRequest) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
   hasUnsavedChanges?: boolean;
@@ -604,9 +614,9 @@ export function VersionHistoryListPopover({
    * User will need to save manually to complete the restore.
    */
   const handleRestore = useCallback(
-    (params: { versionId: string }) => {
+    (params: VersionLoadRequest) => {
       void (async () => {
-        const { versionId } = params;
+        const { versionId, intent = "load" } = params;
 
         // Find the version in the already-fetched data
         const prompt = prompts.find((p) => p.versionId === versionId);
@@ -623,7 +633,10 @@ export function VersionHistoryListPopover({
           await onRestoreSuccess?.(prompt);
           onClose();
           toaster.info({
-            title: `Restored prompt to version ${prompt.version}`,
+            title:
+              intent === "discard"
+                ? "Discarded changes"
+                : `Restored prompt to version ${prompt.version}`,
           });
         } catch (error) {
           logger.error({ error }, "Error loading version");

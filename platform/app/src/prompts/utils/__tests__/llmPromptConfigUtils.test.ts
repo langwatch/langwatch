@@ -342,6 +342,15 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     });
   });
 
+  describe("when the API prefixes a handle with this prompt's project ID", () => {
+    it("strips that project ID without stripping a real folder", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("test-project/folder/gato"),
+      );
+      expect(result.handle).toBe("folder/gato");
+    });
+  });
+
   describe("when prompt handle has organization_ prefix", () => {
     it("strips organization prefix from simple handle", () => {
       const result = versionedPromptToPromptConfigFormValues(

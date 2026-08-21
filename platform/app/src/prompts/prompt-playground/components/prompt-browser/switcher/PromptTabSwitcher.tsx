@@ -7,6 +7,7 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   getDisplayHandle,
   getPromptFolder,
@@ -160,12 +161,16 @@ function PromptTabSwitcherRow({
           {name}
         </Text>
         {hasUnsavedChanges && (
-          <Circle
-            data-testid="unsaved-indicator"
-            size="8px"
-            bg="orange.solid"
-            flexShrink={0}
-          />
+          <Tooltip content="This prompt has unsaved changes">
+            <Circle
+              data-testid="unsaved-indicator"
+              size="8px"
+              bg="orange.solid"
+              flexShrink={0}
+              tabIndex={0}
+              aria-label="This prompt has unsaved changes"
+            />
+          </Tooltip>
         )}
         {showVersionBadge && versionNumber != null && (
           <Text fontSize="xs" color="fg.muted" flexShrink={0}>

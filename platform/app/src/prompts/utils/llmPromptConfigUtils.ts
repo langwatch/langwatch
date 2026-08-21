@@ -559,8 +559,19 @@ export function formValuesToTriggerSaveVersionParams(
  */
 const extractShortHandle = (
   handle: string | null | undefined,
+  projectId?: string,
+  organizationId?: string,
 ): string | null => {
   if (!handle) return null;
+
+  // API responses can carry the database scope prefix verbatim. Match it to
+  // the prompt's own scope identifiers instead of stripping any first path
+  // segment: `folder/gato` is a valid user-authored handle and must survive.
+  for (const scopeId of [projectId, organizationId]) {
+    if (scopeId && handle.startsWith(`${scopeId}/`)) {
+      return handle.slice(scopeId.length + 1);
+    }
+  }
 
   // Check for known prefixes: project_, org_, organization_
   const knownPrefixMatch = handle.match(/^(?:project_|organization_)[^/]+\//);
@@ -590,7 +601,11 @@ export function versionedPromptToPromptConfigFormValues(
    * The API may return full paths in some contexts (like version history)
    * but forms should use the short handle.
    */
-  const shortHandle = extractShortHandle(prompt.handle);
+  const shortHandle = extractShortHandle(
+    prompt.handle,
+    prompt.projectId,
+    prompt.organizationId,
+  );
 
   /**
    * Because we have old handles that are not valid,

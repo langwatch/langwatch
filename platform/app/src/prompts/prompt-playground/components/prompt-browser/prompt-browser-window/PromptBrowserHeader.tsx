@@ -20,6 +20,9 @@ export function PromptBrowserHeader() {
   const { handleSaveVersion } = useHandleSavePrompt();
   const tabId = useTabId();
   const hasUnsavedChanges = useHasUnsavedChanges(tabId);
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
+  );
   const openHistoryOnLoad = useDraggableTabsBrowserStore(({ windows }) => {
     const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
     return tab?.data.meta.openHistoryOnLoad;
@@ -34,6 +37,22 @@ export function PromptBrowserHeader() {
     const newFormValues =
       versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
     formMethods.reset(newFormValues);
+    // Keep the persisted browser draft in lockstep with the reset. Waiting for
+    // the form watcher leaves the unsaved indicator visible for another 500ms
+    // and can let a pending edit overwrite the discarded values.
+    updateTabData({
+      tabId,
+      updater: (data) => ({
+        ...data,
+        form: { currentValues: newFormValues },
+        meta: {
+          ...data.meta,
+          title: newFormValues.handle ?? null,
+          versionNumber: newFormValues.versionMetadata?.versionNumber,
+          scope: newFormValues.scope,
+        },
+      }),
+    });
   };
 
   return (

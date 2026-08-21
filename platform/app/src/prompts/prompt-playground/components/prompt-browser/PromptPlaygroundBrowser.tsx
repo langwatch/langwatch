@@ -7,6 +7,12 @@ import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton
 import { PromptTabStrip } from "./PromptTabStrip";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { usePromptBrowserTabController } from "./tab/usePromptBrowserTabController";
+import {
+  CARD_BORDER_COLOR,
+  CARD_BORDER_WIDTH,
+  CARD_RADIUS,
+  TAB_STRIP_TOP_PADDING,
+} from "./ui/cardSurface";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 
@@ -113,6 +119,7 @@ export function PromptPlaygroundBrowser() {
               onSelectTab={(tabId) =>
                 handleTabChange({ windowId: tabbedWindow.id, tabId })
               }
+              joinTrailingActions={tabbedWindow.tabs.length === 1}
             />
             {/* Strip chrome, not a toolbar: these are secondary to the tabs
                 they sit beside, so they run at the strip's own button scale
@@ -130,11 +137,28 @@ export function PromptPlaygroundBrowser() {
             <HStack
               flexShrink={0}
               gap={1}
-              paddingRight={3}
+              paddingRight={tabbedWindow.tabs.length === 1 ? 2 : 3}
+              marginRight={tabbedWindow.tabs.length === 1 ? 3 : 0}
+              marginTop={
+                tabbedWindow.tabs.length === 1 ? TAB_STRIP_TOP_PADDING : 0
+              }
+              background={
+                tabbedWindow.tabs.length === 1 ? "bg.panel" : "transparent"
+              }
+              borderTopWidth={
+                tabbedWindow.tabs.length === 1 ? CARD_BORDER_WIDTH : 0
+              }
+              borderRightWidth={
+                tabbedWindow.tabs.length === 1 ? CARD_BORDER_WIDTH : 0
+              }
+              borderColor={CARD_BORDER_COLOR}
+              borderTopRightRadius={
+                tabbedWindow.tabs.length === 1 ? CARD_RADIUS : 0
+              }
               // The strip stretches its children so a tab can reach the card
               // below; this row is not a tab, so it centres itself in the row
               // rather than growing into the card's top edge.
-              alignSelf="center"
+              alignSelf={tabbedWindow.tabs.length === 1 ? "stretch" : "center"}
               onPointerDownCapture={() =>
                 setActiveWindow({ windowId: tabbedWindow.id })
               }

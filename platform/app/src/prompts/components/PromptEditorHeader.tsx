@@ -148,6 +148,7 @@ export function PromptEditorHeader({
   const formMethods = useFormContext<PromptConfigFormValues>();
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");
+  const variables = formMethods.watch("version.configData.inputs");
   const deployDialog = useDisclosure();
 
   return (
@@ -191,12 +192,14 @@ export function PromptEditorHeader({
                 configId={configId}
                 handle={handle}
                 projectId={project.id}
+                variables={variables}
               />
             </>
           )}
           <GeneratePromptApiSnippetDialog
             promptHandle={handle}
             apiKey={project?.apiKey}
+            variables={variables}
           >
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} size="xs" />

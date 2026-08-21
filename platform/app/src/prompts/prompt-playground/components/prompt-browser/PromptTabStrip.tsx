@@ -29,6 +29,8 @@ interface PromptTabStripProps {
   /** Tabs in a pane the user is not working in render dimmed. */
   isActiveWindow: boolean;
   onSelectTab: (tabId: string) => void;
+  /** A single tab joins to the card actions that follow this strip. */
+  joinTrailingActions?: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export function PromptTabStrip({
   activeTabId,
   isActiveWindow,
   onSelectTab,
+  joinTrailingActions = false,
 }: PromptTabStripProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const isStripOverflowing = useIsOverflowing(scrollerRef, tabs.length);
@@ -65,7 +68,8 @@ export function PromptTabStrip({
         // No bottom padding: a tab has to reach the bottom of the strip, which
         // is where the card's top edge is.
         paddingBottom={0}
-        paddingX={TAB_STRIP_INLINE_PADDING}
+        paddingLeft={TAB_STRIP_INLINE_PADDING}
+        paddingRight={joinTrailingActions ? 0 : TAB_STRIP_INLINE_PADDING}
         // Tabs shrink to share this row before it ever scrolls, so `flex` lets
         // the strip claim the width the toolbar is not using.
         flex="1 1 0"
@@ -78,8 +82,15 @@ export function PromptTabStrip({
       >
         {tabs.map((tab) => (
           <TabIdProvider key={tab.id} tabId={tab.id}>
-            <DraggableTabsBrowser.Tab id={tab.id} height="full">
-              <DraggableTabsBrowser.Trigger value={tab.id}>
+            <DraggableTabsBrowser.Tab
+              id={tab.id}
+              height="full"
+              fillAvailableWidth={joinTrailingActions && tabs.length === 1}
+            >
+              <DraggableTabsBrowser.Trigger
+                value={tab.id}
+                joinedTrailingActions={joinTrailingActions && tabs.length === 1}
+              >
                 <PromptBrowserTab
                   dimmed={!isActiveWindow}
                   isActive={tab.id === activeTabId}

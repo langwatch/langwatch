@@ -92,7 +92,14 @@ export function TextPart({
   const label = labels?.[sourceRole] ?? visuals.bubbleLabel;
 
   return (
-    <VStack align={align} data-align={align} gap={1} width="100%">
+    <VStack
+      align={align}
+      data-align={align}
+      gap={0}
+      width="100%"
+      className="group"
+      role="group"
+    >
       <Bubble
         side={visuals.displayRole === "user" ? "left" : "right"}
         tone={visuals.displayRole}
@@ -102,9 +109,36 @@ export function TextPart({
         reasoning={part.reasoning}
         size={compact ? "compact" : "regular"}
         maxChars={compact ? 320 : 800}
-        actions={actions}
       />
+      {actions && (
+        <PartActionsRow align={align} compact={compact}>
+          {actions}
+        </PartActionsRow>
+      )}
     </VStack>
+  );
+}
+
+const AVATAR_COLUMN = { regular: "34px", compact: "30px" } as const;
+
+function PartActionsRow({
+  align,
+  compact = false,
+  children,
+}: {
+  align: "flex-start" | "flex-end";
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  const inset = AVATAR_COLUMN[compact ? "compact" : "regular"];
+  return (
+    <Box
+      paddingTop={1}
+      paddingStart={align === "flex-start" ? inset : 0}
+      paddingEnd={align === "flex-end" ? inset : 0}
+    >
+      {children}
+    </Box>
   );
 }
 

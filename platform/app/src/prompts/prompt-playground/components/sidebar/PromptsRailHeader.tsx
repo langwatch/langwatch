@@ -34,7 +34,7 @@ export function PromptsRailHeader() {
         Prompts
       </Text>
       <Spacer />
-      <AddPromptButton size="xs" variant="ghost" color="fg.muted" />
+      <AddPromptButton size="xs" variant="ghost" color="orange.solid" />
     </HStack>
   );
 }
