@@ -31,7 +31,7 @@ export function SyncedChatInput({
   inProgress,
   onSend,
   isVisible = true,
-  onStop: _onStop,
+  onStop,
 }: ChatInputProps) {
   const {
     syncedInput,
@@ -120,9 +120,9 @@ export function SyncedChatInput({
    * Single Responsibility: Triggers send on Enter key (unless Shift held for new line).
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (!e.shiftKey || e.ctrlKey)) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void handleSend();
+      if (!inProgress) void handleSend();
     }
   };
 
@@ -180,8 +180,10 @@ export function SyncedChatInput({
             position="absolute"
             right={2}
             bottom={2}
-            disabled={inProgress || !currentInput.trim()}
+            inProgress={inProgress}
+            disabled={!inProgress && !currentInput.trim()}
             onSend={() => void handleSend()}
+            onStop={onStop}
           />
         </HStack>
       </Box>

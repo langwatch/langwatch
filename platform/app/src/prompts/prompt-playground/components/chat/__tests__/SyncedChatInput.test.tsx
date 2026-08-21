@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -197,18 +197,40 @@ describe("SyncedChatInput", () => {
       expect(buttons.length).toBeGreaterThan(0);
     });
 
-    it("disables send button when inProgress", () => {
+    it("turns the send button into a working stop button while in progress", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
 
-      renderSyncedChatInput({ tabId: tabId!, inProgress: true });
+      const { onStop } = renderSyncedChatInput({
+        tabId: tabId!,
+        inProgress: true,
+      });
 
-      // Find the button (there's only one button when no checkbox)
-      const buttons = screen.getAllByRole("button");
-      const sendButton = buttons.find(
-        (btn) => btn.getAttribute("type") === "button",
-      );
-      expect(sendButton).toBeDisabled();
+      const stopButton = screen.getByRole("button", {
+        name: "Stop generating",
+      });
+      expect(stopButton).not.toBeDisabled();
+
+      fireEvent.click(stopButton);
+
+      expect(onStop).toHaveBeenCalledOnce();
+    });
+
+    it("keeps Shift+Enter as a newline even when Ctrl is held", () => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      const { onSend } = renderSyncedChatInput({ tabId: tabId! });
+      const textarea = screen.getByPlaceholderText(/type your message/i);
+
+      fireEvent.change(textarea, { target: { value: "two lines" } });
+      fireEvent.keyDown(textarea, {
+        key: "Enter",
+        code: "Enter",
+        shiftKey: true,
+        ctrlKey: true,
+      });
+
+      expect(onSend).not.toHaveBeenCalled();
     });
   });
 });
