@@ -33,6 +33,7 @@
  * hash with a later `observedAt` and replaces rather than adds.
  */
 
+import { DEFAULT_ACTOR_KIND } from "@langwatch/identity-links";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -739,6 +740,12 @@ export class AnthropicAdminPuller
       source_event_id: `usage:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
+      // An aggregate report row, not a person's activity: Anthropic reports
+      // these bucketed by workspace/model with no actor at all, which is why
+      // `actor` above is already empty. The schema's documented defaults keep
+      // that unchanged (ADR-094 Decision 5).
+      actor_id: "",
+      actor_kind: DEFAULT_ACTOR_KIND,
       action: "usage_report",
       target: dimension(result.model),
       // Anthropic reports no cost on this report; we price the quantities.
@@ -807,6 +814,9 @@ export class AnthropicAdminPuller
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
+      // Same as the usage report above: a bucketed cost rollup with no actor.
+      actor_id: "",
+      actor_kind: DEFAULT_ACTOR_KIND,
       action: "cost_report",
       target: dimension(result.model),
       // Decimal string — no Number() coercion. The exact value rides through
