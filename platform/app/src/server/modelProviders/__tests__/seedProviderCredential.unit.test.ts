@@ -6,6 +6,7 @@ import {
   describeStored,
   maskSecret,
   readStoredCredential,
+  rowIsUsable,
 } from "../seedProviderCredential";
 
 describe("readStoredCredential", () => {
@@ -28,15 +29,15 @@ describe("readStoredCredential", () => {
   });
 
   it.each([
-    ["null", null],
-    ["undefined", undefined],
-    ["an empty object", {}],
-    ["an empty string", ""],
-    [
-      "an object of empty values",
-      { OPENAI_API_KEY: "", OPENAI_BASE_URL: "  " },
-    ],
-  ])("treats %s as no credential", (_label, value) => {
+    { label: "null", value: null },
+    { label: "undefined", value: undefined },
+    { label: "an empty object", value: {} },
+    { label: "an empty string", value: "" },
+    {
+      label: "an object of empty values",
+      value: { OPENAI_API_KEY: "", OPENAI_BASE_URL: "  " },
+    },
+  ])("treats $label as no credential", ({ value }) => {
     expect(readStoredCredential(value)).toEqual({ state: "absent" });
   });
 
@@ -97,10 +98,12 @@ describe("decideCredentialWrite", () => {
   // let a forced run replace a working key with whitespace, which empties the
   // column by another name.
   it.each([
-    ["an empty string", { OPENAI_API_KEY: "" }],
-    ["whitespace", { OPENAI_API_KEY: "   " }],
-    ["a null value", { OPENAI_API_KEY: null }],
-  ])("keeps a stored credential when the replacement is %s, even forced", (_label, replacement) => {
+    { label: "an empty string", replacement: { OPENAI_API_KEY: "" } },
+    { label: "whitespace", replacement: { OPENAI_API_KEY: "   " } },
+    { label: "a null value", replacement: { OPENAI_API_KEY: null } },
+  ])("keeps a stored credential when the replacement is $label, even forced", ({
+    replacement,
+  }) => {
     expect(
       decideCredentialWrite({
         stored: { state: "present", keys: { OPENAI_API_KEY: "fake-working" } },
@@ -113,9 +116,11 @@ describe("decideCredentialWrite", () => {
   // Forcing swaps one key for another. It is never a way to empty the column,
   // and an unset environment variable is the common way to arrive here.
   it.each([
-    ["null", null],
-    ["an empty record", {}],
-  ])("keeps a stored credential when the replacement is %s", (_label, replacement) => {
+    { label: "null", replacement: null },
+    { label: "an empty record", replacement: {} },
+  ])("keeps a stored credential when the replacement is $label", ({
+    replacement,
+  }) => {
     expect(
       decideCredentialWrite({
         stored: { state: "present", keys: { K: "v" } },
@@ -139,9 +144,15 @@ describe("decideCredentialWrite", () => {
   });
 
   it.each([
-    ["a stored credential", { state: "present" as const, keys: { K: "v" } }],
-    ["an unreadable credential", { state: "unreadable" as const }],
-  ])("replaces %s when forced", (_label, stored) => {
+    {
+      label: "a stored credential",
+      stored: { state: "present" as const, keys: { K: "v" } },
+    },
+    {
+      label: "an unreadable credential",
+      stored: { state: "unreadable" as const },
+    },
+  ])("replaces $label when forced", ({ stored }) => {
     expect(
       decideCredentialWrite({
         stored,
@@ -155,13 +166,61 @@ describe("decideCredentialWrite", () => {
   });
 });
 
+describe("rowIsUsable", () => {
+  // This is what decides whether a seeder enables a provider and puts it in
+  // the routing chain. An unset environment variable must not drop a provider
+  // the organization already has a working credential for.
+  it("keeps a provider whose stored credential is readable and unreplaced", () => {
+    const decision = decideCredentialWrite({
+      stored: { state: "present", keys: { OPENAI_API_KEY: "fake-working" } },
+      replacement: null,
+      shouldForce: false,
+    });
+
+    expect(decision).toEqual({
+      action: "keep",
+      reason: "a credential is already stored",
+    });
+    expect(rowIsUsable(decision)).toBe(true);
+  });
+
+  it.each([
+    {
+      label: "nothing stored and nothing to write",
+      stored: { state: "absent" as const },
+    },
+    {
+      label: "a credential nothing can read",
+      stored: { state: "unreadable" as const },
+    },
+  ])("drops a provider with $label", ({ stored }) => {
+    const decision = decideCredentialWrite({
+      stored,
+      replacement: null,
+      shouldForce: false,
+    });
+
+    expect(rowIsUsable(decision)).toBe(false);
+  });
+
+  it("keeps a provider that this run just filled", () => {
+    const decision = decideCredentialWrite({
+      stored: { state: "absent" },
+      replacement: { OPENAI_API_KEY: "fake-new" },
+      shouldForce: false,
+    });
+
+    expect(rowIsUsable(decision)).toBe(true);
+  });
+});
+
 describe("maskSecret", () => {
   // A one or two character value is entirely head, so a head-and-ellipsis
   // mask would print the whole credential into the log line.
   it.each([
-    ["a one-character value", "x"],
-    ["a two-character value", "ab"],
-  ])("refuses to show %s at all", (_label, value) => {
+    { label: "a one-character value", value: "x" },
+    { label: "a two-character value", value: "ab" },
+  ])("refuses to show $label at all", ({ value }) => {
     const masked = maskSecret(value);
 
     expect(masked).toBe("(too short to mask)");
@@ -177,10 +236,10 @@ describe("maskSecret", () => {
   });
 
   it.each([
-    ["an empty string", ""],
-    ["a non-string", 42],
-    ["null", null],
-  ])("reports %s as empty", (_label, value) => {
+    { label: "an empty string", value: "" },
+    { label: "a non-string", value: 42 },
+    { label: "null", value: null },
+  ])("reports $label as empty", ({ value }) => {
     expect(maskSecret(value)).toBe("(empty)");
   });
 

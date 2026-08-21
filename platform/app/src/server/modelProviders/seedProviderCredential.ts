@@ -157,6 +157,18 @@ function decideWithReplacement({
 }
 
 /**
+ * Whether the row can serve a request once this decision is applied, which is
+ * what decides if a seeder enables it and routes to it.
+ *
+ * `skip` is the only outcome that leaves a row unable to serve: either nothing
+ * can decrypt what it holds, or it holds nothing and this run has nothing to
+ * put there. `keep` means a working credential is already in place.
+ */
+export function rowIsUsable(decision: CredentialWriteDecision): boolean {
+  return decision.action !== "skip";
+}
+
+/**
  * Enough of a secret to tell two apart in a log line, and not enough to use.
  */
 export function maskSecret(value: unknown): string {

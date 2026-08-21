@@ -11,16 +11,14 @@ Feature: A changed provider credential reaches a running gateway
 
   Two things carry the change, and they cover different writes.
 
-  The change feed is the fast path. A write through the provider service tells
-  every gateway that the provider changed, and the next request through an
-  affected key is answered with the new credential.
+  The fast path carries an administrator's change within a poll: the next
+  request through an affected key already uses the new provider state.
 
-  The config version token is the backstop. The gateway revalidates a cached
-  bundle on a short clock, and the control plane answers "still current" by
-  comparing the token the gateway offers. That token has to move whenever
-  anything the bundle is built from moves, or the answer is wrong. It covers
-  the writes the change feed never sees: a seeding script, a migration, or
-  anything else writing straight to the row.
+  The backstop bounds every other write. The gateway rechecks a cached bundle
+  on a short clock and is told whether what it holds is still current, so a
+  change nothing announced is picked up on the next recheck rather than never.
+  That covers a seeding script, a migration, or anything else writing straight
+  to the row.
 
   Background:
     Given an organization with a stored provider credential
@@ -29,18 +27,18 @@ Feature: A changed provider credential reaches a running gateway
   @integration
   Scenario: replacing a stored credential tells the gateway to drop its copy
     When an administrator saves a new key on that provider
-    Then the gateway is told that provider changed
-    And it stops serving the credential it had cached for it
+    Then the next request through that key uses the new credential
+    And no request keeps using the credential it replaced
 
   @integration
   Scenario: disabling a provider tells the gateway to drop its copy
     When an administrator disables that provider
-    Then the gateway is told that provider changed
+    Then no further request is dispatched through it
 
   @integration
   Scenario: deleting a provider tells the gateway to drop its copy
     When an administrator deletes that provider
-    Then the gateway is told that provider changed
+    Then no further request is dispatched through it
 
   @integration
   Scenario: a credential written straight to the row still moves the version token

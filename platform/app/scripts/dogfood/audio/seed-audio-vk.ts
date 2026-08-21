@@ -101,9 +101,10 @@ async function ensureProvider({
   organizationId: string;
   provider: string;
   name: string;
-  keys: Record<string, string>;
+  /** Null when the provider's environment variable is unset on this run. */
+  keys: Record<string, string> | null;
   shouldForceKeys: boolean;
-}): Promise<{ id: string; usable: boolean }> {
+}): Promise<{ id: string; usable: boolean } | null> {
   // Deterministic pick: oldest row first, and be loud when the org carries
   // more than one row for the provider, since only one is considered.
   const existingRows = await prisma.modelProvider.findMany({
@@ -131,7 +132,7 @@ async function ensureProvider({
         provider,
         modelProviderId: existing.id,
         stored,
-        incoming: keys,
+        incoming: keys ?? {},
         decision,
       }),
     );
@@ -154,11 +155,23 @@ async function ensureProvider({
       });
       return { id: existing.id, usable: true };
     }
+    // Only a `write` reaches here, and the rule never returns one without a
+    // replacement in hand.
     await prisma.modelProvider.update({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
     });
     return { id: existing.id, usable: true };
+  }
+
+  // No row for this provider. With no key in hand there is nothing to create,
+  // and creating an empty row would add a provider the gateway cannot build a
+  // credential for.
+  if (!keys) {
+    process.stderr.write(
+      `[seed-audio] no ${provider} provider row and no key in env, nothing to seed\n`,
+    );
+    return null;
   }
   const created = await prisma.modelProvider.create({
     data: {
@@ -225,39 +238,45 @@ async function main() {
   // merge that only adds would leave it there.
   const providerIds: string[] = [];
   const unusableIds: string[] = [];
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    const openai = await ensureProvider({
-      organizationId: org.id,
+
+  // An unset environment variable is not a reason to ignore a provider the
+  // organization already has. The row is still consulted, and a readable
+  // stored credential keeps the provider in the chain; only a row that cannot
+  // serve a request drops out. Skipping the lookup entirely used to fail the
+  // whole run against an organization that was already configured.
+  for (const candidate of [
+    {
       provider: "openai",
       name: "OpenAI",
-      keys: { OPENAI_API_KEY: openaiKey },
-      shouldForceKeys: args.shouldForceKeys,
-    });
-    (openai.usable ? providerIds : unusableIds).push(openai.id);
-  } else {
-    process.stderr.write(
-      "[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n",
-    );
-  }
-  const elevenKey = process.env.ELEVENLABS_API_KEY;
-  if (elevenKey) {
-    const eleven = await ensureProvider({
-      organizationId: org.id,
+      envVar: "OPENAI_API_KEY",
+      value: process.env.OPENAI_API_KEY,
+    },
+    {
       provider: "elevenlabs",
       name: "ElevenLabs",
-      keys: { ELEVENLABS_API_KEY: elevenKey },
+      envVar: "ELEVENLABS_API_KEY",
+      value: process.env.ELEVENLABS_API_KEY,
+    },
+  ]) {
+    if (!candidate.value) {
+      process.stderr.write(
+        `[seed-audio] ${candidate.envVar} unset, keeping whatever ${candidate.provider} credential the org already holds\n`,
+      );
+    }
+    const seeded = await ensureProvider({
+      organizationId: org.id,
+      provider: candidate.provider,
+      name: candidate.name,
+      keys: candidate.value ? { [candidate.envVar]: candidate.value } : null,
       shouldForceKeys: args.shouldForceKeys,
     });
-    (eleven.usable ? providerIds : unusableIds).push(eleven.id);
-  } else {
-    process.stderr.write(
-      "[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n",
-    );
+    if (!seeded) continue;
+    (seeded.usable ? providerIds : unusableIds).push(seeded.id);
   }
+
   if (providerIds.length === 0) {
     throw new Error(
-      "no usable provider rows: every key was unset, or its row holds a credential that cannot be read",
+      "no usable provider rows: no key was in env and the org holds no readable credential for either provider",
     );
   }
 
