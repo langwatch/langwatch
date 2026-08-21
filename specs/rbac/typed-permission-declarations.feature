@@ -232,10 +232,15 @@ Feature: Typed permission declarations
     Given a procedure whose input requires a project, team or organization id
     When the declaration sweep walks the router
     Then the sweep refuses any id no declared check resolves a scope from,
-      except a named, shrink-only list of known gaps
-    And an id a custom middleware enforces must be named by that declaration
-    And a gap on that list that has been closed also fails the sweep, so a
-      fix cannot leave its entry behind
+      with no allowlist: the once-grandfathered gaps are closed and the sweep
+      hard-fails on any new one
+    And an id a resolver enforces must be claimed per field by its
+      declaration, naming what enforces it
+    And a claim about a field the input does not accept also fails the sweep,
+      so a renamed or removed field cannot leave a stale claim behind
+    And a check resolved at the organization tier covers the narrower ids the
+      input carries, because the scope lineage guard anchors every id in the
+      request to that same organization at runtime
 
   @unit
   Scenario: An optional narrower scope id cannot shadow a required wider tier

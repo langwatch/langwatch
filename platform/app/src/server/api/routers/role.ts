@@ -177,57 +177,25 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        {
-          kind: "custom",
-          reason:
-            "the team's organization is loaded by its id; the check runs there, before any plan detail is revealed",
-          permissions: ["organization:manage"],
-        },
-        async ({
-          ctx,
-          input,
-          next,
-        }: {
-          ctx: RoleMiddlewareCtx;
-          input: { teamId: string };
-          next: () => Promise<unknown>;
-        }) => {
-          const team = await ctx.prisma.team.findUnique({
-            where: { id: input.teamId },
-            select: { organizationId: true },
-          });
-
-          if (!team) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Team not found",
-            });
-          }
-
-          if (
-            !(await probeOrganizationPermission(
-              ctx,
-              team.organizationId,
-              "organization:manage",
-            ))
-          ) {
-            throw new TRPCError({ code: "UNAUTHORIZED" });
-          }
-
-          await assertEnterprisePlan({
-            organizationId: team.organizationId,
-            user: ctx.session.user,
-            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
-
-          ctx.permissionChecked = true;
-          return next();
-        },
-      ),
-    )
+    // The declared form of the check the old custom middleware hand-rolled:
+    // resolve the team's organization from its id and require
+    // organization:manage there. The permission runs before the plan gate,
+    // so plan detail is never revealed to a caller who couldn't manage.
+    .permission("organization:manage", { via: "teamId" })
     .mutation(async ({ ctx, input }) => {
+      const team = await ctx.prisma.team.findUnique({
+        where: { id: input.teamId },
+        select: { organizationId: true },
+      });
+      if (!team) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      }
+      await assertEnterprisePlan({
+        organizationId: team.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+
       const roleService = new RoleService(ctx.prisma);
       return await roleService.assignRoleToUser({
         userId: input.userId,

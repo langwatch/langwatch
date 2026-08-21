@@ -52,7 +52,12 @@ export const dataPrivacyRouter = createTRPCRouter({
         config: dataPrivacyConfigSchema,
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(
@@ -87,7 +92,12 @@ export const dataPrivacyRouter = createTRPCRouter({
         personalOnly: z.boolean(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(

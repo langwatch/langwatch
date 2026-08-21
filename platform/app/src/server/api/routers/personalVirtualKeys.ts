@@ -82,7 +82,12 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         targetUserId: z.string().optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "assertOrgMembership refuses non-members; own keys only, unless virtualKeys:viewOtherPersonal is held at this organization",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await assertOrgMembership({
         prisma: ctx.prisma,

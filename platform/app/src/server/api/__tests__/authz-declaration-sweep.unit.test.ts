@@ -36,49 +36,15 @@ import { appRouter } from "../root";
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
 
 /**
- * The scope ids that reach a handler today without a check the sweep can
- * verify, and the reason each is here rather than fixed.
- *
- * This list may only SHRINK. A new entry means a new endpoint accepting a
- * caller-supplied id nothing proves belongs to them; the sweep fails on it,
- * and adding it here is a decision to be argued in review, not a formality.
- * Entries that stop being true also fail the suite (see the staleness check),
- * so fixing one forces its removal.
- *
- * Almost all of these share one cause: a `custom` or `service-authorized`
- * declaration that names NO permission, so the sweep has nothing to check
- * against. `virtualKeys.*` is the pattern — `authorizeInResolver` says "the
- * resolver enforces it" and the resolver does (a membership filter), but the
- * declaration carries no machine-readable claim about which id that covers.
- * The fix is to make those declarations name the scope fields their resolver
- * enforces, the way `.noPermission()` already names an `allow` reason per
- * field; then this list empties out on its own.
+ * Empty, and required to stay empty: every scope id a procedure accepts is
+ * checked at its own tier, covered by the organization-tier rule in
+ * `coveredScopeFields` (the lineage guard anchors narrower ids), or
+ * carries a per-field `enforces` claim naming what the resolver does. There
+ * is no allowlist any more — a new endpoint accepting a caller-supplied id
+ * nothing proves belongs to them fails CI, and the fix is a real check or a
+ * reviewable claim, never an entry here.
  */
-const UNCHECKED_SCOPE_IDS: readonly string[] = [
-  "dataPrivacy.removeForScope accepts projectId unchecked",
-  "dataPrivacy.setForScope accepts projectId unchecked",
-  "dataRetention.previewScopeRemoval accepts projectId unchecked",
-  "dataRetention.removeForScope accepts projectId unchecked",
-  "dataRetention.setForScope accepts projectId unchecked",
-  "departments.assignProject accepts projectId unchecked",
-  "departments.assignTeam accepts teamId unchecked",
-  "gatewayUsage.summary accepts organizationId unchecked",
-  "gatewayUsage.summaryForVirtualKey accepts organizationId unchecked",
-  "llmModelCost.createOrUpdate accepts projectId unchecked",
-  "llmModelCost.delete accepts projectId unchecked",
-  "personalVirtualKeys.list accepts organizationId unchecked",
-  "role.assignToUser accepts teamId unchecked",
-  "virtualKeys.applicableBudgets accepts organizationId unchecked",
-  "virtualKeys.create accepts organizationId unchecked",
-  "virtualKeys.disable accepts organizationId unchecked",
-  "virtualKeys.enable accepts organizationId unchecked",
-  "virtualKeys.get accepts organizationId unchecked",
-  "virtualKeys.list accepts organizationId unchecked",
-  "virtualKeys.revoke accepts organizationId unchecked",
-  "virtualKeys.rotate accepts organizationId unchecked",
-  "virtualKeys.spendThisMonth accepts organizationId unchecked",
-  "virtualKeys.update accepts organizationId unchecked",
-];
+const UNCHECKED_SCOPE_IDS: readonly string[] = [];
 
 /**
  * Procedures whose declared permission resolves no scope from their input,
@@ -227,7 +193,15 @@ function coveredScopeFields({
     const tier = permissionGrantTiers(permission).find((candidate) =>
       present.includes(SCOPE_TIER_FIELDS[candidate]),
     );
-    return tier ? [SCOPE_TIER_FIELDS[tier]] : [];
+    if (!tier) return [];
+    // When the checked tier is the organization, every narrower id the input
+    // carries is anchored to that SAME organization at runtime: the scope
+    // lineage guard (scope-lineage-guard.ts) runs ahead of every check and
+    // refuses any request whose scope ids resolve to different organizations
+    // (or to none). An org-wide grant authorizes the org's teams and
+    // projects, so those ids are covered — by the guard, not by trust.
+    if (tier === "organization") return present;
+    return [SCOPE_TIER_FIELDS[tier]];
   };
 
   switch (declaration.kind) {
@@ -243,12 +217,18 @@ function coveredScopeFields({
       );
     // A custom or service-authorized middleware runs its OWN enforcement,
     // opaque to the sweep, so its declared permissions are trusted against the
-    // fields that always arrive rather than resolved positionally.
+    // fields that always arrive rather than resolved positionally. Fields the
+    // declaration explicitly claims its resolver enforces (`enforces`) are
+    // covered the same way `.noPermission()`'s `allow` covers its fields: a
+    // named, reviewable claim rather than silence.
     case "service-authorized":
     case "custom":
-      return declaration.permissions.flatMap((permission) =>
-        forPermission(permission, required),
-      );
+      return [
+        ...declaration.permissions.flatMap((permission) =>
+          forPermission(permission, required),
+        ),
+        ...(Object.keys(declaration.enforces ?? {}) as ScopeTierField[]),
+      ];
     case "no-permission":
       return Object.keys(declaration.allow ?? {}) as ScopeTierField[];
   }
@@ -317,6 +297,35 @@ describe("tRPC authz declaration sweep", () => {
         .sort();
 
       expect(unchecked).toEqual(UNCHECKED_SCOPE_IDS);
+    });
+
+    /** A claim about a field the input does not carry is rot: the field was
+     *  renamed or removed and the declaration kept asserting enforcement of
+     *  nothing. Refusing it keeps `enforces` honest the same way the
+     *  staleness rule keeps the gap list honest.
+     *  @scenario "Every scope id a procedure accepts is checked or explicitly allowed" */
+    it("refuses an enforces claim about a scope field the input does not accept", () => {
+      const stale = procedures
+        .filter(
+          (procedure) =>
+            procedure.declaration?.kind === "custom" ||
+            procedure.declaration?.kind === "service-authorized",
+        )
+        .flatMap((procedure) => {
+          const declaration = procedure.declaration as Extract<
+            AuthzDeclaration,
+            { kind: "custom" | "service-authorized" }
+          >;
+          return (Object.keys(declaration.enforces ?? {}) as ScopeTierField[])
+            .filter((field) => !procedure.acceptedScopeFields.includes(field))
+            .map(
+              (field) =>
+                `${procedure.path} claims to enforce ${field}, which its input does not accept`,
+            );
+        })
+        .sort();
+
+      expect(stale).toEqual([]);
     });
 
     /** @scenario "A declaration that cannot resolve a scope from its input fails the sweep" */

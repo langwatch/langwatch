@@ -129,6 +129,27 @@ code but the compiler never sees it — assign the result of
 Non-authz middleware — plan gates, error handlers — does not belong here. Put
 it after the declaration, on the plain builder that `.permission()` returns.
 
+When authorization is data-dependent and must run inside the resolver (a
+membership filter, a scope loaded from the row being acted on), use
+`authorizeInResolver(enforces)` and claim, per scope field the input carries,
+what enforces it:
+
+```ts
+.use(
+  authorizeInResolver({
+    organizationId:
+      "requireExistingVk anchors the key to this organization; virtualKeys:update on one of its scopes",
+  }),
+)
+```
+
+The sweep counts a claimed field as covered — the same contract as
+`.noPermission()`'s `allow` — and fails on an unclaimed one, so an input
+growing a new scope id turns CI red until the resolver's enforcement is
+named. A claim about a field the input does not accept also fails, so claims
+cannot rot past a rename. There is no argument-less form: a declaration that
+claims nothing covers nothing.
+
 ### Runtime backstop
 
 Whatever path built the procedure, `enforcePermissionCheck` runs after the
@@ -270,6 +291,7 @@ Spec: `specs/rbac/credential-arbitration.feature`.
 | Hatch | Price |
 | --- | --- |
 | `.noPermission({ reason, allow })` | A written reason per scope field, forever visible in the code and the sweep |
+| `authorizeInResolver({ ...enforces })` | A per-field claim naming what the resolver enforces; an unclaimed or stale field fails the sweep |
 | `.authorizeInService({ reason, permissions })` | The service owns the check; take the witness in the service signature so the claim is proof |
 | `handlerManagedAuth({ reason, permissions })` | Same, on the REST surface |
 | `guard()`-less management endpoint | Does not exist — build error |

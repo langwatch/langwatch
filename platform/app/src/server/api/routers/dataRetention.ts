@@ -82,7 +82,12 @@ export const dataRetentionRouter = createTRPCRouter({
         retentionDays: retentionDaysInputSchema,
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionWriteAllowed run against the scope's own organization",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       await assertCanWriteRetentionScope(
         { prisma: ctx.prisma, session: ctx.session },
@@ -130,7 +135,12 @@ export const dataRetentionRouter = createTRPCRouter({
    */
   previewScopeRemoval: protectedProcedure
     .input(z.object({ projectId: z.string(), scope: scopeInput }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope gates the preview exactly like the removal it previews",
+      }),
+    )
     .query(async ({ input, ctx }) => {
       await assertCanWriteRetentionScope(
         { prisma: ctx.prisma, session: ctx.session },
@@ -148,7 +158,12 @@ export const dataRetentionRouter = createTRPCRouter({
         category: retentionCategorySchema,
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionPlanForScope run against the scope's own organization",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       await assertCanWriteRetentionScope(
         { prisma: ctx.prisma, session: ctx.session },

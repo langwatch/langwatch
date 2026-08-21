@@ -72,7 +72,12 @@ export const llmModelCostsRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -161,7 +166,12 @@ export const llmModelCostsRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       // Derive the scope from the row itself, then authorize manage on that
       // scope. Never trust a caller-supplied scope for a delete.

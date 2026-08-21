@@ -16,6 +16,15 @@ import type { AuthzPermission } from "./registry";
  */
 export const AUTHZ_DECLARATION = Symbol.for("langwatch.authz.declaration");
 
+/**
+ * The machine-readable claim a resolver-authorized declaration makes about
+ * each scope id its resolver enforces: the field, and WHAT enforces it —
+ * the assertion or filter, named so a reviewer can find and judge it. The
+ * sweep counts a claimed field as covered, exactly as `.noPermission()`'s
+ * `allow` names a reason per field; an unclaimed scope id still fails CI.
+ */
+export type EnforcedScopeFields = Partial<Record<ScopeTierField, string>>;
+
 export type AuthzDeclaration =
   | { kind: "permission"; permission: AuthzPermission; via?: ScopeTierField }
   | { kind: "permission-any"; permissions: readonly AuthzPermission[] }
@@ -24,11 +33,13 @@ export type AuthzDeclaration =
       kind: "service-authorized";
       reason: string;
       permissions: readonly AuthzPermission[];
+      enforces?: EnforcedScopeFields;
     }
   | {
       kind: "custom";
       reason: string;
       permissions: readonly AuthzPermission[];
+      enforces?: EnforcedScopeFields;
     };
 
 export type DeclaredAuthzMiddleware<

@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
@@ -1862,18 +1862,31 @@ export function isDemoProject(
  * `.authorizeInService({ reason, permissions })`, which names what the
  * service enforces at the call site.
  */
-export const authorizeInResolver = declareAuthzMiddleware(
-  {
-    kind: "service-authorized",
-    reason:
-      "the scope is data the resolver loads at runtime; the service performs the authorization (see the call site)",
-    permissions: [],
-  },
-  ({ ctx, next }: PermissionMiddlewareParams<object>) => {
-    ctx.permissionChecked = true;
-    return next();
-  },
-);
+/**
+ * For procedures whose authorization is data-dependent and runs inside the
+ * resolver (a membership filter, a scope loaded from the row being acted
+ * on). The declaration must CLAIM, per scope field the input carries, what
+ * enforces it — the sweep counts a claimed field as covered and fails on an
+ * unclaimed one, so an input growing a new scope id turns CI red until the
+ * resolver's enforcement is named. The claims are prose, but they are
+ * per-field and reviewable; the predecessor of this factory claimed nothing
+ * and stamped every input covered, which is how 23 endpoints went unchecked.
+ */
+export function authorizeInResolver(enforces: EnforcedScopeFields) {
+  return declareAuthzMiddleware(
+    {
+      kind: "service-authorized",
+      reason:
+        "the scope is data the resolver loads at runtime; the resolver enforces each claimed field (see `enforces`)",
+      permissions: [],
+      enforces,
+    },
+    ({ ctx, next }: PermissionMiddlewareParams<object>) => {
+      ctx.permissionChecked = true;
+      return next();
+    },
+  );
+}
 
 // ============================================================================
 // OPS PERMISSION

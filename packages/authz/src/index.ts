@@ -112,6 +112,7 @@ export {
 export type {
   AuthzDeclaration,
   DeclaredAuthzMiddleware,
+  EnforcedScopeFields,
 } from "./declared-middleware";
 export { arbitrateClaims } from "./credential-claims";
 export type {
