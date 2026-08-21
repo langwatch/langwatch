@@ -202,7 +202,10 @@ secured.access(requires("evaluations:view")).get(
 // the evaluator routes use; pinning REST to `:manage` locked out every non-admin
 // who can legitimately create evaluations — including Langy, whose session key
 // mirrors the caller's own `:create` rights and could never reach `:manage`.
-// `resourceLimitMiddleware` still caps how many a plan may run. The genuinely
+// Note there is NO monitor-count or plan-level cap anywhere today, and tRPC
+// create has shipped without one all along — widening REST to the same grain
+// widens who can stand up an always-on evaluator, and any future cap must
+// bound both paths, not this route alone. The genuinely
 // administrative moves keep `:manage`: DELETE (destroying a running process) and
 // the cross-project `copy` (tRPC); `:manage` implies `:create`, so no admin
 // loses access here.
