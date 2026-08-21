@@ -756,8 +756,16 @@ export function requireApiKeyPermission({
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      await next();
-      return;
+      // A permission gate running with nobody authenticated is a mis-wired
+      // route (the unified auth middleware must be mounted before this one),
+      // not a caller mistake. Refuse rather than wave the request through —
+      // the old pass-through meant a route that forgot its auth middleware
+      // silently lost its permission check too. The plain Error degrades to
+      // the generic unknown response with a trace id (ADR-045) and logs the
+      // misconfiguration loudly; specs/rbac/credential-arbitration.feature.
+      throw new Error(
+        "requireApiKeyPermission ran with no resolved credential — mount the unified auth middleware before the permission gate",
+      );
     }
 
     try {

@@ -120,3 +120,8 @@ export {
   toLedgerActor,
 } from "./actor";
 export type { Actor, LedgerActor, SystemActorName } from "./actor";
+export { arbitrateClaims } from "./credential-claims";
+export type {
+  ClaimArbitration,
+  CredentialClaim,
+} from "./credential-claims";

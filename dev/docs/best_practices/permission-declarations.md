@@ -243,6 +243,26 @@ with the witness where you can; and do not chain a second verb off one
 `.access(...)` call — the second route would mount without the chain. One
 policy, one verb.
 
+## Credential arbitration
+
+Before any permission is checked, exactly one credential must have decided
+who the request is. Surfaces that accept more than one credential kind
+(API key, session cookie) arbitrate with `arbitrateClaims` from
+`@langwatch/authz` instead of trying kinds in precedence order: every kind
+that is in play claims the request, one claim proceeds, zero claims is
+structurally unauthenticated, and two claims are refused as contested. A
+claimed credential that fails to resolve is that kind's own refusal — never
+a fall-through to the next kind, because masking one credential's failure
+with another identity is how a caller ends up acting as someone they did
+not mean to be.
+
+The same rule fails the permission gate closed: `requireApiKeyPermission`
+mounted without the unified auth middleware in front of it refuses the
+request (a mis-wired route is the platform's own defect, surfaced as the
+generic unknown response) rather than waving it through unchecked.
+
+Spec: `specs/rbac/credential-arbitration.feature`.
+
 ## Escape hatches, and what each one costs
 
 | Hatch | Price |

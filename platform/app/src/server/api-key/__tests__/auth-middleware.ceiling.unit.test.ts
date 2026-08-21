@@ -287,19 +287,21 @@ describe("requireApiKeyPermission()", () => {
 
   describe("given no token was resolved onto the context", () => {
     /**
-     * The middleware passes the request through when nothing authenticated it.
-     * That is safe only while it is chained behind the unified auth middleware,
-     * which rejects unauthenticated callers first — mounted alone, this gate
-     * does nothing. Pinned so the fail-open is an asserted decision and any
-     * future mis-wiring has to change a test to land.
+     * A permission gate running with nobody authenticated is a mis-wired
+     * route — the unified auth middleware was not mounted before it. The
+     * gate refuses rather than waving the request through: the old
+     * pass-through meant a route that forgot its auth middleware silently
+     * lost its permission check too. The plain Error degrades to the
+     * generic unknown response at the boundary (ADR-045).
      */
-    it("passes the request through without any permission check", async () => {
+    /** @scenario "The permission gate refuses a request nobody authenticated" */
+    it("refuses the request instead of passing it through", async () => {
       const { app, handler } = appWith(undefined);
 
       const res = await app.request("/");
 
-      expect(res.status).toBe(200);
-      expect(handler).toHaveBeenCalled();
+      expect(res.status).toBe(500);
+      expect(handler).not.toHaveBeenCalled();
       expect(resolveMock).not.toHaveBeenCalled();
     });
   });
