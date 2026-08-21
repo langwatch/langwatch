@@ -74,6 +74,23 @@ override-dependencies = [
     # which 1.x removed, so every evaluator load crashed at import. Keeping the
     # family on 0.x is what makes this a security-floor change and nothing else;
     # moving to 1.x is a deliberate migration with its own PR.
+    #
+    # SECURITY EXCEPTION this hold knowingly retains (fixes exist only on 1.x,
+    # so no 0.3.x re-lock can pick them up):
+    #   - GHSA-gr75-jv2w-4656 langchain path traversal / sandbox escape in
+    #     file-search middleware and loaders (fixed 1.3.9)
+    #   - GHSA-2g6r-c272-w58r langchain-core SSRF via image_url token counting
+    #     in ChatOpenAI.get_num_tokens_from_messages (fixed 1.2.11)
+    #   - GHSA-qh6h-p6c9-ff54 langchain-core path traversal in legacy
+    #     load_prompt (fixed 1.2.22)
+    # Compensating scope: langevals calls none of the affected APIs itself
+    # (no file-search middleware, document loaders, load_prompt, or
+    # get_num_tokens_from_messages anywhere in this tree) — langchain enters
+    # only through ragas's model plumbing, so the residual exposure is what
+    # ragas does internally with evaluator inputs. The exception ends
+    # when ragas cuts a release past 0.4.3 (the review trigger below) and the
+    # family moves to 1.x in its own migration PR. Owned by the platform team;
+    # re-assess on every langevals dependency PR until then.
     "langchain>=0.3.30,<1",
     "langchain-core>=0.3.86,<1",
     "langchain-openai>=0.2.14,<1",
