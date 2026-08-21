@@ -171,7 +171,7 @@ describe("given the LangWatchQL service", () => {
       // any change to that algorithm, so the digest the key map is provisioned
       // against is stated as a constant instead.
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
+        "3b39a279643e25b0dc08d6ef2f4c6bec873da8fa96a1c7c0b46821c25c9ca0b6e93943bb883b397d76ab896d07b9c7764f0ee8cc2cf9b815cb4e17d320d197a0",
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
@@ -198,12 +198,12 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
+        "3b39a279643e25b0dc08d6ef2f4c6bec873da8fa96a1c7c0b46821c25c9ca0b6e93943bb883b397d76ab896d07b9c7764f0ee8cc2cf9b815cb4e17d320d197a0",
       );
-      // sha256 of PROJECT_WITH_API_KEY.apiKey — what the key map would have to
+      // SHA-512 of PROJECT_WITH_API_KEY.apiKey — what the key map would have to
       // hold instead, and what no LangWatchQL query may ever present.
       expect(executor.calls[0]!.tenantCapability).not.toBe(
-        "725346695d40d416f268694ccc9481c4dc7285693e36226bca84c1b5dade1bd6",
+        "95a41ba91b26b8c5d6143c96a071fe6309f1e5fdb464fe2e10e2e0ae464089bf0f1fc253c0bab6f6530581dfb268f511a53a9fc49cf87caf0ed2f1531e8be690",
       );
       expect(executor.calls[0]!.tenantCapability).not.toContain(
         PROJECT_WITH_API_KEY.apiKey,

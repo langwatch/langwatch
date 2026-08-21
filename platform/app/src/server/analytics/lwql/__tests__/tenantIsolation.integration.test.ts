@@ -480,7 +480,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       // `lwqlTenantCapability` does and would agree with it after any
       // change, including a change that stopped hashing at all.
       expect(harness.tenantA.keyHash).toBe(
-        "80e5fb77f0eed9c68e4b32c0cd2f0b10be340dc6da29142c2c84c51fff50dda1",
+        "baff4cf64716a3750285c79ce2be7cf6732b7c2d2e61e2dda5d59fa3fe575f0f6334f9f8f2393e06df347bcbd950e7b66c6158e0efb1318c1b6420a9dd4ea3db",
       );
       expect(harness.tenantA.rawSecret.length).toBeGreaterThanOrEqual(24);
 
