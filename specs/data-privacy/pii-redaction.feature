@@ -261,3 +261,27 @@ Feature: Redacting personal data from traces
   Scenario: A long value holding no personal data is returned unchanged
     When a trace is ingested whose input is a long opaque token
     Then the stored input is byte-for-byte what was sent
+
+  # The phone detector is the same idea with a number instead of a character,
+  # and it is where the time actually goes. It treats every digit as the start
+  # of a number and then tries to parse it, so 200 KB of ordinary JSON cost
+  # 248 ms and found nothing, against under 4 ms for the whole secrets pass over
+  # the same text. Text whose longest run of digits is too short to hold any
+  # number skips the detector: 165 ms to 1 ms on prose carrying a version
+  # number, 248 ms to 4 ms on that JSON.
+  #
+  # The floor sits one digit below the shortest number the phone metadata has
+  # for any country, so the skip only ever drops a scan that would have found
+  # nothing. The detector itself is the reference the test holds it to.
+
+  @unit
+  Scenario: Every number the detector can find is still redacted
+    When a trace is ingested whose input contains the example number of every
+      country the phone metadata knows
+    Then each number the detector recognises is redacted
+
+  @unit
+  Scenario: Text too short to hold a number is left alone
+    When a trace is ingested whose input carries version numbers and counts but
+      no run of digits long enough to be a phone number
+    Then the stored input is unchanged
