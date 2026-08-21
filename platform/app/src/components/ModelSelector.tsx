@@ -147,6 +147,39 @@ export const providersWithoutRegistryModels = (
   return unavailable;
 };
 
+/**
+ * Adapt the array shape (one row per provider+scope) into the legacy
+ * `Record<provider, config>` shape that getCustomModels and the custom-model
+ * dedup expect. Multiple rows for the same provider (multi-scope) are merged:
+ * the provider counts as enabled if any row is enabled, custom model lists
+ * union.
+ */
+const mergeProviderRowsByKey = (
+  rows: readonly MaybeStoredModelProvider[],
+): Record<string, MaybeStoredModelProvider> => {
+  const byKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of rows) {
+    const existing = byKey[row.provider];
+    if (!existing) {
+      byKey[row.provider] = row;
+      continue;
+    }
+    byKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: [
+        ...(existing.customModels ?? []),
+        ...(row.customModels ?? []),
+      ],
+      customEmbeddingsModels: [
+        ...(existing.customEmbeddingsModels ?? []),
+        ...(row.customEmbeddingsModels ?? []),
+      ],
+    };
+  }
+  return byKey;
+};
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -174,31 +207,7 @@ export const useModelSelectionOptions = (
   const providers = modelProviders.data?.providers;
   const featureKey = opts?.featureKey;
   const { selectOptions, groupedByProvider } = useMemo(() => {
-    // Adapt the array shape (one row per provider+scope) into the
-    // legacy `Record<provider, config>` shape that getCustomModels +
-    // the custom-model dedup loop below expect. Multiple rows for the
-    // same provider (multi-scope) are merged: the provider counts as
-    // enabled if any row is enabled, customModels lists union.
-    const providersByKey: Record<string, MaybeStoredModelProvider> = {};
-    for (const row of providers ?? []) {
-      const existing = providersByKey[row.provider];
-      if (!existing) {
-        providersByKey[row.provider] = row;
-        continue;
-      }
-      providersByKey[row.provider] = {
-        ...existing,
-        enabled: existing.enabled || row.enabled,
-        customModels: [
-          ...(existing.customModels ?? []),
-          ...(row.customModels ?? []),
-        ],
-        customEmbeddingsModels: [
-          ...(existing.customEmbeddingsModels ?? []),
-          ...(row.customEmbeddingsModels ?? []),
-        ],
-      };
-    }
+    const providersByKey = mergeProviderRowsByKey(providers ?? []);
 
     // Build a set of custom model IDs for quick lookup
     const customModelIdSet = new Set<string>();

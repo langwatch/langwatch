@@ -710,6 +710,9 @@ export class LangyConversationService {
         // An import runs no turn — there is nothing in flight to stop.
         currentTurnId: null,
         lastError: null,
+        // No turn ran here yet, so the fork carries no model of its own and
+        // the composer falls back to the resolved default.
+        lastModel: null,
         // The fork's projection has not landed yet, so there is no snapshot
         // position to seed from — the client folds from the start.
         eventCursor: null,

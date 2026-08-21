@@ -13,13 +13,13 @@ import type { MakeDefaultWritePlan } from "../logic/langyMakeDefaultOffer";
  */
 export function LangyMakeDefaultDialog({
   plan,
-  busy,
+  isBusy,
   onDecline,
   onConfirm,
 }: {
   /** The write a yes would perform; null when nothing is being asked. */
   plan: MakeDefaultWritePlan | null;
-  busy: boolean;
+  isBusy: boolean;
   onDecline: () => void;
   onConfirm: () => void;
 }) {
@@ -76,11 +76,15 @@ export function LangyMakeDefaultDialog({
                 ref={declineRef}
                 variant="ghost"
                 onClick={onDecline}
-                disabled={busy}
+                disabled={isBusy}
               >
                 Just this conversation
               </Button>
-              <Button colorPalette="orange" onClick={onConfirm} loading={busy}>
+              <Button
+                colorPalette="orange"
+                onClick={onConfirm}
+                loading={isBusy}
+              >
                 Make it the default
               </Button>
             </HStack>

@@ -91,148 +91,135 @@ const subscription = vi.fn(
   }),
 );
 
-vi.mock("~/utils/api", () => ({
-  trpcClient: {
-    langy: {
-      createConversation: {
-        mutate: (input: unknown) => mutation("langy.createConversation", input),
-      },
-      continueConversation: {
-        mutate: (input: unknown) =>
-          mutation("langy.continueConversation", input),
-      },
-      onTurnStream: {
-        subscribe: (input: unknown, options: unknown) =>
-          subscription("langy.onTurnStream", input, options),
-      },
-    },
-  },
-  api: {
-    useUtils: () => ({
+vi.mock("~/utils/api", async () => {
+  const { modelProviderRouter } = await import("./support/langyApiMock");
+
+  return {
+    trpcClient: {
       langy: {
-        list: { invalidate: () => Promise.resolve() },
-      },
-      github: {
-        getConnectionStatus: { invalidate: () => Promise.resolve() },
-      },
-    }),
-    useContext: () => ({
-      langy: {
-        list: {
-          getInfiniteData: () => undefined,
-          setInfiniteData: () => undefined,
-          cancel: () => Promise.resolve(),
-          invalidate: () => Promise.resolve(),
+        createConversation: {
+          mutate: (input: unknown) =>
+            mutation("langy.createConversation", input),
         },
-        messages: { invalidate: () => Promise.resolve() },
-        detail: { setData: () => undefined },
-      },
-    }),
-    github: {
-      getConnectionStatus: {
-        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
-      },
-      disconnect: {
-        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+        continueConversation: {
+          mutate: (input: unknown) =>
+            mutation("langy.continueConversation", input),
+        },
+        onTurnStream: {
+          subscribe: (input: unknown, options: unknown) =>
+            subscription("langy.onTurnStream", input, options),
+        },
       },
     },
-    langy: {
-      messages: {
-        useQuery: () => ({
-          data: undefined,
-          isLoading: false,
-          isFetching: false,
-          isError: false,
-        }),
-      },
-      modelsAllowed: {
-        useQuery: () => ({
-          data: { modelsAllowed: null },
-          isLoading: false,
-          isError: false,
-        }),
-      },
-      onConversationUpdate: {
-        useSubscription: () => undefined,
-      },
-      stopTurn: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      deleteConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      renameConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      list: {
-        useInfiniteQuery: () => ({
-          data: { pages: [{ items: [], nextCursor: null }] },
-          isLoading: false,
-          isFetching: false,
-          isPlaceholderData: false,
-          isFetched: true,
-          isError: false,
-          error: null,
-          refetch: () => Promise.resolve(),
-          fetchNextPage: () => Promise.resolve(),
-          hasNextPage: false,
-          isFetchingNextPage: false,
-        }),
-      },
-    },
-    modelProvider: {
-      setRoleAssignmentForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      setFeatureOverrideForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      getResolvedDefault: {
-        // A resolved model is configured: these tests exercise conversation
-        // threading on a usable Langy, so langyNeedsModel must be false (else
-        // LangySidebar renders the inline model-setup screen over the panel).
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({
-          data: { providers: [] },
-          isLoading: false,
-        }),
-      },
-    },
-    virtualKeys: {
-      list: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-    // The empty state's asks are picked from the project's reach (see
-    // useProjectReach); a fully-reached project keeps the classic four rows.
-    integrationsChecks: {
-      getCheckStatus: {
-        useQuery: () => ({
-          data: {
-            firstMessage: true,
-            onlineEvaluations: 1,
-            simulations: 1,
-            datasets: 1,
+    api: {
+      useUtils: () => ({
+        langy: {
+          list: { invalidate: () => Promise.resolve() },
+        },
+        github: {
+          getConnectionStatus: { invalidate: () => Promise.resolve() },
+        },
+      }),
+      useContext: () => ({
+        langy: {
+          list: {
+            getInfiniteData: () => undefined,
+            setInfiniteData: () => undefined,
+            cancel: () => Promise.resolve(),
+            invalidate: () => Promise.resolve(),
           },
-          isLoading: false,
-        }),
+          messages: { invalidate: () => Promise.resolve() },
+          detail: { setData: () => undefined },
+        },
+      }),
+      github: {
+        getConnectionStatus: {
+          useQuery: () => ({
+            data: undefined,
+            isLoading: false,
+            isError: true,
+          }),
+        },
+        disconnect: {
+          useMutation: () => ({ mutate: () => undefined, isPending: false }),
+        },
+      },
+      langy: {
+        messages: {
+          useQuery: () => ({
+            data: undefined,
+            isLoading: false,
+            isFetching: false,
+            isError: false,
+          }),
+        },
+        modelsAllowed: {
+          useQuery: () => ({
+            data: { modelsAllowed: null },
+            isLoading: false,
+            isError: false,
+          }),
+        },
+        onConversationUpdate: {
+          useSubscription: () => undefined,
+        },
+        stopTurn: {
+          useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+        },
+        deleteConversation: {
+          useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+        },
+        renameConversation: {
+          useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+        },
+        list: {
+          useInfiniteQuery: () => ({
+            data: { pages: [{ items: [], nextCursor: null }] },
+            isLoading: false,
+            isFetching: false,
+            isPlaceholderData: false,
+            isFetched: true,
+            isError: false,
+            error: null,
+            refetch: () => Promise.resolve(),
+            fetchNextPage: () => Promise.resolve(),
+            hasNextPage: false,
+            isFetchingNextPage: false,
+          }),
+        },
+      },
+      modelProvider: modelProviderRouter(),
+      virtualKeys: {
+        list: {
+          useQuery: () => ({ data: undefined, isLoading: false }),
+        },
+      },
+      // The empty state's asks are picked from the project's reach (see
+      // useProjectReach); a fully-reached project keeps the classic four rows.
+      integrationsChecks: {
+        getCheckStatus: {
+          useQuery: () => ({
+            data: {
+              firstMessage: true,
+              onlineEvaluations: 1,
+              simulations: 1,
+              datasets: 1,
+            },
+            isLoading: false,
+          }),
+        },
+      },
+      ops: {
+        getScope: {
+          useQuery: () => ({
+            data: { scope: { kind: "none" } },
+            isLoading: false,
+          }),
+        },
       },
     },
-    ops: {
-      getScope: {
-        useQuery: () => ({
-          data: { scope: { kind: "none" } },
-          isLoading: false,
-        }),
-      },
-    },
-  },
-}));
+  };
+});
 
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";

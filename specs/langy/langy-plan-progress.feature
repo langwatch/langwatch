@@ -64,13 +64,14 @@ Feature: Langy shows a live plan checklist for multi-step work
   # yet started had no visible mark at all, so nothing on screen agreed with
   # either number. Checkboxes make the list countable and the header counts
   # what is checked.
-  @unit
+  @integration
   Scenario: Every step reads as a checkbox and the header counts what is checked
     Given a plan with finished, current, and not-yet-started steps
     When the checklist renders
     Then a finished step shows a checked box
     And the current step shows a filled box
     And a step not yet started shows an empty box
+    And each box names its status for a reader who gets no shape or colour
     And the header says how many steps are done out of the total, never "left"
 
   @unit

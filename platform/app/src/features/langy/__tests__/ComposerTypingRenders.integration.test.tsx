@@ -126,15 +126,27 @@ describe("given the Langy composer is idle", () => {
   });
 
   describe("when the customer presses the slash key at a word boundary", () => {
-    it("opens the skills palette instead of typing a slash", () => {
+    it("opens the skills palette and leaves the typed message alone", () => {
       renderComposer();
+      typeText("run ");
 
       fireEvent.keyDown(textarea(), { key: "/" });
 
-      expect(useLangyStore.getState().draft).toBe("");
+      expect(useLangyStore.getState().draft).toBe("run ");
       expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
         "Skills",
       );
+    });
+
+    it("types the slash mid-word instead of opening the palette", () => {
+      renderComposer();
+      typeText("and/or");
+
+      fireEvent.keyDown(textarea(), { key: "/" });
+
+      expect(
+        screen.queryByTestId("langy-palette-title"),
+      ).not.toBeInTheDocument();
     });
   });
 });

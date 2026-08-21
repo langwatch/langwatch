@@ -34,18 +34,25 @@ export async function syncLangyAfterDefaultModelWrite({
   fallbackModel?: string;
 }): Promise<void> {
   const resolvedInput = { projectId, featureKey: LANGY_CHAT_FEATURE_KEY };
-  const previousDefault =
-    utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ??
-    null;
 
-  // The role defaults are already written server-side; the invalidate and
-  // the resolver re-read only bring the open UI along. Neither failure may
-  // surface to the caller as the write failing.
-  const nextDefault = await utils.modelProvider
-    .invalidate()
-    .then(() => utils.modelProvider.getResolvedDefault.fetch(resolvedInput))
-    .then((resolved) => resolved?.model ?? fallbackModel ?? previousDefault)
-    .catch(() => fallbackModel ?? previousDefault);
+  // The role defaults are already written server-side; the cache read, the
+  // invalidate and the resolver re-read only bring the open UI along. None of
+  // them may surface to the caller as the write failing, so the whole
+  // query-client interaction is contained here and the store call below runs
+  // on whatever it produced.
+  let previousDefault: string | null = null;
+  let nextDefault: string | null | undefined;
+  try {
+    previousDefault =
+      utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ??
+      null;
+    await utils.modelProvider.invalidate();
+    const resolved =
+      await utils.modelProvider.getResolvedDefault.fetch(resolvedInput);
+    nextDefault = resolved?.model ?? fallbackModel ?? previousDefault;
+  } catch {
+    nextDefault = fallbackModel ?? previousDefault;
+  }
   if (!nextDefault) return;
 
   useLangyStore

@@ -60,6 +60,38 @@ function utilsWith({
   return { utils, fetch, invalidate };
 }
 
+/**
+ * A server that answers one page per call, each page reporting whether more
+ * remains. The last page in the list repeats if the loop asks for more, which
+ * is what a run against its own ceiling looks like from the client's side.
+ */
+function utilsWithPages(
+  pages: Array<{
+    events?: unknown[];
+    cursor: { acceptedAt: number; eventId: string };
+    truncated: boolean;
+  }>,
+) {
+  let call = 0;
+  const fetch = vi.fn().mockImplementation(() => {
+    const page = pages[Math.min(call, pages.length - 1)]!;
+    call += 1;
+    return Promise.resolve({
+      events: page.events ?? [],
+      cursor: page.cursor,
+      truncated: page.truncated,
+    });
+  });
+  const invalidate = vi.fn().mockResolvedValue(undefined);
+  const utils = {
+    langy: {
+      messages: { invalidate },
+      conversationEventsAfter: { fetch },
+    },
+  } as unknown as Utils;
+  return { utils, fetch, invalidate };
+}
+
 describe("catchUpConversationFold", () => {
   beforeEach(() => {
     useLangyStore.setState({ scopeAnnounced: false });
@@ -123,6 +155,91 @@ describe("catchUpConversationFold", () => {
         projectId: "p1",
         conversationId: "conv-1",
       });
+    });
+  });
+
+  describe("when the durable tail arrives over several pages", () => {
+    it("asks for the next page from the cursor the last one ended at", async () => {
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 100, eventId: "e1" },
+        currentTurnId: "turn-1",
+      });
+      const { utils, fetch } = utilsWithPages([
+        {
+          events: [accepted({ id: "e2", createdAt: 200 })],
+          cursor: { acceptedAt: 200, eventId: "e2" },
+          truncated: true,
+        },
+        {
+          events: [responded({ id: "e3", createdAt: 300 })],
+          cursor: { acceptedAt: 300, eventId: "e3" },
+          truncated: false,
+        },
+      ]);
+
+      await catchUpConversationFold({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        targetCursor: { acceptedAt: 300, eventId: "e3" },
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch).toHaveBeenLastCalledWith({
+        projectId: "p1",
+        conversationId: "conv-1",
+        after: { acceptedAt: 200, eventId: "e2" },
+      });
+      const projection = useLangyStore.getState().turnProjection;
+      expect(projection.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
+      expect(projection.turn?.Status).toBe("completed");
+    });
+  });
+
+  describe("when the tail is still truncated at the page ceiling", () => {
+    it("stops paging and refetches the history instead of staying behind", async () => {
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 100, eventId: "e1" },
+        currentTurnId: "turn-1",
+      });
+      const { utils, fetch, invalidate } = utilsWithPages([
+        {
+          events: [accepted({ id: "e2", createdAt: 200 })],
+          cursor: { acceptedAt: 200, eventId: "e2" },
+          truncated: true,
+        },
+      ]);
+
+      await catchUpConversationFold({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        targetCursor: { acceptedAt: 900, eventId: "e9" },
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(invalidate).toHaveBeenCalledWith({
+        projectId: "p1",
+        conversationId: "conv-1",
+      });
+    });
+  });
+
+  describe("when a durable cursor names a freshly minted conversation", () => {
+    it("confirms it exists, so a later not-found read stops reading as pending", async () => {
+      useLangyStore.setState({ unconfirmedConversations: { "conv-1": true } });
+      const { utils } = utilsWith({});
+
+      await catchUpConversationFold({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        targetCursor: { acceptedAt: 200, eventId: "e2" },
+      });
+
+      expect(
+        useLangyStore.getState().unconfirmedConversations["conv-1"],
+      ).toBeUndefined();
     });
   });
 

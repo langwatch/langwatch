@@ -762,10 +762,10 @@ export const useLangyStore = create<LangyState>()(
           // An empty override, or one equal to the resolved default the panel
           // seeds on open, both mean the user never picked since opening this
           // conversation — only then may the record's model take the pill.
-          const untouched =
+          const isUntouched =
             state.modelOverride === "" ||
             state.modelOverride === resolvedDefault;
-          return untouched
+          return isUntouched
             ? {
                 modelOverride: model,
                 modelSeededForConversationId: conversationId,

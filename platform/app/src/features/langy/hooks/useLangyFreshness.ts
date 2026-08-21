@@ -34,31 +34,6 @@ export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useUtils();
 
-  /**
-   * The OPEN conversation's live path (ADR-059): the signal carries the
-   * projection's CURSOR; `catchUpConversationFold` compares it with the local
-   * fold's and, when behind, fetches the durable event tail and folds it in
-   * place — turn state lands event-by-event without re-downloading the
-   * projection. The same helper is also driven by the polled history
-   * snapshot (LangyPanel's seed effect), so a dropped SSE connection is a
-   * latency problem, not a frozen panel.
-   */
-  const catchUpOpenConversation = useCallback(
-    async (
-      projectId: string,
-      conversationId: string,
-      signalCursor: LangyConversationUpdateSignal["cursor"],
-    ) => {
-      await catchUpConversationFold({
-        utils: trpcUtils,
-        projectId,
-        conversationId,
-        targetCursor: signalCursor ?? null,
-      });
-    },
-    [trpcUtils],
-  );
-
   const onConversationUpdated = useCallback(
     (signals: LangyConversationUpdateSignal[]) => {
       const projectId = project?.id;
@@ -70,11 +45,20 @@ export function useLangyFreshness(activeConversationId: string | null): void {
           cursor: signal.cursor ?? null,
         });
         if (signal.conversationId === activeConversationId) {
-          catchUpOpenConversation(
+          // The OPEN conversation's live path (ADR-059): the signal carries
+          // the projection's CURSOR; `catchUpConversationFold` compares it
+          // with the local fold's and, when behind, fetches the durable event
+          // tail and folds it in place — turn state lands event-by-event
+          // without re-downloading the projection. The same helper is also
+          // driven by the polled history snapshot (LangyPanel's seed effect),
+          // so a dropped SSE connection is a latency problem, not a frozen
+          // panel.
+          catchUpConversationFold({
+            utils: trpcUtils,
             projectId,
-            signal.conversationId,
-            signal.cursor,
-          ).catch(() => {
+            conversationId: signal.conversationId,
+            targetCursor: signal.cursor ?? null,
+          }).catch(() => {
             // A failed catch-up must not strand the open thread — fall back to
             // the plain refetch the signal used to mean.
             void trpcUtils.langy.messages.invalidate({
@@ -90,7 +74,7 @@ export function useLangyFreshness(activeConversationId: string | null): void {
       void trpcUtils.langy.list.cancel();
       void trpcUtils.langy.list.invalidate();
     },
-    [trpcUtils, project?.id, activeConversationId, catchUpOpenConversation],
+    [trpcUtils, project?.id, activeConversationId],
   );
 
   useLangyConversationUpdateListener({

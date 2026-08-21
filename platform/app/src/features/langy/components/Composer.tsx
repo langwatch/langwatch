@@ -1,4 +1,5 @@
 import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
+import type { LangyTurnPhase } from "@langwatch/langy";
 import {
   Bot,
   Check,
@@ -57,6 +58,13 @@ export const COMPOSER_ANCHOR_ATTR = "data-langy-composer";
 // The send/stop control crossfades between phases (send ⇄ stop ⇄ stopping)
 // rather than hard-swapping — a small scale+fade keyed on the phase.
 const MotionSwap = motion.create(Box);
+
+// The palette each sigil opens when it is typed at a word boundary. A key
+// outside this map types as the ordinary character it is.
+const PALETTE_MODE_BY_SIGIL: Record<string, PaletteMode | undefined> = {
+  "#": "context",
+  "/": "skills",
+};
 
 // Icon per context kind, so a chip reads as its resource at a glance.
 const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
@@ -503,6 +511,48 @@ Composer.displayName = "Composer";
  * so the row is equally untouched when the card around it re-renders for a
  * palette or a turn-phase change.
  */
+/**
+ * The composer's key handling. A sigil typed at a word boundary opens its
+ * palette instead of typing; Enter sends, Shift+Enter keeps the newline. With
+ * the palettes closed a sigil types as the ordinary character it is.
+ */
+function composerKeyHandler({
+  input,
+  canSend,
+  palettesOpen,
+  textareaRef,
+  openPalette,
+  onSend,
+}: {
+  input: string;
+  canSend: boolean;
+  palettesOpen: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  openPalette: (mode: PaletteMode) => void;
+  onSend: (input: string) => void;
+}) {
+  const atWordBoundary = () => {
+    const el = textareaRef.current;
+    if (!el) return input.length === 0;
+    const before = input.slice(0, el.selectionStart ?? input.length);
+    return before.length === 0 || /\s$/.test(before);
+  };
+
+  return (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const paletteMode = PALETTE_MODE_BY_SIGIL[event.key];
+    if (paletteMode && palettesOpen && atWordBoundary()) {
+      event.preventDefault();
+      openPalette(paletteMode);
+      return;
+    }
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    // No queue: Enter is a no-op mid-turn (canSend is false while a turn is in
+    // flight), so nothing is sent until the turn finishes.
+    if (canSend) onSend(input);
+  };
+}
+
 const ComposerInputRow = memo(function ComposerInputRow({
   hero,
   disabled,
@@ -524,7 +574,6 @@ const ComposerInputRow = memo(function ComposerInputRow({
   const onInputChange = useLangyStore((s) => s.setDraft);
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
-  const reduceMotion = useReducedMotion();
   // Only the hero cares: it centres its single line, and has to stop doing so
   // the moment the field grows, or the send button ends up halfway down a
   // paragraph. Measured from the field itself rather than guessed from the
@@ -532,37 +581,16 @@ const ComposerInputRow = memo(function ComposerInputRow({
   const [multiline, setMultiline] = useState(false);
   const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
 
-  const atWordBoundary = () => {
-    const el = textareaRef.current;
-    if (!el) return input.length === 0;
-    const before = input.slice(0, el.selectionStart ?? input.length);
-    return before.length === 0 || /\s$/.test(before);
-  };
-
-  const onTextareaKeyDown = (
-    event: React.KeyboardEvent<HTMLTextAreaElement>,
-  ) => {
+  const onTextareaKeyDown = composerKeyHandler({
+    input,
+    canSend,
     // The sigils follow their buttons: while a turn is in flight there is
-    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
-    // characters they are rather than opening a picker that cannot take.
-    const palettesOpen = !disabled && !turnActive;
-    if (palettesOpen && event.key === "#" && atWordBoundary()) {
-      event.preventDefault();
-      openPalette("context");
-      return;
-    }
-    if (palettesOpen && event.key === "/" && atWordBoundary()) {
-      event.preventDefault();
-      openPalette("skills");
-      return;
-    }
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      // No queue: Enter is a no-op mid-turn (canSend is false while a turn is in
-      // flight), so nothing is sent until the turn finishes.
-      if (canSend) onSend(input);
-    }
-  };
+    // nothing for a palette to attach to.
+    palettesOpen: !disabled && !turnActive,
+    textareaRef,
+    openPalette,
+    onSend,
+  });
 
   return (
     <HStack
@@ -610,62 +638,112 @@ const ComposerInputRow = memo(function ComposerInputRow({
         _focus={{ outline: "none", boxShadow: "none" }}
         _focusVisible={{ outline: "none", boxShadow: "none" }}
       />
-      {/* A turn in flight disables sending — Stop takes the button (no
-          queue). It persists through the "stopping" window (after the
-          client abort) until the backend confirms the terminal, then flips
-          back to Send. */}
-      <AnimatePresence mode="wait" initial={false}>
-        <MotionSwap
-          key={turnPhase}
-          display="flex"
-          flexShrink={0}
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
-          transition={{ duration: 0.13, ease: "easeOut" }}
-        >
-          {turnActive ? (
-            <SendButton
-              aria-label={turnPhase === "stopping" ? "Stopping" : "Stop"}
-              onClick={onStop}
-              disabled={turnPhase === "stopping"}
-              background={turnPhase === "stopping" ? "bg.muted" : "red.solid"}
-              color={turnPhase === "stopping" ? "fg.muted" : "white"}
-              cursor={turnPhase === "stopping" ? "default" : "pointer"}
-            >
-              {turnPhase === "stopping" ? (
-                <Spinner size="xs" borderWidth="1.5px" />
-              ) : (
-                // The square is symmetric, so it needs no optical
-                // correction — unlike the plane below.
-                <Square size={12} />
-              )}
-            </SendButton>
-          ) : (
-            <SendButton
-              aria-label="Send"
-              onClick={() => onSend(input)}
-              disabled={!canSend}
-              background={canSend ? "orange.solid" : "bg.muted"}
-              color={canSend ? "white" : "fg.muted"}
-              cursor={canSend ? "pointer" : "default"}
-            >
-              {/* Centred, with nothing to interfere. Lucide's paper plane
-                  is very nearly centred in its own box (ink centre within
-                  0.15 of the 24-grid centre), so `place-items: center` is
-                  the whole job — once the wrapper stops inheriting a line
-                  box it has no use for, whose stray half-leading was what
-                  pushed the glyph off centre in the first place. */}
-              <Box display="grid" placeItems="center" lineHeight={0}>
-                <Send size={14} />
-              </Box>
-            </SendButton>
-          )}
-        </MotionSwap>
-      </AnimatePresence>
+      <ComposerSendControl
+        turnPhase={turnPhase}
+        canSend={canSend}
+        onSend={() => onSend(input)}
+        onStop={onStop}
+      />
     </HStack>
   );
 });
+
+/**
+ * Send, or Stop while a turn is in flight (no queue). Stop persists through
+ * the "stopping" window — after the client abort, until the backend confirms
+ * the terminal — then flips back to Send.
+ */
+function ComposerSendControl({
+  turnPhase,
+  canSend,
+  onSend,
+  onStop,
+}: {
+  turnPhase: LangyTurnPhase;
+  canSend: boolean;
+  onSend: () => void;
+  onStop: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <MotionSwap
+        key={turnPhase}
+        display="flex"
+        flexShrink={0}
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+        transition={{ duration: 0.13, ease: "easeOut" }}
+      >
+        {turnPhase === "idle" ? (
+          <SubmitTurnButton canSend={canSend} onSend={onSend} />
+        ) : (
+          <StopTurnButton
+            isStopping={turnPhase === "stopping"}
+            onStop={onStop}
+          />
+        )}
+      </MotionSwap>
+    </AnimatePresence>
+  );
+}
+
+function StopTurnButton({
+  isStopping,
+  onStop,
+}: {
+  isStopping: boolean;
+  onStop: () => void;
+}) {
+  return (
+    <SendButton
+      aria-label={isStopping ? "Stopping" : "Stop"}
+      onClick={onStop}
+      disabled={isStopping}
+      background={isStopping ? "bg.muted" : "red.solid"}
+      color={isStopping ? "fg.muted" : "white"}
+      cursor={isStopping ? "default" : "pointer"}
+    >
+      {isStopping ? (
+        <Spinner size="xs" borderWidth="1.5px" />
+      ) : (
+        // The square is symmetric, so it needs no optical correction —
+        // unlike the plane below.
+        <Square size={12} />
+      )}
+    </SendButton>
+  );
+}
+
+function SubmitTurnButton({
+  canSend,
+  onSend,
+}: {
+  canSend: boolean;
+  onSend: () => void;
+}) {
+  return (
+    <SendButton
+      aria-label="Send"
+      onClick={onSend}
+      disabled={!canSend}
+      background={canSend ? "orange.solid" : "bg.muted"}
+      color={canSend ? "white" : "fg.muted"}
+      cursor={canSend ? "pointer" : "default"}
+    >
+      {/* Centred, with nothing to interfere. Lucide's paper plane is very
+          nearly centred in its own box (ink centre within 0.15 of the
+          24-grid centre), so `place-items: center` is the whole job — once
+          the wrapper stops inheriting a line box it has no use for, whose
+          stray half-leading was what pushed the glyph off centre in the
+          first place. */}
+      <Box display="grid" placeItems="center" lineHeight={0}>
+        <Send size={14} />
+      </Box>
+    </SendButton>
+  );
+}
 
 /**
  * A key, named. Deliberately shows the glyph rather than an icon: the point of

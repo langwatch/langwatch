@@ -900,7 +900,7 @@ function LangyPanel({
   // Declines are per model per panel session: refusing once must not nag on
   // the next pick of the same model, and must not mute the ask forever.
   const makeDefaultDeclinedRef = useRef<Set<string>>(new Set());
-  const makeDefaultBusy =
+  const isMakeDefaultBusy =
     setRoleAssignment.isPending || setFeatureOverride.isPending;
 
   const offerMakeDefault = (picked: string) => {
@@ -2165,7 +2165,7 @@ function LangyPanel({
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
       <LangyMakeDefaultDialog
         plan={makeDefaultPlan}
-        busy={makeDefaultBusy}
+        isBusy={isMakeDefaultBusy}
         onDecline={declineMakeDefault}
         onConfirm={() => void confirmMakeDefault()}
       />

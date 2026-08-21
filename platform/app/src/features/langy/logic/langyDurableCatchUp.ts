@@ -10,6 +10,9 @@ import { useLangyStore } from "../stores/langyStore";
 
 type ApiUtils = ReturnType<typeof api.useUtils>;
 
+/** Pages of durable tail one catch-up will fold before it gives up and refetches. */
+const MAX_CATCH_UP_PAGES = 3;
+
 /**
  * Bring the open conversation's LOCAL turn fold up to a durable cursor by
  * fetching and folding the event tail (ADR-059).
@@ -56,10 +59,13 @@ export async function catchUpConversationFold({
   }
   if (compareLangyEventCursors(targetCursor, local) <= 0) return;
 
-  // Bounded catch-up: each page advances the cursor; three pages is far
-  // beyond any real burst (the ceiling is a defensive log, not a path).
+  // Bounded catch-up: each page advances the cursor; three pages is far beyond
+  // any real burst. Hitting the ceiling means the tail is still truncated, so
+  // the fold is knowingly behind the durable record and the refetch below is
+  // what brings the panel back.
   let after = local;
-  for (let page = 0; page < 3; page++) {
+  let isBehind = false;
+  for (let page = 0; page < MAX_CATCH_UP_PAGES; page++) {
     const tail = await utils.langy.conversationEventsAfter.fetch({
       projectId,
       conversationId,
@@ -73,10 +79,14 @@ export async function catchUpConversationFold({
     }
     useLangyStore.getState().applyTurnEvents(tail.events);
     after = tail.cursor;
-    if (!tail.truncated) break;
+    isBehind = tail.truncated;
+    if (!isBehind) break;
   }
 
-  if (isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)) {
+  if (
+    isBehind ||
+    isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)
+  ) {
     void utils.langy.messages.invalidate({ projectId, conversationId });
   }
 }

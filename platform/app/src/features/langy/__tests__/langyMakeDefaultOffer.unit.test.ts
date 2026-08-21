@@ -18,14 +18,14 @@ const NO_RIGHTS = { organization: false, team: false, project: false };
 const ALL_RIGHTS = { organization: true, team: true, project: true };
 
 describe("makeDefaultOffer", () => {
-  describe("given no configured default (the resolver inferred one)", () => {
+  describe("given a default that is configured at no scope", () => {
     it("asks nothing", () => {
       expect(
         makeDefaultOffer({
           picked: "openai/gpt-5-mini",
           resolvedDefault: {
             model: "openai/gpt-5",
-            source: "inferred",
+            source: "role_default",
             scope: null,
           },
           canManage: ALL_RIGHTS,

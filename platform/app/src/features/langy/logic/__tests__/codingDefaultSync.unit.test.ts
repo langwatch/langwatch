@@ -160,6 +160,18 @@ describe("syncLangyAfterDefaultModelWrite", () => {
     });
   });
 
+  describe("when the query client cannot answer at all", () => {
+    // Callers await this after their write already landed, so a throw here
+    // reaches their catch and reports a saved config as a failed one.
+    it("resolves rather than rejecting", async () => {
+      const utils = { modelProvider: {} } as unknown as Utils;
+
+      await expect(
+        syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("when the previous default is read", () => {
     it("reads it from the cache BEFORE invalidating, for the langy chat key", async () => {
       const { utils, getData, invalidate } = buildUtils({

@@ -19,7 +19,7 @@
  * blink while the model went back to thinking.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -116,6 +116,48 @@ describe("a turn's activity cards", () => {
       expect(
         screen.queryByRole("button", { name: /action completed/i }),
       ).toBeNull();
+    });
+
+    describe("when the reader opens the held card", () => {
+      /** @scenario The action that just finished can be opened to show what it returned */
+      it("shows what the finished call returned", () => {
+        useLangyStore.setState({ turnPhase: "active" });
+        renderTurn(
+          turnFromParts([
+            {
+              type: "tool-bash",
+              toolCallId: "call-1",
+              state: "output-available",
+              input: { command: "cat notes.md" },
+              output: "three findings, all in notes.md",
+            },
+          ]),
+        );
+
+        const disclosure = screen.getByRole("button", { expanded: false });
+        fireEvent.click(disclosure);
+
+        expect(
+          screen.getByText("three findings, all in notes.md"),
+        ).toBeTruthy();
+      });
+
+      it("offers no disclosure when the call recorded no result", () => {
+        useLangyStore.setState({ turnPhase: "active" });
+        const { container } = renderTurn(
+          turnFromParts([
+            {
+              type: "tool-bash",
+              toolCallId: "call-1",
+              state: "output-available",
+              input: { command: "cat notes.md" },
+              output: "",
+            },
+          ]),
+        );
+
+        expect(container.querySelector("[aria-expanded]")).toBeNull();
+      });
     });
 
     describe("when the next tool call starts", () => {

@@ -12,9 +12,8 @@ const CONVERSATION_ID = "conv-1";
 
 function fold(
   events: LangyConversationStateEvent[],
-  from: LangyConversationStateFoldState = initLangyConversationState(),
 ): LangyConversationStateFoldState {
-  return events.reduce(foldLangyConversationState, from);
+  return events.reduce(foldLangyConversationState, initLangyConversationState());
 }
 
 function accepted({

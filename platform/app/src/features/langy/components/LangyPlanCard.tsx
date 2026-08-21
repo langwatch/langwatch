@@ -25,7 +25,11 @@ import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyPlan, LangyPlanItem } from "../logic/langyPlan";
+import type {
+  LangyPlan,
+  LangyPlanItem,
+  LangyPlanItemStatus,
+} from "../logic/langyPlan";
 import { LangyActivityParts } from "./LangyToolActivity";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 
@@ -33,6 +37,14 @@ const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.4; transform: scale(0.72); }
 `;
+
+/** What each step marker says to a reader who gets no shape and no colour. */
+const PLAN_STATUS_LABEL: Record<LangyPlanItemStatus, string> = {
+  completed: "Completed",
+  in_progress: "In progress",
+  pending: "Not started",
+  cancelled: "Cancelled",
+};
 
 export function LangyPlanCard({
   plan,
@@ -225,7 +237,9 @@ function PlanStep({
   // Every step reads as a checkbox: checked when done, a filled square while
   // it runs, an empty square before it starts. Without the empty squares the
   // upcoming steps read as loose prose and the header's count has nothing
-  // visible to agree with.
+  // visible to agree with. The status is shape and colour on screen, so the
+  // marker carries the same answer as a label for anyone not reading either.
+  const statusLabel = PLAN_STATUS_LABEL[item.status];
   const marker =
     item.status === "completed" ? (
       <Box
@@ -233,6 +247,8 @@ function PlanStep({
         display="flex"
         flexShrink={0}
         width="12px"
+        role="img"
+        aria-label={statusLabel}
         data-plan-marker="completed"
       >
         <SquareCheck size={12} />
@@ -244,6 +260,8 @@ function PlanStep({
         justifyContent="center"
         alignItems="center"
         flexShrink={0}
+        role="img"
+        aria-label={statusLabel}
         data-plan-marker="in_progress"
       >
         <Box
@@ -264,6 +282,8 @@ function PlanStep({
         display="flex"
         flexShrink={0}
         width="12px"
+        role="img"
+        aria-label={statusLabel}
         data-plan-marker={item.status}
       >
         <Square size={12} />

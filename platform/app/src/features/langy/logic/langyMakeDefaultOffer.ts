@@ -1,3 +1,4 @@
+import type { DefaultModelEffective } from "~/server/modelProviders/modelDefaults.read";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 
 /**
@@ -25,6 +26,23 @@ export interface MakeDefaultWritePlan {
   model: string;
 }
 
+/**
+ * The scope tier each offerable scope word writes to. Doubles as the set of
+ * scope words an offer can be made for: a resolver answer outside these keys
+ * has no scope to write at.
+ */
+const SCOPE_TIER_BY_LABEL = {
+  organization: "ORGANIZATION",
+  team: "TEAM",
+  project: "PROJECT",
+} as const satisfies Record<MakeDefaultWritePlan["scopeLabel"], ScopeTier>;
+
+function isOfferableScope(
+  scope: NonNullable<DefaultModelEffective["scope"]>,
+): scope is MakeDefaultWritePlan["scopeLabel"] {
+  return scope in SCOPE_TIER_BY_LABEL;
+}
+
 export function makeDefaultOffer({
   picked,
   resolvedDefault,
@@ -33,12 +51,12 @@ export function makeDefaultOffer({
 }: {
   /** The model the user just picked, `provider/model`. */
   picked: string;
-  /** What `getResolvedDefault` answered for Langy's feature key. */
-  resolvedDefault: {
-    model: string;
-    source: string;
-    scope: string | null;
-  } | null;
+  /**
+   * What `getResolvedDefault` answered for Langy's feature key, in the
+   * resolver's own type: a renamed source or scope slug fails here at compile
+   * time rather than turning the offer into a silent no-op.
+   */
+  resolvedDefault: DefaultModelEffective | null;
   /** The caller's manage rights, one per scope the default could live at. */
   canManage: { organization: boolean; team: boolean; project: boolean };
   scopeIds: {
@@ -50,40 +68,21 @@ export function makeDefaultOffer({
   if (!resolvedDefault?.scope) return null;
   if (picked === resolvedDefault.model) return null;
 
-  const kind =
-    resolvedDefault.source === "feature_override"
-      ? ("feature-override" as const)
-      : ("role-default" as const);
+  const scopeLabel = resolvedDefault.scope;
+  if (!isOfferableScope(scopeLabel)) return null;
+  if (!canManage[scopeLabel]) return null;
 
-  switch (resolvedDefault.scope) {
-    case "organization":
-      if (!canManage.organization || !scopeIds.organizationId) return null;
-      return {
-        kind,
-        scopeType: "ORGANIZATION",
-        scopeId: scopeIds.organizationId,
-        scopeLabel: "organization",
-        model: picked,
-      };
-    case "team":
-      if (!canManage.team || !scopeIds.teamId) return null;
-      return {
-        kind,
-        scopeType: "TEAM",
-        scopeId: scopeIds.teamId,
-        scopeLabel: "team",
-        model: picked,
-      };
-    case "project":
-      if (!canManage.project || !scopeIds.projectId) return null;
-      return {
-        kind,
-        scopeType: "PROJECT",
-        scopeId: scopeIds.projectId,
-        scopeLabel: "project",
-        model: picked,
-      };
-    default:
-      return null;
-  }
+  const scopeId = scopeIds[`${scopeLabel}Id`];
+  if (!scopeId) return null;
+
+  return {
+    kind:
+      resolvedDefault.source === "feature_override"
+        ? "feature-override"
+        : "role-default",
+    scopeType: SCOPE_TIER_BY_LABEL[scopeLabel],
+    scopeId,
+    scopeLabel,
+    model: picked,
+  };
 }

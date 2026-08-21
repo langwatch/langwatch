@@ -127,5 +127,13 @@ describe("startNewConversation", () => {
       useLangyStore.getState().startNewConversation();
       expect(useLangyStore.getState().modelOverride).toBe("");
     });
+
+    // A marker left behind would refuse the next conversation's own model,
+    // because followConversationModel seeds a conversation only once.
+    it("clears the marker that says a conversation was already seeded", () => {
+      useLangyStore.setState({ modelSeededForConversationId: "conv-1" });
+      useLangyStore.getState().startNewConversation();
+      expect(useLangyStore.getState().modelSeededForConversationId).toBeNull();
+    });
   });
 });

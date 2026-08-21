@@ -995,40 +995,13 @@ function CompletedActivityRow({
     <VStack align="stretch" gap={1} role="listitem">
       <HStack gap={2} paddingY={1.5}>
         {canOpenResult ? (
-          // The devMode raw-JSON toggle beside this is its own button, so the
-          // disclosure covers only the label half of the row — a button
-          // inside a button is not a thing.
-          <chakra.button
-            type="button"
-            display="flex"
-            alignItems="center"
-            gap={2}
-            flex={1}
-            minWidth={0}
-            textAlign="left"
-            cursor="pointer"
-            aria-expanded={resultOpen}
-            onClick={() => setResultOpen((value) => !value)}
-            _focusVisible={{
-              outline: "2px solid",
-              outlineColor: "orange.solid",
-              outlineOffset: "2px",
-              borderRadius: "4px",
-            }}
+          <ResultDisclosureButton
+            isExpanded={resultOpen}
+            onToggle={() => setResultOpen((value) => !value)}
           >
             {label}
             {detail}
-            <Box
-              as="span"
-              color="fg.subtle"
-              transition="transform 0.18s ease"
-              transform={resultOpen ? "rotate(90deg)" : undefined}
-              flexShrink={0}
-              display="flex"
-            >
-              <ChevronRight size={12} />
-            </Box>
-          </chakra.button>
+          </ResultDisclosureButton>
         ) : (
           <>
             {label}
@@ -1036,21 +1009,10 @@ function CompletedActivityRow({
           </>
         )}
         {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((value) => !value)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
         ) : null}
       </HStack>
       {resultOpen ? (
@@ -1068,6 +1030,79 @@ function CompletedActivityRow({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/**
+ * The label half of a finished row, made to open. The devMode raw-JSON toggle
+ * sits beside it as its own button, so the disclosure covers only this half —
+ * a button inside a button is not a thing.
+ */
+function ResultDisclosureButton({
+  isExpanded,
+  onToggle,
+  children,
+}: {
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={2}
+      flex={1}
+      minWidth={0}
+      textAlign="left"
+      cursor="pointer"
+      aria-expanded={isExpanded}
+      onClick={onToggle}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.solid",
+        outlineOffset: "2px",
+        borderRadius: "4px",
+      }}
+    >
+      {children}
+      <Box
+        as="span"
+        color="fg.subtle"
+        transition="transform 0.18s ease"
+        transform={isExpanded ? "rotate(90deg)" : undefined}
+        flexShrink={0}
+        display="flex"
+      >
+        <ChevronRight size={12} />
+      </Box>
+    </chakra.button>
+  );
+}
+
+/** Dev mode's raw-payload toggle for one finished row. */
+function RawDataToggle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const label = isOpen ? "Hide raw data" : "Show raw data";
+  return (
+    <Tooltip content={label} showArrow>
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        color={isOpen ? "orange.solid" : "fg.subtle"}
+        aria-label={label}
+        aria-expanded={isOpen}
+        onClick={onToggle}
+      >
+        <Braces size={12} />
+      </IconButton>
+    </Tooltip>
   );
 }
 
@@ -1458,7 +1493,14 @@ function LatestSettledActivityCard({
   devMode: boolean;
 }) {
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const detail = group.detail;
+  // The same disclosure the receipt row carries: the reader is watching the
+  // model think about what this call returned, so what it returned has to be
+  // readable here too, not only after the card folds into the receipt.
+  const callsWithResult = group.calls.filter(
+    (call) => toolResultText(call) !== null,
+  );
 
   return (
     <VStack
@@ -1491,32 +1533,30 @@ function LatestSettledActivityCard({
           {groupCategory(group)}
         </Text>
         {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((v) => !v)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
         ) : null}
       </HStack>
 
-      <Box textStyle="sm" fontWeight="640" lineHeight="1.3">
-        {completedActivityLabel(group.label)}
-      </Box>
+      {callsWithResult.length > 0 ? (
+        <ResultDisclosureButton
+          isExpanded={resultOpen}
+          onToggle={() => setResultOpen((value) => !value)}
+        >
+          <SettledActivityLabel label={group.label} detail={detail} />
+        </ResultDisclosureButton>
+      ) : (
+        <SettledActivityLabel label={group.label} detail={detail} />
+      )}
 
-      {detail ? (
-        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
-          {detail}
-        </Text>
+      {resultOpen ? (
+        <VStack align="stretch" gap={1}>
+          {callsWithResult.map((call, index) => (
+            <ToolResultBlock key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
       ) : null}
 
       {devMode && jsonOpen ? (
@@ -1525,6 +1565,28 @@ function LatestSettledActivityCard({
             <RawCallJson key={call.toolCallId ?? index} call={call} />
           ))}
         </VStack>
+      ) : null}
+    </VStack>
+  );
+}
+
+/** The held card's headline and its mono detail line, as one block. */
+function SettledActivityLabel({
+  label,
+  detail,
+}: {
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <VStack align="stretch" gap={2} flex={1} minWidth={0}>
+      <Box textStyle="sm" fontWeight="640" lineHeight="1.3">
+        {completedActivityLabel(label)}
+      </Box>
+      {detail ? (
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
+          {detail}
+        </Text>
       ) : null}
     </VStack>
   );

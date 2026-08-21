@@ -95,6 +95,18 @@ describe("LangyPlanCard", () => {
       expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
       expect(screen.queryByText(/left/)).toBeNull();
     });
+
+    /** @scenario Every step reads as a checkbox and the header counts what is checked */
+    it("names each step's status for a reader who gets no shape or colour", () => {
+      ui(<LangyPlanCard plan={plan()} isStreaming />);
+      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
+
+      expect(
+        [...document.querySelectorAll("[data-plan-marker]")].map((el) =>
+          el.getAttribute("aria-label"),
+        ),
+      ).toEqual(["Completed", "In progress", "Not started"]);
+    });
   });
 
   describe("given a cancelled step", () => {

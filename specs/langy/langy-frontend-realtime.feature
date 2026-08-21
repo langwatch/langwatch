@@ -88,10 +88,17 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     When the next tool call starts, or answer text streams in, or the turn settles
     Then the action folds into the completed receipt with the others
 
+  @integration
+  Scenario: The action that just finished can be opened to show what it returned
+    Given a turn is streaming and the action that just finished holds its own card
+    When the user clicks the card and it has a recorded result
+    Then the card expands to show the result the model saw
+    And a card whose calls recorded no result does not pretend to open
+
   # The receipt names what ran ("Ran a command · langwatch --help") but used to
   # keep the result to itself: debugging "why did the agent conclude that?"
   # means reading what the tool returned, and only dev mode could.
-  @unit
+  @integration
   Scenario: A receipt row opens to show what the tool returned
     Given a settled turn whose receipt lists finished tool calls
     When the user clicks a row that has a recorded result
@@ -113,6 +120,7 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then the events between the local fold and that cursor are fetched and folded
     And none of the turn's recorded work is skipped
     And a fold already at the cursor fetches nothing
+    And a tail still truncated at the page ceiling refetches the history instead of staying behind
 
   # The working indicator (thinking line / status line) is driven by two
   # signals: the live stream and the durable conversation state. The durable
