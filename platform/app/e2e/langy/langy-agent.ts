@@ -112,7 +112,13 @@ async function trpcMutate<T>({
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.error) {
-    const domainErrorCode = body?.error?.json?.data?.error?.code;
+    // The tRPC error envelope nests the domain code at data.error.code (see
+    // the langy_turn_in_progress payload: {"json":{"data":{"error":{"code":
+    // "langy_turn_in_progress"}}}}). The old data.domainError.code path never
+    // matched anything, which silently disabled the turn-lock retry below.
+    const domainErrorCode =
+      body?.error?.json?.data?.error?.code ??
+      body?.error?.json?.data?.domainError?.code;
     const err = new Error(
       `Langy ${path} -> ${res.status}: ${JSON.stringify(body?.error ?? body)}`,
     ) as Error & { domainErrorCode?: string };
@@ -251,6 +257,12 @@ async function streamTurnText({
   const decoder = new TextDecoder();
   let buf = "";
   let assistantText = "";
+  // Mirror turnfold.go's text selection: the product's final reply keeps only
+  // the text emitted AFTER the last tool frame (pre-tool deltas are status
+  // narration, dropped server-side). Track the same trailing segment here so
+  // the judge grades the reply the user actually receives, not the raw stream.
+  let textAfterLastTool = "";
+  let sawTool = false;
   let streamError: string | null = null;
   let streamErrorCode: string | null = null;
   let sawTerminal = false;
@@ -270,6 +282,10 @@ async function streamTurnText({
       if (!entry || typeof entry !== "object") continue;
       if (entry.type === "delta" && typeof entry.text === "string") {
         assistantText += entry.text;
+        textAfterLastTool += entry.text;
+      } else if (entry.type === "tool") {
+        textAfterLastTool = "";
+        sawTool = true;
       } else if (entry.type === "error") {
         // The server emits errorText (see langyChatTransport.ts's onEntry
         // "error" case), not message — checking the wrong field silently
@@ -320,6 +336,12 @@ async function streamTurnText({
     throw streamErrorCode === "langy_worker_stopped"
       ? transientInfrastructureError(message)
       : new Error(message);
+  }
+  // Same fold as turnfold.go: when tools ran and real text followed the last
+  // tool, the product shows only that trailing text (the cards carry the rest),
+  // so the judge must grade what the user actually reads.
+  if (sawTool && textAfterLastTool.trim() !== "") {
+    return textAfterLastTool.replace(/^[\s]+/, "");
   }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.

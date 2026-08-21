@@ -354,6 +354,11 @@ const registry = {
       "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
     ],
   },
+  langy_conversation_id_unadoptable: {
+    tips: [
+      "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
+    ],
+  },
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
   },

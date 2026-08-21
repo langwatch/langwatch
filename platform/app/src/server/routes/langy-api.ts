@@ -157,6 +157,17 @@ const turnBodySchema = z.object({
   messages: z.array(messageSchema).min(1),
   idempotencyKey: z.string().min(1),
   modelOverride: z.string().min(1).optional(),
+  /**
+   * Adopt the path's conversation id as a NEW conversation when it does not
+   * exist yet, instead of minting a fresh one. This is how a caller that keys
+   * continuity on an externally-chosen id — a scenario run POSTing every turn
+   * to `/conversations/{{ threadId }}/messages` — gets one stable conversation
+   * across turns: turn 1 adopts the id, turns 2+ find it owned and resume with
+   * the durable history. Without it, an unknown id silently yields a fresh
+   * conversation per turn, which degrades every multi-turn run to single-turn
+   * (#7187). Only meaningful on the `/:conversationId/messages` route.
+   */
+  adoptConversationId: z.boolean().optional(),
 });
 
 /**
@@ -261,6 +272,29 @@ function requestedWaitSeconds(c: Context): number | null {
 }
 
 /**
+ * Parse and validate a turn request body. Throws `LangyApiRequestInvalidError`
+ * on malformed JSON, schema mismatch, or `adoptConversationId` without an id
+ * in the path — adoption without a path id is a caller mistake, and the silent
+ * reading (ignore the flag, mint fresh) is exactly the ghost-conversation
+ * failure the flag exists to prevent.
+ */
+async function parseTurnBody(c: Context, conversationId: string | null) {
+  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success)
+    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  if (parsed.data.adoptConversationId && !conversationId) {
+    throw new LangyApiRequestInvalidError([
+      {
+        path: ["adoptConversationId"],
+        message:
+          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
+      },
+    ]);
+  }
+  return parsed.data;
+}
+
+/**
  * Start or continue a turn.
  *
  * Nothing is caught. A domain `HandledError` already carries the status, code
@@ -279,19 +313,16 @@ async function startTurn({
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
 
-  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success)
-    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  const body = await parseTurnBody(c, conversationId);
 
   const result = await getApp().langy.turns.startConversationTurn({
     projectId: auth.projectId,
-    idempotencyKey: parsed.data.idempotencyKey,
+    idempotencyKey: body.idempotencyKey,
     session: auth.session,
     requestedConversationId: conversationId,
-    messages: parsed.data.messages as LangyChatMessageInput[],
-    ...(parsed.data.modelOverride
-      ? { modelOverride: parsed.data.modelOverride }
-      : {}),
+    ...(body.adoptConversationId ? { adoptConversationId: true } : {}),
+    messages: body.messages as LangyChatMessageInput[],
+    ...(body.modelOverride ? { modelOverride: body.modelOverride } : {}),
     isRetry: false,
     turnContext: {},
   });
