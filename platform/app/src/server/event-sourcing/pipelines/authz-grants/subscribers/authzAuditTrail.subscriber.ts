@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/authz";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { GrantEventSource } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";

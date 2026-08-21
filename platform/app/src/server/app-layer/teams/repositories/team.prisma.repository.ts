@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import {
   type PrismaClient,

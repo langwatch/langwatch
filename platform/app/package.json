@@ -96,6 +96,7 @@
     "@hono/node-server": "^2.0.6",
     "@hono/standard-validator": "^0.2.3",
     "@langwatch/api": "workspace:*",
+    "@langwatch/actor": "workspace:*",
     "@langwatch/authz": "workspace:*",
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automations": "workspace:*",

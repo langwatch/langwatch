@@ -37,7 +37,7 @@
  * import/migration tool's, where identity must survive re-runs with no
  * caller to remember a mint.
  */
-import type { LedgerActor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
 import {
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,

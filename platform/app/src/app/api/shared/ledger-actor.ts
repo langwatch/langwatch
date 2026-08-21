@@ -13,8 +13,8 @@
  * anomaly is logged, rather than persisting `apikey:undefined` in the audit
  * trail of every such write.
  */
-import type { LedgerActor } from "@langwatch/authz";
-import { ledgerActorFor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 

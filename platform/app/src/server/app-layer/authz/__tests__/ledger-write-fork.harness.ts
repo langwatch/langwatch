@@ -10,7 +10,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
-import type { LedgerActor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
 import { vi } from "vitest";
 import {
   Prisma,

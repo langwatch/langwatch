@@ -1,5 +1,5 @@
-import type { LedgerActor } from "@langwatch/authz";
-import { ledgerActorFor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/actor";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { User } from "~/generated/prisma/client";

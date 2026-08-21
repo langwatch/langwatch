@@ -23,7 +23,7 @@
  * read-only paths that should not allocate.
  */
 
-import { SYSTEM_ACTORS } from "@langwatch/authz";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";

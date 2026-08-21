@@ -113,13 +113,6 @@ export type {
   AuthzDeclaration,
   DeclaredAuthzMiddleware,
 } from "./declared-middleware";
-export {
-  internalActor,
-  ledgerActorFor,
-  SYSTEM_ACTORS,
-  toLedgerActor,
-} from "./actor";
-export type { Actor, LedgerActor, SystemActorName } from "./actor";
 export { arbitrateClaims } from "./credential-claims";
 export type {
   ClaimArbitration,

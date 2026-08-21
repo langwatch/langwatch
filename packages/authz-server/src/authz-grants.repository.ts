@@ -4,8 +4,8 @@
  * while validation, failure naming, and the offboarding proof stay in
  * GrantsService.
  */
-import type {
-  LedgerActor, RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
+import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
 import type {
   AuthzReadRepository,
   ScopeLineageRepository,

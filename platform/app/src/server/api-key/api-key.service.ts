@@ -1,4 +1,4 @@
-import { ledgerActorFor } from "@langwatch/authz";
+import { ledgerActorFor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";

@@ -1,4 +1,5 @@
-import { declareAuthzMiddleware, ledgerActorFor } from "@langwatch/authz";
+import { ledgerActorFor } from "@langwatch/actor";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";

@@ -1,4 +1,4 @@
-import { ledgerActorFor } from "@langwatch/authz";
+import { ledgerActorFor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";

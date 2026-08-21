@@ -9,7 +9,7 @@
  * GrantsService keeps the epoch bump; this module owns the flow, the proof,
  * and the manifest.
  */
-import type { LedgerActor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {

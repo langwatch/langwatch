@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz";
+import type { LedgerActor } from "@langwatch/actor";
 import { DuplicateBindingError } from "@langwatch/authz-server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
