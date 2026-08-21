@@ -217,6 +217,18 @@ describe("legacy governance redirects", () => {
       expect(router.state.location.pathname).toBe("/start");
     });
 
+    /** @scenario A stale tab value on a retired sources address still lands on Sources */
+    it("overrides a stale tab value instead of carrying it to a different pane", async () => {
+      const router = renderRouterAt([
+        "/governance/ingestion-sources?tab=catalog",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+    });
+
     /** @scenario An old ingestion source deep link lands on the inventory detail page */
     it("lands on the inventory detail page with the query intact", async () => {
       const router = renderRouterAt([
@@ -253,6 +265,16 @@ describe("legacy governance redirects", () => {
       const params = new URLSearchParams(router.state.location.search);
       expect(params.get("tab")).toBe("sources");
       expect(params.get("range")).toBe("30d");
+    });
+
+    /** @scenario A stale tab value on a retired sources address still lands on Sources */
+    it("overrides a stale tab value instead of carrying it to a different pane", async () => {
+      const router = renderRouterAt(["/governance/catalog?tab=catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
     });
 
     /** @scenario An old catalog detail deep link lands on the inventory detail page */

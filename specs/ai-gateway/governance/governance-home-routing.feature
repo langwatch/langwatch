@@ -78,6 +78,16 @@ Feature: Governance home — route, nav promotion, persona detection
     # silently land on the tool-tiles pane.
 
   @bdd @ui @governance-home @route @alias @integration
+  Scenario: A stale tab value on a retired sources address still lands on Sources
+    When the admin cold-loads "/governance/catalog?tab=catalog"
+    Then they land on "/governance/inventory?tab=sources"
+    # The retired addresses offered exactly one pane, so every ?tab= value
+    # they ever carried rendered the sources list — an unknown value fell
+    # back to the only tab there was. Carrying such a value forward would
+    # hand the reader a different pane than the address used to mean, so
+    # the retired sources addresses pin the tab rather than default it.
+
+  @bdd @ui @governance-home @route @alias @integration
   Scenario: An old catalog detail deep link lands on the inventory detail page
     When the admin cold-loads "/governance/catalog/src_123?range=30d"
     Then they land on "/governance/inventory/src_123?range=30d"

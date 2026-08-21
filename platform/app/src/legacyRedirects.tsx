@@ -15,9 +15,11 @@ export const legacyRedirectRoutes: RouteObject[] = [
   // The sources surface has had three addresses: ingestion-sources →
   // catalog (PR-renamed) → the inventory Sources tab. Every retired
   // address maps STRAIGHT to its final home — no chaining through the
-  // also-retired middle name. The bare forms pin ?tab=sources because
-  // they always meant the sources list and the inventory default tab is
-  // Catalog; the deep-link forms go to the detail page, which has no tabs.
+  // also-retired middle name. The bare forms pin ?tab=sources, overriding
+  // any tab the old address carried: they served one pane, so every value
+  // they ever took rendered the sources list, while the inventory default
+  // is Catalog. The deep-link forms go to the detail page, which has no
+  // tabs.
   {
     path: "/governance/ingestion-sources/*",
     element: (
@@ -33,7 +35,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
       <LegacyPrefixRedirect
         from="/governance/ingestion-sources"
         to="/governance/inventory"
-        ensureParams={{ tab: "sources" }}
+        pinParams={{ tab: "sources" }}
       />
     ),
   },
@@ -52,7 +54,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
       <LegacyPrefixRedirect
         from="/governance/catalog"
         to="/governance/inventory"
-        ensureParams={{ tab: "sources" }}
+        pinParams={{ tab: "sources" }}
       />
     ),
   },

@@ -10,30 +10,32 @@ import { Navigate, useLocation } from "react-router";
 export function LegacyPrefixRedirect({
   from,
   to,
-  ensureParams,
+  pinParams,
 }: {
   from: string;
   to: string;
   /**
-   * Query params guaranteed on the destination, set only when the old
-   * address does not already carry the key. Used when the old address's
-   * bare form had a meaning the new address's default changed — e.g.
-   * `/governance/catalog` always meant the sources surface, so its
-   * redirect pins `?tab=sources` on the tabbed inventory page.
+   * Query params forced onto the destination, overriding whatever the old
+   * address carried under those keys and leaving every other key alone.
+   * Used when the old address's meaning is not expressible on the new one
+   * by default — `/governance/catalog` served exactly one pane, so every
+   * `?tab=` value it ever carried rendered the sources list, and the
+   * redirect has to pin `?tab=sources` rather than honour a stale value
+   * that now names a different pane.
    */
-  ensureParams?: Record<string, string>;
+  pinParams?: Record<string, string>;
 }) {
   const location = useLocation();
   const suffix = location.pathname.startsWith(from)
     ? location.pathname.slice(from.length)
     : "";
-  // Only the ensureParams path re-serializes the query; without it the
+  // Only the pinParams path re-serializes the query; without it the
   // original search travels byte-for-byte, as it always has.
   let search = location.search;
-  if (ensureParams) {
+  if (pinParams) {
     const params = new URLSearchParams(location.search);
-    for (const [key, value] of Object.entries(ensureParams)) {
-      if (!params.has(key)) params.set(key, value);
+    for (const [key, value] of Object.entries(pinParams)) {
+      params.set(key, value);
     }
     search = params.toString();
   }
