@@ -1035,6 +1035,30 @@ describe("detectSecretsInText", () => {
     });
   });
 
+  describe("given text with a connection URL", () => {
+    /** @scenario "A reported connection URL spans the whole URL" */
+    it("reports a span that starts at the scheme, not at the colon", () => {
+      // The rule reads the scheme in a lookbehind so that it can anchor on the
+      // literal, which keeps the scheme out of the regex match. The credential
+      // still begins at the scheme, so the reported span has to as well.
+      const input = "db postgres://user:hunter2@db.internal:5432/app end";
+      const matches = detectSecretsInText({ text: input });
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("url_credentials");
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
+        "postgres://user:hunter2@",
+      );
+    });
+
+    it("starts the span at the scheme that introduces the URL", () => {
+      const input = "jdbc:postgresql://svc:9f8e7d6c@10.0.0.4:5432/app";
+      const matches = detectSecretsInText({ text: input });
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
+        "postgresql://svc:9f8e7d6c@",
+      );
+    });
+  });
+
   describe("given text with several distinct secrets", () => {
     it("reports each one", () => {
       const matches = detectSecretsInText({

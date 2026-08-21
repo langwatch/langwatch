@@ -112,13 +112,10 @@ Feature: Redacting secrets from traces
     When the text is redacted
     Then the scan completes well inside the ingestion budget
 
-  # What a rule costs is decided by the first thing it makes the engine look
-  # for. A connection URL cannot exist without "://", so that is what the rule
-  # searches for, and the scheme in front of it is read backwards once a match
-  # starts. Written the other way round, with the scheme leading, every letter
-  # in the text started a scan for a "://" that was usually not there, and the
-  # rule cost more than every other rule together. The two scenarios below hold
-  # the behaviour still while the rule is anchored that way.
+  # A connection string is the one secret that is only partly secret. The
+  # password goes and the rest stays, because a reader needs to know which
+  # database the trace was talking to. Schemes are written in many shapes, and
+  # an address or a bare "://" in prose is not a connection string at all.
 
   @unit
   Scenario: A connection URL keeps its scheme whatever shape the scheme has
@@ -131,6 +128,12 @@ Feature: Redacting secrets from traces
     Given text with a "://" that no scheme introduces, and an address with an at sign
     When the text is redacted
     Then the text is unchanged
+
+  @unit
+  Scenario: A reported connection URL spans the whole URL
+    Given a connection string with a password in it
+    When the text is scanned without redacting
+    Then the reported leak covers the URL from its scheme onwards
 
   # Text past the scan budget used to be returned untouched, which was a bypass
   # rather than a budget: a real agent input of nearly a megabyte carried a live

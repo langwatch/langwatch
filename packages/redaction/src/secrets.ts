@@ -60,6 +60,15 @@ interface ValueRule {
    * for the many strings that are ordinary prose.
    */
   precondition?: (text: string) => boolean;
+  /**
+   * Text the rule requires in front of the match but leaves out of it, written
+   * to end at the match. A rule anchors on its own literal for speed and reads
+   * what precedes it in a lookbehind; the credential still begins where that
+   * lookbehind begins, so the reported span has to start there too. Applied to
+   * the text before the match, and only by the detection path: redaction never
+   * rewrites what the match does not cover.
+   */
+  precededBy?: RegExp;
 }
 
 /**
@@ -616,6 +625,9 @@ const VALUE_RULES: ValueRule[] = [
     // The scheme stays outside the match and therefore untouched, which is
     // what the rule already did with it.
     regex: /(?<=[a-z][a-z0-9+.-]{0,30})(:\/\/[^\s:@/]+:)([^\s:@/]+)(@)/gi,
+    // The same scheme the lookbehind reads, so a reported match still spans the
+    // whole URL rather than starting at the colon.
+    precededBy: /[a-z][a-z0-9+.-]{0,30}$/i,
     render: (_m, prefix, _password, at) => `${prefix}${REPLACEMENT}${at}`,
   },
   {
@@ -1137,15 +1149,28 @@ function matchesOfRule(rule: ValueRule, text: string): SecretMatch[] {
     if (ruleDeclines(rule, match)) continue;
     const kept = claimedLength(rule, match);
     if (kept === 0) continue;
-    const start = match.index ?? 0;
+    const matchStart = match.index ?? 0;
     found.push({
       ruleId: rule.id,
       description: rule.description,
-      start,
-      end: start + kept,
+      start: matchStart - lengthPrecedingMatch(rule, text, matchStart),
+      end: matchStart + kept,
     });
   }
   return found;
+}
+
+/**
+ * How much of the credential sits in front of the match, for a rule that reads
+ * part of it in a lookbehind. Zero for every rule whose match covers all of it.
+ */
+function lengthPrecedingMatch(
+  rule: ValueRule,
+  text: string,
+  matchStart: number,
+): number {
+  if (!rule.precededBy) return 0;
+  return rule.precededBy.exec(text.slice(0, matchStart))?.[0].length ?? 0;
 }
 
 /** Whether a rule's second-stage test rejects this candidate. */
