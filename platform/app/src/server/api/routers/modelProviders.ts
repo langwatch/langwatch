@@ -42,7 +42,6 @@ import {
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
-  type Permission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {

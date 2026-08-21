@@ -26,9 +26,9 @@ import {
   RESOURCE_KIND_TO_DB,
   type RoleRowShape,
 } from "@langwatch/authz-server";
+import type { MapEventHandlers } from "../../../projections/abstractMapProjection";
 import { AbstractMapProjection } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { MapEventHandlers } from "../../../projections/abstractMapProjection";
 import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
@@ -38,18 +38,18 @@ import {
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "../schemas/constants";
 import {
-  grantAttachedEventSchema,
   type GrantAttachedEvent,
-  grantRevokedEventSchema,
   type GrantRevokedEvent,
-  grantRoleChangedEventSchema,
   type GrantRoleChangedEvent,
-  roleDefinedEventSchema,
+  grantAttachedEventSchema,
+  grantRevokedEventSchema,
+  grantRoleChangedEventSchema,
   type RoleDefinedEvent,
-  roleDeletedEventSchema,
   type RoleDeletedEvent,
-  rolePermissionsChangedEventSchema,
   type RolePermissionsChangedEvent,
+  roleDefinedEventSchema,
+  roleDeletedEventSchema,
+  rolePermissionsChangedEventSchema,
 } from "../schemas/events";
 
 /**

@@ -143,9 +143,7 @@ export const defineRoleCommandDataSchema = commandDataSchema({
   role: defineRoleEntrySchema,
   actor: grantsLedgerActorSchema,
 });
-export type DefineRoleCommandData = z.infer<
-  typeof defineRoleCommandDataSchema
->;
+export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
 
 export const changeRolePermissionsCommandDataSchema = commandDataSchema({
   roleId: z.string().min(1),

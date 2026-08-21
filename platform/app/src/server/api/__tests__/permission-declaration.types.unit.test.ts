@@ -86,7 +86,9 @@ protectedProcedure.input(teamInput).permission("organization:manage");
 
 /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
 // @ts-expect-error — the input carries no projectId, teamId, or organizationId
-protectedProcedure.input(z.object({ name: z.string() })).permission("traces:view");
+protectedProcedure
+  .input(z.object({ name: z.string() }))
+  .permission("traces:view");
 
 protectedProcedure
   .input(z.object({ projectId: z.string().optional() }))
@@ -109,7 +111,9 @@ protectedProcedure
   .permission("organization:manage", { via: "projectId" });
 
 // @ts-expect-error — via exists for tiers the input cannot satisfy directly; traces:view already accepts teamId
-protectedProcedure.input(teamInput).permission("traces:view", { via: "teamId" });
+protectedProcedure
+  .input(teamInput)
+  .permission("traces:view", { via: "teamId" });
 
 protectedProcedure
   .input(organizationInput)
@@ -118,7 +122,9 @@ protectedProcedure
 
 /** @scenario "An opted-out procedure cannot silently read scoped input" */
 // @ts-expect-error — the input carries projectId; it must be individually allowed with a reason
-protectedProcedure.input(projectInput).noPermission({ reason: "nothing scoped" });
+protectedProcedure
+  .input(projectInput)
+  .noPermission({ reason: "nothing scoped" });
 
 protectedProcedure
   .input(z.object({ projectId: z.string(), organizationId: z.string() }))

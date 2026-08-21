@@ -15,9 +15,7 @@ const legacyPrisma = (roleBindingFindMany: ReturnType<typeof vi.fn>) =>
   ({
     roleBinding: { findMany: roleBindingFindMany },
     systemMigrationTenantState: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
     },
   }) as unknown as PrismaClient;
 

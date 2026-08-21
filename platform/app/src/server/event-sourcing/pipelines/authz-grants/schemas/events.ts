@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
+import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
   GRANT_ATTACHED_EVENT_TYPE,

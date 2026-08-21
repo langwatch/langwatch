@@ -15,28 +15,6 @@ import {
 } from "../api/rbac";
 import { authzChecksFor } from "../app-layer/authz/checks";
 import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
-// The shadow comparison runs on the APP's own Prisma handle, never the
-// caller's. The caller's handle is whatever it happened to pass — a
-// transaction client on any path that opens one — and a detached
-// fire-and-forget query on such a handle either lengthens a transaction it
-// was never part of or lands after the commit and fails with "Transaction
-// already closed". (The API-key mint path used to hold exactly that open
-// interactive transaction; it no longer does, and the rule outlives it,
-// because nothing here can tell what it was handed.) This module is
-// server-only — its importers are org-auth.ts, auth-middleware.ts and
-// api-key.service.ts — so the singleton is safe to hold here, unlike in
-// ./shadow.ts, which rbac.ts (client-reachable) imports.
-//
-// The FORK is the other way round, and deliberately so (delivery-plan PR 3):
-// the cutover gate read and the engine decision are AWAITED inside the
-// caller's own flow, not detached, so they carry none of the hazard above —
-// and being the answer rather than a comment on it, they must see exactly the
-// world the legacy walk they replace sees, which is the caller's handle. The
-// reverse-shadow thunk is the one detached leg, and it is skipped precisely
-// where a transaction is in play. A thunk
-// that does outlive its transaction anyway logs "authz fork comparison
-// failed" and changes nothing.
-import { prisma as appPrisma } from "../db";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,

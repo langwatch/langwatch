@@ -16,11 +16,10 @@ import type {
   Project,
 } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
+import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
 // no module cycle back into the Langy feature.
 import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
-import { type App, getApp } from "~/server/app-layer/app";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import {
   ApiKeyPermissionDeniedError,

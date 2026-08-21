@@ -48,7 +48,10 @@ const ROLE = {
   occurredAtMs: AT,
 } as const;
 
-async function emit(handler: { handle: (c: never) => Promise<unknown[]> }, data: unknown) {
+async function emit(
+  handler: { handle: (c: never) => Promise<unknown[]> },
+  data: unknown,
+) {
   return (await handler.handle({ tenantId: ORG, data } as never)) as {
     aggregateType: string;
     aggregateId: string;
@@ -96,7 +99,11 @@ describe("authz command aggregate identity", () => {
   describe("given a command about one role", () => {
     /** @scenario "A role command names its own role as the aggregate" */
     it.each([
-      ["define", new DefineRoleCommand(), { ...identity, role: ROLE, actor: ACTOR }],
+      [
+        "define",
+        new DefineRoleCommand(),
+        { ...identity, role: ROLE, actor: ACTOR },
+      ],
       [
         "change permissions",
         new ChangeRolePermissionsCommand(),

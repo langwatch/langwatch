@@ -16,7 +16,6 @@ import {
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
 
 const errorCache: Record<string, any> = {};

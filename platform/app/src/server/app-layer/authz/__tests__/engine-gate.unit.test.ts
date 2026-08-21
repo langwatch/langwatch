@@ -3,7 +3,7 @@
  *
  * @see specs/rbac/in-place-authz-migration.feature
  */
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migration-name";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -12,6 +12,7 @@ import {
   resetAuthzEngineGateForTesting,
 } from "../engine-gate";
 import { authzEngineGateReadFailuresTotal } from "../metrics";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migration-name";
 
 async function counterValue(): Promise<number> {
   const metric = await authzEngineGateReadFailuresTotal.get();
@@ -146,7 +147,10 @@ describe("the authz engine gate", () => {
       const { prisma: pending } = stateTable("pending");
 
       await expect(
-        organizationOnAuthzEngine({ organizationId: "org_a", prisma: migrated }),
+        organizationOnAuthzEngine({
+          organizationId: "org_a",
+          prisma: migrated,
+        }),
       ).resolves.toBe(true);
       await expect(
         organizationOnAuthzEngine({ organizationId: "org_b", prisma: pending }),

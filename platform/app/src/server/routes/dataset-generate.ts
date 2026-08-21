@@ -19,7 +19,6 @@ import { tools } from "~/app/api/dataset/generate/tools";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 
 const logger = createLogger("langwatch:api:dataset:generate");

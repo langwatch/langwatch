@@ -6,12 +6,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz";
 import { useMemo } from "react";
 import { Info } from "react-feather";
-import {
-  type AuthzPermission,
-  isRegistryPermission,
-} from "@langwatch/authz";
 import type { Action, Resource } from "../../server/api/rbac";
 import {
   getValidActionsForResource,

@@ -5,14 +5,14 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+} from "../../schemas/constants";
+import {
   AuthzGrantsWriteProjection,
   type GrantProjectionWrite,
   type GrantProjectionWriteStore,
 } from "../authzGrantsWrite.projection";
-import {
-  GRANT_ATTACHED_EVENT_TYPE,
-  GRANT_ROLE_CHANGED_EVENT_TYPE,
-} from "../../schemas/constants";
 
 const store: GrantProjectionWriteStore = { append: async () => undefined };
 const projection = new AuthzGrantsWriteProjection({ store });

@@ -19,8 +19,8 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "./migration-name";
 import { authzEngineGateReadFailuresTotal } from "./metrics";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "./migration-name";
 import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
 
 const logger = createLogger("langwatch:authz:engine-gate");

@@ -153,15 +153,15 @@ describe("authz audit trail subscriber", () => {
 
   describe("when the event carries a backdated source", () => {
     /** @scenario "The migration's own facts never reach the audit trail" */
-    it.each(["migration", "read-through-mint"])(
-      "writes no row for %s",
-      async (source) => {
-        const store = recordingStore();
-        await deliver(store, attached({ source }));
+    it.each([
+      "migration",
+      "read-through-mint",
+    ])("writes no row for %s", async (source) => {
+      const store = recordingStore();
+      await deliver(store, attached({ source }));
 
-        expect(store.inserts).toHaveLength(0);
-      },
-    );
+      expect(store.inserts).toHaveLength(0);
+    });
 
     /** @scenario "The migration's own facts never reach the audit trail" */
     it("still writes a row for a live source", async () => {

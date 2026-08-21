@@ -26,8 +26,8 @@ import {
 } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
 import {
-  SCOPE_ICON,
   BINDING_SCOPE_TIERS,
+  SCOPE_ICON,
 } from "~/components/data-retention/constants";
 import { formatDays } from "~/components/data-retention/format";
 import {

@@ -1,9 +1,6 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz";
 import { Check } from "react-feather";
-import {
-  type AuthzPermission,
-  isRegistryPermission,
-} from "@langwatch/authz";
 import type { Action, Resource } from "../../server/api/rbac";
 import {
   getValidActionsForResource,

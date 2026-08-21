@@ -302,10 +302,10 @@ describe("CutoverAwareAccessListingRepository", () => {
       const roleBindingFindMany = vi.fn().mockResolvedValue([]);
       const prisma = {
         systemMigrationTenantState: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
-    },
+          findUnique: vi
+            .fn()
+            .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+        },
         grant: { findMany: grantFindMany },
         roleBinding: { findMany: roleBindingFindMany },
         user: { findMany: vi.fn().mockResolvedValue([]) },

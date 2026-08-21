@@ -761,7 +761,7 @@ describe("SystemMigrationsService enrollment", () => {
 
 describe("SystemMigrationsService.runForOrganization", () => {
   describe("given an enrolled organization on cloud", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("runs the targeted pass and answers the status the organization ended in", async () => {
       const { service, runTargetedPass } = serviceWith({
         record: {

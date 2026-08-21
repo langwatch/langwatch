@@ -56,7 +56,6 @@ import {
 import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
 import { hasOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 
 import type { NextRequestShim } from "./types";
 

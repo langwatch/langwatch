@@ -41,7 +41,6 @@ import type {
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { liveGrants, liveRoles } from "./live-rows";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
@@ -51,6 +50,7 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
+import { liveGrants, liveRoles } from "./live-rows";
 
 /** The three scope tiers a listed binding can carry - RESOURCE rows are the
  *  share tier and PLATFORM rows are dormant facts; neither is a binding the

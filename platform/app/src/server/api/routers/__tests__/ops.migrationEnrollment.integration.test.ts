@@ -196,7 +196,7 @@ describe("ops migration enrollment procedures", () => {
   });
 
   describe("when an operator runs one migration for one organization", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("delegates to the service and demands ops:manage", async () => {
       service.runForOrganization.mockResolvedValue({
         status: "finalized",

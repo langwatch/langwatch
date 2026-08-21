@@ -39,8 +39,8 @@ interface CreateNextContextOptions {
 import { auditLog } from "@ee/audit-log/auditLog";
 import type {
   AuthzPermission,
-  NoPermissionOptions,
   DeclarationError,
+  NoPermissionOptions,
   ScopeTierField,
   ValidatePermissionForInput,
   ViaFieldFor,

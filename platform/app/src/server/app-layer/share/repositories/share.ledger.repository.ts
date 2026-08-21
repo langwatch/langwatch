@@ -25,7 +25,6 @@ import {
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
-import { liveGrants } from "../../authz/repositories/live-rows";
 import type {
   Prisma,
   PrismaClient,
@@ -36,6 +35,7 @@ import {
   readOrganizationOnAuthzEngine,
 } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
+import { liveGrants } from "../../authz/repositories/live-rows";
 import type {
   CreateShareLinkParams,
   ShareRepository,

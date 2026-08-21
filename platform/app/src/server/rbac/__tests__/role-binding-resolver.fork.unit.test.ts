@@ -123,7 +123,7 @@ describe("the fork at the api-key seams", () => {
         expect(permitted).toBe(true);
         // The engine answered alone: nothing runs the legacy walk behind it.
         expect(roleBindingFindMany).not.toHaveBeenCalled();
-        });
+      });
 
       describe("when the caller silences the comparison", () => {
         it("still decides on the engine, and never runs legacy", async () => {

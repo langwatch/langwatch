@@ -100,7 +100,7 @@ beforeEach(() => {
 describe("the fork at the permission seams", () => {
   describe("given a migrated organization", () => {
     describe("when a project permission is resolved", () => {
-      /** @scenario "A migrated organization is decided by the engine" */
+      /** @scenario "A cut-over organization is decided by the engine" */
       it("returns the engine's answer, and never runs legacy", async () => {
         const { ctx, roleBindingFindMany } = buildPrisma({ onEngine: true });
 

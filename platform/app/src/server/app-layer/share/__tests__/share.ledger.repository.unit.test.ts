@@ -347,7 +347,7 @@ describe("LedgerShareRepository", () => {
         expect(grantFindMany).not.toHaveBeenCalled();
       });
 
-      /** @scenario "A revocation never appends a fact for a link outside the caller's project" */
+      /** @scenario "A revocation never touches a resource outside the caller's project" */
       it("appends nothing for an id neither head anchors to the project", async () => {
         const { repository, legacy, writer } = buildRepository({
           onEngine: true,
@@ -366,7 +366,7 @@ describe("LedgerShareRepository", () => {
     });
 
     describe("when the routing gate is stale or failing", () => {
-      /** @scenario "Revocation routing never trusts a cached gate answer" */
+      /** @scenario "Revocation routing never trusts a cached answer" */
       it("routes a revoke on the uncached projection read, past a stale cached answer", async () => {
         const { repository, legacy, writer, cutoverFindUnique } =
           buildRepository({ onEngine: false });

@@ -22,7 +22,6 @@
  * @see specs/traces-v2/sharing.feature
  */
 import { AuthzCollectorService } from "@langwatch/authz-server";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -38,6 +37,7 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { GrantsAuthzReadRepository } from "../../authz/repositories/authz-read.grants.repository";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import { PrismaShareRepository } from "../repositories/share.prisma.repository";
@@ -183,10 +183,7 @@ describe("given a cut-over organization's capped share link", () => {
       ["grantUsage", { organizationId: organization.id }],
       ["shareLink", { projectId: project.id }],
       ["grant", { organizationId: organization.id }],
-      [
-        "systemMigrationTenantState",
-        { tenantId: organization.id },
-      ],
+      ["systemMigrationTenantState", { tenantId: organization.id }],
       ["project", { id: project.id }],
       ["team", { id: team.id }],
       ["organization", { id: organization.id }],

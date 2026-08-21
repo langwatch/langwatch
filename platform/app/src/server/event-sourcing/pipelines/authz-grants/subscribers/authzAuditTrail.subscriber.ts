@@ -1,6 +1,6 @@
 import type { GrantEventSource } from "@langwatch/authz-server";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { createLogger } from "@langwatch/observability";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,

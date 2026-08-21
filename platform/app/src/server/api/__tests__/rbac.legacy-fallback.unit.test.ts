@@ -60,26 +60,26 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     mockPrisma.teamUser.findMany.mockResolvedValue([]);
   });
 
-  describe.each(["pending", "parked"] as const)(
-    "when the organization's migration is %s",
-    (status) => {
-      /** @scenario "The legacy team rows keep answering until the migration finishes" */
-      it("answers from the legacy row, whatever the migration is doing", async () => {
-        mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
-          status === "pending" ? null : { status },
-        );
+  describe.each([
+    "pending",
+    "parked",
+  ] as const)("when the organization's migration is %s", (status) => {
+    /** @scenario "The legacy team rows keep answering until the migration finishes" */
+    it("answers from the legacy row, whatever the migration is doing", async () => {
+      mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
+        status === "pending" ? null : { status },
+      );
 
-        const result = await resolveTeamPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "team-1",
-          "team:manage" as Permission,
-        );
+      const result = await resolveTeamPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "team-1",
+        "team:manage" as Permission,
+      );
 
-        expect(result.permitted).toBe(true);
-        expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
-      });
-    },
-  );
+      expect(result.permitted).toBe(true);
+      expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
+    });
+  });
 
   describe("when the migration has finished", () => {
     /**

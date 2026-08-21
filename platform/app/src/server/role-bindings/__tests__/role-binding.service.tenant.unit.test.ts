@@ -31,10 +31,8 @@ const prisma = {
   // gate first. Answering it keeps these tests on the legacy head by choice;
   // without it the gate's read throws and they pass on the fail-safe.
   systemMigrationTenantState: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(null),
-    },
+    findUnique: vi.fn().mockResolvedValue(null),
+  },
   $transaction: vi.fn(),
 } as unknown as PrismaClient;
 

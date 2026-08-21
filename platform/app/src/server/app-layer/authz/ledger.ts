@@ -54,7 +54,6 @@ import {
 // bundle reaches it through the shadow fork). See the header of
 // `@langwatch/authz-server/migration`.
 import { bindingIdentityKey } from "@langwatch/authz-server/migration";
-import { liveGrants } from "./repositories/live-rows";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -75,9 +74,10 @@ import {
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { tryGetApp } from "../app";
-import { bumpAuthzEpoch } from "./epoch";
 import { organizationOnAuthzEngine } from "./engine-gate";
+import { bumpAuthzEpoch } from "./epoch";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
+import { liveGrants } from "./repositories/live-rows";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -1526,7 +1526,7 @@ export function grantsLedgerWriter(): GrantsLedgerWriter {
  * listed no id at all, the selector IS the whole instruction and is the only
  * entry — which is why a filtered revoke that matched nothing still appends.
  */
-function ledgerScopeType(value: unknown): LedgerScopeType | undefined {
+function _ledgerScopeType(value: unknown): LedgerScopeType | undefined {
   return LEDGER_SCOPE_TYPES.find((candidate) => candidate === value);
 }
 

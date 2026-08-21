@@ -527,6 +527,9 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    return queryOrganizationOnAuthzEngine({ prisma: this.prisma, organizationId });
+    return queryOrganizationOnAuthzEngine({
+      prisma: this.prisma,
+      organizationId,
+    });
   }
 }

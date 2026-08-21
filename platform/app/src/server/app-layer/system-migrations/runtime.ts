@@ -15,7 +15,6 @@ import {
 } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
-import type { Prisma } from "~/generated/prisma/client";
 import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
@@ -37,9 +36,7 @@ const logger = createLogger("langwatch:system-migrations:runtime");
  * cutover's `cutoverCohort` below).
  */
 /** The runner and the ops service both write through this instance. */
-const systemMigrationState = new PrismaSystemMigrationStateRepository(
-  prisma,
-);
+const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
 
 const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
   prisma,

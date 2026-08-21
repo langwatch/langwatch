@@ -34,8 +34,8 @@ import {
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
-import { liveGrants, liveRoles } from "./live-rows";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
+import { liveGrants, liveRoles } from "./live-rows";
 
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that

@@ -91,7 +91,10 @@ const UNRESOLVABLE_SCOPES: readonly string[] = [
   "datasetRecord.create declares a permission its input carries no scope id for",
 ];
 
-const OPAQUE_INPUTS: readonly string[] = ["dataset.upsert", "datasetRecord.create"];
+const OPAQUE_INPUTS: readonly string[] = [
+  "dataset.upsert",
+  "datasetRecord.create",
+];
 
 type Procedure = {
   path: string;
@@ -225,9 +228,7 @@ function collectProcedures(): Procedure[] {
       // tRPC intersects chained `.input()` calls, so a field required by any
       // of them is required overall.
       requiredScopeFields: [
-        ...new Set(
-          (perInput.filter(Boolean) as ScopeTierField[][]).flat(),
-        ),
+        ...new Set((perInput.filter(Boolean) as ScopeTierField[][]).flat()),
       ],
     };
   });
@@ -299,5 +300,4 @@ describe("tRPC authz declaration sweep", () => {
       expect(opaque).toEqual(OPAQUE_INPUTS);
     });
   });
-
 });
