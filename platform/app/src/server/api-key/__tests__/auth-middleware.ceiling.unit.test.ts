@@ -151,11 +151,14 @@ describe("enforceApiKeyCeiling()", () => {
       it("says it is not delegable rather than not granted", async () => {
         resolveMock.mockResolvedValue(false);
 
+        // `secrets:view` — the incident grain was `triggers:create`, but that
+        // is delegable since the 2026-08-21 widening; secrets have no safe
+        // read and will never be delegated.
         await expect(
           enforceApiKeyCeiling({
             prisma,
             resolved: langySessionKeyToken,
-            permission: "triggers:create",
+            permission: "secrets:view",
           }),
         ).rejects.toMatchObject({
           code: "api_key_permission_not_delegable",
@@ -257,7 +260,10 @@ describe("requireApiKeyPermission()", () => {
         resolveMock.mockResolvedValue(false);
         const { app, handler } = appWith(
           langySessionKeyToken,
-          "triggers:create",
+          // Never delegable: secrets have no safe read (the original incident
+          // grain, `triggers:create`, is delegable since the 2026-08-21
+          // widening).
+          "secrets:view",
         );
 
         const res = await app.request("/");

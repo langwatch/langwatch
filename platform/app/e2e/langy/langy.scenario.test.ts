@@ -758,7 +758,7 @@ describe("Langy via HTTP wrapper", () => {
     // family of their own, so there is no narrower grain the route could ask
     // for — Langy structurally cannot create an agent today. The passing
     // outcome is the boundary handled plainly, and Layer 2 proves nothing was
-    // written. See langyPermissionPolicy.ts (READ_ONLY_FAMILIES.project).
+    // written. See langyPermissionPolicy.ts (AUTH_SCOPE_FAMILIES.project).
     it("states the agent-creation boundary and writes nothing (Layer 2: no agent)", async () => {
       const langy = makeLangyAdapter();
       const agentName = `langy-test-agent-${Date.now()}`;

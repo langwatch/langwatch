@@ -58,24 +58,28 @@ Feature: Per-session caller-scoped Langy key
   # carved back IN (owner decision, 2026-08-21): gateway virtual keys — minting
   # them is driving the gateway, and the caller's own grant bounds it. The user's own permissions
   # remain the ceiling for all of it.
+  @integration
   Scenario: Langy can delete my work, because I can
     Given I can delete my own prompts
     When I ask Langy to delete one
     Then the prompt is deleted
     And nothing I did not name is touched
 
+  @integration
   Scenario: Langy cannot delete my work when I cannot
     Given I cannot delete prompts in this project
     When I ask Langy to delete one
     Then Langy cannot, and says so
     And the prompt is still there
 
+  @unit
   Scenario: Langy cannot change who can do what, even though I can
     Given I can manage my organization's members and roles
     When I ask Langy to change a member's role
     Then Langy cannot, and says so
     And the member's role is unchanged
 
+  @unit
   Scenario: Langy cannot read my project's secrets, even though I can
     Given I can read my project's secrets
     When I ask Langy what a secret's value is

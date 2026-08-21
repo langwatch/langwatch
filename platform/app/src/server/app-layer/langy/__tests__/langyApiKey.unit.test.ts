@@ -35,6 +35,7 @@ vi.mock("~/server/api-key/api-key.service", () => ({
   },
 }));
 
+import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyScopeError,
@@ -42,6 +43,7 @@ import {
   reapExpiredLangySessionApiKeys,
   revokeLangySessionApiKey,
 } from "../langyApiKey";
+import { LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langyPermissionPolicy";
 
 const SESSION = { user: { id: "user-1" }, expires: "1" } as any;
 // The mint resolves the project's team once (a TEAM binding inherits to its
@@ -230,15 +232,8 @@ describe("mintLangySessionApiKey", () => {
           (arg.permissions as string[]).filter((p) => {
             const family = p.split(":")[0]!;
             return (
-              [
-                "organization",
-                "team",
-                "project",
-                "gatewayProviders",
-                "webhookEndpoints",
-                "auditLog",
-                "complianceExport",
-              ].includes(family) && !p.endsWith(":view")
+              LANGY_AUTH_SCOPE_FAMILY_NAMES.includes(family) &&
+              !p.endsWith(":view")
             );
           }),
         ).toEqual([]);
@@ -293,21 +288,29 @@ describe("mintLangySessionApiKey", () => {
         expect(permissions.filter((p) => p.startsWith("secrets:"))).toEqual([]);
         // Auth scope: reads only. (The reads themselves ARE expected — that
         // half of the rule lives in the coverage test's boundary block.)
-        for (const family of [
-          "organization",
-          "team",
-          "gatewayProviders",
-          "auditLog",
-        ]) {
+        for (const family of LANGY_AUTH_SCOPE_FAMILY_NAMES) {
           expect(
             permissions.filter(
               (p) => p.startsWith(`${family}:`) && !p.endsWith(":view"),
             ),
           ).toEqual([]);
         }
-        // Ceiling-escaping actions, on any family.
+        // Ceiling-escaping actions, on any family — asserted on the
+        // EFFECTIVE grain, because `:manage` implies `:rotate` through the
+        // hierarchy; direct containment alone stayed green while
+        // `virtualKeys:manage` made rotation reachable.
         expect(permissions).not.toContain("traces:share");
         expect(permissions).not.toContain("virtualKeys:rotate");
+        expect(permissions).not.toContain("virtualKeys:manage");
+        expect(
+          hasPermissionWithHierarchy(permissions, "virtualKeys:rotate"),
+        ).toBe(false);
+        // The self-invocation and staff-ops walls.
+        expect(
+          permissions.filter(
+            (p) => p.startsWith("langy:") || p.startsWith("ops:"),
+          ),
+        ).toEqual([]);
         // And the widening is real, not vacuous: full CRUD arrived.
         expect(permissions).toContain("traces:manage");
         expect(permissions).toContain("gatewayBudgets:manage");

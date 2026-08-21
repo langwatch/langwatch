@@ -14,7 +14,10 @@
  */
 import { assert, describe, expect, it } from "vitest";
 
-import { classifyForLangy } from "../langyPermissionPolicy";
+import {
+  classifyForLangy,
+  LANGY_AUTH_SCOPE_FAMILY_NAMES,
+} from "../langyPermissionPolicy";
 
 // The cross-products live at module scope rather than as loops inside the
 // `it`. Nested `describe`s already put a test body four levels deep, so a
@@ -25,17 +28,11 @@ import { classifyForLangy } from "../langyPermissionPolicy";
 // The auth scope: every write grain on every family whose writes change who
 // can do what, or change a credential. `view` is deliberately absent from the
 // action list — the read half of the rule is asserted separately below.
+// Drawn from the policy's own exported inventory rather than hand-copied —
+// a family added to AUTH_SCOPE_FAMILIES is asserted here automatically.
 const AUTH_SCOPE_WRITES = ["create", "update", "delete", "manage"].flatMap(
   (action) =>
-    [
-      "organization",
-      "team",
-      "project",
-      "gatewayProviders",
-      "webhookEndpoints",
-      "auditLog",
-      "complianceExport",
-    ].map((family) => `${family}:${action}`),
+    LANGY_AUTH_SCOPE_FAMILY_NAMES.map((family) => `${family}:${action}`),
 );
 
 // The actions no family may carry, because the user-permission ceiling does
@@ -45,6 +42,17 @@ const CEILING_ESCAPING_GRAINS = [
   "traces:share",
   "virtualKeys:rotate",
   "virtualKeys:viewOtherPersonal",
+  // Not a ceiling-escaping ACTION, but the grain that would make the rotate
+  // exclusion fiction: the hierarchy folds `:rotate` into `:manage`
+  // (rbac.ts:545-555), so `virtualKeys:manage` is withheld as a single grain.
+  "virtualKeys:manage",
+  // The self-invocation gate: `langy:create` is the ceiling permission on
+  // `POST /api/langy`, so a key holding it can start Langy turns recursively.
+  "langy:create",
+  "langy:manage",
+  // LangWatch-staff platform surgery, not tenant data.
+  "ops:manage",
+  "ops:view",
 ];
 
 // The widened surface this policy now exists to express: full CRUD on
@@ -63,13 +71,15 @@ const DELEGABLE_GRAINS = [
   "workflows:delete",
   // The auth scope READS — "auth scope read is okay" is half of the owner's
   // rule, and a boundary test that only asserts the refusals would let a
-  // tightening quietly take the reads with it.
-  "organization:view",
+  // tightening quietly take the reads with it. (`organization:view` is NOT
+  // here: the policy would allow it, but it is org-exclusive and therefore
+  // `unreachable` on the project-scoped key — asserted separately below.)
   "team:view",
   "auditLog:view",
-  // virtualKeys is full-access (owner decision, 2026-08-21): people drive the
+  // virtualKeys carries writes (owner decision, 2026-08-21): people drive the
   // AI Gateway through Langy, and minting keys is bounded by the caller's own
-  // grant. `:rotate` alone stays excluded (asserted above).
+  // grant. `:rotate` stays excluded, and so does `:manage`, because the
+  // hierarchy folds `:rotate` into it — asserted below.
   "virtualKeys:view",
   "virtualKeys:create",
   "virtualKeys:delete",
@@ -121,6 +131,7 @@ describe("classifyForLangy", () => {
 
   describe("given the secrets family", () => {
     describe("when any grain of it is classified", () => {
+      /** @scenario Langy cannot read my project's secrets, even though I can */
       it.each([
         "secrets:view",
         "secrets:create",
@@ -133,6 +144,7 @@ describe("classifyForLangy", () => {
 
   describe("given a write on the auth scope", () => {
     describe("when it is classified", () => {
+      /** @scenario Langy cannot change who can do what, even though I can */
       it.each(
         AUTH_SCOPE_WRITES,
       )("refuses %s, with the reason stated", (permission) => {
@@ -170,6 +182,24 @@ describe("classifyForLangy", () => {
           classifyForLangy(permission).disposition,
           `${permission} should be delegable`,
         ).toBe("granted");
+      });
+    });
+  });
+
+  describe("given a grain the policy allows on a family only an org-tier binding can grant", () => {
+    describe("when it is classified", () => {
+      it.each([
+        "organization:view",
+        "governance:manage",
+        "activityMonitor:view",
+        "aiTools:manage",
+      ])("calls %s unreachable, not granted and not excluded", (permission) => {
+        const verdict = classifyForLangy(permission);
+        expect(verdict.disposition).toBe("unreachable");
+        assert(verdict.disposition === "unreachable");
+        // The reason names the actual wall, because "widen your own role" is
+        // useless advice for a scope refusal.
+        expect(verdict.reason).toContain("project-scoped");
       });
     });
   });

@@ -56,19 +56,30 @@ import {
  * for the thirty-five families that exist today has changed.
  */
 
-/** Verdict for a single permission. `excluded` always carries its reason. */
+/**
+ * Verdict for a single permission. Non-granted verdicts always carry their
+ * reason. `excluded` means the POLICY refuses it; `unreachable` means the
+ * policy would grant it but the grain cannot exist on a project-scoped
+ * binding (`bindingScopeCanGrant` refuses org-exclusive permissions below
+ * the org tier), so the minted key never carries it. The distinction matters
+ * to the customer-facing denial: "widen your own role" is useless advice for
+ * either, and the reason string says which wall was hit.
+ */
 export type LangyPermissionVerdict =
   | { readonly disposition: "granted" }
-  | { readonly disposition: "excluded"; readonly reason: string };
+  | { readonly disposition: "excluded"; readonly reason: string }
+  | { readonly disposition: "unreachable"; readonly reason: string };
 
 /**
- * Actions Langy may never hold, on any family, whatever that family's bucket.
+ * The actions Langy may hold, subject to the family buckets below.
  *
- * These are the axes the user-permission ceiling does NOT contain, which is the
- * only reason anything is listed here at all. `delete` and `manage` are
- * deliberately absent: they are destructive, but they destroy only what the
- * requesting human could already destroy by hand, so the ceiling bounds them.
- * The three below are different in kind:
+ * `delete` and `manage` are deliberately present: they are destructive, but
+ * they destroy only what the requesting human could already destroy by hand,
+ * so the ceiling bounds them. `attach`/`detach` are here because they only
+ * mean anything on `gatewayGuardrails` (rbac.ts:34-40), and re-policing a
+ * gateway key is the day job of anyone driving the gateway — the same
+ * ceiling argument as `virtualKeys` below: Langy can only re-police keys for
+ * a caller who could do it by hand.
  */
 const DELEGABLE_ACTIONS = new Set([
   "view",
@@ -81,7 +92,9 @@ const DELEGABLE_ACTIONS = new Set([
 ]);
 
 /**
- * Why each non-delegable action stays out of reach. Keyed by action so a new
+ * Actions Langy may never hold, on any family, whatever that family's bucket.
+ * These are the axes the user-permission ceiling does NOT contain, which is
+ * the only reason anything is listed here at all. Keyed by action so a new
  * one added to `Actions` in rbac.ts surfaces here as an explicit decision.
  *
  * An action absent from BOTH this map and `DELEGABLE_ACTIONS` is refused (the
@@ -110,13 +123,34 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
 /**
  * Families where not even a read is delegable.
  *
- * Exactly one, and it is the owner's stated carve-out: reading a stored
- * credential IS obtaining it. There is no weaker grain here — `secrets:view`
- * is the whole compromise, so the read/manage split the rest of this file
- * turns on has nothing to bite on.
+ * `secrets` is the owner's stated carve-out: reading a stored credential IS
+ * obtaining it. There is no weaker grain — `secrets:view` is the whole
+ * compromise, so the read/manage split the rest of this file turns on has
+ * nothing to bite on.
+ *
+ * `langy` and `ops` are not part of the "everything" the owner widened,
+ * because neither is tenant data:
+ *
+ * - `langy:create` is the ceiling gate on `POST /api/langy` itself
+ *   (langy-api.ts). A session key that carries it can start Langy turns, and
+ *   each turn mints another key that can do the same — the intersection
+ *   ceiling bounds AUTHORITY, not AMPLIFICATION, so nothing else in the
+ *   system stops that recursion. And `langy:delete` archives Langy's own
+ *   conversations, which is the `auditLog` argument over again: an assistant
+ *   that can edit the record of what it did is an assistant whose record
+ *   proves nothing. Langy's conversations are managed by the app, not by its
+ *   tools.
+ * - `ops` gates LangWatch-staff platform surgery (feature flags, ClickHouse
+ *   TTL, blob deletion — routers/ops.ts). It is unreachable through an API
+ *   key today only because no REST route demands it; that is a transport
+ *   coincidence, not a policy, so the policy says no.
  */
 const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   secrets: "reading a stored credential is obtaining it; there is no safe read",
+  langy:
+    "`langy:create` starts Langy turns, so holding it lets Langy invoke " +
+    "itself recursively; and its conversations are Langy's own record",
+  ops: "platform operations for LangWatch staff, not a tenant-facing capability",
 };
 
 /**
@@ -139,9 +173,15 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
  * `virtualKeys` is deliberately NOT here (owner decision, 2026-08-21): virtual
  * keys are gateway credentials, but issuing them is the day job of anyone
  * driving the gateway, and the ceiling bounds it — Langy can only mint keys
- * for a caller who could mint them by hand. `:rotate` stays excluded via
- * `ACTION_EXCLUSIONS` (though note `:manage` implies `:rotate` through the
- * hierarchy, so a manage-holding caller's Langy can reach rotation).
+ * for a caller who could mint them by hand. `:rotate` is excluded via
+ * `ACTION_EXCLUSIONS`, and because `:manage` implies `:rotate` through the
+ * hierarchy (`hasPermissionWithHierarchy`, rbac.ts:545-555), the ONLY way to
+ * make that exclusion true of the credential rather than merely of this
+ * file's text is to withhold `virtualKeys:manage` too — which
+ * `GRAIN_EXCLUSIONS` below does. The cost is real and accepted: Langy cannot
+ * create ORG- or TEAM-scoped virtual keys or widen a key's scopes (the two
+ * REST surfaces demanding `virtualKeys:manage`); project-scoped mint, update,
+ * and delete all remain.
  */
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   organization: "org membership and role administration IS the auth scope",
@@ -170,6 +210,19 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * failure is the entire remaining safety property of this file — see the
  * header. Do not replace this with `Object.values(Resources).filter(...)`;
  * doing so is precisely the fail-open the old allowlist was built to prevent.
+ *
+ * SIX OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
+ * classification, not an access grant: `governance`, `anomalyRules`,
+ * `aiTools`, `activityMonitor`, `gatewaySpend`, and `ingestionSources` are in
+ * `ORG_EXCLUSIVE_RESOURCES` (rbac.ts), so `langyCandidatePermissions` drops
+ * every grain of them and the minted key holds nothing. The org-exclusive
+ * filter was built for ADR-021 scope escalation, not for Langy — several of
+ * these families were previously excluded here with their own reasons
+ * (`activityMonitor` was "cross-principal activity surveillance"). If the
+ * session key ever gains an ORGANIZATION-scoped binding, these six widen
+ * instantly from a change in a different file: RE-DECIDE each of them
+ * explicitly before making that change. The coverage test pins the exact
+ * inventory so the tripwire at least has a bell on it.
  */
 const FULL_ACCESS_FAMILIES = new Set([
   "analytics",
@@ -189,8 +242,6 @@ const FULL_ACCESS_FAMILIES = new Set([
   "gatewayUsage",
   "governance",
   "ingestionSources",
-  "langy",
-  "ops",
   "playground",
   "prompts",
   "routingPolicies",
@@ -202,15 +253,52 @@ const FULL_ACCESS_FAMILIES = new Set([
 ]);
 
 /**
+ * Single grains withheld even though their family and action are both
+ * otherwise delegable. Smallest hammer in the file — use it only when the
+ * permission HIERARCHY makes a coarser grain imply an excluded one.
+ *
+ * `virtualKeys:manage` is here because `:manage` implies `:rotate`
+ * (rbac.ts:545-555): granting it would make the `rotate` exclusion above a
+ * statement about this file's text rather than about the credential. See the
+ * `virtualKeys` note on `AUTH_SCOPE_FAMILIES` for the accepted cost.
+ */
+const GRAIN_EXCLUSIONS: Record<string, string> = {
+  "virtualKeys:manage":
+    "`:manage` implies `:rotate` through the permission hierarchy, and " +
+    "rotation breaks every integration holding the credential",
+};
+
+/**
  * Every family in the system, in exactly one bucket. Exported so the coverage
  * test can assert the partition is total against `Resources` — the check that
  * makes a newly-invented family fail CI instead of sitting silently refused.
  */
+/**
+ * The auth-scope family inventory, exported so tests assert against the
+ * policy's own list instead of hand-copying it (four copies of that list
+ * existed before this export; a family added above would have missed all of
+ * them silently).
+ */
+export const LANGY_AUTH_SCOPE_FAMILY_NAMES: readonly string[] = Object.freeze(
+  Object.keys(AUTH_SCOPE_FAMILIES),
+);
+
 export const LANGY_CLASSIFIED_FAMILIES: ReadonlySet<string> = new Set([
   ...Object.keys(FULLY_EXCLUDED_FAMILIES),
   ...Object.keys(AUTH_SCOPE_FAMILIES),
   ...FULL_ACCESS_FAMILIES,
 ]);
+
+/**
+ * The sum of the three family buckets BEFORE de-duplication. Equal to
+ * `LANGY_CLASSIFIED_FAMILIES.size` iff the buckets are disjoint — the
+ * coverage test asserts exactly that, because a family in two buckets is
+ * decided by `classifyForLangy`'s branch order, not by anyone's intent.
+ */
+export const LANGY_FAMILY_BUCKET_TOTAL =
+  Object.keys(FULLY_EXCLUDED_FAMILIES).length +
+  Object.keys(AUTH_SCOPE_FAMILIES).length +
+  FULL_ACCESS_FAMILIES.size;
 
 /** Every family `Resources` declares. The universe the partition must cover. */
 export const ALL_PERMISSION_FAMILIES: readonly string[] = Object.freeze(
@@ -226,13 +314,17 @@ export const LANGY_CLASSIFIED_ACTIONS: ReadonlySet<string> = new Set([
   ...Object.keys(ACTION_EXCLUSIONS),
 ]);
 
+/** Pre-dedup sum of the two action buckets; see LANGY_FAMILY_BUCKET_TOTAL. */
+export const LANGY_ACTION_BUCKET_TOTAL =
+  DELEGABLE_ACTIONS.size + Object.keys(ACTION_EXCLUSIONS).length;
+
 /** Every action `Actions` declares. The universe the partition must cover. */
 export const ALL_PERMISSION_ACTIONS: readonly string[] = Object.freeze(
   Object.values(Actions),
 );
 
 /** The read grain. Anything else is a write as far as this policy is concerned. */
-const READ_ACTION = "view";
+const READ_ACTION: string = Actions.VIEW;
 
 /**
  * The candidate list, DERIVED from the rule rather than hand-maintained
@@ -265,37 +357,12 @@ export function langyCandidatePermissions(): Permission[] {
   for (const family of ALL_PERMISSION_FAMILIES) {
     for (const action of ALL_PERMISSION_ACTIONS) {
       const permission = `${family}:${action}` as Permission;
-      if (isCandidateGrain(family, action, permission)) {
+      if (classifyForLangy(permission).disposition === "granted") {
         candidates.push(permission);
       }
     }
   }
   return candidates;
-}
-
-/** The per-grain filter `langyCandidatePermissions` runs over the cross-product. */
-function isCandidateGrain(
-  family: string,
-  action: string,
-  permission: Permission,
-): boolean {
-  if (classifyForLangy(permission).disposition !== "granted") return false;
-  // `Permission` is a template literal type, so the cross-product
-  // TYPECHECKS whether or not the grain means anything — `analytics:attach`
-  // is a well-typed string describing nothing. Such an entry is inert (no
-  // role grants it, so the intersection drops it) but it is still 46 dead
-  // rows for `batchProjectPermissions` to carry and one more way for a
-  // reader to over-read what Langy holds. `attach`/`detach` are the only
-  // actions narrow enough to pin precisely: they police guardrails
-  // (rbac.ts:34-40) and mean nothing anywhere else.
-  if (
-    (action === Actions.ATTACH || action === Actions.DETACH) &&
-    family !== Resources.GATEWAY_GUARDRAILS
-  ) {
-    return false;
-  }
-  // Inert at project scope — see above.
-  return !isOrgExclusivePermission(permission);
 }
 
 /** Splits `resource:action`, tolerating anything that is not in that shape. */
@@ -321,6 +388,31 @@ export function splitPermission(permission: string): {
  * reviewer having to classify a family — never as a silently over-broad
  * credential.
  */
+/**
+ * The grain-level exclusions `classifyForLangy` consults after the action and
+ * fully-excluded-family checks: single withheld grains (`GRAIN_EXCLUSIONS`)
+ * and actions that only mean anything on one family. `Permission` is a
+ * template literal type, so the cross-product TYPECHECKS whether or not the
+ * grain means anything — `analytics:attach` is a well-typed string describing
+ * nothing. `attach`/`detach` are the only actions narrow enough to pin
+ * precisely: they police guardrails (rbac.ts:34-40) and mean nothing
+ * anywhere else.
+ */
+function grainExclusionReason(
+  family: string,
+  action: string,
+): string | undefined {
+  const grainExcluded = GRAIN_EXCLUSIONS[`${family}:${action}`];
+  if (grainExcluded) return grainExcluded;
+  if (
+    (action === Actions.ATTACH || action === Actions.DETACH) &&
+    family !== (Resources.GATEWAY_GUARDRAILS as string)
+  ) {
+    return `\`${action}\` polices gateway guardrails and means nothing on \`${family}\``;
+  }
+  return undefined;
+}
+
 export function classifyForLangy(
   permission: Permission | string,
 ): LangyPermissionVerdict {
@@ -346,16 +438,18 @@ export function classifyForLangy(
   const fullyExcluded = FULLY_EXCLUDED_FAMILIES[family];
   if (fullyExcluded) return { disposition: "excluded", reason: fullyExcluded };
 
+  const grainExcluded = grainExclusionReason(family, action);
+  if (grainExcluded) return { disposition: "excluded", reason: grainExcluded };
+
   const authScope = AUTH_SCOPE_FAMILIES[family];
-  if (authScope) {
-    if (action === READ_ACTION) return { disposition: "granted" };
+  if (authScope && action !== READ_ACTION) {
     return {
       disposition: "excluded",
       reason: `${authScope} — Langy may read the auth scope, never write it`,
     };
   }
 
-  if (!FULL_ACCESS_FAMILIES.has(family)) {
+  if (!authScope && !FULL_ACCESS_FAMILIES.has(family)) {
     return {
       disposition: "excluded",
       reason:
@@ -363,6 +457,21 @@ export function classifyForLangy(
         `FULL_ACCESS_FAMILIES if Langy may use it, AUTH_SCOPE_FAMILIES if it ` +
         `decides who can do what or holds a credential, or ` +
         `FULLY_EXCLUDED_FAMILIES if not even a read is safe`,
+    };
+  }
+
+  // The policy would grant it, but the session key is minted with a single
+  // PROJECT-scoped binding and `bindingScopeCanGrant` (rbac.ts:190-196)
+  // refuses org-exclusive permissions below the org tier. Listing it as a
+  // candidate would put dead rows in front of `batchProjectPermissions` on
+  // every turn and invite a reader to conclude Langy has access it has
+  // never had.
+  if (isOrgExclusivePermission(permission as Permission)) {
+    return {
+      disposition: "unreachable",
+      reason:
+        `\`${family}\` is an organization-tier resource and the Langy ` +
+        `session key is project-scoped; no project permission can grant it`,
     };
   }
 
