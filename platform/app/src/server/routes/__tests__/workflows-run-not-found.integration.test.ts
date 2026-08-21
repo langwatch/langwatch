@@ -24,8 +24,8 @@ import {
 
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // This suite only needs Postgres — every harness (CI's testcontainers,
 // native local services) provides that, so it runs unconditionally. Do NOT

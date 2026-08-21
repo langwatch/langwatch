@@ -22,14 +22,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 

@@ -21,8 +21,8 @@
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // vi.hoisted runs before the import graph executes. A plain module-body
 // assignment is too late: wireDefaultTestApp's import chain reaches

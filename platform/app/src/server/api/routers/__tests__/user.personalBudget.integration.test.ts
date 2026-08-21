@@ -26,7 +26,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -34,9 +34,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 describe("user.personalBudget integration", () => {
   const ns = `pbudget-${nanoid(8)}`;

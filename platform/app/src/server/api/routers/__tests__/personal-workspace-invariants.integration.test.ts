@@ -53,6 +53,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
@@ -63,7 +64,6 @@ import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-
 import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
 

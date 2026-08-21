@@ -25,14 +25,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
 

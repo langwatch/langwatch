@@ -63,8 +63,8 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
 });
 
 import type { Redis } from "ioredis";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {

@@ -8,13 +8,13 @@
  * extraction, so these pin the behavior the refactor must preserve.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({
   afterPromptCreated: vi.fn(),

@@ -22,15 +22,15 @@ import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "../langyApiKey";
 import { experimentRoutePermissions } from "./helpers/routePermissions";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // This suite only needs Postgres — every harness (CI's testcontainers, native
 // local services) provides that, so it runs unconditionally. It used to carry

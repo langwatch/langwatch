@@ -39,6 +39,7 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   getTestClickHouseClient,
@@ -47,9 +48,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;

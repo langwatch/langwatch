@@ -40,12 +40,15 @@ vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 // The route reads hasProjectPermission from the app-layer imperative
 // module (it moved off ~/server/api/rbac with ADR-092); mocking the old
 // path leaves the real check running.
-vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("~/server/app-layer/permissions/imperative")
-  >()),
-  hasProjectPermission,
-}));
+vi.mock(
+  "~/server/app-layer/permissions/imperative",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >()),
+    hasProjectPermission,
+  }),
+);
 
 function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
   return {

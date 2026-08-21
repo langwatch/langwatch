@@ -22,12 +22,12 @@ import {
 } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 const ns = `role-authz-${nanoid(8)}`;
 

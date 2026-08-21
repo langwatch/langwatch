@@ -65,11 +65,11 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 /** The container's connection, handed to the test App the CLI routes read. */
 let redisConnection: Redis | null = null;

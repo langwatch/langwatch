@@ -5,13 +5,13 @@
  * Tests the actual getRecentItems endpoint with real database queries.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../utils/testUtils";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 describe("Recent Items Integration", () => {
   const projectId = "test-project-id";

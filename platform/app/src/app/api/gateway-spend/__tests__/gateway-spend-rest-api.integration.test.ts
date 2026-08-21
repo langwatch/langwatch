@@ -52,28 +52,28 @@ vi.mock("~/server/app-layer/app", async () => {
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = permissionsServiceFor(dbForPermissions);
   return {
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    permissions,
-    planProvider: {
-      getActivePlan: async () => ({
-        webhookEndpointsEnabled: planHasWebhookEndpoints,
-      }),
-    },
-    gateway: {
-      budgets: new GatewayBudgetClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-      virtualKeySpend: undefined,
-      spendEvents: new GatewaySpendEventsRepository(
-        resolveTestClickHouseClient,
-      ),
-      webhookEvents: new WebhookEventsClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-    },
-  }),
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({
+          webhookEndpointsEnabled: planHasWebhookEndpoints,
+        }),
+      },
+      gateway: {
+        budgets: new GatewayBudgetClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+        virtualKeySpend: undefined,
+        spendEvents: new GatewaySpendEventsRepository(
+          resolveTestClickHouseClient,
+        ),
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+      },
+    }),
   };
 });
 

@@ -15,13 +15,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { datasetDisplayRecordCount } from "~/server/datasets/record-count";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 const PROJECT_ID = "test-project-id";
 

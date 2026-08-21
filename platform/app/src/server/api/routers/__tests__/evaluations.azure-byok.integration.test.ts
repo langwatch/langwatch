@@ -39,10 +39,10 @@ vi.mock("../../rbac", () => ({
     .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }));
 
-import { evaluationsRouter } from "../evaluations";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
+import { evaluationsRouter } from "../evaluations";
 
+wireDefaultTestApp();
 
 function createCaller(_projectId: string) {
   return evaluationsRouter.createCaller({

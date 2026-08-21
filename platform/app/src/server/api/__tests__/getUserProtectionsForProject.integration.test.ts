@@ -19,13 +19,13 @@ import {
 
 import type { Session } from "~/server/auth";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestProject } from "../../../utils/testUtils";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../db";
 import { getUserProtectionsForProject } from "../utils";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 const NAMESPACE = "dataprivacy-visibility";
 

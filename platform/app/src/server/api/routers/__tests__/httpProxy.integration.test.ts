@@ -10,13 +10,13 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Field } from "~/optimization_studio/types/dsl";
 import type { StudioClientEvent } from "~/optimization_studio/types/events";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { engineRepliesWith } from "./agentTestEngine";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 const mockPostEvent = vi.fn();
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({

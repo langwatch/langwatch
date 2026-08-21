@@ -31,8 +31,8 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
 
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 describe("POST /api/workflows/post_event with a modelless LLM node", () => {
   const testNamespace = `post-event-llm-${nanoid(8)}`;

@@ -7,13 +7,13 @@
  * Binds specs/prompts/duplicate-prompt.feature.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // Fire-and-forget billing hook; it is not what these tests are about.
 vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({

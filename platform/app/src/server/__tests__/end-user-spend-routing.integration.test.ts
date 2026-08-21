@@ -43,27 +43,27 @@ vi.mock("~/server/app-layer/app", async () => {
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = permissionsServiceFor(dbForPermissions);
   return {
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  // Built per call rather than once: the routes now take their ClickHouse
-  // repositories from the App, and `chClient` is only assigned once the test
-  // containers are up - after this factory runs.
-  getApp: () => ({
-    permissions,
-    planProvider: {
-      getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
-    },
-    gateway: {
-      budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
-      virtualKeySpend: new GatewayVirtualKeySpendRepository(
-        async () => chClient,
-      ),
-      spendEvents: new GatewaySpendEventsRepository(async () => chClient),
-      webhookEvents: new WebhookEventsClickHouseRepository(
-        async () => chClient,
-      ),
-    },
-  }),
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    // Built per call rather than once: the routes now take their ClickHouse
+    // repositories from the App, and `chClient` is only assigned once the test
+    // containers are up - after this factory runs.
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
+      },
+      gateway: {
+        budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
+        virtualKeySpend: new GatewayVirtualKeySpendRepository(
+          async () => chClient,
+        ),
+        spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          async () => chClient,
+        ),
+      },
+    }),
   };
 });
 let chClient: ClickHouseClient;

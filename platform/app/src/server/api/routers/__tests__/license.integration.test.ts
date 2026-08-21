@@ -20,6 +20,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import {
   ENTERPRISE_TEMPLATE,
   LicenseHandler,
@@ -47,9 +48,8 @@ import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {

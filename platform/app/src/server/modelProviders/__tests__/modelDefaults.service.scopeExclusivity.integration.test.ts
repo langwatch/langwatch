@@ -14,7 +14,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import type { Session } from "../../auth";
 import { prisma } from "../../db";
@@ -24,9 +24,8 @@ import {
   updateConfig,
 } from "../modelDefaults.service";
 import { resolveModelForFeature } from "../resolveModelForFeature";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 describe("given default-model configs with scope attachments (real DB)", () => {
   const ns = `mdcfg-excl-${nanoid(8)}`;

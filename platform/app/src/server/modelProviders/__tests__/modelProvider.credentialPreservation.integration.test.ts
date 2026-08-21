@@ -22,15 +22,14 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-wireDefaultTestApp();
 
+wireDefaultTestApp();
 
 // Postgres and an encryption key are all this needs (the setup files
 // provide a deterministic CREDENTIALS_SECRET), so it runs wherever the
