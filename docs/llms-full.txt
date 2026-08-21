@@ -20554,10 +20554,6 @@ from google.genai import types
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 import os
 
-<Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
-</Info>
-
 # Initialize LangWatch with the Google ADK instrumentor
 langwatch.setup(
     instrumentors=[GoogleADKInstrumentor()]
@@ -20609,17 +20605,21 @@ if __name__ == "__main__":
 
 **That's it!** All Google ADK agent activity will now be traced and sent to your LangWatch dashboard automatically.
 
-### Optional: Using Decorators for Additional Context
+The LangWatch API key comes from the `LANGWATCH_API_KEY` environment variable.
 
-If you want to add additional context or metadata to your traces, you can optionally use the `@langwatch.trace()` decorator:
+### Optional: Add metadata with a decorator
+
+To attach metadata to the trace, wrap the call in `@langwatch.trace()` and run
+the agent with **`Runner.run_async`**:
 
 ```python
+import asyncio
+
 import langwatch
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-import os
 
 langwatch.setup(
     instrumentors=[GoogleADKInstrumentor()]
@@ -20628,27 +20628,47 @@ langwatch.setup(
 # ... agent setup code ...
 
 @langwatch.trace(name="Google ADK Agent Run")
-def run_agent_interaction(user_message: str):
+async def run_agent_interaction(user_message: str):
     # Update the current trace with additional metadata
     current_trace = langwatch.get_current_trace()
     if current_trace:
         current_trace.update(
             metadata={
                 "user_id": "user_123",
-                "session_id": "session_abc",
-                "agent_name": "hello_agent",
-                "model": "gemini-2.0-flash"
+                "thread_id": "session_abc",
+                "labels": ["hello_agent"],
             }
         )
 
     user_msg = types.Content(role="user", parts=[types.Part(text=user_message)])
 
-    for event in runner.run(user_id="demo-user", session_id="demo-session", new_message=user_msg):
+    async for event in runner.run_async(
+        user_id="demo-user", session_id="demo-session", new_message=user_msg
+    ):
         if event.is_final_response():
             return event.content.parts[0].text
 
     return "No response generated"
+
+
+asyncio.run(run_agent_interaction("hi"))
 ```
+
+<Warning>
+Use `run_async` under the decorator, not the synchronous `Runner.run`.
+
+`Runner.run` starts a new Python thread and calls `asyncio.run` inside it.
+OpenTelemetry keeps the active trace in a context variable, and a new thread
+starts with an empty one, so the agent spans open a **second, separate trace**.
+The metadata you set stays on the wrapper trace and the agent trace gets none
+of it.
+
+`run_async` stays on the caller's task, so the wrapper span is the parent of
+`invocation`, `agent_run` and `call_llm`, and all of it is one trace.
+
+If you have to keep the synchronous `Runner.run`, drop the decorator and let
+the instrumentor own the trace.
+</Warning>
 
 ## How it Works
 
@@ -20660,7 +20680,7 @@ def run_agent_interaction(user_message: str):
     - Model completions
     - Session management
 
-3.  **Optional Decorators**: You can optionally use `@langwatch.trace()` to add additional context and metadata to your traces, but it's not required for basic functionality.
+3.  **Optional Decorators**: You can optionally use `@langwatch.trace()` to add additional context and metadata to your traces, but it's not required for basic functionality. The decorator parents the agent spans only over `Runner.run_async`.
 
 With this setup, LangWatch traces all agent interactions, tool calls, and model completions.
 
@@ -20669,7 +20689,7 @@ With this setup, LangWatch traces all agent interactions, tool calls, and model 
 
 - You do **not** need to set any OpenTelemetry environment variables or configure exporters manually. `langwatch.setup()` handles it.
 - You can combine Google ADK instrumentation with other instrumentors (e.g., OpenAI, LangChain) by adding them to the `instrumentors` list.
-- The `@langwatch.trace()` decorator is **optional** - the OpenInference instrumentor will capture all ADK activity automatically.
+- The `@langwatch.trace()` decorator is **optional** - the OpenInference instrumentor will capture all ADK activity automatically. Use it with `Runner.run_async`, never with the synchronous `Runner.run`.
 - For advanced configuration (custom attributes, endpoint, etc.), see the [Python integration guide](/integration/python/guide).
 
 ## Troubleshooting
@@ -20678,51 +20698,8 @@ With this setup, LangWatch traces all agent interactions, tool calls, and model 
 - If you see no traces in LangWatch, check that the instrumentor is included in `langwatch.setup()` and that your agent code is being executed.
 - Ensure you have the correct Google API key set for Gemini access.
 - **`AttributeError: module 'google.adk.flows.llm_flows.functions' has no attribute 'trace_tool_call'`** on `langwatch.setup()`: your `openinference-instrumentation-google-adk` is too old for your Google ADK version. ADK 1.32 removed that symbol; the fix shipped in instrumentor 0.1.11. Run `pip install -U "openinference-instrumentation-google-adk>=0.1.11"`. If it still fails, confirm the upgrade actually applied in the running interpreter with `pip show openinference-instrumentation-google-adk`.
-
-## Interoperability with LangWatch SDK
-
-You can use this integration together with the LangWatch Python SDK to add additional attributes to the trace:
-
-```python
-import langwatch
-from google.adk import Agent, Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-
-langwatch.setup(
-    instrumentors=[GoogleADKInstrumentor()]
-)
-
-@langwatch.trace(name="Custom ADK Agent")
-def my_custom_agent(input_message: str):
-    # Your ADK agent code here
-    agent = Agent(
-        name="custom_agent",
-        model="gemini-2.0-flash",
-        instruction="Your custom instructions",
-        tools=[your_custom_tools]
-    )
-
-    # Update the current trace with additional metadata
-    current_trace = langwatch.get_current_trace()
-    if current_trace:
-        current_trace.update(
-            metadata={
-                "user_id": "user_123",
-                "session_id": "session_abc",
-                "agent_name": "custom_agent",
-                "model": "gemini-2.0-flash"
-            }
-        )
-
-    # Run your agent
-    # ... agent execution code ...
-
-    return "Agent response"
-```
-
-This approach allows you to combine the automatic tracing capabilities of Google ADK with the rich metadata and custom attributes provided by LangWatch.
+- **One agent run shows up as two traces, one of them empty except for your decorator span**: you wrapped the synchronous `Runner.run`. Switch to `Runner.run_async`, or drop the decorator. See the warning above.
+- **The metadata you set with `trace.update()` is on a trace with no agent spans**: same cause, same fix.
 
 ---
 
@@ -22845,9 +22822,7 @@ icon: python
 keywords: langwatch, python, audio, voice, realtime, speech, multimodal, tracing
 ---
 
-LangWatch captures a recording as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the audio the way your model provider expects, keep the call inside a trace, and the recording plays on the trace.
-
-This page lists the audio shapes LangWatch understands, what happens to the bytes, and where the player appears in the product.
+Send the audio the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the recording out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the audio with the model call
 
@@ -22855,7 +22830,7 @@ The example below uses `langwatch.setup()` and a `@langwatch.trace()` entry poin
 
 ### OpenAI
 
-A recording rides an `input_audio` part carrying raw base64 and a format.
+Put the recording in an `input_audio` part, as raw base64 with a format.
 
 ```python
 import base64
@@ -22872,7 +22847,7 @@ def transcribe(prompt: str, path: str) -> str:
 
     encoded = base64.b64encode(open(path, "rb").read()).decode("utf-8")
     completion = client.chat.completions.create(
-        model="gpt-4o-audio-preview",
+        model="gpt-audio-mini",
         messages=[
             {
                 "role": "user",
@@ -22894,7 +22869,7 @@ transcribe("What does the caller ask for?", "call.wav")
 
 ### Google Gemini and Vertex
 
-A recording rides an inline data part with an audio media type. The rest of the agent setup does not change.
+Put the recording in an inline data part with an audio media type. The rest of the agent setup does not change.
 
 ```python
 import asyncio
@@ -22948,10 +22923,11 @@ transcribe("What does the caller ask for?", "call.wav")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call. Do not add a
-  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
-  sync-to-async boundary that does not carry the trace context, so the
-  wrapper lands in a separate trace.
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()`
+  wrapper is needed. If you add one to attach metadata, switch the run to
+  `Runner.run_async`: the synchronous `Runner.run` starts its own thread, which
+  begins with an empty OpenTelemetry context, and the agent spans open a second
+  trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 
@@ -22968,13 +22944,13 @@ Send any of these and the recording is captured.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 
-When a message carries both a recording and text, the text is treated as the transcript of that recording and the two are shown as one unit.
+When a message holds both a recording and text, LangWatch treats the text as the transcript of that recording and shows the two together.
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. A recording captured by a simulation and by the trace of the same call is one stored object, not two.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -22982,19 +22958,15 @@ Raw, header-less audio does not play in a browser on its own. LangWatch wraps `p
 
 Open the trace and the Summary tab shows a player under the input. The Conversation tab shows a player in the message it belongs to, next to the transcript. A turn that recorded no transcript still shows its player. The Trace tab shows the full message payload.
 
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no player, ask LangWatch to turn it on for your project.
-</Note>
-
 ## Testing voice agents
 
-Capturing the audio of a live call tells you what happened. To drive a call on purpose, and score it, use Scenario. It synthesizes a caller, speaks to your agent over its real transport, and judges the conversation with the same `scenario.run()` and the same judge you use for text.
+You see what happened on a call once it has run. To drive a call on purpose and score it, use Scenario: it synthesizes a caller, speaks to your agent over its real transport, and scores the conversation with `scenario.run()`.
 
 <Frame caption="Voice agent testing in Scenario, with the simulated call, its per-turn audio and the judge verdict">
   <img src="/images/scenario-voice.webp" alt="LangWatch voice agent testing" />
 </Frame>
 
-Scenario carries adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can inject background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
+Scenario has adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can add background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
 
 ## Related
 
@@ -23014,9 +22986,7 @@ icon: python
 keywords: langwatch, python, documents, pdf, files, attachments, multimodal, tracing
 ---
 
-LangWatch captures a document as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the file the way your model provider expects, keep the call inside a trace, and the attachment is on the trace.
-
-This page lists the document shapes LangWatch understands, what happens to the bytes, and where the attachment appears in the product.
+Send the file the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the document out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the document with the model call
 
@@ -23024,7 +22994,7 @@ The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry 
 
 ### OpenAI
 
-A document rides a `file` part carrying `file_data`. That is the shape Chat Completions accepts for PDF files.
+Put the document in a `file` part, as `file_data`. That is the shape Chat Completions accepts for PDF files.
 
 ```python
 import base64
@@ -23072,7 +23042,7 @@ read_invoice("What is the invoice number and the total due?", "invoice.pdf")
 
 ### Anthropic
 
-A document rides a `document` content block with a base64 source.
+Put the document in a `document` content block with a base64 source.
 
 ```python
 import base64
@@ -23116,7 +23086,7 @@ read_invoice("What is the invoice number and the total due?", "invoice.pdf")
 
 ### Google Gemini and Vertex
 
-A document rides an inline data part with the PDF media type. The rest of the agent setup does not change.
+Put the document in an inline data part with the PDF media type. The rest of the agent setup does not change.
 
 ```python
 import asyncio
@@ -23170,10 +23140,11 @@ ask("What is the invoice number and the total due?", "invoice.pdf")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call. Do not add a
-  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
-  sync-to-async boundary that does not carry the trace context, so the
-  wrapper lands in a separate trace.
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()`
+  wrapper is needed. If you add one to attach metadata, switch the run to
+  `Runner.run_async`: the synchronous `Runner.run` starts its own thread, which
+  begins with an empty OpenTelemetry context, and the agent spans open a second
+  trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 
@@ -23189,29 +23160,25 @@ Send any of these and the attachment is captured.
 | Google Gemini and Vertex | `{"inline_data": {"mime_type": "application/pdf", "data": "..."}}` |
 | AG-UI | `{"type": "document", "source": {"type": "data", "value": "...", "mimeType": "application/pdf"}}` |
 
-A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, carries no bytes. It is passed through as it is and no attachment is stored.
+A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, holds no bytes. LangWatch passes it through unchanged and stores no attachment.
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. The same contract sent on ten traces costs one stored object.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
 ## Where the document appears
 
-A paperclip sits next to the input preview on the trace list, so a run that carried a file is recognisable without opening it.
+The trace list draws a paperclip next to the input preview, so you can spot a run with a file without opening it.
 
-Open the trace and the Summary tab shows an attachment chip. The chip carries the filename, or the media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
+Open the trace and the Summary tab shows an attachment chip, named after the file, or after its media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
 
 <Frame caption="The trace drawer Summary tab, with an application/pdf attachment chip below the input text and the model answer reading the invoice number and total from the file">
   <img src="/images/integration/multimodal/trace-drawer-pdf.png" alt="LangWatch trace drawer showing a PDF attachment chip below the input question" />
 </Frame>
-
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no attachment, ask LangWatch to turn it on for your project.
-</Note>
 
 ## Related
 
@@ -23473,9 +23440,7 @@ icon: python
 keywords: langwatch, python, images, multimodal, vision, attachments, tracing
 ---
 
-LangWatch captures an image as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the image the way your model provider expects, keep the call inside a trace, and the picture is on the trace.
-
-This page lists the image shapes LangWatch understands, what happens to the bytes, and where the picture appears in the product.
+Send the image the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the image out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the image with the model call
 
@@ -23483,7 +23448,7 @@ The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry 
 
 ### OpenAI
 
-An image rides an `image_url` part carrying a data URL.
+Put the image in an `image_url` part, as a data URL.
 
 ```python
 import base64
@@ -23526,7 +23491,7 @@ describe("What does this image show?", "shapes.png")
 
 ### Anthropic
 
-An image rides an `image` content block with a base64 source.
+Put the image in an `image` content block with a base64 source.
 
 ```python
 import base64
@@ -23572,7 +23537,7 @@ Anthropic's hosted form, `{"type": "url", "url": "https://..."}`, is understood 
 
 ### Google Gemini and Vertex
 
-An image rides an inline data part. `Part.from_bytes` builds it for you. The rest of the agent setup does not change.
+Put the image in an inline data part. `Part.from_bytes` builds one for you. The rest of the agent setup does not change.
 
 ```python
 import asyncio
@@ -23626,10 +23591,11 @@ describe("What does this image show?", "shapes.png")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call. Do not add a
-  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
-  sync-to-async boundary that does not carry the trace context, so the
-  wrapper lands in a separate trace.
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()`
+  wrapper is needed. If you add one to attach metadata, switch the run to
+  `Runner.run_async`: the synchronous `Runner.run` starts its own thread, which
+  begins with an empty OpenTelemetry context, and the agent spans open a second
+  trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 
@@ -23646,19 +23612,19 @@ Send any of these and the picture is captured. The list covers the shapes the ma
 | Google Gemini and Vertex | `{"inline_data": {"mime_type": "image/png", "data": "..."}}` |
 | AG-UI | `{"type": "image", "source": {"type": "data", "value": "...", "mimeType": "image/png"}}` |
 
-Always set the media type. A part that carries bytes with no media type stays inline in the trace instead of moving into storage, because those bytes would come back as a plain download and not as a picture.
+Always set the media type. Without one, LangWatch leaves the bytes inline in the trace instead of storing them, because it cannot serve them back as a picture.
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. The same picture sent on ten traces costs one stored object.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
 ## Where the image appears
 
-A thumbnail sits next to the input preview on the trace list, so a run that carried a picture is recognisable without opening it.
+The trace list draws a thumbnail next to the input preview, so you can spot a run with a picture without opening it.
 
 <Frame caption="Trace list rows showing image thumbnails next to the input text, and a paperclip on the row whose attachment is a document">
   <img src="/images/integration/multimodal/trace-list-thumbnails.png" alt="LangWatch trace list with image thumbnails on the input previews" />
@@ -23669,10 +23635,6 @@ Open the trace and the Summary tab shows the picture inline under the question. 
 <Frame caption="The trace drawer Summary tab, with the captured picture rendered inline below the input text and the model answer below it">
   <img src="/images/integration/multimodal/trace-drawer-image.png" alt="LangWatch trace drawer showing a captured image below the input question" />
 </Frame>
-
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no picture, ask LangWatch to turn it on for your project.
-</Note>
 
 ## Related
 
@@ -26024,6 +25986,44 @@ console.log(await main("Hey, tell me a joke"));
 
 The Vercel AI SDK automatically sends traces to LangWatch when `experimental_telemetry.isEnabled` is set to `true`. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
 
+## Metadata
+
+Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
+keys from it:
+
+| Key | What it does |
+|---|---|
+| `labels` | An array of labels. Filter the trace list by them. |
+| `thread_id` | Groups the call into a conversation with every other call that sends the same id. |
+| `user_id` | The end user the call belongs to. |
+| `customer_id` | The customer or tenant the call belongs to. |
+
+Any other key becomes custom metadata on the trace, filterable by its own name.
+
+```typescript
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: message,
+  experimental_telemetry: {
+    isEnabled: true,
+    metadata: {
+      labels: ["checkout", "beta"],
+      thread_id: "conversation-8f21",
+      user_id: "user-42",
+      tenant: "eu-west",
+    },
+  },
+});
+```
+
+The AI SDK accepts strings, numbers, booleans and arrays of them as metadata
+values. It does not accept a nested object, so flatten anything deeper into
+separate keys.
+
+Setting the same key as a span attribute overrides the value you pass here. See
+[Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
+for the attribute names.
+
 ## Related
 
 - [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
@@ -26042,9 +26042,7 @@ icon: square-js
 keywords: langwatch, typescript, javascript, audio, voice, realtime, speech, multimodal, tracing
 ---
 
-LangWatch captures a recording as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the audio the way your model provider expects, keep the call inside a trace, and the recording plays on the trace.
-
-This page lists the audio shapes LangWatch understands, what happens to the bytes, and where the player appears in the product.
+Send the audio the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the recording out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the audio with the model call
 
@@ -26052,7 +26050,7 @@ The examples below use `setupObservability()`. Read [Integration Guide](/integra
 
 ### Vercel AI SDK
 
-A recording rides a `file` part inside the user message, the same part an image uses. Only the media type changes.
+Put the recording in a `file` part inside the user message. `mediaType` is what tells LangWatch and the provider what the bytes are.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26064,8 +26062,8 @@ setupObservability({ serviceName: "voice-service" });
 
 const data = readFileSync("call.wav").toString("base64");
 
-const result = await generateText({
-  model: openai.chat("gpt-4o-audio-preview"),
+const { text } = await generateText({
+  model: openai.chat("gpt-audio-mini"),
   messages: [
     {
       role: "user",
@@ -26077,11 +26075,13 @@ const result = await generateText({
   ],
   experimental_telemetry: { isEnabled: true },
 });
+
+console.log(text);
 ```
 
 ### OpenAI SDK
 
-A recording rides an `input_audio` part carrying raw base64 and a format.
+Put the recording in an `input_audio` part, as raw base64 with a format.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26100,7 +26100,7 @@ const transcribe = async (prompt: string, path: string): Promise<string> => {
 
     const encoded = readFileSync(path).toString("base64");
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-audio-preview",
+      model: "gpt-audio-mini",
       messages: [
         {
           role: "user",
@@ -26133,13 +26133,13 @@ Send any of these and the recording is captured.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 
-When a message carries both a recording and text, the text is treated as the transcript of that recording and the two are shown as one unit.
+When a message holds both a recording and text, LangWatch treats the text as the transcript of that recording and shows the two together.
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. A recording captured by a simulation and by the trace of the same call is one stored object, not two.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -26147,19 +26147,15 @@ Raw, header-less audio does not play in a browser on its own. LangWatch wraps `p
 
 Open the trace and the Summary tab shows a player under the input. The Conversation tab shows a player in the message it belongs to, next to the transcript. A turn that recorded no transcript still shows its player. The Trace tab shows the full message payload.
 
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no player, ask LangWatch to turn it on for your project.
-</Note>
-
 ## Testing voice agents
 
-Capturing the audio of a live call tells you what happened. To drive a call on purpose, and score it, use Scenario. It synthesizes a caller, speaks to your agent over its real transport, and judges the conversation with the same `scenario.run()` and the same judge you use for text.
+You see what happened on a call once it has run. To drive a call on purpose and score it, use Scenario: it synthesizes a caller, speaks to your agent over its real transport, and scores the conversation with `scenario.run()`.
 
 <Frame caption="Voice agent testing in Scenario, with the simulated call, its per-turn audio and the judge verdict">
   <img src="/images/scenario-voice.webp" alt="LangWatch voice agent testing" />
 </Frame>
 
-Scenario carries adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can inject background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
+Scenario has adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can add background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
 
 ## Related
 
@@ -26179,9 +26175,7 @@ icon: square-js
 keywords: langwatch, typescript, javascript, documents, pdf, files, attachments, multimodal, tracing
 ---
 
-LangWatch captures a document as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the file the way your model provider expects, keep the call inside a trace, and the attachment is on the trace.
-
-This page lists the document shapes LangWatch understands, what happens to the bytes, and where the attachment appears in the product.
+Send the file the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the document out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the document with the model call
 
@@ -26189,7 +26183,7 @@ The examples below use `setupObservability()`. Read [Integration Guide](/integra
 
 ### Vercel AI SDK
 
-A document rides a `file` part inside the user message, the same part an image uses. Only the media type changes.
+Put the document in a `file` part inside the user message. `mediaType` is what tells LangWatch and the provider what the bytes are.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26201,7 +26195,7 @@ setupObservability({ serviceName: "invoice-service" });
 
 const data = readFileSync("invoice.pdf").toString("base64");
 
-const result = await generateText({
+const { text } = await generateText({
   model: openai.chat("gpt-5-mini"),
   messages: [
     {
@@ -26219,11 +26213,13 @@ const result = await generateText({
   ],
   experimental_telemetry: { isEnabled: true },
 });
+
+console.log(text);
 ```
 
 ### OpenAI SDK
 
-A document rides a `file` part carrying `file_data`. That is the shape Chat Completions accepts for PDF files.
+Put the document in a `file` part, as `file_data`. That is the shape Chat Completions accepts for PDF files.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26282,29 +26278,25 @@ Send any of these and the attachment is captured.
 | Google Gemini and Vertex | `{ inlineData: { mimeType: "application/pdf", data: "..." } }` |
 | AG-UI | `{ type: "document", source: { type: "data", value: "...", mimeType: "application/pdf" } }` |
 
-A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, carries no bytes. It is passed through as it is and no attachment is stored.
+A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, holds no bytes. LangWatch passes it through unchanged and stores no attachment.
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. The same contract sent on ten traces costs one stored object.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
 ## Where the document appears
 
-A paperclip sits next to the input preview on the trace list, so a run that carried a file is recognisable without opening it.
+The trace list draws a paperclip next to the input preview, so you can spot a run with a file without opening it.
 
-Open the trace and the Summary tab shows an attachment chip. The chip carries the filename, or the media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
+Open the trace and the Summary tab shows an attachment chip, named after the file, or after its media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
 
 <Frame caption="The trace drawer Summary tab, with an application/pdf attachment chip below the input text and the model answer reading the invoice number and total from the file">
   <img src="/images/integration/multimodal/trace-drawer-pdf.png" alt="LangWatch trace drawer showing a PDF attachment chip below the input question" />
 </Frame>
-
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no attachment, ask LangWatch to turn it on for your project.
-</Note>
 
 ## Related
 
@@ -26324,9 +26316,7 @@ icon: square-js
 keywords: langwatch, typescript, javascript, images, multimodal, vision, attachments, tracing
 ---
 
-LangWatch captures an image as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the image the way your model provider expects, keep the call inside a trace, and the picture is on the trace.
-
-This page lists the image shapes LangWatch understands, what happens to the bytes, and where the picture appears in the product.
+Send the image the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the image out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the image with the model call
 
@@ -26334,7 +26324,7 @@ The examples below use `setupObservability()`. Read [Integration Guide](/integra
 
 ### Vercel AI SDK
 
-An image rides a `file` part inside the user message. `experimental_telemetry` turns tracing on for the call.
+Put the image in a `file` part inside the user message. `experimental_telemetry` turns tracing on for the call.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26346,7 +26336,7 @@ setupObservability({ serviceName: "image-service" });
 
 const data = readFileSync("shapes.png").toString("base64");
 
-const result = await generateText({
+const { text } = await generateText({
   model: openai.chat("gpt-5-mini"),
   messages: [
     {
@@ -26359,11 +26349,13 @@ const result = await generateText({
   ],
   experimental_telemetry: { isEnabled: true },
 });
+
+console.log(text);
 ```
 
 ### OpenAI SDK
 
-An image rides an `image_url` part carrying a data URL.
+Put the image in an `image_url` part, as a data URL.
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -26418,19 +26410,19 @@ Send any of these and the picture is captured. The list covers the shapes the ma
 | Google Gemini and Vertex | `{ inlineData: { mimeType: "image/png", data: "..." } }` |
 | AG-UI | `{ type: "image", source: { type: "data", value: "...", mimeType: "image/png" } }` |
 
-Always set the media type. A part that carries bytes with no media type stays inline in the trace instead of moving into storage, because those bytes would come back as a plain download and not as a picture.
+Always set the media type. Without one, LangWatch leaves the bytes inline in the trace instead of storing them, because it cannot serve them back as a picture.
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. The same picture sent on ten traces costs one stored object.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
 ## Where the image appears
 
-A thumbnail sits next to the input preview on the trace list, so a run that carried a picture is recognisable without opening it.
+The trace list draws a thumbnail next to the input preview, so you can spot a run with a picture without opening it.
 
 <Frame caption="Trace list rows showing image thumbnails next to the input text, and a paperclip on the row whose attachment is a document">
   <img src="/images/integration/multimodal/trace-list-thumbnails.png" alt="LangWatch trace list with image thumbnails on the input previews" />
@@ -26441,10 +26433,6 @@ Open the trace and the Summary tab shows the picture inline under the question. 
 <Frame caption="The trace drawer Summary tab, with the captured picture rendered inline below the input text and the model answer below it">
   <img src="/images/integration/multimodal/trace-drawer-image.png" alt="LangWatch trace drawer showing a captured image below the input question" />
 </Frame>
-
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no picture, ask LangWatch to turn it on for your project.
-</Note>
 
 ## Related
 

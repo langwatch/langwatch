@@ -62,6 +62,44 @@ console.log(await main("Hey, tell me a joke"));
 
 The Vercel AI SDK automatically sends traces to LangWatch when `experimental_telemetry.isEnabled` is set to `true`. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
 
+## Metadata
+
+Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
+keys from it:
+
+| Key | What it does |
+|---|---|
+| `labels` | An array of labels. Filter the trace list by them. |
+| `thread_id` | Groups the call into a conversation with every other call that sends the same id. |
+| `user_id` | The end user the call belongs to. |
+| `customer_id` | The customer or tenant the call belongs to. |
+
+Any other key becomes custom metadata on the trace, filterable by its own name.
+
+```typescript
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: message,
+  experimental_telemetry: {
+    isEnabled: true,
+    metadata: {
+      labels: ["checkout", "beta"],
+      thread_id: "conversation-8f21",
+      user_id: "user-42",
+      tenant: "eu-west",
+    },
+  },
+});
+```
+
+The AI SDK accepts strings, numbers, booleans and arrays of them as metadata
+values. It does not accept a nested object, so flatten anything deeper into
+separate keys.
+
+Setting the same key as a span attribute overrides the value you pass here. See
+[Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
+for the attribute names.
+
 ## Related
 
 - [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
