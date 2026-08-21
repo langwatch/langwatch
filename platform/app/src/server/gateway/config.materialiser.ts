@@ -16,7 +16,7 @@ import type {
   VirtualKey,
 } from "~/generated/prisma/client";
 
-import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
+import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import {
   type LangyMirrorTier,
   resolveLangyMirrorTier,
@@ -640,7 +640,7 @@ function geminiCredentials(
 
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -723,7 +723,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   // Providers whose base-URL override the gateway consumes (see mapProvider
   // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
   // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom

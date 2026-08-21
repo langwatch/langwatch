@@ -192,6 +192,7 @@ export const APP_ERROR_CODES = [
   "model_default_scope_forbidden",
   "model_not_configured",
   "model_provider_anchor_required",
+  "model_provider_credentials_unreadable",
   "model_provider_credentials_would_be_dropped",
   "model_provider_deprecated",
   "model_provider_disabled",
