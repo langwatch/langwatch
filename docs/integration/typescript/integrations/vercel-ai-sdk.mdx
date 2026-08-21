@@ -92,11 +92,16 @@ const response = await generateText({
 });
 ```
 
-The AI SDK accepts strings, numbers, booleans and arrays of them as metadata
-values. It does not accept a nested object, so flatten anything deeper into
-separate keys.
+`experimental_telemetry` is the AI SDK's own experimental API, and its shape
+can change between AI SDK versions.
 
-Setting the same key as a span attribute overrides the value you pass here. See
+It accepts strings, numbers, booleans and arrays of them as metadata values. It
+does not accept a nested object, so flatten anything deeper into separate keys.
+A `null` inside a `labels` array is dropped.
+
+A `thread_id`, `user_id`, `customer_id` or `metadata.<key>` you also set as a
+span attribute wins over the one you pass here. Labels are the exception: the
+two sets are combined, so the trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
 

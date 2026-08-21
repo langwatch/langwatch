@@ -10,7 +10,7 @@ Send the file the way your model provider expects and keep the call inside a tra
 
 ## Send the document with the model call
 
-The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+The examples below all call `langwatch.setup()`. The OpenAI and Anthropic ones run inside a `@langwatch.trace()` entry point; the Google ADK one lets the instrumentor make the trace. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
 
 ### OpenAI
 

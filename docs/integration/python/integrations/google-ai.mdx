@@ -43,6 +43,11 @@ The [OpenInference Google ADK instrumentor](https://github.com/Arize-ai/openinfe
 
 Here's the simplest way to instrument your application:
 
+<Info>
+Set `LANGWATCH_API_KEY` in the environment before you run this. Without it the
+SDK sends nothing.
+</Info>
+
 ```python
 import langwatch
 from google.adk import Agent, Runner
@@ -101,8 +106,6 @@ if __name__ == "__main__":
 ```
 
 **That's it!** All Google ADK agent activity will now be traced and sent to your LangWatch dashboard automatically.
-
-The LangWatch API key comes from the `LANGWATCH_API_KEY` environment variable.
 
 ### Optional: Add metadata with a decorator
 

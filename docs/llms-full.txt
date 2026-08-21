@@ -20546,6 +20546,11 @@ The [OpenInference Google ADK instrumentor](https://github.com/Arize-ai/openinfe
 
 Here's the simplest way to instrument your application:
 
+<Info>
+Set `LANGWATCH_API_KEY` in the environment before you run this. Without it the
+SDK sends nothing.
+</Info>
+
 ```python
 import langwatch
 from google.adk import Agent, Runner
@@ -20604,8 +20609,6 @@ if __name__ == "__main__":
 ```
 
 **That's it!** All Google ADK agent activity will now be traced and sent to your LangWatch dashboard automatically.
-
-The LangWatch API key comes from the `LANGWATCH_API_KEY` environment variable.
 
 ### Optional: Add metadata with a decorator
 
@@ -22826,7 +22829,7 @@ Send the audio the way your model provider expects and keep the call inside a tr
 
 ## Send the audio with the model call
 
-The example below uses `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+Both examples below call `langwatch.setup()`. The OpenAI one runs inside a `@langwatch.trace()` entry point; the Google ADK one lets the instrumentor make the trace. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
 
 ### OpenAI
 
@@ -22937,10 +22940,12 @@ Send any of these and the recording is captured.
 
 | Source | Shape |
 |---|---|
-| OpenAI Realtime | `{"type": "input_audio", "input_audio": {"data": "<base64>", "format": "wav"}}` |
+| OpenAI | `{"type": "input_audio", "input_audio": {"data": "<base64>", "format": "wav"}}` |
 | OpenAI | `{"type": "file", "file": {"filename": "call.wav", "file_data": "<base64>"}}` |
 | Google Gemini and Vertex | `{"inline_data": {"mime_type": "audio/wav", "data": "..."}}` |
 | AG-UI | `{"type": "audio", "source": {"type": "data", "value": "...", "mimeType": "audio/wav"}}` |
+
+An OpenAI Realtime session sends its turns in the same `input_audio` shape.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 
@@ -22990,7 +22995,7 @@ Send the file the way your model provider expects and keep the call inside a tra
 
 ## Send the document with the model call
 
-The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+The examples below all call `langwatch.setup()`. The OpenAI and Anthropic ones run inside a `@langwatch.trace()` entry point; the Google ADK one lets the instrumentor make the trace. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
 
 ### OpenAI
 
@@ -23444,7 +23449,7 @@ Send the image the way your model provider expects and keep the call inside a tr
 
 ## Send the image with the model call
 
-The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+The examples below all call `langwatch.setup()`. The OpenAI and Anthropic ones run inside a `@langwatch.trace()` entry point; the Google ADK one lets the instrumentor make the trace. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
 
 ### OpenAI
 
@@ -26016,11 +26021,16 @@ const response = await generateText({
 });
 ```
 
-The AI SDK accepts strings, numbers, booleans and arrays of them as metadata
-values. It does not accept a nested object, so flatten anything deeper into
-separate keys.
+`experimental_telemetry` is the AI SDK's own experimental API, and its shape
+can change between AI SDK versions.
 
-Setting the same key as a span attribute overrides the value you pass here. See
+It accepts strings, numbers, booleans and arrays of them as metadata values. It
+does not accept a nested object, so flatten anything deeper into separate keys.
+A `null` inside a `labels` array is dropped.
+
+A `thread_id`, `user_id`, `customer_id` or `metadata.<key>` you also set as a
+span attribute wins over the one you pass here. Labels are the exception: the
+two sets are combined, so the trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
 
@@ -26125,11 +26135,13 @@ Send any of these and the recording is captured.
 
 | Source | Shape |
 |---|---|
-| OpenAI Realtime | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
+| OpenAI | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
 | Vercel AI SDK | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }` |
 | OpenAI | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }` |
 | Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }` |
 | AG-UI | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
+
+An OpenAI Realtime session sends its turns in the same `input_audio` shape.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 

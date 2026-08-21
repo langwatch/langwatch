@@ -92,6 +92,13 @@ Feature: Vercel AI SDK telemetry metadata reaches the trace summary
     When the trace summary is built
     Then the trace user id is "explicit-user"
 
+  @unit
+  Scenario: An explicit custom metadata attribute wins over the Vercel channel
+    Given a span with the metadata attribute "tenant" set to "explicit"
+    And the same span with ai.telemetry.metadata.tenant = "vercel"
+    When the trace summary is built
+    Then the trace metadata key "tenant" is "explicit"
+
   # ─── Not a metadata key ────────────────────────────────────────────
 
   @unit

@@ -89,11 +89,13 @@ Send any of these and the recording is captured.
 
 | Source | Shape |
 |---|---|
-| OpenAI Realtime | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
+| OpenAI | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
 | Vercel AI SDK | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }` |
 | OpenAI | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }` |
 | Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }` |
 | AG-UI | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
+
+An OpenAI Realtime session sends its turns in the same `input_audio` shape.
 
 The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
 

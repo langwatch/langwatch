@@ -275,6 +275,19 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
       );
       expect(result["langwatch.user_id"]).toBe("explicit-user");
     });
+
+    /** @scenario "An explicit custom metadata attribute wins over the Vercel channel" */
+    it("keeps the explicit custom metadata value", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: {
+            "metadata.tenant": "explicit",
+            "ai.telemetry.metadata.tenant": "vercel",
+          },
+        }),
+      );
+      expect(result["metadata.tenant"]).toBe("explicit");
+    });
   });
 
   describe("when a span carries Vercel telemetry keys that are not metadata", () => {
