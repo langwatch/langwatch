@@ -370,7 +370,7 @@ A first-party [Model Context Protocol](https://modelcontextprotocol.io) server f
 - **`lwql_schema`** — the dataset catalog your key can see, ready for the model's context
 - **`lwql_query`** — run one read-only SQL statement and get typed rows, statistics, and diagnostics back
 
-LWQL is read-only, tenant-isolated and resource-capped at the database, so an agent connected through MCP cannot write, cannot reach another tenant's rows, and cannot exhaust the server. Those are the guarantees the database enforces; whatever your agent then does with the rows it legitimately reads is your side of the boundary.
+LWQL is read-only, tenant-isolated and resource-capped at the database, so an agent connected through MCP cannot write and cannot reach another tenant's rows, and every query it sends is bounded by the configured ceilings — one that exceeds them is refused, timed out, or truncated rather than left to run. Those are per-query and per-identity guarantees the database enforces, not a global availability guarantee for the cluster; and whatever your agent then does with the rows it legitimately reads is your side of the boundary.
 
 ## Until then
 
