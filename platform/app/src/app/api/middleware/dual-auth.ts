@@ -1,4 +1,5 @@
 import { arbitrateClaims } from "@langwatch/authz";
+import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { Project } from "~/generated/prisma/client";
@@ -6,6 +7,25 @@ import { getTokenType } from "~/server/api-key/api-key-token.utils";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { getServerAuthSession } from "~/server/auth";
 import { authMiddleware } from "./auth";
+
+/**
+ * More than one credential kind claimed the request. A knowable cause the
+ * caller can act on — drop one credential — so it carries a stable `code`
+ * rather than prose a caller would have to string-match, and is
+ * distinguishable on the wire from the plain unauthenticated 401.
+ */
+export class ContestedCredentialsError extends HandledError {
+  declare readonly code: "contested_credentials";
+
+  constructor(kinds: readonly string[]) {
+    super(
+      "contested_credentials",
+      "The request carries more than one credential. Send exactly one.",
+      { httpStatus: 401, meta: { kinds: [...kinds] }, fault: "customer" },
+    );
+    this.name = "ContestedCredentialsError";
+  }
+}
 
 export type DualAuthVariables = {
   project?: Project;
@@ -90,10 +110,7 @@ export const dualAuth: MiddlewareHandler<{
     throw new HTTPException(401, { message: "unauthenticated" });
   }
   if (arbitration.outcome === "contested") {
-    throw new HTTPException(401, {
-      message:
-        "The request carries more than one credential (API key and session). Send exactly one.",
-    });
+    throw new ContestedCredentialsError(arbitration.kinds);
   }
 
   if (arbitration.claim.kind === "session") {
@@ -112,7 +129,15 @@ export const dualAuth: MiddlewareHandler<{
     // fall back to. Invoked manually rather than through Hono's compose,
     // the returned Response must be handed back explicitly.
     if (authResult instanceof Response) return authResult;
-    return;
+    // Neither a project nor a refusal response: the silent degradation the
+    // CONTRACT block above warns about (authMiddleware stopped populating
+    // c.var.project as a side effect). Falling through here would let Hono
+    // answer a bare 404 on a valid credential. Surface it as a logged 500
+    // with a trace id instead, so the regression shows up in dev and test
+    // rather than rotting in prod.
+    throw new Error(
+      "dualAuth: authMiddleware returned without populating project or a refusal response",
+    );
   }
   c.set("apiKeyProjectId", project.id);
   return next();

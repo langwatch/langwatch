@@ -1371,6 +1371,11 @@ const presentations = {
     describe: () =>
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
+  contested_credentials: {
+    title: "This request carried more than one credential",
+    describe: () =>
+      "Send exactly one: either an API key or a signed-in session, not both.",
+  },
   invalid_credentials: {
     // Deliberately says nothing about which credential class the route
     // wanted. A key of the wrong class gets `credential_class_mismatch` and

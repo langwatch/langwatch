@@ -1,4 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DualAuthVariables } from "../dual-auth";
 
@@ -31,6 +33,15 @@ function appWithDualAuth() {
     });
   });
   const app = new Hono<{ Variables: DualAuthVariables }>();
+  // Mirror createServiceApp's onError: a thrown HandledError serialises to its
+  // code at its httpStatus, which is how the real byte routes answer.
+  app.onError((err, c) => {
+    if (HandledError.isHandled(err)) {
+      return c.json({ error: err.code, meta: err.meta }, err.httpStatus as 401);
+    }
+    if (err instanceof HTTPException) return err.getResponse();
+    throw err;
+  });
   app.use("*", dualAuth);
   app.get("/", handler as never);
   return { app, handler };
@@ -106,7 +117,10 @@ describe("dualAuth", () => {
       });
 
       expect(res.status).toBe(401);
-      await expect(res.text()).resolves.toContain("exactly one");
+      await expect(res.json()).resolves.toMatchObject({
+        error: "contested_credentials",
+        meta: { kinds: ["api-key", "session"] },
+      });
       expect(authMiddlewareMock).not.toHaveBeenCalled();
       expect(handler).not.toHaveBeenCalled();
     });
