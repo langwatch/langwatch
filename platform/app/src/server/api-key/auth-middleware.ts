@@ -620,6 +620,25 @@ export function collectAuthDiagnostics(c: {
 }
 
 /**
+ * A Langy session key is refused for two different reasons that look
+ * identical from the ceiling check: the human it mirrors does not hold the
+ * permission, or Langy is never delegated it at all. Only the first one is
+ * fixed by a wider key, so the policy that decides the second gets to say so.
+ *
+ * `excluded` (policy refusal) and `unreachable` (org-tier grain on a
+ * project-scoped key) both mean no grant anyone can make will help, so both
+ * get the not-delegable message instead of "widen your key".
+ */
+function langyNotDelegableReason(
+  resolved: ResolvedToken & { type: "apiKey" },
+  permission: Permission,
+): string | undefined {
+  if (!resolved.isLangySessionKey) return undefined;
+  const verdict = classifyForLangy(permission);
+  return verdict.disposition !== "granted" ? verdict.reason : undefined;
+}
+
+/**
  * Enforces the API key permission ceiling for an already-resolved token.
  *
  * Legacy project keys are granted full access (current behavior — project API
@@ -653,20 +672,7 @@ export async function enforceApiKeyCeiling({
   });
 
   if (!allowed) {
-    // A Langy session key is refused for two different reasons that look
-    // identical from here: the human it mirrors does not hold the permission,
-    // or Langy is never delegated it at all. Only the first one is fixed by a
-    // wider key, so the policy that decides the second gets to say so.
-    const langyVerdict = resolved.isLangySessionKey
-      ? classifyForLangy(permission)
-      : undefined;
-    // `excluded` (policy refusal) and `unreachable` (org-tier grain on a
-    // project-scoped key) both mean no grant anyone can make will help, so
-    // both get the not-delegable message instead of "widen your key".
-    const notDelegableReason =
-      langyVerdict && langyVerdict.disposition !== "granted"
-        ? langyVerdict.reason
-        : undefined;
+    const notDelegableReason = langyNotDelegableReason(resolved, permission);
 
     permissionLogger.warn(
       {
