@@ -967,6 +967,7 @@ export class ApiKeyService {
     callerUserId,
     callerIsAdmin,
     organizationId,
+    awaitProjection = true,
   }: {
     id: string;
     /**
@@ -976,6 +977,15 @@ export class ApiKeyService {
     callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
+    /**
+     * Whether the deletion of the key's private role holds for its
+     * projection. The key row itself is revoked imperatively either way, so
+     * the key is dead on the next read regardless, and the retired role is
+     * named after the key id, so no later mint waits for that name to come
+     * free. A caller that only needs the credential dead (the hard-cut
+     * ingestion-key rotation) turns this off and saves a fold pickup cycle.
+     */
+    awaitProjection?: boolean;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
@@ -1009,6 +1019,7 @@ export class ApiKeyService {
           userId: callerUserId,
           fallback: "apiKeyService",
         }),
+        awaitProjection,
       });
     }
 

@@ -355,6 +355,24 @@ describe("given an organization whose genesis import has landed", () => {
     expect(db.auditLog.createMany).not.toHaveBeenCalled();
   });
 
+  describe("when a caller only needs the role retired", () => {
+    /** @scenario "Retiring the old key's private role does not hold the answer" */
+    it("appends the deletion without polling for the row's disappearance", async () => {
+      const { writer, db, sent } = harness({ onLedger: true });
+
+      await writer.deleteRole({
+        organizationId: ORG_ID,
+        roleId: "role_1",
+        actor: ACTOR,
+        awaitProjection: false,
+      });
+
+      expect(sent.map((command) => command.verb)).toEqual(["deleteRole"]);
+      expect(db.customRole.count).not.toHaveBeenCalled();
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG_ID });
+    });
+  });
+
   /** @scenario "Completing the genesis import moves an organization's writes onto the ledger" */
   it("emits the offboard command and deletes no binding row itself", async () => {
     const { writer, db, sent } = harness({ onLedger: true });

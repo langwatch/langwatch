@@ -1317,6 +1317,11 @@ export class GrantsLedgerWriter {
       ],
       actor,
     });
+    // Always held. A role row is a foreign key target: the grant attach that
+    // normally follows writes a compat RoleBinding pointing at this role, and
+    // that write fails if the role row is not there yet. Commands are queued
+    // per command name, not per organization, so `attachGrants` can be picked
+    // up before `defineRoles` and cannot stand in for this hold.
     await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
@@ -1421,10 +1426,21 @@ export class GrantsLedgerWriter {
     organizationId,
     roleId,
     actor,
+    awaitProjection = true,
   }: {
     organizationId: string;
     roleId: string;
     actor: LedgerActor;
+    /**
+     * Whether to hold for the projection to drop the role row. On by
+     * default: a caller that deletes a role usually needs the name free
+     * again straight away. A caller that only retires a role nothing reads
+     * any more turns it off and saves a full fold pickup cycle on the
+     * request; the append is durable either way and the fold converges.
+     * Nothing here depends on the ordering of other commands, which the
+     * queue does not give: command jobs are grouped per command name.
+     */
+    awaitProjection?: boolean;
   }): Promise<void> {
     if (!(await this.onLedger(organizationId))) {
       // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
@@ -1451,16 +1467,18 @@ export class GrantsLedgerWriter {
       actor,
       occurredAtMs: this.now(),
     });
-    await this.awaitProjection({
-      what: `deletion of role ${roleId}`,
-      organizationId,
-      check: async () => {
-        const present = await this.prisma.customRole.count({
-          where: { id: roleId, organizationId },
-        });
-        return present === 0;
-      },
-    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `deletion of role ${roleId}`,
+        organizationId,
+        check: async () => {
+          const present = await this.prisma.customRole.count({
+            where: { id: roleId, organizationId },
+          });
+          return present === 0;
+        },
+      });
+    }
     await bumpAuthzEpoch({ organizationId });
   }
 
