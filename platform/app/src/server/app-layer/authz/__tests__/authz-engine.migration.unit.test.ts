@@ -9,6 +9,7 @@
 import type {
   ExternalMemberFact,
   GrantFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
@@ -22,7 +23,6 @@ import type {
 } from "@langwatch/authz-server";
 import { PRINCIPAL_TO_DB } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
-import type { GrantHeadRow } from "../authz-engine.check";
 import {
   AuthzEngineMigration,
   type AuthzEngineMigrationStore,
@@ -943,6 +943,42 @@ describe("given an organization with legacy access rows", () => {
       expect(outcome.status).toBe("finalized");
     });
 
+    /** @scenario "Every legacy table is a source of facts" */
+    it("leaves an earlier import of a principal-less binding alone, and finalizes anyway", async () => {
+      const retained = binding({
+        id: "binding_retained",
+        userId: null,
+        groupId: null,
+        apiKeyId: null,
+      });
+      const { migration, sent } = harness({
+        bindings: [retained],
+        organizationCreatedAtMs: null,
+        // A head an earlier import wrote for the row this pass declines to
+        // express. Legacy still HAS the row, so the sweep must not revoke
+        // it — and the check must not count it outstanding either, because
+        // no later pass could ever clear that.
+        grantHeads: [
+          {
+            id: retained.id,
+            principalType: "USER",
+            principalId: null,
+            roleKey: "member",
+            legacyRole: null,
+            source: "genesis-import",
+            scopeType: "PROJECT",
+            scopeId: "project_1",
+            revoked: false,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(sent.filter((entry) => entry.kind === "revokeGrant")).toEqual([]);
+      expect(outcome.status).toBe("finalized");
+    });
+
     /** @scenario "Team membership is stated directly, not promoted first" */
     it("never states a CUSTOM membership row: the legacy fallback denies that shape", async () => {
       const { migration, sent } = harness({
@@ -1048,6 +1084,24 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
+      const facts = attachedFacts(sent);
+      expect(facts.some((fact) => fact.roleKey === "legacy-admin")).toBe(false);
+    });
+
+    /** @scenario "The organization member floor is stated once" */
+    it("reads a group-held binding as a binding, the way the legacy resolver does", async () => {
+      const { migration, sent } = harness({
+        members: [member("user_admin", "ADMIN")],
+        bindings: [binding({ userId: null, groupId: "group_1" })],
+        groupMemberships: [{ userId: "user_admin", groupId: "group_1" }],
+        organizationCreatedAtMs: null,
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      // The admin's only binding is held through a group. The resolver
+      // counts it, so the fallback is suppressed here too — the same
+      // predicate the team-membership suppression uses.
       const facts = attachedFacts(sent);
       expect(facts.some((fact) => fact.roleKey === "legacy-admin")).toBe(false);
     });

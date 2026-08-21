@@ -43,7 +43,7 @@ import type {
   GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsWrite.projection";
-import { MIGRATION_OWNED_SOURCES } from "../authz-engine.facts";
+import { isMigrationOwned } from "../authz-engine.facts";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 
@@ -129,10 +129,6 @@ function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
     { write: write.kind, occurredAt: write.occurredAt },
     "authz projection write matched no row; the grant it names is absent or newer",
   );
-}
-
-function isMigrationOwnedSource(source: string): boolean {
-  return (MIGRATION_OWNED_SOURCES as readonly string[]).includes(source);
 }
 
 /** Prisma's codes for "a unique or foreign key says no". */
@@ -296,7 +292,7 @@ export class PrismaAuthzGrantsWriteRepository
     // must not be given one: its legacy representation is the membership or
     // credential row it came from, and minting a binding for it would be
     // exactly the visible change the migration promises not to make.
-    const migrationSourced = isMigrationOwnedSource(grant.source);
+    const migrationSourced = isMigrationOwned(grant.source);
 
     const binding = grantFactToCompatBinding({ grant, organizationId });
     if (binding) {

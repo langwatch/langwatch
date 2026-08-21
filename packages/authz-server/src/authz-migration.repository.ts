@@ -157,6 +157,22 @@ export type ProjectCredentialFact = {
 };
 
 
+/** One non-RESOURCE `Grant` head row, as the authz-engine migration's proof
+ *  reads it. Columns as stored, uppercase spellings kept. */
+export type GrantHeadRow = {
+  id: string;
+  principalType: string;
+  principalId: string | null;
+  roleKey: string | null;
+  legacyRole: string | null;
+  /** Which writer emitted the fact — what tells the migration's sweep and
+   *  completeness check a row is theirs to own. */
+  source: string;
+  scopeType: string;
+  scopeId: string;
+  revoked: boolean;
+};
+
 /** One RESOURCE-scope `Grant` head row, re-read for the import proof.
  *  Columns as stored: `principalType` and `resourceKind` keep the database's
  *  uppercase spellings, and the proof is where they meet the source row's. */

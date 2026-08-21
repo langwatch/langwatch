@@ -4,6 +4,7 @@ import type {
   AuthzMigrationRepository,
   ExistingTeamBinding,
   ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
@@ -18,7 +19,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import type { GrantHeadRow } from "../authz-engine.check";
+
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**

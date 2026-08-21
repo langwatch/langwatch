@@ -57,6 +57,7 @@ import { createHash } from "node:crypto";
 import type {
   ExternalMemberFact,
   GrantFact,
+  GrantHeadRow,
   GrantsLedgerActor,
   LegacyBindingRow,
   LegacyRoleRow,
@@ -78,7 +79,6 @@ import {
   checkGrantHeads,
   checkResourceHeads,
   checkRoleHeads,
-  type GrantHeadRow,
   type HeadState,
   roleDrifted,
 } from "./authz-engine.check";
@@ -415,7 +415,17 @@ export class AuthzEngineMigration implements SystemMigration {
     await this.each(staleGrants, signal, (grantId) =>
       this.deps.ledger.revokeGrant({
         organizationId,
-        commandId: `authz-engine:deny:grant:${grantId}`,
+        // The pass's business time is in the key for the reason the repair
+        // keys carry it: a legacy row deleted, restored under the same id,
+        // then deleted again would otherwise collide with the first deny's
+        // idempotency key and be swallowed, leaving a live head with no
+        // legacy row behind it. A live head is the only sweep candidate, so
+        // a re-appended deny costs at most one event while the fold lags.
+        commandId: contentCommandId({
+          kind: "deny:grant",
+          id: grantId,
+          content: { occurredAtMs },
+        }),
         grantId,
         reason: "authz-engine reconciliation: legacy row no longer exists",
         actor: ACTOR,
@@ -435,7 +445,11 @@ export class AuthzEngineMigration implements SystemMigration {
     await this.each(staleRoles, signal, (roleId) =>
       this.deps.ledger.deleteRole({
         organizationId,
-        commandId: `authz-engine:deny:role:${roleId}`,
+        commandId: contentCommandId({
+          kind: "deny:role",
+          id: roleId,
+          content: { occurredAtMs },
+        }),
         roleId,
         actor: ACTOR,
         occurredAtMs,

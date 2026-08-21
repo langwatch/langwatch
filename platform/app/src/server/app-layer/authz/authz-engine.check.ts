@@ -11,6 +11,7 @@
 import { createHash } from "node:crypto";
 import type {
   GrantFact,
+  GrantHeadRow,
   ResourceGrantRow,
   RoleFact,
   RoleHeadRow,
@@ -25,19 +26,6 @@ import {
   isMigrationOwned,
   permissionStrings,
 } from "./authz-engine.facts";
-
-/** One non-resource Grant head row, as the proof reads it. */
-export type GrantHeadRow = {
-  id: string;
-  principalType: string;
-  principalId: string | null;
-  roleKey: string | null;
-  legacyRole: string | null;
-  source: string;
-  scopeType: string;
-  scopeId: string;
-  revoked: boolean;
-};
 
 /** One named disagreement between a head and the legacy row it mirrors.
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
@@ -81,13 +69,18 @@ export function checkGrantHeads({
     diffs.push(...grantDiffs({ fact, head }));
   }
   // Stale rows revoked this pass, not yet folded: outstanding, never a diff.
+  // The guard matches the sweep's exactly, `retainedGrantIds` included — a
+  // row the sweep deliberately did NOT revoke is never going to disappear
+  // from the head, so counting it outstanding would hold the organization
+  // for a condition no later pass can clear.
   outstanding.push(
     ...heads.grantRows
       .filter(
         (row) =>
           !row.revoked &&
           isMigrationOwned(row.source) &&
-          !expected.grantIds.has(row.id),
+          !expected.grantIds.has(row.id) &&
+          !expected.retainedGrantIds.has(row.id),
       )
       .map((row) => row.id),
   );

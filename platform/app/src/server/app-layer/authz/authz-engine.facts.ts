@@ -45,6 +45,41 @@ export function isMigrationOwned(source: string): boolean {
   return (MIGRATION_OWNED_SOURCES as readonly string[]).includes(source);
 }
 
+/** Whether one binding row covers one user — named directly, or held
+ *  through a group the user belongs to. */
+export type BindingCoverage = (args: {
+  row: LegacyBindingRow;
+  userId: string;
+}) => boolean;
+
+/**
+ * The coverage predicate, built once per organization from its group
+ * memberships. The legacy resolver reads a group-held binding exactly like a
+ * user-held one, so every rule phrased as "this user already holds a
+ * binding" — the team-membership suppression AND the admin fallback — has to
+ * read them the same way. Two predicates that disagree would state a fact on
+ * one path that the other suppresses.
+ */
+function bindingCoverage({
+  groupMemberships,
+}: {
+  groupMemberships: Array<{ userId: string; groupId: string }>;
+}): BindingCoverage {
+  const groupsByUser = new Map<string, Set<string>>();
+  for (const membership of groupMemberships) {
+    const groups = groupsByUser.get(membership.userId) ?? new Set<string>();
+    groups.add(membership.groupId);
+    groupsByUser.set(membership.userId, groups);
+  }
+  return ({ row, userId }) => {
+    if (row.userId === userId) return true;
+    return (
+      row.groupId !== null &&
+      (groupsByUser.get(userId)?.has(row.groupId) ?? false)
+    );
+  };
+}
+
 export type ExpectedShareLink = { row: ShareLinkFactRow; fact: GrantFact };
 
 export type ExpectedFacts = {
@@ -92,17 +127,24 @@ export function assembleFacts({
       const fact = bindingToFact({ row });
       return fact ? [fact] : [];
     });
+  // One coverage predicate for both suppression rules below: a user is
+  // "already bound" identically whether the binding names them or a group
+  // they belong to, and the two rules must never disagree about that.
+  const covers = bindingCoverage({
+    groupMemberships: inventory.groupMemberships,
+  });
   const teamFacts = teamMembershipFacts({
     organizationId,
     teamRows: inventory.teamRows,
     bindingRows: inventory.bindingRows,
-    groupMemberships: inventory.groupMemberships,
+    covers,
   });
   const organizationFacts = organizationLevelFacts({
     organizationId,
     members: inventory.members,
     externalMembers: inventory.externalMembers,
     bindingRows: inventory.bindingRows,
+    covers,
     organizationCreatedAtMs: inventory.organizationCreatedAtMs,
   });
   const credentialFacts = inventory.credentials
@@ -223,32 +265,13 @@ function teamMembershipFacts({
   organizationId,
   teamRows,
   bindingRows,
-  groupMemberships,
+  covers,
 }: {
   organizationId: string;
   teamRows: LegacyTeamRow[];
   bindingRows: LegacyBindingRow[];
-  groupMemberships: Array<{ userId: string; groupId: string }>;
+  covers: BindingCoverage;
 }): GrantFact[] {
-  const groupsByUser = new Map<string, Set<string>>();
-  for (const membership of groupMemberships) {
-    const groups = groupsByUser.get(membership.userId) ?? new Set<string>();
-    groups.add(membership.groupId);
-    groupsByUser.set(membership.userId, groups);
-  }
-  const covers = ({
-    row,
-    userId,
-  }: {
-    row: LegacyBindingRow;
-    userId: string;
-  }): boolean => {
-    if (row.userId === userId) return true;
-    return (
-      row.groupId !== null &&
-      (groupsByUser.get(userId)?.has(row.groupId) ?? false)
-    );
-  };
   const suppressed = ({ userId, teamId }: { userId: string; teamId: string }) =>
     bindingRows.some((row) => {
       const inPlay =
@@ -306,12 +329,14 @@ function organizationLevelFacts({
   members,
   externalMembers,
   bindingRows,
+  covers,
   organizationCreatedAtMs,
 }: {
   organizationId: string;
   members: OrganizationMemberFact[];
   externalMembers: ExternalMemberFact[];
   bindingRows: LegacyBindingRow[];
+  covers: BindingCoverage;
   organizationCreatedAtMs: number | null;
 }): GrantFact[] {
   const scope = { type: "ORGANIZATION" as const, id: organizationId };
@@ -334,13 +359,14 @@ function organizationLevelFacts({
     });
   }
 
-  const boundUserIds = new Set(
-    bindingRows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
-  );
   for (const member of members
     .slice()
     .sort((a, b) => a.userId.localeCompare(b.userId))) {
-    if (member.role !== "ADMIN" || boundUserIds.has(member.userId)) continue;
+    if (member.role !== "ADMIN") continue;
+    // "No binding anywhere" reads group-held bindings too — the same
+    // predicate the team-membership suppression uses.
+    if (bindingRows.some((row) => covers({ row, userId: member.userId })))
+      continue;
     const principal = { type: "user" as const, id: member.userId };
     facts.push({
       grantId: deriveGrantId({

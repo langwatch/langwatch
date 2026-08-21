@@ -41,6 +41,7 @@ export type {
   AuthzMigrationRepository,
   ExistingTeamBinding,
   ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
