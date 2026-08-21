@@ -16,16 +16,14 @@ import {
   MessagesSquare,
   Plus,
   Send,
-  Sparkles,
   Square,
   Waypoints,
   Workflow,
-  X,
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -151,20 +149,15 @@ function ComposerImpl({
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
-  const [focused, setFocused] = useState(false);
-  // Only the hero cares: it centres its single line, and has to stop doing so
-  // the moment the field grows, or the send button ends up halfway down a
-  // paragraph. Measured from the field itself rather than guessed from the
-  // text's length, which would be wrong at every width.
-  const [multiline, setMultiline] = useState(false);
   const reduceMotion = useReducedMotion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // Keep the hot keystroke subscription at the leaf. When LangyPanel itself
-  // subscribed to `draft`, every character rebuilt the whole conversation,
-  // capability cards, context derivation, and wave. On large trace pages that
-  // was enough main-thread work to look like a page reload.
-  const input = useLangyStore((s) => s.draft);
-  const onInputChange = useLangyStore((s) => s.setDraft);
+  // The draft subscription lives in ComposerInputRow, NOT here. When this
+  // component read the draft, every character re-rendered the whole card:
+  // context menu, model picker combobox (portal, positioner and every row,
+  // even closed) and the sigil tooltips — ~580 component renders per
+  // keystroke, measured. `setDraft` is a stable function, so subscribing to
+  // it re-renders nothing.
+  const setDraft = useLangyStore((s) => s.setDraft);
   // The turn phase is the SINGLE source for the send/stop affordance (ADR-078):
   // `idle` lets the composer send; `active`/`stopping` disable sending and show
   // Stop. Gating on the durable phase — not the client stream's flaky isBusy —
@@ -172,17 +165,6 @@ function ComposerImpl({
   // arrives and 409-ing the in-flight turn. You can still TYPE the next message.
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
-
-  // The one-time gesture hint. Both selectors return booleans, so the target
-  // registry's churn (rows mounting as a table scrolls) re-renders the composer
-  // only on the single transition from "nothing to point at" to "something".
-  const contextHintDismissed = useLangyStore((s) => s.contextHintDismissed);
-  const dismissContextHint = useLangyStore((s) => s.dismissContextHint);
-  const pageHasTargets = useLangyContextTargetStore(
-    (s) => Object.keys(s.targets).length > 0,
-  );
-  const showGestureHint = !contextHintDismissed && pageHasTargets;
-  const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
 
   // An `askLangy` handoff asks the panel's composer to take focus so the
   // reader can keep typing. Honored on mount (the panel usually opens WITH the
@@ -225,10 +207,11 @@ function ComposerImpl({
   const [palette, setPalette] = useState<PaletteMode | null>(null);
   const [paletteQuery, setPaletteQuery] = useState("");
 
-  const openPalette = (mode: PaletteMode) => {
+  // Stable so the memoized input row is untouched by a palette opening.
+  const openPalette = useCallback((mode: PaletteMode) => {
     setPaletteQuery("");
     setPalette(mode);
-  };
+  }, []);
 
   /**
    * A picked skill becomes a real, editable message rather than a token.
@@ -245,8 +228,8 @@ function ComposerImpl({
       skill.source === "client-command"
         ? `/${skill.id}`
         : (skill.prompt ?? `Use the ${skill.label} skill: `);
-    const existing = input.trim();
-    onInputChange(existing ? `${existing}\n\n${text}` : text);
+    const existing = useLangyStore.getState().draft.trim();
+    setDraft(existing ? `${existing}\n\n${text}` : text);
   };
 
   const closePalette = () => {
@@ -255,38 +238,6 @@ function ComposerImpl({
     // Give the message back its cursor — the palette was a detour, not a
     // destination.
     requestAnimationFrame(() => textareaRef.current?.focus());
-  };
-
-  const atWordBoundary = () => {
-    const el = textareaRef.current;
-    if (!el) return input.length === 0;
-    const before = input.slice(0, el.selectionStart ?? input.length);
-    return before.length === 0 || /\s$/.test(before);
-  };
-
-  const onTextareaKeyDown = (
-    event: React.KeyboardEvent<HTMLTextAreaElement>,
-  ) => {
-    // The sigils follow their buttons: while a turn is in flight there is
-    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
-    // characters they are rather than opening a picker that cannot take.
-    const palettesOpen = !disabled && !turnActive;
-    if (palettesOpen && event.key === "#" && atWordBoundary()) {
-      event.preventDefault();
-      openPalette("context");
-      return;
-    }
-    if (palettesOpen && event.key === "/" && atWordBoundary()) {
-      event.preventDefault();
-      openPalette("skills");
-      return;
-    }
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      // No queue: Enter is a no-op mid-turn (canSend is false while a turn is in
-      // flight), so nothing is sent until the turn finishes.
-      if (canSend) onSend(input);
-    }
   };
 
   return (
@@ -321,9 +272,6 @@ function ComposerImpl({
 
           The travelling rainbow sheen rides the same trigger: lit while a turn
           is in flight, dark at rest. See the note on `turnActive` above. */}
-      {showGestureHint ? (
-        <ContextGestureHint onDismiss={dismissContextHint} />
-      ) : null}
       <Box
         position="relative"
         borderRadius={COMPOSER_RADIUS}
@@ -348,7 +296,7 @@ function ComposerImpl({
           {...{ [COMPOSER_ANCHOR_ATTR]: hero ? "hero" : "panel" }}
           borderWidth="1px"
           borderStyle="solid"
-          borderColor={focused ? "orange.emphasized" : "border.emphasized"}
+          borderColor="border.emphasized"
           borderRadius={COMPOSER_RADIUS}
           // Hero sits on GLASS. It is the only variant with a moving canvas
           // behind it, so an opaque fill would punch a hole in the block it is
@@ -360,13 +308,21 @@ function ComposerImpl({
           // floating card leans on the panel it overlays (no shadow, as before),
           // while the sidebar card grows its own drop shadow so it lifts off the
           // flat dock instead of reading as a bar welded to the bottom.
+          //
+          // The ring is pure CSS (`:has` on the field's focus) rather than
+          // React state: a `focused` boolean here re-rendered the whole card —
+          // model picker and all — twice per focus cycle for a border color.
           boxShadow={
-            focused
-              ? "0 0 0 4px var(--chakra-colors-orange-subtle)"
-              : floating
-                ? undefined
-                : "0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 16px -6px rgba(0, 0, 0, 0.14)"
+            floating
+              ? undefined
+              : "0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 16px -6px rgba(0, 0, 0, 0.14)"
           }
+          css={{
+            "&:has(textarea:focus)": {
+              borderColor: "var(--chakra-colors-orange-emphasized)",
+              boxShadow: "0 0 0 4px var(--chakra-colors-orange-subtle)",
+            },
+          }}
           transition="border-color 150ms ease, box-shadow 150ms ease"
           overflow="hidden"
         >
@@ -426,113 +382,15 @@ function ComposerImpl({
               button share one optical centre line. It still flips to bottom
               alignment once the field has grown past a single line, so a long
               question does not drag the button down the middle of it. */}
-          <HStack
-            gap={1.5}
-            align={hero && !multiline ? "center" : "flex-end"}
-            paddingRight={hero ? "7px" : 2}
-            paddingLeft={hero ? "5px" : 0}
-            paddingY={hero ? "7px" : 0}
-            paddingBottom={hero ? "7px" : 1}
-          >
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                onInputChange(e.target.value);
-                if (hero) setMultiline(e.target.scrollHeight > 30);
-              }}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              onKeyDown={onTextareaKeyDown}
-              placeholder={
-                turnActive ? "Write your next message…" : placeholder
-              }
-              disabled={disabled}
-              rows={1}
-              autoresize
-              maxHeight="120px"
-              minHeight="20px"
-              flex={1}
-              minWidth={0}
-              paddingX={3}
-              // Symmetric in the hero so the single line sits on the row's
-              // centre; the panel keeps its asymmetric pair, which is tuned to
-              // the rail sitting directly underneath it.
-              paddingTop={hero ? 0 : 2.5}
-              paddingBottom={hero ? 0 : 0.5}
-              border="none"
-              background="transparent"
-              // Denser than the panel's body scale: the composer is a control, not
-              // reading matter, and a wider panel made 14px input read shouty.
-              fontSize="sm"
-              lineHeight="1.5"
-              color="fg"
-              resize="none"
-              // Block (not the default inline-block) so the textarea has no
-              // baseline descender gap under it — that phantom ~5px was the
-              // "dead band" between the placeholder and the model rail.
-              display="block"
-              _focus={{ outline: "none", boxShadow: "none" }}
-              _focusVisible={{ outline: "none", boxShadow: "none" }}
-            />
-            {/* A turn in flight disables sending — Stop takes the button (no
-                queue). It persists through the "stopping" window (after the
-                client abort) until the backend confirms the terminal, then flips
-                back to Send. */}
-            <AnimatePresence mode="wait" initial={false}>
-              <MotionSwap
-                key={turnPhase}
-                display="flex"
-                flexShrink={0}
-                initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={
-                  reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }
-                }
-                transition={{ duration: 0.13, ease: "easeOut" }}
-              >
-                {turnActive ? (
-                  <SendButton
-                    aria-label={turnPhase === "stopping" ? "Stopping" : "Stop"}
-                    onClick={onStop}
-                    disabled={turnPhase === "stopping"}
-                    background={
-                      turnPhase === "stopping" ? "bg.muted" : "red.solid"
-                    }
-                    color={turnPhase === "stopping" ? "fg.muted" : "white"}
-                    cursor={turnPhase === "stopping" ? "default" : "pointer"}
-                  >
-                    {turnPhase === "stopping" ? (
-                      <Spinner size="xs" borderWidth="1.5px" />
-                    ) : (
-                      // The square is symmetric, so it needs no optical
-                      // correction — unlike the plane below.
-                      <Square size={12} />
-                    )}
-                  </SendButton>
-                ) : (
-                  <SendButton
-                    aria-label="Send"
-                    onClick={() => onSend(input)}
-                    disabled={!canSend}
-                    background={canSend ? "orange.solid" : "bg.muted"}
-                    color={canSend ? "white" : "fg.muted"}
-                    cursor={canSend ? "pointer" : "default"}
-                  >
-                    {/* Centred, with nothing to interfere. Lucide's paper plane
-                        is very nearly centred in its own box (ink centre within
-                        0.15 of the 24-grid centre), so `place-items: center` is
-                        the whole job — once the wrapper stops inheriting a line
-                        box it has no use for, whose stray half-leading was what
-                        pushed the glyph off centre in the first place. */}
-                    <Box display="grid" placeItems="center" lineHeight={0}>
-                      <Send size={14} />
-                    </Box>
-                  </SendButton>
-                )}
-              </MotionSwap>
-            </AnimatePresence>
-          </HStack>
+          <ComposerInputRow
+            hero={hero}
+            disabled={disabled}
+            placeholder={placeholder}
+            onSend={onSend}
+            onStop={onStop}
+            openPalette={openPalette}
+            textareaRef={textareaRef}
+          />
 
           {/* Bottom rail: the per-send model picker and the composer
               affordances. Send is NOT here any more — it sits beside the input
@@ -637,6 +495,179 @@ export const Composer = memo(ComposerImpl);
 Composer.displayName = "Composer";
 
 /**
+ * The input row — the ONLY part of the composer that re-renders per keystroke.
+ *
+ * The draft subscription lives here, at a real leaf: a character updates the
+ * textarea and the send button, and nothing else. Memoized with stable props
+ * (the palette opener is a `useCallback`, the rest are refs and primitives),
+ * so the row is equally untouched when the card around it re-renders for a
+ * palette or a turn-phase change.
+ */
+const ComposerInputRow = memo(function ComposerInputRow({
+  hero,
+  disabled,
+  placeholder,
+  onSend,
+  onStop,
+  openPalette,
+  textareaRef,
+}: {
+  hero: boolean;
+  disabled: boolean;
+  placeholder: string;
+  onSend: (input: string) => void;
+  onStop: () => void;
+  openPalette: (mode: PaletteMode) => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+  const input = useLangyStore((s) => s.draft);
+  const onInputChange = useLangyStore((s) => s.setDraft);
+  const turnPhase = useLangyStore((s) => s.turnPhase);
+  const turnActive = turnPhase !== "idle";
+  const reduceMotion = useReducedMotion();
+  // Only the hero cares: it centres its single line, and has to stop doing so
+  // the moment the field grows, or the send button ends up halfway down a
+  // paragraph. Measured from the field itself rather than guessed from the
+  // text's length, which would be wrong at every width.
+  const [multiline, setMultiline] = useState(false);
+  const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
+
+  const atWordBoundary = () => {
+    const el = textareaRef.current;
+    if (!el) return input.length === 0;
+    const before = input.slice(0, el.selectionStart ?? input.length);
+    return before.length === 0 || /\s$/.test(before);
+  };
+
+  const onTextareaKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    // The sigils follow their buttons: while a turn is in flight there is
+    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
+    // characters they are rather than opening a picker that cannot take.
+    const palettesOpen = !disabled && !turnActive;
+    if (palettesOpen && event.key === "#" && atWordBoundary()) {
+      event.preventDefault();
+      openPalette("context");
+      return;
+    }
+    if (palettesOpen && event.key === "/" && atWordBoundary()) {
+      event.preventDefault();
+      openPalette("skills");
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      // No queue: Enter is a no-op mid-turn (canSend is false while a turn is in
+      // flight), so nothing is sent until the turn finishes.
+      if (canSend) onSend(input);
+    }
+  };
+
+  return (
+    <HStack
+      gap={1.5}
+      align={hero && !multiline ? "center" : "flex-end"}
+      paddingRight={hero ? "7px" : 2}
+      paddingLeft={hero ? "5px" : 0}
+      paddingY={hero ? "7px" : 0}
+      paddingBottom={hero ? "7px" : 1}
+    >
+      <Textarea
+        ref={textareaRef}
+        value={input}
+        onChange={(e) => {
+          onInputChange(e.target.value);
+          if (hero) setMultiline(e.target.scrollHeight > 30);
+        }}
+        onKeyDown={onTextareaKeyDown}
+        placeholder={turnActive ? "Write your next message…" : placeholder}
+        disabled={disabled}
+        rows={1}
+        autoresize
+        maxHeight="120px"
+        minHeight="20px"
+        flex={1}
+        minWidth={0}
+        paddingX={3}
+        // Symmetric in the hero so the single line sits on the row's
+        // centre; the panel keeps its asymmetric pair, which is tuned to
+        // the rail sitting directly underneath it.
+        paddingTop={hero ? 0 : 2.5}
+        paddingBottom={hero ? 0 : 0.5}
+        border="none"
+        background="transparent"
+        // Denser than the panel's body scale: the composer is a control, not
+        // reading matter, and a wider panel made 14px input read shouty.
+        fontSize="sm"
+        lineHeight="1.5"
+        color="fg"
+        resize="none"
+        // Block (not the default inline-block) so the textarea has no
+        // baseline descender gap under it — that phantom ~5px was the
+        // "dead band" between the placeholder and the model rail.
+        display="block"
+        _focus={{ outline: "none", boxShadow: "none" }}
+        _focusVisible={{ outline: "none", boxShadow: "none" }}
+      />
+      {/* A turn in flight disables sending — Stop takes the button (no
+          queue). It persists through the "stopping" window (after the
+          client abort) until the backend confirms the terminal, then flips
+          back to Send. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <MotionSwap
+          key={turnPhase}
+          display="flex"
+          flexShrink={0}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+          transition={{ duration: 0.13, ease: "easeOut" }}
+        >
+          {turnActive ? (
+            <SendButton
+              aria-label={turnPhase === "stopping" ? "Stopping" : "Stop"}
+              onClick={onStop}
+              disabled={turnPhase === "stopping"}
+              background={turnPhase === "stopping" ? "bg.muted" : "red.solid"}
+              color={turnPhase === "stopping" ? "fg.muted" : "white"}
+              cursor={turnPhase === "stopping" ? "default" : "pointer"}
+            >
+              {turnPhase === "stopping" ? (
+                <Spinner size="xs" borderWidth="1.5px" />
+              ) : (
+                // The square is symmetric, so it needs no optical
+                // correction — unlike the plane below.
+                <Square size={12} />
+              )}
+            </SendButton>
+          ) : (
+            <SendButton
+              aria-label="Send"
+              onClick={() => onSend(input)}
+              disabled={!canSend}
+              background={canSend ? "orange.solid" : "bg.muted"}
+              color={canSend ? "white" : "fg.muted"}
+              cursor={canSend ? "pointer" : "default"}
+            >
+              {/* Centred, with nothing to interfere. Lucide's paper plane
+                  is very nearly centred in its own box (ink centre within
+                  0.15 of the 24-grid centre), so `place-items: center` is
+                  the whole job — once the wrapper stops inheriting a line
+                  box it has no use for, whose stray half-leading was what
+                  pushed the glyph off centre in the first place. */}
+              <Box display="grid" placeItems="center" lineHeight={0}>
+                <Send size={14} />
+              </Box>
+            </SendButton>
+          )}
+        </MotionSwap>
+      </AnimatePresence>
+    </HStack>
+  );
+});
+
+/**
  * A key, named. Deliberately shows the glyph rather than an icon: the point of
  * the control is to teach the keystroke, and an icon teaches nothing about
  * which key to press.
@@ -707,55 +738,6 @@ function SigilButton({
         <Text textStyle="2xs">{label}</Text>
       </chakra.button>
     </Tooltip>
-  );
-}
-
-/**
- * The one-time teaching line for "you can hand me things off the page".
- *
- * It appears the first time there is actually something on the page to hand
- * over — a hint on a page with nothing to point at would be teaching a gesture
- * that does nothing — and it goes away for good the moment the user dismisses
- * it OR does the thing (see `absorbContextTarget`). One showing, then silence.
- */
-function ContextGestureHint({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <HStack
-      gap={2}
-      align="start"
-      marginBottom={2}
-      paddingX={2.5}
-      paddingY={1.5}
-      borderRadius="lg"
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor="orange.subtle"
-      background="orange.subtle/40"
-      data-testid="langy-context-gesture-hint"
-    >
-      <Box color="orange.fg" display="grid" paddingTop="2px" flexShrink={0}>
-        <Sparkles size={12} />
-      </Box>
-      <Text textStyle="2xs" color="fg.muted" flex={1} minWidth={0}>
-        Type <chakra.kbd fontFamily="mono">#</chakra.kbd> to add anything on
-        this page to Langy context
-      </Text>
-      <chakra.button
-        type="button"
-        aria-label="Dismiss hint"
-        onClick={onDismiss}
-        display="grid"
-        placeItems="center"
-        borderWidth={0}
-        background="transparent"
-        color="fg.subtle"
-        cursor="pointer"
-        flexShrink={0}
-        _hover={{ color: "fg" }}
-      >
-        <X size={12} />
-      </chakra.button>
-    </HStack>
   );
 }
 

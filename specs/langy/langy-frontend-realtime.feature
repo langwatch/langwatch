@@ -80,6 +80,40 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then a progress bar reflects the percent or segment
     And the shimmer thinking indicator remains while no status is present
 
+  @integration
+  Scenario: The action that just finished stays on the table while the model thinks
+    Given a turn is streaming
+    When an action finishes and the model goes back to thinking
+    Then that action renders as its own settled card instead of folding into the receipt
+    When the next tool call starts, or answer text streams in, or the turn settles
+    Then the action folds into the completed receipt with the others
+
+  # The receipt names what ran ("Ran a command · langwatch --help") but used to
+  # keep the result to itself: debugging "why did the agent conclude that?"
+  # means reading what the tool returned, and only dev mode could.
+  @unit
+  Scenario: A receipt row opens to show what the tool returned
+    Given a settled turn whose receipt lists finished tool calls
+    When the user clicks a row that has a recorded result
+    Then the row expands to show the result the model saw
+    And a row whose calls recorded no result does not pretend to open
+
+  # The live view of a turn is driven by two independent cursors toward the
+  # same durable event log: the freshness signal (push, low latency) and the
+  # polled history snapshot (pull, always running while a turn is in flight).
+  # Both hand their cursor to one catch-up that fetches and folds the tail
+  # from wherever the local fold stands. A browser that loses its push
+  # connection mid-turn therefore keeps converging on what the turn is doing;
+  # jump-seeding the fold to the polled cursor used to skip the events in
+  # between and freeze the panel mid-turn.
+  @unit
+  Scenario: A tab whose live stream dropped still converges on the turn
+    Given a turn is running and this tab's local fold is behind the durable record
+    When a fresher durable cursor arrives, by push or by poll
+    Then the events between the local fold and that cursor are fetched and folded
+    And none of the turn's recorded work is skipped
+    And a fold already at the cursor fetches nothing
+
   # The working indicator (thinking line / status line) is driven by two
   # signals: the live stream and the durable conversation state. The durable
   # state finalizes asynchronously, so the indicator must never outlive the

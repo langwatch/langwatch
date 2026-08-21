@@ -51,6 +51,12 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     And reloading the conversation still shows that partial answer
     And the stopped message is not rendered as a red error
 
+  @integration
+  Scenario: A stop before any words arrive reads as interrupted, not as missing content
+    Given I stop a turn before Langy has written anything
+    Then the empty reply row says "Interrupted"
+    And it does not say "No content", because the emptiness was my own doing
+
   # The distinguishing act of THIS spec versus langy-turn-recovery: a stop is
   # neither a success nor a failure. It is its own terminal outcome, carried on the
   # same "the agent responded" event that carries a completed answer (it has an

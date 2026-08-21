@@ -62,3 +62,17 @@ Feature: Langy composer, feedback, and card polish
     Given an applied proposal that opens an in-app trace
     When the customer cmd-clicks or ctrl-clicks the open link
     Then the browser opens it in a new tab as usual
+
+  @integration
+  Scenario: Typing in the message field leaves the rest of the composer alone
+    Given the Langy composer is idle
+    When the customer types a message one character at a time
+    Then the message field shows exactly what was typed
+    And the model picker is not rebuilt for each character
+
+  @integration
+  Scenario: The input row still sends and opens palettes after typing
+    Given the Langy composer is idle with a typed message
+    When the customer presses Enter
+    Then the message is sent
+    And pressing the slash key at a word boundary opens the skills palette instead of typing a slash

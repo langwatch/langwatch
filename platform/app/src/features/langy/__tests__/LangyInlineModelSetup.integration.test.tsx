@@ -231,6 +231,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,

@@ -59,6 +59,20 @@ Feature: Langy shows a live plan checklist for multi-step work
     Then that step is shown struck through
     And it is not counted toward the completed total
 
+  # "0 of 4 · 4 left" sat above a list where only three steps looked
+  # outstanding: "left" counted the step currently running, and the steps not
+  # yet started had no visible mark at all, so nothing on screen agreed with
+  # either number. Checkboxes make the list countable and the header counts
+  # what is checked.
+  @unit
+  Scenario: Every step reads as a checkbox and the header counts what is checked
+    Given a plan with finished, current, and not-yet-started steps
+    When the checklist renders
+    Then a finished step shows a checked box
+    And the current step shows a filled box
+    And a step not yet started shows an empty box
+    And the header says how many steps are done out of the total, never "left"
+
   @unit
   Scenario: No plan means today's rendering, unchanged
     Given a turn in which the agent never maintained a todo list

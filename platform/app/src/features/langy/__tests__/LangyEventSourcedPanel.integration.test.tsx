@@ -292,6 +292,12 @@ vi.mock("~/utils/api", async () => {
       listAllForProjectForFrontend: {
         useQuery: () => ({ data: { providers: [] }, isLoading: false }),
       },
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
     },
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },

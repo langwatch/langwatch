@@ -181,6 +181,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         // A resolved model is configured: these tests exercise conversation
         // threading on a usable Langy, so langyNeedsModel must be false (else

@@ -7,7 +7,7 @@
  * a turn with no plan renders exactly the flat activity list it does today.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
@@ -57,7 +57,7 @@ describe("LangyPlanCard", () => {
   describe("given a multi-step plan in flight", () => {
     it("shows only the current step under a compact progress summary", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
-      expect(screen.getByText("Plan · 1 of 3 · 2 left")).toBeDefined();
+      expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
       expect(screen.queryByText("Find the slow traces")).toBeNull();
       expect(screen.getByText("Summarise them")).toBeDefined();
       expect(screen.queryByText("Open a fix")).toBeNull();
@@ -83,6 +83,20 @@ describe("LangyPlanCard", () => {
     });
   });
 
+  describe("given finished, current, and not-yet-started steps", () => {
+    /** @scenario Every step reads as a checkbox and the header counts what is checked */
+    it("marks every step as a checkbox and counts done, never left", () => {
+      ui(<LangyPlanCard plan={plan()} isStreaming />);
+      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
+      const markers = [...document.querySelectorAll("[data-plan-marker]")].map(
+        (el) => el.getAttribute("data-plan-marker"),
+      );
+      expect(markers).toEqual(["completed", "in_progress", "pending"]);
+      expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
+      expect(screen.queryByText(/left/)).toBeNull();
+    });
+  });
+
   describe("given a cancelled step", () => {
     it("shows it struck through and out of the total", () => {
       ui(
@@ -99,7 +113,7 @@ describe("LangyPlanCard", () => {
           isStreaming
         />,
       );
-      expect(screen.getByText("Plan · 1 of 2 · 1 left")).toBeDefined();
+      expect(screen.getByText("Plan · 1 of 2 done")).toBeDefined();
       screen.getByRole("button", { name: /plan/i }).click();
       const struck = screen.getByText("Abandoned");
       expect(getComputedStyle(struck).textDecoration).toContain("line-through");
@@ -123,7 +137,7 @@ describe("LangyPlanCard", () => {
           isStreaming={false}
         />,
       );
-      expect(screen.getByText("Plan · 2 of 2 · done")).toBeDefined();
+      expect(screen.getByText("Plan · 2 of 2 done")).toBeDefined();
       // The individual steps are hidden behind the collapse.
       expect(screen.queryByText("Summarise them")).toBeNull();
     });
@@ -139,7 +153,7 @@ describe("LangyPlanCard", () => {
       );
       // Not collapsed to a "Completed N steps" summary — the plan is frozen.
       expect(screen.queryByText(/Completed 3 steps/)).toBeNull();
-      expect(screen.getByText("Plan · 1 of 3 · 2 left")).toBeDefined();
+      expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
       expect(screen.getByText("Summarise them")).toBeDefined();
     });
   });
