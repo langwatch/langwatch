@@ -228,7 +228,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media rides inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
+      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
   {
     key: "release_ui_ai_governance_enabled",

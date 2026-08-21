@@ -3,7 +3,7 @@
     uv run --with langwatch --with google-adk --with "openinference-instrumentation-google-adk>=0.1.11" python google_adk.py image
     uv run --with langwatch --with google-adk --with "openinference-instrumentation-google-adk>=0.1.11" python google_adk.py pdf
 
-An image or a PDF rides a `Part.from_bytes` inline data block next to the
+An image or a PDF goes in a `Part.from_bytes` inline data block next to the
 text question, inside one user `Content` message. `GoogleADKInstrumentor`
 patches ADK globally, so the run through `Runner.run` is enough to produce a
 span. ADK talks to the Gemini Developer API through `GOOGLE_API_KEY`, so the
