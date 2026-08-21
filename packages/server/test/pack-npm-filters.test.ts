@@ -92,10 +92,13 @@ function buildFixture(trackedPaths: string[]): string {
 	return root;
 }
 
-function runCheck(
-	root: string,
-	extraArgs: string[] = [],
-): { code: number; output: string } {
+function runCheck({
+	root,
+	extraArgs = [],
+}: {
+	root: string;
+	extraArgs?: string[];
+}): { code: number; output: string } {
 	const args = [
 		join(root, "dev", "scripts", "pack-npm.sh"),
 		"--check-filters",
@@ -122,7 +125,13 @@ function runCheck(
 }
 
 /** Whether a repo-relative path survived into the staged tree. */
-function staged(stageDir: string, relPath: string): boolean {
+function staged({
+	stageDir,
+	relPath,
+}: {
+	stageDir: string;
+	relPath: string;
+}): boolean {
 	return existsSync(join(stageDir, "app", relPath));
 }
 
@@ -141,11 +150,11 @@ describe("npm pack staging filters", () => {
 		const root = buildFixture(collisions);
 		const stageDir = join(root, "_stage");
 
-		const { code } = runCheck(root, ["--stage-to", stageDir]);
+		const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
 
 		expect(code).toBe(0);
 		for (const relPath of collisions) {
-			expect(staged(stageDir, relPath)).toBe(true);
+			expect(staged({ stageDir, relPath })).toBe(true);
 		}
 	});
 
@@ -164,7 +173,7 @@ describe("npm pack staging filters", () => {
 			"packages/api/tests/integration.test.ts",
 		]);
 
-		const { code, output } = runCheck(root);
+		const { code, output } = runCheck({ root });
 		expect(output).toContain("staging keeps every tracked source file");
 		expect(code).toBe(0);
 	});
@@ -181,11 +190,15 @@ describe("npm pack staging filters", () => {
 		]);
 		const stageDir = join(root, "_stage");
 
-		const { code } = runCheck(root, ["--stage-to", stageDir]);
+		const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
 
 		expect(code).toBe(0);
-		expect(staged(stageDir, "platform/app/.env.example")).toBe(true);
-		expect(staged(stageDir, "platform/app/.env.staging")).toBe(false);
+		expect(staged({ stageDir, relPath: "platform/app/.env.example" })).toBe(
+			true,
+		);
+		expect(staged({ stageDir, relPath: "platform/app/.env.staging" })).toBe(
+			false,
+		);
 	});
 
 	it("still strips the artifacts the app root writes", () => {
@@ -203,10 +216,13 @@ describe("npm pack staging filters", () => {
 		const root = buildFixture(artifacts);
 		const stageDir = join(root, "_stage");
 
-		const { code, output } = runCheck(root, ["--stage-to", stageDir]);
+		const { code, output } = runCheck({
+			root,
+			extraArgs: ["--stage-to", stageDir],
+		});
 
 		for (const relPath of artifacts) {
-			expect(staged(stageDir, relPath)).toBe(false);
+			expect(staged({ stageDir, relPath })).toBe(false);
 		}
 		// Everything but the log is outside the guard's exemptions, so the guard
 		// names each one it dropped. That is the failing half of the guard, which
@@ -216,5 +232,35 @@ describe("npm pack staging filters", () => {
 		for (const named of artifacts.filter((p) => !p.endsWith(".log"))) {
 			expect(output).toContain(named);
 		}
+	});
+
+	describe("--stage-to", () => {
+		it.each([["--stage-to", ""], ["--stage-to="]])(
+			"refuses %s with no directory",
+			(...extraArgs: string[]) => {
+				const root = buildFixture(["platform/app/src/server/config.ts"]);
+
+				const { code, output } = runCheck({ root, extraArgs });
+
+				expect(code).toBe(1);
+				expect(output).toContain("--stage-to needs a directory");
+			},
+		);
+
+		it("refuses a directory that already holds something", () => {
+			// rsync adds and overwrites but never deletes, so a stale file left in
+			// the directory would read as staged and, on a full pack, ship.
+			const root = buildFixture(["platform/app/src/server/config.ts"]);
+			const stageDir = join(root, "_stage");
+			write({ root: stageDir, relPath: "leftover.txt" });
+
+			const { code, output } = runCheck({
+				root,
+				extraArgs: ["--stage-to", stageDir],
+			});
+
+			expect(code).toBe(1);
+			expect(output).toContain("needs an empty directory");
+		});
 	});
 });

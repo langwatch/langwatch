@@ -46,6 +46,7 @@ cd "$ROOT"
 # person, or a test, reads what actually survived.
 CHECK_FILTERS_ONLY=0
 STAGE_TO=""
+STAGE_TO_GIVEN=0
 PACK_ARGS=()
 prev_arg=""
 for arg in "$@"; do
@@ -56,12 +57,15 @@ for arg in "$@"; do
   fi
   case "$arg" in
     --check-filters) CHECK_FILTERS_ONLY=1 ;;
-    --stage-to) prev_arg="--stage-to" ;;
-    --stage-to=*) STAGE_TO="${arg#--stage-to=}" ;;
+    --stage-to) prev_arg="--stage-to"; STAGE_TO_GIVEN=1 ;;
+    --stage-to=*) STAGE_TO="${arg#--stage-to=}"; STAGE_TO_GIVEN=1 ;;
     *) PACK_ARGS+=("$arg") ;;
   esac
 done
-if [ "$prev_arg" = "--stage-to" ]; then
+# Tracked separately from the value, so `--stage-to=` and `--stage-to ""` are
+# refused rather than falling back to the temporary directory and quietly
+# ignoring the mode the caller asked for.
+if [ "$STAGE_TO_GIVEN" -eq 1 ] && [ -z "$STAGE_TO" ]; then
   echo "✗ --stage-to needs a directory" >&2
   exit 1
 fi
@@ -79,7 +83,16 @@ if [ ! -f "pnpm-lock.yaml" ]; then
 fi
 
 if [ -n "$STAGE_TO" ]; then
+  # An empty directory only. `rsync -a` adds and overwrites but never deletes,
+  # so anything already sitting there would read as staged and, on a full pack,
+  # ship: the published manifest lists `app`, so the whole preserved tree goes
+  # out. Refusing is the safe half of the choice, because the alternative is
+  # this script deleting a directory a caller named.
   mkdir -p "$STAGE_TO"
+  if [ -n "$(ls -A "$STAGE_TO" 2>/dev/null)" ]; then
+    echo "✗ --stage-to needs an empty directory, and $STAGE_TO is not empty" >&2
+    exit 1
+  fi
   STAGE="$(cd "$STAGE_TO" && pwd)"
 else
   STAGE="$(mktemp -d "${TMPDIR:-/tmp}/langwatch-pack.XXXXXX")"
