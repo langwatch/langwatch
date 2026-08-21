@@ -286,14 +286,16 @@ function ProductSidebarBody({
  * Search, the surface's own pages, and the bottom block pinned under
  * them. Laid out at the expanded width whatever the column is showing,
  * so a collapsing column slides the same content out of view instead of
- * reflowing it.
+ * reflowing it. The mobile menu reuses it at the full viewport width.
  */
-function SidebarContent({
+export function SidebarContent({
   surface,
   showExpanded,
+  fullWidth = false,
 }: {
   surface: SidebarSurface;
   showExpanded: boolean;
+  fullWidth?: boolean;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   // Keyed by surface: each product's menu keeps its own place, and moving
@@ -307,7 +309,7 @@ function SidebarContent({
       gap={0}
       height="100%"
       align="start"
-      width={SHELL_SIDEBAR_WIDTH_EXPANDED}
+      width={fullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
       {/* The way back out of Settings sits above the scroll region, so a

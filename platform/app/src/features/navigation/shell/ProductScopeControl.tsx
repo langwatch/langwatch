@@ -7,6 +7,10 @@ import { useWorkspaceData } from "~/components/useWorkspaceData";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import type { ProductId } from "../products";
+import {
+  type ProjectPickGroup,
+  ProjectSwitcherCombobox,
+} from "./ProjectSwitcherCombobox";
 
 function ScopeDivider() {
   return (
@@ -49,10 +53,18 @@ function MeScopeChip() {
 }
 
 /**
+ * Above this many projects the plain menu turns into a searchable
+ * combobox: the list no longer fits a screen, so finding beats reading.
+ */
+const PROJECT_SEARCH_THRESHOLD = 8;
+
+/**
  * The LLM Ops scope: the current project as a chip, opening a menu with
  * the organization's projects (and a per-team create entry where the
  * user can create one). Organization choice lives in its own control,
- * so this menu stays within the current organization.
+ * so this menu stays within the current organization. Past
+ * PROJECT_SEARCH_THRESHOLD projects the menu becomes a combobox that
+ * opens with a focused search field.
  */
 function ProjectScopeMenu() {
   const { organization, project } = useOrganizationTeamProject({
@@ -77,75 +89,118 @@ function ProjectScopeMenu() {
       (group) => group.projects.length > 0 || group.team.canCreateProject,
     );
 
+  const projectCount = groups.reduce(
+    (count, group) => count + group.projects.length,
+    0,
+  );
+  const showTeamHeaders = orgTeams.length > 1;
+
   return (
     <>
       <ScopeDivider />
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button
-            variant="ghost"
-            aria-label="Switch project"
-            fontSize="13px"
-            fontWeight="normal"
-            paddingX={2}
-            height="32px"
-            color="fg"
-            gap={2}
-            _hover={{ backgroundColor: "bg.muted" }}
-          >
-            <ProjectAvatar name={project.name} />
-            <Text whiteSpace="nowrap">{project.name}</Text>
-            <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
-          </Button>
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Content minWidth="240px">
-            {groups.map(({ team, projects: teamProjects }) => (
-              <Menu.ItemGroup
-                key={team.teamId}
-                title={orgTeams.length > 1 ? team.label : "Projects"}
-              >
-                {teamProjects.map((candidate) => (
-                  <Menu.Item
-                    key={candidate.projectId}
-                    value={candidate.projectId}
-                    fontSize="13px"
-                    asChild
-                  >
-                    <Link
-                      href={candidate.href}
-                      _hover={{ textDecoration: "none" }}
-                    >
-                      <HStack gap={2} width="full">
-                        <ProjectAvatar name={candidate.label} />
-                        <Text flex={1}>{candidate.label}</Text>
-                        {candidate.projectId === project.id && (
-                          <Check size={13} aria-label="Current project" />
-                        )}
-                      </HStack>
-                    </Link>
-                  </Menu.Item>
-                ))}
-                {team.canCreateProject && (
-                  <Menu.Item
-                    value={`new-project-${team.teamId}`}
-                    fontSize="13px"
-                    onClick={() =>
-                      onCreateProjectForTeam?.({
-                        teamId: team.teamId,
-                        orgId: team.orgId,
-                      })
-                    }
-                  >
-                    <Plus size={13} /> New Project
-                  </Menu.Item>
-                )}
-              </Menu.ItemGroup>
-            ))}
-          </Menu.Content>
-        </Portal>
-      </Menu.Root>
+      {projectCount > PROJECT_SEARCH_THRESHOLD ? (
+        <ProjectSwitcherCombobox
+          groups={groups}
+          currentProjectId={project.id}
+          currentProjectName={project.name}
+          showTeamHeaders={showTeamHeaders}
+          onCreateProjectForTeam={onCreateProjectForTeam}
+        />
+      ) : (
+        <ProjectMenu
+          groups={groups}
+          currentProjectId={project.id}
+          currentProjectName={project.name}
+          showTeamHeaders={showTeamHeaders}
+          onCreateProjectForTeam={onCreateProjectForTeam}
+        />
+      )}
     </>
+  );
+}
+
+/** The plain project menu, for a list short enough to read whole. */
+function ProjectMenu({
+  groups,
+  currentProjectId,
+  currentProjectName,
+  showTeamHeaders,
+  onCreateProjectForTeam,
+}: {
+  groups: ProjectPickGroup[];
+  currentProjectId: string;
+  currentProjectName: string;
+  showTeamHeaders: boolean;
+  onCreateProjectForTeam:
+    | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
+    | undefined;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          variant="ghost"
+          aria-label="Switch project"
+          fontSize="13px"
+          fontWeight="normal"
+          paddingX={2}
+          height="32px"
+          color="fg"
+          gap={2}
+          _hover={{ backgroundColor: "bg.muted" }}
+        >
+          <ProjectAvatar name={currentProjectName} />
+          <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
+        </Button>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Content minWidth="240px">
+          {groups.map(({ team, projects: teamProjects }) => (
+            <Menu.ItemGroup
+              key={team.teamId}
+              title={showTeamHeaders ? team.label : "Projects"}
+            >
+              {teamProjects.map((candidate) => (
+                <Menu.Item
+                  key={candidate.projectId}
+                  value={candidate.projectId}
+                  fontSize="13px"
+                  asChild
+                >
+                  <Link
+                    href={candidate.href}
+                    _hover={{ textDecoration: "none" }}
+                  >
+                    <HStack gap={2} width="full">
+                      <ProjectAvatar name={candidate.label} />
+                      <Text flex={1}>{candidate.label}</Text>
+                      {candidate.projectId === currentProjectId && (
+                        <Check size={13} aria-label="Current project" />
+                      )}
+                    </HStack>
+                  </Link>
+                </Menu.Item>
+              ))}
+              {team.canCreateProject && (
+                <Menu.Item
+                  value={`new-project-${team.teamId}`}
+                  fontSize="13px"
+                  onClick={() =>
+                    onCreateProjectForTeam?.({
+                      teamId: team.teamId,
+                      orgId: team.orgId,
+                    })
+                  }
+                >
+                  <Plus size={13} /> New Project
+                </Menu.Item>
+              )}
+            </Menu.ItemGroup>
+          ))}
+        </Menu.Content>
+      </Portal>
+    </Menu.Root>
   );
 }
 

@@ -8,7 +8,14 @@
  * the caller explicitly disallowed.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -200,6 +207,170 @@ describe("ScopeChipPicker single-select variant", () => {
       // org/team/project quick-pick buttons.
       expect(screen.queryByTestId("quick-scope-project")).toBeNull();
       expect(screen.queryByTestId("quick-scope-multiple")).toBeNull();
+    });
+  });
+});
+
+describe("ScopeChipPicker search and team grouping", () => {
+  afterEach(cleanup);
+
+  const teams = [
+    { id: "t-acme", name: "QA Shared Team" },
+    { id: "t-platform", name: "Platform Team" },
+  ];
+
+  /** Nine projects across two teams: with the org option, past the search threshold. */
+  const manyProjects = [
+    ...Array.from({ length: 7 }, (_, index) => ({
+      id: `p-qa-${index}`,
+      name: `qa-app-${index}`,
+      teamId: "t-acme",
+    })),
+    { id: "p-bill", name: "billing-svc", teamId: "t-platform" },
+    { id: "p-edge", name: "edge-router", teamId: "t-platform" },
+  ];
+
+  async function openDropdown() {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox"));
+    return user;
+  }
+
+  /** The dropdown list. Ark mirrors every label into a hidden native
+   *  `<select>`, so queries must stay inside the listbox. */
+  function listbox() {
+    return within(screen.getByRole("listbox"));
+  }
+
+  describe("given projects across two teams", () => {
+    /** @scenario Projects group under their team name */
+    it("lists each project under a group header carrying its team name", async () => {
+      renderPicker(
+        <ScopeChipPicker
+          value={[]}
+          onChange={vi.fn()}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          availableTeams={teams}
+          availableProjects={[
+            { id: "p-web", name: "web-app", teamId: "t-acme" },
+            { id: "p-bill", name: "billing-svc", teamId: "t-platform" },
+            { id: "p-lost", name: "orphan-app" },
+          ]}
+        />,
+      );
+      await openDropdown();
+
+      await waitFor(() => {
+        expect(listbox().getByText("web-app")).toBeInTheDocument();
+      });
+      const groups = listbox().getAllByRole("group");
+      const groupHolding = (label: string, item: string) =>
+        groups.some(
+          (group) =>
+            within(group).queryByText(label) !== null &&
+            within(group).queryByText(item) !== null,
+        );
+      expect(groupHolding("QA Shared Team", "web-app")).toBe(true);
+      expect(groupHolding("Platform Team", "billing-svc")).toBe(true);
+      // A project whose team is not listed keeps the flat group.
+      expect(groupHolding("Projects", "orphan-app")).toBe(true);
+    });
+  });
+
+  describe("given more than eight scopes", () => {
+    function renderCrowdedPicker(onChange = vi.fn()) {
+      renderPicker(
+        <ScopeChipPicker
+          value={[]}
+          onChange={onChange}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          availableTeams={teams}
+          availableProjects={manyProjects}
+        />,
+      );
+      return onChange;
+    }
+
+    /** @scenario A long scope list gets a search field */
+    it("shows a search field that narrows by name and team", async () => {
+      renderCrowdedPicker();
+      const user = await openDropdown();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Search scopes")).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText("Search scopes"), "platform");
+      await waitFor(() => {
+        expect(listbox().queryByText("qa-app-1")).not.toBeInTheDocument();
+      });
+      // Both Platform Team projects match through their team's name.
+      expect(listbox().getByText("billing-svc")).toBeInTheDocument();
+      expect(listbox().getByText("edge-router")).toBeInTheDocument();
+      expect(listbox().queryByText("ACME Inc")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Searching does not drop scopes already selected */
+    it("keeps the selected scopes when a search picks another one", async () => {
+      const onChange = vi.fn();
+      renderPicker(
+        <ScopeChipPicker
+          value={[
+            { scopeType: "PROJECT", scopeId: "p-qa-0" },
+            { scopeType: "PROJECT", scopeId: "p-qa-1" },
+          ]}
+          onChange={onChange}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          availableTeams={teams}
+          availableProjects={manyProjects}
+        />,
+      );
+      const user = await openDropdown();
+
+      await user.type(screen.getByLabelText("Search scopes"), "billing");
+      await waitFor(() => {
+        expect(listbox().queryByText("qa-app-2")).not.toBeInTheDocument();
+      });
+      await user.click(listbox().getByText("billing-svc"));
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalled();
+      });
+      const next = onChange.mock.calls.at(-1)?.[0];
+      expect(next).toEqual(
+        expect.arrayContaining([
+          { scopeType: "PROJECT", scopeId: "p-qa-0" },
+          { scopeType: "PROJECT", scopeId: "p-qa-1" },
+          { scopeType: "PROJECT", scopeId: "p-bill" },
+        ]),
+      );
+    });
+  });
+
+  describe("given eight scopes or fewer", () => {
+    /** @scenario A short scope list has no search field */
+    it("offers no search field", async () => {
+      renderPicker(
+        <ScopeChipPicker
+          value={[]}
+          onChange={vi.fn()}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          availableTeams={teams}
+          availableProjects={[
+            { id: "p-web", name: "web-app", teamId: "t-acme" },
+          ]}
+        />,
+      );
+      await openDropdown();
+
+      await waitFor(() => {
+        expect(listbox().getByText("web-app")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Search scopes")).not.toBeInTheDocument();
     });
   });
 });

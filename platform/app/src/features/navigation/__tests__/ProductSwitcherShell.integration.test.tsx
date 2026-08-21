@@ -60,7 +60,20 @@ const orgA = {
   teams: [teamA, personalTeam],
 };
 /** The team the page being rendered resolves to. */
-let mockAmbientTeam: typeof teamA | typeof personalTeam = teamA;
+let mockAmbientTeam: {
+  id: string;
+  name: string;
+  slug: string;
+  isPersonal: boolean;
+  ownerUserId: string | null;
+  members: Array<{ userId: string; role: string }>;
+  projects: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    isPersonal: boolean;
+  }>;
+} = teamA;
 const orgB = {
   id: "org_2",
   name: "Beta Corp",
@@ -85,6 +98,50 @@ const orgB = {
   ],
 };
 let mockOrganizations: unknown[] = [orgA];
+
+/** Two teams and eleven projects: past the search threshold. */
+const crowdedTeamCore = {
+  id: "team_core",
+  name: "Core",
+  slug: "crowded-core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: Array.from({ length: 9 }, (_, index) => ({
+    id: `project_core_${index}`,
+    slug: `core-app-${index}`,
+    name: `Core App ${index}`,
+    isPersonal: false,
+  })),
+};
+const crowdedTeamPlatform = {
+  id: "team_platform",
+  name: "Platform",
+  slug: "crowded-platform",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: [
+    {
+      id: "project_router",
+      slug: "edge-router",
+      name: "Edge Router",
+      isPersonal: false,
+    },
+    {
+      id: "project_billing",
+      slug: "billing-sync",
+      name: "Billing Sync",
+      isPersonal: false,
+    },
+  ],
+};
+const crowdedOrg = {
+  id: "org_1",
+  name: "ACME",
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  teams: [crowdedTeamCore, crowdedTeamPlatform, personalTeam],
+};
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -452,6 +509,101 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(screen.getByText("Support Bot")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("when the organization holds more than eight projects", () => {
+    beforeEach(() => {
+      mockOrganizations = [crowdedOrg];
+      mockAmbientTeam = crowdedTeamCore;
+    });
+
+    async function openProjectPicker() {
+      // Ark's combobox input is machine-controlled, so zero-delay typing
+      // outruns the re-render and drops characters; a small delay types
+      // the way a person does.
+      const user = userEvent.setup({ delay: 20 });
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Search projects"),
+        ).toBeInTheDocument();
+      });
+      return user;
+    }
+
+    /** @scenario A large project list opens with a focused search field */
+    it("opens with a focused search field that filters by project and team name", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+
+      expect(screen.getByPlaceholderText("Search projects")).toHaveFocus();
+      await waitFor(() => {
+        expect(screen.getByText("Edge Router")).toBeInTheDocument();
+      });
+
+      await user.keyboard("router");
+      await waitFor(() => {
+        expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
+      });
+      expect(screen.getByText("Edge Router")).toBeInTheDocument();
+
+      // Team names match too: "platform" is the team, not a project name.
+      await user.clear(screen.getByPlaceholderText("Search projects"));
+      await user.keyboard("platform");
+      await waitFor(() => {
+        expect(screen.getByText("Billing Sync")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Edge Router")).toBeInTheDocument();
+      expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The project search answers the keyboard */
+    it("moves with the arrow keys and opens the highlighted project on Enter", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+
+      await user.keyboard("billing");
+      await waitFor(() => {
+        expect(screen.getByText("Billing Sync")).toBeInTheDocument();
+      });
+      await user.keyboard("{ArrowDown}{Enter}");
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
+    });
+
+    /** @scenario Creating a project stays available while the list is unfiltered */
+    it("keeps the per-team create entries while nothing is typed and drops them while searching", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+
+      // One create entry per team the user can create in (org admin: both).
+      expect(screen.getAllByText("New Project")).toHaveLength(2);
+
+      await user.keyboard("core");
+      await waitFor(() => {
+        expect(screen.queryByText("New Project")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when the organization holds eight projects or fewer", () => {
+    /** @scenario A short project list stays a plain menu */
+    it("lists the projects with no search field", async () => {
+      renderShell();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(screen.getByText("Support Bot")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByPlaceholderText("Search projects"),
+      ).not.toBeInTheDocument();
     });
   });
 
