@@ -164,6 +164,67 @@ describe("langy turn-start rejections", () => {
     });
   });
 
+  describe("when the send carries a modelOverride", () => {
+    /** @scenario A model id that itself contains a slash is accepted */
+    it("accepts a custom-provider model whose id contains a slash and forwards it intact", async () => {
+      const result = await caller().createConversation({
+        projectId: "project_1",
+        idempotencyKey: "idem-key-0001",
+        messages: [message],
+        modelOverride: "custom/stealth/ox-alpha",
+      });
+
+      expect(result).toMatchObject({ conversationId: "c1", turnId: "t1" });
+      expect(startConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ modelOverride: "custom/stealth/ox-alpha" }),
+      );
+    });
+
+    it("accepts the canonical mp_<rowId> wire form with a multi-segment model", async () => {
+      const result = await caller().createConversation({
+        projectId: "project_1",
+        idempotencyKey: "idem-key-0001",
+        messages: [message],
+        modelOverride: "mp_01jm7qk3v8/deepseek/deepseek-r1:free",
+      });
+
+      expect(result).toMatchObject({ conversationId: "c1", turnId: "t1" });
+      expect(startConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelOverride: "mp_01jm7qk3v8/deepseek/deepseek-r1:free",
+        }),
+      );
+    });
+
+    /** @scenario A model reference without a provider segment is rejected as invalid input */
+    it("rejects a model without a provider segment as a validation_error naming the field", async () => {
+      const error = await caller()
+        .createConversation({
+          projectId: "project_1",
+          idempotencyKey: "idem-key-0001",
+          messages: [message],
+          modelOverride: "gpt-5-mini",
+        })
+        .catch((e: unknown) => e);
+
+      // Input-parse failures reject as BAD_REQUEST with the ZodError as the
+      // cause; the errorFormatter is what promotes them to the handled
+      // `validation_error` on the wire.
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
+      // The wire names the offending field, so the client card can say which
+      // value to look at instead of the anonymous fallback sentence.
+      const wire = onTheWire(error);
+      expect(wire.data.error).not.toBeNull();
+      expect(wire.data.error).toMatchObject({ code: "validation_error" });
+      expect(
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
+          .meta.fieldErrors,
+      ).toHaveProperty("modelOverride");
+      expect(startConversationTurn).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the send carries neither idempotencyKey nor requestId", () => {
     it("rejects with a ValidationError whose meta.message survives serialization", async () => {
       const error = await caller()
