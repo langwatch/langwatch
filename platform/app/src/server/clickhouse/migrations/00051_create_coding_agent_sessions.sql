@@ -43,12 +43,9 @@
 --     (TenantId, SessionId, max(UpdatedAt)) — the IN-tuple pattern, never FINAL.
 --   * ORDER BY (TenantId, StartedAt, SessionId) — TIME-LEADING. The reads this
 --     table exists for are time-bounded scans ("what did this project's agents
---     do this week", "my usage this month"), not per-session point lookups.
---     Always filter StartedAt where the read can — it is the partition key.
---     Where it cannot (the single-session read's dedup subquery must stay
---     unwindowed for correctness, ADR-071), the primary index cannot help:
---     SessionId sits behind an unbounded StartedAt. That case is served by the
---     idx_session_id bloom filter added in migration 00085, not by the sort key.
+--     do this week", "my usage this month"), not per-session point lookups; the
+--     drawer's single-session read is a cheap seek within one partition.
+--     Always filter StartedAt — it is the partition key.
 -- ============================================================================
 
 -- +goose StatementBegin

@@ -42,6 +42,14 @@
 -- This index changes no results. The subquery stays unwindowed and keeps its
 -- correctness property; it simply stops reading granules that cannot contain
 -- the session.
+--
+-- SUPERSEDES a line in migration 00051, which cannot be edited once merged.
+-- Its header says of the sort key: "the drawer's single-session read is a cheap
+-- seek within one partition. Always filter StartedAt". That holds for the reads
+-- that CAN filter StartedAt, and they should. It does not hold for the dedup
+-- subquery, which must not filter it, and which this index exists to serve. The
+-- same correction is on `findLatestRecord` in
+-- coding-agent-session.clickhouse.repository.ts, where the subquery is built.
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
