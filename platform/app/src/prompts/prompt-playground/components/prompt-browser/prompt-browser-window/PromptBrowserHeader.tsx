@@ -43,6 +43,7 @@ export function PromptBrowserHeader() {
         hasUnsavedChanges={hasUnsavedChanges}
         onVersionRestore={handleOnRestore}
         openHistoryOnLoad={openHistoryOnLoad}
+        showPromptContext
       />
     </Box>
   );
