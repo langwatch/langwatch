@@ -52,6 +52,12 @@ export const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<
     source_event_id: "$.id",
     event_timestamp: "$.created_at",
     actor: "$.user.email",
+    // No `actor_id` on purpose. OpenAI has no declared id namespace in
+    // ADR-094's Constants (Databricks, Anthropic and Microsoft do), and a
+    // report joins the link list on kind + value — so feeding `$.user.id`
+    // into the join key before the kind exists would produce a column that
+    // silently matches nothing. It stays in `extra` where it is today, and
+    // moves up when the provider joins the vocabulary.
     action: "$.type",
     target: "$.model",
     cost_usd: "$.cost.usd",

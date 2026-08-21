@@ -1,34 +1,28 @@
 /**
- * Unit coverage for the puller worker's NormalizedPullEvent → OCSF
- * row mapping. The full effect shape (Prisma + CH + process outbox) is
- * exercised by the integration tier; this file documents the
- * pure-function shape of the mapping that's hardest to get right
- * (eventId composition, raw_event preservation, time-coercion fallback).
+ * @vitest-environment node
+ *
+ * Unit coverage for the puller worker's NormalizedPullEvent → OCSF row
+ * mapping. The full effect shape (Prisma + ClickHouse + process outbox) is
+ * exercised by the integration tier; this file covers the pure mapping — id
+ * composition, time coercion, and the actor identity ADR-094 added.
+ *
+ * It CALLS the mapper. It used to re-implement the mapping inline and assert
+ * against its own copy, which meant it stayed green through any change to the
+ * real one — the worst kind of passing test, since it looks like coverage.
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedPullEvent } from "../pullerAdapter";
-
-// We re-import the mapping helper from the worker module's internals
-// via a small shim. Keeping the helper unexported keeps the worker
-// surface narrow; the test accesses it through a module-internal
-// import alias.
-async function loadMapper() {
-  const mod: any = await import("../pullerWorker");
-  // Expose the internal function for testing — falling back to dynamic
-  // resolution via the module's source if the export shape changes.
-  // We don't ship a runtime export to keep the API surface minimal,
-  // so this test re-implements the semantic contract that the worker
-  // relies on. If you change `mapToOcsfRow`, mirror the change here.
-  return mod;
-}
+import { mapToOcsfRow } from "../pullerWorker";
 
 const baseEvent: NormalizedPullEvent = {
   source_event_id: "evt-123",
   event_timestamp: "2026-05-03T10:00:00Z",
   actor: "alice@acme.test",
+  actor_id: "6f8a1b2c-3d4e-4f50-9a1b-2c3d4e5f6071",
+  actor_kind: "person",
   action: "completion",
   target: "gpt-5-mini",
   cost_usd: "0.0023",
@@ -37,87 +31,97 @@ const baseEvent: NormalizedPullEvent = {
   raw_payload: '{"id":"evt-123","raw":"data"}',
 };
 
-describe("PullerWorker — OCSF mapping (semantic contract)", () => {
-  it("loads the worker module without crashing", async () => {
-    const mod = await loadMapper();
-    expect(mod.runIngestionPull).toBeTypeOf("function");
+const map = (event: NormalizedPullEvent = baseEvent, sourceType = "x") =>
+  mapToOcsfRow({
+    event,
+    tenantId: "gov-proj-1",
+    ingestionSourceId: "src-1",
+    sourceType,
   });
 
-  // Direct test of the semantic shape — this matches the implementation
-  // in pullerWorker.ts. Keep them in sync.
-  describe("when reproducing the worker's mapping shape inline", () => {
-    function mapToOcsfRowSemantic({
-      event,
-      tenantId,
-      ingestionSourceId,
-      sourceType,
-    }: {
-      event: NormalizedPullEvent;
-      tenantId: string;
-      ingestionSourceId: string;
-      sourceType: string;
-    }) {
-      const eventTime = new Date(event.event_timestamp);
-      const safeEventTime = Number.isFinite(eventTime.getTime())
-        ? eventTime
-        : new Date();
-      const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
-      return {
-        tenantId,
-        eventId,
-        traceId: `pull:${eventId}`,
-        sourceId: ingestionSourceId,
-        sourceType,
-        eventTime: safeEventTime,
-        actorEmail: event.actor,
-        actionName: event.action,
-        targetName: event.target,
-      };
-    }
+const ocsfOf = (row: ReturnType<typeof map>) =>
+  JSON.parse(row.rawOcsfJson) as {
+    actor: {
+      user: { uid: string; email_addr: string; type_id: number; type: string };
+    };
+  };
 
+describe("the puller worker's OCSF mapping", () => {
+  describe("identity", () => {
     it("composes eventId as `<sourceType>:<sourceId>:<source_event_id>`", () => {
-      const row = mapToOcsfRowSemantic({
-        event: baseEvent,
-        tenantId: "gov-proj-1",
-        ingestionSourceId: "src-1",
-        sourceType: "copilot_studio",
-      });
+      const row = map(baseEvent, "copilot_studio");
+
       expect(row.eventId).toBe("copilot_studio:src-1:evt-123");
       expect(row.traceId).toBe("pull:copilot_studio:src-1:evt-123");
     });
 
-    it("uses the org's hidden internal_governance Project ID as tenantId", () => {
-      // Same key the trace-fold subscriber + OCSF export service use, so
-      // pull events surface alongside trace-derived events on the SIEM
-      // export path.
-      const row = mapToOcsfRowSemantic({
-        event: baseEvent,
-        tenantId: "gov-proj-acme-42",
-        ingestionSourceId: "src-1",
-        sourceType: "copilot_studio",
-      });
-      expect(row.tenantId).toBe("gov-proj-acme-42");
+    it("uses the organization's hidden governance project as tenantId", () => {
+      // The same key the trace-fold subscriber and the SIEM export use, so
+      // pulled events surface alongside trace-derived ones.
+      expect(map().tenantId).toBe("gov-proj-1");
+    });
+  });
+
+  describe("the actor", () => {
+    it("writes the provider's own id into the column reports join on", () => {
+      // Empty until ADR-094; a report groups by this, so an unpopulated
+      // column means every pulled row is unattributable by omission.
+      expect(map().actorUserId).toBe("6f8a1b2c-3d4e-4f50-9a1b-2c3d4e5f6071");
+      expect(ocsfOf(map()).actor.user.uid).toBe(
+        "6f8a1b2c-3d4e-4f50-9a1b-2c3d4e5f6071",
+      );
     });
 
-    it("falls back to current time when event_timestamp is unparseable", () => {
-      const row = mapToOcsfRowSemantic({
-        event: { ...baseEvent, event_timestamp: "not-a-date" },
-        tenantId: "gov-proj-1",
-        ingestionSourceId: "src-1",
-        sourceType: "x",
+    it("keeps the email beside it rather than instead of it", () => {
+      expect(map().actorEmail).toBe("alice@acme.test");
+      expect(ocsfOf(map()).actor.user.email_addr).toBe("alice@acme.test");
+    });
+
+    it("stays empty when the provider exposes no id", () => {
+      const row = map({ ...baseEvent, actor_id: "" });
+
+      expect(row.actorUserId).toBe("");
+    });
+
+    it("carries the adapter's bucket declaration in the OCSF user type", () => {
+      expect(ocsfOf(map()).actor.user).toMatchObject({
+        type_id: 1,
+        type: "person",
       });
+      expect(
+        ocsfOf(map({ ...baseEvent, actor_kind: "service_principal" })).actor
+          .user,
+      ).toMatchObject({ type_id: 3, type: "service_principal" });
+    });
+  });
+
+  describe("re-pulling the same source event", () => {
+    it("produces a byte-identical row, so a restatement overwrites cleanly", () => {
+      // ADR-088's restatement path re-inserts on the same key and lets the
+      // ReplacingMergeTree collapse it. Any nondeterminism here would make a
+      // re-pull look like a change.
+      const first = map();
+      const second = map();
+
+      expect(second.rawOcsfJson).toBe(first.rawOcsfJson);
+      expect(second.actorUserId).toBe(first.actorUserId);
+      expect(second.eventId).toBe(first.eventId);
+    });
+  });
+
+  describe("when event_timestamp is unparseable", () => {
+    it("falls back to a valid time rather than writing an invalid date", () => {
+      const row = map({ ...baseEvent, event_timestamp: "not-a-date" });
+
       expect(row.eventTime).toBeInstanceOf(Date);
       expect(Number.isFinite(row.eventTime.getTime())).toBe(true);
     });
+  });
 
-    it("propagates actor/action/target to the OCSF fields without transformation", () => {
-      const row = mapToOcsfRowSemantic({
-        event: baseEvent,
-        tenantId: "gov-proj-1",
-        ingestionSourceId: "src-1",
-        sourceType: "x",
-      });
-      expect(row.actorEmail).toBe("alice@acme.test");
+  describe("action and target", () => {
+    it("propagates them untransformed", () => {
+      const row = map();
+
       expect(row.actionName).toBe("completion");
       expect(row.targetName).toBe("gpt-5-mini");
     });

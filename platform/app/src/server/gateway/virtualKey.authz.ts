@@ -264,7 +264,7 @@ export async function loadMembershipSet(
   const [orgMembership, teamMemberships] = await Promise.all([
     prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true },
+      select: { role: true, disabledAt: true },
     }),
     prisma.teamUser.findMany({
       where: { userId, team: { organizationId } },
@@ -279,9 +279,14 @@ export async function loadMembershipSet(
           select: { id: true },
         })
       : [];
+  // A disabled membership is an ended membership (ADR-094 Decision 4): the
+  // row survives for history and seat accounting, so its mere existence is
+  // not an access answer.
+  const activeOrgMembership =
+    orgMembership?.disabledAt === null ? orgMembership : null;
   return {
-    isOrgMember: orgMembership !== null,
-    isOrgAdmin: orgMembership?.role === OrganizationUserRole.ADMIN,
+    isOrgMember: activeOrgMembership !== null,
+    isOrgAdmin: activeOrgMembership?.role === OrganizationUserRole.ADMIN,
     teamIds,
     projectIds: new Set(projects.map((p) => p.id)),
   };

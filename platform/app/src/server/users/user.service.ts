@@ -121,15 +121,12 @@ export class UserService {
   }
 
   /**
-   * Deactivate a user AND force-logout all their existing sessions
-   * (browser AND CLI).
+   * Force-logout everywhere: browser sessions AND CLI tokens.
    *
    * Browser revocation: BetterAuth caches sessions in Redis and reads
    * from cache before falling back to the DB, so a `deactivatedAt`
    * update alone is invisible to ongoing sessions for up to 30 days.
-   * Every deactivation path (tRPC, SCIM webhook, SCIM provisioning
-   * sync) routes through here so they all benefit from the cache
-   * invalidation. See `src/server/better-auth/revokeSessions.ts`.
+   * See `src/server/better-auth/revokeSessions.ts`.
    *
    * CLI revocation: device-flow access + refresh tokens live in Redis
    * under `lwcli:access:*` / `lwcli:refresh:*` independently of
@@ -138,15 +135,19 @@ export class UserService {
    * against the control plane until their TTLs expired (1h access /
    * 30d refresh). Spec:
    * specs/ai-gateway/cli-token-revoke-on-deactivation.feature.
+   *
+   * This is a Redis-side effect, so it can never join the database
+   * transaction that writes `deactivatedAt`; callers run it right after
+   * that transaction commits. The flag write and the deactivation's other
+   * database work live in `MembershipLifecycleService` (ADR-094 Decision
+   * 4), which is the single implementation every deactivation entry point
+   * goes through — global revocation happens only on a GLOBAL deactivate,
+   * never when one organization's directory disables one membership
+   * (#6976).
    */
-  async deactivate({ id }: { id: string }): Promise<User> {
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: { deactivatedAt: new Date() },
-    });
-    await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
-    await this.cliTokenRevocation.revokeForUser({ userId: id });
-    return user;
+  async revokeAllAccess({ userId }: { userId: string }): Promise<void> {
+    await revokeAllSessionsForUser({ prisma: this.prisma, userId });
+    await this.cliTokenRevocation.revokeForUser({ userId });
   }
 
   async reactivate({ id }: { id: string }): Promise<User> {

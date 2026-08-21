@@ -1460,15 +1460,26 @@ New users provisioned via SCIM are assigned the **Member** role by default. You 
 When your identity provider sends a **DELETE** for a user:
 
 - Their org membership and all role bindings are **removed**
-- Their account is **deactivated**: they can no longer sign in
+- They lose access to **this organization**; their account is deactivated only if this was their last active organization
 - Their data (traces, annotations, datasets) is **preserved**
 - A second DELETE returns `404 Not Found`, the operation is idempotent
 
 When your identity provider **suspends** a user (`PATCH active: false`):
 
-- Their account is **deactivated**: they can no longer sign in
-- Their org membership and role bindings are **preserved**
+- Their membership is **disabled**: they lose access to this organization
+- Their org membership row and role bindings are **preserved**
+- Their account is deactivated only if this was their last active organization
 - Re-activating (`active: true`) immediately restores access
+
+<Info>
+  Suspending and deleting act on the user's membership of **this** organization. A person who belongs to more than one organization keeps their account and their access everywhere else; only when their last active membership ends is the account itself deactivated.
+
+  The `active` attribute we return follows the same rule: it reports whether the user is active in the organization your SCIM token is scoped to, not whether their LangWatch account exists. A user suspended here reads back as `active: false` even though they are still working in another organization.
+</Info>
+
+Re-activating restores access, but it does **not** restore usage-attribution links —
+the records matching this person to their provider logins in cost reports were closed
+when they were offboarded, and an administrator relinks them.
 
 <Info>
   Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings, re-provisioning the user starts from scratch.

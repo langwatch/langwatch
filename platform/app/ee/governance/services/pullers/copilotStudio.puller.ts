@@ -56,6 +56,19 @@ export const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
     source_event_id: "$.id",
     event_timestamp: "$.activityDateTime",
     actor: "$.initiatedBy.user.userPrincipalName",
+    // Entra's objectId — Microsoft's `entra_object_id` namespace, the one
+    // immutable id of the three (`upn` moves when a person is renamed, and a
+    // report joining on a value that moves attributes their spend to nobody).
+    actor_id: "$.initiatedBy.user.id",
+    // The directory audit says "an application did this" by populating
+    // `initiatedBy.app` instead of `initiatedBy.user`, so the app id existing
+    // is the entire signal — there is no value to enumerate. A human-initiated
+    // event has no app id and falls through to `person`.
+    actor_kind: {
+      path: "$.initiatedBy.app.appId",
+      byValue: {},
+      whenPresent: "service_principal",
+    },
     action: "$.activityDisplayName",
     target: "$.targetResources[0].displayName",
     extra: {

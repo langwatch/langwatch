@@ -28,6 +28,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import {
   mapUserToBackofficeRow,
@@ -472,7 +473,21 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
           payload: { id: userId, reactivate: true },
         });
       } else if (typeof v === "string" || v instanceof Date) {
-        await userService.deactivate({ id: userId });
+        // The lifecycle hook is the single deactivation implementation
+        // (ADR-094 Decision 4): the account flag, the closing link rows for
+        // every organization the person was still active in, and the
+        // revocations.
+        //
+        // It runs on the real clock, NOT on the admin's picked date. The
+        // picked date is a label on the account flag, which every reader
+        // null-checks; the closing rows are a money paper trail, and dating
+        // them in the past would silently move spend from an already-reported
+        // period out of the person's name (ADR-094 Decision 3 allows
+        // backdating, but never silently — that notice is the report batch's).
+        await MembershipLifecycleService.create(prisma).onUserDeactivated({
+          userId,
+          actorUserId: user?.id ?? null,
+        });
         delete data.deactivatedAt;
         handledSideEffect = true;
         const pickedDate = v instanceof Date ? v : new Date(v);
