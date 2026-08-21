@@ -21,17 +21,15 @@
  * first call; this moves the discovery to CI, before any call exists.
  */
 import {
+  type AuthzDeclaration,
   type AuthzPermission,
+  authzDeclarationOf,
   isPlatformTierPermission,
   permissionGrantTiers,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import {
-  type AuthzDeclaration,
-  authzDeclarationOf,
-} from "@langwatch/authz";
 import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];

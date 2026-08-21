@@ -42,7 +42,7 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-// The approval route reads hasProjectPermission from the app-layer
+// The approval route reads probeProjectPermission from the app-layer
 // imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
 // the old path leaves the real check running and the deny test inert.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
@@ -50,10 +50,10 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
     await importActual<
       typeof import("~/server/app-layer/permissions/imperative")
     >();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -542,7 +542,7 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
   /** @scenario the project-key endpoint refuses a project the caller cannot write to */
   it("denies a project the caller cannot write, without leaking the key", async () => {
-    vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
       exchange.access_token,

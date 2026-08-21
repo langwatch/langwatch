@@ -12,7 +12,7 @@
  *
  * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
  * checks the caller's organization permissions BEFORE the service call and
- * returns FORBIDDEN otherwise. Mirrors `hasOrganizationPermission` from
+ * returns FORBIDDEN otherwise. Mirrors `probeOrganizationPermission` from
  * src/server/api/rbac.ts. Services trust the surface for audit attribution
  * but DO NOT gate access — gating is the entrypoint's job.
  *
@@ -54,7 +54,7 @@ type McpServerLike = {
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
 import type { Permission } from "../server/api/rbac";
-import { hasOrganizationPermission } from "../server/app-layer/permissions/imperative";
+import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
 const SURFACE = "mcp" as const;
 
@@ -116,7 +116,7 @@ export function registerGovernanceMcpTools(
     if (!rctx.callerUserId) {
       return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
     }
-    const allowed = await hasOrganizationPermission(
+    const allowed = await probeOrganizationPermission(
       {
         session: { user: { id: rctx.callerUserId } } as any,
       },
@@ -137,7 +137,7 @@ export function registerGovernanceMcpTools(
     // since the legacy MCP auth path is project-scoped and the org is
     // implicit. Only enforce permission when a userId is present.
     if (!rctx.callerUserId) return null;
-    const allowed = await hasOrganizationPermission(
+    const allowed = await probeOrganizationPermission(
       {
         session: { user: { id: rctx.callerUserId } } as any,
       },

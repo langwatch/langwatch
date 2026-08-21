@@ -17,7 +17,7 @@ import {
 } from "ai";
 import { tools } from "~/app/api/dataset/generate/tools";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 
@@ -52,7 +52,7 @@ secured
       return c.json({ error: "Missing projectId header" }, { status: 400 });
     }
 
-    const hasPermission = await hasProjectPermission(
+    const hasPermission = await probeProjectPermission(
       { session },
       projectId,
       "datasets:manage",

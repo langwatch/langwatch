@@ -1,11 +1,11 @@
 import { auditLog } from "@ee/audit-log/auditLog";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import {
   personalWorkspaceArchiveViolation,

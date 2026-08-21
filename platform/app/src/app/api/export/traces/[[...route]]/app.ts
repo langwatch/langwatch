@@ -16,7 +16,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -65,7 +65,7 @@ secured
     }
 
     // Authorize
-    const hasPermission = await hasProjectPermission(
+    const hasPermission = await probeProjectPermission(
       { session },
       request.projectId,
       "traces:view",

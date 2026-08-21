@@ -52,7 +52,7 @@ vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
 
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
-const hasOrganizationPermission = vi.fn();
+const probeOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
 const applyPullRequestEvent = vi.fn();
@@ -87,14 +87,14 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 // Partial mock: the route uses only this helper, but other modules in the
 // import graph read further rbac exports (Resources etc.).
-// The route reads hasOrganizationPermission from the app-layer imperative
+// The route reads probeOrganizationPermission from the app-layer imperative
 // module (it moved off ~/server/api/rbac with ADR-092).
 vi.mock(
   import("~/server/app-layer/permissions/imperative"),
   async (importOriginal) => ({
     ...(await importOriginal()),
-    hasOrganizationPermission: ((...args: unknown[]) =>
-      hasOrganizationPermission(...args)) as never,
+    probeOrganizationPermission: ((...args: unknown[]) =>
+      probeOrganizationPermission(...args)) as never,
   }),
 );
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -136,7 +136,7 @@ beforeEach(() => {
   appConfig.webhookSecret = "whsecret";
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
-  hasOrganizationPermission.mockResolvedValue(true);
+  probeOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
   applyPullRequestEvent.mockResolvedValue(true);
   isEnabled.mockResolvedValue(true);
@@ -174,12 +174,12 @@ describe("GET /api/github/install", () => {
       // Connecting the App grants repository access to every project in the
       // organization: membership alone must not be enough on the REST twin
       // either.
-      hasOrganizationPermission.mockResolvedValue(false);
+      probeOrganizationPermission.mockResolvedValue(false);
       const res = await request(
         "http://localhost/api/github/install?organizationId=org1",
       );
       expect(res.status).toBe(403);
-      expect(hasOrganizationPermission).toHaveBeenCalledWith(
+      expect(probeOrganizationPermission).toHaveBeenCalledWith(
         expect.anything(),
         "org1",
         "organization:manage",
@@ -292,7 +292,7 @@ describe("GET /api/github/setup", () => {
 
   describe("when the connect permission was lowered mid-flow", () => {
     it("re-checks organization management and refuses to persist the installation", async () => {
-      hasOrganizationPermission.mockResolvedValue(false);
+      probeOrganizationPermission.mockResolvedValue(false);
       const state = await makeState({ mode: "popup" });
 
       const res = await request(

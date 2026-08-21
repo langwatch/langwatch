@@ -28,7 +28,9 @@
  */
 import {
   type AuthzPermission,
+  type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
+  declareAuthzMiddleware,
   declaredScopeId,
   PermissionDeniedError,
   SCOPE_TIER_FIELDS,
@@ -40,10 +42,6 @@ import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
 import { type App, getApp } from "../app";
 import { LiteMemberRestrictedError } from "../permissions/errors";
-import {
-  type DeclaredAuthzMiddleware,
-  declareAuthzMiddleware,
-} from "@langwatch/authz";
 
 const logger = createLogger("langwatch:authz");
 

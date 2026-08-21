@@ -11,6 +11,7 @@
  * contract these pin.
  */
 import type { EndpointConfig } from "@langwatch/api";
+import type { Authorized } from "@langwatch/authz/witness";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
@@ -199,16 +200,40 @@ describe("typed permission declarations", () => {
         .input(projectInput)
         .use(checkDeclaredPermission({ permission: "traces:view" }));
 
+      // A bare function that flips permissionChecked by hand, exactly the
+      // hand-rolled shape the brand exists to refuse.
+      const handRolledCheck = async ({
+        ctx,
+        next,
+      }: {
+        ctx: { permissionChecked: boolean };
+        next: () => Promise<unknown>;
+      }) => {
+        ctx.permissionChecked = true;
+        return next();
+      };
       const handRolled = protectedProcedure
         .input(projectInput)
-        // @ts-expect-error — a bare function carries no declaration; flipping permissionChecked by hand does not compile
-        .use(async ({ ctx, next }: { ctx: { permissionChecked: boolean }; next: () => Promise<unknown> }) => {
-          ctx.permissionChecked = true;
-          return next();
-        });
+        // @ts-expect-error — no declaration, no compile: only declareAuthzMiddleware output is accepted
+        .use(handRolledCheck);
 
       expect(declared).toBeDefined();
       expect(handRolled).toBeDefined();
+    });
+  });
+
+  describe("given a function that demands the authorization witness", () => {
+    it("cannot be reached with anything but a minted witness", () => {
+      const guarded = (proof: Authorized<"project">) => proof.scope.id;
+
+      // @ts-expect-error — the brand is module-private; a literal cannot impersonate the proof
+      const forged = guarded({
+        permission: "traces:view",
+        scope: { tier: "project", id: "project_1" },
+      });
+
+      expect(guarded).toBeDefined();
+      expect(forged).toBeDefined();
     });
   });
 
@@ -234,7 +259,13 @@ describe("typed permission declarations", () => {
       // @ts-expect-error — the permission vocabulary is the registry's, here too
       const offRegistry: EndpointConfig = { permission: "traces:rotate" };
 
-      for (const config of [declared, optedOutEndpoint, bare, both, offRegistry]) {
+      for (const config of [
+        declared,
+        optedOutEndpoint,
+        bare,
+        both,
+        offRegistry,
+      ]) {
         expect(config).toBeDefined();
       }
     });

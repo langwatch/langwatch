@@ -31,7 +31,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -238,7 +238,7 @@ secured.access(sessionAuth).post(
       );
     }
 
-    const hasPermission = await hasProjectPermission(
+    const hasPermission = await probeProjectPermission(
       { session },
       projectId,
       "evaluations:manage",
@@ -387,7 +387,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
     );
   }
 
-  const hasPermission = await hasProjectPermission(
+  const hasPermission = await probeProjectPermission(
     { session },
     projectId,
     "evaluations:manage",

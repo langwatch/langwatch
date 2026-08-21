@@ -1,39 +1,42 @@
-import type { AuthzDecision, AuthzScopeRef } from "./types";
+import type { AuthzPermission } from "./registry";
+import type { BindingScopeTier } from "./vocabulary";
 
 /**
- * ADR-092 §7 L3 — the authorization witness: a branded proof that
- * `authz.authorize()` allowed `permission` at `scope`. Repositories that
- * adopt the witness convention take `Authorized<"project">` instead of a raw
- * projectId, which makes "forgot the permission check" fail to compile.
+ * ADR-092 §7 L3 — the authorization witness: a branded proof that a check
+ * ALLOWED `permission` at `scope`. A function that takes `Authorized<"project">`
+ * instead of a raw projectId cannot be reached by a path that skipped the
+ * check — "forgot the permission check" becomes a missing-argument compile
+ * error at the caller.
  *
- * The brand symbol is module-private, so the brand blocks accidental
- * construction: the only factory is `mintWitness`, and it is off the package
- * barrel — the `@langwatch/authz/witness` subpath is for the server runtime
- * only, where AuthzService mints one after a decision it just made.
+ * The scope is the tier and id the decision was actually made at — exactly
+ * what the engine decided over, never lineage the minting site would have to
+ * invent. The brand symbol is module-private, so the only factory is
+ * `mintWitness`, and that is off the package barrel: the
+ * `@langwatch/authz/witness` subpath is for the server runtime only, where
+ * the permission seams mint one after a decision they just made. Application
+ * code receives witnesses; it never mints them.
  */
 const AUTHORIZED_BRAND: unique symbol = Symbol("langwatch.authz.authorized");
 
-export type Authorized<S extends AuthzScopeRef["type"]> = {
+export type Authorized<Tier extends BindingScopeTier = BindingScopeTier> = {
   readonly [AUTHORIZED_BRAND]: true;
-  readonly scope: Extract<AuthzScopeRef, { type: S }>;
-  readonly permission: string;
-  readonly decision: AuthzDecision;
+  readonly permission: AuthzPermission;
+  readonly scope: { readonly tier: Tier; readonly id: string };
 };
 
-/** @internal — only the authz service (server runtime) may mint witnesses. */
-export function mintWitness<S extends AuthzScopeRef["type"]>({
-  scope,
+/** @internal — only the server's permission seams may mint witnesses. */
+export function mintWitness<Tier extends BindingScopeTier>({
+  tier,
+  id,
   permission,
-  decision,
 }: {
-  scope: Extract<AuthzScopeRef, { type: S }>;
-  permission: string;
-  decision: AuthzDecision;
-}): Authorized<S> {
+  tier: Tier;
+  id: string;
+  permission: AuthzPermission;
+}): Authorized<Tier> {
   return {
     [AUTHORIZED_BRAND]: true,
-    scope,
     permission,
-    decision,
+    scope: { tier, id },
   };
 }

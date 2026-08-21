@@ -26,7 +26,7 @@ vi.mock("~/server/auth", async (importOriginal) => ({
 
 const mockHasProjectPermission = vi.fn();
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  hasProjectPermission: (...args: unknown[]) =>
+  probeProjectPermission: (...args: unknown[]) =>
     mockHasProjectPermission(...args),
 }));
 

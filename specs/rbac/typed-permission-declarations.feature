@@ -184,6 +184,20 @@ Feature: Typed permission declarations
     Then the build fails naming both halves of the declaration
 
   @unit
+  Scenario: A passing imperative check returns a proof, not a boolean
+    Given a caller the engine permits
+    When an asserting imperative check runs
+    Then it returns a witness naming the permission and the decided scope
+    And a function can demand the witness in place of a raw id
+
+  @unit
+  Scenario: An imperative denial throws before the caller can continue
+    Given a caller the engine refuses
+    When an asserting imperative check runs
+    Then it throws the engine's denial with its stable code
+    And an unauthenticated context is refused before any id is read
+
+  @unit
   Scenario: A hand-rolled procedure middleware cannot claim a permission check
     Given the pending procedure builder's custom-check escape hatch
     When a middleware without a declaration is passed to it

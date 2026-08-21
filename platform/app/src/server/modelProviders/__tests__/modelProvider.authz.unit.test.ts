@@ -5,10 +5,10 @@ const hasTeamPermissionMock = vi.fn();
 const hasProjectPermissionMock = vi.fn();
 
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  hasOrganizationPermission: (...args: unknown[]) =>
+  probeOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
-  hasTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
-  hasProjectPermission: (...args: unknown[]) =>
+  probeTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
+  probeProjectPermission: (...args: unknown[]) =>
     hasProjectPermissionMock(...args),
 }));
 

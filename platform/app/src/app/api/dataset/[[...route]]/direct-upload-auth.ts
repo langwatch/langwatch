@@ -11,7 +11,7 @@
  *
  * Dual path so the routes keep working for both callers:
  *   1. NextAuth session cookie (the upload UI) — verified with
- *      `hasProjectPermission`.
+ *      `probeProjectPermission`.
  *   2. Project API key / legacy key / PAT (parity with the rest of the surface)
  *      — resolved via `TokenResolver` + `enforceApiKeyCeiling`.
  *
@@ -27,7 +27,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
@@ -102,7 +102,7 @@ export async function authorizeDirectUpload(
         error: "Cross-site request blocked.",
       };
     }
-    const permitted = await hasProjectPermission(
+    const permitted = await probeProjectPermission(
       { session },
       projectId,
       PERMISSION,

@@ -6,7 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
 import {
@@ -225,7 +225,7 @@ export async function getUserProtectionsForProject(
   // costs; a member resolving an org/project-scoped link sees them only if they
   // hold `cost:view` in-app. Sharing a trace must not disclose spend. See
   // ADR-057.
-  const canSeeCosts = await hasProjectPermission(ctx, projectId, "cost:view");
+  const canSeeCosts = await probeProjectPermission(ctx, projectId, "cost:view");
 
   // The plan-based visibility window applies to every user-facing read,
   // including public shares — sharing must not be the bypass.

@@ -61,7 +61,7 @@ import {
   generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
@@ -911,7 +911,7 @@ secured
     // TeamUser relation. A user added to the team after that migration has no
     // TeamUser row, so the old `team.members.some` check rejected them with a
     // false 403. `project:view` is the baseline grant every team role (incl.
-    // VIEWER) has, and hasProjectPermission also honors org-level access.
+    // VIEWER) has, and probeProjectPermission also honors org-level access.
     // ProjectService is constructed directly (not via getApp()) so this handler
     // stays unit-testable without booting the app container — the same pattern
     // used in presets.ts and the project-service middleware.
@@ -923,7 +923,7 @@ secured
     if (
       !project ||
       project.archivedAt !== null ||
-      !(await hasProjectPermission({ session }, projectId, "project:view"))
+      !(await probeProjectPermission({ session }, projectId, "project:view"))
     ) {
       // Single 403 whether the project is missing, archived, or simply
       // inaccessible — never disclose existence of a project the caller can't reach.

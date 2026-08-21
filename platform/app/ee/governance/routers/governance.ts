@@ -36,7 +36,7 @@ import {
 } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { hasOrganizationPermission } from "~/server/app-layer/permissions/imperative";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
@@ -121,7 +121,7 @@ export const governanceRouter = createTRPCRouter({
           .getUsageStats(input.organizationId, ctx.session.user)
           .then((u) => u?.activePlan?.type === "ENTERPRISE")
           .catch(() => false),
-        hasOrganizationPermission(
+        probeOrganizationPermission(
           ctx,
           input.organizationId,
           "organization:manage",

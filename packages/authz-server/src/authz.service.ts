@@ -4,7 +4,6 @@
  * (platform/app/src/server/app-layer/authz/runtime.ts) and everything asks it:
  *
  *   authz.can({ principal, permission: "prompts:update", scope })
- *   authz.authorize({ ... })            → Authorized witness, or throws
  *   authz.check({ ... })                → full AuthzDecision, never throws
  *   authz.effectivePermissions({ ... }) → string[] (feeds useCan)
  *
@@ -27,7 +26,6 @@
  */
 import {
   ALL_PERMISSIONS,
-  type Authorized,
   AuthzEngine,
   type AuthzDecision,
   type AuthzPermission,
@@ -38,9 +36,7 @@ import {
   type ResourceGrant,
   scopeOrganizationId,
 } from "@langwatch/authz";
-// mintWitness is off the browser-safe barrel: it lives on the server-only
 // subpath alongside the passport primitives.
-import { mintWitness } from "@langwatch/authz/witness";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type { AuthzReadRepository } from "./authz-read.repository";
@@ -131,31 +127,6 @@ export class AuthzService {
   async can(args: CheckArgs): Promise<boolean> {
     const decision = await this.check(args);
     return decision.allowed;
-  }
-
-  /**
-   * Check and throw on denial; on success returns the Authorized witness
-   * for the scope, the only proof object repositories following the
-   * witness convention accept (ADR-092 §7 L3).
-   */
-  async authorize<S extends AuthzScopeRef["type"]>(args: {
-    principal: AuthzPrincipalRef;
-    permission: AuthzPermission;
-    scope: Extract<AuthzScopeRef, { type: S }>;
-  }): Promise<Authorized<S>> {
-    const decision = await this.check(args);
-    if (!decision.allowed) {
-      throw new PermissionDeniedError({
-        permission: args.permission,
-        scope: args.scope,
-        denialReason: decision.denialReason ?? "no-binding",
-      });
-    }
-    return mintWitness({
-      scope: args.scope,
-      permission: args.permission,
-      decision,
-    });
   }
 
   /**

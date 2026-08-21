@@ -1,4 +1,5 @@
 import type { AuthzPermission } from "@langwatch/authz";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import {
@@ -8,7 +9,6 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
   LiteMemberRestrictedError,
@@ -1087,8 +1087,11 @@ export async function resolveProjectPermissionAny(
  * Check if user has a specific permission for a project.
  *
  * @deprecated Production callers use the App-routed helpers in
- * `~/server/app-layer/permissions/imperative` — this stays only as the legacy
- * walk's own test surface until the contract PR deletes the walk.
+ * `~/server/app-layer/permissions/imperative` (`probe*Permission` for a
+ * boolean, `require*Permission` for the throwing form that returns the
+ * Authorized witness) — this stays only as the legacy walk's own test
+ * surface until the contract PR deletes the walk. The names no longer
+ * collide, so a mock can no longer bind the wrong module silently.
  */
 export async function hasProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -1178,8 +1181,11 @@ export async function resolveTeamPermission(
  * Check if user has a specific permission for a team.
  *
  * @deprecated Production callers use the App-routed helpers in
- * `~/server/app-layer/permissions/imperative` — this stays only as the legacy
- * walk's own test surface until the contract PR deletes the walk.
+ * `~/server/app-layer/permissions/imperative` (`probe*Permission` for a
+ * boolean, `require*Permission` for the throwing form that returns the
+ * Authorized witness) — this stays only as the legacy walk's own test
+ * surface until the contract PR deletes the walk. The names no longer
+ * collide, so a mock can no longer bind the wrong module silently.
  */
 export async function hasTeamPermission(
   ctx: { prisma: PrismaClient; session: Session | null },

@@ -20,7 +20,7 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),
 }));
 
-// The route reads hasProjectPermission from the app-layer imperative
+// The route reads probeProjectPermission from the app-layer imperative
 // module (it moved off ~/server/api/rbac with ADR-092); mocking the old
 // path leaves the real check running.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
@@ -28,7 +28,7 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
     await importActual<
       typeof import("~/server/app-layer/permissions/imperative")
     >();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 // Interactive runs have no polling run-state record.

@@ -1,7 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
+import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import {
   SCOPE_TIERS,
   type ScopeAssignment,
@@ -622,7 +622,12 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(declareAuthzMiddleware(SCOPE_AWARE_WRITE_DECLARATION, scopeAwarePermissionMiddleware))
+    .use(
+      declareAuthzMiddleware(
+        SCOPE_AWARE_WRITE_DECLARATION,
+        scopeAwarePermissionMiddleware,
+      ),
+    )
     .mutation(async ({ input, ctx }) => {
       await setRoleAtScope(
         { prisma: ctx.prisma },
@@ -646,7 +651,12 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(declareAuthzMiddleware(SCOPE_AWARE_WRITE_DECLARATION, scopeAwarePermissionMiddleware))
+    .use(
+      declareAuthzMiddleware(
+        SCOPE_AWARE_WRITE_DECLARATION,
+        scopeAwarePermissionMiddleware,
+      ),
+    )
     .mutation(async ({ input, ctx }) => {
       if (!featureByKey(input.featureKey)) {
         throw new Error(`Unknown feature key: "${input.featureKey}".`);
@@ -697,7 +707,12 @@ export const modelProviderRouter = createTRPCRouter({
           .min(1, "Pick at least one scope."),
       }),
     )
-    .use(declareAuthzMiddleware(SAVE_CONFIG_DECLARATION, saveConfigPermissionMiddleware))
+    .use(
+      declareAuthzMiddleware(
+        SAVE_CONFIG_DECLARATION,
+        saveConfigPermissionMiddleware,
+      ),
+    )
     .mutation(async ({ input, ctx }) => {
       if (input.id) {
         await updateConfig(
@@ -729,7 +744,12 @@ export const modelProviderRouter = createTRPCRouter({
    */
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .use(declareAuthzMiddleware(DELETE_CONFIG_DECLARATION, deleteConfigPermissionMiddleware))
+    .use(
+      declareAuthzMiddleware(
+        DELETE_CONFIG_DECLARATION,
+        deleteConfigPermissionMiddleware,
+      ),
+    )
     .mutation(async ({ input, ctx }) => {
       await deleteConfig({ prisma: ctx.prisma }, input.id);
       return { ok: true };
@@ -976,4 +996,3 @@ async function deleteConfigPermissionMiddleware({
   ctx.permissionChecked = true;
   return next();
 }
-

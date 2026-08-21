@@ -51,7 +51,7 @@ vi.mock("~/server/auth", () => ({
 }));
 // The picked shared project's key requires project:update; that RBAC decision
 // is covered elsewhere. Grant it so the gate logic is what's under test.
-// The approval route reads hasProjectPermission from the app-layer
+// The approval route reads probeProjectPermission from the app-layer
 // imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
 // the old path leaves the real check running and the deny test inert.
 vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
@@ -59,12 +59,12 @@ vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
     await importActual<
       typeof import("~/server/app-layer/permissions/imperative")
     >();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 import type { Redis } from "ioredis";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
@@ -494,9 +494,9 @@ describe("CLI login personal-project guards", () => {
     describe("when the caller lacks write access to the picked project", () => {
       /** @scenario project-login approval denies a project the caller cannot write */
       it("returns forbidden and never the project's API key", async () => {
-        // hasProjectPermission is the source of truth: a caller without
+        // probeProjectPermission is the source of truth: a caller without
         // project:update is denied even though the project is in their org.
-        vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
         const userCode = await mintDeviceCode("project_api_key");
 
         const { status, json } = await approve({

@@ -21,7 +21,7 @@ import { createLogger } from "@langwatch/observability";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import {
   ScenarioRunExportForbiddenError,
@@ -57,7 +57,7 @@ secured
         throw new ScenarioRunExportUnauthenticatedError();
       }
 
-      const hasPermission = await hasProjectPermission(
+      const hasPermission = await probeProjectPermission(
         { session },
         request.projectId,
         "scenarios:view",

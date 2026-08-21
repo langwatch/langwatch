@@ -3,7 +3,9 @@ import {
   type DeclaredScopeId,
   PermissionDeniedError,
   type PermissionScopeArg,
+  type TierOfScopeArg,
 } from "@langwatch/authz";
+import { type Authorized, mintWitness } from "@langwatch/authz/witness";
 import type { Permission } from "~/server/api/rbac";
 import type {
   ApiKeyPermissionCheck,
@@ -116,11 +118,17 @@ export class PermissionsService {
   /**
    * The asserting form of {@link hasPermission}: throws the engine's one
    * denial (`permission_denied`, with the permission and tier in `meta`), or
-   * the lite-member restriction where that is the cause.
+   * the lite-member restriction where that is the cause. On success it
+   * returns the {@link Authorized} witness for the decided scope — a
+   * function that takes the witness instead of a raw id cannot be reached by
+   * a path that skipped this check.
    */
-  async requirePermission<P extends AuthzPermission>(
-    check: { userId: string; permission: P } & PermissionScopeArg<P>,
-  ): Promise<void> {
+  async requirePermission<
+    P extends AuthzPermission,
+    A extends PermissionScopeArg<P>,
+  >(
+    check: { userId: string; permission: P } & A,
+  ): Promise<Authorized<TierOfScopeArg<A>>> {
     const scope = scopeOf(check);
     if (!scope) {
       throw new PermissionDeniedError({
@@ -134,7 +142,13 @@ export class PermissionsService {
       permission: check.permission,
       scope,
     });
-    if (permitted) return;
+    if (permitted) {
+      return mintWitness({
+        tier: scope.tier,
+        id: scope.id,
+        permission: check.permission,
+      }) as Authorized<TierOfScopeArg<A>>;
+    }
     if (organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(
         check.permission.split(":")[0] ?? "unknown",

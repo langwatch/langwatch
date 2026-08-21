@@ -66,6 +66,7 @@ export type {
   ScopeTierField,
   ValidatePermissionForInput,
   ViaFieldFor,
+  TierOfScopeArg,
 } from "./declaration";
 export {
   builtinRoleGrants,

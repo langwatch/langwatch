@@ -9,7 +9,7 @@
  *   - reject an API key minted for a different project → 401,
  *   - admit a valid API key for the project (and bump lastUsedAt).
  *
- * The boundaries (`getServerAuthSession`, `hasProjectPermission`,
+ * The boundaries (`getServerAuthSession`, `probeProjectPermission`,
  * `extractCredentials`, `TokenResolver`, `enforceApiKeyCeiling`,
  * `apiKeyCeilingDenialResponse`, `prisma`) are mocked so the test exercises only
  * the authorization decision logic. Mirrors the experiments-v3 auth-test style.
@@ -21,9 +21,10 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
 }));
 
-const hasProjectPermission = vi.fn();
+const probeProjectPermission = vi.fn();
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  hasProjectPermission: (...args: unknown[]) => hasProjectPermission(...args),
+  probeProjectPermission: (...args: unknown[]) =>
+    probeProjectPermission(...args),
 }));
 
 const extractCredentials = vi.fn();
@@ -87,7 +88,7 @@ describe("authorizeDirectUpload", () => {
 
     describe("when the member holds datasets:manage on the project", () => {
       it("authorizes and returns the project + team", async () => {
-        hasProjectPermission.mockResolvedValue(true);
+        probeProjectPermission.mockResolvedValue(true);
 
         // A legit same-site upload carries a positive signal (the CSRF gate now
         // fails closed when both Sec-Fetch-Site and Origin are absent).
@@ -108,7 +109,7 @@ describe("authorizeDirectUpload", () => {
 
     describe("when the member targets a foreign project (IDOR)", () => {
       it("denies with 403 and never resolves the team", async () => {
-        hasProjectPermission.mockResolvedValue(false);
+        probeProjectPermission.mockResolvedValue(false);
 
         // Same-site signal so this exercises the permission denial (IDOR), not
         // the CSRF gate.
@@ -125,7 +126,7 @@ describe("authorizeDirectUpload", () => {
 
     describe("when the request is forged cross-site (CSRF)", () => {
       it("rejects with 403 on Sec-Fetch-Site: cross-site, before any permission check", async () => {
-        hasProjectPermission.mockResolvedValue(true); // would pass if reached
+        probeProjectPermission.mockResolvedValue(true); // would pass if reached
 
         const result = await authorizeDirectUpload(
           makeContext({ "sec-fetch-site": "cross-site" }),
@@ -134,12 +135,12 @@ describe("authorizeDirectUpload", () => {
 
         expect(result).toMatchObject({ ok: false, status: 403 });
         // The CSRF gate fires before the permission check and team resolve.
-        expect(hasProjectPermission).not.toHaveBeenCalled();
+        expect(probeProjectPermission).not.toHaveBeenCalled();
         expect(projectFindUnique).not.toHaveBeenCalled();
       });
 
       it("rejects when the Origin host differs from the Host (older browser, no Sec-Fetch-Site)", async () => {
-        hasProjectPermission.mockResolvedValue(true);
+        probeProjectPermission.mockResolvedValue(true);
 
         const result = await authorizeDirectUpload(
           makeContext({
@@ -150,25 +151,25 @@ describe("authorizeDirectUpload", () => {
         );
 
         expect(result).toMatchObject({ ok: false, status: 403 });
-        expect(hasProjectPermission).not.toHaveBeenCalled();
+        expect(probeProjectPermission).not.toHaveBeenCalled();
       });
 
       it("fails CLOSED when neither Sec-Fetch-Site nor Origin is present", async () => {
-        hasProjectPermission.mockResolvedValue(true); // would pass if reached
+        probeProjectPermission.mockResolvedValue(true); // would pass if reached
 
         // No positive same-site signal at all → treated as cross-site, so a
         // cookie-bearing request from a header-stripping context can't slip past.
         const result = await authorizeDirectUpload(makeContext(), PROJECT_ID);
 
         expect(result).toMatchObject({ ok: false, status: 403 });
-        expect(hasProjectPermission).not.toHaveBeenCalled();
+        expect(probeProjectPermission).not.toHaveBeenCalled();
         expect(projectFindUnique).not.toHaveBeenCalled();
       });
     });
 
     describe("when the request is same-origin", () => {
       it("proceeds to the permission check on Sec-Fetch-Site: same-origin", async () => {
-        hasProjectPermission.mockResolvedValue(true);
+        probeProjectPermission.mockResolvedValue(true);
 
         const result = await authorizeDirectUpload(
           makeContext({ "sec-fetch-site": "same-origin" }),
@@ -180,7 +181,7 @@ describe("authorizeDirectUpload", () => {
           projectId: PROJECT_ID,
           teamId: TEAM_ID,
         });
-        expect(hasProjectPermission).toHaveBeenCalled();
+        expect(probeProjectPermission).toHaveBeenCalled();
       });
     });
   });

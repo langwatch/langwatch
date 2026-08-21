@@ -11,7 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { hasProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import {
@@ -132,7 +132,7 @@ secured
 
     const { prompt, currentScenario, projectId } = body;
 
-    const hasPermission = await hasProjectPermission(
+    const hasPermission = await probeProjectPermission(
       { session },
       projectId,
       "scenarios:manage",

@@ -9,20 +9,20 @@ import {
 } from "../virtualKey.authz";
 
 vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  hasOrganizationPermission: vi.fn(),
-  hasTeamPermission: vi.fn(),
-  hasProjectPermission: vi.fn(),
+  probeOrganizationPermission: vi.fn(),
+  probeTeamPermission: vi.fn(),
+  probeProjectPermission: vi.fn(),
 }));
 
 import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
 
-const orgPerm = vi.mocked(hasOrganizationPermission);
-const teamPerm = vi.mocked(hasTeamPermission);
-const projectPerm = vi.mocked(hasProjectPermission);
+const orgPerm = vi.mocked(probeOrganizationPermission);
+const teamPerm = vi.mocked(probeTeamPermission);
+const projectPerm = vi.mocked(probeProjectPermission);
 
 const ctx = {
   prisma: {} as RBACContext["prisma"],

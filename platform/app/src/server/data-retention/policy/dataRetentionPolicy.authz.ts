@@ -6,9 +6,9 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import {
@@ -53,16 +53,16 @@ async function canWriteScope(
 ): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
-    return hasOrganizationPermission(
+    return probeOrganizationPermission(
       { session: ctx.session },
       scope.scopeId,
       "organization:manage",
     );
   }
   if (scope.scopeType === "TEAM") {
-    return hasTeamPermission(ctx, scope.scopeId, "team:manage");
+    return probeTeamPermission(ctx, scope.scopeId, "team:manage");
   }
-  return hasProjectPermission(ctx, scope.scopeId, "project:update");
+  return probeProjectPermission(ctx, scope.scopeId, "project:update");
 }
 
 /**

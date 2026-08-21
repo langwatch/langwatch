@@ -181,6 +181,16 @@ export type PermissionScopeArg<P extends AuthzPermission> =
       ? { organizationId: string; projectId?: undefined; teamId?: undefined }
       : never);
 
+/**
+ * The tier a {@link PermissionScopeArg} value addressed — what the witness a
+ * throwing check returns is scoped to.
+ */
+export type TierOfScopeArg<A> = A extends { projectId: string }
+  ? "project"
+  : A extends { teamId: string }
+    ? "team"
+    : "organization";
+
 // The same rules at runtime, so the middleware agrees with the types.
 
 /** The input-addressable tiers `permission` can be granted at, narrowest first. */
