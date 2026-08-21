@@ -130,20 +130,29 @@ describe("given the Langy composer is idle", () => {
       renderComposer();
       typeText("run ");
 
-      fireEvent.keyDown(textarea(), { key: "/" });
+      // fireEvent returns false when the handler called preventDefault, which
+      // is how the slash is kept out of the field: the key opens the palette
+      // instead of reaching the browser's own insertion.
+      const reachedTheField = fireEvent.keyDown(textarea(), { key: "/" });
 
+      expect(reachedTheField).toBe(false);
       expect(useLangyStore.getState().draft).toBe("run ");
       expect(screen.getByTestId("langy-palette-title")).toHaveTextContent(
         "Skills",
       );
     });
 
-    it("types the slash mid-word instead of opening the palette", () => {
+    it("lets the slash reach the field mid-word instead of opening the palette", () => {
       renderComposer();
       typeText("and/or");
 
-      fireEvent.keyDown(textarea(), { key: "/" });
+      const reachedTheField = fireEvent.keyDown(textarea(), { key: "/" });
 
+      // Not prevented, so the browser types the character; jsdom does not
+      // insert on a synthetic keydown, so the draft is what proves the
+      // palette stayed shut and the field kept what was typed.
+      expect(reachedTheField).toBe(true);
+      expect(useLangyStore.getState().draft).toBe("and/or");
       expect(
         screen.queryByTestId("langy-palette-title"),
       ).not.toBeInTheDocument();

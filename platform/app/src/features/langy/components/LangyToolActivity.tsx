@@ -964,8 +964,12 @@ function CompletedActivityRow({
   );
   const canOpenResult = callsWithResult.length > 0;
 
+  // Spans, not the default paragraph: the disclosure below wraps these in a
+  // native <button>, which may hold phrasing content only.
   const label = (
     <Text
+      as="span"
+      display="block"
       textStyle="xs"
       color="fg"
       fontWeight="520"
@@ -981,6 +985,8 @@ function CompletedActivityRow({
   );
   const detail = group.detail ? (
     <Text
+      as="span"
+      display="block"
       textStyle="2xs"
       color="fg.subtle"
       fontFamily="mono"
@@ -1570,7 +1576,12 @@ function LatestSettledActivityCard({
   );
 }
 
-/** The held card's headline and its mono detail line, as one block. */
+/**
+ * The held card's headline and its mono detail line, as one block.
+ *
+ * Spans throughout, because the disclosure wraps this in a native `<button>`,
+ * which may hold phrasing content only.
+ */
 function SettledActivityLabel({
   label,
   detail,
@@ -1579,16 +1590,31 @@ function SettledActivityLabel({
   detail?: string;
 }) {
   return (
-    <VStack align="stretch" gap={2} flex={1} minWidth={0}>
-      <Box textStyle="sm" fontWeight="640" lineHeight="1.3">
+    <Box
+      as="span"
+      display="flex"
+      flexDirection="column"
+      alignItems="stretch"
+      gap={2}
+      flex={1}
+      minWidth={0}
+    >
+      <Box as="span" textStyle="sm" fontWeight="640" lineHeight="1.3">
         {completedActivityLabel(label)}
       </Box>
       {detail ? (
-        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
+        <Text
+          as="span"
+          display="block"
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          truncate
+        >
           {detail}
         </Text>
       ) : null}
-    </VStack>
+    </Box>
   );
 }
 

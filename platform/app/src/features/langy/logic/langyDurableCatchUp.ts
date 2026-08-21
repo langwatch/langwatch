@@ -14,6 +14,60 @@ type ApiUtils = ReturnType<typeof api.useUtils>;
 const MAX_CATCH_UP_PAGES = 3;
 
 /**
+ * How a tail fold ended.
+ *
+ *   - `caught-up` — the server said there is nothing left;
+ *   - `behind`    — still truncated at the page ceiling, so the fold is
+ *                   knowingly behind the durable record;
+ *   - `abandoned` — the user selected another conversation while a page was in
+ *                   flight, and the rest of the tail was dropped.
+ */
+type TailFoldOutcome = "caught-up" | "behind" | "abandoned";
+
+/**
+ * Fetch and fold the durable tail from `from`, one page at a time.
+ *
+ * Bounded: each page advances the cursor, and three pages is far beyond any
+ * real burst. `turnProjection` is one global fold and selecting another
+ * conversation resets it, so a page that lands after the user moved on is
+ * dropped — folding it would write the previous turn into the open
+ * conversation's fresh projection.
+ */
+async function foldDurableTail({
+  utils,
+  projectId,
+  conversationId,
+  from,
+}: {
+  utils: ApiUtils;
+  projectId: string;
+  conversationId: string;
+  from: LangyEventCursor;
+}): Promise<TailFoldOutcome> {
+  let after = from;
+  for (let page = 0; page < MAX_CATCH_UP_PAGES; page++) {
+    const tail = await utils.langy.conversationEventsAfter.fetch({
+      projectId,
+      conversationId,
+      after,
+    });
+    if (useLangyStore.getState().activeConversationId !== conversationId) {
+      return "abandoned";
+    }
+    // The inspector's durable lane: the EVENT LOG as this client received it,
+    // recorded before the fold so the tape shows what arrived even if applying
+    // it turns out to be the bug.
+    for (const event of tail.events) {
+      useLangyDevLog.getState().recordDurableEvent(event);
+    }
+    useLangyStore.getState().applyTurnEvents(tail.events);
+    after = tail.cursor;
+    if (!tail.truncated) return "caught-up";
+  }
+  return "behind";
+}
+
+/**
  * Bring the open conversation's LOCAL turn fold up to a durable cursor by
  * fetching and folding the event tail (ADR-059).
  *
@@ -59,32 +113,18 @@ export async function catchUpConversationFold({
   }
   if (compareLangyEventCursors(targetCursor, local) <= 0) return;
 
-  // Bounded catch-up: each page advances the cursor; three pages is far beyond
-  // any real burst. Hitting the ceiling means the tail is still truncated, so
-  // the fold is knowingly behind the durable record and the refetch below is
-  // what brings the panel back.
-  let after = local;
-  let isBehind = false;
-  for (let page = 0; page < MAX_CATCH_UP_PAGES; page++) {
-    const tail = await utils.langy.conversationEventsAfter.fetch({
-      projectId,
-      conversationId,
-      after,
-    });
-    // The inspector's durable lane: the EVENT LOG as this client received
-    // it, recorded before the fold so the tape shows what arrived even if
-    // applying it turns out to be the bug.
-    for (const event of tail.events) {
-      useLangyDevLog.getState().recordDurableEvent(event);
-    }
-    useLangyStore.getState().applyTurnEvents(tail.events);
-    after = tail.cursor;
-    isBehind = tail.truncated;
-    if (!isBehind) break;
-  }
+  const outcome = await foldDurableTail({
+    utils,
+    projectId,
+    conversationId,
+    from: local,
+  });
+  // Nobody is looking at this conversation any more, so there is no view to
+  // repair and no history worth refetching.
+  if (outcome === "abandoned") return;
 
   if (
-    isBehind ||
+    outcome === "behind" ||
     isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)
   ) {
     void utils.langy.messages.invalidate({ projectId, conversationId });

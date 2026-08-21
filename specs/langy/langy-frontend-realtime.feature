@@ -122,6 +122,17 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     And a fold already at the cursor fetches nothing
     And a tail still truncated at the page ceiling refetches the history instead of staying behind
 
+  # The local fold is one document for whichever conversation is open, and
+  # selecting another one resets it. A tail fetched for the conversation the
+  # user just left would otherwise land in the new conversation's fresh fold
+  # and show the previous turn under the wrong title.
+  @unit
+  Scenario: A tail that lands after a conversation switch is dropped
+    Given a durable tail is being fetched for the open conversation
+    When the user selects another conversation before it arrives
+    Then the tail is dropped rather than folded
+    And the conversation now open shows no turn it never ran
+
   # The working indicator (thinking line / status line) is driven by two
   # signals: the live stream and the durable conversation state. The durable
   # state finalizes asynchronously, so the indicator must never outlive the

@@ -148,6 +148,23 @@ export const providersWithoutRegistryModels = (
 };
 
 /**
+ * A real union by model id: the first row that declares a model wins, and the
+ * same model declared again at a wider scope adds nothing. Concatenating
+ * instead put one model in the picker twice, because `getCustomModels` turns
+ * every entry into an option without looking for repeats.
+ */
+const unionCustomModels = <T extends { modelId: string }>(
+  first: readonly T[] | null | undefined,
+  second: readonly T[] | null | undefined,
+): T[] => {
+  const byModelId = new Map<string, T>();
+  for (const model of [...(first ?? []), ...(second ?? [])]) {
+    if (!byModelId.has(model.modelId)) byModelId.set(model.modelId, model);
+  }
+  return [...byModelId.values()];
+};
+
+/**
  * Adapt the array shape (one row per provider+scope) into the legacy
  * `Record<provider, config>` shape that getCustomModels and the custom-model
  * dedup expect. Multiple rows for the same provider (multi-scope) are merged:
@@ -167,14 +184,11 @@ const mergeProviderRowsByKey = (
     byKey[row.provider] = {
       ...existing,
       enabled: existing.enabled || row.enabled,
-      customModels: [
-        ...(existing.customModels ?? []),
-        ...(row.customModels ?? []),
-      ],
-      customEmbeddingsModels: [
-        ...(existing.customEmbeddingsModels ?? []),
-        ...(row.customEmbeddingsModels ?? []),
-      ],
+      customModels: unionCustomModels(existing.customModels, row.customModels),
+      customEmbeddingsModels: unionCustomModels(
+        existing.customEmbeddingsModels,
+        row.customEmbeddingsModels,
+      ),
     };
   }
   return byKey;

@@ -96,6 +96,9 @@ describe("catchUpConversationFold", () => {
   beforeEach(() => {
     useLangyStore.setState({ scopeAnnounced: false });
     useLangyStore.getState().resetForProject("project-test");
+    // Both callers only reach the catch-up for the conversation that is open,
+    // so that is the state under test.
+    useLangyStore.setState({ activeConversationId: "conv-1" });
   });
 
   describe("when the local fold is behind the target cursor", () => {
@@ -193,6 +196,41 @@ describe("catchUpConversationFold", () => {
       const projection = useLangyStore.getState().turnProjection;
       expect(projection.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
       expect(projection.turn?.Status).toBe("completed");
+    });
+  });
+
+  describe("when the user switches conversation while the tail is in flight", () => {
+    /** @scenario A tail that lands after a conversation switch is dropped */
+    it("drops the tail instead of folding it into the conversation now open", async () => {
+      useLangyStore.getState().seedTurnProjection({
+        cursor: { acceptedAt: 100, eventId: "e1" },
+        currentTurnId: "turn-1",
+      });
+      const { utils, fetch } = utilsWith({});
+      // The switch resolves before the fetch does, exactly as it would when a
+      // click lands while the request is open.
+      fetch.mockImplementation(() => {
+        useLangyStore.getState().selectConversation("conv-2");
+        return Promise.resolve({
+          events: [
+            accepted({ id: "e2", createdAt: 200 }),
+            responded({ id: "e3", createdAt: 300 }),
+          ],
+          cursor: { acceptedAt: 300, eventId: "e3" },
+          truncated: false,
+        });
+      });
+
+      await catchUpConversationFold({
+        utils,
+        projectId: "p1",
+        conversationId: "conv-1",
+        targetCursor: { acceptedAt: 300, eventId: "e3" },
+      });
+
+      const projection = useLangyStore.getState().turnProjection;
+      expect(projection.turn).toBeNull();
+      expect(projection.cursor).toBeNull();
     });
   });
 
