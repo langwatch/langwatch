@@ -4,6 +4,8 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 
+import { remediation } from "../app-layer/error-remediation";
+
 /**
  * Message thrown by `organization.acceptInvite` when the invite has already
  * been consumed. Shared between server (where it's thrown) and client (where
@@ -15,9 +17,27 @@ export const INVITE_ALREADY_ACCEPTED_MESSAGE =
 export const INVITE_NOT_READY_MESSAGE =
   "Invite is not ready to be accepted" as const;
 
-export class DuplicateInviteError extends Error {
+/**
+ * An invite for this email is already pending in the organization.
+ *
+ * Handled (409): the tRPC router keeps its own instanceof mapping, and the
+ * REST surface answers the code directly, so a provisioning tool can treat
+ * the conflict as already-done. `email` is in `meta` because a batch invite
+ * needs to say WHICH address collided.
+ */
+export class DuplicateInviteError extends HandledError {
+  declare readonly code: "duplicate_invite";
+
   constructor(email: string) {
-    super(`An active invitation for ${email} already exists`);
+    super(
+      "duplicate_invite",
+      `An active invitation for ${email} already exists`,
+      {
+        httpStatus: 409,
+        meta: { email },
+        ...remediation("duplicate_invite"),
+      },
+    );
     this.name = "DuplicateInviteError";
   }
 }
@@ -49,10 +69,32 @@ export class AlreadyOrganizationMemberError extends HandledError {
   }
 }
 
-export class InviteNotFoundError extends Error {
+export class InviteNotFoundError extends HandledError {
+  declare readonly code: "invite_not_found";
+
   constructor(message = "Invitation not found or is not waiting for approval") {
-    super(message);
+    super("invite_not_found", message, { httpStatus: 404 });
     this.name = "InviteNotFoundError";
+  }
+}
+
+/**
+ * An invite's team assignment named a team outside the organization.
+ *
+ * Refused loudly on the API surface: silently dropping the assignment (the
+ * lenient mode the invite form uses) would let a provisioning tool believe
+ * the team membership was granted.
+ */
+export class TeamNotInOrganizationError extends HandledError {
+  declare readonly code: "team_not_in_organization";
+
+  constructor(teamId: string) {
+    super(
+      "team_not_in_organization",
+      "That team does not belong to this organization",
+      { httpStatus: 422, meta: { teamId } },
+    );
+    this.name = "TeamNotInOrganizationError";
   }
 }
 

@@ -9,6 +9,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [labeled]
   merge_group:
@@ -26,8 +30,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
@@ -42,19 +55,19 @@ jobs:
   lint:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "services/langevals/uv.lock"
@@ -70,19 +83,19 @@ jobs:
   test:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "services/langevals/uv.lock"
@@ -111,7 +124,6 @@ jobs:
         # intermittently. Ignored pending langwatch/langwatch#3240.
         run: |
           uv run pytest -x -v \
-            --ignore=evaluators/legacy/ \
             --ignore=evaluators/ragas/ \
             --ignore=evaluators/langevals/tests/ \
             --ignore=evaluators/openai/tests/ \
@@ -119,17 +131,31 @@ jobs:
             --ignore=evaluators/topic_clustering/tests/ \
             --ignore=tests/
 
+      - name: Run evaluator regression tests that need no provider
+        # `evaluators/langevals/tests/` is ignored by the step above because
+        # its LLM-judged tests are non-deterministic. This file is not one of
+        # them: it stubs the call to the provider, so it needs no key, makes no
+        # provider request and always gives the same answer. The step above also
+        # ignores `tests/`, which holds the same kind of test. Naming both paths
+        # here is what makes them run, and they run on forks too. They guard the
+        # dspy thread-affinity crash that broke every evaluation after the first
+        # one on a long-lived server, the event-loop block that made the health
+        # probe time out under load, and the worker-count detection that has to
+        # survive a bad value without stopping the boot.
+        working-directory: services/langevals
+        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/
+
   docker-build:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -143,8 +169,12 @@ jobs:
           file: infra/docker/Dockerfile.langevals
           push: false
           tags: langwatch/langevals:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped, like every other buildx cache in this repo. Unscoped, this
+          # and langwatch-nlp-ci both wrote to buildkit's default scope and
+          # evicted each other's layers on every run — and with mode=max
+          # against a 10 GB per-repo budget, images this size evict a lot.
+          cache-from: type=gha,scope=langevals
+          cache-to: type=gha,mode=max,scope=langevals
 
   langevals-complete:
     needs: [changes, lint, test, docker-build]

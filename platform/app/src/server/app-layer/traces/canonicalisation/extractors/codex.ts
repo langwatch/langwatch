@@ -69,16 +69,19 @@ const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 /**
  * codex sets its instrumentation scope to the originator: the interactive TUI
- * is `codex_cli_rs`, `codex exec` is `codex_exec`. The exec wire has NO
- * `session_task.turn` rollup, `handle_responses` response spans are its only
- * usage record, so the redundant-usage skip below must never fire for it.
+ * is `codex_cli_rs`, `codex exec` is `codex_exec`. On the exec wire the
+ * `handle_responses` response spans are the authoritative usage record: older
+ * codex emits no `session_task.turn` rollup there at all, and when a newer
+ * codex does emit one it repeats the response spans' summed totals. So under
+ * exec the response-span skip below must never fire, and it is the rollup
+ * that defers instead.
  */
 const CODEX_EXEC_SCOPE_NAME = "codex_exec";
 const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
   CODEX_RUST_SCOPE_NAME,
   CODEX_EXEC_SCOPE_NAME,
 ]);
-const CODEX_TURN_SPAN_NAME = "session_task.turn";
+export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
 // into the `session_task.turn` rollup, so the fold must count the usage on
@@ -160,9 +163,10 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       // call on both wires, and the drawer renders an untyped span as a
       // generic row rather than under the agent turn.
       this.typeUsageSpanAsModelCall(ctx);
-      // The skip marker does not. `codex exec` emits no turn rollup at all,
-      // so its response spans are the trace's ONLY usage record, and skipping
-      // them there would zero the trace totals.
+      // The skip marker does not. On the exec wire the response spans are
+      // the authoritative usage record (older codex emits no turn rollup
+      // there at all), so skipping them would zero those traces' totals;
+      // the exec-side duplicate is the rollup, handled below.
       if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
         this.markRedundantUsageSpan(ctx);
       }
@@ -211,6 +215,18 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     if (applyCanonicalLifts(ctx, lifts)) {
       ctx.recordRule("codex/session_task.turn");
+    }
+
+    // Under `codex_exec` the response spans always accumulate (above), so a
+    // usage-bearing exec rollup is the same totals a second time and must
+    // defer, exactly as the response spans defer to the rollup on the TUI
+    // wire. Checked after the lifts so a rollup whose usage arrives only
+    // codex-spelled is still recognised. If a future codex exec drops its
+    // response spans, this zeroes those traces' totals; today every exec
+    // trace carries both records and counting both doubles all of them.
+    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+      ctx.recordRule("codex/skip-exec-rollup-usage");
     }
   }
 

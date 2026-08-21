@@ -25,6 +25,17 @@ describe("formatLoginCeremony", () => {
     });
   });
 
+  // Parse the command token right after "$ langwatch" instead of scanning
+  // the whole line: formatLoginCeremony appends the displayName after the
+  // command, so substring checks could match a label ("... # langwatch open
+  // helper") and hide a missing or extra wrapper.
+  const getCommandSlug = (line: string): string | undefined =>
+    /^ {2}\$ langwatch (\S+)/.exec(line)?.[1];
+  const isToolCommand = (line: string): boolean => {
+    const slug = getCommandSlug(line);
+    return slug !== undefined && slug !== "open";
+  };
+
   describe("AI tools block", () => {
     describe("when the org publishes coding-assistant tools", () => {
       it("lists exactly those tools as runnable commands with their names", () => {
@@ -35,9 +46,7 @@ describe("formatLoginCeremony", () => {
             { slug: "codex", displayName: "Codex" },
           ],
         });
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
+        const toolLines = lines.filter(isToolCommand);
         expect(toolLines).toHaveLength(2);
         expect(toolLines[0]).toBe("  $ langwatch claude  # Claude Code");
         expect(toolLines[1]).toBe("  $ langwatch codex   # Codex");
@@ -45,23 +54,29 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the org publishes no tools", () => {
-      it("falls back to the built-in default wrappers", () => {
+      it("falls back to every built-in wrapper (all seven tools)", () => {
         const lines = formatLoginCeremony(baseInput);
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
-        expect(toolLines).toHaveLength(3);
-        expect(toolLines.find((l) => l.includes("claude"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("codex"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("cursor"))).toBeDefined();
+        const toolLines = lines.filter(isToolCommand);
+        expect(toolLines).toHaveLength(7);
+        for (const slug of [
+          "claude",
+          "codex",
+          "copilot",
+          "code",
+          "cursor",
+          "gemini",
+          "opencode",
+        ]) {
+          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(
+            true,
+          );
+        }
       });
 
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
-        expect(toolLines).toHaveLength(3);
+        const toolLines = lines.filter(isToolCommand);
+        expect(toolLines).toHaveLength(7);
       });
     });
   });
@@ -121,7 +136,8 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("when a budget is supplied", () => {
+  describe("when the server predates the overview and sends only the collapsed budget", () => {
+    /** @scenario "The login epilogue falls back to the legacy single line on a server without the overview" */
     it("renders the budget line with the storyboard formatting", () => {
       const lines = formatLoginCeremony({
         ...baseInput,
@@ -152,6 +168,154 @@ describe("formatLoginCeremony", () => {
     it("omits the budget section when not supplied", () => {
       const lines = formatLoginCeremony(baseInput);
       expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
+    });
+  });
+
+  describe("budget overview lines (per-budget, labelled)", () => {
+    const orgBudget = {
+      spentUsd: 2.43,
+      limitUsd: 100,
+      window: "MONTH",
+      scopePhrase: "whole organization budget",
+      resetsAt: "2026-08-01T00:00:00.000Z",
+    };
+    const personalBudget = {
+      spentUsd: 0.1,
+      limitUsd: 25,
+      window: "MONTH",
+      scopePhrase: "personal budget",
+      resetsAt: "2026-08-01T00:00:00.000Z",
+    };
+    const deptBudget = {
+      spentUsd: 5,
+      limitUsd: 50,
+      window: "WEEK",
+      scopePhrase: "department budget (Engineering)",
+      resetsAt: "2026-08-03T00:00:00.000Z",
+    };
+
+    // The ceremony is handed an empty list for two different server
+    // answers: gateway access denied, and access granted with no budget
+    // bound. Both must render nothing, so both are covered here.
+    describe("when the organization gives the member no gateway access", () => {
+      /** @scenario "The login epilogue renders nothing without gateway access" */
+      it("renders no budget section at all", () => {
+        const lines = formatLoginCeremony({ ...baseInput, budgets: [] });
+        expect(lines).not.toContain("Budgets that apply to your key:");
+        expect(
+          lines.find((l) => l.includes("budget")),
+        ).toBeUndefined();
+      });
+
+      it("suppresses the legacy collapsed line even when also supplied", () => {
+        // gatewayAccess=false and zero-budget cases both arrive as an
+        // empty list; the unlabeled legacy number must not resurface.
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
+          budgets: [],
+        });
+        expect(
+          lines.find((l) => l.startsWith("Monthly budget:")),
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when one budget applies", () => {
+      /** @scenario "The login epilogue names each budget that applies to the key" */
+      it("renders it with its scope phrase and reset day", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [orgBudget],
+        });
+        expect(lines).toContain("Budgets that apply to your key:");
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
+        );
+      });
+
+      it("appends the provider filter when the budget counts one provider", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [{ ...orgBudget, providerLabel: "OpenAI" }],
+        });
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget, OpenAI only), resets Aug 1",
+        );
+      });
+
+      it("omits the reset suffix for TOTAL windows", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [
+            {
+              spentUsd: 1,
+              limitUsd: 10,
+              window: "TOTAL",
+              scopePhrase: "personal budget",
+              resetsAt: null,
+            },
+          ],
+        });
+        expect(lines).toContain(
+          "  $1.00 used of $10.00 all time (personal budget)",
+        );
+      });
+    });
+
+    describe("when three budgets apply", () => {
+      it("renders all three, one line each", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [personalBudget, deptBudget, orgBudget],
+        });
+        const budgetLines = lines.filter((l) => l.includes(" used of "));
+        expect(budgetLines).toHaveLength(3);
+        expect(budgetLines[0]).toContain("(personal budget)");
+        expect(budgetLines[1]).toContain(
+          "(department budget (Engineering))",
+        );
+        expect(budgetLines[2]).toContain("(whole organization budget)");
+      });
+    });
+
+    describe("when five budgets apply", () => {
+      /** @scenario "The login epilogue caps at three budgets and links the rest" */
+      it("caps at three lines and links to the budgets page for the rest", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [
+            personalBudget,
+            deptBudget,
+            orgBudget,
+            { ...orgBudget, scopePhrase: "team budget (Core)" },
+            { ...orgBudget, scopePhrase: "project budget (Demo)" },
+          ],
+          budgetsUrl: "https://app.langwatch.ai/settings/gateway/budgets",
+        });
+        const budgetLines = lines.filter((l) => l.includes(" used of "));
+        expect(budgetLines).toHaveLength(3);
+        expect(lines).toContain(
+          "  ...and 2 more: https://app.langwatch.ai/settings/gateway/budgets",
+        );
+      });
+    });
+
+    describe("when the overview supersedes the legacy line", () => {
+      /** @scenario "The labelled budget lines replace the legacy single line" */
+      it("renders the labelled lines, not the collapsed number", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
+          budgets: [orgBudget],
+        });
+        expect(
+          lines.find((l) => l.startsWith("Monthly budget:")),
+        ).toBeUndefined();
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
+        );
+      });
     });
   });
 

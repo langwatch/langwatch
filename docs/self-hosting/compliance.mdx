@@ -11,9 +11,9 @@ auditability and PII redaction. Going beyond that, multi-source
 ingestion, extended retention, anomaly detection, OCSF/SIEM export,
 tamper-evidence, requires an **Enterprise** license.
 
-This page is the canonical self-hosted compliance map. Skim it before
-you commit to a deployment plan; the right tier for your org depends
-on which mechanisms you actually need on day one.
+The right tier for your organization depends on which mechanisms you
+need on day one, so read the map below before you commit to a
+deployment plan.
 
 <Info>**Pairs with:** [AI Governance → Compliance architecture](/ai-governance/compliance-architecture). That page documents the underlying substrate; this page narrows it to "what runs in *your* self-hosted box without buying anything else".</Info>
 
@@ -140,8 +140,8 @@ explicitly requires the Enterprise retention extension.
 
 ## What's *intentionally* unavailable on Apache 2.0
 
-Not "limited", *intentional* design boundaries that keep the open-core
-floor narrow enough to be free-as-in-beer-AND-as-in-speech:
+These are deliberate design boundaries that keep the Apache 2.0 floor
+free to run and free to modify:
 
 - **Anomaly detection + dispatch** is Enterprise. The detection is the
   thing you pay for.
@@ -155,12 +155,12 @@ floor narrow enough to be free-as-in-beer-AND-as-in-speech:
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
 - **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD) for sign-in.
+  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
 
 ## Migrating from Apache 2.0 to Enterprise
 
 There's no schema migration. Adding an Enterprise license to a running
-self-hosted deployment unlocks the gated UI surfaces (`<EnterpriseLockedSurface>`
+self-hosted deployment enables the gated UI surfaces (`<EnterpriseLockedSurface>`
 flips to render the page content) and removes the router-layer
 `requireEnterprisePlan` middleware's 403, CLI 402 responses for those
 procedures + endpoints. Existing data, traces, event_log rows,
@@ -172,7 +172,7 @@ For the upgrade path:
 2. Set `LANGWATCH_LICENSE` (or equivalent, see your contract) in your
    self-hosted env.
 3. Restart the control-plane pod, `pnpm dev` (no migration needed).
-4. The previously-gated surfaces light up immediately. Existing
+4. The previously-gated surfaces become available immediately. Existing
    `<EnterpriseLockedSurface>` wraps detect the plan flip on next page
    render.
 
@@ -184,4 +184,4 @@ queryable; gated surfaces re-gate.
 - [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
 - [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
 - [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
-- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD wiring
+- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD, AWS Cognito and OneLogin wiring

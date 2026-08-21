@@ -1,8 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import {
   type ApiErrorEnvelope,
@@ -10,11 +10,23 @@ import {
   canonicalErrorFor,
   requestTraceIds,
 } from "~/app/api/shared/canonical-error";
+import type {
+  Organization,
+  PrismaClient,
+  Project,
+} from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
+import { type App, getApp } from "~/server/app-layer/app";
+// A pure rule with a type-only dependency of its own, so reading it here adds
+// no module cycle back into the Langy feature.
+import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
 import { getTokenType } from "./api-key-token.utils";
-import { ApiKeyPermissionDeniedError } from "./errors";
 import {
+  ApiKeyPermissionDeniedError,
+  ApiKeyPermissionNotDelegableError,
+} from "./errors";
+import {
+  type OrgResolution,
   type OrgResolvedToken,
   type ResolvedToken,
   TokenResolver,
@@ -254,6 +266,33 @@ export type OrgAuthVariables = {
 };
 
 /**
+ * A refusal from {@link createOrgAuthMiddleware} in its throwing mode.
+ *
+ * One class for the three auth refusals rather than one each, because the
+ * refusal descriptors in {@link resolveOrgPrincipal} are the single source of
+ * code, message and status for BOTH modes; a per-code subclass would be a
+ * second place for those to drift apart. Callers branch on `error.code`
+ * (`missing_credentials` / `invalid_credentials` / `organization_not_found`),
+ * which is the cross-boundary discriminant anyway (ADR-045).
+ */
+export class OrgAuthRefusedError extends HandledError {
+  constructor(refusal: AuthRefusal) {
+    super(refusal.code, refusal.message, {
+      httpStatus: refusal.status,
+      // A refusal is the credential's problem; anything 5xx reaching here is
+      // not, and must not be logged as routine customer noise.
+      fault: refusal.status >= 500 ? "platform" : "customer",
+      // The refusal's client-readable context travels in both modes or the
+      // two disagree: `credential_class_mismatch` carries the class a route
+      // needs against the one that arrived, which is what tells a caller to
+      // swap the key rather than hunt a typo.
+      ...(refusal.meta ? { meta: refusal.meta } : {}),
+    });
+    this.name = "OrgAuthRefusedError";
+  }
+}
+
+/**
  * Org-level Hono auth middleware for endpoints that operate at the
  * organization level (e.g. project CRUD). Only accepts API key tokens —
  * legacy project keys are rejected since they lack org context.
@@ -267,13 +306,26 @@ export type OrgAuthVariables = {
  * a family that emits the canonical envelope from its handlers must not
  * answer a flat body when the same request fails one layer earlier. Families
  * predating the envelope stay on `legacy` until they migrate deliberately.
+ *
+ * `refusals` picks WHO turns a refusal into a response. The default,
+ * `"respond"`, answers here in the family's `errorEnvelope`, unchanged for
+ * every existing consumer. `"throw"` raises the same refusal as a
+ * `HandledError` instead (`missing_credentials` / `invalid_credentials` /
+ * `organization_not_found`, via {@link OrgAuthRefusedError}) so a family whose
+ * error handler owns the response shape serialises auth refusals exactly like
+ * its domain errors. A database failure during auth is not a refusal and stays
+ * a plain error in throw mode: it rethrows as-is and degrades to the generic
+ * unknown response at the boundary (ADR-045), rather than being dressed up as
+ * handled.
  */
 export function createOrgAuthMiddleware({
   prisma,
   errorEnvelope = "legacy",
+  refusals = "respond",
 }: {
   prisma: PrismaClient;
   errorEnvelope?: ApiErrorEnvelope;
+  refusals?: "respond" | "throw";
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
@@ -289,7 +341,11 @@ export function createOrgAuthMiddleware({
     });
 
     if (!outcome.ok) {
-      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
+      if (refusals === "throw") raiseOrgAuthRefusal(outcome.refusal);
+      return c.json(
+        refusal(outcome.refusal),
+        outcome.refusal.status as 401 | 500,
+      );
     }
 
     const { organization, resolved } = outcome;
@@ -318,7 +374,71 @@ type AuthRefusal = {
   code: string;
   legacyError: string;
   message: string;
+  /**
+   * Set when the refusal is an infrastructure failure rather than a credential
+   * problem. Only the throwing mode reads it: it rethrows the underlying error
+   * plain instead of minting a handled one. Carried as its own flag rather
+   * than inferred from `cause`, because a rejection whose value is `undefined`
+   * is still an infrastructure failure. The responding mode ignores both, so
+   * its bodies are unchanged by these fields existing.
+   */
+  isInfrastructureFailure?: boolean;
+  cause?: unknown;
+  /**
+   * Client-readable context for the refusal. Only fields a caller acts on:
+   * the credential class a route needs against the one that arrived is the
+   * difference between swapping a key and hunting a typo.
+   */
+  meta?: Record<string, string>;
 };
+
+/**
+ * Turns a refusal into the exception the throwing mode raises. An
+ * infrastructure failure is rethrown plain so it stays an unhandled 500, not a
+ * fake handled one; a non-Error rejection value is wrapped so the boundary
+ * still receives a stack.
+ */
+function raiseOrgAuthRefusal(refusal: AuthRefusal): never {
+  if (refusal.isInfrastructureFailure) {
+    if (refusal.cause instanceof Error) throw refusal.cause;
+    throw new Error(refusal.message, { cause: refusal.cause });
+  }
+  throw new OrgAuthRefusedError(refusal);
+}
+
+/**
+ * What to tell a caller whose token resolved to no organization.
+ *
+ * A working key of the wrong family gets its own answer. The one message this
+ * used to give asserted "Project API keys cannot be used here" at a typo and
+ * at a revoked key too, sending people to check a credential class that was
+ * never the problem. Everything else stays deliberately vague: telling "no
+ * such key" apart from "revoked key" for an unauthenticated caller would
+ * confirm which secrets exist.
+ */
+function refusalForUnresolvedOrg(
+  reason: Extract<OrgResolution, { ok: false }>["reason"],
+): AuthRefusal {
+  if (reason === "wrong_credential_class") {
+    return {
+      status: 401,
+      code: "credential_class_mismatch",
+      legacyError: "Unauthorized",
+      message:
+        "This endpoint needs an organization API key. The key sent is a project API key.",
+      meta: {
+        required: "organization_api_key",
+        presented: "project_api_key",
+      },
+    };
+  }
+  return {
+    status: 401,
+    code: "invalid_credentials",
+    legacyError: "Unauthorized",
+    message: "Invalid credentials.",
+  };
+}
 
 /**
  * The organization behind a credential, or the reason there isn't one.
@@ -357,9 +477,9 @@ async function resolveOrgPrincipal({
     };
   }
 
-  let resolved: OrgResolvedToken | null;
+  let resolution: OrgResolution;
   try {
-    resolved = await resolver.resolveOrgOnly({ token: credentials.token });
+    resolution = await resolver.resolveOrgOnly({ token: credentials.token });
   } catch (error) {
     orgLogger.error({ ...diag, error }, "Database error during org auth");
     return {
@@ -369,34 +489,79 @@ async function resolveOrgPrincipal({
         code: "internal_error",
         legacyError: "Internal Server Error",
         message: "Authentication service error",
+        isInfrastructureFailure: true,
+        cause: error,
       },
     };
   }
 
-  if (!resolved) {
+  if (!resolution.ok) {
     orgLogger.warn(
-      { ...diag, hasToken: true },
-      "Org auth failed: invalid credentials",
+      { ...diag, hasToken: true, reason: resolution.reason },
+      "Org auth failed",
     );
+    return { ok: false, refusal: refusalForUnresolvedOrg(resolution.reason) };
+  }
+
+  const resolved = resolution.resolved;
+
+  const loaded = await loadOrganization({
+    prisma,
+    organizationId: resolved.organizationId,
+    orgLogger,
+    diag,
+  });
+  if (!loaded.ok) return loaded;
+
+  return { ok: true, organization: loaded.organization, resolved };
+}
+
+/**
+ * The organization a resolved credential belongs to, or the refusal that
+ * stands in for it.
+ *
+ * The two ways this can fail are not the same failure: an organization that is
+ * genuinely gone is the credential's problem, while a database that cannot
+ * answer is ours. Both are described here as data, so the responding mode
+ * still answers in the family's shape and the throwing mode still re-raises
+ * the infrastructure failure as it arrived (ADR-045).
+ */
+async function loadOrganization({
+  prisma,
+  organizationId,
+  orgLogger,
+  diag,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  orgLogger: ReturnType<typeof createLogger>;
+  diag: AuthDiagnostics;
+}): Promise<
+  { ok: true; organization: Organization } | { ok: false; refusal: AuthRefusal }
+> {
+  let organization: Organization | null;
+  try {
+    organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+  } catch (error) {
+    orgLogger.error({ ...diag, error }, "Database error during org auth");
     return {
       ok: false,
       refusal: {
-        status: 401,
-        code: "invalid_credentials",
-        legacyError: "Unauthorized",
-        message:
-          "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+        isInfrastructureFailure: true,
+        cause: error,
       },
     };
   }
 
-  const organization = await prisma.organization.findUnique({
-    where: { id: resolved.organizationId },
-  });
-
   if (!organization) {
     orgLogger.warn(
-      { ...diag, organizationId: resolved.organizationId },
+      { ...diag, organizationId },
       "Org auth failed: organization not found",
     );
     return {
@@ -410,7 +575,7 @@ async function resolveOrgPrincipal({
     };
   }
 
-  return { ok: true, organization, resolved };
+  return { ok: true, organization };
 }
 
 /**
@@ -465,18 +630,27 @@ export function collectAuthDiagnostics(c: {
  * Throws `ApiKeyPermissionDeniedError` when denied.
  */
 export async function enforceApiKeyCeiling({
-  prisma,
   resolved,
   permission,
+  app,
 }: {
-  prisma: PrismaClient;
   resolved: ResolvedToken;
   permission: Permission;
+  /**
+   * The App to decide through — pass `appFromContext(c)` where a Hono
+   * context is in hand; handlers without one fall back to the process
+   * singleton (the same instance in production).
+   */
+  app?: App;
 }): Promise<void> {
+  // A legacy project key has no per-permission ceiling: it passes every gate,
+  // including a `permission`-kind policy, because project keys predate RBAC and
+  // carry full project access by design (decision 1: no legacy-key sunset). So
+  // a route's declared permission is decorative for that credential class —
+  // intended, not a gap. Only scoped API keys are checked below.
   if (resolved.type !== "apiKey") return;
 
-  const allowed = await resolveApiKeyPermission({
-    prisma,
+  const allowed = await (app ?? getApp()).permissions.hasApiKeyPermission({
     apiKeyId: resolved.apiKeyId,
     userId: resolved.userId,
     organizationId: resolved.organizationId,
@@ -488,24 +662,56 @@ export async function enforceApiKeyCeiling({
     permission,
   });
 
-  if (!allowed) {
-    permissionLogger.warn(
-      {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-        permission,
-      },
-      "API key ceiling check failed",
-    );
-    throw new ApiKeyPermissionDeniedError(permission, {
-      meta: {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-      },
+  if (!allowed) refuseApiKeyCeiling({ resolved, permission });
+}
+
+/**
+ * The refusal, which is two refusals wearing the same face.
+ *
+ * A Langy session key is denied for one of two reasons that are identical from
+ * the ceiling's point of view: the human it mirrors does not hold the
+ * permission, or Langy is never delegated it at all. Only the first is fixed
+ * by widening the key, so telling a customer to widen it for the second sends
+ * them to a door that does not open — which is exactly what Langy did with
+ * `triggers:create`, offering to retry once the user "granted the permission".
+ */
+function refuseApiKeyCeiling({
+  resolved,
+  permission,
+}: {
+  resolved: Extract<ResolvedToken, { type: "apiKey" }>;
+  permission: Permission;
+}): never {
+  const langyVerdict = resolved.isLangySessionKey
+    ? classifyForLangy(permission)
+    : undefined;
+  const notDelegableReason =
+    langyVerdict?.disposition === "excluded" ? langyVerdict.reason : undefined;
+
+  const meta = {
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    projectId: resolved.project.id,
+  };
+
+  permissionLogger.warn(
+    {
+      ...meta,
+      permission,
+      // The policy's own words, which name the constants a reader of the rule
+      // needs and a customer must never see.
+      ...(notDelegableReason ? { notDelegableReason } : {}),
+    },
+    "API key ceiling check failed",
+  );
+
+  if (notDelegableReason) {
+    throw new ApiKeyPermissionNotDelegableError(permission, {
+      subject: "Langy",
+      meta,
     });
   }
+  throw new ApiKeyPermissionDeniedError(permission, { meta });
 }
 
 /**
@@ -531,7 +737,8 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
 } {
   if (
     HandledError.isHandled(error) &&
-    error.code === "api_key_permission_denied"
+    (error.code === "api_key_permission_denied" ||
+      error.code === "api_key_permission_not_delegable")
   ) {
     const { statusCode, body } = handledErrorResponseBody(error);
     return { status: statusCode, body, message: error.message };
@@ -545,23 +752,33 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
  * from context.
  */
 export function requireApiKeyPermission({
-  prisma,
   permission,
   errorEnvelope = "legacy",
 }: {
-  prisma: PrismaClient;
   permission: Permission;
   errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      await next();
-      return;
+      // A permission gate running with nobody authenticated is a mis-wired
+      // route (the unified auth middleware must be mounted before this one),
+      // not a caller mistake. Refuse rather than wave the request through —
+      // the old pass-through meant a route that forgot its auth middleware
+      // silently lost its permission check too. The plain Error degrades to
+      // the generic unknown response with a trace id (ADR-045) and logs the
+      // misconfiguration loudly; specs/rbac/credential-arbitration.feature.
+      throw new Error(
+        "requireApiKeyPermission ran with no resolved credential — mount the unified auth middleware before the permission gate",
+      );
     }
 
     try {
-      await enforceApiKeyCeiling({ prisma, resolved, permission });
+      await enforceApiKeyCeiling({
+        resolved,
+        permission,
+        app: appFromContext(c),
+      });
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
       // The ceiling refuses BENEATH the family's own error handler, so it has

@@ -6,11 +6,11 @@ description: "Use LangWatch TypeScript manual instrumentation for fine-grained t
 
 # Manual Instrumentation
 
-This guide covers advanced manual span management techniques for TypeScript/JavaScript applications when you need fine-grained control over observability beyond the automatic `withActiveSpan` method.
+Manual span management gives TypeScript and JavaScript applications fine-grained control over observability, beyond what the automatic `withActiveSpan` method provides.
 
 <CardGroup cols={2}>
 <Card title="withActiveSpan Method" icon="auto" href="#withactivespan-method">
-  The recommended approach for most use cases with automatic context management and error handling.
+  The recommended approach, with automatic context management and error handling.
 </Card>
 
 <Card title="Manual Span Control" icon="settings" href="#basic-manual-span-management">
@@ -20,7 +20,7 @@ This guide covers advanced manual span management techniques for TypeScript/Java
 
 ## withActiveSpan Method
 
-The `withActiveSpan` method is the recommended approach for most manual instrumentation needs. It automatically handles context propagation, error handling, and span cleanup, making it both safer and easier to use than manual span management. For consistent attribute naming, combine this with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions).
+The `withActiveSpan` method is the recommended approach for manual instrumentation. It automatically handles context propagation, error handling, and span cleanup, making it both safer and easier to use than manual span management. For consistent attribute naming, combine this with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions).
 
 ### Basic Usage
 
@@ -262,7 +262,7 @@ async function processWithContext(userId: string) {
 
 ## Error Handling Patterns
 
-Implement robust error handling for manual span management:
+Implement error handling for manual span management:
 
 ```typescript
 class SpanManager {
@@ -521,7 +521,7 @@ try {
 </Tabs>
 
 <Info>
-For most use cases, the `withActiveSpan` method provides the best balance of ease of use, safety, and functionality. Only use manual span management when you need specific control over span lifecycle or context propagation that `withActiveSpan` cannot provide.
+The `withActiveSpan` method provides the best balance of ease of use, safety, and functionality. Only use manual span management when you need specific control over span lifecycle or context propagation that `withActiveSpan` cannot provide.
 </Info>
 
 ## Related Documentation

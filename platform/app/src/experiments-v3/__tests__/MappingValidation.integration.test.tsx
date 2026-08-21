@@ -1371,12 +1371,17 @@ describe("Target play button validation", () => {
 // Tests: Evaluator validation with required/optional fields
 // ============================================================================
 
-const createTestEvaluator = (
-  id: string,
-  evaluatorType: string,
-  inputs: Array<{ identifier: string; type: string }>,
-  mappings: EvaluatorConfig["mappings"] = {},
-): EvaluatorConfig => ({
+const createTestEvaluator = ({
+  id,
+  evaluatorType,
+  inputs,
+  mappings = {},
+}: {
+  id: string;
+  evaluatorType: string;
+  inputs: Array<{ identifier: string; type: string }>;
+  mappings?: EvaluatorConfig["mappings"];
+}): EvaluatorConfig => ({
   id,
   evaluatorType: evaluatorType as EvaluatorConfig["evaluatorType"],
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
@@ -1387,16 +1392,16 @@ describe("Evaluator validation with required/optional fields", () => {
   const targetId = "target-1";
 
   it("marks evaluator as valid when all required fields are mapped", () => {
-    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "legacy/ragas_answer_correctness",
-      [
+    // ragas/faithfulness has requiredFields: ["output", "contexts"], optionalFields: ["input"]
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "ragas/faithfulness",
+      inputs: [
         { identifier: "output", type: "str" },
-        { identifier: "expected_output", type: "str" },
+        { identifier: "contexts", type: "str" },
         { identifier: "input", type: "str" },
       ],
-      {
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
             output: {
@@ -1405,17 +1410,17 @@ describe("Evaluator validation with required/optional fields", () => {
               sourceId: targetId,
               sourceField: "output",
             },
-            expected_output: {
+            contexts: {
               type: "source",
               source: "dataset",
               sourceId: DEFAULT_TEST_DATA_ID,
-              sourceField: "expected_output",
+              sourceField: "contexts",
             },
             // "input" is optional and not mapped - should still be valid
           },
         },
       },
-    );
+    });
 
     const result = getEvaluatorMissingMappings(
       evaluator,
@@ -1428,15 +1433,15 @@ describe("Evaluator validation with required/optional fields", () => {
   });
 
   it("marks evaluator as invalid when required field is missing", () => {
-    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"]
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "legacy/ragas_answer_correctness",
-      [
+    // ragas/faithfulness has requiredFields: ["output", "contexts"]
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "ragas/faithfulness",
+      inputs: [
         { identifier: "output", type: "str" },
-        { identifier: "expected_output", type: "str" },
+        { identifier: "contexts", type: "str" },
       ],
-      {
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
             output: {
@@ -1445,11 +1450,11 @@ describe("Evaluator validation with required/optional fields", () => {
               sourceId: targetId,
               sourceField: "output",
             },
-            // "expected_output" is required but missing
+            // "contexts" is required but missing
           },
         },
       },
-    );
+    });
 
     const result = getEvaluatorMissingMappings(
       evaluator,
@@ -1459,21 +1464,21 @@ describe("Evaluator validation with required/optional fields", () => {
 
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
-    expect(result.missingMappings[0]?.fieldId).toBe("expected_output");
+    expect(result.missingMappings[0]?.fieldId).toBe("contexts");
     expect(result.missingMappings[0]?.isRequired).toBe(true);
   });
 
   it("marks evaluator as valid when only optional fields are unmapped (llm_boolean)", () => {
     // langevals/llm_boolean has requiredFields: [], optionalFields: ["input", "output", "contexts"]
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "langevals/llm_boolean",
-      [
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "langevals/llm_boolean",
+      inputs: [
         { identifier: "input", type: "str" },
         { identifier: "output", type: "str" },
         { identifier: "contexts", type: "str" },
       ],
-      {
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
             input: {
@@ -1492,7 +1497,7 @@ describe("Evaluator validation with required/optional fields", () => {
           },
         },
       },
-    );
+    });
 
     const result = getEvaluatorMissingMappings(
       evaluator,
@@ -1506,18 +1511,18 @@ describe("Evaluator validation with required/optional fields", () => {
 
   it("marks evaluator as invalid when ALL fields are empty (even if all optional)", () => {
     // langevals/llm_boolean has requiredFields: [], optionalFields: ["input", "output", "contexts"]
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "langevals/llm_boolean",
-      [
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "langevals/llm_boolean",
+      inputs: [
         { identifier: "input", type: "str" },
         { identifier: "output", type: "str" },
         { identifier: "contexts", type: "str" },
       ],
-      {
+      mappings: {
         // No mappings at all
       },
-    );
+    });
 
     const result = getEvaluatorMissingMappings(
       evaluator,
@@ -1533,15 +1538,15 @@ describe("Evaluator validation with required/optional fields", () => {
 
   it("evaluatorHasMissingMappings returns false for valid evaluator with optional unmapped", () => {
     // langevals/llm_boolean with input and output mapped, contexts unmapped (optional)
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "langevals/llm_boolean",
-      [
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "langevals/llm_boolean",
+      inputs: [
         { identifier: "input", type: "str" },
         { identifier: "output", type: "str" },
         { identifier: "contexts", type: "str" },
       ],
-      {
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
             input: {
@@ -1559,7 +1564,7 @@ describe("Evaluator validation with required/optional fields", () => {
           },
         },
       },
-    );
+    });
 
     expect(
       evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId),
@@ -1567,15 +1572,15 @@ describe("Evaluator validation with required/optional fields", () => {
   });
 
   it("evaluatorHasMissingMappings returns true when all fields empty", () => {
-    const evaluator = createTestEvaluator(
-      "eval-1",
-      "langevals/llm_boolean",
-      [
+    const evaluator = createTestEvaluator({
+      id: "eval-1",
+      evaluatorType: "langevals/llm_boolean",
+      inputs: [
         { identifier: "input", type: "str" },
         { identifier: "output", type: "str" },
       ],
-      {},
-    );
+      mappings: {},
+    });
 
     expect(
       evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId),

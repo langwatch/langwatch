@@ -120,6 +120,7 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
     const onError = this._config.onError ?? createErrorHandler();
     mountResolvedRoutes({
       app,
+      basePath,
       onError,
       providers: this._providers,
       serviceConfig: this._config,
@@ -145,6 +146,33 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
         throw new Error(
           `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} declares resourceLimit ` +
             `"${endpoint.config.resourceLimit}" but the service has no resourceLimitMiddleware`,
+        );
+      }
+      // The runtime half of AccessDeclaration (@langwatch/authz): exactly one
+      // of permission or a written opt-out, judged before the wiring checks so
+      // an invalid declaration is named as such rather than as missing
+      // plumbing. A withdrawal marker carries a placeholder config — its
+      // access came from the registration it withdraws, and its handler never
+      // runs.
+      if (!endpoint.withdrawn) {
+        const optedOut = endpoint.config.noPermission;
+        if (Boolean(endpoint.config.permission) === Boolean(optedOut)) {
+          throw new Error(
+            `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} must declare exactly one of ` +
+              `\`permission\` or \`noPermission: { reason }\``,
+          );
+        }
+        if (optedOut && optedOut.reason.trim() === "") {
+          throw new Error(
+            `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} opts out of its permission ` +
+              `check with a blank reason`,
+          );
+        }
+      }
+      if (endpoint.config.permission && !this._config.permissionEnforcer) {
+        throw new Error(
+          `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} declares permission ` +
+            `"${endpoint.config.permission}" but the service has no permissionEnforcer`,
         );
       }
     }

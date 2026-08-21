@@ -8,6 +8,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [labeled]
   merge_group:
@@ -25,8 +29,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
@@ -43,7 +56,7 @@ jobs:
   test:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -53,23 +66,37 @@ jobs:
     env:
       GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          # Read the floor from the module instead of restating it. The SDK
+          # deliberately targets an older Go than the rest of the repo — it
+          # must build standalone at its declared directive, which is why
+          # these jobs run with GOWORK=off — and a literal here is a second
+          # copy of that decision, free to drift from the first. It already
+          # had: go.mod said 1.25.0 while three other workflows said "1.25",
+          # "1.26" and go.mod's 1.26.5.
+          go-version-file: sdks/go/go.mod
           cache: true
+          # Every module, because test-all.sh walks every go.mod under sdks/go
+          # and a key built from the core module alone goes stale silently.
+          cache-dependency-path: sdks/go/**/go.sum
 
-      - name: Install dependencies
+      # The SDK is a set of separate modules on purpose: importing one
+      # provider's instrumentation must never pull in another's SDK. A single
+      # `go test ./...` in the core therefore covers none of them, so walk
+      # every go.mod instead — test-all.sh vets, tests and gofmt-checks each
+      # module independently. It forwards its arguments to `go test`, so -race
+      # runs the detector: the SDK's span processing, streaming accumulators and
+      # exporters all run on the caller's goroutines, where a data race is a
+      # customer-visible corruption rather than a test-only artefact.
+      - name: Run tests for every module
         working-directory: ./sdks/go
-        run: go mod download
-
-      - name: Run tests
-        working-directory: ./sdks/go
-        run: go test -v ./...
+        run: ./test-all.sh -race
 
       - name: Install examples dependencies
         working-directory: ./sdks/go/examples
@@ -101,7 +128,7 @@ jobs:
   typecheck:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -111,7 +138,7 @@ jobs:
   build:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -120,15 +147,19 @@ jobs:
     env:
       GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          # The module's own floor, as in `test` above.
+          go-version-file: sdks/go/go.mod
           cache: true
+          # The core module only: this job builds it alone, never the
+          # per-provider modules that `test` walks.
+          cache-dependency-path: sdks/go/go.sum
 
       - name: Install dependencies
         working-directory: ./sdks/go

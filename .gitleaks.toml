@@ -27,18 +27,26 @@ targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
 
 # Gateway test fixtures that pattern-match `generic-api-key` but are provably
-# not credentials: a sequential-hex HMAC fixture (`0123456789abcdef...`) signing
-# the vk-lifecycle and spend-ingest route tests, and the literal process key
-# `"conversation-1"` in the process-store suite.
-# Scoped to those test files and the generic rule only, so a real token
-# landing in either is still caught by every provider-specific rule.
+# not credentials: the sequential-hex fixture `0123456789abcdef0123456789abcdef`
+# that signs the vk-lifecycle, vk-expiry and spend-ingest route tests and the
+# gateway JWT suite.
+#
+# Scoped by VALUE as well as path, matched with AND, so a real token landing in
+# one of these files is still reported. The value is anchored: only the whole
+# fixture is allowed, never a string that merely starts with it.
 [[allowlists]]
-description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
+description = "Sequential-hex signing fixture in the gateway tests, not a credential"
 targetRules = ["generic-api-key"]
+condition = "AND"
 paths = [
   '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-expiry\.integration\.test\.ts''',
   '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.health-route\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.config-route\.integration\.test\.ts''',
+  '''platform/app/src/server/gateway/__tests__/gatewayJwt\.unit\.test\.ts''',
 ]
+regexes = ['''^0123456789abcdef0123456789abcdef$''']
 
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
@@ -61,3 +69,161 @@ paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__test
 description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
 targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
+
+# gitleaks scans the branch's whole commit range, not just its tip, so a value
+# removed in a later commit is still found in the commit that added it. This one
+# is the sequential-hex placeholder `0123456789abcdef...` that briefly stood in
+# for CREDENTIALS_SECRET in the CI workflow. It never protected anything: it
+# encrypted and decrypted throwaway rows inside a single CI job, and the workflow
+# generates a random key per run now instead.
+#
+# Scoped by VALUE as well as path, and matched with AND, so any other
+# high-entropy string in a workflow file is still caught. The value is anchored,
+# so a longer secret that merely contains the placeholder is still reported.
+# A real credential cannot be this string.
+#
+# The field is `condition`. `matchCondition` is not a name gitleaks knows, and
+# an unknown key is dropped in silence, which leaves the block as a bare `paths`
+# entry allowlisting the whole workflow file.
+[[allowlists]]
+description = "Sequential-hex CREDENTIALS_SECRET placeholder once inlined in the CI workflow"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
+regexes = ['''^(0123456789abcdef){4}$''']
+
+# The two AWS-shaped literals the secrets-gate tests plant into throwaway
+# repositories. The tests exist to prove the gate fails on a credential a pull
+# request adds and passes on one it did not (#6681), and a fixture that no
+# scanner recognises would prove neither half. No such AWS account exists, and
+# the tests run the scanners in offline mode precisely because these values
+# cannot verify against a provider.
+#
+# Scoped by VALUE and by nothing else, so any OTHER credential — in this file
+# or any other — is still caught by every rule. The two values live in exactly
+# two places, this file and the test script that plants them, so a path scope
+# would add little: the value is the axis that matters.
+[[allowlists]]
+description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
+regexes = [
+  '''AKIAQYLPMN5HHHFPZAM2''',
+  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
+]
+
+# The synthetic credentials the secrets-redaction suite feeds to the redactor.
+# This suite's whole job is to hand credential-shaped strings to `redact()` and
+# assert they come back as `[SECRET]`, so a fixture no scanner recognises would
+# prove nothing, the same argument as the secrets-gate entry above. The five
+# values are a sequential-hex stand-in for a Twilio auth token
+# (`a1b2c3d4e5f6...`), two keyboard-pattern bodies, an obviously-truncated
+# `sk-proj-abc123def456`, and an invented `zyq_` vendor prefix. None names a real
+# account, and the negative half of the same suite asserts ordinary text is left
+# alone.
+#
+# `private-key` is in the rule list for the PEM cases: the suite has to hand the
+# redactor a real armour block to prove it redacts one, and `MIIabc` between
+# BEGIN and END markers is a private key to any scanner. The armour is assembled
+# at run time at the tip so no new literal is added, but gitleaks scans the whole
+# commit range, so the earlier commits that carried it still need naming here.
+#
+# Scoped to these two rules and to this one path, so every provider-specific
+# rule still applies here: a real OpenAI, AWS, GitHub or Stripe token pasted into
+# this file is still caught, which matters more in this file than most given what
+# it is full of. Scoped by path rather than by value so adding a fixture to the
+# corpus does not need a config change.
+[[allowlists]]
+description = "Synthetic credential fixtures fed to the redactor in the secrets-redaction suite"
+targetRules = ["generic-api-key", "private-key"]
+paths = ['''packages/redaction/src/__tests__/secrets\.unit\.test\.ts''']
+
+# `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing
+# docs. An idempotency key is a value the CALLER invents to make a retry safe,
+# and it is meaningless to anyone who is not already authenticated: it names a
+# request, never grants access to one. gitleaks' `generic-api-key` rule fires on
+# the `Key: "<value>"` shape and cannot tell a caller-chosen request tag from a
+# credential. `llms-full.txt` is the generated concatenation of the same pages.
+#
+# Scoped to `generic-api-key` and to docs paths only, so a real token pasted
+# into the documentation is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Idempotency-Key examples in the docs are caller-chosen request tags, not credentials"
+targetRules = ["generic-api-key"]
+paths = [
+  '''docs/ai-gateway/api/management\.mdx''',
+  '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
+  '''docs/llms-full\.txt''',
+]
+
+# `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
+# `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
+# before it reaches a log. To prove that, the fixture has to be shaped exactly
+# like the thing a real leak would be — so gitleaks flags it, correctly, on
+# shape alone.
+#
+# Naming the value, as this file requires. `LEAKED_TOKEN` is three base64
+# segments that decode to:
+#   header    {"alg":"RS256","typ":"JWT"}
+#   payload   {"aud":"https://storage"}
+#   signature the literal ASCII word `signature`
+# No key signed it, it names no tenant, no account and no subject, and it
+# authenticates against nothing. Decode it and there is nothing to revoke.
+#
+# Scoped to this one file and to the two rules its shape trips, so every other
+# rule still applies here: a real Azure account key or SAS token landing in this
+# file is still caught.
+[[allowlists]]
+description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
+targetRules = ["jwt", "generic-api-key"]
+paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
+
+# The three synthetic credentials the secret-redaction tests assign to a named
+# key. Same argument as the Azure fixture above: a test that proves a secret is
+# scrubbed has to hand it something shaped like the thing a real leak would be,
+# and gitleaks' `generic-api-key` rule fires on the `TOKEN": "<high-entropy
+# value>"` shape without being able to tell the fixture from what it imitates.
+#
+# Naming the values, as this file requires:
+#   sk-live-abc123    printed by a code node in the nlpgo stdout/stderr
+#                     redaction test. Already the repository's stand-in leak in
+#                     services/langyagent and services/aigateway, where it sits
+#                     in prose rather than an assignment and so goes unflagged.
+#   hunter2-signing   the second secret in that same test, present to prove the
+#                     scrub covers every entry in the map and not just the first.
+#   tok-live-abc123   the `{{ secrets.NAME }}` value in the scenario HTTP target
+#                     test.
+# No provider issued any of them, none has ever authenticated anything, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE rather than by path, which is the stronger of the two: any
+# other high-entropy string in these files is still caught, and the same fixture
+# stays covered wherever else it is used. Scoped to `generic-api-key` on top, so
+# every provider-specific rule still applies to these values too.
+#
+# ANCHORED, because a gitleaks allowlist regex is a substring match against the
+# matched secret. Unanchored, `sk-live-abc123` would also allow a real
+# `sk-live-abc123<rest-of-a-live-key>`, which is the one string an attacker
+# could pick on purpose. `^...$` allows the fixture and nothing that merely
+# starts with it.
+[[allowlists]]
+description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^sk-live-abc123$''',
+  '''^hunter2-signing$''',
+  '''^tok-live-abc123$''',
+]
+
+# `ik-lw-fresh1234567890_secret`, the stand-in ingestion token an earlier commit
+# on the ingest-key rotation branch handed the mocked `apiKeys.create`. The tip
+# spells it `ik-lw-fake-token`, which no rule fires on, but gitleaks scans the
+# whole commit range on a pull request, so the earlier commit still needs naming
+# here. The value was invented for a mock return, reaches no provider, and
+# authenticates nothing.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real token that merely starts with
+# this prefix.
+[[allowlists]]
+description = "Stand-in ingestion token in the ingest-key rotation test, issued by nobody"
+targetRules = ["generic-api-key"]
+regexes = ['''^ik-lw-fresh1234567890_secret$''']

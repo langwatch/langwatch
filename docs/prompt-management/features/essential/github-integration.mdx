@@ -3,11 +3,11 @@ title: "GitHub Integration"
 description: "Sync prompts with GitHub using LangWatch to maintain version history, enable review workflows, and support agent evaluations."
 ---
 
-LangWatch's prompt management integrates seamlessly with GitHub through the [Prompts CLI](/prompt-management/cli), enabling you to version control your prompts alongside your code and automatically sync changes with the LangWatch platform.
+LangWatch's prompt management integrates with GitHub through the [Prompts CLI](/prompt-management/cli), so you can version control your prompts alongside your code and automatically sync changes with the LangWatch platform.
 
 ## How It Works
 
-The CLI creates standard YAML files that work perfectly with Git workflows:
+The CLI creates standard YAML files that you commit like any other file:
 - **Local prompts** are stored as `.prompt.yaml` files in your repository
 - **Remote prompts** are materialized locally but gitignored (fetched fresh on each sync)
 - **Dependencies** are declared in `prompts.json` and locked in `prompts-lock.json`
@@ -49,7 +49,7 @@ This ensures remote prompts are fetched fresh and not committed to your reposito
 
 ### 3. Create and Version Your Prompts
 
-Create local prompts that will be versioned with your code:
+Create local prompts that are versioned with your code:
 
 ```bash
 # Create a prompt for your feature

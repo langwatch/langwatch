@@ -3,10 +3,40 @@
  *
  * Router-level tests for automation filter validation and update sanitization.
  */
-import { TriggerAction } from "@prisma/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type RedisConnection,
+  RedisConnectionService,
+} from "@langwatch/redis-client";
+import { nanoid } from "nanoid";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
+
+/** Handed to the test App so the cap paths reach the same Redis this file does. */
+let connection: RedisConnection | null = null;
+
+beforeAll(() => {
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
+  });
+});
+
+afterAll(() => {
+  connection?.disconnect();
+});
 
 const {
   mockEnforceLicenseLimit,
@@ -70,12 +100,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission: vi.fn().mockImplementation(() => {
-      return async ({ ctx, next }: any) =>
-        next({
-          ctx: { ...ctx, permissionChecked: true },
-        });
-    }),
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
@@ -83,6 +110,13 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+import {
+  _resetMemoryPersistCapStore,
+  consumePersistCapSlot,
+  persistCapClaimKey,
+  persistCapKey,
+  resolvePersistDailyCap,
+} from "../../../app-layer/automations/dispatch/persistCap";
 import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
 import { TriggerService } from "../../../app-layer/automations/trigger.service";
 import { automationRouter } from "../automations";
@@ -156,6 +190,9 @@ describe("automationRouter", () => {
     });
     globalForApp.__langwatch_app = createTestApp({
       triggers: triggerService,
+      // The cap counters this suite asserts on live on the real Redis, and
+      // both the router's read and the direct consume calls take it from here.
+      redis: connection,
     });
     caller = createTestCaller();
   });
@@ -284,7 +321,11 @@ describe("automationRouter", () => {
           await caller.upsert(baseGraphAlertInput as any);
 
           expect(mockCustomGraphFindUnique).toHaveBeenCalledWith({
-            where: { id: "graph_1", projectId: "proj_123" },
+            where: {
+              id: "graph_1",
+              projectId: "proj_123",
+              kind: BUILDER_CHART_KIND,
+            },
             select: { id: true },
           });
           expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
@@ -701,6 +742,57 @@ describe("automationRouter", () => {
       },
     };
 
+    describe("when a paused automation is switched back on", () => {
+      /** @scenario "Resuming a paused automation clears the pause reason" */
+      it("clears the platform's pause record in the same write", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce({
+          triggerKind: "TRIGGER",
+          actionParams: {},
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "paused_trig",
+          action: TriggerAction.ADD_TO_DATASET,
+          active: true,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "paused_trig",
+          active: true,
+        });
+
+        expect(mockTriggerUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { active: true, pausedReason: null, pausedAt: null },
+          }),
+        );
+      });
+
+      it("leaves the pause record alone when switching OFF", async () => {
+        // Pausing by hand must not erase why the platform paused it earlier;
+        // only resuming declares the pause over.
+        mockTriggerFindUnique.mockResolvedValueOnce({
+          triggerKind: "TRIGGER",
+          actionParams: {},
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "paused_trig",
+          action: TriggerAction.ADD_TO_DATASET,
+          active: false,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "paused_trig",
+          active: false,
+        });
+
+        expect(mockTriggerUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { active: false } }),
+        );
+      });
+    });
+
     describe("when a REPORT is paused", () => {
       it("retires its scheduler job, so it stops claiming slots it will never send", async () => {
         mockTriggerFindUnique.mockResolvedValueOnce(reportRow);
@@ -815,7 +907,11 @@ describe("automationRouter", () => {
 
         // Multitenancy: the graph lookup is scoped to the calling project.
         expect(mockCustomGraphFindMany).toHaveBeenCalledWith({
-          where: { id: { in: ["graph-1"] }, projectId: "proj_123" },
+          where: {
+            id: { in: ["graph-1"] },
+            projectId: "proj_123",
+            kind: BUILDER_CHART_KIND,
+          },
           select: { id: true, name: true },
         });
         const graphRow = result.find((t) => t.id === "trigger_graph");
@@ -1020,6 +1116,293 @@ describe("automationRouter", () => {
 
         expect(mockTriggerUpdate).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  // What the automations list reads to say "N matches skipped today". Without
+  // it, a customer sees an automation switched on and producing nothing, with
+  // nothing on the page to explain the gap.
+  describe("given an automation that passed its ceiling today", () => {
+    // The cap counter lives on the real Redis under a 25h TTL, so ids reused
+    // across runs would carry one run's count into the next one on the same UTC
+    // day and make the skipped assertion drift. Run-unique ids keep each run on
+    // its own counter, and the keys they write are deleted after it.
+    const writtenKeys: string[] = [];
+
+    afterEach(async () => {
+      // One key per DEL: a multi-key DEL fails with CROSSSLOT on a Redis
+      // Cluster connection, and a failed teardown would strand 25h keys.
+      for (const key of writtenKeys) {
+        await connection?.del(key);
+      }
+      writtenKeys.length = 0;
+    });
+
+    describe("when the automations list reads the daily cap status", () => {
+      /** @scenario "The automations list shows what was skipped today" */
+      it("reports today's skipped count per automation alongside the ceiling", async () => {
+        _resetMemoryPersistCapStore();
+        const projectId = `proj_${nanoid(8)}`;
+        const busyTrigger = `trigger_busy_${nanoid(8)}`;
+        const quietTrigger = `trigger_quiet_${nanoid(8)}`;
+        const now = new Date();
+
+        const cap = await resolvePersistDailyCap(projectId);
+        writtenKeys.push(
+          `ttlcache:persist-daily-cap:${projectId}`,
+          persistCapKey({ projectId, triggerId: busyTrigger, now }),
+        );
+        for (let index = 0; index <= cap; index++) {
+          const dedupKey = `${projectId}/${busyTrigger}:persist:trace-${index}`;
+          writtenKeys.push(
+            persistCapClaimKey({
+              projectId,
+              triggerId: busyTrigger,
+              dedupKey,
+            }),
+          );
+          await consumePersistCapSlot({
+            projectId,
+            triggerId: busyTrigger,
+            now,
+            cap,
+            dedupKey,
+          });
+        }
+
+        mockTriggerFindMany.mockResolvedValue([
+          { id: busyTrigger },
+          { id: quietTrigger },
+        ]);
+
+        const status = await caller.getDailyCapStatus({ projectId });
+
+        expect(status.cap).toBe(cap);
+        expect(status.counts[busyTrigger]?.skipped).toBe(1);
+        expect(status.counts[quietTrigger]?.skipped).toBe(0);
+      });
+
+      /** @scenario "Every automation on the list reports what it skipped" */
+      it("covers automations past the size one request used to carry", async () => {
+        // The status used to take the ids from the caller, capped at 500, so
+        // the badge silently vanished from every automation after that. The
+        // count is read here for whatever the project owns.
+        _resetMemoryPersistCapStore();
+        const projectId = `proj_${nanoid(8)}`;
+        const lateTrigger = `trigger_late_${nanoid(8)}`;
+        const now = new Date();
+
+        const cap = await resolvePersistDailyCap(projectId);
+        writtenKeys.push(
+          `ttlcache:persist-daily-cap:${projectId}`,
+          persistCapKey({ projectId, triggerId: lateTrigger, now }),
+        );
+        for (let index = 0; index <= cap; index++) {
+          const dedupKey = `${projectId}/${lateTrigger}:persist:trace-${index}`;
+          writtenKeys.push(
+            persistCapClaimKey({ projectId, triggerId: lateTrigger, dedupKey }),
+          );
+          await consumePersistCapSlot({
+            projectId,
+            triggerId: lateTrigger,
+            now,
+            cap,
+            dedupKey,
+          });
+        }
+
+        mockTriggerFindMany.mockResolvedValue([
+          ...Array.from({ length: 600 }, (_, index) => ({
+            id: `trigger_quiet_${index}`,
+          })),
+          { id: lateTrigger },
+        ]);
+
+        const status = await caller.getDailyCapStatus({ projectId });
+
+        expect(Object.keys(status.counts)).toHaveLength(601);
+        expect(status.counts[lateTrigger]?.skipped).toBe(1);
+      });
+    });
+  });
+
+  // The drawer has always refused a condition-less automation, but only in the
+  // browser. Every server write path accepted one, so the rule was one curl
+  // away from being bypassed — and the REST create went further and DEFAULTED
+  // the condition to empty. A match-everything automation fires on every trace
+  // forever, which is the one genuinely customer-facing hole behind the volume
+  // incident. These pin the rule where it belongs, on the server.
+  describe("when a write would leave an automation with no condition", () => {
+    const baseAutomationInput = {
+      projectId: "proj_123",
+      name: "No condition",
+      action: TriggerAction.SEND_SLACK_MESSAGE,
+      filters: {},
+      customGraphId: null,
+      actionParams: {
+        slackWebhook: "https://hooks.slack.com/services/abc",
+      },
+      templates: {
+        slackTemplate: null,
+        slackTemplateType: null,
+        emailSubjectTemplate: null,
+        emailBodyTemplate: null,
+      },
+    };
+
+    /** @scenario "Creating an automation with no condition is refused" */
+    it("refuses the legacy create and persists nothing", async () => {
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "No condition",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          filters: {},
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/abc",
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses the upsert create and persists nothing", async () => {
+      await expect(
+        caller.upsert(baseAutomationInput as any),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a key selector that carries no values", async () => {
+      // A shallow vacuity check counted the outer key as a condition while the
+      // matcher discarded the empty leaf, so this shape saved cleanly and then
+      // fired on every trace. Validator and matcher now share one recursive
+      // check, so it is refused like the empty object.
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "Vacuous key selector",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          filters: { "metadata.labels": { region: [] } } as any,
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/abc",
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Editing an automation down to no condition is refused" */
+    it("refuses to strip the last condition off an existing automation", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        id: "trigger_test_123",
+        triggerKind: "AUTOMATION",
+        filterQuery: null,
+        filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
+      });
+
+      await expect(
+        caller.updateTriggerFilters({
+          projectId: "proj_123",
+          triggerId: "trigger_test_123",
+          filters: {},
+        }),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerUpdate).not.toHaveBeenCalled();
+    });
+
+    it("allows clearing the structured set when a query still narrows it", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        id: "trigger_test_123",
+        triggerKind: "AUTOMATION",
+        filterQuery: "status:error",
+        filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
+      });
+
+      await caller.updateTriggerFilters({
+        projectId: "proj_123",
+        triggerId: "trigger_test_123",
+        filters: {},
+      });
+
+      expect(mockTriggerUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A query is a condition on its own" */
+    it("accepts a query as the whole condition", async () => {
+      mockTriggerCreate.mockResolvedValueOnce({
+        id: "trigger_new",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+      });
+
+      await caller.upsert({
+        ...baseAutomationInput,
+        filterQuery: "status:error",
+      } as any);
+
+      expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+      const createArgs = mockTriggerCreate.mock.calls[0]![0];
+      expect(createArgs.data.filterQuery).toBe("status:error");
+      // A query supersedes the structured set, which persists empty.
+      expect(createArgs.data.filters).toBe("{}");
+    });
+
+    it("refuses a query that is only whitespace", async () => {
+      await expect(
+        caller.upsert({
+          ...baseAutomationInput,
+          filterQuery: "   ",
+        } as any),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Alerts and reports do not need a trace condition" */
+    it("accepts a graph alert with no trace condition", async () => {
+      mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+      mockTriggerCreate.mockResolvedValueOnce({
+        id: "trigger_new",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+      });
+
+      // A graph alert's condition IS the threshold rule; it has no trace
+      // filter to require, and its `filters` is empty by construction.
+      await caller.upsert({
+        ...baseAutomationInput,
+        alertType: "WARNING" as const,
+        customGraphId: "graph_1",
+        graphAlert: {
+          seriesName: "0/latency/p95",
+          operator: "gt" as const,
+          threshold: 250,
+          timePeriod: 60 as const,
+        },
+      } as any);
+
+      expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+      expect(mockTriggerCreate.mock.calls[0]![0].data.triggerKind).toBe(
+        "ALERT",
+      );
     });
   });
 });

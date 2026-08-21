@@ -21,10 +21,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import {
+	type BudgetOverviewResponse,
 	type CliBootstrapResponse,
 	extractLookupIdFromToken,
+	getBudgetOverview,
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
@@ -42,7 +45,7 @@ import { formatLoginCeremony } from "./login-ceremony";
 import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
-	/** Credential type to mint. Defaults to 'device_session' for back-compat. */
+	/** Credential type to request. Defaults to 'device_session' for back-compat. */
 	kind?: CredentialType;
 	/** Optional browser override (LANGWATCH_BROWSER also honoured). */
 	browser?: string;
@@ -78,7 +81,7 @@ export async function runUnifiedLoginFlow(
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
 		dc.verification_uri_complete ??
-		`${dc.verification_uri.replace(/\/+$/, "")}?user_code=${encodeURIComponent(dc.user_code)}`;
+		`${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;
 
 	console.log();
 	console.log(chalk.cyan(`Opening: ${verifyURL}`));
@@ -157,10 +160,15 @@ export async function runUnifiedLoginFlow(
 						cfg.default_personal_ingest_keys,
 					)) {
 						const lookupId = extractLookupIdFromToken(entry.secret ?? "");
-						if (lookupId && liveSet.has(`${sourceType}:${lookupId}`)) {
+						if (lookupId === undefined) {
+							// Not a personal ik-lw- token: a credential the user placed
+							// here by hand. It cannot be matched against the personal
+							// listing, so it is kept, never dropped as stale.
+							reconciled[sourceType] = entry;
+						} else if (liveSet.has(`${sourceType}:${lookupId}`)) {
 							reconciled[sourceType] = entry;
 						} else {
-							// Entry is stale (revoked or lookupId missing) — omit from reconciled
+							// Revoked on the platform — omit from reconciled.
 							changed = true;
 						}
 					}
@@ -196,6 +204,31 @@ export async function runUnifiedLoginFlow(
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
 
+			// Per-budget epilogue data. Every budget that binds this key,
+			// labelled with its scope, so the ceremony never presents the
+			// whole organization's cap as if it were personal. Null on older
+			// servers without the endpoint; the ceremony then falls back to
+			// the /bootstrap collapsed line.
+			const budgetOverview = await fetchBudgetOverviewSafely(cfg);
+
+			// Three states, named rather than nested: undefined means the
+			// server predates the overview endpoint and the ceremony may
+			// fall back to the legacy line; an empty list means the member
+			// has no gateway access, which renders nothing budget-related
+			// and stops the legacy line resurfacing it.
+			const ceremonyBudgets = !budgetOverview
+				? undefined
+				: budgetOverview.gatewayAccess
+					? budgetOverview.budgets.map((b) => ({
+							spentUsd: Number.parseFloat(b.spentUsd) || 0,
+							limitUsd: Number.parseFloat(b.limitUsd) || 0,
+							window: b.window,
+							scopePhrase: b.scopePhrase,
+							providerLabel: b.providerLabel,
+							resetsAt: b.resetsAt,
+						}))
+					: [];
+
 			console.log();
 			const ceremonyLines = formatLoginCeremony({
 				email: cfg.user?.email ?? result.user.email,
@@ -210,6 +243,8 @@ export async function runUnifiedLoginFlow(
 								usedUsd: bootstrap.budget.monthlyUsedUsd,
 							}
 						: undefined,
+				budgets: ceremonyBudgets,
+				budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
 			});
 			for (const line of ceremonyLines) {
 				console.log(line);
@@ -222,7 +257,7 @@ export async function runUnifiedLoginFlow(
 
 		// kind === 'api_key' — write to project-local .env (NO copy-paste)
 		spinner.succeed(
-			`API key generated for project ${chalk.bold(result.project.name)}`,
+			`Connected to project ${chalk.bold(result.project.name)}`,
 		);
 		// Seed the identity notice's credential-to-project-name cache while the
 		// server is telling us the name anyway, so the first api-key notice
@@ -322,7 +357,7 @@ function persistDeviceSession(
 		};
 	}
 	if (result.endpoint) {
-		cfg.control_plane_url = result.endpoint.replace(/\/+$/, "");
+		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}
 }
 
@@ -365,6 +400,29 @@ async function fetchBootstrapSafely(
 	try {
 		return await getCliBootstrap(cfg);
 	} catch {
+		return null;
+	}
+}
+
+/**
+ * The login has already succeeded by the time this runs, so the epilogue
+ * gets a deadline rather than the user's patience: a control plane that
+ * accepts the connection and never answers would otherwise stop the
+ * ceremony from printing at all.
+ */
+const BUDGET_OVERVIEW_TIMEOUT_MS = 5_000;
+
+async function fetchBudgetOverviewSafely(
+	cfg: GovernanceConfig,
+): Promise<BudgetOverviewResponse | null> {
+	try {
+		return await getBudgetOverview(cfg, {
+			timeoutMs: BUDGET_OVERVIEW_TIMEOUT_MS,
+		});
+	} catch {
+		// The epilogue is decoration on a login that already succeeded:
+		// a timeout, a refused connection or a 5xx all fall back to the
+		// legacy collapsed line rather than failing the login.
 		return null;
 	}
 }

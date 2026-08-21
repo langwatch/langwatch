@@ -1,11 +1,12 @@
 import { TupleParam } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
+  buildDedupedRunItemsWhere,
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
@@ -38,8 +39,16 @@ interface ClickHouseCountRow {
 }
 
 type ProjectClickHouseClient = NonNullable<
-  Awaited<ReturnType<typeof getClickHouseClientForProject>>
+  Awaited<ReturnType<typeof projectClickHouseClient>>
 >;
+
+/** The App's per-tenant resolver, preserving this service's documented
+ *  no-client semantics: null when ClickHouse is not enabled, never a throw. */
+async function projectClickHouseClient(projectId: string) {
+  const { clickhouse } = getApp();
+  if (!clickhouse.enabled) return null;
+  return clickhouse.resolveClient(projectId);
+}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -121,7 +130,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -224,7 +233,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -299,7 +308,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -429,7 +438,7 @@ export class ExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           // Deliberately `null`, not `throw` — see method JSDoc above for
           // why this method diverges from the rest of the class.
@@ -634,14 +643,6 @@ export class ExperimentRunService {
     });
 
     // Fetch per-evaluator breakdown for all runs.
-    //
-    // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
-    // of the per-row dedup anti-pattern. That pattern reads every selected column
-    // (including heavy payloads like EvaluationDetails / EvaluationInputs)
-    // before deduplicating, which can OOM on large parts. The IN-tuple
-    // pattern resolves dedup using only lightweight key columns and the
-    // ReplacingMergeTree version column (OccurredAt). See
-    // trace-dedup-oom-safety.unit.test.ts for the rationale.
     const breakdownResult = await clickHouseClient.query({
       query: `
         SELECT
@@ -653,29 +654,12 @@ export class ExperimentRunService {
           if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
           countIf(Passed IS NOT NULL) AS hasPassedCount
         FROM experiment_run_items
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-          AND ResultType = 'evaluator'
-          AND EvaluationStatus = 'processed'
-          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-            SELECT
-              TenantId,
-              ExperimentId,
-              RunId,
-              RowIndex,
-              TargetId,
-              ResultType,
-              coalesce(EvaluatorId, ''),
-              max(OccurredAt)
-            FROM experiment_run_items
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-              AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-          )
+        ${buildDedupedRunItemsWhere({
+          extraFilters: [
+            "ResultType = 'evaluator'",
+            "EvaluationStatus = 'processed'",
+          ],
+        })}
         GROUP BY ExperimentId, RunId, EvaluatorId
         LIMIT 10000
       `,
@@ -706,8 +690,6 @@ export class ExperimentRunService {
     }
 
     // Fetch cost/duration summary per run.
-    // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
-    // the breakdown query above — see comment there for the rationale.
     const costResult = await clickHouseClient.query({
       query: `
         SELECT
@@ -720,27 +702,7 @@ export class ExperimentRunService {
           avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
           avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
         FROM experiment_run_items
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-            SELECT
-              TenantId,
-              ExperimentId,
-              RunId,
-              RowIndex,
-              TargetId,
-              ResultType,
-              coalesce(EvaluatorId, ''),
-              max(OccurredAt)
-            FROM experiment_run_items
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-              AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-          )
+        ${buildDedupedRunItemsWhere()}
         GROUP BY ExperimentId, RunId
         LIMIT 10000
       `,

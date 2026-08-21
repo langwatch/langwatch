@@ -1,4 +1,4 @@
-go 1.26.5
+go 1.26.6
 
 // Monorepo Go workspace. Ties the root module together with the in-tree
 // SDK and the ClickHouse operator so local builds resolve them without

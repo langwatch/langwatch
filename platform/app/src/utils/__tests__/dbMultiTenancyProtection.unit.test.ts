@@ -1,5 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardProjectId,
   PROJECT_TENANCY_REGIMES,
@@ -19,22 +20,9 @@ import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
  * These tests lock that in.
  */
 
-async function runGuard(
-  params: Partial<Prisma.MiddlewareParams> & {
-    model: string;
-    action: Prisma.MiddlewareParams["action"];
-    args: Prisma.MiddlewareParams["args"];
-  },
-): Promise<unknown> {
+async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
-  return guardProjectId(
-    {
-      dataPath: [],
-      runInTransaction: false,
-      ...params,
-    } as Prisma.MiddlewareParams,
-    next,
-  );
+  return guardProjectId(params, next);
 }
 
 describe("guardProjectId — exempt org-scoped gateway models", () => {
@@ -208,27 +196,93 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
   });
 });
 
-describe("guardProjectId — WebhookDelivery cleanup", () => {
-  describe("when deleteMany omits projectId", () => {
-    it("rejects the cross-tenant prune", async () => {
+// The shared webhook delivery log holds both channels, so it has two tenancy
+// anchors: organizationId + endpointId for the endpoints platform, projectId +
+// triggerId for automations. A query must name one; a create must carry a
+// complete pair, so a row can never land without a tenant.
+describe("guardProjectId — shared WebhookEndpointDelivery log", () => {
+  describe("when a query names no tenancy at all", () => {
+    it("rejects it", async () => {
       await expect(
         runGuard({
-          model: "WebhookDelivery",
-          action: "deleteMany",
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
           args: { where: { firedAt: { lt: new Date() } } },
         }),
-      ).rejects.toThrow(/requires a 'projectId'/);
+      ).rejects.toThrow(/organizationId, endpointId, or projectId/);
     });
   });
 
-  describe("when deleteMany includes projectId", () => {
-    it("permits the tenant-scoped prune", async () => {
+  describe("when a query names either channel's anchor", () => {
+    it("permits the organization-scoped read", async () => {
       await expect(
         runGuard({
-          model: "WebhookDelivery",
-          action: "deleteMany",
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
+          args: { where: { organizationId: "org-1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("permits the project-scoped read the automations drawer makes", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
           args: {
-            where: { projectId: "project-1", firedAt: { lt: new Date() } },
+            where: {
+              channel: "automations",
+              projectId: "project-1",
+              triggerId: "trigger-1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a create carries only half a pair", () => {
+    it("rejects it", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: { data: { projectId: "project-1", dispatchId: "evt_1" } },
+        }),
+      ).rejects.toThrow(/projectId and triggerId/);
+    });
+  });
+
+  describe("when a create carries one complete pair", () => {
+    it("permits the automations row", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: {
+            data: {
+              channel: "automations",
+              projectId: "project-1",
+              triggerId: "trigger-1",
+              dispatchId: "evt_1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("permits the platform row", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: {
+            data: {
+              channel: "platform",
+              organizationId: "org-1",
+              endpointId: "endpoint-1",
+              dispatchId: "btch_1",
+            },
           },
         }),
       ).resolves.toBe("ok");
@@ -396,6 +450,104 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
           args: { where: {} },
         }),
       ).rejects.toThrow(/row id.*modelProviderId.*scope predicate/);
+    });
+  });
+});
+
+describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => {
+  describe("when findMany names only a migration", () => {
+    /** @scenario Migration-wide reads are the ops rollup and stay allowed */
+    it("allows the ops dashboard to list one migration's tenants", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findMany",
+          args: { where: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when findUnique names the compound key", () => {
+    it("allows the read of one tenant's row", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findUnique",
+          args: {
+            where: {
+              migrationName_tenantId: {
+                migrationName: "authz-team-user-backfill",
+                tenantId: "org_acme",
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when findMany carries no predicate at all", () => {
+    it("refuses the walk across every migration's every tenant", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/migrationName or tenantId/);
+    });
+  });
+
+  describe("when deleteMany names only a migration", () => {
+    /** @scenario A migration-wide bulk write is refused */
+    it("refuses the delete that would silently un-switch every organization", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: { where: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
+
+  describe("when updateMany names only a migration", () => {
+    it("refuses the rewrite of every tenant's state at once", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "updateMany",
+          args: {
+            where: { migrationName: "authz-team-user-backfill" },
+            data: { status: "finalized" },
+          },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
+
+  describe("when deleteMany names a tenant", () => {
+    it("allows the delete bounded to one organization", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: { where: { tenantId: "org_acme" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when create omits the tenant", () => {
+    it("refuses a row that would belong to nobody", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "create",
+          args: { data: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).rejects.toThrow(/migrationName and tenantId/);
     });
   });
 });
@@ -658,7 +810,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: {
             query: `SELECT id FROM "Trace" WHERE "projectId" = $1`,
@@ -670,7 +822,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — TemplateStringsArray shape (strings) is also recognised", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: {
             strings: [
@@ -687,7 +839,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("THROWS — a scope-less raw query must not walk every tenant", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: { query: `SELECT id FROM "Trace" WHERE "deletedAt" IS NULL` },
         }),
@@ -697,7 +849,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("THROWS on executeRaw too — writes are guarded the same way", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: { query: `DELETE FROM "Trace"` },
         }),
@@ -709,7 +861,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — explicit grep-able marker bypasses the predicate check", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: {
             query: `-- @tenancy: global recovery sweep\nSELECT id FROM "Outbox" WHERE "status" = 'stuck'`,
@@ -723,7 +875,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("falls through without throwing — unknown args shape is not the guard's job", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: { somethingElse: true },
         }),
@@ -733,7 +885,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("falls through when args is undefined", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: undefined,
         }),
@@ -758,11 +910,10 @@ describe("project-tenancy regime partition", () => {
     RELATIONAL_PARENT_SCOPED,
     LICENSE_COUNTED_PROJECT_MODELS,
   } = PROJECT_TENANCY_REGIMES;
-  const allModelNames = Prisma.dmmf.datamodel.models.map((m) => m.name);
+  const datamodel = parsePrismaDatamodel();
+  const allModelNames = datamodel.map((m) => m.name);
   const modelHasField = (model: string, field: string) =>
-    Prisma.dmmf.datamodel.models
-      .find((m) => m.name === model)
-      ?.fields.some((f) => f.name === field) ?? false;
+    datamodel.find((m) => m.name === model)?.fields.includes(field) ?? false;
   const noProjectIdModels = allModelNames.filter(
     (name) => !modelHasField(name, "projectId"),
   );

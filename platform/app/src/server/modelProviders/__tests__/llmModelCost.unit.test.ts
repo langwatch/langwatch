@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getStaticModelCosts } from "../llmModelCost";
+import { matchModelCostWithFallbacks } from "../../tracer/collector/cost";
+import {
+  getStaticModelCosts,
+  resolveAudioOutputRate,
+  resolveCacheWrite1hRate,
+} from "../llmModelCost";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -151,6 +156,244 @@ describe("getStaticModelCosts", () => {
           mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))
             ?.model,
         ).toBe("x/abc-def");
+      });
+    });
+  });
+});
+
+/**
+ * Anthropic keeps a prompt-cache entry for five minutes at 1.25x the input rate
+ * or for an hour at 2x, and publishes only the five-minute figure. The catalog
+ * carries that one figure, so the hour-long rate is derived at load time. These
+ * pin the derivation against Anthropic's published pricing; if a registry sync
+ * changes the underlying numbers, re-check the pricing page before updating.
+ */
+describe("hour-long cache write rate", () => {
+  const costs = getStaticModelCosts();
+  const byModel = (modelId: string) => costs.find((c) => c.model === modelId);
+
+  describe("given the catalog carries no hour-long price", () => {
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("prices an hour-long Anthropic cache write at twice the input rate", () => {
+      const opus = byModel("anthropic/claude-opus-5");
+      expect(opus?.inputCostPerToken).toBe(0.000005);
+      // The catalog's single cache write price is the five-minute one.
+      expect(opus?.cacheCreationCostPerToken).toBe(0.00000625);
+      expect(opus?.cacheCreation1hCostPerToken).toBe(0.00001);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives it across the Anthropic family, aliases included", () => {
+      const anthropic = costs.filter(
+        (c) =>
+          /^~?anthropic\//.test(c.model) && c.cacheCreationCostPerToken != null,
+      );
+      expect(anthropic.length).toBeGreaterThan(0);
+      for (const entry of anthropic) {
+        expect(
+          entry.cacheCreation1hCostPerToken,
+          `${entry.model} has no hour-long rate`,
+        ).toBeCloseTo((entry.inputCostPerToken ?? 0) * 2, 12);
+      }
+      // The tilde-prefixed aliases are Anthropic too, and would be missed by a
+      // plain prefix check.
+      const aliases = anthropic.filter((c) =>
+        c.model.startsWith("~anthropic/"),
+      );
+      expect(aliases.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("leaves models from other providers without one", () => {
+      const others = costs.filter(
+        (c) =>
+          !/^~?anthropic\//.test(c.model) &&
+          c.cacheCreation1hCostPerToken !== undefined,
+      );
+      expect(others).toEqual([]);
+    });
+  });
+});
+
+describe("resolveCacheWrite1hRate", () => {
+  const ANTHROPIC = "anthropic/claude-opus-5";
+
+  describe("given the catalog carries its own hour-long price", () => {
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("uses the catalog price rather than deriving one", () => {
+      expect(
+        resolveCacheWrite1hRate(ANTHROPIC, {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+          inputCacheWrite1hPerToken: 0.000009,
+        }),
+      ).toBe(0.000009);
+    });
+
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("uses it for a provider that would otherwise get nothing", () => {
+      expect(
+        resolveCacheWrite1hRate("openai/gpt-5", {
+          inputCostPerToken: 0.000001,
+          inputCacheWritePerToken: 0.00000125,
+          inputCacheWrite1hPerToken: 0.000002,
+        }),
+      ).toBe(0.000002);
+    });
+  });
+
+  describe("given the catalog carries no hour-long price", () => {
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives twice the input rate for an Anthropic model", () => {
+      expect(
+        resolveCacheWrite1hRate(ANTHROPIC, {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+        }),
+      ).toBe(0.00001);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives it for a tilde-prefixed Anthropic alias", () => {
+      expect(
+        resolveCacheWrite1hRate("~anthropic/claude-opus-5-latest", {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+        }),
+      ).toBe(0.00001);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives nothing for another provider", () => {
+      expect(
+        resolveCacheWrite1hRate("openai/gpt-5", {
+          inputCostPerToken: 0.000001,
+          inputCacheWritePerToken: 0.00000125,
+        }),
+      ).toBeUndefined();
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives nothing for a model that is not cache-priced at all", () => {
+      expect(
+        resolveCacheWrite1hRate(ANTHROPIC, { inputCostPerToken: 0.000005 }),
+      ).toBeUndefined();
+    });
+  });
+});
+
+describe("audio token rates in the static registry", () => {
+  const costs = getStaticModelCosts();
+  const findByModel = (modelId: string) =>
+    costs.find((c) => c.model === modelId);
+  const match = (model: string) => matchModelCostWithFallbacks(model, costs);
+
+  describe("given a model the catalog prices audio input for", () => {
+    describe("when the registry is built", () => {
+      it("maps the catalog's audioCostPerToken onto the input audio rate", () => {
+        expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(
+          0.000032,
+        );
+      });
+
+      it("derives the output audio rate at twice the input rate", () => {
+        expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(
+          0.000064,
+        );
+      });
+    });
+  });
+
+  describe("given the catalog carries its own output audio price", () => {
+    describe("when the rate is resolved", () => {
+      it("uses the catalog price rather than deriving one", () => {
+        expect(
+          resolveAudioOutputRate("openai/gpt-realtime", {
+            audioCostPerToken: 0.000032,
+            audioOutputCostPerToken: 0.00009,
+          }),
+        ).toBe(0.00009);
+      });
+    });
+  });
+
+  describe("given a model outside the OpenAI audio families", () => {
+    describe("when the rate is resolved", () => {
+      it("derives nothing", () => {
+        expect(
+          resolveAudioOutputRate("anthropic/claude-opus-5", {
+            audioCostPerToken: 0.000032,
+          }),
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given an OpenAI audio model with no audio input price", () => {
+    describe("when the rate is resolved", () => {
+      it("derives nothing, because there is nothing to scale", () => {
+        expect(
+          resolveAudioOutputRate("openai/gpt-realtime", {}),
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given both realtime models are in the catalog", () => {
+    describe("when the smaller one is matched", () => {
+      // The prefix-anchored regex would price mini at the full rate if the
+      // two entries did not land together.
+      it("does not price gpt-realtime-mini at gpt-realtime's rate", () => {
+        const mini = match("openai/gpt-realtime-mini");
+        expect(mini?.model).toBe("openai/gpt-realtime-mini");
+        expect(mini?.inputAudioCostPerToken).toBe(0.00001);
+        expect(mini?.outputAudioCostPerToken).toBe(0.00002);
+      });
+    });
+
+    describe("when the full model is matched", () => {
+      it("keeps it on the full rate", () => {
+        const full = match("openai/gpt-realtime");
+        expect(full?.model).toBe("openai/gpt-realtime");
+        expect(full?.inputAudioCostPerToken).toBe(0.000032);
+      });
+    });
+  });
+});
+
+describe("the ElevenLabs conversational entry", () => {
+  const costs = getStaticModelCosts();
+  const match = (model: string) => matchModelCostWithFallbacks(model, costs);
+
+  // The gateway confirms with the BARE resolved model id, because
+  // matchModelCostWithFallbacks strips the provider prefix.
+  describe("given the bare model id the gateway confirms with", () => {
+    describe("when it is matched", () => {
+      it("resolves the conversational entry", () => {
+        expect(match("convai")?.model).toBe("elevenlabs/convai");
+      });
+
+      it("is priced per second of conversation", () => {
+        expect(match("convai")?.inputCostPerSecond).toBeCloseTo(0.08 / 60, 15);
+      });
+    });
+  });
+
+  describe("given the prefixed model id", () => {
+    describe("when it is matched", () => {
+      it("resolves the same entry", () => {
+        expect(match("elevenlabs/convai")?.model).toBe("elevenlabs/convai");
+      });
+    });
+  });
+
+  describe("given a transcription model id", () => {
+    describe("when it is matched", () => {
+      it("is not captured by the conversational entry", () => {
+        expect(match("scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
+        expect(match("elevenlabs/scribe_v1")?.model).toBe(
+          "elevenlabs/scribe_v1",
+        );
       });
     });
   });

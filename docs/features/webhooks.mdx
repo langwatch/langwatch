@@ -19,13 +19,15 @@ An endpoint belongs to your **organization** and carries:
 
 | Field | Meaning |
 |---|---|
-| `url` | Where batches are POSTed. HTTPS required (see [self-hosted egress](/self-hosting/webhooks) for the local-development exception). |
+| `destination_kind` | Where batches go: `http` (the default) or `sqs`. See [Delivering to an Amazon SQS queue](#delivering-to-an-amazon-sqs-queue). Set at creation and fixed for the endpoint's life. |
+| `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
+| `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
 | `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/gateway/webhooks`) or over REST with an organization API key:
 
 ```
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
@@ -54,7 +56,31 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/ai-gateway/api/management#retrying-a-create-safely) and a retry that lost its response returns the original secret instead of stranding it.
+
+### What a receiver URL must look like
+
+A webhook URL is a destination our workers dial on your behalf, so it is held to one policy across the product:
+
+| Rule | Why |
+|---|---|
+| `https` only | The batch carries your data and your signature; plaintext exposes both. |
+| The default port, 443 | A URL pointing at another port is how an outbound webhook gets used to probe internal services. |
+| No credentials in the URL | `https://user:pass@host/...` puts a secret in every log line that records the destination. Send credentials in a header instead. |
+| A public host | Private, loopback, and link-local addresses are refused, so an endpoint cannot reach inside our network. |
+
+Anything else is refused at create and update time with `400` and `error.code = "webhook_endpoint_invalid"`, naming the rule it broke:
+
+```json
+{ "error": { "type": "bad_request", "code": "webhook_endpoint_invalid",
+             "message": "url must use the default https port (443)" } }
+```
+
+<Warning>
+The port and credential rules apply to endpoints you already have. If an existing endpoint uses a non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move credentials into a custom header.
+</Warning>
+
+Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
 
 <Warning>
 The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints carry signing secrets and stream org-wide events out of the platform, so by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
@@ -156,126 +182,86 @@ X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw bo
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
 
-<Warning>
-`X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is not an event id and must not be used for deduplication: every event in the batch shares it, so deduping on it drops all but one of them.
-
-**Deduplicate on the envelope `id` inside the body**, which is stable across retries and replays and unique per event.
-</Warning>
-
-Verify by recomputing the HMAC over the **exact raw bytes** you received (parsing and re-serializing the JSON first breaks the digest), and reject timestamps outside a 5-minute tolerance. Compare digests in constant time.
-
-<Warning>
-**`v1` may appear more than once.** During a secret rotation the header carries one `v1` per currently valid secret, newest first:
-
-```
-X-LangWatch-Signature: t=1753000000,v1=<signed with the new secret>,v1=<signed with the previous one>
-```
-
-Your verifier must accept the delivery when **any** `v1` matches. A verifier that reads only the first `v1` (or that treats the header as holding exactly one) rejects every delivery signed during a rotation window. Both snippets below collect all of them.
-</Warning>
+Both SDKs ship a verifier, so you do not have to get the digest, the timestamp tolerance, the constant-time compare, and the rotation window right yourself. Pass the **raw bytes** you received: parsing and re-serializing the JSON first breaks the digest.
 
 <CodeGroup>
 
-```typescript verify-signature.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+```typescript verify.ts
+import {
+  verifyWebhookSignature,
+  WebhookSignatureVerificationError,
+} from "langwatch";
 
-const TOLERANCE_SECONDS = 5 * 60;
+// Pass both secrets while a rotation is in flight: the header carries one
+// v1 per valid secret, and any match accepts the delivery.
+const secrets = [
+  process.env.LANGWATCH_WEBHOOK_SECRET!,
+  process.env.LANGWATCH_WEBHOOK_SECRET_PREVIOUS,
+].filter(Boolean) as string[];
 
-export function verifySignature(params: {
-  rawBody: string | Buffer;       // exactly as received
-  signatureHeader: string | undefined;
-  secret: string;                 // shown once at endpoint creation
-}): boolean {
-  if (!params.signatureHeader) return false;
-
-  const parts = new Map<string, string>();
-  for (const piece of params.signatureHeader.split(",")) {
-    const eq = piece.indexOf("=");
-    if (eq > 0) parts.set(piece.slice(0, eq).trim(), piece.slice(eq + 1).trim());
-  }
-  const timestamp = parts.get("t");
-  // Every v1, not just the first: a rotation window carries one per secret.
-  const signatures = params.signatureHeader
-    .split(",")
-    .map((piece) => piece.split("="))
-    .filter(([key]) => key?.trim() === "v1")
-    .map(([, value]) => value?.trim() ?? "");
-  if (!timestamp || signatures.length === 0) return false;
-
-  const timestampSeconds = Number(timestamp);
-  if (!Number.isFinite(timestampSeconds)) return false;
-  if (Math.abs(Date.now() / 1000 - timestampSeconds) > TOLERANCE_SECONDS) return false;
-
-  const expected = createHmac("sha256", params.secret)
-    .update(`${timestamp}.`)
-    .update(params.rawBody)
-    .digest();
-  let matched = false;
-  for (const signature of signatures) {
-    let received: Buffer;
-    try {
-      received = Buffer.from(signature, "hex");
-    } catch {
-      continue;
+export function handleDelivery(rawBody: Buffer, signatureHeader: string) {
+  try {
+    verifyWebhookSignature({
+      body: rawBody,
+      header: signatureHeader,
+      secret: secrets,
+    });
+  } catch (error) {
+    if (error instanceof WebhookSignatureVerificationError) {
+      // error.code is "malformed_header", "stale_timestamp",
+      // or "invalid_signature". Reject, do not retry.
+      return { status: 400, reason: error.code };
     }
-    // Compare every candidate even after a match, so the work does not
-    // depend on WHICH signature matched.
-    if (received.length === expected.length && timingSafeEqual(received, expected)) {
-      matched = true;
-    }
+    throw error;
   }
-  return matched;
+  return { status: 200, batch: JSON.parse(rawBody.toString("utf8")).batch };
 }
 ```
 
-```python verify_signature.py
-import hashlib
-import hmac
-import time
+```python verify.py
+import json
+import os
 
-TOLERANCE_SECONDS = 5 * 60
+from langwatch import (
+    WebhookSignatureVerificationError,
+    verify_webhook_signature,
+)
+
+# Pass both secrets while a rotation is in flight: the header carries one
+# v1 per valid secret, and any match accepts the delivery.
+secrets = [
+    s
+    for s in (
+        os.environ["LANGWATCH_WEBHOOK_SECRET"],
+        os.environ.get("LANGWATCH_WEBHOOK_SECRET_PREVIOUS"),
+    )
+    if s
+]
 
 
-def verify_signature(raw_body: bytes, signature_header: str | None, secret: str) -> bool:
-    if not signature_header:
-        return False
-
-    timestamp: str | None = None
-    signatures: list[str] = []
-    for piece in signature_header.split(","):
-        key, eq, value = piece.partition("=")
-        if not eq:
-            continue
-        if key.strip() == "t":
-            timestamp = value.strip()
-        elif key.strip() == "v1":
-            # Every v1: a rotation window carries one per valid secret.
-            signatures.append(value.strip())
-    if not timestamp or not signatures:
-        return False
-
+def handle_delivery(raw_body: bytes, signature_header: str):
     try:
-        timestamp_seconds = float(timestamp)
-    except ValueError:
-        return False
-    if abs(time.time() - timestamp_seconds) > TOLERANCE_SECONDS:
-        return False
-
-    expected = hmac.new(
-        secret.encode(), f"{timestamp}.".encode() + raw_body, hashlib.sha256
-    ).hexdigest()
-    # Compare every candidate even after a match, so the work does not
-    # depend on WHICH signature matched.
-    matched = False
-    for signature in signatures:
-        if hmac.compare_digest(expected, signature):
-            matched = True
-    return matched
+        verify_webhook_signature(
+            body=raw_body,
+            header=signature_header,
+            secret=secrets,
+        )
+    except WebhookSignatureVerificationError as error:
+        # error.code is "malformed_header", "stale_timestamp",
+        # or "invalid_signature". Reject, do not retry.
+        return 400, error.code
+    return 200, json.loads(raw_body)["batch"]
 ```
 
 </CodeGroup>
 
-Both snippets, wired into working receivers, live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
+The verifier throws (Python raises) rather than returning a boolean, so a receiver cannot accept a delivery by ignoring a return value. Branch on `.code` when you want to tell a clock-skew problem from a wrong secret. Timestamps outside a 5-minute tolerance are rejected; pass `toleranceSeconds` / `tolerance_seconds` if your receiver needs a different window.
+
+<Warning>
+`X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is not an event id and must not be used for deduplication: every event in the batch shares it, so deduping on it drops all but one of them. **Deduplicate on the envelope `id` inside the body**, which is stable across retries and replays and unique per event.
+</Warning>
+
+Working receivers built on both snippets live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
 
 ### Rotating the signing secret
 
@@ -286,6 +272,16 @@ Both snippets, wired into working receivers, live in the [agent-billing-demo](ht
 3. After the window the old secret stops being signed with and stops verifying.
 
 Rolling twice inside a window discards the secret that was already rolling off, so the oldest one stops working immediately. That is what you want when you are rolling because a secret leaked.
+
+## Signing automation webhooks
+
+An [automation trigger](/features/automations) can also call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
+
+Set one and every fire from that trigger carries the same `X-LangWatch-Signature: t=...,v1=...` header, computed the same way, so the verifier above validates it without a single change. The trigger's own id header is `X-LangWatch-Event-Id` rather than `X-LangWatch-Delivery-Id`, and it groups the attempts of one fire.
+
+- **Opt-in per trigger.** A trigger with no secret keeps sending exactly what it sent before, so adding this breaks no existing receiver.
+- **Rotation works the same way.** Replacing the secret keeps the previous one signing for 24 hours, so you deploy the new value on your own schedule. During the window the header carries a `v1` for each, which is why a verifier has to accept any match.
+- Secrets are encrypted at rest, and, like an endpoint's, are not readable again after you save them.
 
 ## Delivery, retries, and auto-disable
 
@@ -314,6 +310,77 @@ stateDiagram-v2
     Retrying --> Disabled: 72h of consecutive failures
     Disabled --> Pending: re-enable, then replay the gap
 ```
+
+## Delivering to an Amazon SQS queue
+
+An endpoint can put each batch on your own Amazon SQS queue instead of POSTing it to a URL. Only the last hop changes. The batching, the retry ladder, the delivery log, and the signature over the same bytes all work as they do for an HTTPS endpoint.
+
+<Warning>
+**`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
+</Warning>
+
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+
+| Message attribute | Same as the HTTP header |
+|---|---|
+| `X-LangWatch-Signature` | `t=<unix>,v1=<hmac>`, one `v1` per valid secret |
+| `X-LangWatch-Delivery-Id` | Groups the retries of one delivery; never the dedup key |
+| `X-LangWatch-Delivery-Attempt` | 1-based attempt number |
+| `X-LangWatch-Test-Fire` | `"true"`, and present only on a test fire. Absent on every real delivery |
+
+So verification is the same call over the same bytes, and moving an integration from HTTP to a queue does not change your verification code.
+
+```bash
+curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination_kind": "sqs",
+    "sqs": {
+      "queue_url": "https://sqs.eu-central-1.amazonaws.com/123456789012/billing-events",
+      "role_arn": "arn:aws:iam::123456789012:role/langwatch-webhook-producer"
+    },
+    "enabled_events": ["gateway.request.completed"]
+  }'
+```
+
+**Granting access.** Three modes, in the order to prefer them:
+
+| Mode | How | When |
+|---|---|---|
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
+| `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
+
+The trust policy on your role, with the `external_id` the create response returned:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "<the LangWatch principal for your deployment>" },
+    "Action": "sts:AssumeRole",
+    "Condition": { "StringEquals": { "sts:ExternalId": "lw-<the external id from the response>" } }
+  }]
+}
+```
+
+<Note>
+On LangWatch Cloud, ask support for the principal to trust; it is a property of the deployment, not of your endpoint. On a self-hosted install it is whatever identity your workers run as.
+</Note>
+
+**Rules the queue itself must satisfy:**
+
+- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering is not part of the delivery contract, and a FIFO queue would add a throughput ceiling for a guarantee this path does not need.
+- **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
+- **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
+
+**Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
+
+**Changing where an endpoint delivers** is not an update. `destination_kind` is fixed once created, because batches already planned against the old transport are in flight. Create a second endpoint, let the first drain, then archive it.
 
 ## Delivery controls
 
@@ -354,13 +421,21 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
+Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. Nothing about our request is stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
+
 ## Test fire
 
 `POST /endpoints/:id/test` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
 
 ## The events log
 
-`GET /api/webhooks/v1/events?type=&from=&to=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type and `created` range (unix milliseconds). Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+<Warning>
+**Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
+</Warning>
+
+`GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
@@ -376,8 +451,6 @@ The log serves the **request** families only:
 | `gateway.virtual_key.*` | **No** |
 
 The governance families are delivered to your endpoints exactly like the request families, but they are not retained in a queryable log, so they cannot be listed, read by id, or replayed. If you need a durable record of budget and virtual-key events, persist them from your receiver when they arrive. A request for a type this log does not hold returns an empty page rather than an error, so a client can probe for new families without breaking.
-
-For **billing reconciliation**, do not reconcile against this log: read the spend ledger surfaces instead ([`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger)), which include settled rows and carry the 13-month retention contract. The events log is for delivery recovery and debugging.
 
 ## What events never carry
 

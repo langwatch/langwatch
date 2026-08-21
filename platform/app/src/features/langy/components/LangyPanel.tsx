@@ -1030,7 +1030,6 @@ function LangyPanel({
             : "This answer is still starting up — try stopping it again in a moment.",
         type: "info",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -1550,7 +1549,6 @@ function LangyPanel({
         description: "Failed to delete conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
     }
   };
@@ -1564,7 +1562,6 @@ function LangyPanel({
         description: "Failed to rename conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       throw new Error("Failed to rename conversation");
     }
@@ -1582,7 +1579,6 @@ function LangyPanel({
           description: `No handler for '${proposal.kind}' on this page.`,
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }
@@ -1595,7 +1591,6 @@ function LangyPanel({
           description: proposal.summary,
           type: "success",
           duration: 3000,
-          meta: { closable: true },
         });
       } catch (error) {
         showErrorToast({
@@ -1738,7 +1733,7 @@ function LangyPanel({
   //                 subscription closes the moment a silent worker stops pushing
   //                 frames, and because `reconnectToStream()` returns null,
   //                 useChat settles to "ready" and isBusy goes false LONG before
-  //                 the turn is actually over (the liveness reactor keeps
+  //                 the turn is actually over (the liveness subscriber keeps
   //                 re-driving for up to its whole grace budget, ~90s).
   //   serverTurnInFlight  the DURABLE truth off the fold — status `active`
   //                 (message sent, worker cold-starting) OR `running` (agent
@@ -1958,7 +1953,7 @@ function LangyPanel({
   }, [isBusy]);
 
   const onGithubConnected = useCallback(() => {
-    void utils.langyGithub.getInstallStatus.invalidate({
+    void utils.github.getConnectionStatus.invalidate({
       organizationId: organizationId ?? "",
     });
     if (githubRedrivenRef.current) return;
@@ -1999,8 +1994,8 @@ function LangyPanel({
 
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
-  // so the title-generation reactor's `conversation_title_generated` event
-  // lands here without a second fetch. Null until the reactor produces one: the
+  // so the title-generation subscriber's `conversation_title_generated` event
+  // lands here without a second fetch. Null until the subscriber produces one: the
   // header shows nothing that pretends to be a title in the meantime.
   const conversationTitle = useMemo(() => {
     if (!activeConversationId) return null;

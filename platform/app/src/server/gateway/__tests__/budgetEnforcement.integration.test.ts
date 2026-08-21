@@ -19,11 +19,12 @@ import {
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import {
-  CURRENT_ROLLUP_REBUILD_MIGRATION,
   replayGooseMigrationUp,
+  replayRollupRebuild,
 } from "~/server/clickhouse/__tests__/migrationReplay";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -72,6 +73,11 @@ function servedRequest(options: {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       reasoning_tokens: 0,
+      cache_creation_1h_tokens: 0,
+      input_audio_tokens: 0,
+      output_audio_tokens: 0,
+      input_chars: 0,
+      audio_ms: 0,
     },
     cost_nano_usd: COST_PER_REQUEST * NANO_USD_PER_USD,
     rate_version: "catalog@test",
@@ -81,6 +87,11 @@ function servedRequest(options: {
     occurred_at: Date.now(),
   };
 }
+
+// Held for the whole file. This suite both replays the rollup rebuild and
+// reads the rollup back, and neither the rebuild nor the rollup is scoped to
+// this run's tenant.
+holdClickHouseSchemaLockForFile();
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
@@ -136,6 +147,9 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         displayPrefix: "vk-lw-xxxxxxx",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
@@ -170,7 +184,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     });
 
     const resolveClient = async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     };
@@ -349,6 +363,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
           displayPrefix: "vk-lw-yyyyyyy",
           principalUserId: USER_ID,
           createdById: USER_ID,
+          traceProjectId: PRE_PROJECT_ID,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: PRE_PROJECT_ID }],
           },
@@ -369,7 +384,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         },
       });
 
-      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
+      const client = await getClickHouseClientForTenant(PRE_PROJECT_ID);
       if (!client) throw new Error("no ClickHouse client in test environment");
 
       // Pre-rebuild state: the 00055 view truncates periods in the server
@@ -423,10 +438,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       // honest as the rollup evolves: the claim is that spend folded by any
       // older view still enforces after the upgrade a deployment runs.
       preRebuildDecision = await decidePreProject();
-      await replayGooseMigrationUp({
-        client,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      await replayRollupRebuild(client);
     }, 120_000);
 
     afterAll(async () => {
@@ -434,11 +446,8 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       // Re-apply the current migration unconditionally so a failure
       // anywhere in this describe can never leave later suites running
       // against the 00055 view. Idempotent by the migration's own design.
-      const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
-      await replayGooseMigrationUp({
-        client: client!,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      const client = await getClickHouseClientForTenant(PRE_PROJECT_ID);
+      await replayRollupRebuild(client!);
     }, 120_000);
 
     describe("when the rollup rebuild has not run", () => {

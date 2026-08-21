@@ -14,7 +14,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 | **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
 | **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
 | **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
-| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection reactor, OCSF/SIEM forwarding |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding |
 | **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
 | **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
 | **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
@@ -36,8 +36,7 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
   - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
-  - `langwatch.governance.retention_class`, derived governance context (driving CH TTL)
-- **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
+- **Same trace viewer**: open a span in `/traces`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
 - **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
 
 The auth + tenancy split is what's actually different:
@@ -64,5 +63,5 @@ The internal-architecture decision behind this is captured in [ADR-018](https://
 - [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/ingest/otel/:sourceId` for an external platform.
 - [Generic OTel ingestion source](/ai-governance/ingestion-sources/otel-generic): copy-paste curl that pushes a canonical 5-attribute body to the governance endpoint.
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
-- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` retention classes; how the CH TTL policy keys off the origin attribute.
+- [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept, and the scoped policies that decide it.
 - [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest tail <id>` consumes the governance data; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.

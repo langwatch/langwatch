@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   GovernanceCliError,
+  SESSION_EXPIRED_MESSAGE,
+  cloneIngestionTemplateFromPlatform,
+  getBudgetOverview,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -78,14 +81,20 @@ describe("cli-api — auth contract", () => {
   });
 
   describe("when the server returns 401", () => {
-    it("throws GovernanceCliError(401, unauthorized) with a re-login hint", async () => {
+    it("surfaces the platform-named failure as a typed HandledError (code unauthorized), keeping the re-login hint", async () => {
+      // The 401 body `{ error: "unauthorized" }` is a named domain-error
+      // envelope, so the ADR-045 path raises a typed LangWatchHandledError
+      // rather than the CLI's generic GovernanceCliError. The `code` and
+      // `status` control-flow surface is unchanged; the CLI's composed
+      // re-login message is reused verbatim.
       const { fetchImpl } = spyFetch(status(401, { error: "unauthorized" }));
       await expect(
         getGovernanceStatus(baseCfg(), { fetchImpl }),
       ).rejects.toMatchObject({
-        name: "GovernanceCliError",
+        name: "LangWatchHandledError",
         status: 401,
         code: "unauthorized",
+        message: SESSION_EXPIRED_MESSAGE,
       });
     });
   });
@@ -127,8 +136,7 @@ describe("cli-api — auth contract", () => {
       const authHeaders: (string | undefined)[] = [];
       const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
         authHeaders.push(
-          (init?.headers as Record<string, string> | undefined)
-            ?.Authorization,
+          (init?.headers as Record<string, string> | undefined)?.Authorization,
         );
         return responses.shift()!;
       }) as unknown as typeof fetch;
@@ -152,8 +160,8 @@ describe("cli-api — auth contract", () => {
 
     it("surfaces the 401 when the refresh token is refused too", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_dead" };
-      const fetchImpl = vi.fn(
-        async () => status(401, { error: "unauthorized" }),
+      const fetchImpl = vi.fn(async () =>
+        status(401, { error: "unauthorized" }),
       ) as unknown as typeof fetch;
 
       await expect(
@@ -185,7 +193,10 @@ describe("cli-api — auth contract", () => {
   });
 
   describe("when the server returns 404 with an error_description", () => {
-    it("surfaces the description verbatim", async () => {
+    it("surfaces the description verbatim as a typed HandledError (the body names the failure)", async () => {
+      // `{ error: "not_found", ... }` is a named envelope, so the ADR-045 path
+      // raises a typed LangWatchHandledError with code `not_found`; the CLI's
+      // composed message (from error_description) is reused verbatim.
       const { fetchImpl } = spyFetch(
         status(404, {
           error: "not_found",
@@ -195,19 +206,24 @@ describe("cli-api — auth contract", () => {
       await expect(
         getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
       ).rejects.toMatchObject({
-        name: "GovernanceCliError",
+        name: "LangWatchHandledError",
         status: 404,
+        code: "not_found",
         message: "IngestionSource not found",
       });
     });
 
-    it("falls back to a generic message if the body has no description", async () => {
+    it("falls back to a generic GovernanceCliError if the body does not name the failure", async () => {
+      // An empty 404 body is not a domain-error envelope, so it stays the CLI's
+      // own generic GovernanceCliError — still handled-error-shaped for the
+      // render pipeline, but the CLI's fallback rather than a server-named one.
       const { fetchImpl } = spyFetch(status(404));
       await expect(
         getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
       ).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 404,
+        code: "not_found",
         message: "Not found",
       });
     });
@@ -302,9 +318,7 @@ describe("cli-api — request shape", () => {
         beforeIso: "2026-04-27T00:00:00.000Z",
       });
       expect(seen[0]!.url).toContain("limit=25");
-      expect(seen[0]!.url).toContain(
-        "before_iso=2026-04-27T00%3A00%3A00.000Z",
-      );
+      expect(seen[0]!.url).toContain("before_iso=2026-04-27T00%3A00%3A00.000Z");
     });
 
     it("omits the query string entirely when neither flag is set", async () => {
@@ -332,7 +346,9 @@ describe("cli-api — request shape", () => {
         },
       ];
       const { fetchImpl } = spyFetch(ok({ events: fixture }));
-      const events = await getEventsForSource(baseCfg(), "src-1", { fetchImpl });
+      const events = await getEventsForSource(baseCfg(), "src-1", {
+        fetchImpl,
+      });
       expect(events).toEqual(fixture);
     });
   });
@@ -397,15 +413,15 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/bootstrap",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/bootstrap");
       expect(seen[0]!.authHeader).toBe("Bearer at_x");
       expect(out).toEqual(fixture);
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
+      const { fetchImpl } = spyFetch(
+        status(404, { error_description: "Not found" }),
+      );
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });
@@ -422,6 +438,91 @@ describe("cli-api — request shape", () => {
       await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
         /500/,
       );
+    });
+  });
+  describe("when the caller sets a request timeout", () => {
+    it("aborts a request the server never answers", async () => {
+      // A control plane that accepts the connection and then goes quiet:
+      // fetch has no deadline of its own, so without the signal this
+      // never settles and the login ceremony never prints.
+      const fetchImpl: typeof fetch = (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "TimeoutError")),
+          );
+        });
+
+      await expect(
+        getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 }),
+      ).rejects.toThrow(/abort/i);
+    });
+
+    it("passes no signal when the caller sets no timeout", async () => {
+      let sawSignal: AbortSignal | null | undefined;
+      const fetchImpl: typeof fetch = async (_url, init) => {
+        sawSignal = init?.signal;
+        return ok({ gatewayAccess: true, budgets: [] });
+      };
+
+      await getBudgetOverview(baseCfg(), { fetchImpl });
+      expect(sawSignal).toBeUndefined();
+    });
+  });
+  describe("ingestion-templates clone-from-platform", () => {
+    /**
+     * The command posted to `/ingestion-templates/clone-from-platform`. The
+     * route is `/ingestion-templates/clone`, which is also what the spec and
+     * the governance guide document, so the command 404'd every time it ran.
+     *
+     * The stub answers 404 for any path the app does not register, so a caller
+     * reaching for one fails here the way it failed in production.
+     */
+    const REGISTERED_TEMPLATE_PATHS = new Set([
+      "/api/governance/ingestion-templates",
+      "/api/governance/ingestion-templates/admin",
+      "/api/governance/ingestion-templates/clone",
+    ]);
+
+    const onlyRealRoutes = (): {
+      fetchImpl: typeof fetch;
+      seen: SeenCall[];
+    } => {
+      const seen: SeenCall[] = [];
+      const fetchImpl: typeof fetch = async (input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        seen.push({
+          url,
+          authHeader: headers.Authorization,
+          acceptHeader: headers.Accept,
+        });
+        const { pathname } = new URL(url);
+        return REGISTERED_TEMPLATE_PATHS.has(pathname)
+          ? ok({ ingestion_template: { id: "tpl_new" } })
+          : status(404, { error: "Not Found" });
+      };
+      return { fetchImpl, seen };
+    };
+
+    /** @scenario "Cloning a platform template posts to the documented route" */
+    it("posts to the route the app actually serves", async () => {
+      const { fetchImpl, seen } = onlyRealRoutes();
+
+      const out = await cloneIngestionTemplateFromPlatform(
+        baseCfg(),
+        "tpl_platform",
+        { fetchImpl },
+      );
+
+      expect(seen[0]!.url).toBe(
+        "http://app.example/api/governance/ingestion-templates/clone",
+      );
+      expect(out).toEqual({ id: "tpl_new" });
     });
   });
 });

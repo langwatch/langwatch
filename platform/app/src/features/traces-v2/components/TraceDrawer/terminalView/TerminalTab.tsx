@@ -1,11 +1,16 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
 import { TERMINAL_TOKENS } from "./palette";
 import { deriveSessionBanner } from "./sessionBanner";
 import { TerminalSkeleton } from "./TerminalSkeleton";
 import { TerminalView } from "./TerminalView";
 import { indexToolSpansBySpanId } from "./toolSpans";
+import { useSessionScrollback } from "./useSessionScrollback";
+
+/** Stable identity while the transcript is still in flight. */
+const NO_ENTRIES: TranscriptEntry[] = [];
 
 interface TerminalTabProps {
   projectId: string;
@@ -14,6 +19,12 @@ interface TerminalTabProps {
   occurredAtMs?: number;
   /** The trace's own name, shown in the bottom bar. */
   sessionName?: string | null;
+  /**
+   * The agent's session id: the other turns of this session are the traces
+   * that share it. Null on a trace that belongs to no session, which is what
+   * limits the view to the one turn it opened on.
+   */
+  conversationId: string | null;
 }
 
 /**
@@ -29,12 +40,17 @@ interface TerminalTabProps {
  * the tools' REAL I/O (Bash stdout, a file's content, Edit's structured patch)
  * rides on `tool.output` span events, which are fetched alongside and joined
  * in by span id.
+ *
+ * A trace is one TURN of a session, so the reads above cover the turn the
+ * drawer opened on. The rest of the session sits in its sibling traces, and
+ * `useSessionScrollback` walks backwards into them as the reader scrolls up.
  */
 export function TerminalTab({
   projectId,
   traceId,
   occurredAtMs,
   sessionName,
+  conversationId,
 }: TerminalTabProps) {
   const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
     { projectId, traceId, occurredAtMs },
@@ -76,6 +92,23 @@ export function TerminalTab({
     [resourceQuery.data, spansQuery.data],
   );
 
+  const session = useSessionScrollback({
+    projectId,
+    traceId,
+    occurredAtMs,
+    conversationId,
+    openedTranscript: transcriptQuery.data?.entries ?? NO_ENTRIES,
+    openedToolSpans: toolSpans,
+  });
+  const scrollback = useMemo(
+    () => ({
+      status: session.status,
+      earlierCount: session.earlierCount,
+      onLoadEarlier: session.loadEarlier,
+    }),
+    [session.status, session.earlierCount, session.loadEarlier],
+  );
+
   // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (transcriptQuery.isLoading) {
     return <TerminalSkeleton />;
@@ -98,8 +131,13 @@ export function TerminalTab({
 
   return (
     <TerminalView
-      entries={transcriptQuery.data?.entries ?? []}
-      toolSpans={toolSpans}
+      entries={session.entries}
+      rowKeys={session.rowKeys}
+      toolSpans={session.toolSpans}
+      turnDividers={session.turnDividers}
+      scrollback={scrollback}
+      earlierTotals={session.earlierTotals}
+      sessionStartAtMs={session.sessionStartAtMs}
       banner={banner}
       sessionName={sessionName}
     />

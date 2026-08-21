@@ -6,7 +6,7 @@ import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
@@ -22,6 +22,7 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
@@ -31,8 +32,6 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { connection } from "~/server/redis";
-import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -67,7 +66,7 @@ const logger = createLogger("langwatch:langy:router");
 /**
  * Builds a Langy procedure gated on one `langy:*` permission, with three
  * gates in order:
- *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *  1. `.permission(permission)` — may the caller do THIS to the
  *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
  *     because it provisions credentials, spawns a worker and spends the
  *     project's model budget — not something a read grant should buy.
@@ -75,18 +74,20 @@ const logger = createLogger("langwatch:langy:router");
  *     the demo project, so a permission check alone would expose whatever
  *     Langy chat someone left there; refuse it explicitly.
  *  3. `enforceLangyAccess` — the authoritative rollout gate, the SAME decision
- *     the `langyGithub` / `langyEgress` routers and the GitHub install route
- *     use. Last, so membership is always proven before the flag is read.
+ *     the `langyEgress` router uses. Last, so membership is always proven
+ *     before the flag is read.
  *
- * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * The permission declaration comes before any `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyProcedure = (permission: Permission) =>
+const langyProcedure = (
+  permission: "langy:view" | "langy:create" | "langy:update" | "langy:delete",
+) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
@@ -129,11 +130,20 @@ const langyTurnMessageSchema = z.object({
 /**
  * Per-send model override from the sidebar picker. Shape-validated here;
  * the value is checked against the project's Langy VK allowlist in the service.
+ *
+ * The provider segment ends at the FIRST slash; the model half may contain
+ * slashes and colons of its own, because custom OpenAI-compatible providers
+ * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
+ * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);
@@ -202,6 +212,7 @@ async function canWatchTurn({
   turnId: string;
   userId: string;
 }): Promise<boolean> {
+  const connection = tryGetApp()?.redis ?? null;
   if (connection) {
     const access = createLangyTurnAccessStore({ redis: connection });
     if (
@@ -216,25 +227,6 @@ async function canWatchTurn({
     userId,
   });
   return !!conv;
-}
-
-/**
- * Sleep for `ms`, resolving early to `false` when the signal aborts — so a
- * watcher loop unblocks promptly the moment its follow() ends — otherwise `true`.
- */
-function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
-  return new Promise<boolean>((resolve) => {
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, ms);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */
@@ -859,7 +851,6 @@ export const langyRouter = createTRPCRouter({
     const emitter = getApp().broadcast.getTenantEmitter(projectId);
     try {
       for await (const eventArgs of on(emitter, "langy_conversation_updated", {
-        // @ts-expect-error - signal is not typed on the events overload
         signal: opts.signal,
       })) {
         const data = eventArgs[0] as { event?: unknown; timestamp?: number };
@@ -924,6 +915,7 @@ export const langyRouter = createTRPCRouter({
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
+      const connection = tryGetApp()?.redis ?? null;
       if (!connection) return;
 
       const blocking = connection.duplicate();
@@ -936,7 +928,6 @@ export const langyRouter = createTRPCRouter({
       const signals: AbortSignal[] = [
         AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
       ];
-      // @ts-expect-error - signal is not typed
       if (opts.signal) signals.push(opts.signal);
       const signal = AbortSignal.any(signals);
 

@@ -74,8 +74,14 @@ const mockEvaluators = [
   },
 ];
 
-// Router mock with mutable query state
+// Router mock with mutable query state. The address bar is kept in step with
+// the query because the drawer stack reads what the browser is actually on,
+// not the router snapshot, when it has to reconstruct a deep-linked parent.
 let mockQuery: Record<string, string> = {};
+const syncLocationWithQuery = () => {
+  const search = qs.stringify(mockQuery);
+  window.history.replaceState({}, "", search ? `/test?${search}` : "/test");
+};
 const mockPush = vi.fn((url: string) => {
   const queryString = url.split("?")[1] ?? "";
   const params = new URLSearchParams(queryString);
@@ -83,6 +89,7 @@ const mockPush = vi.fn((url: string) => {
   params.forEach((value, key) => {
     mockQuery[key] = value;
   });
+  syncLocationWithQuery();
   return Promise.resolve(true);
 });
 
@@ -116,7 +123,7 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
-    useContext: vi.fn(() => ({
+    useUtils: vi.fn(() => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },
       },
@@ -149,6 +156,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery = {};
+    syncLocationWithQuery();
     clearDrawerStack();
     clearFlowCallbacks();
     clearGuardrailsDrawerState();
@@ -166,6 +174,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
 
     // Start with guardrails drawer open
     mockQuery = { "drawer.open": "guardrails" };
+    syncLocationWithQuery();
 
     const { rerender } = render(
       <Wrapper>
@@ -241,6 +250,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery = {};
+    syncLocationWithQuery();
     clearDrawerStack();
     clearFlowCallbacks();
     clearGuardrailsDrawerState();
@@ -264,6 +274,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
 
     // Start with guardrails drawer open
     mockQuery = { "drawer.open": "guardrailsDrawer" };
+    syncLocationWithQuery();
 
     // Render BOTH drawers - the open prop is controlled by URL state (like real app)
     const { rerender } = render(
@@ -332,6 +343,7 @@ describe("GuardrailsDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery = {};
+    syncLocationWithQuery();
     clearDrawerStack();
     clearFlowCallbacks();
     clearGuardrailsDrawerState();

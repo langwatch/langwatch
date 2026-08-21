@@ -28,25 +28,77 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # The languages whose code actually changed, as the analyze matrix.
+      #
+      # `relevant` fires on any of six trees and the matrix then ran EVERY
+      # analyser, so a TypeScript-only change paid 133s for the Python one and
+      # a Python-only change paid 468s for the JavaScript one. The filters
+      # below split that gate by the language CodeQL would parse the tree as.
+      languages: ${{ steps.languages.outputs.languages }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
           filters: |
+            # `relevant` MUST be the union of the per-language filters below.
+            # It is the outer gate, so a path it omits skips CodeQL entirely no
+            # matter what the language filters say, and a path it includes with
+            # no matching language produces an empty matrix and skips just the
+            # same. Both failure modes are silent and both read green.
+            #
+            # `sdks/go/**` used to sit here and is deliberately gone: this
+            # workflow's matrix analyses javascript-typescript and python only,
+            # so a Go path could never produce a leg. It was buying nothing
+            # except a js+python scan triggered by a Go-only change. (Whether Go
+            # gets analysed at all is a separate question — see the note about
+            # the default code-scanning setup in the PR that added this.)
             relevant:
               - 'platform/app/**'
-              - 'langwatch_server/**'
               - 'sdks/python/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'services/langevals/**'
-              - 'sdks/go/**'
+              - 'packages/**'
               - '.github/workflows/codeql.yml'
+            codeql-javascript:
+              - 'platform/app/**'
+              - 'sdks/typescript/**'
+              - 'mcp/typescript/**'
+              - 'packages/**'
+              - '.github/workflows/codeql.yml'
+            codeql-python:
+              - 'sdks/python/**'
+              - 'services/langevals/**'
+              - '.github/workflows/codeql.yml'
+
+      # Emitted as a matrix rather than as two `if`s on a fixed matrix, because
+      # a skipped matrix leg still reports a result CodeQL's own tooling reads
+      # as an analysis that ran and found nothing.
+      - name: Build the language matrix
+        id: languages
+        shell: bash
+        run: |
+          languages=()
+          if [ "${{ steps.detect.outputs.codeql-javascript }}" = "true" ]; then
+            languages+=('{"language":"javascript-typescript","build-mode":"none"}')
+          fi
+          if [ "${{ steps.detect.outputs.codeql-python }}" = "true" ]; then
+            languages+=('{"language":"python","build-mode":"none"}')
+          fi
+          printf 'languages=[%s]\n' "$(IFS=,; echo "${languages[*]}")" >> "$GITHUB_OUTPUT"
 
   analyze:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    # An empty matrix is a valid "nothing to analyse", but GitHub errors on one
+    # rather than skipping, so the emptiness is checked here instead.
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.languages != '[]'
     name: analyze (${{ matrix.language }})
     # Runner size impacts CodeQL analysis time. To learn more, please see:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
@@ -68,11 +120,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - language: javascript-typescript
-            build-mode: none
-          - language: python
-            build-mode: none
+        include: ${{ fromJSON(needs.changes.outputs.languages) }}
         # CodeQL supports the following values keywords for 'language': 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
         # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
@@ -83,7 +131,7 @@ jobs:
         # your codebase is analyzed, see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/codeql-code-scanning-for-compiled-languages
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       # Add any setup steps before running the `github/codeql-action/init` action.
       # This includes steps like installing compilers or runtimes (`actions/setup-node`
@@ -93,7 +141,7 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -121,7 +169,7 @@ jobs:
           exit 1
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: "/language:${{matrix.language}}"
 

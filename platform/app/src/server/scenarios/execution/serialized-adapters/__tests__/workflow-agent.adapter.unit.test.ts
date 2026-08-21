@@ -5,7 +5,20 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "../../types";
+
+vi.mock("@langwatch/observability/tracing", () => ({
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
+}));
+
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
+
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -93,36 +106,42 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
   });
 
   describe("basic contract", () => {
     it("has AGENT role", () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       expect(adapter.role).toBe(AgentRole.AGENT);
     });
 
     it("has correct name", () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       expect(adapter.name).toBe("SerializedWorkflowAgentAdapter");
     });
   });
 
   describe("when the adapter receives a message from the simulator", () => {
     it("sends an execute_flow event to /go/studio/execute_sync", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -141,8 +160,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
     describe("when the config has project secrets", () => {
       it("merges them into workflow.secrets so `secrets.NAME` resolves in code nodes", async () => {
-        const adapter = new SerializedWorkflowAgentAdapter(
-          {
+        const adapter = new SerializedWorkflowAgentAdapter({
+          config: {
             ...defaultConfig,
             secrets: {
               WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
@@ -150,8 +169,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
             },
           },
           nlpServiceUrl,
-          apiKey,
-        );
+          projectApiKey: apiKey,
+        });
 
         await adapter.call(defaultInput);
 
@@ -163,8 +182,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
       });
 
       it("overrides pre-existing workflow.secrets values with the fresh prefetched ones", async () => {
-        const adapter = new SerializedWorkflowAgentAdapter(
-          {
+        const adapter = new SerializedWorkflowAgentAdapter({
+          config: {
             ...defaultConfig,
             workflow: {
               ...defaultDsl,
@@ -178,8 +197,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
             },
           },
           nlpServiceUrl,
-          apiKey,
-        );
+          projectApiKey: apiKey,
+        });
 
         await adapter.call(defaultInput);
 
@@ -193,11 +212,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("passes the pre-fetched workflow DSL through unchanged", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -210,11 +229,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("returns the end node output as a response string", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       const result = await adapter.call(defaultInput);
 
@@ -222,11 +241,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("sets run_evaluations to false and do_not_trace to true", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -235,11 +254,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("generates a valid 32-char hex trace_id", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -256,11 +275,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
           { identifier: "context", type: "str" },
         ],
       };
-      const adapter = new SerializedWorkflowAgentAdapter(
-        multiInputConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: multiInputConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -280,11 +299,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         ],
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       await adapter.call(multiMessageInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -306,11 +325,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     };
 
     it("uses resolved mappings for input record values", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        multiInputConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: multiInputConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -332,11 +351,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
           },
         },
       };
-      const adapter = new SerializedWorkflowAgentAdapter(
+      const adapter = new SerializedWorkflowAgentAdapter({
         config,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -354,11 +373,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
           deleted_field: { type: "value", value: "stale mapping" },
         },
       };
-      const adapter = new SerializedWorkflowAgentAdapter(
-        singleInputConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: singleInputConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -383,11 +402,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "answer",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter(
+      const adapter = new SerializedWorkflowAgentAdapter({
         config,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("42");
@@ -403,11 +422,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "structured",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter(
+      const adapter = new SerializedWorkflowAgentAdapter({
         config,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe(JSON.stringify({ key: "value" }));
@@ -420,11 +439,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         scenarioOutputField: "missing_field",
       };
 
-      const adapter = new SerializedWorkflowAgentAdapter(
+      const adapter = new SerializedWorkflowAgentAdapter({
         config,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         'Scenario output field "missing_field" not found in agent output. Available fields: output',
@@ -441,11 +460,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         text: vi.fn().mockResolvedValue('{"detail": "Workflow crashed"}'),
       });
 
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         "Workflow execution failed: HTTP 500 - Workflow crashed",
@@ -460,11 +479,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
         text: vi.fn().mockResolvedValue("Bad Gateway"),
       });
 
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         "Workflow execution failed: HTTP 502 - Bad Gateway",
@@ -476,11 +495,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     it("returns an empty string", async () => {
       mockFetch.mockResolvedValue(nlpResponse(null));
 
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("");
@@ -489,15 +508,147 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   describe("when sending the request to the NLP service", () => {
     it("passes an abort signal for timeout protection", async () => {
-      const adapter = new SerializedWorkflowAgentAdapter(
-        defaultConfig,
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
         nlpServiceUrl,
-        apiKey,
-      );
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  describe("given a run that resolved parameter values", () => {
+    function callWithParameters(
+      parameters: Record<string, string | number | boolean>,
+    ) {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters,
+      });
+      return adapter.call(defaultInput);
+    }
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends each one as an entry input", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0]).toMatchObject({ region: "eu-central" });
+    });
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends an entry input as a string, whatever the value's type", async () => {
+      await callWithParameters({ seats: 12, trial: false });
+
+      expect(sentPayload().inputs[0]).toMatchObject({
+        seats: "12",
+        trial: "false",
+      });
+    });
+
+    it("keeps the mapped conversation input alongside them", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    it("leaves a declared input alone when a parameter shares its name", async () => {
+      // The workflow's own `input` carries the conversation turn. A parameter
+      // that replaced it would leave the target answering the wrong question,
+      // and the run would read as an agent that ignored the user.
+      await callWithParameters({ input: "not the conversation" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+    it("carries them on the workflow with their native types, beside its secrets", async () => {
+      await callWithParameters({ region: "eu-central", seats: 12 });
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        seats: 12,
+      });
+      expect(sentPayload().workflow.secrets).toEqual({});
+    });
+  });
+
+  describe("when a turn has an active trace context", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+    };
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("carries params.trace_id and params.traceparent on the workflow", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The trace context wins over a run parameter with the same name" */
+    it("overrides a run parameter named trace_id or traceparent", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { trace_id: "supplied", traceparent: "supplied" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("keeps the trace context out of the entry inputs", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const entryInputs = sentPayload().inputs[0];
+      expect(entryInputs.trace_id).toBeUndefined();
+      expect(entryInputs.traceparent).toBeUndefined();
+      expect(entryInputs.region).toBe("eu-central");
     });
   });
 });

@@ -12,8 +12,9 @@
  * @see specs/langy/langy-api-key-provisioning.feature
  *      "Reducing someone's access takes effect on keys already issued"
  */
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   resolveApiKeyPermission,
   type ScopeRef,
@@ -62,7 +63,7 @@ function makePrisma({
     user: { findFirst: vi.fn().mockResolvedValue(null) },
     teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
     customRole: {
-      findUnique: vi.fn().mockImplementation(async ({ where }: any) => ({
+      findFirst: vi.fn().mockImplementation(async ({ where }: any) => ({
         permissions:
           where.id === KEY_ROLE
             ? ["scenarios:view", "scenarios:manage"]

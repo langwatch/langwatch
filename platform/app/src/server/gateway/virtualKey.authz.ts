@@ -1,13 +1,16 @@
-import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+} from "~/generated/prisma/client";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-  type Permission,
-} from "../api/rbac";
+import type { Permission } from "../api/rbac";
 import { resolveApiKeyPermission } from "../rbac/role-binding-resolver";
 import {
   GatewayGuardrailProjectMismatchError,
@@ -39,8 +42,8 @@ import type { VirtualKeyService } from "./virtualKey.service";
  *     the scopes the key is already reachable from.
  *
  * The upward cascade (a broader grant covers narrower scopes) is handled
- * inside the rbac helpers: `hasTeamPermission` also reads the org-scoped
- * binding, `hasProjectPermission` reads the team + org bindings.
+ * inside the rbac helpers: `probeTeamPermission` also reads the org-scoped
+ * binding, `probeProjectPermission` reads the team + org bindings.
  *
  * No new code here relies on the legacy `TeamUserRole.ADMIN` short-circuit
  * in rbac.ts — every gate is an explicit per-scope permission check, so
@@ -96,12 +99,16 @@ async function actorHasPermissionAtScope(
       if (!actor.session) return false;
       const sessionCtx = { prisma, session: actor.session };
       if (scope.scopeType === "ORGANIZATION") {
-        return hasOrganizationPermission(sessionCtx, scope.scopeId, permission);
+        return probeOrganizationPermission(
+          sessionCtx,
+          scope.scopeId,
+          permission,
+        );
       }
       if (scope.scopeType === "TEAM") {
-        return hasTeamPermission(sessionCtx, scope.scopeId, permission);
+        return probeTeamPermission(sessionCtx, scope.scopeId, permission);
       }
-      return hasProjectPermission(sessionCtx, scope.scopeId, permission);
+      return probeProjectPermission(sessionCtx, scope.scopeId, permission);
     }
     case "apiKey": {
       const scopeRef = await scopeRefFor(prisma, scope);

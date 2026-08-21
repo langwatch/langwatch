@@ -7,6 +7,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
 
 concurrency:
@@ -21,8 +25,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
@@ -31,17 +44,21 @@ jobs:
               - 'docs/**'
               - 'skills/**'
               - '.github/workflows/docs-ci.yml'
+              # The docs site ships a copy of the canonical OpenAPI document and
+              # generates its api-reference pages from it, so a spec change has
+              # to re-run this job or the copy silently falls behind.
+              - 'platform/app/src/app/api/openapiLangWatch.json'
 
   check_links:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: docs
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check for broken links
         run: |
@@ -67,11 +84,11 @@ jobs:
 
   check_generated_files:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Shared pnpm + Node setup with pnpm-store caching, so this job stops
       # re-downloading the full langwatch + skills dependency trees on every run.
@@ -103,13 +120,36 @@ jobs:
       - name: Regenerate llms.txt
         run: cd docs && node llms.txt.cjs
 
+      # The api-reference pages and their nav are generated from the docs site's
+      # copy of the canonical OpenAPI document. Both the copy and the pages used
+      # to drift silently, because nothing regenerated them and nothing checked.
+      - name: Re-sync the API spec copy and regenerate api-reference pages
+        run: cd docs && make sync-api-spec && make generate-api-reference
+
       - name: Check for stale generated files
         run: |
-          if ! git diff --exit-code docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx docs/llms.txt docs/llms-full.txt; then
+          STALE=0
+          if ! git diff --exit-code \
+            docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx \
+            docs/llms.txt docs/llms-full.txt \
+            docs/api-reference/openapiLangWatch.json docs/docs.json; then
+            STALE=1
+          fi
+          # A newly documented endpoint shows up as an untracked page, which a
+          # diff of tracked files cannot see.
+          UNTRACKED=$(git ls-files --others --exclude-standard docs/api-reference)
+          if [ -n "$UNTRACKED" ]; then
+            echo ""
+            echo "ERROR: these api-reference pages are generated but not committed:"
+            echo "$UNTRACKED"
+            STALE=1
+          fi
+          if [ "$STALE" = "1" ]; then
             echo ""
             echo "ERROR: Generated files are stale. Please run:"
             echo "  bash docs/scripts/sync-prompts.sh"
             echo "  cd docs && node llms.txt.cjs"
+            echo "  cd docs && make sync-api-spec && make generate-api-reference"
             echo "Then commit the updated files."
             exit 1
           fi

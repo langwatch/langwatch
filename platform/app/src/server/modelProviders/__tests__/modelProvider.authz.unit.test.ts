@@ -4,11 +4,11 @@ const hasOrganizationPermissionMock = vi.fn();
 const hasTeamPermissionMock = vi.fn();
 const hasProjectPermissionMock = vi.fn();
 
-vi.mock("../../api/rbac", () => ({
-  hasOrganizationPermission: (...args: unknown[]) =>
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
+  probeOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermissionMock(...args),
-  hasTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
-  hasProjectPermission: (...args: unknown[]) =>
+  probeTeamPermission: (...args: unknown[]) => hasTeamPermissionMock(...args),
+  probeProjectPermission: (...args: unknown[]) =>
     hasProjectPermissionMock(...args),
 }));
 
@@ -52,7 +52,7 @@ describe("assertCanManageScope", () => {
         }),
       ).resolves.toBeUndefined();
       expect(hasOrganizationPermissionMock).toHaveBeenCalledWith(
-        expect.objectContaining({ prisma: expect.anything() }),
+        expect.objectContaining({ session: expect.anything() }),
         "org_acme",
         "organization:manage",
       );

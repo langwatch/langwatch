@@ -5,7 +5,7 @@ sidebarTitle: Retention
 keywords: retention, governance data, TTL, billing records, compliance evidence
 ---
 
-Governance data (gateway traces, activity events, audit-relevant spans and log records) lives in the same stores as every other trace your platform ingests, and its lifetime is governed by the same mechanism: **tenant retention policies**. One system, one answer to "how long do we keep it".
+Governance data (gateway traces, activity events, audit-relevant spans and log records) lives in the same stores as every other trace your platform ingests, and its lifetime is governed by the same mechanism: **tenant retention policies**.
 
 ## Tenant retention policies
 
@@ -14,7 +14,7 @@ Retention is configured per scope under **Settings > Data Retention**: an organi
 The full mechanics, including how deletion works and the self-hosted notes, live on [Platform → Data Retention](/platform/data-retention). Everything there applies to governance-origin data unchanged: a project holding gateway traffic follows its project policy, or its team's, or the organization default.
 
 <Note>
-An earlier design attached a per-source retention class to each governance ingestion source. That mechanism was dropped before it shipped anywhere it could be relied on: retention is per organization, team, and project scope, not per source. If your compliance notes reference `retentionClass`, map them to scoped retention policies.
+Retention is scoped per organization, team, and project, never per ingestion source. Compliance notes that describe a per-source retention class map onto these scoped policies instead.
 </Note>
 
 ## What is deliberately exempt: billing records

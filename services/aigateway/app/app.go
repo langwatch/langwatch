@@ -26,6 +26,7 @@ type App struct {
 	models     ModelResolver
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
+	realtime   RealtimeSessionRegistry
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -47,7 +48,14 @@ func WithModels(m ModelResolver) Option          { return func(app *App) { app.m
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
 
 // WithSpend wires the spend emitter that records billing lifecycle events.
-func WithSpend(e pipeline.SpendEmitter) Option   { return func(app *App) { app.spend = e } }
+func WithSpend(e pipeline.SpendEmitter) Option { return func(app *App) { app.spend = e } }
+
+// WithRealtimeSessions wires the control plane's open-voice-session record.
+// Without it the realtime mint endpoints refuse rather than mint: a session
+// nobody recorded is unbillable voice.
+func WithRealtimeSessions(r RealtimeSessionRegistry) Option {
+	return func(app *App) { app.realtime = r }
+}
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
@@ -85,10 +93,19 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 		chain = append(chain, pipeline.RateLimit(a.ratelimit.Allow))
 	}
 	if a.policy != nil {
-		chain = append(chain, pipeline.Policy(a.policy.Check))
+		// Model rules are enforced from the model resolver, on the resolved
+		// id, so without a resolver there is nothing to enforce them against.
+		// A bundle carrying one is refused rather than served: an unenforced
+		// deny rule is the one failure mode that looks exactly like a working
+		// one, and this build cannot honor what the bundle asks for.
+		chain = append(chain, pipeline.Policy(a.policy.Check, a.models != nil))
 	}
 	if a.models != nil {
-		chain = append(chain, pipeline.ModelResolve(a.models.Resolve))
+		var checkModel pipeline.CheckModelFunc
+		if a.policy != nil {
+			checkModel = a.policy.CheckModel
+		}
+		chain = append(chain, pipeline.ModelResolve(a.models.Resolve, checkModel))
 	}
 	if a.cache != nil {
 		chain = append(chain, pipeline.Cache(a.evaluateCache))
@@ -134,6 +151,9 @@ func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
 func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
 func (discardMetrics) RecordBudgetBlock(_ string)                         {}
+func (discardMetrics) RecordRealtimeMint(_, _ string)                     {}
+func (discardMetrics) RecordRealtimeSessionLimitBlock()                   {}
+func (discardMetrics) RecordRealtimeRegistryError(_ string)               {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
 	return model
@@ -159,16 +179,43 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 	var models []domain.Model
 	var gaps []domain.ModelDiscoveryGap
 	seen := make(map[string]bool)
-	add := func(m domain.Model) {
-		if m.ID == "" || seen[m.ID] {
+
+	// Built once: the predicate reports an unreadable pattern when it is
+	// compiled, and an operator wants that said once per listing, not once
+	// per pass over the models.
+	allowedByPolicy := modelPolicyFilter(cfg.PolicyRules, a.logger)
+	reachable := reachableProviders(bundle)
+
+	// Every name is judged on the model a request for it would reach, never
+	// on the name itself, because that is the only thing dispatch judges. An
+	// alias name is not a model at all, and a name is displayed under whatever
+	// spelling its source uses, so judging the displayed string asked a
+	// different question of every source and answered it differently.
+	//
+	// listed is the name a client sends; target is what it resolves to.
+	add := func(listed string, target domain.Model) {
+		if listed == "" || seen[listed] {
 			return
 		}
-		seen[m.ID] = true
-		models = append(models, m)
+		if !cfg.AllowsResolvedModel(target.ProviderID, target.ID) {
+			return
+		}
+		if !allowedByPolicy(target) {
+			return
+		}
+		if !reachable(target.ProviderID) {
+			return
+		}
+		seen[listed] = true
+		models = append(models, domain.Model{
+			ID:         listed,
+			Name:       listed,
+			ProviderID: target.ProviderID,
+		})
 	}
 
 	for name, alias := range cfg.ModelAliases {
-		add(domain.Model{ID: name, Name: name, ProviderID: alias.ProviderID})
+		add(name, domain.Model{ID: alias.Model, ProviderID: alias.ProviderID})
 	}
 
 	if len(cfg.AllowedModels) > 0 {
@@ -190,24 +237,30 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 				hasWildcards = true
 				continue
 			}
-			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
+			// A qualified entry names its own provider, and outranks the
+			// chain-wide guess, which is only there because a bare entry
+			// names no provider at all.
+			if qualified, model, ok := domain.SplitModelSpelling(id); ok {
+				add(id, domain.Model{ID: model, ProviderID: qualified})
+				continue
+			}
+			add(id, domain.Model{ID: id, ProviderID: providerID})
 		}
 		if hasWildcards {
-			discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+			discoveredGaps, err := a.addDiscovered(ctx, bundle, add)
 			if err != nil {
 				return nil, nil, err
 			}
 			gaps = discoveredGaps
 		}
 	} else {
-		discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+		discoveredGaps, err := a.addDiscovered(ctx, bundle, add)
 		if err != nil {
 			return nil, nil, err
 		}
 		gaps = discoveredGaps
 	}
 
-	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, gaps, nil
 }
@@ -218,7 +271,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 // endpoint serves, so the allowlist is applied here too: dispatch rejects
 // anything outside it, and listing a model the VK cannot call is worse
 // than omitting it.
-func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) ([]domain.ModelDiscoveryGap, error) {
+func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func(string, domain.Model)) ([]domain.ModelDiscoveryGap, error) {
 	if a.providers == nil {
 		return nil, nil
 	}
@@ -227,12 +280,42 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		return nil, err
 	}
 	for _, m := range discovered {
-		if !cfg.AllowsModel(m.ID) {
-			continue
-		}
-		add(m)
+		// A discovered model is its own target: the catalog reports the id
+		// the provider serves it under, which is the id a client sends.
+		add(m.ID, m)
 	}
 	return gaps, nil
+}
+
+// reachableProviders reports, for one credential chain, whether a name
+// pointing at a given provider can be served at all.
+//
+// The listing owes this the same way it owes the allowlist and the policy
+// rules: dispatch refuses a name whose provider the key holds no credential
+// for, so offering it advertises a model every request for it will be
+// refused. An unattributed name has no provider to judge and stays.
+//
+// A chain with no credentials narrows nothing. Nothing dispatches for such a
+// key at all, so singling out its provider-qualified names would not make the
+// list truer, only empty, and a key still being wired up keeps a model list
+// that shows what it is configured to reach.
+func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
+	creds := bundle.Credentials
+	if len(creds) == 0 {
+		return func(domain.ProviderID) bool { return true }
+	}
+	held := make(map[domain.ProviderID]bool, len(creds))
+	for _, cred := range creds {
+		// providers_allowed narrows the chain at dispatch too, so a
+		// credential it excludes serves nothing and makes no name reachable.
+		if !bundle.Config.AllowsProvider(cred.ID) {
+			continue
+		}
+		held[cred.ProviderID] = true
+	}
+	return func(providerID domain.ProviderID) bool {
+		return providerID == "" || held[providerID]
+	}
 }
 
 // soleCredentialProviderID returns the credential chain's provider when
@@ -252,7 +335,7 @@ func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 	return providerID
 }
 
-// filterModelsByPolicy mirrors dispatch-time model policy: models matching
+// Mirrors dispatch-time model policy: models matching
 // a deny rule are dropped, and when any allow rule targets models, only
 // models matching one survive (the policy matcher rejects the rest with
 // "is not in allowlist"). Invalid patterns are skipped (not failed
@@ -261,8 +344,35 @@ func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 // still reject a request against a listed model if its pattern is bad.
 // The skip is logged so a typo'd rule doesn't silently fail to hide a
 // model from the list without a trace anywhere.
-func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule, logger *zap.Logger) []domain.Model {
-	var deny, allow []*regexp.Regexp
+// modelPolicyFilter builds the "may this model be listed" predicate. It is
+// applied to the model a name resolves to, exactly once, which is the same
+// thing CheckModel judges at dispatch.
+func modelPolicyFilter(rules []domain.PolicyRule, logger *zap.Logger) func(domain.Model) bool {
+	deny, allow := compileModelRules(rules, logger)
+	if len(deny) == 0 && len(allow) == 0 {
+		return func(domain.Model) bool { return true }
+	}
+	return func(m domain.Model) bool {
+		// Every spelling of the model, the same set CheckModel judges at
+		// dispatch, so a rule written "openai/gpt-4.*" hides the same
+		// models it refuses.
+		spellings := domain.ModelSpellings(m.ProviderID, m.ID)
+		if matchesAnyPattern(deny, spellings) {
+			return false
+		}
+		return len(allow) == 0 || matchesAnyPattern(allow, spellings)
+	}
+}
+
+// compileModelRules compiles the model rules, skipping any pattern that will
+// not compile. Skipped rather than failed closed, unlike dispatch: the list is
+// discovery, and dispatch stays the authority that would refuse a request
+// against a listed model whose rule is broken. The skip is logged so a typo
+// does not silently stop hiding a model with no trace anywhere.
+func compileModelRules(
+	rules []domain.PolicyRule,
+	logger *zap.Logger,
+) (deny, allow []*regexp.Regexp) {
 	for _, r := range rules {
 		if r.Target != domain.PolicyTargetModel {
 			continue
@@ -282,26 +392,16 @@ func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule, logg
 			allow = append(allow, re)
 		}
 	}
-	if len(deny) == 0 && len(allow) == 0 {
-		return models
-	}
-	matchesAny := func(id string, patterns []*regexp.Regexp) bool {
-		for _, re := range patterns {
-			if re.MatchString(id) {
+	return deny, allow
+}
+
+func matchesAnyPattern(patterns []*regexp.Regexp, candidates []string) bool {
+	for _, re := range patterns {
+		for _, candidate := range candidates {
+			if re.MatchString(candidate) {
 				return true
 			}
 		}
-		return false
 	}
-	kept := models[:0]
-	for _, m := range models {
-		if matchesAny(m.ID, deny) {
-			continue
-		}
-		if len(allow) > 0 && !matchesAny(m.ID, allow) {
-			continue
-		}
-		kept = append(kept, m)
-	}
-	return kept
+	return false
 }

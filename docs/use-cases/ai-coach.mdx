@@ -4,7 +4,7 @@ description: Evaluate AI coaching systems using LangWatch with LLM-as-a-Judge sc
 keywords: AI coach, evaluation, LangWatch, AI therapist, AI Leadership
 ---
 
-This guide demonstrates how to build a robust evaluation pipeline for a sophisticated conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
+This guide demonstrates how to build an evaluation pipeline for a conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
 
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
@@ -156,10 +156,10 @@ This script produces a detailed, multi-faceted evaluation of your AI coach. In t
 
 * **See an Overview**: Get an aggregate pass/fail rate for each judge (e.g., `stacking_judge_passed`, `looping_judge_passed`) across your entire dataset.
 * **Filter for Failures**: Instantly isolate all conversation turns where a specific judge failed. For example, you can view all samples where `looping_judge_passed` was False to understand why your model is getting repetitive.
-* **Compare Runs**: Easily compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
+* **Compare Runs**: Compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
 
 ### **6. Conclusion**
 
-By implementing this evaluation framework with LangWatch, you can systematically improve the quality and consistency of your AI coaching conversations. The combination of specialized LLM judges and ground truth annotations provides a robust way to measure and enhance key aspects of coaching interactions, from question quality to conversational flow. This approach ensures your AI coach maintains high standards of engagement and effectiveness as it scales to serve more users.
+By implementing this evaluation framework with LangWatch, you can systematically improve the quality and consistency of your AI coaching conversations. The combination of specialized LLM judges and ground truth annotations gives you a way to measure and enhance key aspects of coaching interactions, from question quality to conversational flow.
 
 For more examples of building and evaluating conversational AI, explore [Scenarios](https://langwatch.ai/scenario/).

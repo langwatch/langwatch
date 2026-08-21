@@ -2,8 +2,8 @@ apiVersion: v2
 name: langwatch
 description: Helm chart for LangWatch application
 type: application
-appVersion: 3.9.0
-version: 3.9.0
+appVersion: 3.16.0
+version: 3.16.0
 annotations:
   category: Observability
   keywords: ai,observability,monitoring,secrets
@@ -15,7 +15,7 @@ dependencies:
     condition: prometheus.chartManaged
   - name: clickhouse-serverless
     alias: clickhouse
-    version: 0.2.0
+    version: '>= 0.0.0'
     repository: file://../clickhouse-serverless
     condition: clickhouse.chartManaged
   - name: langwatch-gateway

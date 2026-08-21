@@ -9,6 +9,7 @@
  * spawning the tool.
  */
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig } from "./config";
 
 export interface BudgetExceededPayload {
@@ -39,7 +40,7 @@ export async function checkBudget(
 ): Promise<BudgetExceededPayload | null> {
   if (!cfg.access_token) return null;
   const f = opts.fetchImpl ?? fetch;
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + "/api/auth/cli/budget/status";
+  const url = normalizeEndpoint(cfg.control_plane_url) + "/api/auth/cli/budget/status";
   let res: Response;
   try {
     res = await f(url, {
@@ -86,7 +87,10 @@ const PERIOD_LABEL: Record<string, string> = {
   total: "total",
 };
 
-export function renderBudgetExceeded(e: BudgetExceededPayload): string {
+export function renderBudgetExceeded(
+  e: BudgetExceededPayload,
+  { fallbackUrl }: { fallbackUrl?: string } = {},
+): string {
   const period = (e.period || "month").toLowerCase();
   const periodLabel = PERIOD_LABEL[period] ?? period;
   const lines: string[] = [];
@@ -99,7 +103,15 @@ export function renderBudgetExceeded(e: BudgetExceededPayload): string {
     lines.push(`   Admin: ${e.admin_email}`);
     lines.push("");
   }
-  lines.push("   Need urgent access? Run:");
-  lines.push("     langwatch request-increase");
+  // The gateway-signed URL carries the scope/limit/spent params so the
+  // request form arrives pre-filled; the static page is the fallback.
+  // An empty payload URL falls back too, so `??` would be wrong here.
+  const signedUrl = e.request_increase_url?.trim();
+  let requestUrl = fallbackUrl;
+  if (signedUrl !== undefined && signedUrl !== "") requestUrl = signedUrl;
+  if (requestUrl) {
+    lines.push("   Need urgent access? Request an increase:");
+    lines.push(`     ${requestUrl}`);
+  }
   return lines.join("\n") + "\n";
 }

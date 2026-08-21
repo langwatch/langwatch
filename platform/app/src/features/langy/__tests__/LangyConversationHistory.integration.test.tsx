@@ -262,14 +262,13 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      // isInitialLoading, not isLoading: React Query v4 reports a DISABLED
+      // isLoading, not isLoading: React Query v4 reports a DISABLED
       // query as status "loading" forever, and the panel deliberately disables
-      // the list while closed — so the production hook reads isInitialLoading.
+      // the list while closed — so the production hook reads isLoading.
       // Mirror that: only a query that is BOTH enabled AND still loading counts.
-      isInitialLoading: enabled && state.status === "loading",
       isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -395,11 +394,10 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      isInitialLoading:
+      isLoading:
         enabled && state.status === "loading" && state.data === undefined,
-      isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: state.status === "loading" && state.data !== undefined,
+      isPlaceholderData: state.status === "loading" && state.data !== undefined,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -548,8 +546,8 @@ vi.mock("~/utils/api", async () => {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         // Feature off in these tests — the header GitHub button hides
         // itself (isLoading=false, data=undefined) and stays out of the way.
         useQuery: () => ({

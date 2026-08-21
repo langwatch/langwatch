@@ -35,6 +35,7 @@ describe("SerializedHttpAgentAdapter", () => {
     url: "https://api.example.com/chat",
     method: "POST",
     headers: [],
+    secrets: {},
     outputPath: "$.response",
   };
 
@@ -50,6 +51,12 @@ describe("SerializedHttpAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockSsrfSafeFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -60,17 +67,17 @@ describe("SerializedHttpAgentAdapter", () => {
   });
 
   it("has AGENT role", () => {
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
     expect(adapter.role).toBe(AgentRole.AGENT);
   });
 
-  it("has correct name", () => {
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+  it("reports the adapter name", () => {
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
     expect(adapter.name).toBe("SerializedHttpAgentAdapter");
   });
 
   it("makes HTTP request with correct URL and method", async () => {
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
 
     await adapter.call(defaultInput);
 
@@ -83,7 +90,7 @@ describe("SerializedHttpAgentAdapter", () => {
   });
 
   it("includes Content-Type header", async () => {
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
 
     await adapter.call(defaultInput);
 
@@ -105,7 +112,7 @@ describe("SerializedHttpAgentAdapter", () => {
         { key: "X-Another", value: "another-value" },
       ],
     };
-    const adapter = new SerializedHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter({ config });
 
     await adapter.call(defaultInput);
 
@@ -125,7 +132,7 @@ describe("SerializedHttpAgentAdapter", () => {
       ...defaultConfig,
       auth: { type: "bearer", token: "secret-token" },
     };
-    const adapter = new SerializedHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter({ config });
 
     await adapter.call(defaultInput);
 
@@ -144,7 +151,7 @@ describe("SerializedHttpAgentAdapter", () => {
       ...defaultConfig,
       auth: { type: "api_key", header: "X-API-Key", value: "my-key" },
     };
-    const adapter = new SerializedHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter({ config });
 
     await adapter.call(defaultInput);
 
@@ -159,7 +166,7 @@ describe("SerializedHttpAgentAdapter", () => {
   });
 
   it("extracts response using JSONPath", async () => {
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
 
     const result = await adapter.call(defaultInput);
 
@@ -179,7 +186,7 @@ describe("SerializedHttpAgentAdapter", () => {
       text: vi.fn().mockResolvedValue('{"data":"value"}'),
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-    const adapter = new SerializedHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter({ config });
     const result = await adapter.call(defaultInput);
 
     expect(result).toBe('{"data":"value"}');
@@ -194,7 +201,7 @@ describe("SerializedHttpAgentAdapter", () => {
       text: vi.fn().mockResolvedValue(""),
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
 
     await expect(adapter.call(defaultInput)).rejects.toThrow(
       "HTTP 500: Internal Server Error",
@@ -203,7 +210,7 @@ describe("SerializedHttpAgentAdapter", () => {
 
   it("does not send body for GET requests", async () => {
     const config: HttpAgentData = { ...defaultConfig, method: "GET" };
-    const adapter = new SerializedHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter({ config });
 
     await adapter.call(defaultInput);
 
@@ -221,7 +228,7 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"messages": {{messages}}}',
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -235,7 +242,7 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"thread": "{{threadId}}"}',
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -249,7 +256,7 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"input": "{{input}}"}',
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -265,7 +272,7 @@ describe("SerializedHttpAgentAdapter", () => {
           bodyTemplate:
             '{"mode": "{% if input contains \'search\' %}search{% else %}chat{% endif %}", "query": "{{ input }}"}',
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         const input: AgentInput = {
           ...defaultInput,
@@ -294,7 +301,7 @@ describe("SerializedHttpAgentAdapter", () => {
           context: { type: "source", sourceId: "scenario", path: ["messages"] },
         },
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -312,7 +319,7 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"input": "{{input}}", "messages": {{messages}}}',
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -323,53 +330,150 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("trace ID capture", () => {
-    it("exposes captured trace ID after a request", async () => {
-      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
-        headers,
-        traceId: "captured_trace_id_123",
-      }));
+  describe("trace context propagation", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
 
-      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
-      await adapter.call(defaultInput);
-
-      expect(adapter.getTraceId()).toBe("captured_trace_id_123");
-    });
-
-    it("returns undefined when no trace ID was captured", () => {
-      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
-      expect(adapter.getTraceId()).toBeUndefined();
-    });
-  });
-
-  describe("trace context injection", () => {
-    it("calls injectTraceContextHeaders on each request", async () => {
-      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
-
-      await adapter.call(defaultInput);
-
-      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
-        }),
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        headers.tracestate = "vendor=1";
+        return { headers, traceId: TRACE_ID };
       });
+    };
+
+    const sentHeaders = (): Record<string, string> =>
+      (
+        mockSsrfSafeFetch.mock.calls[0]![1] as {
+          headers: Record<string, string>;
+        }
+      ).headers;
+
+    it("captures the propagation once per call and sends its headers", async () => {
+      injectTraceContext();
+      const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
+
+      await adapter.call(defaultInput);
+
+      expect(mockInjectTraceContextHeaders).toHaveBeenCalledTimes(1);
+      expect(sentHeaders().traceparent).toBe(TRACEPARENT);
+      expect(sentHeaders().tracestate).toBe("vendor=1");
     });
 
-    describe("when custom headers are configured", () => {
-      it("calls injection after custom headers are applied", async () => {
+    describe("when the target configures its own traceparent header", () => {
+      /** @scenario "The automatic traceparent does not replace one the target configured" */
+      it("keeps the configured value, whatever its casing", async () => {
+        injectTraceContext();
         const config: HttpAgentData = {
           ...defaultConfig,
-          headers: [{ key: "X-Custom", value: "custom-value" }],
+          headers: [
+            {
+              key: "Traceparent",
+              value: "00-{{ traceId }}-0000000000000001-01",
+            },
+          ],
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         await adapter.call(defaultInput);
 
-        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-          headers: expect.objectContaining({
-            "Content-Type": "application/json",
-            "X-Custom": "custom-value",
-          }),
+        const headers = sentHeaders();
+        expect(headers.Traceparent).toBe(`00-${TRACE_ID}-0000000000000001-01`);
+        expect(headers.traceparent).toBeUndefined();
+        // Propagation headers the target did not configure still arrive.
+        expect(headers.tracestate).toBe("vendor=1");
+      });
+    });
+
+    describe("when the url and body templates read the trace variables", () => {
+      /** @scenario "The url and body templates can read the turn's trace id and traceparent" */
+      it("renders the turn's trace id and traceparent in both", async () => {
+        injectTraceContext();
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/t/{{ traceId }}",
+          bodyTemplate:
+            '{"trace": "{{ traceId }}", "parent": "{{ traceparent }}"}',
+        };
+        const adapter = new SerializedHttpAgentAdapter({ config });
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          `https://api.example.com/t/${TRACE_ID}`,
+          expect.any(Object),
+        );
+        const body = JSON.parse(
+          (mockSsrfSafeFetch.mock.calls[0]![1] as { body: string }).body,
+        );
+        expect(body).toEqual({ trace: TRACE_ID, parent: TRACEPARENT });
+      });
+    });
+  });
+
+  describe("header value templating", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const sentHeaders = (): Record<string, string> =>
+      (
+        mockSsrfSafeFetch.mock.calls[0]![1] as {
+          headers: Record<string, string>;
+        }
+      ).headers;
+
+    /** @scenario "A header value renders run parameters" */
+    it("renders {{ params.NAME }} in a header value", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        headers: [{ key: "X-Region", value: "{{ params.region }}" }],
+      };
+      const adapter = new SerializedHttpAgentAdapter({
+        config,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentHeaders()["X-Region"]).toBe("eu-central");
+    });
+
+    /** @scenario "A header value renders the turn's trace id and traceparent" */
+    it("renders the turn's trace id and traceparent in header values", async () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        headers: [
+          { key: "X-Trace-Id", value: "{{ traceId }}" },
+          { key: "X-Parent", value: "{{ traceparent }}" },
+        ],
+      };
+      const adapter = new SerializedHttpAgentAdapter({ config });
+
+      await adapter.call(defaultInput);
+
+      expect(sentHeaders()["X-Trace-Id"]).toBe(TRACE_ID);
+      expect(sentHeaders()["X-Parent"]).toBe(TRACEPARENT);
+    });
+
+    describe("when a header template is malformed", () => {
+      /** @scenario "A failing header template names the header it came from" */
+      it("rejects naming the header key and the headers field", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          headers: [{ key: "X-Broken", value: "{% if %}" }],
+        };
+        const adapter = new SerializedHttpAgentAdapter({ config });
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          TemplateRenderError,
+        );
+        await expect(adapter.call(defaultInput)).rejects.toMatchObject({
+          field: "headers",
+          message: expect.stringContaining('header "X-Broken"'),
         });
       });
     });
@@ -381,7 +485,7 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         url: "https://api.example.com/conversations/{{threadId}}/messages",
       };
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
 
       await adapter.call(defaultInput);
 
@@ -402,7 +506,7 @@ describe("SerializedHttpAgentAdapter", () => {
         newMessages: [{ role: "user", content: "hello world & friends?" }],
       };
 
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
       await adapter.call(input);
 
       expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
@@ -422,7 +526,7 @@ describe("SerializedHttpAgentAdapter", () => {
         newMessages: [{ role: "user", content: "hello world & friends" }],
       };
 
-      const adapter = new SerializedHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter({ config });
       await adapter.call(input);
 
       const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
@@ -443,7 +547,7 @@ describe("SerializedHttpAgentAdapter", () => {
           newMessages: [{ role: "user", content: "needs encoding" }],
         };
 
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
         await adapter.call(input);
 
         expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
@@ -455,7 +559,9 @@ describe("SerializedHttpAgentAdapter", () => {
 
     describe("when url has no placeholders", () => {
       it("passes url through unchanged", async () => {
-        const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+        const adapter = new SerializedHttpAgentAdapter({
+          config: defaultConfig,
+        });
         await adapter.call(defaultInput);
 
         expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
@@ -474,7 +580,7 @@ describe("SerializedHttpAgentAdapter", () => {
             conversationId: { type: "value", value: "conv-42" },
           },
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         await adapter.call(defaultInput);
 
@@ -489,7 +595,7 @@ describe("SerializedHttpAgentAdapter", () => {
           ...defaultConfig,
           url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         await adapter.call(defaultInput);
 
@@ -521,7 +627,7 @@ describe("SerializedHttpAgentAdapter", () => {
           messages: [{ role: "user", content: host }],
           newMessages: [{ role: "user", content: host }],
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         await expect(adapter.call(input)).rejects.toThrow();
 
@@ -538,7 +644,7 @@ describe("SerializedHttpAgentAdapter", () => {
           ...defaultConfig,
           url: "https://api.example.com/{% if %}/broken",
         };
-        const adapter = new SerializedHttpAgentAdapter(config);
+        const adapter = new SerializedHttpAgentAdapter({ config });
 
         await expect(adapter.call(defaultInput)).rejects.toThrow(
           TemplateRenderError,

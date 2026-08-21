@@ -134,7 +134,7 @@ export class MonitorPerformanceClickHouseRepository
       const rows = await result.json<ClickHouseMonitorPerformanceRow>();
       return rows.map(toPerformanceBucket);
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: params.tenantId,
           evaluatorCount: params.evaluatorIds.length,

@@ -6,13 +6,13 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**`otel_generic` + `thirty_days` retention are Apache 2.0 floor; multi-source + extended retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the default 30-day retention; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and the `one_year`, `seven_years` retention classes ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
 <Note>**Governance ingestion is for third-party AI platforms your org runs.** If you want to send your *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key, that's the right home for traces from systems you own. See [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
 
-This section documents each supported `sourceType` honestly: what's wired up today, what's still envelope-only, and what's a configuration contract awaiting an adapter.
+Each supported `sourceType` below states what is wired up today, what is still envelope-only, and what is a configuration contract awaiting an adapter.
 
 ## State of each receiver: at a glance
 
@@ -45,10 +45,10 @@ Different upstreams emit different event shapes:
 
 Independent of source type, the lifecycle is:
 
-1. Admin opens `/settings/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
+1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal, it's never returned by the list/get endpoints again.
 3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
-4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps `langwatch.origin.*` + `langwatch.governance.retention_class` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
+4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps the `langwatch.origin.*` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
 5. Web detail page polls every 10s, CLI tail polls every 3s in `--follow` mode, both see the flip + the new event simultaneously.
 
 For source types where the puller worker is not yet wired (the three "setup-contract-only" rows above), step 4 won't fire; the source stays at `awaiting_first_event` until the adapter ships.
@@ -84,7 +84,6 @@ Every governance-ingested span, log_record is stamped at the receiver edge with 
 | `langwatch.ingestion_source.id` | Source identity (matches the `lw_is_*` Bearer's resolved IngestionSource) |
 | `langwatch.ingestion_source.organization_id` | Org tenancy for cross-source roll-ups |
 | `langwatch.ingestion_source.source_type` | Source type (`otel_generic`, `workato`, etc.) for filtering |
-| `langwatch.governance.retention_class` | `thirty_days`, `one_year`, `seven_years`, drives ClickHouse TTL |
 
 These appear as read-only system metadata in the trace viewer, log detail pane; users cannot supply or edit them.
 
@@ -104,6 +103,6 @@ If you need an unwired adapter, file an issue tagged `governance/ingestion/adapt
 
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion): picking the right OTel URL
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` classes
+- [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept
 - [OCSF, SIEM export](/ai-gateway/governance/ocsf-export): pulling governance events into Splunk, Datadog Security, etc.
 - [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest list/health/tail` commands

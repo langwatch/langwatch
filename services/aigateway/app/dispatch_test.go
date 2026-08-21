@@ -84,7 +84,8 @@ func (m *mockGuardrails) EvaluateChunk(_ context.Context, _ *domain.Bundle, _ *d
 }
 
 type mockPolicy struct {
-	checkFn func(ctx context.Context, rules []domain.PolicyRule, body []byte) error
+	checkFn      func(ctx context.Context, rules []domain.PolicyRule, body []byte) error
+	checkModelFn func(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error
 }
 
 func (m *mockPolicy) Check(ctx context.Context, rules []domain.PolicyRule, body []byte) error {
@@ -94,13 +95,24 @@ func (m *mockPolicy) Check(ctx context.Context, rules []domain.PolicyRule, body 
 	return nil
 }
 
-type mockModels struct {
-	resolveFn func(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+func (m *mockPolicy) CheckModel(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error {
+	if m.checkModelFn != nil {
+		return m.checkModelFn(ctx, rules, resolved)
+	}
+	return nil
 }
 
-func (m *mockModels) Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error) {
+type mockModels struct {
+	resolveFn func(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
+}
+
+func (m *mockModels) Resolve(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error) {
 	if m.resolveFn != nil {
-		return m.resolveFn(ctx, rawModel, config)
+		return m.resolveFn(ctx, req, config)
+	}
+	rawModel := ""
+	if req != nil {
+		rawModel = req.Model
 	}
 	return &domain.ResolvedModel{ModelID: rawModel, ProviderID: "openai", Source: domain.ModelSourceImplicit}, nil
 }
@@ -335,7 +347,7 @@ func TestHandleChat_ModelResolution(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "gpt-4-turbo",
 				ProviderID: domain.ProviderOpenAI,
@@ -555,7 +567,7 @@ func TestHandleChat_ModelAwareSkipsWrongProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "claude-3-5-sonnet-20241022",
 				ProviderID: domain.ProviderAnthropic,
@@ -600,9 +612,9 @@ func TestHandleChat_ModelAwareImplicitInfersProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, raw string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, req *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
-				ModelID:    raw,
+				ModelID:    req.Model,
 				ProviderID: "", // implicit — dispatcher must infer
 				Source:     domain.ModelSourceImplicit,
 			}, nil

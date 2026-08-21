@@ -16,7 +16,20 @@ type Config struct {
 	// daemon prunes them in the background (0 disables pruning). Only databases
 	// haven itself tracked (via the activity clock) are ever touched, and the
 	// protected main database is always kept.
-	DBIdleTTL                time.Duration
+	DBIdleTTL time.Duration
+	// TestContainerTTL is how old a stopped testcontainers-labeled container
+	// must be before the daemon reaps it as leaked (0 disables the sweep
+	// entirely). Fresh ones are left alone — a live test run may still be
+	// using them.
+	TestContainerTTL time.Duration
+	// RunningTestContainerTTL is the same rule for containers still running,
+	// whose age says nothing about current use (reused containers keep their
+	// original creation time across runs). Clamped to at least TestContainerTTL.
+	RunningTestContainerTTL time.Duration
+	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
+	// tick enforces it over every live tsgo process regardless of who spawned
+	// it. Tsgo.RunMaxRSS == 0 disables the governor.
+	Tsgo                     domain.TsgoLimits
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
@@ -30,6 +43,13 @@ type Config struct {
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
+	// ShouldDisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true into every
+	// stack. On by default — local dev should never ship trace text to Google, and
+	// the app then never loads the @google-cloud/dlp SDK. Setting the variable to
+	// anything the app would not read as true (case-insensitive "true") opts back
+	// in: haven emits nothing and .env governs, so DLP can be exercised against
+	// real credentials.
+	ShouldDisableGoogleDLP bool
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves

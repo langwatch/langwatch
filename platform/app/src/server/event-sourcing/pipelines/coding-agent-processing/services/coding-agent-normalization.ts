@@ -71,8 +71,12 @@ export function detectCodingAgent({
  *     appears under both keys for the same trace, so a span and a log of one
  *     session do join.
  *   - opencode:    `session.id` everywhere.
- *   - Codex:       `conversation.id` == `thread.id` == `session.id` (its MCP span
- *     sets two of them to the same thread id).
+ *   - Codex:       `conversation.id` on every log EVENT. Its turn SPAN is the
+ *     exception the shared order cannot serve — there
+ *     `gen_ai.conversation.id` is the id of the TURN and the session rides
+ *     `thread.id` — so the codex definition carries a `sessionKeyFromSpan`
+ *     hook and span callers resolve through
+ *     {@link resolveSpanConversationKey}.
  *
  * Order matters only in that all of these are the same value when more than one
  * is present, so the first hit wins and no agent is disadvantaged.
@@ -97,6 +101,32 @@ export function resolveConversationKey(
     }
   }
   return null;
+}
+
+/**
+ * The conversation key off one SPAN's attributes: the detected agent's own
+ * `sessionKeyFromSpan` hook first, the shared candidate order otherwise.
+ * Span callers use this; log and metric callers keep
+ * {@link resolveConversationKey} — no agent's events need the override, and
+ * consulting the hook there would hand it attributes it never claimed to
+ * understand.
+ */
+export function resolveSpanConversationKey({
+  agent,
+  name,
+  attrs,
+}: {
+  agent: CodingAgent;
+  name: string;
+  attrs: Record<string, unknown>;
+}): string | null {
+  const definition = CODING_AGENT_REGISTRY.find(
+    (candidate) => candidate.id === agent,
+  );
+  return (
+    definition?.sessionKeyFromSpan?.({ name, attrs }) ??
+    resolveConversationKey(attrs)
+  );
 }
 
 /**
@@ -132,14 +162,23 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   assistant_response: "assistant_response",
   api_request: "api_request",
   // Gemini's completion event; carries the reply text (`response_text`) when
-  // prompt logging is on. Claude splits the same fact into api_request (cost
-  // anchor) + api_response_body (raw payload), neither of which lands here.
+  // prompt logging is on. Claude splits the same fact into api_request (the
+  // cost anchor) and api_response_body (the raw payload), so its second half
+  // lands here too: one canonical "the model answered" fact, two carriers.
   api_response: "api_response",
+  api_response_body: "api_response",
   api_error: "api_error",
   api_refusal: "api_refusal",
   refusal: "api_refusal",
   api_retries_exhausted: "retries_exhausted",
   retries_exhausted: "retries_exhausted",
+  // Claude's two rate-limit carriers: `rate_limit_event` fires on a limit
+  // actually engaging, `rate_limit_info` on status/warning updates. Both are
+  // the agent SAYING it was throttled, as opposed to the 429-inferred
+  // `rateLimited` counter, so they land on one canonical fact.
+  rate_limit: "rate_limit",
+  rate_limit_event: "rate_limit",
+  rate_limit_info: "rate_limit",
   tool_result: "tool_result",
   tool_decision: "tool_decision",
   compaction: "compaction",
@@ -150,6 +189,12 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   at_mention: "at_mention",
   internal_error: "internal_error",
   session_created: "session_created",
+  // The LangWatch companion event. It arrives fully qualified
+  // (`langwatch.session_context`), and `langwatch.` is nobody's agent prefix,
+  // so the dot-flattened spelling is what the lookup sees; the bare form maps
+  // too, for an emitter that drops the namespace.
+  session_context: "session_context",
+  langwatch_session_context: "session_context",
   session_idle: "session_idle",
   session_error: "session_error",
   subtask_invoked: "subtask_invoked",
@@ -244,6 +289,23 @@ export function isCodingAgentMetricName(metricName: string): boolean {
 export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "event.name",
   "session.id",
+  // The LangWatch companion event's vocabulary: the agent it declares itself
+  // to be, and the repository / branch / worktree the session ran against.
+  // Operational identity, not conversation content.
+  "coding_agent.name",
+  "vcs.repository.host",
+  "vcs.repository.owner",
+  "vcs.repository.name",
+  "vcs.ref.head.name",
+  "vcs.worktree.name",
+  // The codex harvest names the session on its companion event: codex
+  // withholds prompt text from its own telemetry, so the name is derived
+  // from the transcript on the device and arrives as this one bounded value.
+  "langwatch.session.title",
+  // The session's own name, as the harness itself holds it (claude's --name
+  // and /rename, codex's thread name), mirrored by the capture seams. The
+  // newest name replaces the row's title and outranks the derived titles.
+  "langwatch.session.name",
   "user.id",
   "user.email",
   "user.account_uuid",
@@ -260,8 +322,28 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "speed",
   "decision_type",
   "decision_source",
+  // Sub-agent lineage, for agents that stamp it (the claude_code
+  // subagent-spawn vocabulary): who spawned this session, and whether it
+  // FORKED the parent's context instead of starting fresh.
+  "parent_session_id",
+  "parent_agent_id",
+  "is_fork",
+  "depth",
+  "spawn_mode",
   "mcp_server_scope",
   "gen_ai.request.model",
+  // The codex turn span's vocabulary (session_task.turn): the gen_ai token
+  // buckets — where `input_tokens` INCLUDES the cache buckets, unlike the
+  // disjoint claude spellings above — and codex's own non-cached count, which
+  // is the disjoint input the fold actually wants.
+  "gen_ai.response.model",
+  "gen_ai.usage.input_tokens",
+  "gen_ai.usage.output_tokens",
+  "gen_ai.usage.cache_read.input_tokens",
+  "gen_ai.usage.cache_creation.input_tokens",
+  "codex.turn.token_usage.non_cached_input_tokens",
+  // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
+  "mcp_server",
   "mcp_server.name",
   "mcp_tool.name",
   "plugin.name",
@@ -287,7 +369,9 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "output_tokens",
   "post_tokens",
   "pre_tokens",
+  "precompute_reuse",
   "prompt_length",
+  "query_source",
   "response_length",
   "server_fallback_hop",
   "server_name",
@@ -303,10 +387,98 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "tool_result_size_bytes",
   "total_duration_ms",
   "total_retry_duration_ms",
+  "total_tokens",
+  "trigger",
   "ttft_ms",
   "type",
   "request_id",
 ];
+
+/**
+ * The companion event a LangWatch-installed hook emits, carrying the session's
+ * repository, branch and worktree identity. Fully qualified on the wire, under
+ * the `langwatch.coding_agent.hook` instrumentation scope: it belongs to
+ * LangWatch, and imitating a vendor's scope to sneak past detection would make
+ * every downstream reader unable to tell the two apart.
+ */
+export const SESSION_CONTEXT_EVENT_NAME = "langwatch.session_context";
+
+/**
+ * The fact key the generated conversation title rides on. Derived rather than
+ * lifted for claude (parsed out of a response body by the dispatcher), and
+ * carried as a wire attribute by the codex harvest's session-context record,
+ * which is why the key is also in the lifted vocabulary above.
+ */
+export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
+
+/**
+ * The fact key a prompt-derived name rides on. Separate from
+ * {@link SESSION_TITLE_FACT_KEY} because the two obey different precedence: a
+ * generated title always replaces what the row has, while a prompt-derived
+ * name only fills an empty one. Most sessions never get a generated title
+ * (the agent generates one for a minority of interactive sessions and no
+ * headless session), and a row named by what the user first asked beats an
+ * untitled one.
+ */
+export const SESSION_TITLE_FALLBACK_FACT_KEY =
+  "langwatch.session.title_fallback";
+
+/**
+ * The fact key the session's own name rides on, lifted from the companion
+ * event's `langwatch.session.name` attribute. The capture seams MIRROR the
+ * name the harness itself holds — claude's `--name` flag and `/rename`
+ * command, codex's thread name — rather than inventing one, so renaming the
+ * session in the harness renames it here. Highest-precedence of the three:
+ * the newest name replaces the row's title in place and neither derived
+ * title may clobber it.
+ */
+export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
+
+/**
+ * The literal codex substitutes for prompt text it withholds
+ * (`log_user_prompt` off, the default). Wherever prompt text is read, this
+ * value means "withheld", not "the user typed this".
+ */
+export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
+
+/** The most of a prompt that becomes a session's name. */
+const MAX_PROMPT_TITLE_CHARS = 120;
+
+/**
+ * A session name out of a prompt's text, or null when the prompt cannot name
+ * one: withheld text, an empty string, or a machine-injected turn (agents
+ * deliver notifications and context as user turns wrapped in tags, and a
+ * session named `<task-notification>` names nothing). The name is the
+ * prompt's first line, whitespace collapsed, capped.
+ */
+export function sessionTitleFromPrompt(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
+  if (trimmed.startsWith("<")) return null;
+  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
+  const collapsed = firstLine.replace(/\s+/g, " ").trim();
+  if (collapsed === "") return null;
+  return collapsed.slice(0, MAX_PROMPT_TITLE_CHARS);
+}
+
+/**
+ * The agent a record DECLARES itself to be, when that name is one LangWatch
+ * knows. Only the companion event declares anything; every other record is
+ * named by {@link detectCodingAgent} from evidence the agent itself emitted.
+ *
+ * Unknown names answer null rather than passing through: the declaration is
+ * attacker-supplied in the same sense every wire attribute is, and a label the
+ * registry cannot resolve would become a permanent agent id on the session row
+ * (agent labeling is first-writer-wins in the fold).
+ */
+export function declaredCodingAgent(
+  facts: Record<string, unknown>,
+): CodingAgent | null {
+  const declared = facts["coding_agent.name"];
+  if (typeof declared !== "string" || declared.length === 0) return null;
+  const match = CODING_AGENT_REGISTRY.find((agent) => agent.id === declared);
+  return match?.id ?? null;
+}
 
 /**
  * The coding-agent facts off one log record, for its trace contribution —
@@ -330,6 +502,15 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
  * names and pass on those. An agent that genuinely needs naming by service
  * alone needs a `ServiceName` column extracted on the canonical log record
  * first; do not close it by parsing resource attributes in this path.
+ *
+ * LANGWATCH COMPANION-EVENT ADMISSION: {@link SESSION_CONTEXT_EVENT_NAME} is
+ * admitted by its own name, ahead of detection. It is the event a LangWatch
+ * hook emits to carry the repository, branch and worktree identity no agent
+ * exports itself, and it is deliberately NOT dressed up in a vendor's
+ * instrumentation scope, so detection would decline it. The gate stays one
+ * string equality on the firehose, which is the same cost ADR-069 already
+ * accepts here; WHICH agent the event belongs to is what the event declares,
+ * read by {@link declaredCodingAgent} at the contribution.
  */
 export function liftCodingAgentLogFacts({
   scopeName,
@@ -340,6 +521,7 @@ export function liftCodingAgentLogFacts({
 }): Record<string, string | number | boolean> | null {
   const eventName = attributes["event.name"];
   if (
+    eventName !== SESSION_CONTEXT_EVENT_NAME &&
     detectCodingAgent({
       scopeName,
       recordName: typeof eventName === "string" ? eventName : null,

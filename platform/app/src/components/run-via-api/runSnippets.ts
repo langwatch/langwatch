@@ -290,21 +290,39 @@ RUN=$(curl -s -X POST "${startUrl}" \\
 RUN_ID=$(echo "$RUN" | jq -r '.runId // .run_id')
 echo "Started run: $RUN_ID"
 
-# 2. Poll until it finishes (completed | failed | stopped)
-while true; do
-  STATUS=$(curl -s "${baseUrl}/api/experiments/runs/$RUN_ID" \\
-    -H "X-Auth-Token: \${LANGWATCH_API_KEY}" | jq -r '.status')
+# 2. Poll until it finishes (completed | failed | stopped | interrupted).
+#    Branch on the HTTP status, not the body: a non-200 response (404, an
+#    auth failure, a 5xx) carries no .status, so matching the body alone
+#    spins on it for the full hour instead of failing fast.
+ATTEMPTS=0
+MAX_ATTEMPTS=1800
+while [ "$ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
+  RESPONSE=$(curl -s -w '\\n%{http_code}' "${baseUrl}/api/experiments/runs/$RUN_ID" \\
+    -H "X-Auth-Token: \${LANGWATCH_API_KEY}")
+  CODE=$(printf '%s' "$RESPONSE" | tail -n1)
+  if [ "$CODE" = "404" ]; then
+    echo "run $RUN_ID not found (expired, or never recorded); giving up"
+    exit 1
+  fi
+  if [ "$CODE" != "200" ]; then
+    echo "could not read run $RUN_ID (HTTP $CODE); giving up"
+    exit 1
+  fi
+  STATUS=$(printf '%s' "$RESPONSE" | sed '$d' | jq -r '.status')
   echo "status: $STATUS"
-  case "$STATUS" in completed|failed|stopped) break;; esac
+  case "$STATUS" in completed|failed|stopped|interrupted) break;; esac
+  ATTEMPTS=$((ATTEMPTS + 1))
   sleep 2
 done
 
+if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+  echo "gave up waiting for $RUN_ID after $MAX_ATTEMPTS polls"
+  exit 1
+fi
+
 # 3. Fetch the per-row results
 curl -s "${baseUrl}/api/experiments/runs/$RUN_ID/results" \\
-  -H "X-Auth-Token: \${LANGWATCH_API_KEY}" | jq
-
-# Alternative: stream live progress instead of polling by listening to the
-# Server-Sent Events stream at GET /api/experiments/runs/$RUN_ID/events.`;
+  -H "X-Auth-Token: \${LANGWATCH_API_KEY}" | jq`;
 }
 
 /**

@@ -21,12 +21,13 @@ import * as path from "node:path";
  * - login/logout/config: they MUTATE the identity or the persisted config the
  *   daemon has already resolved and cached. Serving them from a warm process
  *   would leave that process holding stale (or newly-wrong) credentials.
- * - open/request-increase: they launch a browser. The child would inherit the
- *   daemon's environment and session, not the caller's.
+ * - open: it launches a browser. The child would inherit the daemon's
+ *   environment and session, not the caller's.
  * - claude/codex/cursor/gemini/opencode: the gateway wrappers exec a real
  *   binary with inherited stdio and hand it the terminal for an entire
  *   interactive session. That is the caller's process's job, not an RPC's.
- * - init-shell: trivially cheap and its whole purpose is to be `eval`'d.
+ * - instrument: it prompts and rewrites credential wiring on the caller's
+ *   machine; identity and fs side effects belong to the caller's process.
  * - report: a one-shot, network-bound support command, often a customer's
  *   very first `npx langwatch` contact. Leaving a resident daemon behind as
  *   a side effect of filing an issue report would be surprising, and the
@@ -43,13 +44,16 @@ const DENIED_COMMANDS = new Set([
   "logout",
   "config",
   "open",
-  "request-increase",
   "claude",
   "codex",
   "cursor",
   "gemini",
   "opencode",
-  "init-shell",
+  // interactive tool launchers: spawning them from the detached daemon
+  // (stdio /dev/null, no DISPLAY) breaks them silently.
+  "copilot",
+  "code",
+  "instrument",
   "report",
   "push",
 ]);
@@ -67,6 +71,12 @@ const DENIED_COMMANDS = new Set([
  */
 const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
   ["tag", "delete"],
+  // `agent dev` / `agent tunnel` run a tunnel session until Ctrl-C: they hold
+  // signal handlers, a local proxy server and a child process, none of which
+  // survive being served from the detached daemon. Denying the bare word
+  // `agent` would take `agent list` with it, so the phrases are matched.
+  ["agent", "dev"],
+  ["agent", "tunnel"],
 ];
 
 /**

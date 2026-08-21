@@ -29,8 +29,15 @@
  * what it actually spent. Every read here names its budget for the same
  * reason; see `bucketMatchSql`.
  *
+ * Money is the integer nano-USD the request was priced in, carried on
+ * `AmountNanoUSD` and summed there. `AmountUSD` is a `Decimal(18, 6)` that
+ * cannot hold a nano figure, so it renders a single debit for the audit read
+ * and is never summed: rounding each debit to a micro-USD and then adding
+ * them is not the amount anybody spent, and the gap grows with request count.
+ *
  * See: migration 00017_create_gateway_budget_ledger.sql
  * See: migration 00069_gateway_budget_scope_totals_budget_grain.sql
+ * See: migration 00070_gateway_budget_ledger_nano_usd.sql
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
 
@@ -40,15 +47,35 @@ import type {
   GatewayBudgetLedgerStatus,
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  bucketPeriodFloorMs,
+  budgetPeriodFloorMs,
+  currentPeriodStart,
+} from "./budgetPeriod";
 import {
   bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
 } from "./budgetResolution.service";
+import { parseSummedNanoUsd } from "./spendEvents.clickhouse.repository";
+import { nanoUsdToDecimalString } from "./wireMoney";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
+
+/**
+ * How far back the budget detail page's recent-activity panel looks. Wide
+ * enough to cover several periods of the longest recurring window the
+ * product offers, a month, and narrow enough that the read prunes to a
+ * handful of `toYYYYMM(OccurredAt)` partitions.
+ *
+ * A TOTAL-window budget never resets, so its history can run past this
+ * bound. The panel still shows only the last 90 days for it: it answers
+ * "what has been happening lately", not "everything this budget ever
+ * spent", which is what the totals on the same page are for.
+ */
+const RECENT_EVENTS_LOOKBACK_DAYS = 90;
 
 const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
@@ -63,7 +90,13 @@ export type BudgetDebitRow = {
   /** ModelProvider the request was dispatched to, when the gateway said. */
   providerKey?: string | null;
   gatewayRequestId: string;
-  amountUsd: string;
+  /**
+   * What the request cost, as the integer nano-USD it was priced in. The only
+   * amount a caller states: the `AmountUSD` column is written from this one,
+   * so the two cannot drift apart, and it is a `Decimal(18, 6)` that a nano
+   * figure does not fit in, which is why it is not the one that gets summed.
+   */
+  amountNanoUsd: number;
   tokensInput: number;
   tokensOutput: number;
   tokensCacheRead: number;
@@ -75,16 +108,91 @@ export type BudgetDebitRow = {
   occurredAt: Date;
 };
 
+/**
+ * The ledger scope pulled provider cost is written under (ADR-088).
+ *
+ * Non-enforcement is structural, not a flag: this string is deliberately NOT
+ * a `GatewayBudgetScopeType`, so a budget under it cannot be created, and
+ * every enforcement read resolves real budgets first. There is nothing to
+ * remember to check.
+ */
+export const PULLED_USAGE_SCOPE = "pulled" as const;
+
+/**
+ * The synthetic budget id every pulled row carries. The ledger's storage key
+ * is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is not a
+ * cuid, so it can never equal a real `GatewayBudget.id`. Sharing one value
+ * across all pulled rows also keeps them contiguous under the sorting key, so
+ * the read below stays an index seek.
+ */
+export const PULLED_USAGE_BUDGET_ID = "pulled" as const;
+
+/**
+ * Namespaces a restatement key inside the `GatewayRequestId` column.
+ *
+ * `insertDebit` treats the existence of ANY row for a `(TenantId,
+ * GatewayRequestId)` as proof that request was already debited, and skips.
+ * Without this prefix, a restatement key that collided with a gateway ULID
+ * would suppress a customer's real debit — money silently missing from
+ * enforcement. The two id spaces are kept disjoint by construction instead.
+ */
+export function pulledRequestId(restatementKey: string): string {
+  return `${PULLED_USAGE_SCOPE}:${restatementKey}`;
+}
+
+/**
+ * One pulled usage item, priced. Deliberately not a `BudgetDebitRow`: there is
+ * no budget, no scope type and no gateway request behind any of this.
+ */
+export type PulledUsageRow = {
+  /** The org's hidden governance project — a storage partition, not the
+   *  attribution. Who the money belongs to is `scopeId`. */
+  tenantId: string;
+  /** The source's team when it has one, else its organization. */
+  scopeId: string;
+  /** Dimension-only; cost and quantities excluded, so a correction matches. */
+  restatementKey: string;
+  amountNanoUsd: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensCacheRead: number;
+  tokensCacheWrite: number;
+  model: string;
+  providerKey?: string | null;
+  /** The provider's business bucket time. Stable under restatement. */
+  occurredAt: Date;
+  /** Monotonic pull time — the ReplacingMergeTree version column. */
+  observedAt: Date;
+};
+
+/** What a scope spent outside the gateway, over a window. */
+export type PulledUsageTotals = {
+  /** The exact total, in the nano-USD integer the items were priced in. */
+  spentNanoUsd: number;
+  /** The same total as its display string, derived from `spentNanoUsd`. */
+  spentUsd: string;
+  /** How many distinct usage items, after restatements collapse. */
+  items: number;
+  tokensInput: number;
+  tokensOutput: number;
+};
+
 export type ScopeSpend = {
   budgetId: string;
   scope: GatewayBudgetScopeType;
   scopeId: string;
+  /** The exact total, in the nano-USD integer the debits were priced in. */
+  spentNanoUsd: number;
+  /** The same total as its display string, derived from `spentNanoUsd`. */
   spentUsd: string;
 };
 
 /** One bucket of a fanned-out budget and what it has spent this period. */
 export type BucketSpend = {
   scopeId: string;
+  /** The exact total, in the nano-USD integer the debits were priced in. */
+  spentNanoUsd: number;
+  /** The same total as its display string, derived from `spentNanoUsd`. */
   spentUsd: string;
 };
 
@@ -134,10 +242,21 @@ export type BudgetSpendTarget = {
 /**
  * Read targets for a plain list of budgets, with no request context. A
  * GROUP budget has no single member here, so it sums every member bucket.
+ *
+ * `now` is the instant the periods are resolved at, and it is the same one
+ * the rollup read uses. Passing it here rather than letting each floor read
+ * the wall clock is what makes an injected clock mean one thing across both
+ * halves of the read; an anchored budget in particular has a floor that
+ * moves with the clock, so the two halves would otherwise disagree about
+ * which period they are totalling.
  */
-export function spendTargetsForBudgets(
-  budgets: GatewayBudget[],
-): BudgetSpendTarget[] {
+export function spendTargetsForBudgets({
+  budgets,
+  now = new Date(),
+}: {
+  budgets: GatewayBudget[];
+  now?: Date;
+}): BudgetSpendTarget[] {
   return budgets.map((b) =>
     b.scopeType === "GROUP"
       ? {
@@ -153,9 +272,10 @@ export function spendTargetsForBudgets(
           bucketSuffix: b.providerKey
             ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
             : null,
-          // MANUAL windows and mid-period resets move the boundary; the
-          // list must total the CURRENT period, same as enforcement does.
-          periodFloorMs: budgetPeriodFloorMs(b),
+          // MANUAL windows, anchored cycles and mid-period resets all move
+          // the boundary; the list must total the CURRENT period, same as
+          // enforcement does.
+          periodFloorMs: budgetPeriodFloorMs(b, now),
         }
       : {
           budgetId: b.id,
@@ -163,7 +283,7 @@ export function spendTargetsForBudgets(
           scopeId: bucketScopeIdFor(b, b.scopeId),
           window: b.window,
           match: "exact" as const,
-          periodFloorMs: budgetPeriodFloorMs(b),
+          periodFloorMs: budgetPeriodFloorMs(b, now),
         },
   );
 }
@@ -189,15 +309,20 @@ export type LedgerEventRow = {
   occurredAt: Date;
 };
 
-/** Raw shape of a per-bucket spend row, in the ledger's column casing. */
-type BucketSpendRow = { ScopeId: string; SpentUSD: string };
+/**
+ * Raw shape of a per-bucket spend row, in the ledger's column casing.
+ *
+ * ClickHouse serializes an `Int64` sum as a string, which is what keeps a
+ * money total past 2^53 from arriving already rounded.
+ */
+type BucketSpendRow = { ScopeId: string; SpentNanoUSD: string };
 
 /** Raw shape of a rollup total row, in the rollup's column casing. */
 type RollupScopeRow = {
   BudgetId: string;
   Scope: string;
   ScopeId: string;
-  SpentUSD: string;
+  SpentNanoUSD: string;
 };
 
 type ClickHouseClientFor = Awaited<ReturnType<ClickHouseClientResolver>>;
@@ -348,7 +473,7 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
       `fscopeId${i}`,
       `fsuffix${i}`,
     );
-    return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
+    return `toString(sumIf(AmountNanoUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
   });
   return { sql: sums.join(",\n              "), params };
 }
@@ -418,15 +543,31 @@ function rollupRowMatchesTarget(
  * What one target's buckets total in a rollup result. The query asks for
  * every target in the window at once, so the rows come back mixed and each
  * target picks out its own.
+ *
+ * The sum stays in integers. A group budget totals one row per member here,
+ * and adding those as floats would put drift back into a figure the ledger
+ * holds exactly.
  */
 function sumRollupRowsForTarget(
   rows: RollupScopeRow[],
   target: BudgetSpendTarget,
-): number {
+): bigint {
   const scope = scopeToClickHouse(target.scope);
   return rows
     .filter((r) => rollupRowMatchesTarget(r, target, scope))
-    .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
+    .reduce((sum, r) => sum + BigInt(r.SpentNanoUSD || "0"), 0n);
+}
+
+/** One exact total, in both units the surface publishes. */
+function spentFromNano(nano: bigint | string): {
+  spentNanoUsd: number;
+  spentUsd: string;
+} {
+  const exact = typeof nano === "bigint" ? nano : BigInt(nano || "0");
+  return {
+    spentNanoUsd: parseSummedNanoUsd(exact),
+    spentUsd: nanoUsdToDecimalString(exact),
+  };
 }
 
 export class GatewayBudgetClickHouseRepository {
@@ -518,7 +659,8 @@ export class GatewayBudgetClickHouseRepository {
       ProviderCredentialId: r.providerCredentialId ?? "",
       ProviderKey: r.providerKey ?? "",
       GatewayRequestId: r.gatewayRequestId,
-      AmountUSD: r.amountUsd,
+      AmountNanoUSD: r.amountNanoUsd,
+      AmountUSD: nanoUsdToDecimalString(BigInt(r.amountNanoUsd)),
       TokensInput: r.tokensInput,
       TokensOutput: r.tokensOutput,
       TokensCacheRead: r.tokensCacheRead,
@@ -539,12 +681,267 @@ export class GatewayBudgetClickHouseRepository {
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantId, count: rows.length, error },
         "failed to insert gateway budget ledger events",
       );
       throw error;
     }
+  }
+
+  /**
+   * The pulled-usage write (ADR-088). Cost the customer already spent
+   * DIRECTLY with a provider, pulled from that provider's own record.
+   *
+   * It is a separate method from `insertDebit` / `insertDebitsForBudgets` on
+   * purpose, and the separation is the non-enforcement guarantee. Those two
+   * take a `GatewayBudgetScopeType` and a real `GatewayBudget.id`; this one
+   * takes neither. It writes the constant `Scope = "pulled"` — which is not a
+   * `GatewayBudgetScopeType` and so cannot be the scope of any budget that
+   * could ever exist — under the constant `BudgetId = "pulled"`, which is not
+   * a cuid and so cannot be any budget's id. Enforcement resolves real budget
+   * rows and sums ledger rows matching them; there is no budget these rows
+   * match, so no resolver reaches them. Nothing here is a flag anything has
+   * to remember to check.
+   *
+   * Restatement rides the table's own machinery. `GatewayRequestId` is the
+   * dimension-only restatement key, so every version of one bucket collapses
+   * to one row, and `EventTimestamp` is `observedAt` — the monotonic pull
+   * instant — so the ReplacingMergeTree keeps the newest observation. The
+   * `pulled:` prefix on the request id is load-bearing rather than cosmetic:
+   * `insertDebit` skips a real gateway debit when ANY row already exists for
+   * its `(TenantId, GatewayRequestId)`, so a restatement key that happened to
+   * equal a gateway ULID would silently suppress a customer's real debit. The
+   * prefix makes that collision impossible by construction.
+   *
+   * Reads must NOT trust the merge to have happened — see
+   * `readPulledUsageTotals`, which collapses with `argMax` over
+   * `EventTimestamp`. A bare read of an unmerged table would show a superseded
+   * figure, and on money that is not a staleness bug, it is a wrong number.
+   *
+   * `Status` is always `'success'`: these rows are spend that already
+   * happened, not attempts. That is also exactly why the rollup materialised
+   * view has to exclude them explicitly — its filter is `Status = 'success'`,
+   * which these rows satisfy — see migration 00073.
+   */
+  async insertPulledUsageRows(rows: PulledUsageRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    const tenantId = rows[0]!.tenantId;
+    if (rows.some((r) => r.tenantId !== tenantId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertPulledUsageRows: rows span multiple tenants",
+      );
+    }
+
+    const fresh = await this.pulledRowsThatChanged({ tenantId, rows });
+    if (fresh.length === 0) return;
+
+    const client = await this.resolveClient(tenantId);
+    const records = fresh.map((r) => ({
+      TenantId: r.tenantId,
+      BudgetId: PULLED_USAGE_BUDGET_ID,
+      Scope: PULLED_USAGE_SCOPE,
+      ScopeId: r.scopeId,
+      // One lifetime bucket. These rows carry no budget and so no period; the
+      // read bounds by OccurredAt, never by a budget's window.
+      Window: "TOTAL",
+      VirtualKeyId: "",
+      ProviderCredentialId: "",
+      ProviderKey: r.providerKey ?? "",
+      GatewayRequestId: pulledRequestId(r.restatementKey),
+      AmountNanoUSD: r.amountNanoUsd,
+      AmountUSD: nanoUsdToDecimalString(BigInt(r.amountNanoUsd)),
+      TokensInput: r.tokensInput,
+      TokensOutput: r.tokensOutput,
+      TokensCacheRead: r.tokensCacheRead,
+      TokensCacheWrite: r.tokensCacheWrite,
+      Model: r.model || "unknown",
+      ProviderSlot: "",
+      DurationMS: 0,
+      Status: "success",
+      OccurredAt: r.occurredAt.getTime(),
+      // The ReplacingMergeTree version. Pull time, not bucket time: a
+      // restatement of period P keeps P's OccurredAt, so ordering versions by
+      // it would compare the period against itself.
+      EventTimestamp: r.observedAt.getTime(),
+    }));
+
+    try {
+      await client.insert({
+        table: EVENTS_TABLE,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        { tenantId, count: fresh.length, error },
+        "failed to insert pulled usage ledger rows",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * The subset of a pulled batch that actually says something new.
+   *
+   * "An unchanged re-pull records nothing new", enforced where the money is.
+   * The command boundary keeps a corrected bucket distinct from an unchanged
+   * one, but an identical observation still arrives here on every pull of a
+   * window that has not drained, and writing it would churn the ledger for no
+   * change in what anybody is owed.
+   *
+   * The comparison is against the LATEST version per key (`argMax` over
+   * `EventTimestamp`), not against whatever row a merge happens to have left
+   * behind. Comparing against a superseded row would resurrect it: a bucket
+   * corrected $10 → $12 and then re-pulled at $12 would look "changed"
+   * relative to the stale $10 and write a third row saying $12 again.
+   */
+  private async pulledRowsThatChanged({
+    tenantId,
+    rows,
+  }: {
+    tenantId: string;
+    rows: PulledUsageRow[];
+  }): Promise<PulledUsageRow[]> {
+    const client = await this.resolveClient(tenantId);
+    // The batch's own bucket span, which is what makes this a partition-pruned
+    // read instead of a full-history scan. `OccurredAt` is the partition key,
+    // and a probe without it touches every partition the tenant has ever
+    // written — including whatever has aged onto S3 — on every single pull.
+    // A restatement always carries its ORIGINAL bucket time (that is what
+    // makes it a restatement), so any prior version of these rows is inside
+    // this span by construction; the day of slack on each side is for a
+    // provider that nudges a bucket boundary, not for correctness.
+    const occurredAtMs = rows.map((r) => r.occurredAt.getTime());
+    const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
+    const probe = await client.query({
+      query: `
+        SELECT GatewayRequestId,
+               argMax(AmountNanoUSD, EventTimestamp)    AS AmountNanoUSD,
+               argMax(TokensInput, EventTimestamp)      AS TokensInput,
+               argMax(TokensOutput, EventTimestamp)     AS TokensOutput,
+               argMax(TokensCacheRead, EventTimestamp)  AS TokensCacheRead,
+               argMax(TokensCacheWrite, EventTimestamp) AS TokensCacheWrite
+        FROM ${EVENTS_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND BudgetId = {budgetId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+          AND GatewayRequestId IN {requestIds:Array(String)}
+        GROUP BY GatewayRequestId`,
+      query_params: {
+        tenantId,
+        budgetId: PULLED_USAGE_BUDGET_ID,
+        fromMs: Math.min(...occurredAtMs) - SPAN_SLACK_MS,
+        toMs: Math.max(...occurredAtMs) + SPAN_SLACK_MS,
+        requestIds: rows.map((r) => pulledRequestId(r.restatementKey)),
+      },
+      format: "JSONEachRow",
+    });
+    const existing = new Map(
+      (
+        (await probe.json()) as Array<
+          { GatewayRequestId: string } & Record<string, string | number>
+        >
+      ).map((r) => [r.GatewayRequestId, r]),
+    );
+
+    return rows.filter((row) => {
+      const seen = existing.get(pulledRequestId(row.restatementKey));
+      if (!seen) return true;
+      return !(
+        BigInt(seen.AmountNanoUSD ?? 0) === BigInt(row.amountNanoUsd) &&
+        Number(seen.TokensInput) === row.tokensInput &&
+        Number(seen.TokensOutput) === row.tokensOutput &&
+        Number(seen.TokensCacheRead) === row.tokensCacheRead &&
+        Number(seen.TokensCacheWrite) === row.tokensCacheWrite
+      );
+    });
+  }
+
+  /**
+   * Pulled cost for one org/team scope, collapsed to one row per usage item.
+   *
+   * The shape mirrors the READ that already surfaces ingestion cost
+   * (`personalUsage.clickhouse.repository.ts`'s principal query): filter by tenant, scope
+   * and scope id, never by budget. It does not mirror that query's WRITE —
+   * principal rows carry real budgets and do enforce; these carry none.
+   *
+   * `argMax` over `EventTimestamp` rather than a bare `sum`, and rather than
+   * `FINAL`: a restatement is a second row until the merge collapses it, and
+   * the merge can be hours away or never. Summing raw rows would add a
+   * corrected figure to the one it corrects; trusting the merge would report
+   * whichever version happened to survive. Neither is acceptable on money.
+   */
+  async readPulledUsageTotals({
+    tenantId,
+    scopeIds,
+    from,
+    to,
+  }: {
+    tenantId: string;
+    /** The org id, the team id, or both — whichever the caller can see. */
+    scopeIds: string[];
+    from: Date;
+    to: Date;
+  }): Promise<PulledUsageTotals> {
+    const empty: PulledUsageTotals = {
+      spentNanoUsd: 0,
+      spentUsd: "0",
+      items: 0,
+      tokensInput: 0,
+      tokensOutput: 0,
+    };
+    if (scopeIds.length === 0) return empty;
+
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          toString(sum(Amount))  AS SpentNanoUSD,
+          count()                AS Items,
+          toString(sum(TokensIn))  AS TokensInput,
+          toString(sum(TokensOut)) AS TokensOutput
+        FROM (
+          SELECT
+            GatewayRequestId,
+            argMax(AmountNanoUSD, EventTimestamp) AS Amount,
+            argMax(TokensInput, EventTimestamp)   AS TokensIn,
+            argMax(TokensOutput, EventTimestamp)  AS TokensOut
+          FROM ${EVENTS_TABLE}
+          WHERE TenantId = {tenantId:String}
+            AND Scope = {scope:String}
+            AND ScopeId IN {scopeIds:Array(String)}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          GROUP BY GatewayRequestId
+        )`,
+      query_params: {
+        tenantId,
+        scope: PULLED_USAGE_SCOPE,
+        scopeIds,
+        fromMs: from.getTime(),
+        toMs: to.getTime(),
+      },
+      format: "JSONEachRow",
+    });
+    const [row] = (await result.json()) as Array<{
+      SpentNanoUSD: string;
+      Items: string | number;
+      TokensInput: string;
+      TokensOutput: string;
+    }>;
+    if (!row) return empty;
+
+    const nano = BigInt(row.SpentNanoUSD || "0");
+    return {
+      spentNanoUsd: parseSummedNanoUsd(nano),
+      spentUsd: nanoUsdToDecimalString(nano),
+      items: Number(row.Items ?? 0),
+      tokensInput: Number(row.TokensInput ?? 0),
+      tokensOutput: Number(row.TokensOutput ?? 0),
+    };
   }
 
   /**
@@ -624,7 +1021,7 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       [tenantId],
-      toSpendTargets(budgets),
+      toSpendTargets(budgets, now),
       now,
     );
   }
@@ -650,7 +1047,7 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       tenantIds,
-      toSpendTargets(budgets),
+      toSpendTargets(budgets, now),
       now,
     );
   }
@@ -696,16 +1093,18 @@ export class GatewayBudgetClickHouseRepository {
           budgetId: t.budgetId,
           scope: t.scope,
           scopeId: t.scopeId,
-          spentUsd: "0",
+          ...spentFromNano(0n),
         },
     );
   }
 
   /**
    * Spend for the targets whose period floor has moved off the calendar:
-   * MANUAL windows, and calendar windows reset mid-period. The floor sits
-   * inside the rollup's calendar bucket, which cannot answer it, so the
-   * total is summed straight off the ledger, successful requests only.
+   * MANUAL windows, anchored windows, and calendar windows reset
+   * mid-period. The floor sits inside the rollup's calendar bucket, which
+   * cannot answer it, so the total is summed straight off the ledger,
+   * successful requests only. An anchored budget lives here permanently:
+   * its periods never coincide with the calendar ones the rollup keys on.
    */
   private async readFlooredTargetSpend(
     tenantIds: string[],
@@ -715,6 +1114,14 @@ export class GatewayBudgetClickHouseRepository {
     if (floored.length === 0) return [];
 
     const sums = flooredTargetSums(floored);
+    // The table partitions by toYYYYMM(OccurredAt), and each target's own
+    // floor is already inside its sumIf. Repeating the earliest of them as a
+    // WHERE term is what lets ClickHouse prune partitions before the scan:
+    // without it the read walks every month the tenant has ever written,
+    // cold storage included, to sum a window that is usually this one.
+    const earliestFloorMs = Math.min(
+      ...floored.map((t) => t.periodFloorMs ?? 0),
+    );
     try {
       const client = await this.resolveClient(tenantIds[0]!);
       const result = await client.query({
@@ -724,8 +1131,13 @@ export class GatewayBudgetClickHouseRepository {
             FROM ${EVENTS_TABLE} FINAL
             WHERE TenantId IN (${tenantPlaceholders(tenantIds)})
               AND Status = 'success'
+              AND OccurredAt >= fromUnixTimestamp64Milli({earliestFloor:Int64})
           `,
-        query_params: { ...tenantParams(tenantIds), ...sums.params },
+        query_params: {
+          ...tenantParams(tenantIds),
+          ...sums.params,
+          earliestFloor: earliestFloorMs,
+        },
         format: "JSONEachRow",
       });
       const rows = (await result.json()) as Array<Record<string, string>>;
@@ -734,10 +1146,10 @@ export class GatewayBudgetClickHouseRepository {
         budgetId: t.budgetId,
         scope: t.scope,
         scopeId: t.scopeId,
-        spentUsd: (Number.parseFloat(row[`T${i}`] ?? "0") || 0).toFixed(6),
+        ...spentFromNano(row[`T${i}`] ?? "0"),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, targets: floored.length, error },
         "failed to read boundary-floored gateway budget spend",
       );
@@ -769,7 +1181,7 @@ export class GatewayBudgetClickHouseRepository {
               BudgetId,
               Scope,
               ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
+              toString(sumMerge(SpendNanoUSD)) AS SpentNanoUSD
             FROM ${TOTALS_TABLE}
             WHERE TenantId IN (${tenantPlaceholders(tenantIds)})
               AND Window = {window:String}
@@ -790,10 +1202,10 @@ export class GatewayBudgetClickHouseRepository {
         budgetId: t.budgetId,
         scope: t.scope,
         scopeId: t.scopeId,
-        spentUsd: sumRollupRowsForTarget(rows, t).toFixed(6),
+        ...spentFromNano(sumRollupRowsForTarget(rows, t)),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, window, error },
         "failed to read gateway budget scope totals across tenants",
       );
@@ -845,10 +1257,7 @@ export class GatewayBudgetClickHouseRepository {
         : await this.flooredBucketSpend({ client, shape, budget });
 
     return [...spentByBucket.entries()]
-      .map(([scopeId, raw]) => ({
-        scopeId,
-        spentUsd: (Number.parseFloat(raw) || 0).toFixed(6),
-      }))
+      .map(([scopeId, raw]) => ({ scopeId, ...spentFromNano(raw) }))
       .sort((a, b) => (a.scopeId < b.scopeId ? -1 : 1));
   }
 
@@ -875,7 +1284,7 @@ export class GatewayBudgetClickHouseRepository {
         query: `
           SELECT
             ScopeId,
-            toString(sumMerge(SpendUSD)) AS SpentUSD
+            toString(sumMerge(SpendNanoUSD)) AS SpentNanoUSD
           FROM ${TOTALS_TABLE}
           WHERE TenantId IN (${shape.tenantPlaceholders})
             AND Scope = {scope:String}
@@ -891,10 +1300,10 @@ export class GatewayBudgetClickHouseRepository {
         format: "JSONEachRow",
       });
       for (const row of (await result.json()) as BucketSpendRow[]) {
-        spentByBucket.set(row.ScopeId, row.SpentUSD);
+        spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
       }
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds: shape.tenantIds, budgetId: budget.id, error },
         "failed to read gateway budget bucket spend from the rollup",
       );
@@ -912,7 +1321,7 @@ export class GatewayBudgetClickHouseRepository {
       budgetId: budget.id,
       floorPredicate: `(${shape.movedBoundaryPredicates.join(" OR ")})`,
     })) {
-      spentByBucket.set(row.ScopeId, row.SpentUSD);
+      spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
     }
     return spentByBucket;
   }
@@ -944,7 +1353,7 @@ export class GatewayBudgetClickHouseRepository {
       budgetId: budget.id,
       floorPredicate,
     })) {
-      spentByBucket.set(row.ScopeId, row.SpentUSD);
+      spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
     }
     return spentByBucket;
   }
@@ -966,7 +1375,7 @@ export class GatewayBudgetClickHouseRepository {
         query: `
           SELECT
             ScopeId,
-            toString(sum(AmountUSD)) AS SpentUSD
+            toString(sum(AmountNanoUSD)) AS SpentNanoUSD
           FROM ${EVENTS_TABLE} FINAL
           WHERE TenantId IN (${shape.tenantPlaceholders})
             AND Scope = {scope:String}
@@ -981,7 +1390,7 @@ export class GatewayBudgetClickHouseRepository {
       });
       return (await result.json()) as BucketSpendRow[];
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds: shape.tenantIds, budgetId: args.budgetId, error },
         "failed to read boundary-floored gateway budget bucket spend",
       );
@@ -994,20 +1403,46 @@ export class GatewayBudgetClickHouseRepository {
    * descending. Used by the budget detail page to render the recent-activity
    * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
    * in budget.service.ts:getDetail).
+   *
+   * Takes the full tenant fan-out because the ledger is sharded on
+   * TenantId = the project the trace landed in: an org, team, principal,
+   * or per-member group budget accrues rows under every project that
+   * emitted a matching trace, so reading a single tenant would render
+   * "No usage yet" on a budget that is actively debiting.
+   *
+   * Bounded by {@link RECENT_EVENTS_LOOKBACK_DAYS} on `OccurredAt`, the
+   * table's partition key: without it ClickHouse opens every monthly
+   * partition the budget has ever written to before it can sort and take
+   * the top rows. The panel asks for recent activity, so the window is
+   * part of the question, not a shortcut.
    */
   async recentEventsForBudget(
-    tenantId: string,
+    tenantIds: string[],
     budgetId: string,
     limit = 20,
   ): Promise<LedgerEventRow[]> {
-    const client = await this.resolveClient(tenantId);
+    if (tenantIds.length === 0) return [];
+    const params: Record<string, string | number> = {
+      budgetId,
+      limit,
+      since: Date.now() - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    };
+    const tenantPlaceholders = tenantIds
+      .map((id, i) => {
+        params[`tenant${i}`] = id;
+        return `{tenant${i}:String}`;
+      })
+      .join(",");
+    // Any tenant resolves the client — the events table is a single
+    // physical table; `resolveClient` only differs by project for routing.
+    const client = await this.resolveClient(tenantIds[0]!);
     const result = await client.query({
       query: `
         SELECT
           GatewayRequestId AS id,
           BudgetId AS budgetId,
           VirtualKeyId AS virtualKeyId,
-          toString(AmountUSD) AS amountUsd,
+          toString(AmountNanoUSD) AS amountNanoUsd,
           Model AS model,
           ProviderSlot AS providerSlot,
           TokensInput AS tokensInput,
@@ -1016,15 +1451,17 @@ export class GatewayBudgetClickHouseRepository {
           Status AS status,
           toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
         FROM ${EVENTS_TABLE}
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId IN (${tenantPlaceholders})
           AND BudgetId = {budgetId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
         ORDER BY OccurredAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, budgetId, limit },
+      query_params: params,
       format: "JSONEachRow",
     });
-    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status" | "amountUsd"> & {
+      amountNanoUsd: string;
       occurredAtMs: string;
       status: string;
     };
@@ -1037,7 +1474,7 @@ function toLedgerEventRow(r: {
   id: string;
   budgetId: string;
   virtualKeyId: string;
-  amountUsd: string;
+  amountNanoUsd: string;
   model: string;
   providerSlot: string | null;
   tokensInput: number;
@@ -1050,7 +1487,9 @@ function toLedgerEventRow(r: {
     id: r.id,
     budgetId: r.budgetId,
     virtualKeyId: r.virtualKeyId,
-    amountUsd: r.amountUsd,
+    // Rendered from the integer, so a single debit shown next to the request
+    // that caused it is the amount that request was actually priced at.
+    amountUsd: nanoUsdToDecimalString(BigInt(r.amountNanoUsd || "0")),
     model: r.model,
     providerSlot:
       r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
@@ -1088,12 +1527,13 @@ function ledgerStatusFromCH(raw: string): GatewayBudgetLedgerStatus {
  */
 function toSpendTargets(
   input: GatewayBudget[] | BudgetSpendTarget[],
+  now: Date,
 ): BudgetSpendTarget[] {
   if (input.length === 0) return [];
   const first = input[0]!;
   return "budgetId" in first
     ? (input as BudgetSpendTarget[])
-    : spendTargetsForBudgets(input as GatewayBudget[]);
+    : spendTargetsForBudgets({ budgets: input as GatewayBudget[], now });
 }
 
 function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
@@ -1117,106 +1557,4 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
 
 function windowToClickHouse(window: GatewayBudgetWindow): string {
   return window.toString();
-}
-
-/**
- * Start-of-period (UTC) for the current window.
- *
- * This is one half of a contract: the rollup only ever returns a row when
- * this lands on exactly the PeriodStart the materialised view bucketed the
- * debit into. The other half is the multiIf() in
- * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
- * together by budget.clickhouse.repository.periodStart.integration.test.ts.
- * Change one without the other and the affected window stops accruing
- * entirely: spend is written, every read returns 0, and budgets on that
- * window silently stop enforcing.
- */
-/**
- * The OccurredAt lower bound a spend read must honor for a budget whose
- * period boundary is not the calendar one, or undefined for the rollup
- * fast path. MANUAL windows always read from their stored boundary. A
- * calendar (or TOTAL) window reads from the boundary only after an actual
- * mid-period reset (lastResetAt set) and only until the next calendar
- * boundary passes it; an unreset TOTAL budget keeps its lifetime-bucket
- * semantics.
- */
-export function budgetPeriodFloorMs(
-  budget: {
-    window: GatewayBudgetWindow;
-    currentPeriodStartedAt: Date;
-    lastResetAt: Date | null;
-  },
-  now: Date = new Date(),
-): number | undefined {
-  if (budget.window === "MANUAL") {
-    return budget.currentPeriodStartedAt.getTime();
-  }
-  if (!budget.lastResetAt) return undefined;
-  const boundary = budget.currentPeriodStartedAt.getTime();
-  return boundary > currentPeriodStart(budget.window, now).getTime()
-    ? boundary
-    : undefined;
-}
-
-/**
- * The OccurredAt lower bound for ONE bucket of a budget: the later of the
- * budget's own period floor and that bucket's boundary row, whichever of
- * the two exist. A per-bucket reset moves only its own boundary, so a read
- * that ignored it would keep counting spend the reset forgave; a template
- * reset moves the budget floor and outranks a stale bucket boundary.
- *
- * There is no calendar clamp here on purpose: enforcement reads the same
- * floor, and a display that clamped would disagree with the figure that
- * actually blocks a request.
- */
-export function bucketPeriodFloorMs(
-  budget: {
-    window: GatewayBudgetWindow;
-    currentPeriodStartedAt: Date;
-    lastResetAt: Date | null;
-  },
-  boundaryPeriodStartedAt: Date | null | undefined,
-  now: Date = new Date(),
-): number | undefined {
-  const candidates = [
-    budgetPeriodFloorMs(budget, now),
-    boundaryPeriodStartedAt?.getTime(),
-  ].filter((n): n is number => typeof n === "number");
-  return candidates.length > 0 ? Math.max(...candidates) : undefined;
-}
-
-export function currentPeriodStart(
-  window: GatewayBudgetWindow,
-  now: Date,
-): Date {
-  const d = new Date(now.getTime());
-  if (window === "MINUTE") {
-    d.setUTCSeconds(0, 0);
-    return d;
-  }
-  if (window === "HOUR") {
-    d.setUTCMinutes(0, 0, 0);
-    return d;
-  }
-  if (window === "DAY") {
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
-  }
-  if (window === "WEEK") {
-    d.setUTCHours(0, 0, 0, 0);
-    const day = d.getUTCDay();
-    // ISO week start (Monday). Matches ClickHouse toStartOfWeek(t, 1).
-    const delta = day === 0 ? 6 : day - 1;
-    d.setUTCDate(d.getUTCDate() - delta);
-    return d;
-  }
-  if (window === "MONTH") {
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-  }
-  // TOTAL and MANUAL: one lifetime bucket, keyed by the epoch sentinel
-  // (the MV's multiIf falls through to epoch for both). MANUAL is never
-  // read through the PeriodStart fast path (budgetPeriodFloorMs always
-  // floors it onto the raw-events read); the sentinel only keys where its
-  // debits land in the rollup.
-  return new Date(0);
 }

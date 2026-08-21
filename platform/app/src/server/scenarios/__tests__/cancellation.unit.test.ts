@@ -3,8 +3,9 @@
  *
  * The service uses event-sourcing for cancellation:
  * - Dispatches cancel_requested event (always)
- * - For queued jobs: also dispatches finished(CANCELLED)
- * - For active jobs: reactor broadcasts to workers, worker kills child
+ * - The simulationRunExecution process manager takes it from there:
+ *   queued runs are finished CANCELLED by the process manager itself;
+ *   active runs are broadcast to workers, and the owning worker kills the child
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -17,23 +18,19 @@ function createMockDeps(): {
   deps: CancellationServiceDeps;
   mockGetRunsForBatch: ReturnType<typeof vi.fn>;
   mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
-  mockDispatchFinishRun: ReturnType<typeof vi.fn>;
 } {
   const mockGetRunsForBatch = vi.fn().mockResolvedValue([]);
   const mockDispatchCancelRequested = vi.fn().mockResolvedValue(undefined);
-  const mockDispatchFinishRun = vi.fn().mockResolvedValue(undefined);
 
   const deps: CancellationServiceDeps = {
     getRunsForBatch: mockGetRunsForBatch,
     dispatchCancelRequested: mockDispatchCancelRequested,
-    dispatchFinishRun: mockDispatchFinishRun,
   };
 
   return {
     deps,
     mockGetRunsForBatch,
     mockDispatchCancelRequested,
-    mockDispatchFinishRun,
   };
 }
 
@@ -90,17 +87,14 @@ describe("ScenarioCancellationService", () => {
     describe("when the job is queued", () => {
       let result: { cancelled: boolean };
       let mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
-      let mockDispatchFinishRun: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
         const {
           deps,
           mockGetRunsForBatch,
           mockDispatchCancelRequested: cancelFn,
-          mockDispatchFinishRun: finishFn,
         } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
-        mockDispatchFinishRun = finishFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.QUEUED);
 
         const service = new ScenarioCancellationService(deps);
@@ -117,17 +111,6 @@ describe("ScenarioCancellationService", () => {
         );
       });
 
-      /** @scenario "Cancelling a queued run writes both cancel and finished events" */
-      it("also dispatches finished(CANCELLED) since no worker will pick it up", () => {
-        expect(mockDispatchFinishRun).toHaveBeenCalledWith(
-          expect.objectContaining({
-            tenantId: "proj1",
-            scenarioRunId: "run1",
-            status: ScenarioRunStatus.CANCELLED,
-          }),
-        );
-      });
-
       it("returns cancelled: true", () => {
         expect(result).toEqual({ cancelled: true });
       });
@@ -136,17 +119,14 @@ describe("ScenarioCancellationService", () => {
     describe("when the job is active (IN_PROGRESS)", () => {
       let result: { cancelled: boolean };
       let mockDispatchCancelRequested: ReturnType<typeof vi.fn>;
-      let mockDispatchFinishRun: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
         const {
           deps,
           mockGetRunsForBatch,
           mockDispatchCancelRequested: cancelFn,
-          mockDispatchFinishRun: finishFn,
         } = createMockDeps();
         mockDispatchCancelRequested = cancelFn;
-        mockDispatchFinishRun = finishFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.IN_PROGRESS);
 
         const service = new ScenarioCancellationService(deps);
@@ -160,10 +140,6 @@ describe("ScenarioCancellationService", () => {
             scenarioRunId: "run1",
           }),
         );
-      });
-
-      it("does not dispatch finished (worker handles it after killing child)", () => {
-        expect(mockDispatchFinishRun).not.toHaveBeenCalled();
       });
 
       it("returns cancelled: true", () => {

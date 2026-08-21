@@ -14,8 +14,8 @@ evaluations.
   eval union; two new SQL builders (`eval-slim` + `eval-rollup`) and three
   new read repos. A parallel
   `.withOutbox("evaluationAnalytics", "graphTriggerEvaluation", …)`
-  reactor on the eval pipeline uses the **same** handler as PR #5013's
-  trace-side reactor. The heartbeat is now source-aware — per-trigger
+  subscriber on the eval pipeline uses the **same** handler as PR #5013's
+  trace-side subscriber. The heartbeat is now source-aware — per-trigger
   metric routes to the correct slim table (trace vs eval) and batches per
   `(project, source)`.
 - **Phase 7 — pulled back.** The simulation / experiment / suite
@@ -71,8 +71,8 @@ pnpm dev                            # from platform/app/
 
 1. Enable `release_es_graph_triggers_firing`.
 2. Fire an evaluator on a trace that breaches the metric threshold.
-3. Within seconds (debounced), the eval reactor dispatches via the same
-   outbox path the trace reactor uses. Handler is the same
+3. Within seconds (debounced), the eval subscriber dispatches via the same
+   outbox path the trace subscriber uses. Handler is the same
    `evaluateGraphTrigger` from PR #5013.
 
 ### 4. Heartbeat source-awareness
@@ -136,7 +136,7 @@ All three return empty.
   `IF(_retention_days > 0, …, '2106-01-01')` (the P0 TTL fix spanning
   00037-00041). Regression = bare `INTERVAL _retention_days DAY` reaps
   indefinite-retention rows on next merge. SHOW CREATE TABLE for each.
-- **Reactor name stamp.** The eval notify reactor must emit
+- **Subscriber name stamp.** The eval notify subscriber must emit
   `actionClass: "notify"`. A draft regression dropped that; the
   eval-notify path silently classified as eval-persist and skipped the
   notify branch.
@@ -149,7 +149,7 @@ All three return empty.
   active project with many eval triggers. One query per trigger =
   regression; correct is one per `(project, source)` per tick.
 - **Outbox runtime attached (again).** Every stack PR depends on the
-  PR-4498 `attachOutbox()` wire-up. Absence: eval reactor's `decide`
+  PR-4498 `attachOutbox()` wire-up. Absence: eval subscriber's `decide`
   returns enqueues, no `ReactorOutbox` row, no dispatch.
 - **No sim/exp/suite artifacts.** Phase 7 pulled back — no
   `simulation_analytics` / `experiment_analytics` / `suite_analytics`
@@ -175,7 +175,7 @@ All three return empty.
 
 - Sentry: `Cannot find column EvaluatorId` on `evaluation_analytics_rollup`
   — router regression, key-bearing query hit the rollup.
-- Sentry: `unknown outbox reactor name` at worker boot — eval reactor's
+- Sentry: `unknown outbox subscriber name` at worker boot — eval subscriber's
   `definition.name` regressed.
 - CloudWatch grep: `heartbeat batched … count=1` at high rate across many
   triggers — batching regressed.
@@ -186,5 +186,5 @@ All three return empty.
   has `_retention_days = 0` → TTL sentinel regressed.
 - CloudWatch: `analytics.tripwire.divergence` on eval-source queries —
   real numeric mismatch, triage before wider rollout.
-- Sentry: eval reactor stamping wrong `actionClass` — silent routing bug
+- Sentry: eval subscriber stamping wrong `actionClass` — silent routing bug
   (persist branch takes notify's payload).

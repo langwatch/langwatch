@@ -381,6 +381,9 @@ export const conversationTurnSchema = z.object({
   outputRedacted: z.boolean().nullish(),
   inputVisibleTo: z.string().nullish(),
   outputVisibleTo: z.string().nullish(),
+  // Per-turn economics for the terminal view's session-anchored totals.
+  totalTokens: z.number().nullish(),
+  totalCost: z.number().nullish(),
 });
 
 export type ConversationTurn = z.infer<typeof conversationTurnSchema>;

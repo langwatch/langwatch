@@ -35,6 +35,13 @@ export type LogRedactionService = {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      /**
+       * The real OTLP attribute name behind each key of `attributes`, for the
+       * keys where the two differ. `attributes` is keyed by a JSON path so that
+       * two attributes sharing a name still address separate values; the
+       * sensitive-NAME rules have to see the name instead.
+       */
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: string,
@@ -232,22 +239,67 @@ function canonicalAttributes(
     });
 }
 
-type StringRef = { owner: UnknownRecord; key: string; path: string };
+type StringRef = {
+  owner: UnknownRecord;
+  key: string;
+  path: string;
+  /** The OTLP attribute this string belongs to, when it sits under one. */
+  attributeName?: string;
+};
 
-function collectStringRefs(value: unknown, prefix: string, refs: StringRef[]) {
+/**
+ * Walk a decoded OTLP tree and collect every `stringValue` leaf.
+ *
+ * `path` addresses the leaf and must stay unique, which is why it is built from
+ * array indices. That makes it useless to the sensitive-NAME rules: an
+ * attribute list yields `log.0.value.stringValue`, and no deny-list entry can
+ * ever match that. So the owning attribute's real name is carried down
+ * alongside the path. Without it the name rules simply never fired on this
+ * pipeline, and an `authorization` or `x-api-key` attribute was left to the
+ * value-shape rules alone.
+ */
+/** The attribute an OTLP KeyValue node names, when this node is one. */
+function otlpAttributeName(value: UnknownRecord): string | undefined {
+  return typeof value.key === "string" && "value" in value
+    ? value.key
+    : undefined;
+}
+
+function collectStringRefs({
+  value,
+  prefix,
+  refs,
+  attributeName,
+}: {
+  value: unknown;
+  prefix: string;
+  refs: StringRef[];
+  attributeName?: string;
+}) {
   if (Array.isArray(value)) {
     value.forEach((child, index) =>
-      collectStringRefs(child, `${prefix}.${index}`, refs),
+      collectStringRefs({
+        value: child,
+        prefix: `${prefix}.${index}`,
+        refs,
+        attributeName,
+      }),
     );
     return;
   }
   if (!isRecord(value)) return;
+  const ownName = otlpAttributeName(value) ?? attributeName;
   for (const [key, child] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (key === "stringValue" && typeof child === "string") {
-      refs.push({ owner: value, key, path });
+      refs.push({ owner: value, key, path, attributeName });
     } else {
-      collectStringRefs(child, path, refs);
+      collectStringRefs({
+        value: child,
+        prefix: path,
+        refs,
+        attributeName: ownName,
+      });
     }
   }
 }
@@ -262,15 +314,24 @@ async function redactTypedLog(args: {
   tenantId: string;
 }) {
   const refs: StringRef[] = [];
-  collectStringRefs(args.resourceAttributes, "resource", refs);
-  collectStringRefs(args.scopeAttributes, "scope", refs);
-  collectStringRefs(args.logAttributes, "log", refs);
-  collectStringRefs(args.body, "body", refs);
+  collectStringRefs({
+    value: args.resourceAttributes,
+    prefix: "resource",
+    refs,
+  });
+  collectStringRefs({ value: args.scopeAttributes, prefix: "scope", refs });
+  collectStringRefs({ value: args.logAttributes, prefix: "log", refs });
+  collectStringRefs({ value: args.body, prefix: "body", refs });
   const attributes = Object.fromEntries(
     refs.map((ref) => [ref.path, String(ref.owner[ref.key])]),
   );
+  const attributeNames = Object.fromEntries(
+    refs
+      .filter((ref) => ref.attributeName !== undefined)
+      .map((ref) => [ref.path, ref.attributeName as string]),
+  );
   await args.redactionService.redactLog(
-    { body: "", attributes, resourceAttributes: {} },
+    { body: "", attributes, resourceAttributes: {}, attributeNames },
     args.piiRedactionLevel,
     args.tenantId,
   );

@@ -14,15 +14,15 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import {
-  type OrganizationUserRole,
-  RoleBindingScopeType,
-} from "@prisma/client";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import {
+  type OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -32,6 +32,7 @@ import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
+import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -103,7 +104,7 @@ function MembersList({
   const department = useDepartmentColumn(organization.id);
   const showDepartment = department.show && hasOrganizationManagePermission;
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [selectedMember, setSelectedMember] = useState<{
     userId: string;
@@ -172,9 +173,6 @@ function MembersList({
             description: "The member has been removed from the organization.",
             type: "success",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
@@ -186,6 +184,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.limits.getUsage.invalidate();
           void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
@@ -194,9 +193,6 @@ function MembersList({
             description: "Please try that again",
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -213,6 +209,7 @@ function MembersList({
             tags: { organizationId: organization.id },
           });
         });
+      void queryClient.limits.getUsage.invalidate();
       void queryClient.licenseEnforcement.checkLimit.invalidate();
     },
   });
@@ -314,6 +311,12 @@ function MembersList({
             </HStack>
           )}
         </HStack>
+        {hasOrganizationManagePermission && (
+          <MemberSeatUsage
+            organizationId={organization.id}
+            activePlan={activePlan}
+          />
+        )}
         <Card.Root width="full" overflow="hidden">
           {/*
             Card wraps the table in overflowX="auto" so the row never

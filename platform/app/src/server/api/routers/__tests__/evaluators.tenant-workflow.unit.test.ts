@@ -1,10 +1,11 @@
-import type { PrismaClient } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 
@@ -62,6 +63,7 @@ const createCaller = () => {
     permissionChecked: true,
   });
   ctx.prisma = prisma;
+  ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
   return evaluatorsRouter.createCaller(ctx);
 };
 

@@ -36,6 +36,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   assertOverThreshold,
   insertEventLogRow,
@@ -87,7 +89,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     await importOriginal<
       typeof import("~/server/clickhouse/clickhouseClient")
     >();
-  return { ...actual, getClickHouseClientForProject: vi.fn() };
+  return { ...actual, getClickHouseClientForTenant: vi.fn() };
 });
 
 vi.mock("~/server/db", () => ({
@@ -246,7 +248,30 @@ beforeAll(async () => {
   ch = containers.clickHouseClient;
 
   const chModule = await import("~/server/clickhouse/clickhouseClient");
-  vi.mocked(chModule.getClickHouseClientForProject).mockResolvedValue(ch);
+  vi.mocked(chModule.getClickHouseClientForTenant).mockResolvedValue(ch);
+
+  // ExportService reaches buildTraceBlobResolutionDeps() with no override,
+  // which now takes its default resolver from getApp().clickhouse rather
+  // than isClickHouseEnabled()/getClickHouseClientForTenant directly — so
+  // the production wiring this test wants to exercise needs a real App
+  // singleton whose resolver dials the same (mocked) testcontainer client.
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({
+    clickhouse: {
+      enabled: true,
+      resolveClient: async (tenantId: string) => {
+        const resolved = await chModule.getClickHouseClientForTenant(tenantId);
+        if (!resolved) {
+          throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+        }
+        return resolved;
+      },
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
 
   assertOverThreshold(LARGE_VALUE);
   await seedOffloadedTrace();
@@ -261,6 +286,7 @@ afterAll(async () => {
       });
     }
   }
+  await resetApp();
   await stopTestContainers();
 });
 
@@ -305,9 +331,11 @@ describe.skipIf(!hasTestcontainers)(
           const { prisma } = await import("~/server/db");
 
           // No resolvers wired at all — the list-grid construction shape.
-          const listService = new ClickHouseTraceService(
-            prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-          );
+          const listService = new ClickHouseTraceService({
+            prisma: prisma as ConstructorParameters<
+              typeof ClickHouseTraceService
+            >[0]["prisma"],
+          });
 
           const result = await listService.getAllTracesForProject(
             {

@@ -5,12 +5,12 @@ description: Instrument Azure OpenAI API calls with the LangWatch Python SDK to 
 keywords: azure openai, openai, instrumentation, autotrack, openinference, openllmetry, LangWatch, Python
 ---
 
-LangWatch offers robust integration with Azure OpenAI, allowing you to capture detailed information about your LLM calls automatically. There are two primary approaches to instrumenting your Azure OpenAI interactions:
+LangWatch captures information about your Azure OpenAI LLM calls automatically. There are two primary approaches to instrumenting your Azure OpenAI interactions:
 
 1.  **Using `autotrack_openai_calls()`**: This method, part of the LangWatch SDK, dynamically patches your `AzureOpenAI` client instance to capture calls made through it within a specific trace.
-2.  **Using Community OpenTelemetry Instrumentors**: Leverage existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
+2.  **Using Community OpenTelemetry Instrumentors**: Use existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
 
-This guide will walk you through both methods.
+This guide walks you through both methods.
 
 ## Using `autotrack_openai_calls()`
 
@@ -67,7 +67,7 @@ Key points for `autotrack_openai_calls()` with Azure OpenAI:
 
 ## Using Community OpenTelemetry Instrumentors
 
-If you prefer to use broader OpenTelemetry-based instrumentation, or are already using libraries like `OpenInference` or `OpenLLMetry`, LangWatch can seamlessly integrate with them. These libraries provide instrumentors that automatically capture data from the `openai` library, which `AzureOpenAI` is part of.
+If you prefer to use broader OpenTelemetry-based instrumentation, or are already using libraries like `OpenInference` or `OpenLLMetry`, LangWatch works with them. These libraries provide instrumentors that automatically capture data from the `openai` library, which `AzureOpenAI` is part of.
 
 There are two main ways to integrate these:
 
@@ -164,7 +164,7 @@ if __name__ == "__main__":
 ### Which Approach to Choose?
 
 -   **`autotrack_openai_calls()`** is ideal for targeted instrumentation within specific traces or when you want fine-grained control over which `AzureOpenAI` client instances are tracked. It's simpler if you're not deeply invested in a separate OpenTelemetry setup.
--   **Community Instrumentors** are powerful if you're already using OpenTelemetry, want to capture Azure OpenAI calls globally across your application, or need to instrument other libraries alongside Azure OpenAI with a consistent OpenTelemetry approach. They provide a more holistic observability solution if you have multiple OpenTelemetry-instrumented components.
+-   **Community Instrumentors** fit when you're already using OpenTelemetry, want to capture Azure OpenAI calls globally across your application, or need to instrument other libraries alongside Azure OpenAI with a consistent OpenTelemetry approach. They cover several OpenTelemetry-instrumented components at once.
 
 Choose the method that best fits your existing setup and instrumentation needs. Both approaches effectively send Azure OpenAI call data to LangWatch for monitoring and analysis.
 </Note>

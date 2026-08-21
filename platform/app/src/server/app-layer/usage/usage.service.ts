@@ -25,13 +25,16 @@ import {
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
-export interface UsageLimitResult {
-  exceeded: boolean;
-  message?: string;
-  count?: number;
-  maxMessagesPerMonth?: number;
-  planName?: string;
-}
+export type UsageLimitResult =
+  | { exceeded: false }
+  | {
+      exceeded: true;
+      message: string;
+      count: number;
+      maxMessagesPerMonth: number;
+      planName: string;
+      usageUnit: UsageUnit;
+    };
 
 /**
  * App-layer usage service.
@@ -107,6 +110,7 @@ export class UsageService {
         count,
         maxMessagesPerMonth: plan.maxMessagesPerMonth,
         planName: plan.name,
+        usageUnit: decision.usageUnit,
       };
     }
     return { exceeded: false };

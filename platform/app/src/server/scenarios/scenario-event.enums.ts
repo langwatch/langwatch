@@ -22,9 +22,9 @@ export enum ScenarioEventType {
 
 /**
  * Domain-level statuses persisted in ES/ClickHouse (PENDING, IN_PROGRESS, …).
- * QUEUED and RUNNING were originally transient BullMQ overlays, but QUEUED is
- * now written to ClickHouse via the fold projection when a queueRun command is
- * dispatched. RUNNING maps to BullMQ "active" and remains a UI-only overlay.
+ * QUEUED is written to ClickHouse via the fold projection when a queueRun
+ * command is dispatched. RUNNING maps to a job the queue is executing and
+ * remains a UI-only overlay.
  */
 export enum ScenarioRunStatus {
   SUCCESS = "SUCCESS",
@@ -33,10 +33,16 @@ export enum ScenarioRunStatus {
   IN_PROGRESS = "IN_PROGRESS",
   PENDING = "PENDING",
   FAILED = "FAILED",
+  /**
+   * Kept for external API/UI compatibility and any legacy stored rows.
+   * No longer produced anywhere: a stalled run now reaches terminal ERROR
+   * (reason "stalled") via the simulationRunExecution process manager's
+   * stall watchdog — nothing derives STALLED at read time anymore.
+   */
   STALLED = "STALLED",
-  /** BullMQ waiting state - job is queued but not yet picked up by a worker */
+  /** Queue waiting state - job is queued but not yet picked up by a worker */
   QUEUED = "QUEUED",
-  /** BullMQ active state - job is being executed by a worker */
+  /** Queue active state - job is being executed by a worker */
   RUNNING = "RUNNING",
 }
 
@@ -58,4 +64,24 @@ export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
  */
 export function isCancellableStatus(status: ScenarioRunStatus): boolean {
   return CANCELLABLE_STATUSES.has(status);
+}
+
+/** Statuses a run cannot move out of. */
+export const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+  ScenarioRunStatus.ERROR,
+  ScenarioRunStatus.CANCELLED,
+  ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Whether a run has reached a state it will never leave.
+ *
+ * Not the negation of `isCancellableStatus`: RUNNING is neither cancellable
+ * (it has no queued job to drop) nor terminal, so the two sets do not
+ * partition the enum between them.
+ */
+export function isTerminalStatus(status: ScenarioRunStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
 }

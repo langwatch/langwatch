@@ -15,7 +15,7 @@ const PREFETCH_STALE_TIME_MS = 5000;
 
 export function usePrefetchRunState() {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   return useCallback(
     (scenarioRunId: string) => {

@@ -56,6 +56,7 @@ import {
   TraceOriginService,
   TracePromptAccumulationService,
 } from "./services";
+import { anchorStorageTime } from "./services/storage-anchor";
 
 export type { TraceSummaryData };
 
@@ -640,6 +641,10 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
+      // Sentinel: 0 means "nothing observed yet". `apply` freezes it on the
+      // first contribution carrying a usable business time, and it is what the
+      // repository writes into the `OccurredAt` partition/TTL column (ADR-087).
+      storageAnchorMs: 0,
       // events, scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
       // accumulated in the fold state: they scaled O(span-count) and made each
       // fold step O(n) (copy + re-serialize the whole growing blob), so a
@@ -653,6 +658,37 @@ export class TraceSummaryFoldProjection
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.
       occurredAt: 0,
     };
+  }
+
+  /**
+   * Dispatch as the base class does, then freeze the storage anchor if this is
+   * the first contribution that carried a usable business time (ADR-087,
+   * {@link anchorStorageTime}).
+   *
+   * Here rather than in the ten handlers because the anchor's rule is about
+   * CONTRIBUTIONS, not about spans: a trace whose only signal is a log record, a
+   * metric correlation or a topic assignment must still get a real partition and
+   * a real TTL deadline. One seam also means a new event type cannot silently
+   * arrive un-anchored — the way `state.occurredAt` left every non-span
+   * contribution anchored at the epoch.
+   *
+   * After `super.apply`, so a span's own start time (which the handler has by
+   * then put on `state.occurredAt`) is preferred over the envelope's ingest
+   * stamp, and so an unhandled event type — which `super.apply` returns
+   * untouched — anchors nothing.
+   */
+  override apply(
+    state: TraceSummaryData,
+    event: { type: string },
+  ): TraceSummaryData {
+    const folded = super.apply(state, event);
+    if (folded === state) return state;
+    const eventOccurredAt = (event as { occurredAt?: unknown }).occurredAt;
+    return anchorStorageTime({
+      state: folded,
+      eventOccurredAtMs:
+        typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
+    });
   }
 
   handleTraceSpanReceived(

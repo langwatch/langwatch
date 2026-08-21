@@ -26,8 +26,6 @@ vi.mock("~/server/posthog", () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
 
-vi.mock("~/server/redis", () => ({ connection: undefined }));
-
 vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));
@@ -64,13 +62,13 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 describe("userRouter.register()", () => {
-  let userFindUniqueMock: ReturnType<typeof vi.fn>;
+  let userFindFirstMock: ReturnType<typeof vi.fn>;
   let userCreateMock: ReturnType<typeof vi.fn>;
   let accountCreateMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    userFindUniqueMock = vi.fn().mockResolvedValue(null);
+    userFindFirstMock = vi.fn().mockResolvedValue(null);
     userCreateMock = vi
       .fn()
       .mockResolvedValue({ id: "user-1", name: "Alice", email: "a@x.com" });
@@ -83,7 +81,7 @@ describe("userRouter.register()", () => {
   const createCaller = () => {
     const ctx = createInnerTRPCContext({ session: null });
     const prismaMock = {
-      user: { findUnique: userFindUniqueMock, create: userCreateMock },
+      user: { findFirst: userFindFirstMock, create: userCreateMock },
       account: { create: accountCreateMock },
       $transaction: vi.fn(
         async (cb: (tx: unknown) => unknown) =>
@@ -115,18 +113,61 @@ describe("userRouter.register()", () => {
     });
   });
 
+  describe("when the email is typed with capital letters", () => {
+    /**
+     * Sign-in goes through BetterAuth, which lowercases the address on every
+     * lookup, so an account stored as typed is one sign-in can never find:
+     * the customer is locked out with "User already exists" forever.
+     */
+    /** @scenario "A capitalised email creates an account sign-in can find" */
+    it("stores the lowercased address", async () => {
+      await createCaller().register({
+        name: "Joel",
+        email: "Joel.During@example.com",
+        password: "supersecret",
+      });
+
+      expect(userCreateMock).toHaveBeenCalledWith({
+        data: { name: "Joel", email: "joel.during@example.com" },
+      });
+    });
+
+    /** @scenario "A capitalised email creates an account sign-in can find" */
+    it("finds an existing account regardless of its stored casing", async () => {
+      userFindFirstMock.mockResolvedValue({ id: "user-1" });
+
+      await expect(
+        createCaller().register({
+          name: "Joel",
+          email: "Joel.During@example.com",
+          password: "supersecret",
+        }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+
+      expect(userFindFirstMock).toHaveBeenCalledWith({
+        where: {
+          email: { equals: "joel.during@example.com", mode: "insensitive" },
+        },
+      });
+      expect(userCreateMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the user already exists", () => {
     /** @scenario A rejected registration tracks no PostHog signed_up milestone */
     it("does not track signed_up", async () => {
-      userFindUniqueMock.mockResolvedValue({ id: "user-1" });
+      userFindFirstMock.mockResolvedValue({ id: "user-1" });
 
+      // The refusal is the handled email_already_registered error (the signup
+      // screen keys its recovery flow off this code), surfaced through tRPC
+      // with the CONFLICT transport code its 409 maps to.
       await expect(
         createCaller().register({
           name: "Alice",
           email: "a@x.com",
           password: "supersecret",
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({ code: "CONFLICT" });
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });

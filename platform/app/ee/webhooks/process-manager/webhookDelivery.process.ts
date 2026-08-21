@@ -3,12 +3,7 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import {
-  assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  type WebhookSendResult,
-} from "~/server/app-layer/automations/delivery/sendWebhook";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type {
@@ -16,8 +11,8 @@ import type {
   ConfirmSpendCommandData,
   FailSpendCommandData,
   SettleSpendCommandData,
-  SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -30,8 +25,12 @@ import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
+import type { WebhookDispatchResult } from "~/server/webhooks/destinations/types";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
@@ -39,7 +38,6 @@ import type {
   WebhookEndpointService,
   WebhookEndpointView,
 } from "../webhookEndpoint.service";
-import { allowsInsecureLocalUrls } from "../webhookEndpoint.service";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
@@ -155,12 +153,21 @@ export function isEndpointStreamKey(processKey: string): boolean {
   return processKey.startsWith("endpoint:");
 }
 
+/** Every quantity added after the first deploy carries a default: this rides
+ *  a durable outbox row, so a payload the previous build wrote is read back
+ *  by this one, and a field without a default turns that row into a
+ *  permanent parse failure instead of a delivery. */
 const spendUsagePayloadSchema = z.object({
   input_tokens: z.number().int().min(0),
   output_tokens: z.number().int().min(0),
   cache_read_input_tokens: z.number().int().min(0),
   cache_creation_input_tokens: z.number().int().min(0),
+  cache_creation_1h_tokens: z.number().int().min(0).default(0),
   reasoning_tokens: z.number().int().min(0),
+  input_audio_tokens: z.number().int().min(0).default(0),
+  output_audio_tokens: z.number().int().min(0).default(0),
+  input_chars: z.number().int().min(0).default(0),
+  audio_ms: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and
@@ -229,18 +236,14 @@ export type FlushEndpointPayload = z.infer<typeof flushEndpointSchema>;
 export interface WebhookDeliveryProcessDeps {
   processStore: ProcessStore;
   endpoints: WebhookEndpointService;
+  /** Install-wide maintenance runs off this PM's hourly sweep and reaches
+   *  past the endpoint tables (the idempotency receipt expiry), so it needs a
+   *  handle rather than going through the endpoint service. */
+  prisma: PrismaClient;
   /** Resolves the org's active plan for the enterprise gate. */
   getPlan: (organizationId: string) => Promise<PlanInfo>;
   now?: () => number;
 }
-
-const EMPTY_USAGE: SpendUsage = {
-  input_tokens: 0,
-  output_tokens: 0,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  reasoning_tokens: 0,
-};
 
 /** The columns admission's attribution owns. A row whose process instance
  *  never saw an `admitted` event still needs every one of them, so each
@@ -282,7 +285,7 @@ function resolvedModel(payload: DeliverPayload, fallback: string): string {
  *  event carried, never a fresh rating and never a read of the fold's
  *  table: the log's consumers stay independent AND state the same cost. */
 export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
-  const usage = payload.usage ?? EMPTY_USAGE;
+  const usage = payload.usage ?? EMPTY_SPEND_USAGE;
   return {
     ...attributedColumns(payload.attribution),
     tenantId: payload.project_id,
@@ -674,50 +677,64 @@ async function runMaintenanceIfDue(
       before: now - OUTBOX_ROW_RETENTION_MS,
     });
     await deps.endpoints.pruneDeliveries(new Date(now));
+    // Receipts expire lazily, when their key is next presented, so a key that
+    // is never retried is never revisited and its row never leaves. The
+    // expiresAt index was built for a bulk sweep; this is it.
+    await pruneExpiredIdempotencyReceipts({
+      prisma: deps.prisma,
+      now: new Date(now),
+    });
   } catch (error) {
     logger.warn({ error }, "webhook delivery maintenance sweep failed");
   }
 }
 
 /**
- * POST one frozen batch through the SSRF-fenced signed sender.
+ * Hand one frozen batch to the endpoint's transport.
  *
- * A transport-level failure (DNS, SSRF block, timeout) leaves no receiver
- * status to store, so the attempt is recorded here and the error rethrown:
- * DispatchError carries the retryable classification the dispatcher acts
- * on.
+ * The transport answers with an ALREADY CLASSIFIED verdict, because the
+ * classification depends on the transport: an HTTPS receiver answers with a
+ * status code, a queue answers with a message id and no status at all. What
+ * the two share is the bytes, which are built here, once, so both transports
+ * put the same body on the wire and one signature verifier reads either.
+ *
+ * A transport-level failure (DNS, an SSRF block, a timeout) leaves nothing to
+ * classify, so the attempt is recorded here and the error rethrown:
+ * DispatchError carries the retryable flag the dispatcher acts on.
  */
-async function postWebhookBatch({
+async function dispatchWebhookBatch({
   deps,
   payload,
   context,
-  endpoint,
   startedAt,
 }: {
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  endpoint: WebhookEndpointView;
   startedAt: number;
-}): Promise<WebhookSendResult> {
-  const secrets = await deps.endpoints.getSigningSecrets({
-    organizationId: payload.organizationId,
-    endpointId: payload.endpointId,
-  });
+}): Promise<WebhookDispatchResult> {
+  // Two reads, run together: the secrets and the destination. The liveness
+  // read above already has the row, but neither of these can be served from
+  // it — both decrypt, and decryption is the service's to do, not this
+  // executor's.
+  const [secrets, destination] = await Promise.all([
+    deps.endpoints.getSigningSecrets({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+    deps.endpoints.getDestinationConfig({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+  ]);
   try {
-    return await sendWebhook({
-      url: endpoint.url,
+    return await webhookDestinationFor(destination).send({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
       body: JSON.stringify({ batch: payload.envelopes }),
-      triggerName: payload.endpointId,
-      contextLabel: `Webhook endpoint ${payload.endpointId}`,
-      // Endpoints are organization-scoped, so their dispatch cap buckets
-      // per organization rather than per project.
-      projectId: payload.organizationId,
-      eventId: payload.batchId,
-      dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
-      signingSecrets: secrets,
+      batchId: payload.batchId,
       attempt: context.attempt,
-      allowInsecureLocal: allowsInsecureLocalUrls(),
+      signingSecrets: secrets,
     });
   } catch (error) {
     const retryable =
@@ -740,10 +757,13 @@ async function postWebhookBatch({
 }
 
 /**
- * Record the receiver's answer and classify it: 2xx acks, 5xx/429/408
- * retry along the ladder (Retry-After honored as a floor), other statuses
- * retire the batch to the dead letter immediately. The endpoint's failure
- * streak and the 72h auto-disable ride every recorded outcome.
+ * Record the transport's verdict and act on it: success acks, retryable
+ * ladders (Retry-After honored as a floor), terminal retires the batch to
+ * the dead letter immediately. The endpoint's failure streak and the 72h
+ * auto-disable ride every recorded outcome.
+ *
+ * The verdict is the transport's, not re-derived here. A status code is only
+ * one transport's way of expressing it, and a queue has none.
  */
 async function recordWebhookBatchOutcome({
   deps,
@@ -755,7 +775,7 @@ async function recordWebhookBatchOutcome({
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  result: WebhookSendResult;
+  result: WebhookDispatchResult;
   latencyMs: number;
 }): Promise<void> {
   const attempt = {
@@ -764,10 +784,10 @@ async function recordWebhookBatchOutcome({
     dispatchId: payload.batchId,
     attempt: context.attempt,
     eventCount: payload.envelopes.length,
-    responseStatus: result.status,
+    ...(result.status !== null ? { responseStatus: result.status } : {}),
     latencyMs,
   };
-  if (result.status >= 200 && result.status < 300) {
+  if (result.verdict === "success") {
     await deps.endpoints.recordDeliveryAttempt({
       ...attempt,
       outcome: "success",
@@ -775,30 +795,37 @@ async function recordWebhookBatchOutcome({
     return;
   }
 
-  const retryable =
-    result.status >= 500 || result.status === 429 || result.status === 408;
+  // A transport may return a failure verdict with nothing to say. One reason
+  // stands in for both the log row and the throw, so a delivery-log reader
+  // never sees a failed attempt with a blank reason column.
+  const reason = result.error ?? "delivery failed";
   await deps.endpoints.recordDeliveryAttempt({
     ...attempt,
-    outcome: retryable ? "retryable" : "terminal",
-    error: `HTTP ${result.status}`,
+    outcome: result.verdict,
+    error: reason,
     response: {
-      body: result.body.slice(0, 1000),
+      body: result.body,
       ...(result.retryAfterMs !== undefined
         ? { retryAfterMs: result.retryAfterMs }
         : {}),
     },
   });
-  // Throws DispatchError with the same classification just recorded; the
-  // dispatcher ladders retryables and dead-letters terminals immediately.
-  assertWebhookDelivered({
-    result,
-    triggerName: payload.endpointId,
+  // The same classification just recorded, as the throw the dispatcher acts
+  // on: it ladders retryables and dead-letters terminals immediately.
+  throw new DispatchError({
+    message: `Webhook endpoint ${payload.endpointId}: ${reason}`,
+    retryable: result.verdict === "retryable",
+    // Honor the receiver's backpressure on a retryable verdict (ADR-040 §5);
+    // the queue folds it into its backoff as a floor.
+    ...(result.verdict === "retryable" && result.retryAfterMs !== undefined
+      ? { retryAfterMs: result.retryAfterMs }
+      : {}),
   });
 }
 
 /**
- * Level 2: deliver one frozen batch to one endpoint through the
- * SSRF-fenced signed sender and record what the receiver answered.
+ * Level 2: deliver one frozen batch to one endpoint through whichever
+ * transport it named, and record what came back.
  */
 export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -806,7 +833,7 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     context: IntentContext,
   ): Promise<void> => {
     // The service's deliverable read owns the liveness predicate. A deleted
-    // or disabled endpoint drains its queue without POSTing: the spend
+    // or disabled endpoint drains its queue without delivering: the spend
     // record keeps the events, re-enable plus replay covers the gap.
     const endpoint = await deps.endpoints.getDeliverable({
       organizationId: payload.organizationId,
@@ -821,11 +848,10 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     }
 
     const startedAt = (deps.now ?? Date.now)();
-    const result = await postWebhookBatch({
+    const result = await dispatchWebhookBatch({
       deps,
       payload,
       context,
-      endpoint,
       startedAt,
     });
     await recordWebhookBatchOutcome({
@@ -976,6 +1002,123 @@ function withStashedOutcome(
   };
 }
 
+/**
+ * The attribution an outcome states about itself, or null when it states
+ * none.
+ *
+ * Every outcome carries it from the build that sets
+ * `outcome_carries_attribution` on its admissions; an older build's outcomes
+ * carry nothing and fall back to the admission this instance remembered.
+ * The organization is the discriminator because delivery cannot resolve a
+ * single endpoint without it.
+ */
+function attributionFromOutcome(
+  data: ConfirmSpendCommandData | FailSpendCommandData | SettleSpendCommandData,
+): SpendAttribution | null {
+  if (!data.organization_id) return null;
+  return {
+    organization_id: data.organization_id,
+    virtual_key_id: data.virtual_key_id,
+    principal_user_id: data.principal_user_id,
+    end_user_id: data.end_user_id,
+    // Every outcome states a model identity. A confirmation or failure
+    // states the one it RESOLVED; a settlement resolved none, so the
+    // sweeper copies the identity admission requested off the spend record
+    // — which is what a settled envelope has always named.
+    model: data.model,
+    model_provider_id: data.model_provider_id,
+    trace_id: data.trace_id,
+    request_type: data.request_type,
+    labels: data.labels,
+    metadata: data.metadata,
+    admitted_at: data.admitted_at,
+  };
+}
+
+/** What an outcome handler needs from the process context. */
+interface DeliverOutcomeContext<Intent> {
+  projectId: string;
+  intents: { deliver: (key: string, payload: DeliverPayload) => Intent };
+}
+
+/**
+ * One outcome, routed by what it can see. All three route identically, so
+ * they share this rather than repeating it with a different payload builder.
+ *
+ * An outcome that states its own attribution freezes its deliver intent
+ * immediately and leaves the state untouched, so the evolution is transient
+ * and the request costs no durable row. One that does not falls back to the
+ * admission this instance remembered: stashed until admission arrives,
+ * released by it after.
+ */
+function onSpendOutcome<
+  Intent,
+  Data extends
+    | ConfirmSpendCommandData
+    | FailSpendCommandData
+    | SettleSpendCommandData,
+>({
+  state,
+  ctx,
+  status,
+  data,
+  toPayload,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  status: DeliverPayload["status"];
+  data: Data;
+  toPayload: (data: Data, instance: DeliverInstance) => DeliverPayload;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFromOutcome(data) ?? state.attribution;
+  const payload = toPayload(data, { projectId: ctx.projectId, attribution });
+  if (attribution === null) {
+    return { state: withStashedOutcome(state, payload) };
+  }
+  return {
+    state,
+    intents: [ctx.intents.deliver(`deliver:${status}`, payload)],
+  };
+}
+
+/**
+ * The admission: the one place a request's attribution is known.
+ *
+ * It releases an outcome that arrived ahead of it on BOTH paths, including
+ * the one where it remembers nothing. A stash is not expected there — an
+ * outcome only stashes when it carried no attribution, and admission and
+ * outcome always come from the same pod and the same build — but the two
+ * conditions are not the same one: an outcome stashes on its OWN empty
+ * organization, not on the build that sent it. Where they disagree, dropping
+ * the stash would cost the envelope and strand the instance row holding it,
+ * since this handler is the only thing that could ever clear it.
+ */
+function onAdmission<Intent>({
+  state,
+  ctx,
+  admit,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  admit: AdmitSpendCommandData;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFrom(admit);
+  const stashed = state.pendingOutcome;
+  const release = stashed
+    ? [ctx.intents.deliver("deliver:late", { ...stashed, attribution })]
+    : void 0;
+
+  // Every outcome states the attribution itself, so there is nothing worth
+  // remembering and this admission writes no row.
+  if (admit.outcome_carries_attribution) {
+    if (!stashed) return { state };
+    return { state: { ...state, pendingOutcome: null }, intents: release };
+  }
+
+  const admitted = { ...state, attribution, pendingOutcome: null };
+  return stashed ? { state: admitted, intents: release } : { state: admitted };
+}
+
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
   return {
     organization_id: data.organization_id,
@@ -1010,57 +1153,36 @@ export function webhookDeliveryPM(
       // releases whatever outcome arrived ahead of it. One admission per
       // instance (the log's idempotency key, then the inbox) means
       // `deliver:late` is minted at most once.
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
-        const attribution = attributionFrom(data as AdmitSpendCommandData);
-        const stashed = state.pendingOutcome;
-        const admitted = { ...state, attribution, pendingOutcome: null };
-        if (!stashed) return { state: admitted };
-        return {
-          state: admitted,
-          intents: [
-            ctx.intents.deliver("deliver:late", { ...stashed, attribution }),
-          ],
-        };
-      })
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = confirmedDeliverPayload(
-          data as ConfirmSpendCommandData,
-          { projectId: ctx.projectId, attribution: state.attribution },
-        );
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) =>
+        onAdmission({ state, ctx, admit: data as AdmitSpendCommandData }),
+      )
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:confirmed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = failedDeliverPayload(data as FailSpendCommandData, {
-          projectId: ctx.projectId,
-          attribution: state.attribution,
-        });
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "confirmed",
+          data: data as ConfirmSpendCommandData,
+          toPayload: confirmedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:failed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
-        const payload = settledDeliverPayload(data as SettleSpendCommandData, {
-          projectId: ctx.projectId,
-          attribution: state.attribution,
-        });
-        if (state.attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "failed",
+          data: data as FailSpendCommandData,
+          toPayload: failedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:settled", payload)],
-        };
-      })
+          ctx,
+          status: "settled",
+          data: data as SettleSpendCommandData,
+          toPayload: settledDeliverPayload,
+        }),
+      )
       // Endpoint streams arm wakes for their coalescing deadlines; the
       // wake hands the flush to the I/O executor.
       .onWake((state, ctx) => {
@@ -1080,5 +1202,11 @@ export function webhookDeliveryPM(
       // metadata echo; no prompts or responses exist anywhere in this
       // pipeline, so the event data is safe to persist as the payload.
       .toPayload((event) => event.data as unknown as JsonValue)
+      // Per-REQUEST keys hold nothing once an outcome states its own
+      // attribution, so they commit one idempotent outbox insert and no row.
+      // Per-ENDPOINT streams are untouched by this: they hold a buffer and a
+      // wake, so their evolutions are never transient and keep the
+      // compare-and-swap that guards a concurrent flush.
+      .transient()
       .outbox(WEBHOOK_DELIVERY_OUTBOX);
 }

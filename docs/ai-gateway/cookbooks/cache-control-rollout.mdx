@@ -32,17 +32,6 @@ Pick one path, all three land the same row via the same service layer.
 - Match → Model (optional): `claude-*`
 - Action: `force`, TTL: `600`
 
-**CLI:**
-
-```bash
-langwatch cache-rules create \
-  --name force-cache-enterprise-anthropic \
-  --priority 300 \
-  --mode force --ttl 600 \
-  --match-tag tier=enterprise \
-  --match-model "claude-*"
-```
-
 **REST:**
 
 ```bash
@@ -108,17 +97,23 @@ On `/v1/chat/completions` (OpenAI), the rule still fires + attributes + bumps th
 
 ## Scenario 2: Disable cache for evaluation traffic
 
-Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request with `X-Langwatch-Suite: evals`. You want these to hit provider caches as rarely as possible, fresh completions keep eval scores honest.
+Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request with `X-Langwatch-Suite: evals`. These requests should hit provider caches as rarely as possible, because fresh completions keep cache effects out of the eval scores.
 
 ### Author
 
 ```bash
-langwatch cache-rules create \
-  --name disable-cache-evals \
-  --priority 200 \
-  --mode disable \
-  --match-vk-prefix vk-lw- \
-  --match-metadata X-Langwatch-Suite=evals
+curl -X POST https://app.langwatch.ai/api/gateway/v1/cache-rules \
+  -H "Authorization: Bearer $LANGWATCH_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "disable-cache-evals",
+    "priority": 200,
+    "action": { "mode": "disable" },
+    "matchers": {
+      "vk_prefix": "vk-lw-",
+      "request_metadata": { "x-langwatch-suite": "evals" }
+    }
+  }'
 ```
 
 Matchers are ANDed, this rule only fires when BOTH the VK prefix and the metadata header match. Other eval traffic from non-prefixed VKs stays on the per-VK default.
@@ -154,8 +149,13 @@ You've rolled out a new system prompt template. Existing cache entries now point
 Update the rule's `salt` rather than archive+recreate, this preserves the audit trail and the rule id (so dashboards don't break).
 
 ```bash
-langwatch cache-rules update <rule_id> --salt "2026Q2-template-rollout"
+curl -X PATCH https://app.langwatch.ai/api/gateway/v1/cache-rules/<rule_id> \
+  -H "Authorization: Bearer $LANGWATCH_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{ "action": { "mode": "force", "ttl": 600, "salt": "2026Q2-template-rollout" } }'
 ```
+
+`action` is replaced wholesale, so send the mode and TTL you want to keep alongside the new salt.
 
 Any cache the provider or downstream layer keys by the rule's salt will miss on the next hit and be populated fresh. For providers without explicit TTL, salt support, this is a no-op on the wire but the `rule_id` + `mode_applied` attributes record the intent so dashboards can correlate the rollout.
 
@@ -164,9 +164,7 @@ Any cache the provider or downstream layer keys by the rule's salt will miss on 
 Archiving a rule stops it matching new requests. History is preserved in the audit log + Prometheus counter.
 
 ```bash
-# UI: Cache control → … → Archive
-# CLI:
-langwatch cache-rules archive <rule_id>
+# UI: Cache control > ... > Archive
 # REST:
 curl -X DELETE https://app.langwatch.ai/api/gateway/v1/cache-rules/<rule_id> \
   -H "Authorization: Bearer $LANGWATCH_PAT"
@@ -178,13 +176,12 @@ DELETE returns `200` + the archived row (not `204`), so scripts can confirm the 
 
 - **At least one matcher is required.** Rules with no matchers that would match every request are unsupported in v1, that's the per-VK `cache.mode` default's job. Author an explicit matcher instead.
 - **`matchers` and `action` are REPLACED on PATCH.** If you `PATCH /cache-rules/:id` with a `matchers` object, the stored value is replaced wholesale. To add a new matcher, include the existing ones too.
-- **`model` matchers fire on both endpoints.** Earlier iterations had a caveat that `matchers.model` didn't fire on `/v1/messages` due to pipeline ordering, that was fixed via a cheap single-field JSON peek (`extractModelField`, ~150 ns, zero-alloc on no-rules path). Rules like `matchers.model = "claude-haiku-*"` now match on both `/v1/chat/completions` and `/v1/messages`.
+- **`model` matchers fire on both endpoints.** A rule like `matchers.model = "claude-haiku-*"` matches on `/v1/chat/completions` and `/v1/messages` alike.
 - **Per-request header always wins.** A client that sends `X-LangWatch-Cache: disable` bypasses every rule. This is intentional, it's the per-request escape hatch for repros and cold-cache benchmarks.
 - **Rules are organization-scoped.** They apply to every VK in the organization, not just the project whose API key you used to author them. Scope a rule narrowly with `matchers.vk_id`, `vk_tags`, `vk_prefix` if you want project- or environment-specific behaviour.
 
 ## See also
 
 - [Cache control](/ai-gateway/cache-control): full per-provider semantics + precedence
-- [CLI reference](/ai-gateway/cli/langwatch-cli#cache-rules): `langwatch cache-rules` subcommand
 - [Management REST API](/ai-gateway/api/management#cache-rules): 5-route wire contract
 - [RBAC](/ai-gateway/rbac): `gatewayCacheRules:*` permission matrix

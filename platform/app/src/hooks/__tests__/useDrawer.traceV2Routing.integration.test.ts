@@ -41,7 +41,7 @@ describe("openDrawer Trace Explorer default routing", () => {
     router.pathname = "/[project]/experiments";
   });
 
-  describe("given the open happens outside the legacy Traces page", () => {
+  describe("given a screen opens a trace", () => {
     describe("when opening a trace's details from a results view", () => {
       /** @scenario "A trace opened from a results view uses the Trace Explorer" */
       it("rewrites the open to the Trace Explorer drawer in the URL", () => {
@@ -59,14 +59,16 @@ describe("openDrawer Trace Explorer default routing", () => {
     });
 
     describe("when opening a trace from the evaluation results View action", () => {
-      it("routes to the Trace Explorer and drops the legacy-only tab param", () => {
+      it("routes to the Trace Explorer drawer", () => {
         const { result } = renderHook(() => useDrawer());
 
-        // Mirrors the exact payload the eval results "View" button sends.
+        // Mirrors the payload the eval results "View" button sends. The
+        // legacy-only `selectedTab` it used to carry is gone from the call
+        // site AND from the type; that the funnel drops any such leftover is
+        // covered in traceDrawerV2Routing.unit.test.ts, which can pass one.
         act(() => {
-          result.current.openDrawer("traceDetails", {
+          result.current.openDrawer("traceV2Details", {
             traceId: "trace-eval",
-            selectedTab: "traceDetails",
           });
         });
 
@@ -78,14 +80,14 @@ describe("openDrawer Trace Explorer default routing", () => {
     });
   });
 
-  describe("given the open happens on the legacy Traces page", () => {
+  describe("given the legacy Traces path, which now only redirects", () => {
     beforeEach(() => {
       router.pathname = "/[project]/messages";
     });
 
-    describe("when opening a trace's details from the legacy traces table", () => {
-      /** @scenario "Opening a trace from the legacy Traces page uses the legacy drawer" */
-      it("keeps the open on the legacy drawer in the URL", () => {
+    describe("when a trace is opened while that redirect is resolving", () => {
+      /** @scenario "The default applies to every trace entry point, not only the traces table" */
+      it("still routes to the Trace Explorer drawer", () => {
         const { result } = renderHook(() => useDrawer());
 
         act(() => {
@@ -93,9 +95,9 @@ describe("openDrawer Trace Explorer default routing", () => {
         });
 
         const url = lastOpenedUrl();
-        expect(url).toMatch(/drawer\.open=traceDetails/);
+        expect(url).toMatch(/drawer\.open=traceV2Details/);
         expect(url).toContain("trace-abc");
-        expect(url).not.toContain("traceV2Details");
+        expect(url).not.toMatch(/drawer\.open=traceDetails(?![a-zA-Z])/);
       });
     });
   });

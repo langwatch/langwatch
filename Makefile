@@ -109,6 +109,16 @@ setup-hooks:
 # launching the gateway, but a flat `. .env` would clobber it back to
 # the hardcoded default and the gateway would hit a dead control-plane
 # port (every VK call → 401 invalid_api_key).
+#
+# For a standalone run (no pnpm dev in the ancestry, so nothing pre-derived
+# LW_GATEWAY_BASE_URL) dev/scripts/lib/derive-gateway-base-url.sh derives it
+# from PORT the same way start.sh does, once .env has had its say. Without
+# this, a bare `make service svc=aigateway` on a non-default-PORT worktree
+# silently falls through to services/aigateway/config.go's compatibility
+# default (http://localhost:5560), correct only for a single worktree on
+# the default port, and wrong everywhere else with no error anywhere: the
+# gateway still proxies LLM traffic and returns 200, it just ships spend,
+# budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= platform/app/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
@@ -117,6 +127,7 @@ service:
 			&& set -a && . $(DEV_ENV_FILE) && set +a \
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
+		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
 
@@ -129,6 +140,7 @@ service-watch:
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
+		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
 			--build.bin "./tmp/$(svc) $(svc)" \
@@ -360,7 +372,7 @@ worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
-	pnpm run task generateOpenAPISpec
+	cd platform/app && pnpm run task generateOpenAPISpec
 	cd sdks/typescript && pnpm run generate:openapi-types
 	cd sdks/python && make generate/api-client
 

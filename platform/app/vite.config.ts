@@ -6,6 +6,8 @@ import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
+import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -147,6 +149,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
   plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
+      // The generated Prisma client's `client.ts` entry hard-imports the node
+      // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
+      // externalizes — evaluating it in the browser throws and blanks every
+      // page. Frontend files import it for enums and types; the old
+      // `@prisma/client` package routed those through its `browser` package
+      // field, but the generated client is plain source with no package.json,
+      // so the browser bundle is pointed at the generated browser entry here.
+      // Must precede the bare "~" alias — vite matches aliases in order.
+      "~/generated/prisma/client": path.resolve(
+        __dirname,
+        "./src/generated/prisma/browser.ts",
+      ),
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
@@ -203,6 +217,35 @@ export default defineConfig(async (): Promise<UserConfig> => {
           return shikiManualChunk(id);
         },
       },
+    },
+  },
+  experimental: {
+    // ADR-086: the base for content-hashed assets is chosen at container start,
+    // not build time — one image serves self-host same-origin and SaaS from a
+    // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
+    // runtime resolver defined by the served HTML shell (src/server/asset-base.ts);
+    // keep CSS-referenced assets relative to the CSS file (which lives under the
+    // same base, so fonts/images resolve on the CDN); leave HTML entry refs
+    // base-absolute for the server to rewrite; leave public/ assets same-origin.
+    renderBuiltUrl(filename, { type, hostType }) {
+      if (type === "public") return undefined;
+      if (hostType === "js") {
+        // Self-defaulting so the built bundle is usable even when the server
+        // hasn't injected the resolver: `vite preview`, the boot-smoke, and any
+        // raw-`dist/` static server fall back to same-origin ("/"+path). Read
+        // via `globalThis` (defined in the main document AND in Web Worker
+        // scopes, where `window` is undefined) so a worker chunk degrades to
+        // same-origin instead of throwing. The server sets
+        // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
+        // is configured.
+        return {
+          runtime: `(globalThis.${ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
+            filename,
+          )})`,
+        };
+      }
+      if (hostType === "css") return { relative: true };
+      return undefined;
     },
   },
   server: {
@@ -289,6 +332,30 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // No-op when API is on plain HTTP.
         secure: false,
       },
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`. In production start.ts routes those into the API; in dev
+      // the frontend owns the root, so they need an entry of their own or they
+      // fall through to the SPA. Exact-match, same reasoning as /mcp below.
+      "^/v1/(?:traces|logs|metrics)/?(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`
+      // (src/server/routes/root-discovery.ts). Same split as the OTLP paths
+      // above: start.ts routes them in production, the frontend owns the root
+      // in dev. Left out, they fall to the SPA, which answers an agent's
+      // discovery request with the HTML shell and a 200.
+      //
+      // The pattern is DERIVED from the same list start.ts dispatches on, not
+      // written out again here: a path added there and missed here would work
+      // in production and return HTML in development, which is the shape of
+      // bug that only shows up where nobody is looking for it.
+      [ROOT_DISCOVERY_PROXY_PATTERN]: {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
       // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
       // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
       // sending it to the API server, which has no dev-mode page fallback.
@@ -326,6 +393,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      // Probed by MCP clients during discovery. The API answers a JSON 404;
+      // without this entry dev would answer the SPA's HTML instead, which is
+      // the failure mode this route exists to avoid.
+      "/.well-known/openid-configuration": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

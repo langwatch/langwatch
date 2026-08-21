@@ -261,12 +261,10 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
-	// cost calc prices each bucket once. Fall back to the full prompt if a
-	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
-	if freshInput < 0 {
-		freshInput = params.Usage.PromptTokens
-	}
+	// cost calc prices each bucket once. The spend record reports the same
+	// remainder from the same helper, which is what keeps a trace and its bill
+	// on one number.
+	freshInput := params.Usage.BillableInputTokens()
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
@@ -276,11 +274,28 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
+	if params.RequestedModel != "" {
+		attrs = append(attrs, attribute.String(AttrRequestedModel, params.RequestedModel))
+	}
+	// Audio tokens ride beside the text totals, not inside them, so the cost
+	// pipeline can price them at the audio rate. Reporting them inside
+	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at
+	// the text rate, which is why a trace and its budget disagreed on every
+	// audio call.
+	if params.Usage.InputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputAudioTokens, params.Usage.InputAudioTokens))
+	}
+	if params.Usage.OutputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
+	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
+	}
+	if params.Usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate1h, params.Usage.CacheCreation1hTokens))
 	}
 	// Audio usage: TTS reports the characters synthesized, STT the seconds
 	// transcribed. Character- and duration-priced audio models have no token
@@ -376,9 +391,14 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// calls that structurally never carry completion tokens or extracted
 	// output: TTS spans (binary audio response), duration-priced STT spans
 	// (scribe reports seconds, not tokens), and embeddings.
+	// Audio tokens count as output here even though they are carried out of
+	// the completion total: an audio-native model answers entirely in audio
+	// tokens, so reading the completion field alone would drop a real answer
+	// as an empty probe.
+	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
 	isProbeShape := params.RequestType == domain.RequestTypeChat ||
 		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
@@ -485,11 +505,12 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 		domain.RequestTypeResponses, domain.RequestTypeSpeech:
 		return EndUserIDFromBody(params.RequestBody)
 	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
-		domain.RequestTypeTranscription:
+		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
-		// bodies are provider-shaped and forwarded verbatim, and transcription
-		// arrives as multipart form data rather than JSON.
+		// bodies are provider-shaped and forwarded verbatim, transcription
+		// arrives as multipart form data rather than JSON, and a realtime mint
+		// declares a socket rather than a completion.
 	}
 	return ""
 }
@@ -530,10 +551,12 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 			return sid
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription:
+		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
 		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all); the header lifted above (when present) is
-		// the only source.
+		// session field at all, and a realtime mint's session id is the one
+		// the gateway itself hands back); the header lifted above (when
+		// present) is the only source.
 	}
 	return ""
 }

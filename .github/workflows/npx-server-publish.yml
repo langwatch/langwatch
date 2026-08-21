@@ -4,8 +4,10 @@
 # Trigger policy:
 # - `release.published` whose tag starts with `langwatch@` (the main langwatch
 #   release tag — release-please uses `<component>@<version>`). Releases for
-#   other components (sdk-go@*, typescript-sdk@*, mcp-server@*, etc.) are
-#   filtered out by the `if:` guard on the publish job.
+#   other components (typescript-sdk@*, mcp-server@*, etc.) are
+#   filtered out by the `if:` guard on the publish job. The Go SDK is the one
+#   exception to the `<component>@<version>` shape: Go requires a submodule's
+#   tag to be `<subdir>/vX.Y.Z`, so it tags as `sdks/go/v*`.
 # - `workflow_dispatch` from main for break-glass / first publish / beta
 #   bumps. The dispatched run reads the version from package.json — it does
 #   NOT require a release tag.
@@ -36,6 +38,13 @@ on:
     types: [published]
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This job uploads monobinaries
+# onto the GitHub release AND publishes to npm, so a cancelled run can leave a
+# release carrying a partial set of assets that nothing reconciles.
+concurrency:
+  group: npx-server-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write # for creating/updating GH release with aigateway monobinaries
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange
@@ -50,14 +59,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
@@ -106,7 +115,7 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: true
@@ -163,7 +172,7 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
-      # Pre-build the langwatch app (vite client + scenario-child-process +
+      # Pre-build the langwatch app (vite client + the dist/server bundles +
       # mcp-server) so the published tarball ships dist/ artifacts. Without
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
@@ -213,7 +222,18 @@ jobs:
             "package/app/package.json"
             "package/app/platform/app/package.json"
             "package/app/platform/app/dist/client/index.html"
-            "package/app/platform/app/dist/scenario-child-process.js"
+            # The server bundles. `start:app` and `start:workers` execute these
+            # directly on plain node, and the published tree has no tsx to fall
+            # back to, so a tarball missing any of them is a server that cannot
+            # boot. `task.cjs` runs the migrations, and the scenario bundle is
+            # what keeps simulation cold-starts to seconds.
+            "package/app/platform/app/dist/server/server.cjs"
+            "package/app/platform/app/dist/server/workers.cjs"
+            "package/app/platform/app/dist/server/task.cjs"
+            "package/app/platform/app/dist/server/scenario-child-process.cjs"
+            # goose reads the ClickHouse migrations from ${__dirname}/migrations,
+            # which in the bundle is dist/server/migrations.
+            "package/app/platform/app/dist/server/migrations"
             "package/app/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship sdks/python/pyproject.toml + src/.

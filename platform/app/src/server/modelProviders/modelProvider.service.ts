@@ -1,16 +1,25 @@
-import type { PrismaClient, Project } from "@prisma/client";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { getSchemaShape } from "../../utils/modelProviderHelpers";
+import { rateLimit } from "../rateLimit";
+import { isSecretCredential, mergeStoredCustomKeys } from "./credentialMerge";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsUnreadableError,
+  ModelProviderCredentialsWouldBeDroppedError,
+  ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
+  ModelProviderTestRateLimitedError,
 } from "./errors";
+import { rowCannotServeEmbeddings } from "./geminiDoor";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -21,9 +30,14 @@ import {
   type ScopeInput,
 } from "./modelProvider.repository";
 import {
+  type ValidationResult,
+  validateProviderApiKey,
+} from "./providerValidation";
+import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
+  providerDeprecation,
 } from "./registry";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
@@ -100,6 +114,24 @@ export type UpdateModelProviderInput = {
   providerConfig?: Record<string, unknown> | null;
 };
 
+/**
+ * What a connection test needs: which row, and which tenant to resolve it in.
+ *
+ * The schema is the source and the type is inferred from it, so the router's
+ * runtime validation and the service's compile-time contract cannot drift —
+ * and it lives here, beside the method that consumes it, so the service never
+ * has to import the router to know its own input shape.
+ *
+ * Conspicuously absent: anywhere to put an endpoint. See `testConnection`.
+ */
+export const testConnectionInputSchema = z.object({
+  modelProviderId: z.string(),
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+});
+
+export type TestConnectionInput = z.infer<typeof testConnectionInputSchema>;
+
 export type DeleteModelProviderInput = {
   id?: string;
   /** Same tenant anchor as `UpdateModelProviderInput`: one of the two. */
@@ -130,6 +162,60 @@ function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
   if (row.scopes.length === 0) {
     throw new ModelProviderNotFoundError();
   }
+}
+
+/**
+ * How many credential checks one organization may run per window, and how
+ * many the whole instance may run.
+ *
+ * Two buckets rather than one. The per-organization budget is what keeps a
+ * single tenant from turning the settings page into an outbound request
+ * generator; the global one is what keeps a hundred tenants doing something
+ * reasonable each from adding up to something that is not. Both are generous
+ * against real use — a person checking their providers clicks a handful of
+ * times — and tight against a loop.
+ *
+ * How hard a ceiling this is depends on the deployment. `rateLimit` counts in
+ * Redis when one is configured and in a process-local map otherwise, so an
+ * installation running several replicas without Redis gets these numbers per
+ * replica rather than per fleet. That is worth knowing before reading either
+ * figure as a guarantee; it is a property of the shared limiter, not of this
+ * budget, and it bounds a handful of listing requests rather than anything
+ * expensive.
+ */
+const TEST_CONNECTION_WINDOW_SECONDS = 60;
+const TEST_CONNECTION_PER_ORGANIZATION = 20;
+const TEST_CONNECTION_GLOBAL = 500;
+
+async function assertTestConnectionWithinBudget(
+  organizationId: string,
+): Promise<void> {
+  const perOrganization = await rateLimit({
+    key: `model-provider-test:org:${organizationId}`,
+    windowSeconds: TEST_CONNECTION_WINDOW_SECONDS,
+    max: TEST_CONNECTION_PER_ORGANIZATION,
+  });
+  if (!perOrganization.allowed) {
+    throw new ModelProviderTestRateLimitedError({
+      retryAfterSeconds: retryAfterFrom(perOrganization.resetAt),
+    });
+  }
+
+  const global = await rateLimit({
+    key: "model-provider-test:global",
+    windowSeconds: TEST_CONNECTION_WINDOW_SECONDS,
+    max: TEST_CONNECTION_GLOBAL,
+  });
+  if (!global.allowed) {
+    throw new ModelProviderTestRateLimitedError({
+      retryAfterSeconds: retryAfterFrom(global.resetAt),
+    });
+  }
+}
+
+/** Whole seconds until the window resets, never below one. */
+function retryAfterFrom(resetAt: number): number {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }
 
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
@@ -188,17 +274,41 @@ export function providerRowServesModel({
  * Framework-agnostic - no tRPC dependencies.
  */
 export class ModelProviderService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: ModelProviderRepository,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: ModelProviderRepository;
+  private readonly changeEvents: ChangeEventRepository;
+
+  constructor({
+    prisma,
+    repository,
+    changeEvents,
+  }: {
+    prisma: PrismaClient;
+    repository: ModelProviderRepository;
+    /**
+     * The gateway's cache-invalidation feed. Every write that changes a
+     * stored credential has to land here: the gateway holds the decrypted
+     * key inside a per-virtual-key bundle in memory, and a
+     * `MODEL_PROVIDER_UPDATED` event is what evicts the bundles that carry
+     * this provider id so the next request resolves the new key.
+     */
+    changeEvents?: ChangeEventRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
+  }
 
   /**
    * Static factory method for creating a ModelProviderService with proper DI.
    */
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
-    return new ModelProviderService(prisma, repository);
+    return new ModelProviderService({
+      prisma,
+      repository,
+      changeEvents: new ChangeEventRepository(prisma),
+    });
   }
 
   /**
@@ -238,10 +348,12 @@ export class ModelProviderService {
    * Gets model providers with API keys masked for frontend display.
    *
    * Business rules:
-   * - Only masks customKeys fields matching KEY_CHECK patterns (API keys)
+   * - Every customKeys field is masked unless `PUBLIC_CREDENTIAL_FIELDS`
+   *   names it, so a provider that adds a credential is covered by default
    * - Extra-header values are always masked — they routinely carry auth
    *   secrets for azure/custom providers
-   * - URLs and other values remain visible
+   * - Endpoints, API versions, regions and cloud project or location pairs
+   *   remain visible, because the settings form has to render them back
    *
    * Masking runs even when `includeKeys` is false: customKeys are already
    * nulled by that flag, but extraHeaders are returned regardless, so
@@ -296,6 +408,10 @@ export class ModelProviderService {
         ...provider_,
         isSystem: true,
         scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
       });
     }
 
@@ -307,6 +423,13 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        // Derived before masking: the door depends on the API key's
+        // presence, which the masked shape still shows, but deriving it
+        // here keeps the rule reading one row shape.
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -361,7 +484,15 @@ export class ModelProviderService {
     for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
       if (savedProviderKeys.has(providerKey)) continue;
       if (!provider_.enabled) continue;
-      systemRows.push({ ...provider_, isSystem: true, scopes: [] });
+      systemRows.push({
+        ...provider_,
+        isSystem: true,
+        scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
+      });
     }
     // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
     // up cross-account credentials for a specific org. Surface a SYSTEM
@@ -389,6 +520,10 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -504,6 +639,21 @@ export class ModelProviderService {
       throw new ModelProviderNotFoundError();
     }
 
+    // A deprecated provider accepts no NEW rows. The Add menu hides it,
+    // but hiding a tile is not enforcement: a direct API call, an SDK, or
+    // a stale frontend would keep minting rows under a provider whose
+    // whole purpose is to reach zero, and the compatibility entry could
+    // never be deleted. Keyed on there being no existing row, so editing,
+    // disabling, re-scoping and deleting a stored row all stay open —
+    // that is what keeps a deployment mid-fold from being stranded.
+    const deprecation = providerDeprecation(provider);
+    if (!existingProvider && deprecation) {
+      throw new ModelProviderDeprecatedError({
+        provider,
+        replacement: deprecation.replacedBy,
+      });
+    }
+
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
     // When neither is given, defer to the create/update defaults.
@@ -574,6 +724,19 @@ export class ModelProviderService {
           },
           validatedKeys,
           customKeysProvided,
+          tx,
+        );
+
+        // A running gateway is serving the previous credential, base URL and
+        // headers from cache. Rotating a key is exactly the moment where that
+        // matters, so the eviction rides the same transaction as the write:
+        // either both land or the operator sees the write fail.
+        await this.changeEvents.append(
+          {
+            organizationId: existingProvider.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: existingProvider.id,
+          },
           tx,
         );
       } else {
@@ -734,10 +897,126 @@ export class ModelProviderService {
       );
     }
 
+    // A deleted credential has to leave the gateway's cache with the row.
+    // Until it does the bundle keeps dispatching through a provider the
+    // operator has removed, and there is no later write to carry the news.
     if (id) {
-      return await this.repository.delete(id);
+      return await this.prisma.$transaction(async (tx) => {
+        const deleted = await this.repository.delete(id, tx);
+        await this.changeEvents.append(
+          {
+            organizationId: deleted.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: deleted.id,
+          },
+          tx,
+        );
+        return deleted;
+      });
     }
-    return await this.repository.deleteByProvider(provider, projectId!);
+    return await this.prisma.$transaction(async (tx) => {
+      // Resolve the set, delete the part of it still inside the scope, then
+      // ask which rows actually went. Each statement gets its own READ
+      // COMMITTED snapshot, so neither the resolved set nor the count is a
+      // safe answer on its own: the first can name a row that left the scope
+      // before the delete, and the second says how many went without saying
+      // which. The difference is exact, and every row in it gets an event.
+      const doomed = await this.repository.findIdsByProvider({
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const ids = doomed.map((row) => row.id);
+      const result = await this.repository.deleteByIdsInProviderScope({
+        ids,
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const survivors = await this.repository.findSurvivingIds({ ids, tx });
+      for (const row of doomed) {
+        if (survivors.has(row.id)) continue;
+        await this.changeEvents.append(
+          {
+            organizationId: row.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: row.id,
+          },
+          tx,
+        );
+      }
+      return result;
+    });
+  }
+
+  /**
+   * Checks a credential that is already saved, on demand.
+   *
+   * Distinct from the save-time probe in three ways, each of them load-bearing.
+   *
+   * It takes a row id and no endpoint. The save-time path accepts a base URL
+   * from the caller, which is reasonable there — the caller supplies the key
+   * too, so there is nothing to escalate. Here the credential comes out of
+   * storage and is one the caller may never have been allowed to read, so
+   * accepting a destination would let anyone who can edit a provider have this
+   * server post the key wherever they liked. The row's own endpoint is the
+   * only one used.
+   *
+   * It is anchored by id against the organization rather than looked up by
+   * provider name inside a project. `findByProvider` matches PROJECT-scope
+   * grants only, so the org- and team-scoped rows the settings list happily
+   * displays would come back empty and be reported as having no credential.
+   *
+   * And it gates the way the delete path gates, with both guards. The
+   * scope-carrying check is not redundant in front of the per-scope check:
+   * `assertCanManageAllScopes` iterates the scope list, so an empty list
+   * satisfies it vacuously, and the org-anchored lookup has no scope
+   * predicate to stop such a row being addressed by id.
+   */
+  async testConnection({
+    input,
+    ctx,
+  }: {
+    input: TestConnectionInput;
+    ctx: AuthzContext;
+  }): Promise<ValidationResult> {
+    const { modelProviderId, projectId, organizationId } = input;
+
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId,
+    });
+    if (!anchor) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+
+    const existing = await this.repository.findByIdForOrganization(
+      modelProviderId,
+      anchor,
+    );
+    if (!existing) {
+      throw new ModelProviderNotFoundError();
+    }
+
+    assertRowCarriesScopes(existing);
+    await assertCanManageAllScopes(
+      ctx,
+      existing.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+    );
+
+    // After authz, before the outbound request: a caller who cannot manage
+    // the row should be refused rather than throttled, and no amount of
+    // clicking should turn this page into an egress amplifier. The
+    // organization is the unit that matters — rows multiply freely across
+    // provider types and projects, so a per-row budget caps nothing.
+    await assertTestConnectionWithinBudget(anchor);
+
+    const customKeys = (existing.customKeys ?? {}) as Record<string, string>;
+
+    return await validateProviderApiKey(existing.provider, customKeys);
   }
 
   /**
@@ -944,7 +1223,9 @@ export class ModelProviderService {
   }
 
   /** Mask key-bearing fields of a row's customKeys for frontend display,
-   * leaving URLs and other non-secret values visible. */
+   * leaving URLs and other non-secret values visible. The same test decides
+   * what `mergeStoredCustomKeys` keeps on a write that leaves a field out:
+   * what we never show back is what a caller cannot resend. */
   private maskRowCustomKeys(
     customKeys: unknown,
   ): MaybeStoredModelProvider["customKeys"] {
@@ -953,9 +1234,7 @@ export class ModelProviderService {
       Object.entries(customKeys as Record<string, unknown>).map(
         ([key, value]) => [
           key,
-          KEY_CHECK.some((k) => key.includes(k))
-            ? MASKED_KEY_PLACEHOLDER
-            : value,
+          isSecretCredential(key) ? MASKED_KEY_PLACEHOLDER : value,
         ],
       ),
     ) as MaybeStoredModelProvider["customKeys"];
@@ -1271,6 +1550,7 @@ export class ModelProviderService {
     existingProvider: {
       id: string;
       customKeys: unknown;
+      customKeysUnreadable?: boolean;
       extraHeaders: unknown;
     },
     data: {
@@ -1290,10 +1570,20 @@ export class ModelProviderService {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
-      customKeysToSave = this.mergeCustomKeys(
+      const existingKeys = existingProvider.customKeys as Record<
+        string,
+        unknown
+      > | null;
+      this.assertKeepsStoredCredentials({
+        provider: data.provider,
         validatedKeys,
-        existingProvider.customKeys as Record<string, unknown> | null,
-      );
+        existingKeys,
+        existingUnreadable: existingProvider.customKeysUnreadable === true,
+      });
+      customKeysToSave = mergeStoredCustomKeys({
+        incoming: validatedKeys,
+        stored: existingKeys,
+      });
     }
 
     return await this.repository.update(
@@ -1354,32 +1644,87 @@ export class ModelProviderService {
   }
 
   /**
-   * Smart merging: preserves original keys when masked placeholder is sent.
+   * Refuses a write whose credential payload names none of the provider's
+   * credential fields.
    *
-   * Business rules:
-   * - Start with new validated keys
-   * - For any key with MASKED_KEY_PLACEHOLDER value, use existing value
+   * Such a payload cannot be a credential edit — it would replace the whole
+   * bag with something that is not a credential — and it is how a UI slip
+   * arrived here: a header-only object, which Azure's loose schema
+   * (`.passthrough()`, every field optional) accepted without a murmur.
+   * `mergeStoredCustomKeys` keeps the secrets it leaves out, so what is left
+   * to lose is the visible configuration, and losing that silently is still
+   * not something to do on a write that asked for nothing.
+   *
+   * Omission is the signal this reads, not emptiness: clearing a credential on
+   * purpose sends the field with an empty value, and that still goes through.
+   * `MANAGED` rows carry their own single key rather than the schema's, so they
+   * are recognised too.
    */
-  private mergeCustomKeys(
-    validatedKeys: Record<string, unknown> | null,
-    existingKeys: Record<string, unknown> | null,
-  ): Record<string, unknown> {
-    if (!validatedKeys) return {};
+  private assertKeepsStoredCredentials({
+    provider,
+    validatedKeys,
+    existingKeys,
+    existingUnreadable,
+  }: {
+    provider: string;
+    validatedKeys: Record<string, unknown> | null;
+    existingKeys: Record<string, unknown> | null;
+    existingUnreadable: boolean;
+  }): void {
+    const definition =
+      modelProviders[provider as keyof typeof modelProviders] ?? undefined;
+    const schemaKeys = new Set([
+      ...Object.keys(getSchemaShape(definition?.keysSchema)),
+      "MANAGED",
+    ]);
+    if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
 
-    if (!existingKeys) return validatedKeys;
+    const incomingCredentials = Object.entries(validatedKeys ?? {}).filter(
+      ([key]) => schemaKeys.has(key),
+    );
 
-    return {
-      ...validatedKeys,
-      ...Object.fromEntries(
-        Object.entries(existingKeys)
-          .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-          .map(([key, value]) => [key, value]),
-      ),
-    };
+    // A row whose stored credentials will not decrypt reads back as keyless,
+    // so without this branch the same save that is refused on a readable row
+    // goes through here and replaces ciphertext that a restored
+    // CREDENTIALS_SECRET would have recovered.
+    //
+    // Naming a field is enough on a readable row, where an empty value is a
+    // deliberate clear of something the customer could see. Here it is not: the
+    // drawer renders the masked placeholder for every secret field of an
+    // enabled row it found no credentials on, and empty for the rest, so the
+    // ordinary save carries a full set of field names and no credential at
+    // all. Only a value that could serve a request counts.
+    if (existingUnreadable) {
+      const replacement = incomingCredentials.some(
+        ([, value]) =>
+          typeof value === "string" &&
+          value !== "" &&
+          value !== MASKED_KEY_PLACEHOLDER,
+      );
+      if (!replacement) {
+        throw new ModelProviderCredentialsUnreadableError({ provider });
+      }
+      return;
+    }
+
+    if (incomingCredentials.length > 0) return;
+
+    if (!existingKeys) return;
+
+    // Only a credential that actually holds something is worth protecting. A
+    // field already sitting empty has nothing to lose, and counting it would
+    // block the save right after a customer cleared one on purpose.
+    const storedCredentials = Object.entries(existingKeys).filter(
+      ([key, value]) =>
+        schemaKeys.has(key) && typeof value === "string" && value !== "",
+    );
+    if (storedCredentials.length === 0) return;
+
+    throw new ModelProviderCredentialsWouldBeDroppedError({ provider });
   }
 
   /**
-   * Header counterpart of `mergeCustomKeys`: the frontend receives header
+   * Header counterpart of `mergeStoredCustomKeys`: the frontend receives header
    * values as the masked placeholder, so an untouched header comes back
    * masked on save and must be restored from the stored row. Restore by
    * header key first; when the key was renamed in place, fall back to the

@@ -17,7 +17,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as ServerRedis from "~/server/redis";
+import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
@@ -67,9 +67,26 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue(SESSION),
 }));
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
-vi.mock("~/server/redis", async (importOriginal) => {
-  const actual = await importOriginal<typeof ServerRedis>();
-  return { ...actual, connection: mockRedis };
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof AppLayerApp>();
+  // misc.ts reads its connection through tryGetApp; getApp is overridden too
+  // so both accessors agree on the fake.
+  // The authorize route decides through the App's permissions (ADR-092);
+  // composing over this file's mocked ~/server/db keeps the roleBinding
+  // stubs in charge of every outcome.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const fakeApp = () => ({
+    redis: mockRedis,
+    permissions: permissionsServiceFor(dbForPermissions),
+  });
+  return {
+    ...actual,
+    getApp: fakeApp,
+    tryGetApp: fakeApp,
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
@@ -97,11 +114,27 @@ async function authorize(overrides: Record<string, unknown> = {}) {
   });
 }
 
+/**
+ * `mockClear` does not drain a `mockResolvedValueOnce` queue, so a value a test
+ * queued but the route never read would answer the next test's call and make
+ * the outcome depend on execution order. Reset drains it, and also drops the
+ * declared default, so each default is restated here.
+ */
+function resetMocks() {
+  mockRedis.set.mockReset().mockResolvedValue("OK");
+  mockRedis.get.mockReset();
+  mockPrisma.roleBinding.findMany
+    .mockReset()
+    .mockResolvedValue([
+      { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
+    ]);
+  mockPrisma.organizationUser.findFirst
+    .mockReset()
+    .mockResolvedValue({ role: "MEMBER" });
+}
+
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {
-  beforeEach(() => {
-    mockRedis.set.mockClear();
-    mockRedis.get.mockClear();
-  });
+  beforeEach(resetMocks);
 
   describe("when redirect_uri exactly matches a registered URI for client_id", () => {
     /** @scenario Authorization succeeds when redirect_uri exactly matches the registered client */
@@ -139,6 +172,30 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
     });
   });
 
+  describe.each([
+    "javascript:alert(1)",
+    "vbscript:msgbox(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "blob:https://app.langwatch.ai/00000000-0000-4000-8000-000000000000",
+    "filesystem:https://app.langwatch.ai/temporary/x",
+  ])("when redirect_uri is %s", (redirect_uri) => {
+    /** @scenario Authorization is rejected when redirect_uri uses a scheme the browser executes */
+    it("rejects with 400 and never mints an authorization code", async () => {
+      // No registration is queued on purpose: the scheme is refused before the
+      // client registry is ever consulted, which is what keeps a client that
+      // registered such a URI from being able to use it.
+      const res = await authorize({ redirect_uri });
+      const json = (await res.json()) as { redirect?: string; error?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain("disallowed scheme");
+      expect(json.redirect).toBeUndefined();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+      // Proves the ordering the comment above relies on.
+      expect(mockRedis.get).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when client_id was never registered via /oauth/register", () => {
     /** @scenario Authorization is rejected for an unregistered client_id */
     it("rejects with 400 and never mints an authorization code", async () => {
@@ -162,6 +219,91 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
       expect(res.status).toBe(400);
       expect(json.error).toContain("client_id");
       expect(mockRedis.get).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * RFC 6749 §4.1.2.1: once the client_id is known and the presented
+ * redirect_uri is one it registered, an authorization failure has to travel
+ * back to that redirect_uri as an OAuth error. The advertised authorize
+ * endpoint is a page in this app, so a failure rendered only as a toast here
+ * leaves the client's popup waiting forever with nothing to report.
+ */
+describe("POST /api/mcp/authorize — where failures are reported", () => {
+  beforeEach(resetMocks);
+
+  describe("when the client is verified but the request has no code challenge", () => {
+    /** @scenario A consent failure a client can be told about is redirected back to the client */
+    it("sends the browser back to the registered redirect URI with the OAuth error", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+
+      const res = await authorize({ code_challenge: undefined });
+      const json = (await res.json()) as {
+        error?: string;
+        redirect?: string;
+      };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("invalid_request");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.origin + redirect.pathname).toBe(REGISTERED_REDIRECT_URI);
+      expect(redirect.searchParams.get("error")).toBe("invalid_request");
+      expect(redirect.searchParams.get("error_description")).toContain(
+        "code_challenge",
+      );
+      expect(redirect.searchParams.get("state")).toBe("xyz");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the client is verified but asks for a PKCE method we do not support", () => {
+    /** @scenario A code challenge method other than S256 is refused at the authorization request */
+    it("refuses it rather than minting a code that can never be redeemed", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+
+      const res = await authorize({ code_challenge_method: "plain" });
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("invalid_request");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error_description")).toContain("S256");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the client is verified but the user cannot reach the project", () => {
+    /** @scenario A project the user cannot reach is reported to the client as access denied */
+    it("sends the browser back to the registered redirect URI as access denied", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
+
+      const res = await authorize();
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(403);
+      expect(json.error).toBe("access_denied");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the failure cannot be attributed to a registered client", () => {
+    /** @scenario A consent failure that cannot be attributed to a client stays on the LangWatch page */
+    it("offers no redirect back to the caller", async () => {
+      mockRedis.get.mockResolvedValueOnce(null);
+
+      const res = await authorize({ client_id: "mcp_never_registered" });
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.redirect).toBeUndefined();
+      expect(json.error).toBe("Unknown or unregistered client_id");
     });
   });
 });

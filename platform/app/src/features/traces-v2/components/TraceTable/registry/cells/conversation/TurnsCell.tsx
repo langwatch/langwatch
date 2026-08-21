@@ -3,21 +3,26 @@ import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
+/**
+ * True per-session trace count from the server rollup. `traces` only holds
+ * the lazily loaded turn rows for the expanded session, so its length is not
+ * the total.
+ */
 export const TurnsCell: CellDef<ConversationGroup> = {
   id: "turns",
-  label: "Turns",
+  label: "Traces",
   render: ({ row }) => (
     <MonoCell>
-      {row.traces.length}
+      {row.traceCount}
       <Text as="span" color="fg.subtle" textStyle="2xs">
         {" "}
-        turns
+        {row.traceCount === 1 ? "trace" : "traces"}
       </Text>
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg.muted" textAlign="right">
-      {row.traces.length} {row.traces.length === 1 ? "turn" : "turns"}
+      {row.traceCount} {row.traceCount === 1 ? "trace" : "traces"}
     </Text>
   ),
 };

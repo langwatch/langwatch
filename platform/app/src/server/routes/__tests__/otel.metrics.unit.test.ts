@@ -9,6 +9,8 @@ const mockGetActivePlan = vi.fn();
 const mockNotifyPlanLimitReached = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     planProvider: { getActivePlan: mockGetActivePlan },
@@ -118,15 +120,43 @@ describe("POST /api/otel/v1/metrics", () => {
       planName: "free",
       count: 10,
       maxMessagesPerMonth: 10,
+      usageUnit: "traces",
     });
 
     const response = await postMetrics();
 
-    expect(response.status).toBe(429);
-    expect(await response.json()).toEqual({
-      message: "ERR_PLAN_LIMIT: monthly limit reached",
+    expect(response.status).toBe(402);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      error: "ERR_PLAN_LIMIT",
+      message: "monthly limit reached",
+      currentMonthMessagesCount: 10,
+      maxMessagesPerMonth: 10,
+      activePlanName: "free",
     });
     expect(mockHandleMetrics).not.toHaveBeenCalled();
+  });
+
+  it("tells the plan limit notifier which cap was hit", async () => {
+    mockCheckLimit.mockResolvedValue({
+      exceeded: true,
+      message: "monthly limit reached",
+      planName: "free",
+      count: 12000,
+      maxMessagesPerMonth: 10000,
+      usageUnit: "events",
+    });
+
+    await postMetrics();
+
+    expect(mockNotifyPlanLimitReached).toHaveBeenCalledWith(
+      expect.objectContaining({
+        planName: "free",
+        usageUnit: "events",
+        current: 12000,
+        max: 10000,
+      }),
+    );
   });
 
   it("returns OTLP partial success when some data points are rejected", async () => {

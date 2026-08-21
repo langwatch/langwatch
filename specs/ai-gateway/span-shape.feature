@@ -143,6 +143,21 @@ Feature: Gateway span shape — mandatory attributes per completed request
     But gen_ai.usage.input_tokens / output_tokens are ABSENT (not emitted as 0)
     # Absent signals "no data" — downstream shouldn't treat 0 as "0 tokens used".
 
+  # Not every failure after model resolution is the provider's. A handled
+  # error already carries the two facts the span needs — the status the client
+  # was answered with, and a stable code — so recording a generic 502
+  # provider_error instead sends the customer to a provider status page for a
+  # failure only they can fix (a dead sign-in, a guardrail block, a limit we
+  # imposed).
+  # Bindings: services/aigateway/app/pipeline/trace_classify_test.go
+  Scenario: A gateway-authored failure records its own status and code
+    Given the request fails after model resolution with one of the gateway's own handled errors
+    When the exported span arrives at the collector
+    Then http.response.status_code is the status that error answers with
+    And error.type is that error's own code, not a generic provider_error
+    # An error we cannot type at all is still the upstream's until proven otherwise.
+    And an untyped failure still records the generic 502 provider_error
+
   # ─────────────────────────────────────────────────────────────────────────
   # §6. Fallback attempts
   # ─────────────────────────────────────────────────────────────────────────
@@ -217,7 +232,38 @@ Feature: Gateway span shape — mandatory attributes per completed request
     And the request is served rather than failing on the oversized tag list
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §9. Out of scope (for now)
+  # §9. The model name the client sent
+  # ─────────────────────────────────────────────────────────────────────────
+  # gen_ai.request.model carries the model that was dispatched. A routing
+  # policy rewrites names before dispatch, so with model tiers the two are
+  # routinely different, and that attribute alone does not retain the name
+  # the client sent. Without it a trace of a tier request says nothing about
+  # the tier, and once a tier is repointed there is nothing left to recover
+  # which callers were using it.
+
+  @unit
+  Scenario: A rewritten model name reaches the customer span
+    Given a routing policy pointing the "complex" tier at a flagship model
+    When a client sends model "complex" and the request completes
+    Then the exported customer span carries the requested name "complex"
+    And it carries the dispatched model in its own attribute
+    And it does so on a failed request and on a stream as well as a plain answer
+
+  @unit
+  Scenario: A model name that was not rewritten stamps nothing
+    Given a client that names the model it is served
+    When the request completes through the gateway
+    Then the exported customer span carries no requested-name attribute
+    And every accepted spelling of the dispatched model counts as naming it
+
+  @unit
+  Scenario: A provider spelling the gateway normalises is not a rewrite
+    Given a client that names a provider by one of its accepted spellings
+    When the request completes through the gateway
+    Then the exported customer span carries no requested-name attribute
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §10. Out of scope (for now)
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Vendor-specific embedding-token attributes — embeddings is a narrow

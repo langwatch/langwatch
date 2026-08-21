@@ -1,7 +1,4 @@
-import { createLogger } from "@langwatch/observability";
-
 import { definePipeline } from "../../pipeline/staticBuilder";
-import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -16,9 +13,9 @@ import {
   digestBatchKey,
   drainDue,
   INITIAL_SETTLEMENT_STATE,
+  pagePersistMatches,
   type SettlementState,
   settleBoundary,
-  TRIGGER_SETTLEMENT_PROCESS_NAME,
 } from "./process-manager/triggerSettlement.process";
 import {
   createLogOverflowHandler,
@@ -45,40 +42,6 @@ import {
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
-
-const logger = createLogger("langwatch:triggers:automations-pipeline");
-
-/** triggerSettlement is keyed per-trigger (aggregateType "trigger") and only
- *  wakes when it has pending matches, so — unlike graphAlertSweep/
- *  webhookDeliveryPrune — it has no singleton schedule of its own to hang
- *  outbox retention off. Pruning it from its own onWake would fire a global
- *  cross-tenant delete from every single trigger's wake (a thundering herd),
- *  so instead we piggyback on webhookDeliveryPrune's existing daily wake —
- *  the same singleton-PM retention mechanism sweep/prune already use for
- *  themselves — to also prune triggerSettlement's dispatched outbox rows,
- *  the highest-volume PM in this pipeline. */
-const TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
-
-function runWebhookDeliveryPruneWithTriggerSettlementRetention(
-  deps: WebhookDeliveryPruneDeps,
-) {
-  const pruneWebhookDeliveries = runWebhookDeliveryPrune(deps);
-  return async (): Promise<void> => {
-    await pruneWebhookDeliveries();
-    const startedAt = (deps.now ?? Date.now)();
-    try {
-      await deps.deleteDispatchedBefore({
-        processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
-        before: startedAt - TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn(
-        toSafeFailureDiagnostic(error),
-        "triggerSettlement outbox retention failed",
-      );
-    }
-  };
-}
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
@@ -120,6 +83,12 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
         )
         .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
           const { state: nextState, flushed } = addPending(state, data, ctx.at);
+          const flushedPersist = flushed.filter(
+            ({ match }) => match.actionClass === "persist",
+          );
+          const flushedNotify = flushed.filter(
+            ({ match }) => match.actionClass !== "persist",
+          );
           return {
             state: nextState,
             // Cap hit: the oldest matches dispatch NOW instead of being
@@ -127,23 +96,47 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
             intents:
               flushed.length > 0
                 ? [
-                    ...flushed.map(({ traceId, match }) =>
-                      match.actionClass === "persist"
-                        ? ctx.intents.persistMatch(
-                            `persist:${traceId}:${match.settleWindowBucket}`,
-                            { triggerId: ctx.key, traceId },
-                          )
-                        : ctx.intents.notifyDigest(
-                            `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                            {
-                              triggerId: ctx.key,
-                              traceIds: [traceId],
-                              boundary: match.dispatchDueAt,
-                            },
-                          ),
+                    ...pagePersistMatches({
+                      matches: flushedPersist.map(({ traceId, match }) => ({
+                        traceId,
+                        settleWindowBucket: match.settleWindowBucket,
+                      })),
+                    }).map((page) =>
+                      ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                        triggerId: ctx.key,
+                        traceIds: page.traceIds,
+                      }),
                     ),
+                    ...flushedNotify.map(({ traceId, match }) =>
+                      ctx.intents.notifyDigest(
+                        `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                        {
+                          triggerId: ctx.key,
+                          traceIds: [traceId],
+                          boundary: match.dispatchDueAt,
+                        },
+                      ),
+                    ),
+                    // The message key is what the outbox dedups on, so it
+                    // decides how many DURABLE ROWS a log line costs. Keyed on
+                    // the cumulative counter it was unique every single time,
+                    // which meant one row per overflowed match: 119,665 rows in
+                    // one project-day, whose entire content was "we flushed
+                    // early again". Keyed on the trigger and the minute of
+                    // EVENT time, a storm coalesces to at most one row per
+                    // trigger per minute, and a redelivery of the same event
+                    // produces a byte-identical key so it dedups rather than
+                    // adding a row. The payload still carries the running
+                    // total, so the storm rate is recoverable from any single
+                    // surviving row.
+                    //
+                    // A key written here only has to be unique inside ONE
+                    // trigger: the outbox unique index is (processName,
+                    // projectId, messageKey), and the runtime prefixes every
+                    // builder-authored key with `process:<processKey>:`, so
+                    // two triggers never collide on identical bodies.
                     ctx.intents.logOverflow(
-                      `overflow:${nextState.overflowFlushed}`,
+                      `overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`,
                       {
                         triggerId: ctx.key,
                         flushed: flushed.length,
@@ -170,20 +163,20 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
                   },
                 ),
               ),
-              ...due.settledMatches.map((match) =>
-                ctx.intents.persistMatch(
-                  `persist:${match.traceId}:${match.settleWindowBucket}`,
-                  {
-                    triggerId: ctx.key,
-                    traceId: match.traceId,
-                  },
-                ),
+              ...due.persistPages.map((page) =>
+                ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                  triggerId: ctx.key,
+                  traceIds: page.traceIds,
+                }),
               ),
             ],
             nextWakeAt: due.nextBoundary,
           };
         })
-        .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
+        // The lease covers a full page of degraded per-trace confirms with
+        // room to spare (see PERSIST_PAGE_MAX); the dispatcher releases any
+        // batch tail that would run past it.
+        .outbox({ maxAttempts: 8, leaseDurationMs: 300_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm
@@ -197,11 +190,7 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
         .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
         .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
         .onWake(webhookDeliveryPruneWake)
-        .intent(
-          "prune",
-          pruneSchema,
-          runWebhookDeliveryPruneWithTriggerSettlementRetention(deps.prune),
-        ),
+        .intent("prune", pruneSchema, runWebhookDeliveryPrune(deps.prune)),
     )
     .build();
 }

@@ -25,6 +25,8 @@ export async function resolveLangyTurnBaseDependencies(args: {
   userId: string;
   session: Session;
   requestedConversationId: string | null;
+  /** Adopt an unknown requested id as a new conversation — see `ensureConversation`. */
+  adoptConversationId?: boolean;
   modelOverride?: string;
 }) {
   const {
@@ -33,6 +35,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
     userId,
     session,
     requestedConversationId,
+    adoptConversationId,
     modelOverride,
   } = args;
   const [
@@ -55,6 +58,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
           projectId,
           userId,
           conversationId: requestedConversationId,
+          ...(adoptConversationId ? { adoptUnknownId: true } : {}),
         }),
         // The resolved default is forwarded to the worker (ADR-065), so with
         // no override the lookup is load-bearing, not just a gate. An

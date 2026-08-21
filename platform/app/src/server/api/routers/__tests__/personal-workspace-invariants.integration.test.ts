@@ -33,11 +33,6 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -49,16 +44,28 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
 import { globalForApp, resetApp } from "../../../app-layer/app";
+import { OrganizationService } from "../../../app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
+import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
+import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -71,6 +78,8 @@ const colleagueEmail = `${ns}-colleague@example.com`;
 let organizationId: string;
 let ownerUserId: string;
 let colleagueUserId: string;
+/** Set by the seat-decision block; read by the shared teardown. */
+let seatUserIdForCleanup: string | undefined;
 let sharedTeamId: string;
 let sharedProjectId: string;
 let personalTeamId: string;
@@ -560,12 +569,30 @@ function takingTheOwnersAccessToTheirWorkspaceAway() {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
-      message: expect.stringContaining("exactly one member"),
+      // The code, not the sentence: the sentence is copy, and it is the code
+      // the client keys the refusal's copy off once this crosses the wire.
+      cause: { code: "personal_workspace_not_managed_here" },
     });
 
     await expect(ownerBindingsOnPersonalTeam()).resolves.toEqual([
       { userId: ownerUserId, role: TeamUserRole.ADMIN },
     ]);
+  });
+
+  /** @scenario Refusing a change to a personal workspace says whose workspace it is */
+  it("names the workspace so an admin knows whose it is", async () => {
+    const error = await callerAsOwner()
+      .organization.updateTeamMemberRole({
+        teamId: personalTeamId,
+        userId: ownerUserId,
+        role: TeamUserRole.VIEWER,
+      })
+      .catch((e) => e);
+
+    expect(error.cause).toMatchObject({
+      code: "personal_workspace_not_managed_here",
+      meta: { ownerName: personalTeamName },
+    });
   });
 
   /** @scenario Taking the owner's access to their own workspace away is refused */
@@ -716,6 +743,278 @@ function archivingThePersonalTeam() {
   });
 }
 
+/**
+ * The seat decision, which is the one thing here that has to *succeed*.
+ *
+ * Every other block in this suite proves a refusal. This one proves the
+ * refusals stay out of the way of an organization-level decision about a person:
+ * an admin working down the member list to fit their plan moves somebody to a
+ * Lite Member seat, and the workspace provisioned for that member has no say in
+ * it. It used to: the downgrade swept the personal team into its
+ * everything-becomes-Viewer correction, tripped the last-admin guard on a team
+ * whose only admin is its owner, and rolled the whole transaction back, so the
+ * organization role never changed either.
+ *
+ * A separate member from the rest of the fixture, because this block changes
+ * their role and reads it back.
+ */
+function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
+  const seatUserEmail = `${ns}-seat@example.com`;
+  let seatUserId: string;
+  let seatPersonalTeamId: string;
+  let seatPersonalProjectId: string;
+
+  const rbacCtxForSeatUser = () => ({
+    prisma,
+    session: {
+      user: { id: seatUserId, name: "Seat User", email: seatUserEmail },
+      expires: "1",
+    } as any,
+  });
+
+  const orgRoleOfSeatUser = async () =>
+    (
+      await prisma.organizationUser.findUniqueOrThrow({
+        where: {
+          userId_organizationId: { userId: seatUserId, organizationId },
+        },
+        select: { role: true },
+      })
+    ).role;
+
+  const teamBindingRoles = async (teamId: string) =>
+    (
+      await prisma.roleBinding.findMany({
+        where: {
+          organizationId,
+          userId: seatUserId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+        },
+        select: { role: true },
+      })
+    ).map((binding) => binding.role);
+
+  const setSeatUserOrganizationRole = (role: OrganizationUserRole) =>
+    callerAsOwner().organization.updateMemberRole({
+      organizationId,
+      userId: seatUserId,
+      role,
+    });
+
+  beforeAll(async () => {
+    const seatUser = await prisma.user.create({
+      data: { name: "Seat User", email: seatUserEmail },
+    });
+    seatUserId = seatUser.id;
+    seatUserIdForCleanup = seatUser.id;
+
+    await prisma.organizationUser.create({
+      data: {
+        userId: seatUserId,
+        organizationId,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    // Admin of the team the organization shares, which is the binding the
+    // downgrade is supposed to correct. The fixture owner is an admin of it too,
+    // so correcting this one does not strand the team without an admin.
+    await prisma.roleBinding.create({
+      data: {
+        userId: seatUserId,
+        organizationId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: sharedTeamId,
+      },
+    });
+
+    const workspace = await workspaceService.ensure({
+      userId: seatUserId,
+      organizationId,
+      displayName: "Seat User",
+      displayEmail: seatUserEmail,
+    });
+    seatPersonalTeamId = workspace.team.id;
+    seatPersonalProjectId = workspace.project.id;
+  });
+
+  // A plan with Lite Member seats to give away. FREE_PLAN allows none, so
+  // without this the downgrade is refused for the allowance rather than for
+  // anything this block is about.
+  //
+  // With a REAL organization service against the test database, because
+  // `createTestApp` defaults to a NullOrganizationRepository that resolves
+  // without writing: every assertion here is about what the role change left
+  // behind, and a mutation that quietly no-opped would satisfy all of them.
+  beforeEach(async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          ...FREE_PLAN,
+          overrideAddingLimitations: false,
+          maxMembers: 100,
+          maxMembersLite: 100,
+        }),
+      }),
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        new PromptTagRepository(prisma),
+      ),
+      usageLimits: {
+        notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+  });
+
+  // Put the seat user back the way `beforeAll` left them, by writing the rows
+  // rather than replaying the router: teardown that depends on the app a test
+  // wired up restores nothing once the app is reset, and swallowing that is how
+  // it goes unnoticed. The shared-team binding goes back to ADMIN too, or the
+  // next test's assertion that the cascade corrected it to VIEWER would hold
+  // whether or not the cascade ran.
+  afterEach(async () => {
+    await resetApp();
+    await prisma.organizationUser.update({
+      where: { userId_organizationId: { userId: seatUserId, organizationId } },
+      data: { role: OrganizationUserRole.MEMBER },
+    });
+    await prisma.roleBinding.updateMany({
+      where: {
+        organizationId,
+        userId: seatUserId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: sharedTeamId,
+      },
+      data: { role: TeamUserRole.ADMIN },
+    });
+  });
+
+  /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
+  it("changes the organization role", async () => {
+    await expect(
+      setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL),
+    ).resolves.toMatchObject({ success: true });
+
+    await expect(orgRoleOfSeatUser()).resolves.toBe(
+      OrganizationUserRole.EXTERNAL,
+    );
+  });
+
+  /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
+  it("corrects their role on the shared team to viewer", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    await expect(teamBindingRoles(sharedTeamId)).resolves.toEqual([
+      TeamUserRole.VIEWER,
+    ]);
+  });
+
+  /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
+  it("leaves them the admin of their own workspace", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    await expect(teamBindingRoles(seatPersonalTeamId)).resolves.toEqual([
+      TeamUserRole.ADMIN,
+    ]);
+  });
+
+  /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */
+  it("leaves the workspace where their next login finds it", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    await expect(
+      workspaceService.ensure({
+        userId: seatUserId,
+        organizationId,
+        displayName: "Seat User",
+        displayEmail: seatUserEmail,
+      }),
+    ).resolves.toMatchObject({
+      created: false,
+      team: { id: seatPersonalTeamId },
+      project: { id: seatPersonalProjectId },
+    });
+  });
+
+  // Why leaving that admin binding alone is safe, and the assertion the whole
+  // design rests on. A member's organization role caps what any non-custom
+  // binding of theirs can do (`resolveBindingPermission`), so the cap does the
+  // restricting and the binding is free to stay what it is. Nothing asserted
+  // this before, and `rbac.ts` names retiring that cap as future work.
+
+  /** @scenario A Lite Member reads their own personal workspace but cannot write to it */
+  it("still lets them read their own workspace", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    await expect(
+      hasProjectPermission(
+        rbacCtxForSeatUser(),
+        seatPersonalProjectId,
+        "datasets:view",
+      ),
+    ).resolves.toBe(true);
+  });
+
+  /** @scenario A Lite Member reads their own personal workspace but cannot write to it */
+  it("stops them writing to it, admin binding and all", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    await expect(
+      hasProjectPermission(
+        rbacCtxForSeatUser(),
+        seatPersonalProjectId,
+        "datasets:create",
+      ),
+    ).resolves.toBe(false);
+  });
+
+  /** @scenario Giving a Lite Member their full access back restores writing in their own workspace */
+  it("lets them write again once they are a member, with nothing to repair", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+    await setSeatUserOrganizationRole(OrganizationUserRole.MEMBER);
+
+    await expect(
+      hasProjectPermission(
+        rbacCtxForSeatUser(),
+        seatPersonalProjectId,
+        "datasets:create",
+      ),
+    ).resolves.toBe(true);
+  });
+
+  /** @scenario A personal workspace is not listed among the access an admin manages */
+  it("keeps the workspace out of the access an admin is shown for them", async () => {
+    const bindings = await callerAsOwner().roleBinding.listForUser({
+      organizationId,
+      userId: seatUserId,
+    });
+
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
+      seatPersonalTeamId,
+    );
+    // The shared team is still there: this hides what cannot be managed, not
+    // everything about the member.
+    expect(bindings.map((binding) => binding.scopeId)).toContain(sharedTeamId);
+  });
+
+  /** @scenario A personal workspace is not listed among the access an admin manages */
+  it("keeps every member's workspace out of the organization-wide list", async () => {
+    const bindings = await callerAsOwner().roleBinding.listForOrg({
+      organizationId,
+    });
+
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
+      seatPersonalTeamId,
+    );
+    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
+      personalTeamId,
+    );
+  });
+}
+
 function archivingASharedTeam() {
   it("archives it, because only personal teams are held back", async () => {
     const disposable = await prisma.team.create({
@@ -744,7 +1043,7 @@ describe("given a personal workspace beside a shared team in one organization", 
   afterAll(async () => {
     await deleteFixture({
       organizationId,
-      userIds: [ownerUserId, colleagueUserId],
+      userIds: [ownerUserId, colleagueUserId, seatUserIdForCleanup],
     });
   });
 
@@ -786,6 +1085,12 @@ describe("given a personal workspace beside a shared team in one organization", 
   describe(
     "when the owner archives the personal team",
     archivingThePersonalTeam,
+  );
+
+  // The one decision that has to go through rather than be refused.
+  describe(
+    "when an admin moves a member who has a personal workspace to a Lite Member seat",
+    movingAMemberWithAPersonalWorkspaceToALiteSeat,
   );
 
   // Runs last: it archives a team, which moves the team count the assertions

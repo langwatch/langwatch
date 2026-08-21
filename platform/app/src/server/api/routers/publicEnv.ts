@@ -1,9 +1,9 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
-import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
+import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
-import { skipPermissionCheck } from "../rbac";
+import { hasEmailProvider } from "../../mailer/providers";
 import { publicProcedure } from "../trpc";
 
 const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
@@ -17,7 +17,9 @@ const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
 
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
-  .use(skipPermissionCheck)
+  .noPermission({
+    reason: "exposes only the PUBLIC_* env allowlist; no tenant data",
+  })
   .query(async ({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
 
@@ -31,8 +33,7 @@ export const publicEnvRouter = publicProcedure
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 
-      HAS_EMAIL_PROVIDER_KEY:
-        !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
+      HAS_EMAIL_PROVIDER_KEY: hasEmailProvider(),
       IS_SAAS: env.IS_SAAS,
       // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
       // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see

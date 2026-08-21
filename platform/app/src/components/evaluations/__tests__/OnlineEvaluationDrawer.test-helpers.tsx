@@ -67,7 +67,7 @@ export const mockEvaluators = [
     slug: "answer-relevance-ghi78",
     type: "evaluator",
     config: {
-      evaluatorType: "legacy/ragas_answer_relevancy",
+      evaluatorType: "ragas/response_relevancy",
       settings: { model: "openai/gpt-4" },
     },
     workflowId: null,
@@ -363,7 +363,7 @@ export function createApiMock() {
           })),
         },
       },
-      useContext: vi.fn(() => ({
+      useUtils: vi.fn(() => ({
         evaluators: {
           getAll: { invalidate: mockInvalidate },
           getById: { invalidate: mockInvalidate },

@@ -15,11 +15,16 @@
  * writes with, and come back out through the same method the budgets list,
  * the detail page, and the management API all read.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -82,7 +87,7 @@ let repo: GatewayBudgetClickHouseRepository;
 async function debit(args: {
   budgetId: string;
   bucketScopeId: string;
-  amountUsd: string;
+  amountNanoUsd: number;
   window?: GatewayBudgetWindow;
   status?: "SUCCESS" | "PROVIDER_ERROR";
   tokensInput?: number;
@@ -97,7 +102,7 @@ async function debit(args: {
       window: args.window ?? "DAY",
       virtualKeyId: `vk_${suffix}`,
       gatewayRequestId: `grq_${nanoid()}`,
-      amountUsd: args.amountUsd,
+      amountNanoUsd: args.amountNanoUsd,
       tokensInput: args.tokensInput ?? 100,
       tokensOutput: 50,
       tokensCacheRead: 0,
@@ -115,6 +120,11 @@ function overCap(buckets: BucketSpend[], limitUsd = Number(LIMIT_USD)): number {
   return buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd)
     .length;
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("given per-user buckets recorded against attributed-user templates", () => {
   beforeAll(async () => {
@@ -144,7 +154,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
     });
 
     repo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     });
@@ -172,7 +182,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
           bucketScopeId: `${anchorId}:user${i}`,
           // The first three land exactly on the limit, which is the seam
           // the gateway's `>=` comparator sits on.
-          amountUsd: i <= 3 ? "1.000000" : "0.100000",
+          amountNanoUsd: i <= 3 ? 1_000_000_000 : 100_000_000,
         });
       }
       buckets = await repo.getBucketSpendBreakdownForBudget({
@@ -208,13 +218,13 @@ describe("given per-user buckets recorded against attributed-user templates", ()
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:unpriced`,
-        amountUsd: "0.000000",
+        amountNanoUsd: 0,
         tokensInput: 900,
       });
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:onlyfailed`,
-        amountUsd: "0.500000",
+        amountNanoUsd: 500_000_000,
         status: "PROVIDER_ERROR",
       });
       buckets = await repo.getBucketSpendBreakdownForBudget({
@@ -253,18 +263,18 @@ describe("given per-user buckets recorded against attributed-user templates", ()
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:user1`,
-        amountUsd: "2.000000",
+        amountNanoUsd: 2_000_000_000,
       });
       // Historical shape: spend filed against the bare anchor, no end user.
       await debit({
         budgetId: template.id,
         bucketScopeId: anchorId,
-        amountUsd: "5.000000",
+        amountNanoUsd: 5_000_000_000,
       });
       await debit({
         budgetId: `bdg-neighbour-${suffix}`,
         bucketScopeId: `${neighbourAnchorId}:user1`,
-        amountUsd: "7.000000",
+        amountNanoUsd: 7_000_000_000,
       });
       buckets = await repo.getBucketSpendBreakdownForBudget({
         budget: template,
@@ -307,12 +317,12 @@ describe("given per-user buckets recorded against attributed-user templates", ()
       await debit({
         budgetId: unfiltered.id,
         bucketScopeId: `${anchorId}:plainuser`,
-        amountUsd: "2.000000",
+        amountNanoUsd: 2_000_000_000,
       });
       await debit({
         budgetId: filtered.id,
         bucketScopeId: `${anchorId}:pinneduser${PROVIDER_BUCKET_SEPARATOR}${PROVIDER_KEY}`,
-        amountUsd: "3.000000",
+        amountNanoUsd: 3_000_000_000,
       });
       unfilteredBuckets = await repo.getBucketSpendBreakdownForBudget({
         budget: unfiltered,
@@ -355,7 +365,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
         await debit({
           budgetId: template.id,
           bucketScopeId: `${anchorId}:${user}`,
-          amountUsd: "2.000000",
+          amountNanoUsd: 2_000_000_000,
           occurredAt: new Date(NOW.getTime() - 60_000),
         });
       }
@@ -405,14 +415,14 @@ describe("given per-user buckets recorded against attributed-user templates", ()
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:stale`,
-        amountUsd: "5.000000",
+        amountNanoUsd: 5_000_000_000,
         window: "MANUAL",
         occurredAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
       });
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:current`,
-        amountUsd: "0.400000",
+        amountNanoUsd: 400_000_000,
         window: "MANUAL",
         occurredAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
       });
@@ -420,7 +430,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
       await debit({
         budgetId: template.id,
         bucketScopeId: `${anchorId}:current`,
-        amountUsd: "3.000000",
+        amountNanoUsd: 3_000_000_000,
         window: "MANUAL",
         occurredAt: new Date(NOW.getTime() - 60_000),
       });

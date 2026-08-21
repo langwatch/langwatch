@@ -11,6 +11,7 @@ import {
   PayloadTooLargeError,
   readEnvelopeLease,
   readEnvelopeRetirement,
+  readJobPayloadBytes,
   readJobRoutingMeta,
 } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -409,6 +410,140 @@ describe("jobEnvelope", () => {
       });
     });
 
+    // ADR-066 pillar 2: what a coalesced batch will weigh cannot be read off the
+    // stored value once a body is compressed or offloaded, so the encoder
+    // records it in the header and the drain's byte budget reads it there.
+    describe("when the recorded payload size is read back", () => {
+      it("reports the pre-offload payload size for an offloaded body", async () => {
+        const { tieredBlobs } = makeTiered();
+        const jobData = {
+          __jobName: "spanReceived",
+          bulk: "z".repeat(64 * 1024),
+        };
+
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        // The stored value is a small reference; the payload is not.
+        expect(Buffer.byteLength(encoded)).toBeLessThan(1024);
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(64 * 1024);
+      });
+
+      it("reports the uncompressed payload size for a compressed inline body", async () => {
+        const { tieredBlobs } = makeTiered();
+        // Over the compression threshold, under the inline ceiling: stays in the
+        // envelope, but stored far smaller than it will be in a worker's hands.
+        const jobData = { __jobName: "tiny", bulk: "z".repeat(3 * 1024) };
+
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(
+          Buffer.byteLength(encoded),
+        );
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(3 * 1024);
+      });
+
+      it("falls back to the stored length for legacy bare JSON", () => {
+        const value = JSON.stringify({ hello: "world" });
+
+        expect(readJobPayloadBytes(value)).toBe(Buffer.byteLength(value));
+      });
+
+      it("falls back to the stored length for a corrupt value", () => {
+        expect(readJobPayloadBytes("GQ2|not-a-length|{}")).toBe(19);
+      });
+
+      // Old workers keep staging pre-`s` envelopes for the length of a rolling
+      // deploy. For those, the stored length is honest only when the body is
+      // inline and uncompressed; anything else is a fraction of the payload
+      // with nothing in the value saying by how much.
+      describe("when the envelope predates the recorded size", () => {
+        /** Strips `s` back out of an encoded envelope, leaving the rest intact. */
+        const withoutRecordedSize = (value: string): string => {
+          const buf = Buffer.from(value, "utf8");
+          const barIdx = buf.indexOf(0x7c, 4); // "|" after the prefix
+          const headerLen = Number(buf.subarray(4, barIdx).toString("utf8"));
+          const header = JSON.parse(
+            buf.subarray(barIdx + 1, barIdx + 1 + headerLen).toString("utf8"),
+          ) as Record<string, unknown>;
+          const body = buf.subarray(barIdx + 1 + headerLen).toString("utf8");
+          delete header.s;
+          const json = JSON.stringify(header);
+          return `${value.slice(0, 4)}${Buffer.byteLength(json)}|${json}${body}`;
+        };
+
+        it("costs the payload cap for an offloaded body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "spanReceived", bulk: "z".repeat(64 * 1024) },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          // A stored-length reading would call a 64 KiB payload ~200 bytes.
+          expect(Buffer.byteLength(legacy)).toBeLessThan(1024);
+          expect(readJobPayloadBytes(legacy)).toBe(MAX_BLOB_BYTES);
+        });
+
+        it("costs the payload cap for a compressed inline body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "tiny", bulk: "z".repeat(3 * 1024) },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          expect(readJobPayloadBytes(legacy)).toBe(MAX_BLOB_BYTES);
+        });
+
+        // A recorded size that is not a byte count must not be able to talk the
+        // budget down. `1e999` is the one that matters: it is valid JSON, parses
+        // to Infinity, and would reach the Lua drain as an unparseable ARGV.
+        // Written as raw header text because JSON.stringify cannot emit these.
+        const SIZES = [
+          "1e999",
+          "9007199254740992",
+          "0.1",
+          "-1",
+          '"4096"',
+          "null",
+        ];
+
+        it.each(
+          SIZES,
+        )("ignores a recorded size of %s, costing the cap", (s) => {
+          const header = `{"v":2,"e":"redis","s":${s}}`;
+          const value = `GQ2|${Buffer.byteLength(header)}|${header}`;
+
+          expect(readJobPayloadBytes(value)).toBe(MAX_BLOB_BYTES);
+        });
+
+        it("keeps the stored length for a plain inline body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "tiny", value: 1 },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          expect(readJobPayloadBytes(legacy)).toBe(Buffer.byteLength(legacy));
+        });
+      });
+    });
+
     describe("when a small payload is encoded", () => {
       it("keeps it inline under a GQ2 prefix and round-trips", async () => {
         const { tieredBlobs } = makeTiered();
@@ -473,6 +608,28 @@ describe("jobEnvelope", () => {
         ).toEqual(big);
       });
 
+      /** @scenario "Provider migration does not change the durable queue reference format" */
+      it("keeps the durable reference on the existing GQ2 wire shape", async () => {
+        const { tieredBlobs } = makeTiered(8);
+
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        const lease = readEnvelopeLease(encoded);
+
+        expect(encoded.startsWith("GQ2|")).toBe(true);
+        expect(lease?.ref).toEqual({
+          tier: "s3",
+          projectId: PROJECT,
+          hash: expect.any(String),
+        });
+        expect(
+          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).toEqual(big);
+      });
+
       it("exposes routing meta from the header without resolving the blob", async () => {
         const { tieredBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -532,7 +689,7 @@ describe("jobEnvelope", () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const payload = { evt: "x".repeat(8 * 1024) }; // > 4 KiB → offloads
 
-        // Same user payload, two distinct fan-out reactors over the same event.
+        // Same user payload, two distinct fan-out subscribers over the same event.
         const v1 = await encodeJobEnvelope({
           jobData: {
             ...payload,

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -68,6 +69,12 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// realtimeClient makes the one bounded REST call a voice session mint
+	// needs. Its own client because the mint must not follow redirects and
+	// re-checks every dialed address against the endpoint policy: it carries
+	// the customer's provider key in a header Go does not strip across
+	// hosts.
+	realtimeClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -128,19 +135,21 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
 	return &BifrostRouter{
-		bf:           bf,
-		logger:       opts.Logger,
-		voyageClient: newVoyageClient(),
-		endpointPolicy: newCustomerEndpointPolicy(
-			opts.BlockLocalHTTPCalls,
-			opts.RequireHTTPSCustomerEndpoints,
-			opts.AllowedEndpointHosts,
-		),
+		bf:              bf,
+		logger:          opts.Logger,
+		voyageClient:    newVoyageClient(),
+		endpointPolicy:  endpointPolicy,
 		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		realtimeClient:  newRealtimeClient(endpointPolicy),
 	}, nil
 }
 
@@ -192,6 +201,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
+	// A realtime session mint is a bounded REST call to the vendor's own
+	// mint endpoint, not an inference request: no Bifrost translation, no
+	// model dispatch, no usage on the answer. It branches before the
+	// provider mapping because the route already named the vendor.
+	if req.Type == domain.RequestTypeRealtimeSession {
+		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -301,10 +318,19 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// shape.
 	if req.Type == domain.RequestTypeMessages {
 		if rawBody, ok := rawResponseBytes(resp); ok {
+			usage := extractUsage(resp)
+			// The normalized usage struct has one flat cache-write count, so
+			// the write's lifetime is only in the provider's own body. Read it
+			// back off the bytes we are about to return, then reconcile: this
+			// lane mixes the normalized struct's write total with a split read
+			// from the raw bytes, and on Anthropic-native responses the struct
+			// reports no writes at all.
+			usage.CacheCreation1hTokens = anthropicCacheCreation1h(rawBody)
+			usage = usage.ReconcileCacheWrites()
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: http.StatusOK,
-				Usage:      extractUsage(resp),
+				Usage:      usage,
 			}, nil
 		}
 	}
@@ -844,7 +870,10 @@ func passthroughResponseHeaders(in map[string]string) map[string]string {
 	for k, v := range in {
 		switch {
 		case strings.EqualFold(k, "Content-Length"),
-			strings.EqualFold(k, "Content-Encoding"):
+			strings.EqualFold(k, "Content-Encoding"),
+			// A provider must not be able to echo this header and have it
+			// forwarded as if the gateway had authored the response.
+			strings.EqualFold(k, herr.HandledErrorHeader):
 			continue
 		default:
 			out[k] = v
@@ -1012,14 +1041,25 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
-	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+	// Every provider is sized explicitly, standard ones included. A zero here
+	// is not "no opinion": CheckAndSetDefaults at the bottom of this function
+	// replaces it with bifrost's own 1000 workers and 5000-slot queue, and
+	// GetConfiguredProviders registers the whole standard list up front, so
+	// leaving it zero bought a worker pool per provider whether or not this
+	// install ever dispatches to it. See standardProviderConcurrency.
+	cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
+		Concurrency: standardProviderConcurrency,
+		BufferSize:  standardProviderBufferSize,
+	}
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
+		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		endpoint, ok := a.anthropicCompat.lookup(string(provider))
 		if !ok {
-			return nil, fmt.Errorf("no endpoint registered for anthropic-compatible provider %q", provider)
+			return nil, fmt.Errorf("no endpoint registered for URL-derived provider %q", provider)
 		}
 		cfg.NetworkConfig.BaseURL = endpoint.baseURL
 		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
-			BaseProviderType: bfschemas.Anthropic,
+			BaseProviderType: endpoint.baseType,
 			IsKeyLess:        endpoint.keyless,
 		}
 		// Every compat endpoint gets its own bifrost worker pool, unlike the
@@ -1157,7 +1197,8 @@ func envVar(v string) bfschemas.EnvVar {
 // never the ones evicted.
 func (r *BifrostRouter) mapProviderForDispatch(cred domain.Credential) bfschemas.ModelProvider {
 	provider := mapProvider(cred)
-	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
+		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		return r.anthropicCompat.register(cred)
 	}
 	return provider
@@ -1172,6 +1213,15 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderVertex:
 		return bfschemas.Vertex
 	case domain.ProviderGemini:
+		// A credential carrying a project and region is an Agent Platform
+		// key — Gemini's second door. It dispatches through a derived
+		// custom provider (base type Gemini) whose base URL names the
+		// project and location, because the stock Gemini provider is
+		// pinned to generativelanguage.googleapis.com, where such a key
+		// is refused by its own restrictions.
+		if credentialIsAgentPlatform(cred) {
+			return geminiCompatProviderKey(cred)
+		}
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
 		// Anthropic with a base-URL override (self-hosted server speaking
@@ -1238,6 +1288,13 @@ type anthropicCompatEndpoint struct {
 	// empty-value keys for base provider Anthropic and fails the
 	// dispatch; CustomProviderConfig.IsKeyLess skips selection entirely.
 	keyless bool
+	// baseType is the bifrost provider whose wire format the endpoint
+	// speaks: Anthropic for self-hosted Anthropic-compatible servers,
+	// Gemini for the Agent Platform door (a Gemini credential carrying a
+	// project and location — see geminiAgentPlatformEndpointForCred). The
+	// registry that holds these entries is shared by both; only the
+	// derivation and the prefix differ.
+	baseType bfschemas.ModelProvider
 }
 
 // anthropicCompatMaxEndpoints bounds the endpoint registry. Every distinct
@@ -1257,6 +1314,30 @@ const anthropicCompatMaxEndpoints = 32
 const (
 	anthropicCompatConcurrency = 128
 	anthropicCompatBufferSize  = 1024
+)
+
+// standardProviderConcurrency and standardProviderBufferSize size the worker
+// pool bifrost creates for each entry in bfschemas.StandardProviders.
+//
+// GetConfiguredProviders returns that whole list, because a virtual key may
+// name any provider and bifrost resolves config by provider key alone. Left
+// unset, each of the 23 entries took bifrost's own defaults — 1000 workers
+// and a 5000-slot queue, sized for a deployment where one provider fronts the
+// entire gateway. Paid 23 times over, that was ~21,000 permanently parked
+// goroutines per pod in production (99.85% of the process's goroutines), for
+// providers most installs never dispatch to. Their only measurable effect was
+// making the GC rescan 21,000 stacks on every mark cycle and the profiler
+// serialize them every 15 seconds.
+//
+// 128 is the figure the compat path above already arrived at, for the same
+// reason: the pool bounds in-flight upstream requests, and a burst past it
+// queues rather than fails — bifrost drops queued requests only under
+// DropExcessRequests, which the gateway leaves off. Across the production
+// pods that is several hundred concurrent upstream requests per provider,
+// far above what the gateway's own request ceiling makes reachable.
+const (
+	standardProviderConcurrency = 128
+	standardProviderBufferSize  = 1024
 )
 
 // anthropicCompatRegistry maps derived provider keys to their endpoints.
@@ -1297,7 +1378,7 @@ func newAnthropicCompatRegistry(capacity int) *anthropicCompatRegistry {
 // register records the credential's endpoint under its derived provider key,
 // refreshes LRU recency, and returns the key. Evicts beyond capacity.
 func (reg *anthropicCompatRegistry) register(cred domain.Credential) bfschemas.ModelProvider {
-	endpoint, key := anthropicCompatEndpointForCred(cred)
+	endpoint, key := compatEndpointForCred(cred)
 
 	reg.mu.Lock()
 	if el, ok := reg.entries[string(key)]; ok {
@@ -1368,8 +1449,9 @@ func anthropicCompatEndpointForCred(cred domain.Credential) (anthropicCompatEndp
 	endpoint := anthropicCompatEndpoint{
 		// Same "/v1"-stripping as the OpenAI-compat path: Bifrost's
 		// Anthropic provider appends the full "/v1/messages" path itself.
-		baseURL: normalizeOpenAICompatBaseURL(credBaseURL(cred)),
-		keyless: strings.TrimSpace(cred.APIKey) == "",
+		baseURL:  normalizeOpenAICompatBaseURL(credBaseURL(cred)),
+		keyless:  strings.TrimSpace(cred.APIKey) == "",
+		baseType: bfschemas.Anthropic,
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
 	return endpoint, bfschemas.ModelProvider(anthropicCompatPrefix + hex.EncodeToString(sum[:8]))
@@ -1380,6 +1462,58 @@ func anthropicCompatEndpointForCred(cred domain.Credential) (anthropicCompatEndp
 func anthropicCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
 	_, key := anthropicCompatEndpointForCred(cred)
 	return key
+}
+
+// geminiCompatPrefix namespaces derived provider keys for Gemini credentials
+// served through the Agent Platform door, the way anthropicCompatPrefix does
+// for self-hosted Anthropic endpoints. A distinct prefix keeps the two
+// derivations from ever colliding in the shared registry.
+const geminiCompatPrefix = "gemini-url-"
+
+// geminiAgentPlatformEndpointForCred derives the endpoint identity and
+// provider key for a Gemini credential carrying a project and location — an
+// Agent Platform key, Gemini's second door. Bifrost's Gemini provider
+// appends "/models/{model}:generateContent" to its base URL and sends the
+// key as `x-goog-api-key`, both verified to be exactly what Agent Platform
+// serves, so the whole door is a base-URL prefix naming the project and
+// location. See specs/model-providers/google-agent-platform.feature.
+func geminiAgentPlatformEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
+	endpoint := anthropicCompatEndpoint{
+		baseURL: fmt.Sprintf(
+			"https://aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google",
+			url.PathEscape(cred.Extra["project_id"]),
+			url.PathEscape(cred.Extra["region"]),
+		),
+		keyless:  false,
+		baseType: bfschemas.Gemini,
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
+	return endpoint, bfschemas.ModelProvider(geminiCompatPrefix + hex.EncodeToString(sum[:8]))
+}
+
+// geminiCompatProviderKey derives the provider key for a Gemini credential
+// with Agent Platform routing fields.
+func geminiCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
+	_, key := geminiAgentPlatformEndpointForCred(cred)
+	return key
+}
+
+// credentialIsAgentPlatform reports whether a Gemini credential names the
+// Agent Platform door: both routing fields present, per the materialiser's
+// contract (config.materialiser.ts emits project_id and region together or
+// not at all).
+func credentialIsAgentPlatform(cred domain.Credential) bool {
+	return cred.Extra["project_id"] != "" && cred.Extra["region"] != ""
+}
+
+// compatEndpointForCred picks the derivation matching the credential — the
+// registry stores both kinds of derived endpoint, and the credential's
+// provider says which one this is.
+func compatEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
+	if cred.ProviderID == domain.ProviderGemini {
+		return geminiAgentPlatformEndpointForCred(cred)
+	}
+	return anthropicCompatEndpointForCred(cred)
 }
 
 // normalizeOpenAICompatBaseURL strips a trailing "/v1" (and trailing
@@ -1571,11 +1705,19 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.PromptTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.CompletionTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -1591,11 +1733,19 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.OutputTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -1725,6 +1875,22 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				if u.CacheCreationTokens > 0 {
 					it.usage.CacheCreationTokens = u.CacheCreationTokens
 				}
+				if u.CacheCreation1hTokens > 0 {
+					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
+				}
+				// Audio tokens merge on the same rule. A chunk that
+				// reports none must not clear a count an earlier chunk
+				// already carried, or a streamed audio turn prices at the
+				// text rate.
+				if u.InputAudioTokens > 0 {
+					it.usage.InputAudioTokens = u.InputAudioTokens
+				}
+				if u.OutputAudioTokens > 0 {
+					it.usage.OutputAudioTokens = u.OutputAudioTokens
+				}
+				if u.ReasoningTokens > 0 {
+					it.usage.ReasoningTokens = u.ReasoningTokens
+				}
 				// Prefer the parser's reported total when non-zero —
 				// Gemini's `totalTokenCount` can exceed prompt+completion
 				// (reasoning / thinking tokens). Anthropic doesn't report
@@ -1735,6 +1901,10 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				} else if it.usage.PromptTokens > 0 || it.usage.CompletionTokens > 0 {
 					it.usage.TotalTokens = it.usage.PromptTokens + it.usage.CompletionTokens
 				}
+				// The two cache-write counters merge independently across
+				// chunks, so keep the running usage obeying the rule that the
+				// hour-long count is a portion of the total.
+				it.usage = it.usage.ReconcileCacheWrites()
 			}
 		}
 		return true
@@ -1765,7 +1935,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		return domain.Usage{}, false
 	}
 	prompt := int(usage.Get("promptTokenCount").Int())
-	completion := int(usage.Get("candidatesTokenCount").Int())
+	// Gemini reports its thinking tokens OUTSIDE candidatesTokenCount
+	// (totalTokenCount = promptTokenCount + candidatesTokenCount +
+	// thoughtsTokenCount), unlike OpenAI, whose completion total already
+	// contains them. Google bills thoughts at the output rate, so the
+	// completion total has to carry them or every thinking call under-bills:
+	// a 47-token answer with 196 thinking tokens billed for 47.
+	thoughts := int(usage.Get("thoughtsTokenCount").Int())
+	completion := int(usage.Get("candidatesTokenCount").Int()) + thoughts
 	total := int(usage.Get("totalTokenCount").Int())
 	if prompt == 0 && completion == 0 && total == 0 {
 		return domain.Usage{}, false
@@ -1781,7 +1958,20 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		CompletionTokens: completion,
 		TotalTokens:      total,
 		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
+		// The reported subset of the completion total, never priced on its own.
+		ReasoningTokens: thoughts,
 	}, true
+}
+
+// anthropicCacheCreation1h reads how many of a response's cache writes bought
+// an hour-long entry, from Anthropic's own `usage.cache_creation` breakdown.
+// Zero when the field is absent, which is what a request that did not ask for
+// the extended TTL looks like, and prices the writes short-lived.
+func anthropicCacheCreation1h(body []byte) int {
+	if len(body) == 0 {
+		return 0
+	}
+	return int(gjson.GetBytes(body, "usage.cache_creation.ephemeral_1h_input_tokens").Int())
 }
 
 // parseAnthropicPassthroughUsage extracts Anthropic's usage block from a
@@ -1791,6 +1981,8 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 //	event: message_start
 //	data: {"type":"message_start","message":{"usage":{"input_tokens":N,
 //	       "cache_creation_input_tokens":N,"cache_read_input_tokens":N,
+//	       "cache_creation":{"ephemeral_5m_input_tokens":N,
+//	                         "ephemeral_1h_input_tokens":N},
 //	       "output_tokens":1, ...}}}
 //
 //	event: message_delta
@@ -1830,6 +2022,10 @@ func parseAnthropicPassthroughUsage(body []byte) (domain.Usage, bool) {
 				usage.CompletionTokens = int(m.Get("output_tokens").Int())
 				usage.CacheReadTokens = int(m.Get("cache_read_input_tokens").Int())
 				usage.CacheCreationTokens = int(m.Get("cache_creation_input_tokens").Int())
+				// How long those writes live, which decides their rate.
+				// Present only when the request asked for the extended
+				// TTL; absent leaves it zero and they price short-lived.
+				usage.CacheCreation1hTokens = int(m.Get("cache_creation.ephemeral_1h_input_tokens").Int())
 				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 				matched = true
 			}

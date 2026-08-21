@@ -63,27 +63,30 @@
  * because hashing and verifying both read that same local pepper.
  */
 
-import {
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
 import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
 import {
+  PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../src/generated/prisma/client";
+import {
   API_KEY_PREFIX,
   hashSecret,
   INGEST_KEY_PREFIX,
 } from "../src/server/api-key/api-key-token.utils";
 import { modelProviders } from "../src/server/modelProviders/registry";
-import { CUSTOM_ROLE_KIND } from "../src/server/role/repositories/role.repository";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
+import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
 import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -115,6 +118,10 @@ const PUBLIC_ACCESS_TOKEN = `${INGEST_KEY_PREFIX}${PUBLIC_TOKEN_LOOKUP_ID}_${PUB
 const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
 
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
+
+/** The prompt tag `resolveLangyPrompt` reads by default. */
+const DEFAULT_PROMPT_TAG = "production";
+const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
 async function main() {
   // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
@@ -150,6 +157,25 @@ async function main() {
       license: ENTERPRISE_LICENSE_KEY,
     },
     update: { license: ENTERPRISE_LICENSE_KEY },
+  });
+
+  // Prompt tags are org-defined, and `production` is the one
+  // `resolveLangyPrompt` reads by default — so without it `seed:langy-prompts`
+  // fails on a fresh stack with "Invalid tag", and every prompt seeded into a
+  // new database needs the tag created by hand first.
+  await prisma.promptTag.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: organization.id,
+        name: DEFAULT_PROMPT_TAG,
+      },
+    },
+    create: {
+      id: DEFAULT_PROMPT_TAG_ID,
+      organizationId: organization.id,
+      name: DEFAULT_PROMPT_TAG,
+    },
+    update: {},
   });
 
   const team = await prisma.team.upsert({
@@ -384,6 +410,7 @@ async function main() {
     await seedDemoPlatform({
       prisma,
       projectId: project.id,
+      organizationId: organization.id,
       userId: user.id,
     });
   }

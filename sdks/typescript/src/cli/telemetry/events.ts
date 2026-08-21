@@ -33,6 +33,7 @@
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
 import { handledErrorFromThrown } from "@langwatch/langy/cards/handled-error";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { resolveLogsEndpoint } from "@/internal/endpoint";
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,
   LANGWATCH_EVENTS,
@@ -94,23 +95,6 @@ const NOOP_EVENTS: CommandEvents = Object.freeze({
 const isTruthy = (value: string | undefined): boolean =>
   value !== undefined &&
   ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-
-/**
- * The OTLP logs endpoint, per the OTEL exporter spec: the signal-specific var
- * wins and is used verbatim; the generic var is a base that `/v1/logs` hangs off.
- * Null when neither is set — which, flag or no flag, means no OTLP transport.
- */
-export const resolveLogsEndpoint = (
-  env: NodeJS.ProcessEnv = process.env,
-): string | null => {
-  const signal = env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim();
-  if (signal) return signal;
-
-  const generic = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
-  if (generic) return `${generic.replace(/\/+$/, "")}/v1/logs`;
-
-  return null;
-};
 
 /** Which transport, if any, this environment is asking for. */
 export type Transport =
@@ -236,11 +220,10 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
 
   const provider = new LoggerProvider({
     resource,
-    forceFlushTimeoutMillis: FLUSH_TIMEOUT_MS,
     processors: [
-      new SimpleLogRecordProcessor(
-        new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
-      ),
+      new SimpleLogRecordProcessor({
+        exporter: new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+      }),
     ],
   });
 
@@ -257,7 +240,9 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
       });
     },
     flush: async () => {
-      await provider.forceFlush();
+      // `forceFlushTimeoutMillis` moved off `LoggerProviderOptions` and onto this
+      // call in @opentelemetry/sdk-logs 0.221 — pass it here instead.
+      await provider.forceFlush({ timeoutMillis: FLUSH_TIMEOUT_MS });
       // Shutting the provider down aborts anything still in flight, so the process
       // can exit instead of waiting out the exporter's own timeout.
       await provider.shutdown();

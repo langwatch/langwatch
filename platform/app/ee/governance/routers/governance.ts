@@ -17,7 +17,6 @@
  */
 
 import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
-import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
@@ -35,13 +34,9 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
-import {
-  checkOrganizationPermission,
-  hasOrganizationPermission,
-} from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
@@ -60,9 +55,12 @@ export const governanceRouter = createTRPCRouter({
    */
   setupState: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      const service = GovernanceSetupStateService.create(ctx.prisma);
+      const service = GovernanceSetupStateService.create({
+        prisma: ctx.prisma,
+        traceActivity: getApp().governance.traceActivity,
+      });
       return await service.resolve(input.organizationId);
     }),
 
@@ -84,10 +82,13 @@ export const governanceRouter = createTRPCRouter({
    */
   resolveHome: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }): Promise<PersonaResolution> => {
       const userId = ctx.session.user.id;
-      const setupService = GovernanceSetupStateService.create(ctx.prisma);
+      const setupService = GovernanceSetupStateService.create({
+        prisma: ctx.prisma,
+        traceActivity: getApp().governance.traceActivity,
+      });
       const usageService = UsageStatsService.create(ctx.prisma);
 
       const [
@@ -120,7 +121,7 @@ export const governanceRouter = createTRPCRouter({
           .getUsageStats(input.organizationId, ctx.session.user)
           .then((u) => u?.activePlan?.type === "ENTERPRISE")
           .catch(() => false),
-        hasOrganizationPermission(
+        probeOrganizationPermission(
           ctx,
           input.organizationId,
           "organization:manage",
@@ -219,10 +220,13 @@ export const governanceRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(1000).default(500),
       }),
     )
-    .use(checkOrganizationPermission("complianceExport:view"))
+    .permission("complianceExport:view")
     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
-      const service = GovernanceOcsfExportService.create(ctx.prisma);
+      const service = GovernanceOcsfExportService.create({
+        prisma: ctx.prisma,
+        ocsfRepository: getApp().governance.ocsfEvents,
+      });
       return await service.list({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,
@@ -282,20 +286,11 @@ export const governanceRouter = createTRPCRouter({
         workspaceLabel: z.string().max(256).optional(),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .mutation(async ({ ctx, input }) => {
-      const ocsfRepository = new GovernanceOcsfEventsClickHouseRepository(
-        async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) {
-            throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-          }
-          return client;
-        },
-      );
       const service = AdminWorkspaceViewAuditService.create({
         prisma: ctx.prisma,
-        ocsfRepository,
+        ocsfRepository: getApp().governance.ocsfEvents,
       });
       return await service.recordView({
         actorUserId: ctx.session.user.id,
@@ -310,7 +305,7 @@ export const governanceRouter = createTRPCRouter({
    * Resolves a CH-side `actor` token (typically the email stamped on
    * spans as `langwatch.user_id`, occasionally the User.id directly)
    * to that user's Personal Workspace inside the given org. Drives
-   * the bird's-eye `/settings/governance/users/[id]` "View their
+   * the bird's-eye `/governance/users/[id]` "View their
    * workspace →" link — without this, admins can see who's been
    * active but can't drill into their traces from the user row.
    *
@@ -333,7 +328,7 @@ export const governanceRouter = createTRPCRouter({
         actor: z.string().min(1).max(512),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       // Match by email (CH-stamped actor is typically the email) OR
       // by id directly. Two-step: resolve User first, then ask
@@ -391,9 +386,12 @@ export const governanceRouter = createTRPCRouter({
           .default(QUARANTINE_DEFAULT_THRESHOLD),
       }),
     )
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      const evaluator = QuarantineFillEvaluator.create({ prisma: ctx.prisma });
+      const evaluator = QuarantineFillEvaluator.create({
+        prisma: ctx.prisma,
+        traceActivity: getApp().governance.traceActivity,
+      });
       return await evaluator.evaluate({
         organizationId: input.organizationId,
         windowSeconds: input.windowSeconds,

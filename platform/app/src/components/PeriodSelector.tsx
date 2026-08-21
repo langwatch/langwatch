@@ -68,7 +68,7 @@ const isValidDateString = (dateString: string) => {
  * Day-based presets snap the start to start-of-day to match the historical
  * behaviour of the day quick selectors.
  */
-const computeRelativeWindow = (
+export const computeRelativeWindow = (
   presetKey: RelativePresetKey,
   now: Date,
 ): Period => {
@@ -108,7 +108,11 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   const queryStartDate = router.query.startDate;
   const queryEndDate = router.query.endDate;
 
-  const { period, mode } = useMemo<{ period: Period; mode: PeriodMode }>(() => {
+  const { period, mode, isDefault } = useMemo<{
+    period: Period;
+    mode: PeriodMode;
+    isDefault: boolean;
+  }>(() => {
     if (
       typeof queryStartDate === "string" &&
       typeof queryEndDate === "string" &&
@@ -121,16 +125,17 @@ export const usePeriodSelector = (defaultNDays = 30) => {
       return {
         period: { startDate: safeStart, endDate },
         mode: "absolute",
+        isDefault: false,
       };
     }
 
-    const presetKey = isRelativePresetKey(queryPeriod)
-      ? queryPeriod
-      : defaultPresetForDays(defaultNDays);
+    const picked = isRelativePresetKey(queryPeriod);
+    const presetKey = picked ? queryPeriod : defaultPresetForDays(defaultNDays);
 
     return {
       period: computeRelativeWindow(presetKey, now),
       mode: "relative",
+      isDefault: !picked,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryPeriod, queryStartDate, queryEndDate, defaultNDays]);
@@ -189,6 +194,13 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   return {
     period,
     mode,
+    /**
+     * True while the URL carries no range of its own, so `period` is this
+     * hook's own fallback rather than something the reader asked for. Surfaces
+     * where a default window would hide rows read this to filter only once a
+     * range has actually been picked.
+     */
+    isDefault,
     setPeriod,
     setRelativePeriod,
     daysDifference,
@@ -212,13 +224,27 @@ const getPresetForRange = (
 export function PeriodSelector({
   period: { startDate, endDate },
   mode,
+  label,
   setPeriod,
   setRelativePeriod,
+  clearPeriod,
 }: {
   period: Period;
   mode: PeriodMode;
+  /**
+   * Replaces the range shown on the trigger. For a surface that only filters
+   * once a range is picked, so the control does not name a window it is not
+   * applying.
+   */
+  label?: string;
   setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (presetKey: RelativePresetKey) => void;
+  /**
+   * Takes the range back off, offered as "All time". Only surfaces that show
+   * everything without a range have somewhere to go back to, so the entry
+   * appears only when they pass this.
+   */
+  clearPeriod?: () => void;
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
@@ -259,7 +285,7 @@ export function PeriodSelector({
           onClick={onOpen}
         >
           <LuCalendar />
-          <Text>{getDateRangeLabel()}</Text>
+          <Text>{label ?? getDateRangeLabel()}</Text>
           <Box>
             <ChevronDown />
           </Box>
@@ -294,6 +320,17 @@ export function PeriodSelector({
               </Field.Root>
             </VStack>
             <VStack>
+              {clearPeriod && (
+                <Button
+                  width="full"
+                  onClick={() => {
+                    clearPeriod();
+                    onClose();
+                  }}
+                >
+                  All time
+                </Button>
+              )}
               {RELATIVE_PRESETS.map((preset) => (
                 <Button
                   width="full"

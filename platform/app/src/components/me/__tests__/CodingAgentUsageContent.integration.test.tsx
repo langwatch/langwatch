@@ -94,12 +94,14 @@ describe("CodingAgentUsageContent", () => {
       expect(screen.getByText("Sessions")).toBeTruthy();
       expect(screen.getByText("7")).toBeTruthy();
       expect(screen.getByText("$12.50")).toBeTruthy();
-      expect(screen.getByText("4.5m")).toBeTruthy();
+      // Token counts print in full, matching the pull requests table this card
+      // links to; an abbreviated "4.5m" would disagree with it on one screen.
+      expect(screen.getByText("4,500,000")).toBeTruthy();
       expect(screen.getByText("3h 20m")).toBeTruthy();
       // Produced line summarises the outcome.
       expect(screen.getByText(/1,200 added \/ 300 removed/)).toBeTruthy();
       expect(screen.getByText(/4 commits/)).toBeTruthy();
-      expect(screen.getByText(/1 PR/)).toBeTruthy();
+      expect(screen.getByText(/1 pull request/)).toBeTruthy();
     });
   });
 

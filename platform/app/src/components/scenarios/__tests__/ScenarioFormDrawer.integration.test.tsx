@@ -44,13 +44,15 @@ vi.mock("../SaveAndRunMenu", () => ({
     onSaveAndRun,
     onCreateAgent,
     selectedTarget,
+    isLoading,
   }: {
     onSaveWithoutRunning?: () => void;
     onSaveAndRun?: (target: { type: string; id: string }) => void;
     onCreateAgent?: () => void;
     selectedTarget?: { type: string; id: string } | null;
+    isLoading?: boolean;
   }) => (
-    <div data-testid="save-and-run-menu">
+    <div data-testid="save-and-run-menu" data-loading={String(!!isLoading)}>
       <button data-testid="save-button" onClick={onSaveWithoutRunning}>
         Save
       </button>
@@ -111,6 +113,13 @@ const mocks = vi.hoisted(() => ({
     criteria: string[];
     labels: string[];
   } | null,
+  mockGetByIdIsLoading: false,
+  mockGetByIdHasError: false,
+  mockGetByIdRefetch: vi.fn(),
+  mockPromptsCatalogIsLoading: false,
+  mockProject: { id: "project-123", slug: "my-project" } as
+    | { id: string; slug: string }
+    | undefined,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -161,7 +170,12 @@ vi.mock("~/utils/api", () => ({
       getById: {
         useQuery: () => ({
           data: mocks.mockGetByIdData,
-          isLoading: false,
+          isLoading: mocks.mockGetByIdIsLoading,
+          isError: mocks.mockGetByIdHasError,
+          error: mocks.mockGetByIdHasError
+            ? new Error("scenario read failed")
+            : null,
+          refetch: mocks.mockGetByIdRefetch,
         }),
       },
     },
@@ -172,7 +186,10 @@ vi.mock("~/utils/api", () => ({
     },
     prompts: {
       getAllPromptsForProject: {
-        useQuery: () => ({ data: [] }),
+        useQuery: () =>
+          mocks.mockPromptsCatalogIsLoading
+            ? { data: undefined, isLoading: true }
+            : { data: [], isLoading: false },
       },
     },
     licenseEnforcement: {
@@ -186,7 +203,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },
@@ -211,7 +228,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { id: "project-123", slug: "my-project" },
+    project: mocks.mockProject,
     organization: { id: "org-123" },
   }),
 }));
@@ -272,6 +289,10 @@ describe("<ScenarioFormDrawer/>", () => {
     mocks.mockDrawerParams = {};
     mocks.mockComplexProps = {};
     mocks.mockGetByIdData = null;
+    mocks.mockGetByIdIsLoading = false;
+    mocks.mockGetByIdHasError = false;
+    mocks.mockPromptsCatalogIsLoading = false;
+    mocks.mockProject = { id: "project-123", slug: "my-project" };
     mocks.mockCreateMutateAsync.mockResolvedValue({
       id: "new-scenario-id",
       name: "Refund Request Test",
@@ -412,7 +433,10 @@ describe("<ScenarioFormDrawer/>", () => {
     });
 
     it("displays 'Edit Scenario' heading", () => {
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      render(
+        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />,
+        { wrapper: Wrapper },
+      );
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
     });
@@ -422,9 +446,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -457,9 +488,16 @@ describe("<ScenarioFormDrawer/>", () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ScenarioFormDrawer
+          open={true}
+          scenarioId="existing-scenario-id"
+          onClose={onClose}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
@@ -475,9 +513,16 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays an error message", async () => {
       const user = userEvent.setup();
 
-      render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ScenarioFormDrawer
+          open={true}
+          scenarioId="existing-scenario-id"
+          onClose={vi.fn()}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
@@ -522,9 +567,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -545,9 +597,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -563,9 +622,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         await user.click(screen.getByTestId("save-and-run-button"));
 
@@ -713,6 +779,266 @@ describe("<ScenarioFormDrawer/>", () => {
 
         expect(mocks.mockClearFlowCallbacks).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * The reported symptom: on first load the fields sat empty for seconds with
+   * nothing to say they were still coming, so the drawer read as a scenario
+   * with no name and no criteria.
+   */
+  describe("when opened on an existing scenario that has not loaded yet", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdIsLoading = true;
+    });
+
+    /** @scenario "An unloaded scenario shows that it is loading" */
+    it("shows a placeholder instead of an empty form", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
+        null,
+      );
+    });
+
+    /** @scenario "An unloaded scenario is still titled as an edit" */
+    it("titles itself Edit Scenario rather than Create Scenario", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
+      expect(screen.queryByText("Create Scenario")).toBe(null);
+    });
+
+    /** @scenario "Saving is not offered until the scenario has loaded" */
+    it("keeps the save actions busy so a save cannot create a duplicate", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute(
+        "data-loading",
+        "true",
+      );
+    });
+  });
+
+  describe("when the existing scenario has loaded", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = {
+        id: "scenario-123",
+        name: "Refund Request Test",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockGetByIdIsLoading = false;
+    });
+
+    /** @scenario "A loaded scenario shows its fields" */
+    it("replaces the placeholder with the populated form", async () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+      await waitFor(() => {
+        expect(
+          screen.getByDisplayValue("Refund Request Test"),
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute(
+        "data-loading",
+        "false",
+      );
+    });
+  });
+
+  describe("when the prompt catalog has not answered yet", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = {
+        id: "scenario-123",
+        name: "Refund Request Test",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockPromptsCatalogIsLoading = true;
+    });
+
+    /** @scenario "The editor does not wait for the prompt catalog" */
+    it("shows the scenario fields without waiting for it", async () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+      await waitFor(() => {
+        expect(
+          screen.getByDisplayValue("Refund Request Test"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * A failed read ends the wait without a record. Treated as loaded, the
+   * drawer hands back an editable blank form over a scenario that exists,
+   * and the save that follows creates a second one.
+   */
+  describe("when the existing scenario could not be read", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockGetByIdHasError = true;
+    });
+
+    /** @scenario "A failed read says so instead of showing empty fields" */
+    it("says it could not load the scenario instead of offering the fields", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("scenario-read-error")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
+        null,
+      );
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+    });
+
+    /** @scenario "A failed read offers the read again" */
+    it("reads the scenario again when asked to try again", async () => {
+      const user = userEvent.setup();
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(mocks.mockGetByIdRefetch).toHaveBeenCalled();
+    });
+
+    /** @scenario "A failed read does not offer to save" */
+    it("does not offer the save actions over a scenario it never read", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("save-and-run-menu")).toBe(null);
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * The read is disabled until the project resolves, and a disabled query
+   * reports itself as not loading. Taken at its word, that window hands back
+   * the blank form the placeholder exists to prevent.
+   */
+  describe("when the project is not known yet", () => {
+    /** @scenario "The editor waits for the project too" */
+    it("shows the placeholder rather than an empty form", () => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockProject = undefined;
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdIsLoading = false;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
+        null,
+      );
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * A read that fails after one succeeded still holds the record it read, and
+   * the person may be part way through editing it. The error state is for
+   * having nothing to show, not for every failure.
+   */
+  describe("when a later read of a loaded scenario fails", () => {
+    /** @scenario "A failed background read keeps the scenario on screen" */
+    it("keeps the fields rather than replacing them with the error", () => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = {
+        id: "scenario-123",
+        name: "Refund Request Test",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockGetByIdHasError = true;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(
+        screen.getByDisplayValue("Refund Request Test"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("scenario-read-error")).toBe(null);
+    });
+  });
+
+  /**
+   * The duplicate this whole loading state exists to prevent. The UI gating
+   * above is what says so; this is the guarantee underneath it, asserted by
+   * driving the save with no record present.
+   */
+  describe("when a save is attempted before the scenario has been read", () => {
+    /** @scenario "Editing never creates a second scenario" */
+    it("creates nothing, because being pointed at a scenario means editing it", async () => {
+      const user = userEvent.setup();
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdIsLoading = false;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByTestId("save-button"));
+
+      await waitFor(() => {
+        expect(mocks.mockCreateMutateAsync).not.toHaveBeenCalled();
+      });
+      expect(mocks.mockUpdateMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when creating a new scenario", () => {
+    /** @scenario "A new scenario never waits on a read" */
+    it("never shows the placeholder, because there is nothing to read", () => {
+      // A disabled query reports isLoading false, but the drawer gates on the
+      // scenarioId too, so a stale true here must still not blank the form.
+      mocks.mockGetByIdIsLoading = true;
+
+      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+      expect(
+        screen.getByPlaceholderText("e.g., Angry refund request"),
+      ).toBeInTheDocument();
     });
   });
 });

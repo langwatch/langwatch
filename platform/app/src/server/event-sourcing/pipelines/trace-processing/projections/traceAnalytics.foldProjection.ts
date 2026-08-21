@@ -51,7 +51,10 @@ import {
   TraceOriginService,
 } from "./services";
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
-import { isValidTimestamp } from "./services/span-timing.service";
+import {
+  anchorStorageTime,
+  firstUsableAnchor,
+} from "./services/storage-anchor";
 import {
   MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
@@ -463,108 +466,12 @@ export interface TraceAnalyticsData {
 }
 
 /**
- * How far ahead of fold time a producer-supplied business time may still be
- * taken as the storage anchor.
- *
- * The anchor is producer-controlled where it matters: a span's own
- * `startTimeUnixMs`, which the collector accepts as any 13-digit epoch-ms value,
- * bounding only the PAST edge (`SPAN_MAX_PAST_MS`). (The other two candidates
- * are not producer times — a log's envelope carries `record.acceptedAt` and a
- * span's carries ingest `Date.now()` — so the span start is the one that needs
- * a bound, and it is the one a span-led trace anchors on.)
- * Unbounded on the future edge, one span claiming to start in 2286 would fix
- * that row's partition and its `TTL toDateTime(OccurredAt) + retention` deadline
- * in 2286: a row that outlives its tenant's retention policy indefinitely, that
- * `ttlReconciler` cannot reach because it anchors on the same column, and that
- * sits outside every read window so every delivery pays an unwindowed scan.
- *
- * Before the freeze this self-corrected — `min(span start)` pulled the live row
- * back into a real partition as soon as a sane span arrived, leaving only
- * orphaned versions stranded. Freezing the anchor is exactly what makes the
- * producer's value permanent, so the bound belongs to the freeze that needs it.
- *
- * A day, not an hour: client clock skew of minutes is routine and a whole day
- * still lands inside the ±7-day read window, so a legitimately skewed trace
- * anchors on its own time rather than being pushed onto fold time.
+ * The storage-anchor rule itself lives in
+ * {@link ./services/storage-anchor.ts} - `MAX_ANCHOR_FUTURE_SKEW_MS`,
+ * `isUsableAnchorMs`, `firstUsableAnchor` and `anchorStorageTime` - because
+ * `traceSummary` applies the same rule (migration 00072, ADR-087) and a second
+ * copy of it would drift.
  */
-const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Usable as a storage anchor: a valid timestamp (finite, strictly positive —
- * the same predicate `SpanTimingService` applies to span times) that is not
- * implausibly far in the future ({@link MAX_ANCHOR_FUTURE_SKEW_MS}).
- *
- * `now` is injected rather than read here so the fold stays testable; callers
- * pass `Date.now()`, which is what `AbstractFoldProjection.apply` already uses
- * to stamp `updatedAt`.
- */
-function isUsableAnchorMs(
-  value: number | undefined,
-  now: number,
-): value is number {
-  return isValidTimestamp(value) && value <= now + MAX_ANCHOR_FUTURE_SKEW_MS;
-}
-
-/**
- * The first candidate that survives {@link isUsableAnchorMs}, falling back to
- * `now`. Written as a chain rather than nested ternaries because the point is
- * that EVERY step is validated: the partition column must never be the epoch,
- * and a fallback that is trusted rather than checked is how it would become one.
- */
-function firstUsableAnchor(candidates: readonly number[], now: number): number {
-  for (const candidate of candidates) {
-    if (isUsableAnchorMs(candidate, now)) return candidate;
-  }
-  // The terminal step is checked too, so the invariant is structural rather
-  // than a convention every caller has to keep. No production caller injects
-  // `now`, but one that injected 0 would otherwise land the row in 196952 —
-  // the single outcome this whole change exists to prevent.
-  return isUsableAnchorMs(now, now) ? now : Date.now();
-}
-
-/**
- * Freeze the storage anchor on the first contribution that carries a usable
- * business time (ADR-071). First-observed, never `min` and never `max`: the
- * anchor's whole job is to hold a row's partition, sort position and TTL
- * deadline still, and every consequence ADR-071 prices comes from the column
- * moving rather than from which column it is.
- *
- * A span's own start time wins over the envelope's `occurredAt` when the fold
- * has one, because `span_received` stamps the envelope at ingest — a
- * long-running span's start can predate it by the span's whole duration, and
- * anchoring on ingest would move every span trace's partition off the value
- * written before this change. `state.occurredAt` holds exactly that start once
- * `SpanTimingService` has seen the span, so it is read from there rather than
- * re-derived.
- *
- * A time implausibly far in the future is refused rather than frozen
- * ({@link MAX_ANCHOR_FUTURE_SKEW_MS}) — the anchor is producer-controlled, and
- * freezing is what would make a bad one permanent. Refusing simply leaves the
- * state un-anchored, so the next contribution gets to try and, failing that, the
- * write falls back to fold time.
- *
- * Handles no event itself — {@link TraceAnalyticsFoldProjection.apply} calls it
- * once per event, after the handler, so every contribution type anchors without
- * ten handlers each remembering to.
- *
- * @internal Exported for unit testing.
- */
-export function anchorStorageTime({
-  state,
-  eventOccurredAtMs,
-  now = Date.now(),
-}: {
-  state: TraceAnalyticsData;
-  eventOccurredAtMs: number | undefined;
-  now?: number;
-}): TraceAnalyticsData {
-  if (state.storageAnchorMs > 0) return state;
-  const candidate = isUsableAnchorMs(state.occurredAt, now)
-    ? state.occurredAt
-    : eventOccurredAtMs;
-  if (!isUsableAnchorMs(candidate, now)) return state;
-  return { ...state, storageAnchorMs: candidate };
-}
 
 /**
  * Project the in-memory slim state into the slim `TraceAnalyticsRow`. Pure: no
@@ -640,7 +547,8 @@ export function projectAnalyticsStateToRow({
    * candidate is bounded against it, so a state whose committed anchor is
    * implausibly far ahead of `now` is re-anchored on write rather than carried
    * through. That is the one case where an already-committed row changes
-   * partition, and it is deliberate — see {@link MAX_ANCHOR_FUTURE_SKEW_MS}.
+   * partition, and it is deliberate — see `MAX_ANCHOR_FUTURE_SKEW_MS` in
+   * {@link ./services/storage-anchor.ts}.
    */
   now?: number;
 }): TraceAnalyticsRow {
@@ -679,10 +587,10 @@ export function projectAnalyticsStateToRow({
     // first write. What the ADR argues for instead (the event log's accept time
     // threaded into the row) is sequencing item 6 and needs the human sign-off
     // recorded there; it is not this change's to take.
-    occurredAtMs: firstUsableAnchor(
-      [state.storageAnchorMs, state.createdAt],
+    occurredAtMs: firstUsableAnchor({
+      candidates: [state.storageAnchorMs, state.createdAt],
       now,
-    ),
+    }),
     earliestSpanStartMs: state.occurredAt,
     createdAtMs: state.createdAt,
     updatedAtMs: state.updatedAt,

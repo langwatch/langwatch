@@ -18,25 +18,28 @@
             "code": {
               "sdk": {
                 "python": "langwatch.trace",
-                "typescript": "langwatch"
+                "typescript": "langwatch",
+                "go": "langwatch.Tracer"
               },
               "cli": [
                 "trace search",
                 "trace get",
                 "trace export",
-                "trace transcript"
+                "trace transcript",
+                "session events"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
                 "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
-                "trace transcript": "langwatch trace transcript <traceId> -o json"
+                "trace transcript": "langwatch trace transcript <traceId> -o json",
+                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
             "platform": {
-              "ui": "/messages",
+              "ui": "/traces",
               "mcp": [
                 "search_traces",
                 "get_trace"
@@ -102,7 +105,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.track_event",
-                "typescript": null
+                "typescript": null,
+                "go": "client.Events"
               },
               "cli": null,
               "skill": null,
@@ -127,7 +131,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.annotations",
-                "typescript": "langwatch.annotations"
+                "typescript": "langwatch.annotations",
+                "go": "client.Annotations"
               },
               "cli": [
                 "annotation list",
@@ -199,8 +204,11 @@
             "platform": {
               "ui": "/evaluations",
               "mcp": [
-                "platform_run_evaluation",
-                "platform_evaluation_status"
+                "platform_experiment_list",
+                "platform_run_experiment",
+                "platform_experiment_status",
+                "platform_experiment_list_runs",
+                "platform_experiment_results"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
@@ -226,7 +234,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.monitors",
-                "typescript": "langwatch.monitors"
+                "typescript": "langwatch.monitors",
+                "go": "client.Monitors"
               },
               "cli": [
                 "monitor list",
@@ -287,7 +296,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.scenarios",
-                "typescript": "langwatch.scenarios"
+                "typescript": "langwatch.scenarios",
+                "go": "client.Scenarios"
               },
               "cli": [
                 "scenario list",
@@ -340,7 +350,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": "langwatch.simulationRuns"
+                "typescript": "langwatch.simulationRuns",
+                "go": "client.Scenarios.ListRuns"
               },
               "cli": [
                 "simulation-run list",
@@ -445,7 +456,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.prompts",
-                "typescript": "langwatch.prompts"
+                "typescript": "langwatch.prompts",
+                "go": "client.Prompts"
               },
               "cli": [
                 "prompt init",
@@ -544,6 +556,7 @@
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent dev",
                 "agent update",
                 "agent delete"
               ],
@@ -677,7 +690,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.dataset",
-                "typescript": "langwatch.datasets"
+                "typescript": "langwatch.datasets",
+                "go": "client.Datasets"
               },
               "cli": [
                 "dataset list",
@@ -793,7 +807,8 @@
         "code": {
           "sdk": {
             "python": "langwatch.triggers",
-            "typescript": "langwatch.triggers"
+            "typescript": "langwatch.triggers",
+            "go": "client.Triggers"
           },
           "cli": [
             "trigger list",
@@ -860,7 +875,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
             },
             "platform": {
-              "ui": "/settings/gateway/virtual-keys",
+              "ui": "/gateway/virtual-keys",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -895,7 +910,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
             },
             "platform": {
-              "ui": "/settings/gateway/budgets",
+              "ui": "/gateway/budgets",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -914,7 +929,7 @@
         {
           "id": "ai-gateway.webhooks",
           "name": "Webhook endpoints",
-          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries, retry ladder, delivery log, replay (enterprise)",
+          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries to an HTTPS endpoint or an Amazon SQS queue, retry ladder, delivery log, replay (enterprise)",
           "surfaces": {
             "code": {
               "sdk": {
@@ -928,7 +943,7 @@
                 "webhooks update",
                 "webhooks enable",
                 "webhooks disable",
-                "webhooks delete",
+                "webhooks archive",
                 "webhooks roll-secret",
                 "webhooks test",
                 "webhooks deliveries",
@@ -940,7 +955,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/gateway/webhooks",
+              "ui": "/gateway/webhooks",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1013,7 +1028,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance",
+              "ui": "/governance",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1029,8 +1044,8 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Ingestion Sources",
-          "description": "Read-only inspection of OCSF-normalised event ingestion (sources, event tail, health)",
+          "name": "Catalog (ingestion)",
+          "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1040,13 +1055,14 @@
               "cli": [
                 "ingest list",
                 "ingest tail",
-                "ingest health"
+                "ingest health",
+                "ingest codex"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/settings/governance/ingestion-sources",
+              "ui": "/governance/ingestion-sources",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1075,7 +1091,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": null
+                "typescript": null,
+                "go": "client.Projects"
               },
               "cli": [
                 "projects list",
@@ -1121,6 +1138,8 @@
               "cli": [
                 "api-keys list",
                 "api-keys create",
+                "api-keys get",
+                "api-keys update",
                 "api-keys revoke"
               ],
               "skill": null,
@@ -1142,6 +1161,264 @@
           "sync": null,
           "produces": [
             "api-keys"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.organization",
+          "name": "Organization",
+          "description": "Read and update the organization profile, and provision organizations on a self-hosted instance",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "organization get",
+                "organization update",
+                "organizations create",
+                "organizations list",
+                "organizations get"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "organizations"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.members",
+          "name": "Members and Invites",
+          "description": "Manage who belongs to the organization: member roles, access, removal, and pending invites",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "members list",
+                "members get",
+                "members update",
+                "members disable",
+                "members enable",
+                "members remove",
+                "members access",
+                "invites list",
+                "invites create",
+                "invites revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/members",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization/members",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "members",
+            "invites"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.teams",
+          "name": "Teams",
+          "description": "Create and manage the teams that group projects and people",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "teams list",
+                "teams get",
+                "teams create",
+                "teams update",
+                "teams archive",
+                "teams members list",
+                "teams members add",
+                "teams members remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/teams",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/teams",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "teams"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.groups",
+          "name": "Access Groups",
+          "description": "Group members so a single role binding grants everyone in the group",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "groups list",
+                "groups get",
+                "groups create",
+                "groups rename",
+                "groups delete",
+                "groups members list",
+                "groups members add",
+                "groups members remove",
+                "groups bindings list",
+                "groups bindings add",
+                "groups bindings remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/groups",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/groups",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "groups"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.roles",
+          "name": "Custom Roles",
+          "description": "Define custom roles from resource and action permissions, and read the permission catalog",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "roles list",
+                "roles get",
+                "roles create",
+                "roles update",
+                "roles delete",
+                "roles permissions"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/roles",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/roles",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "custom-roles"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.role-bindings",
+          "name": "Role Bindings",
+          "description": "Grant a role to a user, a group or an API key at an organization, team or project scope",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "role-bindings list",
+                "role-bindings create",
+                "role-bindings update",
+                "role-bindings delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/role-bindings",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/role-bindings",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "role-bindings"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.scim",
+          "name": "SCIM Provisioning",
+          "description": "Mint and revoke the bearer tokens an identity provider uses to sync users and groups",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "scim-tokens list",
+                "scim-tokens create",
+                "scim-tokens revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/scim",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/scim-tokens",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "scim-tokens"
           ],
           "consumes": []
         },
@@ -1346,7 +1623,7 @@
     ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
-      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
+      "agent-performance": "Cross-cutting skill for querying performance (works for both code and platform users)",
       "datasets": "Generate realistic synthetic evaluation datasets from codebase, prompts, and traces"
     },
     "recipes": {
@@ -1355,7 +1632,7 @@
       "debug-with-langwatch": "Root-cause production errors: errored traces, span inspection, monitor/evaluator scores",
       "eval-triage": "Investigate failing experiments and evaluation regressions",
       "setup-lw": "Set up and troubleshoot the LangWatch CLI (login, endpoint, project)",
-      "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
+      "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
       "test-compliance": "Test that your agent stays observational in regulated domains"

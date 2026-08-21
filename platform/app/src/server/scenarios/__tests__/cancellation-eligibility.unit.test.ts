@@ -61,7 +61,7 @@ describe("isCancellableStatus()", () => {
 
   describe("when status is RUNNING", () => {
     it("returns false", () => {
-      // RUNNING is a BullMQ active state — cancellation of active jobs uses
+      // RUNNING is a queue active state — cancellation of active jobs uses
       // a separate abort-signal mechanism, not the status-based check
       expect(isCancellableStatus(ScenarioRunStatus.RUNNING)).toBe(false);
     });

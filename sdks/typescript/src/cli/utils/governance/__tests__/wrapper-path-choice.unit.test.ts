@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
 import {
+  parseProjectScopeFlags,
   parseToolModeFlag,
   resolveWrapperPath,
   pathChoiceMessage,
@@ -219,7 +220,7 @@ describe("resolveWrapperPath", () => {
           "keep your own plan, send only telemetry to LangWatch",
         );
         expect(promptArg.choices[1]!.description).toBe(
-          "route calls through LangWatch with a virtual key, billed per token",
+          "route calls through LangWatch with a virtual key",
         );
         // Remembered for next time.
         expect(save).toHaveBeenCalledTimes(1);
@@ -356,6 +357,160 @@ describe("resolveWrapperPath", () => {
     });
   });
 
+  describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
+    // Copilot's gateway path switches it into BYOK mode, moving spend off
+    // the user's paid Copilot seat onto the org's provider keys — not
+    // billing-neutral like the claude/codex base-URL swap. The resolver is
+    // ingestion-first for every tool, which keeps copilot safe by default;
+    // these tests pin that copilot rides those defaults and that every
+    // gateway route names the seat bypass. Explicit choices are honored.
+
+    /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
+    it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {
+      const save = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The copilot path prompt pre-selects direct OTLP */
+    it("pre-selects the direct OTLP choice on the copilot prompt", async () => {
+      const prompt = vi.fn(async () => ({
+        path: "ingestion",
+      })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+      await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: prompt,
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        env: {},
+      });
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as {
+        choices: Array<{ value: string; description: string }>;
+        initial: number;
+      };
+      const values = promptArg.choices.map((c) => c.value);
+      expect(values[promptArg.initial]).toBe("ingestion");
+      expect(promptArg.choices[values.indexOf("gateway")]!.description).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
+    });
+
+    /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
+    it("honors an explicit gateway override for copilot and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        override: "gateway",
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("names the seat bypass when copilot's gateway path is chosen at the prompt", async () => {
+      // The prompt answer is the route that actually moves spend off the
+      // user's Copilot seat — the saved-choice line must name the shift.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: (async () => ({
+          path: "gateway",
+        })) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"],
+        saveImpl: vi.fn(),
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("suppresses the seat-bypass notice when policy will downgrade the pinned gateway anyway", async () => {
+      // Warning about a billing shift the downgrade then cancels would be
+      // false; resolveWrapperMode's downgrade branch prints its own notice.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_mode: { copilot: "gateway" },
+          tool_policies: { copilot: { allowVk: false, allowOtelDirect: true } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+        writeImpl: write,
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A pinned gateway mode for copilot is honored without prompting */
+    it("honors a pinned gateway mode for copilot without prompting and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { copilot: "gateway" } }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(false);
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+    it("names the Copilot seat bypass when policy forces the gateway path", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      const written = write.mock.calls.map((c) => c[0]).join("");
+      expect(written).toContain("Copilot seat");
+    });
+  });
+
   describe("when there is no remembered answer (run-time policy refresh)", () => {
     it("re-checks the policy at run time and honors a freshly-disabled gateway", async () => {
       // Login cached BOTH paths; the admin has since turned the gateway off.
@@ -435,7 +590,9 @@ describe("resolveWrapperPath", () => {
         "keep your own plan, send only telemetry to LangWatch",
       );
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toContain("billed per token");
+      expect(gatewayChoiceDescription()).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {
@@ -446,6 +603,71 @@ describe("resolveWrapperPath", () => {
       expect(otlpChoiceTitle("toString")).toBe("Using your own toString plan");
       // opencode is a bring-your-own client with no single subscription.
       expect(otlpChoiceTitle("opencode")).toBe("Using your own opencode plan");
+    });
+  });
+});
+
+describe("parseProjectScopeFlags", () => {
+  describe("given no scope flag is present", () => {
+    it("forwards every arg verbatim with no scope", () => {
+      const out = parseProjectScopeFlags(["-p", "say hi"]);
+      expect(out).toEqual({
+        args: ["-p", "say hi"],
+        project: undefined,
+        personal: false,
+      });
+    });
+  });
+
+  describe("given --project <value> in the args", () => {
+    it("strips the flag and its value, order preserved", () => {
+      const out = parseProjectScopeFlags(["--project", "acme-app", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBe("acme-app");
+    });
+
+    it("supports the --project=<value> form", () => {
+      const out = parseProjectScopeFlags(["--project=acme-app", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBe("acme-app");
+    });
+
+    it("treats an empty value as no project", () => {
+      expect(parseProjectScopeFlags(["--project="]).project).toBeUndefined();
+      expect(parseProjectScopeFlags(["--project", "  "]).project).toBeUndefined();
+    });
+
+    it("drops a trailing --project with no value instead of eating a flag", () => {
+      const out = parseProjectScopeFlags(["-p", "hi", "--project"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.project).toBeUndefined();
+    });
+  });
+
+  describe("given --project is followed by another option", () => {
+    it("leaves --personal to be parsed, so the scope conflict still surfaces", () => {
+      const out = parseProjectScopeFlags(["--project", "--personal"]);
+      expect(out.project).toBeUndefined();
+      expect(out.personal).toBe(true);
+      expect(out.args).toEqual([]);
+    });
+
+    it("leaves a later wrapper flag on the args instead of consuming it", () => {
+      const out = parseProjectScopeFlags([
+        "--project",
+        "--tool-mode",
+        "gateway",
+      ]);
+      expect(out.project).toBeUndefined();
+      expect(out.args).toEqual(["--tool-mode", "gateway"]);
+    });
+  });
+
+  describe("given --personal in the args", () => {
+    it("strips it and reports the personal reset", () => {
+      const out = parseProjectScopeFlags(["--personal", "-p", "hi"]);
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.personal).toBe(true);
     });
   });
 });

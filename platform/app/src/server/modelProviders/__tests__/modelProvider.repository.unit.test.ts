@@ -10,7 +10,10 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type { ModelProviderScope, PrismaClient } from "@prisma/client";
+import type {
+  ModelProviderScope,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { decrypt, encrypt } from "../../../utils/encryption";
 import {
   ModelProviderRepository,
@@ -162,41 +165,58 @@ describe("ModelProviderRepository", () => {
     });
   });
 
-  describe("decryptCustomKeys", () => {
-    describe("when given an encrypted string", () => {
+  describe("withDecryptedKeys", () => {
+    describe("when the row holds an encrypted string", () => {
       it("round-trips correctly with encryptCustomKeys", () => {
         const original = {
           OPENAI_API_KEY: "sk-secret123",
           BASE_URL: "https://api.openai.com",
         };
         const encrypted = (repository as any).encryptCustomKeys(original);
-        const decrypted = (repository as any).decryptCustomKeys(encrypted);
+        const row = (repository as any).withDecryptedKeys(
+          createModelProvider({ customKeys: encrypted }),
+        );
 
-        expect(decrypted).toEqual(original);
+        expect(row.customKeys).toEqual(original);
+        expect(row.customKeysUnreadable).toBe(false);
       });
     });
 
-    describe("when given a plaintext object (migration compatibility)", () => {
+    describe("when the row holds a plaintext object (migration compatibility)", () => {
       it("returns the object as-is", () => {
         const plaintext = { OPENAI_API_KEY: "sk-secret123" };
-        const result = (repository as any).decryptCustomKeys(plaintext);
+        const row = (repository as any).withDecryptedKeys(
+          createModelProvider({ customKeys: plaintext }),
+        );
 
-        expect(result).toEqual(plaintext);
+        expect(row.customKeys).toEqual(plaintext);
+        expect(row.customKeysUnreadable).toBe(false);
         expect(decrypt).not.toHaveBeenCalled();
       });
     });
 
-    describe("when given null", () => {
-      it("returns null", () => {
-        const result = (repository as any).decryptCustomKeys(null);
-        expect(result).toBeNull();
+    describe("when the row holds nothing", () => {
+      it("reads back as null and readable", () => {
+        const row = (repository as any).withDecryptedKeys(
+          createModelProvider({ customKeys: null }),
+        );
+
+        expect(row.customKeys).toBeNull();
+        expect(row.customKeysUnreadable).toBe(false);
       });
     });
 
-    describe("when given undefined", () => {
-      it("returns null", () => {
-        const result = (repository as any).decryptCustomKeys(undefined);
-        expect(result).toBeNull();
+    describe("when the row holds something that will not decrypt", () => {
+      // The row still holds ciphertext. Reading it back as null keeps the
+      // providers list loading, and the flag is what stops a write path from
+      // treating it as a row that never had credentials.
+      it("reads back as null and unreadable", () => {
+        const row = (repository as any).withDecryptedKeys(
+          createModelProvider({ customKeys: "not-an-encrypted-value" }),
+        );
+
+        expect(row.customKeys).toBeNull();
+        expect(row.customKeysUnreadable).toBe(true);
       });
     });
   });

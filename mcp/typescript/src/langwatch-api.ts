@@ -294,14 +294,20 @@ export async function makeRequest(
   return response.json();
 }
 
-/** Searches traces with optional filters and pagination. */
+/**
+ * Searches traces with optional filters and pagination.
+ *
+ * Paging is by `scrollId` only: pass the one the previous response returned,
+ * and stop when a response carries none. `pageOffset` used to be accepted here
+ * but was never read by the server, so an offset walk silently re-served the
+ * first page; it is rejected at the boundary now (#6808).
+ */
 export async function searchTraces(params: {
   query?: string;
   filters?: Record<string, string[]>;
   startDate: number;
   endDate: number;
   pageSize?: number;
-  pageOffset?: number;
   scrollId?: string;
   format?: "digest" | "json";
 }): Promise<SearchTracesResponse> {

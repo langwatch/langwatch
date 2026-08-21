@@ -1,9 +1,15 @@
-import { type Prisma, type Trigger, TriggerKind } from "@prisma/client";
+import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
+import {
+  type Prisma,
+  type Trigger,
+  TriggerKind,
+} from "~/generated/prisma/client";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
 import type { ScheduledJobRepository } from "~/server/app-layer/scheduler/scheduler.types";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { isMatchEverythingTrigger } from "./matchEverything";
 import {
   extractReportFromTriggerRow,
   REPORT_SCHEDULER_TARGET_TYPE,
@@ -12,6 +18,8 @@ import type {
   TriggerRepository,
   TriggerSummary,
 } from "./repositories/trigger.repository";
+
+const logger = createLogger("langwatch:automations:trigger-service");
 
 export class TriggerService {
   private static readonly TTL_MS = 60_000;
@@ -45,7 +53,41 @@ export class TriggerService {
     if (cached) return cached;
     const all = await this.repo.findActiveForProject(projectId);
     await this.cache.set(projectId, all);
+    this.reportGrandfatheredMatchEverything(projectId, all);
     return all;
+  }
+
+  /**
+   * Automations with no condition at all are refused on every write path now,
+   * but rows saved before that rule keep running. They are the most expensive
+   * shape we serve — one match record per active trigger per trace, forever —
+   * so how many remain is worth knowing.
+   *
+   * Emitted from the cache FILL rather than from each read, which is what
+   * bounds it to roughly one line per project per minute instead of one per
+   * ingested trace. Best-effort: a logging failure must never break a read
+   * that dispatch depends on.
+   */
+  private reportGrandfatheredMatchEverything(
+    projectId: string,
+    triggers: TriggerSummary[],
+  ): void {
+    try {
+      const grandfathered = triggers.filter(isMatchEverythingTrigger);
+      if (grandfathered.length === 0) return;
+      logger.warn(
+        {
+          projectId,
+          count: grandfathered.length,
+          triggerIds: grandfathered.map((trigger) => trigger.id),
+        },
+        "Project still has automations with no condition; they match every " +
+          "trace and can no longer be saved in this shape",
+      );
+    } catch {
+      // Intentionally silent: this is observability about the read, not the
+      // read itself.
+    }
   }
 
   /**
@@ -55,7 +97,7 @@ export class TriggerService {
    * REPORTs are excluded (ADR-044). A report persists `filters: {}` and no
    * `customGraphId` — byte-identical to a match-everything trace automation —
    * so without the kind check every scheduled report would ALSO fire once per
-   * ingested trace: the notify reactor enqueues a settle for any NOTIFY trigger
+   * ingested trace: the notify subscriber enqueues a settle for any NOTIFY trigger
    * with no evaluation filters, and the settle dispatcher skips the filter
    * guard entirely when `filters` is empty. A report fires from its scheduler
    * calendar entry (`syncReportSchedule`) and nowhere else.
@@ -91,9 +133,9 @@ export class TriggerService {
 
   /**
    * Atomically claim (triggerId, traceId). Returns true on first claim,
-   * false if another reactor already claimed it. Side effects (email,
+   * false if another subscriber already claimed it. Side effects (email,
    * slack, dataset write) must run only when this returns true to avoid
-   * double-fire on concurrent dispatch or reactor retry.
+   * double-fire on concurrent dispatch or subscriber retry.
    */
   async claimSend(params: {
     triggerId: string;
@@ -115,6 +157,19 @@ export class TriggerService {
     projectId: string;
   }): Promise<boolean> {
     return this.repo.isSendClaimed(params);
+  }
+
+  /**
+   * Batched `isSendClaimed`: the subset of `traceIds` already claimed for
+   * this trigger, in one read. A paged persist dispatch filters its whole
+   * page against prior claims at once instead of one round trip per trace.
+   */
+  async filterSendClaimed(params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    return this.repo.findClaimedTraceIds(params);
   }
 
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {

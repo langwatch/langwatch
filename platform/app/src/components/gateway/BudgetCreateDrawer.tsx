@@ -16,10 +16,20 @@ import { useMemo, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { describeError, readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 import { humanizeGatewayError } from "./gatewayErrorCopy";
+
+/**
+ * A budget on a scope no active key can reach is refused, because it would
+ * never spend and never block. Provisioning one ahead of the keys that will
+ * use it is legitimate, so the refusal offers the way through instead of
+ * being a dead end. Offered here rather than as a checkbox on the form: an
+ * admin who has not hit the refusal has no way to know what it would mean.
+ */
+const UNREACHABLE_SCOPE_CODE = "gateway_budget_scope_unreachable";
 
 type BudgetCreateDrawerProps = {
   open: boolean;
@@ -34,7 +44,7 @@ type ScopeKind =
   | "PROJECT"
   | "PRINCIPAL"
   | "VIRTUAL_KEY";
-type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
 const KIND_OPTIONS: Array<{
   kind: ScopeKind;
@@ -71,7 +81,15 @@ export function BudgetCreateDrawer({
   const [window, setWindow] = useState<Window>("MONTH");
   const [limitUsd, setLimitUsd] = useState("");
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
+  const [cycleAnchorAt, setCycleAnchorAt] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /** Set once the server has refused this budget as unreachable. */
+  const [scopeUnreachable, setScopeUnreachable] = useState(false);
+
+  // Only a window that rolls on its own can be phased. Total never rolls
+  // and manual rolls only when someone asks it to, so neither offers the
+  // field, and the server refuses an anchor on either.
+  const isScheduledWindow = window !== "TOTAL" && window !== "MANUAL";
 
   const orgId = organization?.id ?? "";
 
@@ -130,7 +148,7 @@ export function BudgetCreateDrawer({
     [providersQuery.data],
   );
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createMutation = api.gatewayBudgets.create.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -157,7 +175,9 @@ export function BudgetCreateDrawer({
     setWindow("MONTH");
     setLimitUsd("");
     setOnBreach("BLOCK");
+    setCycleAnchorAt("");
     setSubmitError(null);
+    setScopeUnreachable(false);
   };
 
   const close = () => {
@@ -166,13 +186,29 @@ export function BudgetCreateDrawer({
     onOpenChange(false);
   };
 
+  /**
+   * The refusal was about the scope that was picked, and the retry beside it
+   * resubmits the form as it stands with `allowUnreachable` set. Left behind
+   * after a different scope is picked, that button would wave through a
+   * scope the server never refused.
+   */
+  const clearRefusal = () => {
+    setSubmitError(null);
+    setScopeUnreachable(false);
+  };
+
   const pickKind = (kind: ScopeKind) => {
     setScopeKind(kind);
-    setSubmitError(null);
+    clearRefusal();
     // Seed the target with the current context where one exists.
     if (kind === "TEAM") setTargetId(team?.id ?? "");
     else if (kind === "PROJECT") setTargetId(project?.id ?? "");
     else setTargetId("");
+  };
+
+  const pickTarget = (id: string) => {
+    setTargetId(id);
+    clearRefusal();
   };
 
   const targetOptions: Array<{ id: string; name: string }> | null =
@@ -202,7 +238,7 @@ export function BudgetCreateDrawer({
     (scopeKind === "PRINCIPAL" && membersQuery.isLoading) ||
     (scopeKind === "VIRTUAL_KEY" && keysQuery.isLoading);
 
-  const submit = async () => {
+  const submit = async ({ allowUnreachable = false } = {}) => {
     if (!organization) return;
     if (!name || !limitUsd) {
       toaster.create({ title: "Name and limit are required", type: "error" });
@@ -243,11 +279,23 @@ export function BudgetCreateDrawer({
         limitUsd,
         onBreach,
         providerKey: providerKey || null,
+        // The picker gives a local wall-clock string with no zone; the
+        // Date constructor reads it in the browser's zone, which is the
+        // one the admin typed it in.
+        cycleAnchorAt:
+          isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
+        allowUnreachable: allowUnreachable || undefined,
       });
       onCreated();
       reset();
       onOpenChange(false);
     } catch (error) {
+      if (readHandledError(error)?.code === UNREACHABLE_SCOPE_CODE) {
+        setScopeUnreachable(true);
+        setSubmitError(describeError({ error }));
+        return;
+      }
+      setScopeUnreachable(false);
       setSubmitError(humanizeGatewayError(error, "Failed to create budget"));
     }
   };
@@ -334,7 +382,7 @@ export function BudgetCreateDrawer({
                     value={targetId}
                     aria-label="Budget target"
                     data-testid="budget-target"
-                    onChange={(e) => setTargetId(e.target.value)}
+                    onChange={(e) => pickTarget(e.target.value)}
                   >
                     <option value="">
                       {targetsLoading
@@ -396,6 +444,20 @@ export function BudgetCreateDrawer({
                 <Field.ErrorText data-testid="budget-submit-error">
                   {submitError}
                 </Field.ErrorText>
+                {scopeUnreachable && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    alignSelf="flex-start"
+                    mt={2}
+                    loading={createMutation.isPending}
+                    onClick={() => void submit({ allowUnreachable: true })}
+                    data-testid="budget-create-anyway"
+                  >
+                    Create it anyway
+                  </Button>
+                )}
               </Field.Root>
             )}
             <HStack gap={4} align="flex-start">
@@ -403,7 +465,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Window
                   <FieldInfoTooltip
-                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in UTC. 'total' never resets, which suits burn-down budgets on a fixed-fund project."
+                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule, calendar aligned in UTC unless you set a cycle start below. 'total' never resets, which suits burn-down budgets on a fixed-fund project. 'manual' accrues until someone resets it."
                     docHref="/ai-gateway/budgets#windows"
                   />
                 </Field.Label>
@@ -420,6 +482,7 @@ export function BudgetCreateDrawer({
                     <option value="WEEK">Per week</option>
                     <option value="MONTH">Per calendar month</option>
                     <option value="TOTAL">Total (no reset)</option>
+                    <option value="MANUAL">Manual (reset on request)</option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
               </Field.Root>
@@ -427,7 +490,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Limit (USD)
                   <FieldInfoTooltip
-                    description="Spend ceiling per window in USD. Tracked against provider-computed token costs (summed post-response). Near-limit requests (≥90% of cap) trigger a live reconciliation on the gateway with a 200ms fail-open."
+                    description="Spend ceiling per window in USD, tracked against the cost each provider reports for the request. Responses carry a warning from 80% of the cap, and past it the on-breach action applies."
                     docHref="/ai-gateway/budgets#creating-a-budget"
                   />
                 </Field.Label>
@@ -439,6 +502,24 @@ export function BudgetCreateDrawer({
                 />
               </Field.Root>
             </HStack>
+            {isScheduledWindow && (
+              <Field.Root>
+                <Field.Label>
+                  Start cycle on
+                  <FieldInfoTooltip
+                    description="Optional. Leave empty and the window is calendar aligned, so a monthly budget rolls on the 1st. Set it and the window rolls from this moment instead, which is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly cycle anchored past the 28th clamps into shorter months and springs back, so the 31st gives Feb 28 and then Mar 31. This cannot be changed later."
+                    docHref="/ai-gateway/budgets#windows"
+                    testId="budget-cycle-anchor-info"
+                  />
+                </Field.Label>
+                <Input
+                  type="datetime-local"
+                  value={cycleAnchorAt}
+                  onChange={(e) => setCycleAnchorAt(e.target.value)}
+                  data-testid="budget-cycle-anchor"
+                />
+              </Field.Root>
+            )}
             <Field.Root required>
               <Field.Label>
                 On breach
@@ -475,7 +556,7 @@ export function BudgetCreateDrawer({
             </Button>
             <Button
               colorPalette="orange"
-              onClick={submit}
+              onClick={() => void submit()}
               loading={createMutation.isPending}
               disabled={!name || !limitUsd}
             >

@@ -12,13 +12,16 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type * as ServerRedis from "~/server/redis";
+import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
 const TEAM_ID = "team_1";
 const ORG_ID = "org_1";
-const ERROR = "Project not found or you don't have access";
+// The client is verified by this point, so the refusal travels back to it as
+// an OAuth error code; the prose is what the description carries.
+const ERROR = "access_denied";
+const ERROR_DESCRIPTION = "Project not found or you don't have access";
 
 // Hoisted so the mock objects exist before the mocked modules are evaluated
 // (the top-level `import { app } from "../misc"` triggers those factories).
@@ -89,11 +92,27 @@ vi.mock("~/server/auth", () => ({
 }));
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // Partial mock: importing ../misc drags in the worker/collector graph, which
-// also reads `isBuildOrNoRedis` from this module — keep the real exports and
-// override only the connection the handler writes the auth code to.
-vi.mock("~/server/redis", async (importOriginal) => {
-  const actual = await importOriginal<typeof ServerRedis>();
-  return { ...actual, connection: mockRedis };
+// reaches other App members — keep the real exports and override only the
+// connection the handler writes the auth code to.
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof AppLayerApp>();
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma } = await import("~/server/db");
+  // misc.ts reads its connection through tryGetApp; getApp is overridden too
+  // so both accessors agree on the fake. The permission check runs the REAL
+  // walk over this file's prisma fixtures, exactly as it did before the App
+  // owned the service.
+  const app = {
+    redis: mockRedis,
+    permissions: permissionsServiceFor(prisma),
+  };
+  return {
+    ...actual,
+    getApp: () => app,
+    tryGetApp: () => app,
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
@@ -118,6 +137,36 @@ async function authorize() {
   });
 }
 
+/**
+ * Every refusal here happens after the client_id and redirect_uri were
+ * verified against the registry, so the client is waiting on its redirect and
+ * has to be told there: a refusal that only renders on our page leaves it
+ * hanging. Asserting the destination as well as the body keeps a regression
+ * that drops or re-points the redirect from passing.
+ */
+async function expectAccessDenied(res: Response) {
+  const json = (await res.json()) as {
+    error?: string;
+    error_description?: string;
+    redirect?: string;
+  };
+
+  // biome-ignore-start lint/suspicious/noMisplacedAssertion: one refusal shape, asserted whole, for every case that produces it
+  expect(res.status).toBe(403);
+  expect(json.error).toBe(ERROR);
+  expect(json.error_description).toBe(ERROR_DESCRIPTION);
+
+  const redirect = new URL(json.redirect ?? "");
+  expect(`${redirect.origin}${redirect.pathname}`).toBe(validBody.redirect_uri);
+  expect(redirect.searchParams.get("error")).toBe(ERROR);
+  expect(redirect.searchParams.get("error_description")).toBe(
+    ERROR_DESCRIPTION,
+  );
+  expect(redirect.searchParams.get("state")).toBe(validBody.state);
+  expect(redirect.searchParams.get("code")).toBeNull();
+  // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the shared refusal assertions
+}
+
 describe("POST /mcp/authorize", () => {
   describe("when the user has project access via a TEAM-scoped RoleBinding but no legacy TeamUser row", () => {
     it("authorizes the connection instead of returning 403", async () => {
@@ -136,11 +185,7 @@ describe("POST /mcp/authorize", () => {
       // which is also absent → access denied.
       mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
 
-      const res = await authorize();
-      const json = (await res.json()) as { error?: string };
-
-      expect(res.status).toBe(403);
-      expect(json.error).toBe(ERROR);
+      await expectAccessDenied(await authorize());
     });
   });
 
@@ -154,11 +199,7 @@ describe("POST /mcp/authorize", () => {
         archivedAt: new Date("2026-01-01T00:00:00Z"),
       });
 
-      const res = await authorize();
-      const json = (await res.json()) as { error?: string };
-
-      expect(res.status).toBe(403);
-      expect(json.error).toBe(ERROR);
+      await expectAccessDenied(await authorize());
     });
   });
 
@@ -169,11 +210,7 @@ describe("POST /mcp/authorize", () => {
       const previous = process.env.DEMO_PROJECT_ID;
       process.env.DEMO_PROJECT_ID = PROJECT_ID;
       try {
-        const res = await authorize();
-        const json = (await res.json()) as { error?: string };
-
-        expect(res.status).toBe(403);
-        expect(json.error).toBe(ERROR);
+        await expectAccessDenied(await authorize());
       } finally {
         if (previous === undefined) delete process.env.DEMO_PROJECT_ID;
         else process.env.DEMO_PROJECT_ID = previous;

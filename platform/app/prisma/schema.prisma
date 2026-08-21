@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -11,7 +12,8 @@ datasource db {
   // Further reading:
   // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
   // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-  url          = env("DATABASE_URL")
+  // The connection URL lives in prisma.config.ts (Prisma 7); the runtime
+  // client connects through the pg driver adapter in src/server/db.ts.
   relationMode = "prisma"
 }
 
@@ -111,6 +113,8 @@ model User {
   ingestionSourcesCreated       IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated           AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces                  PinnedTrace[]
+  traceEditOverlaysCreated      TraceEditOverlay[]       @relation("TraceEditOverlayCreatedBy")
+  traceEditOverlaysUpdated      TraceEditOverlay[]       @relation("TraceEditOverlayUpdatedBy")
 }
 
 model VerificationToken {
@@ -136,6 +140,30 @@ enum RoleBindingScopeType {
   ORGANIZATION
   TEAM
   PROJECT
+}
+
+// The grants ledger (ADR-092 §13) - scope levels for Grant. Five tiers:
+// the three RoleBinding knows, plus RESOURCE (share-link heritage) and
+// PLATFORM (operator access, minted from ADMIN_EMAILS at cutover).
+enum GrantScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+  RESOURCE
+  PLATFORM
+}
+
+// WHO can hold a grant. Collectives (team, organization) are principals -
+// membership is expanded at check time, never copied per member. project
+// and anyone are valid at the resource tier only.
+enum GrantPrincipalType {
+  USER
+  API_KEY
+  GROUP
+  TEAM
+  ORGANIZATION
+  PROJECT
+  ANYONE
 }
 
 enum OrganizationUserRole {
@@ -275,30 +303,32 @@ model Organization {
   /// ADR-038.
   primaryIntent          OrganizationIntent?
 
-  promoCode                String?
-  stripeCustomerId         String?                   @unique
-  currency                 Currency                  @default(EUR)
-  pricingModel             PricingModel              @default(TIERED)
-  CustomRoles              CustomRole[]
-  notifications            Notification[]
-  subscriptions            Subscription[]
-  scimTokens               ScimToken[]
-  promptTags               PromptTag[]
-  groups                   Group[]
-  roleBindings             RoleBinding[]
-  apiKeys                  ApiKey[]
+  promoCode              String?
+  stripeCustomerId       String?                        @unique
+  currency               Currency                       @default(EUR)
+  pricingModel           PricingModel                   @default(TIERED)
+  CustomRoles            CustomRole[]
+  notifications          Notification[]
+  subscriptions          Subscription[]
+  scimTokens             ScimToken[]
+  promptTags             PromptTag[]
+  groups                 Group[]
+  roleBindings           RoleBinding[]
+  apiKeys                ApiKey[]
   // License enforcement fields (COSS-0226)
-  license                  String?                   @db.Text
-  licenseExpiresAt         DateTime?
-  licenseLastValidatedAt   DateTime?
-  gatewayChangeEvents      GatewayChangeEvent[]
-  routingPolicies          RoutingPolicy[]
-  ingestionSources         IngestionSource[]
-  anomalyRules             AnomalyRule[]
-  anomalyAlerts            AnomalyAlert[]
-  aiToolEntries            AiToolEntry[]
-  ingestionTemplates       IngestionTemplate[]
-  langyGithubInstallations LangyGithubInstallation[]
+  license                String?                        @db.Text
+  licenseExpiresAt       DateTime?
+  licenseLastValidatedAt DateTime?
+  gatewayChangeEvents    GatewayChangeEvent[]
+  routingPolicies        RoutingPolicy[]
+  ingestionSources       IngestionSource[]
+  anomalyRules           AnomalyRule[]
+  anomalyAlerts          AnomalyAlert[]
+  aiToolEntries          AiToolEntry[]
+  ingestionTemplates     IngestionTemplate[]
+  githubInstallations    GithubInstallation[]
+  githubPullRequests     GithubPullRequest[]
+  githubBranchPrChecks   GithubBranchPullRequestCheck[]
 
   @@index([ssoProvider])
 }
@@ -355,12 +385,19 @@ enum Currency {
 }
 
 model Project {
-  id                  String                @id @default(nanoid())
+  id                  String                    @id @default(nanoid())
   name                String
-  slug                String                @unique
-  apiKey              String                @unique
+  slug                String                    @unique
+  apiKey              String                    @unique
+  /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
+  /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
+  /// credential a caller authenticates with and the capability the database
+  /// resolves a tenant from stay decoupled, so rotating one never invalidates
+  /// the other, and a leak of the ClickHouse key map's input discloses nothing
+  /// a caller could authenticate with. Generated by the database on insert.
+  lwqlKey             String                    @unique @default(dbgenerated("(gen_random_uuid())::text"))
   teamId              String
-  team                Team                  @relation(fields: [teamId], references: [id])
+  team                Team                      @relation(fields: [teamId], references: [id])
   language            String
   framework           String
   /// Project kind:
@@ -376,11 +413,11 @@ model Project {
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
-  kind                String                @default("application")
-  firstMessage        Boolean               @default(false)
-  integrated          Boolean               @default(false)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @default(now()) @updatedAt
+  kind                String                    @default("application")
+  firstMessage        Boolean                   @default(false)
+  integrated          Boolean                   @default(false)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @default(now()) @updatedAt
   userLinkTemplate    String?
   checks              Monitor[]
   costs               Cost[]
@@ -390,14 +427,14 @@ model Project {
   customGraphs        CustomGraph[]
   dashboards          Dashboard[]
   batchEvaluations    BatchEvaluation[]
-  traceSharingEnabled Boolean               @default(true)
-  presenceEnabled     Boolean               @default(true)
+  traceSharingEnabled Boolean                   @default(true)
+  presenceEnabled     Boolean                   @default(true)
   triggers            Trigger[]
   experiments         Experiment[]
   annotations         Annotation[]
   projectSecrets      ProjectSecret[]
   TriggerSent         TriggerSent[]
-  WebhookDelivery     WebhookDelivery[]
+  webhookDeliveries   WebhookEndpointDelivery[]
   annotationScores    AnnotationScore[]
   shareLinks          ShareLink[]
   workflows           Workflow[]
@@ -417,9 +454,10 @@ model Project {
   scenarios           Scenario[]
   suiteConfigurations SimulationSuite[]
   savedViews          SavedView[]
-  gatewayGuardrails   GatewayGuardrail[]    @relation("ProjectGatewayGuardrails")
+  gatewayGuardrails   GatewayGuardrail[]        @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents GatewayChangeEvent[]
   pinnedTraces        PinnedTrace[]
+  traceEditOverlays   TraceEditOverlay[]
   emailSuppressions   EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -455,6 +493,20 @@ model Project {
   /// LangyCredentialService.getEgressAllowlist and threaded through the
   /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
   langyEgressAllowlist Json?
+
+  /// When a coding-agent session was last folded for this project, and when a
+  /// pull request was last mapped for a branch one of those sessions ran on.
+  /// Both are instrumentation signals, not counters: the project sidebar shows
+  /// its Sessions and Pull requests destinations only while the matching column
+  /// is inside the recency window, so a project that never sends coding-agent
+  /// telemetry never grows the two links, and one that stops sending loses
+  /// them again. Written through the throttled touch methods on
+  /// ProjectService, which skip the write while the stored value is still
+  /// recent, so a busy project costs at most one update an hour per column.
+  /// No index: every read is by project id, which is the primary key.
+  /// See specs/coding-agent/project-menu-links.feature.
+  lastCodingAgentSessionAt     DateTime?
+  lastCodingAgentPullRequestAt DateTime?
 
   @@index([teamId])
   @@index([isPersonal])
@@ -729,8 +781,17 @@ model CustomGraph {
   projectId String
   project   Project  @relation(fields: [projectId], references: [id])
   name      String
+  /// The chart's definition, in the shape its `kind` names.
   graph     Json
   filters   Json?
+  /// Discriminator for the two chart shapes that share this table:
+  ///   - "builder" (default) - the chart builder's own `graph` payload
+  ///   - "workbench_sql"     - a saved LangWatchQL workbench chart, whose
+  ///     `graph` holds the versioned { sql, parameters, vegaLiteSpec }
+  ///     definition (see server/analytics/saved-workbench-charts)
+  /// Each reader filters by its own kind, so neither sees the other's rows and
+  /// a builder chart can never be interpreted as a workbench definition.
+  kind      String   @default("builder")
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -748,6 +809,7 @@ model CustomGraph {
 
   @@index([projectId])
   @@index([dashboardId])
+  @@index([projectId, kind])
 }
 
 model BatchEvaluation {
@@ -801,14 +863,14 @@ enum AlertType {
 }
 
 model Trigger {
-  id                   String            @id @default(nanoid())
+  id                   String                    @id @default(nanoid())
   name                 String
   projectId            String
-  project              Project           @relation(fields: [projectId], references: [id])
+  project              Project                   @relation(fields: [projectId], references: [id])
   action               TriggerAction
   // ADR-042: the automation kind. Backfilled AUTOMATION/ALERT from
   // customGraphId; REPORT is set by the scheduled-report upsert path.
-  triggerKind          TriggerKind       @default(AUTOMATION)
+  triggerKind          TriggerKind               @default(AUTOMATION)
   actionParams         Json
   // Legacy structured filter object (FilterField -> values). Retained for
   // back-compat; new trace-subject automations author `filterQuery` instead
@@ -819,12 +881,18 @@ model Trigger {
   // Evaluated in-memory against fold state at dispatch (never per-trace CH),
   // fail-closed on any unevaluable field.
   filterQuery          String?
-  lastRunAt            Float             @default(0)
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @default(now()) @updatedAt
-  active               Boolean           @default(true)
+  lastRunAt            Float                     @default(0)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @default(now()) @updatedAt
+  active               Boolean                   @default(true)
+  // Why the platform paused this automation, and when. NULL means it was not
+  // paused by the platform: `active = false` alone cannot distinguish an
+  // automation a customer switched off from one runaway containment stopped,
+  // and resuming must clear both. Today the only value is "runaway_volume".
+  pausedReason         String?
+  pausedAt             DateTime?                 @db.Timestamptz(3)
   message              String?
-  deleted              Boolean           @default(false)
+  deleted              Boolean                   @default(false)
   alertType            AlertType?
   // Customer-authored Liquid notification templates (see ADR-036). NULL on any
   // column means "render with the framework default", so existing triggers are
@@ -835,7 +903,7 @@ model Trigger {
   emailBodyTemplate    String?
   // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
-  notificationCadence  String            @default("immediate")
+  notificationCadence  String                    @default("immediate")
   // Per-trigger trace-readiness debounce in ms (ADR-026). The column
   // applies to every action class — a persist row captured before the
   // trace settles diverges from the trace UI permanently. Today only
@@ -844,46 +912,13 @@ model Trigger {
   // until the persist-side debounce wiring lands. The column default
   // is set so a future code change can enable persist-side debounce
   // without a schema migration.
-  traceDebounceMs      Int               @default(30000)
+  traceDebounceMs      Int                       @default(30000)
   TriggerSent          TriggerSent[]
-  webhookDeliveries    WebhookDelivery[]
-  customGraphId        String?           @unique
-  customGraph          CustomGraph?      @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  webhookDeliveries    WebhookEndpointDelivery[]
+  customGraphId        String?                   @unique
+  customGraph          CustomGraph?              @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
-}
-
-// ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
-// webhook automation's "recent fires". One row per HTTP attempt; all attempts
-// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). A slim
-// facts table: outcome, status, latency, a capped error message, plus a
-// truncated copy of a failure response for debugging. Our request content
-// (URL, headers, body) is never stored. Pruned after 30 days.
-model WebhookDelivery {
-  id             String                 @id @default(nanoid())
-  projectId      String
-  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  triggerId      String
-  trigger        Trigger                @relation(fields: [triggerId], references: [id], onDelete: Cascade)
-  // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
-  dispatchId     String
-  // Null when no HTTP response arrived (transport/SSRF/timeout).
-  responseStatus Int?
-  latencyMs      Int?
-  // Capped, classified error message when the attempt failed (scrubbed of
-  // the configured header values).
-  error          String?
-  // The receiver's truncated failure response ({body, headers, retryAfterMs})
-  // — debugging context, industry-baseline plaintext (GitHub/Stripe style),
-  // scrubbed of our configured header values before storage; deleted with
-  // the row by the 30-day prune. Null on success and no-response failures.
-  response       Json?
-  outcome        WebhookDeliveryOutcome
-  firedAt        DateTime               @default(now())
-  createdAt      DateTime               @default(now())
-
-  @@index([projectId, triggerId, dispatchId])
-  @@index([projectId, triggerId, firedAt])
 }
 
 enum WebhookDeliveryOutcome {
@@ -900,41 +935,70 @@ enum WebhookDeliveryOutcome {
 /// or family wildcards ("gateway.*", "*"). Failure-streak columns drive the
 /// 72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.
 model WebhookEndpoint {
-  id                      String                @id
-  organizationId          String
-  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  url                     String
-  secretEncrypted         String
+  id                          String                 @id
+  organizationId              String
+  organization                Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Where this endpoint delivers. Everything above the last hop is shared:
+  /// same batching, same retry ladder, same delivery log, same signature over
+  /// the same bytes.
+  destinationKind             WebhookDestinationKind @default(http)
+  /// The receiver URL. Present on `http` endpoints and null on the others;
+  /// the per-kind shape is pinned by a CHECK constraint Prisma cannot model.
+  url                         String?
+  /// The Amazon SQS queue this endpoint delivers to, on `sqs` endpoints. The
+  /// region and the owning account are read off it rather than configured
+  /// separately, so they can never disagree with the queue.
+  sqsQueueUrl                 String?
+  /// The role we assume to write to the queue, and the ExternalId that proves
+  /// the request came from us rather than from anyone who learned the role's
+  /// name. The recommended credential mode.
+  sqsRoleArn                  String?
+  sqsExternalId               String?
+  /// A static key pair for the queue, encrypted at rest exactly like the
+  /// signing secret. Both halves are present or both are absent: a half-filled
+  /// pair is what the AWS SDK reads as "we have credentials" and stops looking
+  /// with, so the CHECK constraint refuses it.
+  sqsAccessKeyId              String?
+  sqsSecretAccessKeyEncrypted String?
+  secretEncrypted             String
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
   /// swaps secrets on its own schedule instead of dropping deliveries in the
   /// gap. Null once the window closes or if the secret was never rolled.
-  previousSecretEncrypted String?
+  previousSecretEncrypted     String?
   /// When the previous secret stops being signed with and accepted.
-  previousSecretExpiresAt DateTime?
-  enabledEvents           String[]              @default([])
-  status                  WebhookEndpointStatus @default(ACTIVE)
+  previousSecretExpiresAt     DateTime?
+  enabledEvents               String[]               @default([])
+  status                      WebhookEndpointStatus  @default(ACTIVE)
   /// Why the endpoint is disabled: "auto_failures_72h" or "manual".
-  disabledReason          String?
-  disabledAt              DateTime?
+  disabledReason              String?
+  disabledAt                  DateTime?
   /// Start of the current consecutive-failure streak; cleared on any 2xx.
   /// 72 hours of unbroken failures from this instant auto-disables.
-  failingSince            DateTime?
+  failingSince                DateTime?
   /// Delivery controls, each server-bounded (see webhookDeliveryControls
   /// constants): envelopes per POST, coalescing window before a partial
   /// batch ships, and concurrent POSTs to this receiver.
-  maxBatchSize            Int                   @default(100)
-  maxBatchDelayMs         Int                   @default(250)
-  maxInFlight             Int                   @default(4)
-  lastSuccessAt           DateTime?
-  lastFailureAt           DateTime?
-  archivedAt              DateTime?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @default(now()) @updatedAt
+  maxBatchSize                Int                    @default(100)
+  maxBatchDelayMs             Int                    @default(250)
+  maxInFlight                 Int                    @default(4)
+  lastSuccessAt               DateTime?
+  lastFailureAt               DateTime?
+  archivedAt                  DateTime?
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @default(now()) @updatedAt
 
   deliveries WebhookEndpointDelivery[]
 
   @@index([organizationId, status])
+}
+
+/// The last hop a webhook endpoint delivers over. Lowercase because these
+/// values are the wire spelling: the same strings appear in the REST DTO,
+/// both SDKs and the CLI.
+enum WebhookDestinationKind {
+  http
+  sqs
 }
 
 enum WebhookEndpointStatus {
@@ -942,19 +1006,43 @@ enum WebhookEndpointStatus {
   DISABLED
 }
 
-/// Per-attempt delivery log for webhook-endpoint batches, mirroring the
-/// automations WebhookDelivery shape. `dispatchId` groups every attempt of
-/// one batch (== the X-LangWatch-Event-Id header); the receiver's HTTP
-/// status, latency, and truncated response are stored per attempt so their
-/// error codes are visible. Pruned after 30 days.
+/// Which webhook pipeline wrote a delivery row, and therefore which columns
+/// carry its tenancy: `platform` rows anchor on organizationId + endpointId,
+/// `automations` rows on projectId + triggerId.
+enum WebhookDeliveryChannel {
+  platform
+  automations
+}
+
+/// The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints
+/// platform's batches and the automations channel's trigger fires. One row per
+/// HTTP attempt; `dispatchId` groups every attempt of one logical send (the
+/// value of the X-LangWatch-Delivery-Id or X-LangWatch-Event-Id header). A slim
+/// facts table: outcome, status, latency, a capped error message, and a
+/// truncated copy of a failure response. Our request content (URL, headers,
+/// body) is never stored. Pruned after 30 days.
+///
+/// The two channels used to keep separate tables with the same columns and two
+/// prune implementations. They are one table with a discriminator now, so the
+/// tenancy columns of the channel that did not write a row are null.
 model WebhookEndpointDelivery {
   id             String                 @id @default(nanoid())
-  organizationId String
-  endpointId     String
-  endpoint       WebhookEndpoint        @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  channel        WebhookDeliveryChannel @default(platform)
+  /// Platform tenancy. Null on automations rows.
+  organizationId String?
+  endpointId     String?
+  endpoint       WebhookEndpoint?       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  /// Automations tenancy. Null on platform rows.
+  projectId      String?
+  project        Project?               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  triggerId      String?
+  trigger        Trigger?               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
   dispatchId     String
-  attempt        Int
-  eventCount     Int
+  /// 1-based attempt and the batch's envelope count. Both null on automations
+  /// rows, which record neither: one trigger fire is one event, and the
+  /// channel's sender does not thread its attempt number into the log.
+  attempt        Int?
+  eventCount     Int?
   responseStatus Int?
   latencyMs      Int?
   error          String?
@@ -967,6 +1055,8 @@ model WebhookEndpointDelivery {
   @@index([organizationId, firedAt])
   @@index([firedAt])
   @@index([endpointId, dispatchId])
+  @@index([projectId, triggerId, firedAt])
+  @@index([projectId, triggerId, dispatchId])
 }
 
 enum ExperimentType {
@@ -998,6 +1088,15 @@ model Experiment {
   @@index([projectId, archivedAt])
 }
 
+// Annotation - a reviewer's comment on a trace, or on one part of it.
+//
+// anchorKind/anchorId/anchorPath record which part the comment is about. All
+// three null means the trace as a whole, which is what every surface that reads
+// whole traces (the annotations list, the queue, the trace projections that
+// feed the table and the dataset columns, the REST list endpoints) reads.
+// Plain strings rather than an enum: a fourth kind of part is then a code
+// change and not a schema migration, and a kind this build does not recognise
+// reads as a comment about the trace rather than failing the list.
 model Annotation {
   id             String   @id @default(nanoid())
   projectId      String
@@ -1012,11 +1111,20 @@ model Annotation {
   email          String?
   scoreOptions   Json?
   expectedOutput String?
+  // "span" | "field" | "message"; null = the trace as a whole
+  anchorKind     String?
+  // The element the comment names: a spanId for span and field anchors, the
+  // turn's traceId for a message anchor
+  anchorId       String?
+  // What inside that element: "output", "params.temperature", or a message's
+  // key; null = the whole element
+  anchorPath     String?
 
   @@index([projectId])
   @@index([traceId])
   @@index([userId])
   @@index([projectId, traceId])
+  @@index([projectId, traceId, anchorKind])
 }
 
 // ModelProvider - org-scoped, multi-scope provider configuration.
@@ -1166,8 +1274,12 @@ model ModelDefaultConfig {
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
-// One config can have many scope attachments; one scope can have many
-// configs (resolver tiebreaks by createdAt DESC).
+// One config can have many scope attachments, but a scope belongs to at
+// most ONE config: every write path that attaches a scope first detaches
+// it from whichever config held it, under the same per-scope advisory
+// lock, and deletes any config left with zero attachments. The resolver
+// still tiebreaks same-scope configs by createdAt DESC as defense for
+// rows written before that invariant existed.
 model ModelDefaultConfigScope {
   id        String                @id @default(nanoid())
   configId  String
@@ -1181,17 +1293,18 @@ model ModelDefaultConfigScope {
   @@index([configId])
 }
 
-/// A GitHub App installation mapped to a LangWatch organization. Langy mints
-/// short-lived (1h) installation access tokens against these rows to open
-/// bot-authored pull requests, scoped to the installation's repositories. No
-/// user token and no secret are stored here — the crown jewel is the App
-/// private key, held only in the control-plane env. Issue: #4747. Spec:
-/// specs/langy/langy-github-install.feature.
+/// The organization's GitHub connection: a GitHub App installation mapped to a
+/// LangWatch organization. Short-lived (1h) installation access tokens are
+/// minted against these rows on demand, by Langy for writes (bot-authored pull
+/// requests, scoped to the installation's repositories) and by pull-request
+/// linkage for reads. No user token and no secret are stored here, the crown
+/// jewel is the App private key, held only in the control-plane env.
+/// Spec: specs/integrations/github-connection.feature.
 ///
-/// installationId is globally unique (one GitHub installation → one row); a
+/// installationId is globally unique (one GitHub installation, one row); a
 /// single LangWatch organization may own MANY installations (different GitHub
-/// accounts), so the org↔installation relationship is one-to-many.
-model LangyGithubInstallation {
+/// accounts), so the org to installation relationship is one-to-many.
+model GithubInstallation {
   id                  String       @id @default(nanoid())
   /// GitHub installation id (numeric; stored as string). Globally unique.
   installationId      String       @unique
@@ -1216,6 +1329,92 @@ model LangyGithubInstallation {
   updatedAt           DateTime     @default(now()) @updatedAt
 
   @@index([organizationId])
+}
+
+/// A pull request discovered through the organization's GitHub connection and
+/// mapped to the branch it was opened from, so a coding-agent session that
+/// knows only its branch can name the pull request it produced.
+/// Spec: specs/integrations/github-connection.feature.
+///
+/// The stored title, state, draft and timestamp columns are SNAPSHOTS taken
+/// when the mapping was last refreshed. They are fallback labels only: the
+/// frontend reads live status from GitHub, so a stale row never presents
+/// itself as current truth.
+model GithubPullRequest {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The GitHub host the repository lives on, e.g. "github.com".
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED so a lookup matches whatever casing the
+  /// session reported.
+  repositoryFullName String
+  /// The branch the pull request was opened from.
+  headBranch         String
+  prNumber           Int
+  htmlUrl            String
+  title              String
+  /// GitHub's own state string: "open" or "closed".
+  state              String
+  isDraft            Boolean      @default(false)
+  authorLogin        String?
+  prCreatedAt        DateTime
+  prClosedAt         DateTime?
+  prMergedAt         DateTime?
+  /// GitHub's own `updated_at` for the snapshot this row holds, and the
+  /// freshness guard on every write to it: a snapshot older than the stored one
+  /// is skipped. GitHub may deliver webhooks out of order, and without the
+  /// guard a late `opened` lands after `closed` and reopens a merged pull
+  /// request. NULL means the row predates the column, so any write is accepted.
+  prUpdatedAt        DateTime?
+  /// When this row was first mapped to its branch.
+  mappedAt           DateTime     @default(now())
+  /// When the snapshot columns were last refreshed from GitHub.
+  lastCheckedAt      DateTime     @default(now())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, prNumber])
+  @@index([organizationId, repositoryHost, repositoryFullName, headBranch])
+}
+
+/// The per-branch bookkeeping behind pull-request mapping: when a branch was
+/// last looked up on GitHub, how many pull requests it resolved to, and when it
+/// may be asked about again. A branch with no pull request is the common case,
+/// so `notFoundAt` plus `recheckAfter` is what keeps an unmapped branch from
+/// costing a GitHub call on every read.
+/// Spec: specs/integrations/github-connection.feature.
+model GithubBranchPullRequestCheck {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED, matching GithubPullRequest.
+  repositoryFullName String
+  headBranch         String
+  lastCheckedAt      DateTime
+  prCount            Int          @default(0)
+  /// Set while the branch resolves to no pull request; cleared once one is
+  /// found.
+  notFoundAt         DateTime?
+  /// The earliest instant GitHub may be asked about this branch again.
+  recheckAfter       DateTime?
+  /// Consecutive lookups that found nothing, backing off the recheck.
+  attempts           Int          @default(0)
+  /// When a reader last asked about this branch, whether or not GitHub was
+  /// called.
+  lastRequestedAt    DateTime
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, headBranch])
+  /// The branch-recheck sweep's index, matched to the sweep's query shape:
+  /// `recheckAfter <= now` bounds the scan AND supplies the ordering,
+  /// `lastRequestedAt` cuts the activity horizon in the index, and
+  /// `notFoundAt IS NOT NULL` is checked there too rather than by fetching the
+  /// heap row. Leading with organizationId cannot serve it, because the sweep
+  /// is the one read in this feature with no organization to name.
+  @@index([recheckAfter, lastRequestedAt, notFoundAt])
 }
 
 /// Rebuildable operational state folded from Langy's canonical event stream.
@@ -1503,19 +1702,23 @@ model AnnotationQueueScores {
 }
 
 model AnnotationQueueItem {
-  id                String           @id @default(nanoid())
-  annotationQueueId String?
-  annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
-  userId            String?
-  user              User?            @relation("AssignedTo", fields: [userId], references: [id])
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @default(now()) @updatedAt
-  createdByUserId   String?
-  createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
-  traceId           String
-  projectId         String
-  doneAt            DateTime?
-  project           Project          @relation(fields: [projectId], references: [id])
+  id                 String           @id @default(nanoid())
+  annotationQueueId  String?
+  annotationQueue    AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
+  userId             String?
+  user               User?            @relation("AssignedTo", fields: [userId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @default(now()) @updatedAt
+  createdByUserId    String?
+  createdByUser      User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
+  traceId            String
+  projectId          String
+  doneAt             DateTime?
+  /// Set while the annotator wants this item's trace added to a dataset once
+  /// the queue walk is finished. Persisted rather than kept in the browser so
+  /// the selection survives a refresh and stays visible to teammates.
+  markedForDatasetAt DateTime?
+  project            Project          @relation(fields: [projectId], references: [id])
 
   @@unique([traceId, userId, projectId])
   @@unique([traceId, annotationQueueId, projectId])
@@ -1572,6 +1775,31 @@ model PinnedTrace {
   source    PinSource @default(manual)
   reason    String?
   createdAt DateTime  @default(now())
+
+  @@unique([projectId, traceId])
+  @@index([projectId])
+}
+
+// A reviewer's correction to one trace, stored beside the captured trace and
+// applied at read time. The captured data in ClickHouse is never rewritten.
+//
+// `patch` holds a version-1 correction shaped like the canonical trace model:
+// whole-field replacements per span plus the ids of the spans that were
+// removed (see traceEditOverlay.schemas.ts). It is validated on write and
+// re-validated on read, so a row this build cannot interpret degrades to "no
+// correction" instead of failing the trace read.
+model TraceEditOverlay {
+  id          String   @id
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  traceId     String
+  patch       Json
+  createdById String?
+  createdBy   User?    @relation("TraceEditOverlayCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("TraceEditOverlayUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([projectId, traceId])
   @@index([projectId])
@@ -1655,19 +1883,20 @@ enum CustomLLMModelCostScopeType {
 // has no closer override. The legacy projectId column is kept (nullable)
 // for one release of read compatibility; new writes target the scope.
 model CustomLLMModelCost {
-  id                        String                      @id @default(nanoid())
-  organizationId            String
-  scopeType                 CustomLLMModelCostScopeType @default(PROJECT)
-  scopeId                   String
-  projectId                 String?
-  model                     String
-  regex                     String
-  inputCostPerToken         Float?
-  outputCostPerToken        Float?
-  cacheReadCostPerToken     Float?
-  cacheCreationCostPerToken Float?
-  createdAt                 DateTime                    @default(now())
-  updatedAt                 DateTime                    @default(now()) @updatedAt
+  id                          String                      @id @default(nanoid())
+  organizationId              String
+  scopeType                   CustomLLMModelCostScopeType @default(PROJECT)
+  scopeId                     String
+  projectId                   String?
+  model                       String
+  regex                       String
+  inputCostPerToken           Float?
+  outputCostPerToken          Float?
+  cacheReadCostPerToken       Float?
+  cacheCreationCostPerToken   Float?
+  cacheCreation1hCostPerToken Float?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @default(now()) @updatedAt
 
   @@index([organizationId])
   @@index([scopeType, scopeId])
@@ -1807,7 +2036,12 @@ model LlmPromptConfig {
 
   @@unique([handle], map: "LlmPromptConfig_handle_key")
   @@index([projectId])
-  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  // Listing queries filter on (organizationId, scope) together. On a plain
+  // organizationId index one large organization matches almost every row and
+  // the planner falls back to scanning the table; scope in the index keeps
+  // the lookup selective. The composite also serves organizationId-only
+  // filters as its prefix, so a separate single-column index is not needed.
+  @@index([organizationId, scope])
   @@index([copiedFromPromptId])
 }
 
@@ -1941,7 +2175,7 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow"
+  type              String // "signature" | "code" | "workflow" | "http"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
@@ -1990,11 +2224,21 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Named parameters the scenario declares, as an array of
+  // { name, description?, defaultValue? }. Values are supplied or overridden
+  // when a run starts, delivered to the target under test, and readable from
+  // the scenario's own situation and criteria as `params.NAME`. Null and an
+  // empty array both mean "this scenario declares none", which is the path
+  // that renders its text untouched. See
+  // specs/scenarios/scenario-run-parameters.feature.
+  parameters      Json?
   // Optional per-scenario model overrides for the run. When null the run
   // resolves the project's scenarios.user_simulator / scenarios.judge
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  maxTurns        Int?
+  minTurns        Int?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2162,6 +2406,135 @@ model RoleBinding {
   @@index([groupId])
   @@index([apiKeyId])
   @@index([scopeType, scopeId])
+}
+
+// The grants ledger's operational projection (ADR-092 §13). One row per
+// access fact, fed exclusively by the authz_grants fold - application code
+// never writes here, with ONE named exception: revocation enforcement
+// deletes rows on the calling path ahead of the fold (deny-early only; the
+// fold's later apply of the same event is a no-op). Ids are deterministic
+// KSUIDs derived from event content, which is what makes every upsert
+// idempotent. Principal and scope are plain columns, not foreign keys: rows
+// are facts derived from the ledger, and five scope types point at five
+// different kinds of thing.
+model Grant {
+  id             String @id
+  organizationId String // plain column, never a relation: projection rows are
+  // facts derived from the ledger and must not presume any other row exists
+  // mid-replay or mid-migration
+
+  principalType GrantPrincipalType
+  principalId   String? // null only for ANYONE (resource tier)
+
+  roleKey    String? // admin | member | viewer | lite-member | custom:<id>; null on RESOURCE rows
+  // The `role` column an IMPORTED binding carried alongside a custom:<id>
+  // roleKey, which cannot express it. The legacy resolver still reads it (a
+  // custom role with an empty permission list falls back to the row's own
+  // role), so the compat head has to reproduce it - and this column is what
+  // lets a projection reloaded from these rows reconstruct the fact rather
+  // than a lossy copy. Null on everything ledger-born; retired at cutover.
+  legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
+  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
+
+  scopeType GrantScopeType
+  scopeId   String
+
+  // Resource-tier FACT columns (ShareLink heritage, ADR-057 possession
+  // intact; null on every other tier). All of them are set by the mint event
+  // and owned by the fold like every other column here. View-consumption
+  // accounting (viewCount) deliberately does NOT live on this table - it
+  // has a different writer (ShareService) and lives in GrantUsage below.
+  //
+  // scopeId is the shared resource's id alone, so the row carries the rest
+  // of that resource's identity itself: resourceKind says what the id names
+  // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
+  // lives. createdByUserId is whoever minted the link.
+  // Unique GLOBALLY, revoked or not: a reissued token is an old share link
+  // that works again, which is the one thing revoking it was for.
+  token           String?   @unique
+  permission      String?
+  resourceKind    String?
+  projectId       String?
+  createdByUserId String?
+  expiresAt       DateTime?
+  maxViews        Int?
+
+  occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  // A revoke MARKS the row rather than deleting it. Deleting made the
+  // projection order-dependent - a redelivered `attached` after a `revoked`
+  // had no row left to lose to - and it threw away the answer to when a
+  // grant ended and why. Every read of live access fences on this being null.
+  revokedAt     DateTime?
+  revokedReason String?
+
+  // The collector's principal scan is served by
+  // "Grant_organizationId_principalType_principalId_idx", a PARTIAL index
+  // (`WHERE "scopeType" <> 'RESOURCE'`) defined in migration
+  // 20260817160000_grants_ledger_projections. Prisma has no partial indexes,
+  // so - exactly as RoleBinding's six partial uniques do - it is NOT declared
+  // here: an `@@index` for it would make the next `prisma migrate dev` drop
+  // the partiality and rebuild it over every share-link row, which is the one
+  // thing the WHERE clause exists to avoid.
+  //
+  // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
+  // four identity columns (token, permission, resourceKind, projectId), tied
+  // to scopeType = 'RESOURCE'. Added over two columns in
+  // 20260817160000_grants_ledger_projections and widened to four in
+  // 20260818120001_grant_resource_facts, which is where the other two arrive.
+  // Prisma cannot express it either.
+  @@index([organizationId, scopeType, scopeId])
+  // The resource tier's own access shape: the compat/share write paths and
+  // the token-possession reads both fence on (project, kind, resource).
+  @@index([projectId, resourceKind, scopeId])
+}
+
+// ShareService-owned view accounting for resource grants (delivery-plan
+// decision 22). Split from Grant because it has a different writer: the fold
+// owns the fact columns, ShareService increments this row once per view. The
+// fold NEVER writes here - a projection pass that touched viewCount would
+// reset every share link's view budget.
+model GrantUsage {
+  grantId        String @id // the Grant row's id; deterministic, so this row is addressable before the view happens
+  organizationId String
+  projectId      String
+
+  viewCount    Int       @default(0)
+  lastViewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+  // The share write path fences its conditional consume on (grant,
+  // organization, project) and the cutover seeds a whole project's budgets at
+  // once; without this the project-scoped reads fall back to the
+  // organization index and filter.
+  @@index([projectId])
+}
+
+// The grants ledger's role projection - CustomRole's successor, fed by the
+// same fold. Imported roles keep their CustomRole id, so custom:<id>
+// roleKeys stay stable across the cutover.
+model Role {
+  id             String   @id
+  organizationId String // plain column, never a relation (see Grant)
+  name           String
+  description    String?
+  permissions    Json // registry permission strings only; empty grants nothing
+  kind           String    @default("custom") // "custom" | "system_api_key"
+  occurredAt     DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  // A delete marks the row. The name stays taken: identity is the id, and
+  // reusing a deleted role's name would make two different roles read as one
+  // in every audit trail that recorded the name.
+  deletedAt      DateTime?
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model ApiKey {
@@ -2371,6 +2744,8 @@ enum GatewayChangeEventKind {
   CACHE_RULE_CREATED
   CACHE_RULE_UPDATED
   CACHE_RULE_DELETED
+  ROUTING_POLICY_UPDATED
+  ROUTING_POLICY_DELETED
 }
 
 // Gateway audit action codes - kept as a TypeScript const union in
@@ -2435,6 +2810,14 @@ model VirtualKey {
   disabledAt     DateTime?
   disabledReason String?
 
+  // The moment the key stops serving, or null for a key that never
+  // expires. Read at resolve time and compared with now, the same way
+  // ApiKey.expiresAt is: the status column stays ACTIVE, so extending the
+  // date is an ordinary edit and no sweeper has to run for the key to
+  // stop. Unindexed on purpose: the check rides a lookup by secret hash
+  // that already resolves one row.
+  expiresAt DateTime?
+
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
   // Only the hashed form and a short display prefix are kept after
@@ -2448,10 +2831,22 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
-  // Where this key's traces and costs land, for keys whose access scopes
-  // do not name a single project (org- and team-owned keys). Deliberately
-  // NOT a VirtualKeyScope row: scope rows grant access and visibility,
-  // and the trace destination must grant neither.
+  // Where this key's traces and costs land. Decided once, when the key is
+  // written, and stored: it used to be derived on every read by trying this
+  // column, then the key's single project scope, then the organization's
+  // governance project, which is three lookups that each had to remember
+  // that a deleted project is not a destination.
+  //
+  // Deliberately NOT a VirtualKeyScope row: scope rows grant access and
+  // visibility, and the trace destination must grant neither. Editing the
+  // scopes therefore does not move it.
+  //
+  // Nullable at the database level, and the invariant that every key
+  // written carries a destination is enforced in the app. A NOT NULL would
+  // fail a self-hosted migration on an organization whose data predates
+  // governance projects, where there is genuinely nothing to write; those
+  // keys read as null, the gateway skips span export rather than failing,
+  // and the next edit of the key is refused until it is given a home.
   traceProjectId String?
 
   // Slim config blob - per-key state only. The "gateway-config bundle"
@@ -2593,31 +2988,36 @@ model RoutingPolicy {
   // Ordered list of ModelProvider.id values (post-iter-110: GPC merged
   // into MP, the chain refers to MPs directly). JSON for shape
   // flexibility; gateway materialises into provider chain at request
-  // time. Order = try-first when strategy = 'priority'.
+  // time. Order = the order the gateway tries them in.
   modelProviderIds Json @default("[]")
-
-  // Optional model allowlist (JSON array of glob patterns).
-  // null/empty = "all models the eligible providers can serve".
-  modelAllowlist Json?
 
   // Model name rewrites applied before dispatch. Shape:
   //   { "gpt-4o": "gpt-4o-mini", "claude": "anthropic/claude-haiku-4-5" }
   // Hoisted from per-VK config (iter 110) onto the RoutingPolicy so a
   // single policy edit updates every VK linked to it. Empty object = no
   // rewrites.
+  //
+  // The reserved tier names (complex / reasoning / fast, see
+  // src/utils/modelTierPresets.ts) live in here as ordinary entries. The
+  // gateway needs no knowledge of them: it looks a tier up the same way it
+  // looks up any other name.
   modelAliases Json @default("{}")
+
+  // The model a reserved tier name resolves to when this policy names no
+  // target for it. Applies to the tier names ONLY, never as a catch-all for
+  // an unrecognized model: a catch-all would serve a caller a model they
+  // never named, turn every typo into a billed call, and make an allowlist
+  // unenforceable because nothing would reach the rejection.
+  //
+  // Stores a concrete, provider-qualified model id. A moving name such as
+  // "openai/latest" would make the gateway dispatch a model literally called
+  // "latest".
+  defaultModel String?
 
   // Provider-agnostic policy rules - deny/allow lists per dimension.
   // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
   // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
   policyRules Json @default("{}")
-
-  // Routing strategy applied across the model-eligible subset.
-  //   'priority'    - try modelProviderIds in order (default)
-  //   'cost'        - pick lowest unit cost first
-  //   'latency'     - pick fastest healthy provider
-  //   'round_robin' - distribute evenly
-  strategy String @default("priority")
 
   isDefault Boolean @default(false)
 
@@ -2920,7 +3320,7 @@ model AnomalyAlert {
 }
 
 /// Org-scoped catalog of AI tools surfaced on the personal home portal
-/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+/// (/me) and managed by org admins at /governance/tool-catalog.
 ///
 /// Three first-class tile types via `type` discriminator:
 ///   - "coding_assistant" - click expands to setup helper (e.g. `langwatch claude`)
@@ -3166,6 +3566,14 @@ model GatewayBudget {
   resetsAt               DateTime
   lastResetAt            DateTime?
 
+  // The phase of a cyclic window. NULL keeps the window calendar aligned
+  // (a MONTH budget rolls on the 1st); set, the window rolls from this
+  // instant instead, so a budget anchored on the 17th at 09:00 UTC starts a
+  // fresh month every 17th at 09:00 UTC. Immutable once written: moving it
+  // would redraw every period the budget has already reported and enforced
+  // on. Only ever set on a cyclic window; TOTAL and MANUAL do not cycle.
+  cycleAnchorAt DateTime?
+
   archivedAt DateTime?
 
   createdAt   DateTime @default(now())
@@ -3398,6 +3806,12 @@ model ProcessManagerInbox {
   /// adds NOT NULL once the fleet has cycled and closes it.
   sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
+  // Do not add an index on `consumedAt` here. The retention sweep can use one,
+  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
+  // this table, the highest-volume write path in the system. The index is
+  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
+  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
+  // it on the bounded table it maintains.
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
@@ -3406,6 +3820,15 @@ model ProcessManagerInbox {
 enum ProcessManagerOutboxStatus {
   pending
   dispatched
+  dead
+  /// An operator marked this dead message as never-to-be-sent
+  /// (specs/ops/dead-letter-recovery.feature). A mark, not a delete: the row
+  /// is retained as its own audit trail and the dispatcher never leases it.
+  discarded
+}
+
+enum ProcessManagerOutboxAttemptOutcome {
+  retry_scheduled
   dead
 }
 
@@ -3430,10 +3853,44 @@ model ProcessManagerOutbox {
   dispatchedAt  DateTime?                  @db.Timestamptz(3)
   createdAt     DateTime                   @db.Timestamptz(3)
   updatedAt     DateTime                   @db.Timestamptz(3)
+  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
+  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
+  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
+  // blocks INSERT on this table, the highest-volume write path in the system.
+  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
+  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
+  // without it on the bounded table it maintains.
+
+  attemptLog ProcessManagerOutboxAttempt[]
 
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+}
+
+/// Why an outbox delivery failed, one row per FAILED attempt
+/// (specs/ops/dead-letter-recovery.feature). Successes write nothing, so the
+/// table grows with trouble, not with traffic. Rows die with their message:
+/// the cascade delete is the retention story, riding the existing sweep.
+model ProcessManagerOutboxAttempt {
+  id           String                             @id @default(nanoid())
+  outboxId     String
+  projectId    String
+  /// 1-based attempt number, as the dispatcher counts it.
+  attempt      Int
+  occurredAt   DateTime                           @db.Timestamptz(3)
+  outcome      ProcessManagerOutboxAttemptOutcome
+  errorType    String
+  /// The safe failure diagnostic the dispatcher already computes for its
+  /// span — never a raw provider body.
+  errorMessage String
+  retryAfterMs Int?
+
+  outbox ProcessManagerOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+
+  // Also what makes the cascade delete affordable: Postgres does not index
+  // the referencing side of a foreign key on its own.
+  @@index([outboxId, attempt])
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable
@@ -3636,4 +4093,184 @@ model BugReport {
   metadata         Json?
 
   @@index([createdAt])
+}
+
+// The stored outcome of a request that carried an `Idempotency-Key`, so that
+// retrying a create returns the original answer instead of creating a second
+// row. See `~/server/api/idempotency` for the semantics.
+//
+// `scopeId` is the tenancy the key is unique within: the project on the
+// gateway platform's creates, the organization on the webhook platform's,
+// matching each family's auth scope. A key is private to the tenant that used
+// it, so two tenants can pick the same string without colliding.
+//
+// A NULL `responseStatus` is the pending marker, written before the handler
+// runs and filled in once it succeeds. Only successful outcomes are ever
+// stored, so a row with a status is always a 2xx worth replaying.
+//
+// `responseBody` holds the exact bytes of the original response, AES-256-GCM
+// encrypted under CREDENTIALS_SECRET. Encrypted because two of the four creates
+// answer with a show-once secret that is kept nowhere else in readable form, so
+// replaying them means the secret transits this row. Stored as the serialised
+// bytes rather than as a document because that is what makes a replay
+// byte-identical: a string round trip leaves nothing in a position to reorder
+// or renormalise it.
+//
+// Expired rows are dropped lazily, when their key is next presented, as are
+// rows that no longer decrypt because the secret was rotated under them. The
+// `expiresAt` index is there so an operator can also prune in bulk, since keys
+// that are never retried are never revisited.
+model IdempotencyReceipt {
+  id                 String   @id @default(nanoid())
+  scopeId            String
+  key                String
+  claimId            String
+  requestFingerprint String
+  responseStatus     Int?
+  responseBody       String?  @db.Text
+  createdAt          DateTime @default(now())
+  heartbeatAt        DateTime
+  expiresAt          DateTime
+
+  @@unique([scopeId, key])
+  @@index([expiresAt])
+}
+
+// The status of a brokered realtime voice session (ADR-097).
+enum GatewayRealtimeSessionStatus {
+  // The credential was minted and the call may be running. Only OPEN rows
+  // count against the key's cap.
+  OPEN
+  // The vendor reported the call, or the client posted its usage.
+  CLOSED
+  // The mint never produced a credential, so no call exists.
+  FAILED
+  // The row outlived the longest call the vendor allows with no report.
+  // Its spend record settles as cost-unknown; a late report supersedes it.
+  EXPIRED
+}
+
+// One brokered realtime voice session.
+//
+// The gateway holds no session state: a voice session outlives the request
+// that minted it, its vendor report lands on whichever replica answers next,
+// and the per-key open-session cap has to be counted somewhere every replica
+// sees. This row is that place.
+//
+// `id` IS the gateway request id, so the session and its spend record are one
+// aggregate seen from two sides. Nothing here carries conversation content:
+// the media socket runs client to vendor and never reaches this platform.
+model GatewayRealtimeSession {
+  id             String @id
+  projectId      String
+  organizationId String
+  virtualKeyId   String
+
+  // The credential row the mint used. The vendor's webhook is verified
+  // against this row's own secret, which is what keeps the HMAC check a
+  // single computation instead of a walk over every configured provider.
+  modelProviderId String
+
+  // "openai" or "elevenlabs". Not an enum: a vendor added later must not
+  // need a migration on the hot path of a mint.
+  vendor  String
+  agentId String?
+
+  // The catalog id this session bills under.
+  model String
+
+  // The model id the caller asked for, which is what the mint's own span
+  // records. It differs from `model` whenever the request named a
+  // provider-prefixed alias, so the settlement span has to use this one or
+  // one call shows up as two models: the mint at no cost, and the cost under
+  // a name the trace never mentions.
+  requestedModel String?
+
+  // The vendor's own id for the conversation. Unique per vendor so a
+  // redelivered post-call report resolves to exactly one session, and NULL
+  // until the mint reports one, since Postgres treats NULLs as distinct.
+  vendorConversationId String?
+
+  status GatewayRealtimeSessionStatus @default(OPEN)
+
+  mintedAt    DateTime  @default(now())
+  closedAt    DateTime?
+  // Why the session left OPEN, for the rows that did not close normally.
+  closeReason String?
+
+  // The customer-facing trace the mint was recorded under.
+  //
+  // A brokered call runs client to vendor, so the only span the gateway emits
+  // for it is the mint itself, and that span is written before the call has
+  // cost anything. Keeping the trace id here lets the settlement write its
+  // cost back into the same trace, so one session stays one trace instead of
+  // becoming a zero-cost mint next to an orphaned cost.
+  traceId String?
+
+  // The vendor's own cost payload, kept verbatim for reconciliation only.
+  // Money is rated from the quantities like every other request; this is
+  // what the two are compared against when they disagree.
+  vendorCostRaw Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // The webhook lookup. Unique per vendor across the whole table, not per
+  // tenant: a vendor's conversation id is unique in the vendor's own system,
+  // so two tenants presenting the same one is a bug rather than a collision
+  // to tolerate. Tenant isolation on the read path is matchRealtimeSession's
+  // organizationId filter, not this key.
+  @@unique([vendor, vendorConversationId])
+  // The cap count: open sessions for one key inside the window.
+  @@index([virtualKeyId, status, mintedAt])
+  // The fallback match, and the expiry sweep.
+  @@index([projectId, status, mintedAt])
+}
+
+// One record per (migration, tenant) for the in-place system migrations
+// runner (@langwatch/system-migrations): one-time data migrations the
+// system performs on itself at worker boot, organization by organization.
+// "Pending" is the absence of a record. `status` is the package's
+// TenantMigrationStatus ("migrated" | "finalized" | "parked"); "finalized"
+// is a one-way latch hot paths read through an in-process cache (a tenant
+// may only leave its legacy path once its record says finalized). `report`
+// carries the migration's own evidence: parity diffs for a held tenant,
+// the error for a parked one, counts for a finalized one. `tenantId` is an
+// Organization id as a plain column ref (no FK) - the runner is generic
+// over tenants and survives organization deletion trivially. First rider:
+// the ADR-092 stage-B TeamUser backfill (@langwatch/authz-server). Spec:
+// specs/migration/authz-grants-rollout.feature.
+model SystemMigrationTenantState {
+  migrationName String
+  tenantId      String
+  status        String
+  report        Json?
+  // BUSINESS time of the transition this row holds - stamped by whoever
+  // wrote it, never by the database. `updatedAt` is wall-clock and moves for
+  // reasons that are not transitions, so it cannot order a transition against
+  // a replayed one: a row created by a replay carries `updatedAt = now` and
+  // would then reject every LATER fact in the same replay. The grants-ledger
+  // projection guards its writes on this column instead
+  // (authz-grants-projection.prisma.repository.ts).
+  occurredAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@id([migrationName, tenantId])
+  @@index([migrationName, status])
+}
+
+model SystemMigrationEnrollment {
+  organizationId   String
+  // The stable name of one registered migration (e.g.
+  // "authz-team-user-backfill"). A plain string column validated in code
+  // against the registered migrations, like the status column above - each
+  // migration is enrolled separately, so the rollout paces per
+  // (organization, migration).
+  migrationName    String
+  enrolledByUserId String
+  createdAt        DateTime @default(now())
+
+  @@id([organizationId, migrationName])
+  @@index([migrationName])
 }

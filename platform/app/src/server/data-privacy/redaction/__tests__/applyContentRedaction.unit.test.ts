@@ -162,6 +162,90 @@ describe("redactAttributeNative", () => {
   });
 });
 
+describe("redactAttributeNative on identifier-shaped values", () => {
+  const stored = (value: string) =>
+    redactAttributeNative({ key: "deployment.name", value, policy: policy({}) })
+      .text;
+
+  describe("given a value that is exclusively one identifier-shaped token", () => {
+    /** @scenario "A datestamped identifier attribute value is not read as a phone number" */
+    it("keeps a datestamped identifier whole", () => {
+      expect(stored("hosted-eu-20260812-09")).toBe("hosted-eu-20260812-09");
+    });
+
+    /** @scenario "A uuid or a digest attribute value is left alone" */
+    it("keeps a uuid and a hex digest whole", () => {
+      expect(stored("550e8400-e29b-41d4-a716-446655440000")).toBe(
+        "550e8400-e29b-41d4-a716-446655440000",
+      );
+      expect(stored("da39a3ee5e6b4b0d3255bfef95601890afd80709")).toBe(
+        "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      );
+    });
+
+    /** @scenario "A host identifier that embeds an address is left alone" */
+    it("keeps a host identifier that embeds an address", () => {
+      expect(stored("pod-10.0.0.1")).toBe("pod-10.0.0.1");
+    });
+
+    it("still scrubs a credential sent as the whole value", () => {
+      expect(stored("sk-ant-" + "A".repeat(40))).toBe("[SECRET]");
+    });
+  });
+
+  describe("given a value the recognizers can prove", () => {
+    /** @scenario "A card number inside an identifier-shaped value is still redacted" */
+    it("redacts a checksum-valid card behind an identifier prefix", () => {
+      expect(stored("ref-4111111111111111")).toBe("ref-[CREDIT_CARD]");
+    });
+
+    /** @scenario "An email address that is the whole attribute value is still redacted" */
+    it("redacts an email address that holds digits", () => {
+      expect(stored("jane.doe1985@example.com")).toBe("[EMAIL_ADDRESS]");
+    });
+
+    it("redacts an email address mentioned inside prose", () => {
+      expect(stored("write to jane.doe1985@example.com today")).toBe(
+        "write to [EMAIL_ADDRESS] today",
+      );
+    });
+  });
+
+  describe("given a value made of digits and separators only", () => {
+    /** @scenario "A phone number that is the whole attribute value is still redacted" */
+    it("redacts an international number written with spaces", () => {
+      expect(stored("+31 6 12345678")).toBe("[PHONE_NUMBER]");
+    });
+
+    /** @scenario "A value of digits and separators with no letters is still redacted" */
+    it("redacts a digit run split by a separator", () => {
+      expect(stored("20260812-09")).toBe("[PHONE_NUMBER]");
+    });
+  });
+
+  describe("given a value that is a sentence rather than one token", () => {
+    it("redacts a phone number mentioned between words", () => {
+      expect(stored("ref 2026081209 checkpoint")).toBe(
+        "ref [PHONE_NUMBER] checkpoint",
+      );
+    });
+  });
+
+  describe("given a value that is structure holding data, not an identifier", () => {
+    it("redacts a phone number inside minified JSON", () => {
+      expect(stored('{"phone":"+14155552671"}')).toBe(
+        '{"phone":"[PHONE_NUMBER]"}',
+      );
+    });
+
+    it("redacts a phone number inside a URL", () => {
+      expect(stored("https://acme.example/u/2026081209")).toBe(
+        "https://acme.example/u/[PHONE_NUMBER]",
+      );
+    });
+  });
+});
+
 describe("redactStringNative with policy PII exceptions", () => {
   it("keeps a fully matched value and redacts everything else", () => {
     const p = policy({ exceptPatterns: ["00\\d{12}"] });

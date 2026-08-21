@@ -60,11 +60,12 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 
 ## What ships where
 
-| Signal  | Backend    | TS app (`platform/app/`)                | Go services (nlpgo, aigateway)                        |
-| ------- | ---------- | --------------------------------------- | ---------------------------------------------------- |
-| Traces  | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`           | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`      |
-| Logs    | Loki       | `PINO_OTEL_ENABLED=true`                | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
-| Metrics | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
+| Signal   | Backend    | TS app (`platform/app/`)                | Go services (nlpgo, aigateway)                        |
+| -------- | ---------- | --------------------------------------- | ---------------------------------------------------- |
+| Traces   | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`           | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`      |
+| Logs     | Loki       | `PINO_OTEL_ENABLED=true`                | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
+| Metrics  | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
+| Profiles | Pyroscope  | `PYROSCOPE_SERVER_ADDRESS`              | `PYROSCOPE_SERVER_ADDRESS`                           |
 
 `make observability-connect` sets all of these in `platform/app/.env` for you
 (backing it up first). The Go services **dual-export**: their product/customer
@@ -72,6 +73,62 @@ traces still go to the LangWatch app (dogfooding); their *own* operational
 telemetry additionally goes to the collector. Setting
 `OTEL_DEBUG_COLLECTOR_ENDPOINT` empty (the default everywhere, prod included)
 leaves Go behavior byte-for-byte unchanged.
+
+## Continuous profiling (flame graphs)
+
+Traces say which call was slow and metrics say the process was busy. Neither
+says which *function* burned the CPU, which is why the last step of a
+performance investigation used to be a guess or a laptop reproduction that never
+quite matched. Pyroscope closes that gap: every process samples itself on a timer
+and pushes the samples, so a flame graph for any window is a query.
+
+It is on whenever the stack is. haven writes `PYROSCOPE_SERVER_ADDRESS` into
+`.env.portless` while Pyroscope is listening and omits it when it is not —
+absence is the off switch, and it is a real one: with nowhere to push to, no
+profiler starts, and in the TS app the native `@datadog/pprof` binding never even
+enters the boot graph. Override the port with `LW_OBS_PYROSCOPE_PORT`.
+
+Profiles are tagged from the same `OTEL_RESOURCE_ATTRIBUTES` the other three
+signals use, so `langwatch_worktree` filters a flame graph down to your own
+worktree exactly like it filters logs. Note the spelling: Pyroscope label names
+follow the Prometheus grammar and reject the dot in `langwatch.worktree`, so both
+SDK wrappers rewrite it to an underscore — the same substitution Loki's
+structured metadata makes.
+
+**The two runtimes report different profile types, and this trips people up.**
+
+| Runtime | Profile types pushed                                    | Pick this in Grafana |
+| ------- | ------------------------------------------------------- | -------------------- |
+| Go      | `process_cpu:*`, `memory:*`, `goroutines`                | `process_cpu`        |
+| TS app  | `wall:wall`, `wall:cpu`, `wall:samples`, heap after ~60s | `wall:wall`          |
+
+The Node profiler samples **wall** time where the Go one samples **CPU**. That is
+deliberate rather than a gap: this server spends most of its life waiting on
+Postgres, ClickHouse and model providers, and a pure CPU profile of a request
+that took four seconds and burned forty milliseconds is accurate and answers the
+wrong question. `collectCpuTime` adds the CPU dimension to the same samples, so
+`wall:cpu` is there when you want it. The practical consequence is that a Grafana
+panel defaulting to `process_cpu` looks **empty** for the TS app — the data is
+under `wall`, not missing.
+
+### When the flame graph is empty
+
+Pyroscope has a failure mode none of the other checks catch: its embedded raft
+metastore can stop while the process keeps serving. In that state `/ingest` still
+answers `200`, so pushes look fine and nothing logs an error, while every read
+times out and the flame graph is empty. It has been seen on a container up four
+days.
+
+`haven status` probes this directly and prints `profiling DEGRADED: <reason>`,
+including Pyroscope's own reason string — which is what separates "it started a
+second ago" from "recreate it". The metastore does not recover on its own, so
+the fix is to replace the container. That resets all four signals, which is
+cheap: the stack keeps no volume, so its telemetry is a debugging window rather
+than an archive.
+
+```bash
+haven restart obs
+```
 
 ## Log correlation fields
 
@@ -125,7 +182,7 @@ mount trimmed Loki/Tempo/Prometheus configs (otel-lgtm reads them from
 Override ports if `:3000`/`:4318` are taken:
 
 ```bash
-LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 make observability
+LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 LW_OBS_PYROSCOPE_PORT=4041 make observability
 ```
 
 ## Reading the data as an agent

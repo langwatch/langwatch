@@ -7,7 +7,6 @@
  * fragility of a native HEAD probe.
  */
 import { z } from "zod";
-import { checkProjectPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
@@ -26,7 +25,13 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
  * `exists: true` — the renderer then mapped that to "transient decode
  * error" and dropped the missing badge.
  *
- * Auth: session user must have `scenarios:view` on `projectId`.
+ * Auth: session user must have `traces:view` OR `scenarios:view` on
+ * `projectId`, mirroring the `/api/files/:id` route's own gate. The same
+ * stored object is trace media for one viewer and scenario media for another,
+ * and the two permissions are separate categories a custom role can hold one
+ * of. A probe narrower than the read it describes leaves a viewer who can
+ * fetch the bytes unable to find out why the player failed, which strands the
+ * renderer in its loading state.
  */
 export const storedObjectsRouter = createTRPCRouter({
   headById: protectedProcedure
@@ -36,7 +41,7 @@ export const storedObjectsRouter = createTRPCRouter({
         id: z.string(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permissionAny("traces:view", "scenarios:view")
     .query(async ({ input }) => {
       const { projectId, id } = input;
       const service = createStoredObjectsService({ projectId });

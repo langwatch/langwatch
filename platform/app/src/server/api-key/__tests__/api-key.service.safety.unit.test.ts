@@ -1,3 +1,13 @@
+/**
+ * Every "rejects before persistence" case here names TWO sentinels: no ledger
+ * command, and no key row.
+ *
+ * The second one used to be implied — the whole create ran inside one Prisma
+ * transaction, so a late refusal took the row with it. Since ADR-092
+ * delivery-plan PR 2 the grants are ledger commands and the row is a plain
+ * insert, so a validation the service performs after the insert would leave a
+ * credential behind while every ledger sentinel stayed green.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
 
@@ -45,6 +55,20 @@ vi.mock("@langwatch/observability", () => ({
 const ORG_ID = "org_1";
 const USER_ID = "user_1";
 
+// A key's grants and its private role are ledger commands since ADR-092
+// delivery-plan PR 2. `role_defined` carries the whole fact, so a fresh role
+// and a rewritten one are the same verb, told apart by the role id it names.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 function buildPrisma() {
   const txState = {
     createdApiKey: null as any,
@@ -54,8 +78,15 @@ function buildPrisma() {
     replacedBindings: [] as any[],
   };
 
-  const mockTx = {
+  // One flat client: the service used to re-bind its repositories to a
+  // transaction, and everything that used to be written inside it - grants,
+  // role definitions - is a ledger command now.
+  const prisma = {
+    organizationUser: {
+      findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
+    },
     apiKey: {
+      findFirst: vi.fn(),
       create: vi.fn().mockImplementation((args: any) => {
         txState.createdApiKey = {
           id: "ak_new",
@@ -69,101 +100,73 @@ function buildPrisma() {
         ...txState.createdApiKey,
         roleBindings: txState.createdBindings,
       })),
+      findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn().mockImplementation((args: any) => {
         txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
         return txState.updatedApiKey;
       }),
     },
     roleBinding: {
-      createMany: vi.fn().mockImplementation((args: any) => {
-        txState.createdBindings = args.data;
-        return { count: args.data.length };
-      }),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      // Nothing but this key holds the key's private role.
+      count: vi.fn().mockResolvedValue(0),
     },
+    teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
-      create: vi.fn().mockImplementation((args: any) => {
-        txState.createdCustomRole = { id: "cr_new", ...args.data };
-        return txState.createdCustomRole;
-      }),
-      update: vi.fn().mockImplementation((args: any) => {
-        const roleId =
-          args.where?.id ?? txState.createdCustomRole?.id ?? "cr_updated";
-        txState.createdCustomRole = {
-          id: roleId,
-          ...txState.createdCustomRole,
-          ...args.data,
+      // Two questions on one delegate: the natural-key check asks by
+      // (organizationId, name) and must find the name free, while a redefine
+      // asks by id and must find the role it is rewriting.
+      findUnique: vi.fn().mockImplementation((args: any) => {
+        if (args?.where?.organizationId_name) return null;
+        return {
+          id: args?.where?.id ?? "cr_existing",
+          organizationId: ORG_ID,
+          name: `apikey:${args?.where?.id ?? "cr_existing"}`,
+          description: null,
+          permissions: [],
+          kind: "system_api_key",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         };
-        return txState.createdCustomRole;
       }),
       findFirst: vi.fn().mockResolvedValue(null),
-      findUnique: vi.fn().mockResolvedValue(null),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    team: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    project: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    organization: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    user: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
   };
 
-  return {
-    prisma: {
-      $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
-        fn(mockTx),
-      ),
-      organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
-      },
-      apiKey: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockImplementation((args: any) => ({
-          id: args.where.id,
-          ...args.data,
-        })),
-      },
-      roleBinding: {
-        findFirst: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([]),
-        createMany: vi.fn(),
-        deleteMany: vi.fn(),
-      },
-      customRole: {
-        create: vi.fn(),
-        update: vi.fn(),
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
-      team: {
-        findFirst: vi.fn(),
-        findUnique: vi.fn(),
-      },
-      project: {
-        findUnique: vi.fn(),
-        findMany: vi.fn().mockResolvedValue([]),
-      },
-      organization: {
-        findMany: vi.fn().mockResolvedValue([]),
-      },
-      user: {
-        findMany: vi.fn().mockResolvedValue([]),
-      },
-    } as any,
-    mockTx,
-    txState,
-  };
+  return { prisma: prisma as any, txState };
 }
 
 describe("ApiKeyService — safety invariants (mocked)", () => {
   let prisma: ReturnType<typeof buildPrisma>["prisma"];
-  let mockTx: ReturnType<typeof buildPrisma>["mockTx"];
   let service: ApiKeyService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     const built = buildPrisma();
     prisma = built.prisma;
-    mockTx = built.mockTx;
     service = ApiKeyService.create(prisma);
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindings.mockResolvedValue(undefined);
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
+    ledger.defineRole.mockResolvedValue(undefined);
+    ledger.deleteRole.mockResolvedValue(undefined);
     mockCheckPermission.mockResolvedValue(true);
   });
 
@@ -186,8 +189,8 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("exceeds your own access");
 
-        expect(mockTx.customRole.create).not.toHaveBeenCalled();
-        expect(mockTx.apiKey.create).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -207,16 +210,44 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
 
         expect(result.token).toBeDefined();
 
-        expect(mockTx.apiKey.create).toHaveBeenCalledBefore(
-          mockTx.customRole.create,
-        );
+        expect(prisma.apiKey.create).toHaveBeenCalledBefore(ledger.defineRole);
 
-        expect(mockTx.customRole.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({
+        expect(ledger.defineRole).toHaveBeenCalledWith(
+          expect.objectContaining({
             name: "apikey:ak_new",
             permissions: ["annotations:manage", "traces:view"],
           }),
+        );
+      });
+
+      /** @scenario "A new restricted key is usable the moment it is returned" */
+      it("finishes the role definition before attaching the binding", async () => {
+        const order: string[] = [];
+        ledger.defineRole.mockImplementation(async () => {
+          // The writer holds for the role projection inside this call.
+          await Promise.resolve();
+          order.push("defineRole");
         });
+        ledger.attachBindings.mockImplementation(async () => {
+          order.push("attachBindings");
+          return { attached: [], duplicates: [] };
+        });
+
+        await service.create({
+          name: "Restricted Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        });
+
+        // The binding row carries a foreign key to the role row, so the role
+        // has to be projected first. Command jobs are grouped per command
+        // name, so the attach cannot stand in for the definition's hold.
+        expect(order).toEqual(["defineRole", "attachBindings"]);
       });
     });
 
@@ -239,7 +270,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
         });
 
         const storedPermissions =
-          mockTx.customRole.create.mock.calls[0]![0].data.permissions;
+          ledger.defineRole.mock.calls[0]![0].permissions;
         expect(storedPermissions).toEqual([
           "annotations:view",
           "datasets:view",
@@ -284,7 +315,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        const roleName = mockTx.customRole.create.mock.calls[0]![0].data.name;
+        const roleName = ledger.defineRole.mock.calls[0]![0].name;
         expect(roleName).toBe(`apikey:${result1.apiKey.id}`);
         expect(roleName).not.toContain("Duplicate Name");
       });
@@ -311,13 +342,12 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
     };
 
     describe("when existing CustomRole is exclusively owned by this key", () => {
-      it("updates the existing CustomRole in place", async () => {
+      it("mints a fresh CustomRole and deletes the exclusive one it replaces", async () => {
+        // A fresh role is minted rather than the exclusive role being
+        // updated in place: mutating it first left a crash window where the
+        // key held new permissions with stale binding state. The orphan
+        // cleanup after replaceRoleBindings deletes the superseded role.
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        mockTx.customRole.findFirst.mockResolvedValue({ id: "cr_owned" });
-        mockTx.apiKey.findUnique.mockResolvedValue({
-          ...existingKey,
-          roleBindings: existingKey.roleBindings,
-        });
 
         await service.update({
           id: "ak_existing",
@@ -331,21 +361,20 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        expect(mockTx.customRole.update).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { id: "cr_owned" } }),
+        expect(ledger.defineRole).toHaveBeenCalledTimes(1);
+        expect(ledger.defineRole).not.toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_owned" }),
         );
-        expect(mockTx.customRole.create).not.toHaveBeenCalled();
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_owned" }),
+        );
       });
     });
 
     describe("when existing CustomRole is shared with another key", () => {
       it("creates a new CustomRole instead of mutating the shared one", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        mockTx.customRole.findFirst.mockResolvedValue(null);
-        mockTx.apiKey.findUnique.mockResolvedValue({
-          ...existingKey,
-          roleBindings: existingKey.roleBindings,
-        });
+        prisma.customRole.findFirst.mockResolvedValue(null);
 
         await service.update({
           id: "ak_existing",
@@ -359,14 +388,17 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        expect(mockTx.customRole.update).not.toHaveBeenCalled();
-        expect(mockTx.customRole.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({
+        expect(ledger.defineRole).toHaveBeenCalledTimes(1);
+        expect(ledger.defineRole).not.toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_owned" }),
+        );
+        expect(ledger.defineRole).toHaveBeenCalledWith(
+          expect.objectContaining({
             name: expect.stringMatching(
               /^apikey:ak_existing:apikeyrole_[0-9A-Za-z]+$/,
             ),
           }),
-        });
+        );
       });
     });
 
@@ -389,8 +421,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("exceeds your own access");
 
-        expect(mockTx.customRole.update).not.toHaveBeenCalled();
-        expect(mockTx.customRole.create).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
       });
     });
   });
@@ -414,11 +445,6 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithExclusive);
-        mockTx.apiKey.findUnique.mockResolvedValue(keyWithExclusive);
-        mockTx.apiKey.update.mockResolvedValue({
-          id: "ak_1",
-          revokedAt: new Date(),
-        });
 
         await service.revoke({
           id: "ak_1",
@@ -427,18 +453,14 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
         });
 
-        expect(mockTx.customRole.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ["cr_exclusive"] },
-            roleBindings: { every: { apiKeyId: "ak_1" } },
-            assignedUsers: { none: {} },
-          },
-        });
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_exclusive" }),
+        );
       });
     });
 
     describe("when custom role is shared with another key", () => {
-      it("deleteMany is called but the every filter protects the shared role", async () => {
+      it("keeps a role another key still holds", async () => {
         const keyWithShared = {
           id: "ak_1",
           userId: USER_ID,
@@ -455,11 +477,8 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithShared);
-        mockTx.apiKey.findUnique.mockResolvedValue(keyWithShared);
-        mockTx.apiKey.update.mockResolvedValue({
-          id: "ak_1",
-          revokedAt: new Date(),
-        });
+        // Another credential still holds the role after this key's grants go.
+        prisma.roleBinding.count.mockResolvedValue(1);
 
         await service.revoke({
           id: "ak_1",
@@ -468,13 +487,14 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
         });
 
-        expect(mockTx.customRole.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ["cr_shared"] },
-            roleBindings: { every: { apiKeyId: "ak_1" } },
-            assignedUsers: { none: {} },
-          },
-        });
+        // The key's own grants on the role are revoked either way; the role
+        // itself survives because it is not this key's alone.
+        expect(ledger.revokeBindingsWhere).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { apiKeyId: "ak_1", customRoleId: { in: ["cr_shared"] } },
+          }),
+        );
+        expect(ledger.deleteRole).not.toHaveBeenCalled();
       });
     });
 
@@ -496,11 +516,6 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithNoCustom);
-        mockTx.apiKey.findUnique.mockResolvedValue(keyWithNoCustom);
-        mockTx.apiKey.update.mockResolvedValue({
-          id: "ak_1",
-          revokedAt: new Date(),
-        });
 
         await service.revoke({
           id: "ak_1",
@@ -509,7 +524,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
         });
 
-        expect(mockTx.customRole.deleteMany).not.toHaveBeenCalled();
+        expect(ledger.deleteRole).not.toHaveBeenCalled();
       });
     });
   });
@@ -569,7 +584,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("CUSTOM bindings require at least one permission");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -605,7 +622,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           "restricted mode requires bindings with at least one CUSTOM role",
         );
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -642,7 +661,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("CUSTOM bindings require at least one permission");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
     describe("when create sends restricted mode with only built-in bindings", () => {
@@ -661,7 +682,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           "restricted mode requires at least one CUSTOM binding",
         );
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -682,7 +705,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           "restricted mode requires at least one CUSTOM binding",
         );
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -720,7 +745,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           "CUSTOM permissions require permissionMode 'restricted'",
         );
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
   });
@@ -741,7 +768,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("Invalid permission format");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -760,7 +789,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("Invalid permission format");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -797,7 +828,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("Invalid permission format");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
 
@@ -816,7 +849,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           }),
         ).rejects.toThrow("Invalid permission format");
 
-        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
       });
     });
   });
@@ -840,20 +875,6 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             },
           ],
         });
-        mockTx.apiKey.findUnique.mockResolvedValue({
-          id: "ak_1",
-          name: "Switched Key",
-          permissionMode: "all",
-          roleBindings: [
-            {
-              id: "rb_2",
-              customRoleId: null,
-              role: "ADMIN",
-              scopeType: "ORGANIZATION",
-              scopeId: ORG_ID,
-            },
-          ],
-        });
 
         await service.update({
           id: "ak_1",
@@ -866,18 +887,19 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        expect(mockTx.customRole.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ["cr_orphan"] },
-            roleBindings: { every: { apiKeyId: "ak_1" } },
-            assignedUsers: { none: {} },
-          },
-        });
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_orphan" }),
+        );
       });
     });
 
-    describe("when staying restricted with same custom role", () => {
-      it("does not delete the still-referenced role", async () => {
+    describe("when staying restricted with a permissions change", () => {
+      it("mints a fresh role and deletes the superseded one", async () => {
+        // A fresh role is minted on every restricted update rather than the
+        // previous exclusive role being mutated in place — updating it first
+        // left a crash window where the key held new permissions with stale
+        // binding state. The old role is left orphaned and the existing
+        // cleanup path (after replaceRoleBindings) deletes it.
         prisma.apiKey.findUnique.mockResolvedValue({
           id: "ak_1",
           userId: USER_ID,
@@ -887,22 +909,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           roleBindings: [
             {
               id: "rb_1",
-              customRoleId: "cr_reused",
-              role: "CUSTOM",
-              scopeType: "ORGANIZATION",
-              scopeId: ORG_ID,
-            },
-          ],
-        });
-        mockTx.customRole.findFirst.mockResolvedValue({ id: "cr_reused" });
-        mockTx.apiKey.findUnique.mockResolvedValue({
-          id: "ak_1",
-          name: "Still Restricted",
-          permissionMode: "restricted",
-          roleBindings: [
-            {
-              id: "rb_2",
-              customRoleId: "cr_reused",
+              customRoleId: "cr_previous",
               role: "CUSTOM",
               scopeType: "ORGANIZATION",
               scopeId: ORG_ID,
@@ -922,7 +929,10 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           ],
         });
 
-        expect(mockTx.customRole.deleteMany).not.toHaveBeenCalled();
+        expect(ledger.defineRole).toHaveBeenCalled();
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: "cr_previous" }),
+        );
       });
     });
   });
@@ -981,6 +991,51 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             ],
           }),
         ).rejects.toThrow("not found or archived");
+      });
+    });
+  });
+
+  describe("create with no bindings", () => {
+    describe("when the key belongs to a user", () => {
+      it("refuses rather than minting a token authorized for nothing", async () => {
+        await expect(
+          service.create({
+            name: "Dead Personal Key",
+            userId: USER_ID,
+            organizationId: ORG_ID,
+            permissionMode: "all",
+            bindings: [],
+          }),
+        ).rejects.toMatchObject({ code: "api_key_scope_violation" });
+
+        expect(ledger.defineRole).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(prisma.apiKey.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the key belongs to no user", () => {
+      it("still defaults a service key to organization-wide ADMIN", async () => {
+        const { apiKey } = await service.create({
+          name: "Headless Automation Key",
+          userId: null,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [],
+        });
+
+        expect(apiKey).toBeDefined();
+        expect(ledger.attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bindings: [
+              expect.objectContaining({
+                role: "ADMIN",
+                scopeType: "ORGANIZATION",
+                scopeId: ORG_ID,
+              }),
+            ],
+          }),
+        );
       });
     });
   });

@@ -2,7 +2,15 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
+  walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -34,10 +42,19 @@ export interface VirtualKey {
   display_prefix: string;
   principal_user_id: string | null;
   /**
-   * Where an org- or team-owned key's traces and costs land. Not a
-   * scope: it grants no access to the key.
+   * Where this key's traces and costs land. Not a scope: it grants no
+   * access to the key. Decided when the key is written and stored on it,
+   * so editing what the key is scoped to never moves it. Null only on a
+   * key created before this was stored, in an organization that had no
+   * governance project to fall back to.
    */
   trace_project_id: string | null;
+  /**
+   * True when the project in `trace_project_id` has been deleted. The key
+   * goes on sending its traces there, so the data stays whole and
+   * reappears if the project is restored, and traffic is never refused.
+   */
+  trace_project_archived: boolean;
   scopes: VirtualKeyScope[];
   routing_policy_id: string | null;
   routing_mode: VirtualKeyRoutingMode;
@@ -47,6 +64,13 @@ export interface VirtualKey {
   updated_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
+  /**
+   * When the key stops serving, or null for a key that never expires.
+   * Requests presented after this moment are refused with
+   * `virtual_key_expired`. `status` stays "active" past the date, so read
+   * this field rather than the status to tell an expired key apart.
+   */
+  expires_at: string | null;
 }
 
 /**
@@ -74,9 +98,26 @@ export interface CreateVirtualKeyInput {
   trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
+  /**
+   * When the key stops serving, as an ISO 8601 instant. Omit it and the key
+   * never expires. A date already in the past is refused.
+   */
+  expires_at?: string;
   /** Optional cap created atomically with the key. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;
+  /**
+   * Your own identifier for this key, unique within the organization. Lets
+   * you look the key up by the id your system already has instead of storing
+   * ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateVirtualKeyInput {
@@ -86,9 +127,27 @@ export interface UpdateVirtualKeyInput {
   trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
+  /**
+   * Undefined leaves the expiration alone; null clears it, so the key never
+   * expires; an ISO 8601 instant moves it. An expired key accepts this edit
+   * like any other, which is how it goes back into service.
+   */
+  expires_at?: string | null;
   /** Undefined leaves the cap alone; a value upserts it; null archives it. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;
+  /**
+   * Your own identifier for this key, unique within the organization. Lets
+   * you look the key up by the id your system already has instead of storing
+   * ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface VirtualKeyWithSecret {
@@ -128,6 +187,14 @@ export class VirtualKeysApiError extends Error {
   }
 }
 
+/**
+ * Client for the gateway virtual-key surface (/api/gateway/v1).
+ *
+ * Entity types and the create/update bodies mirror the wire verbatim, so
+ * their fields are lowercase snake_case. Call options this SDK invents (query
+ * filters, per-call behaviour, action arguments) are camelCase like the rest
+ * of the SDK.
+ */
 export class VirtualKeysApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
@@ -149,9 +216,15 @@ export class VirtualKeysApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: ObservedRequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
     });
     if (!response.ok) {
@@ -174,6 +247,7 @@ export class VirtualKeysApiService {
       });
       throw new VirtualKeysApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -189,8 +263,11 @@ export class VirtualKeysApiService {
   async listPage(options?: {
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<VirtualKeyPage> {
     const params = new URLSearchParams();
+    if (options?.externalId) params.set("external_id", options.externalId);
     if (options?.cursor) params.set("cursor", options.cursor);
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
     const query = params.toString() !== "" ? `?${params.toString()}` : "";
@@ -212,11 +289,13 @@ export class VirtualKeysApiService {
    *
    * `limit` sizes each request in the walk, it does NOT cap what comes back.
    * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`.
+   * `listPage()`, or stream the walk with `iterate()`.
    */
   async list(options?: {
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<VirtualKey[]> {
     const pages = await collectCursorPages<VirtualKeyPage>({
       startCursor: options?.cursor,
@@ -230,9 +309,43 @@ export class VirtualKeysApiService {
         this.listPage({
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
     return pages.flatMap((page) => page.data);
+  }
+
+  /**
+   * Every visible virtual key, one row at a time, fetching each page only
+   * when the consumer reaches it. Stop early and the rest is never read,
+   * which `list()` cannot offer because it materialises the whole listing
+   * first. Raises rather than looping forever on a cursor chain that never
+   * ends, exactly like `list()`.
+   */
+  async *iterate(options?: {
+    cursor?: string;
+    limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
+  }): AsyncGenerator<VirtualKey> {
+    const pages = walkCursorPages<VirtualKeyPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new VirtualKeysApiError(
+          `Failed to list virtual keys: ${reason}.`,
+          "list virtual keys",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
   }
 
   async get(id: string): Promise<VirtualKey> {
@@ -243,42 +356,64 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
-  async create(input: CreateVirtualKeyInput): Promise<VirtualKeyWithSecret> {
+  /**
+   * Mint a key. The response carries the secret ONCE; nothing ever serves it
+   * again, so a create that times out is recovered with `idempotencyKey`
+   * rather than by listing.
+   */
+  async create(
+    input: CreateVirtualKeyInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       "create virtual key",
       "/api/gateway/v1/virtual-keys",
-      { method: "POST", body: JSON.stringify(input) },
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
+      },
     );
   }
 
-  async update(id: string, input: UpdateVirtualKeyInput): Promise<VirtualKey> {
+  async update(
+    id: string,
+    input: UpdateVirtualKeyInput,
+    options?: MutationOptions,
+  ): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `update virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input) },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return virtual_key;
   }
 
-  async rotate(id: string): Promise<VirtualKeyWithSecret> {
+  async rotate(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       `rotate virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/rotate`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
   }
 
-  async revoke(id: string): Promise<VirtualKey> {
+  async revoke(id: string, options?: MutationOptions): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `revoke virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/revoke`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return virtual_key;
   }
 
   /** Reversible stop; enable() restores the key exactly as it was. */
-  async disable(id: string, options: { reason?: string } = {}): Promise<VirtualKey> {
+  async disable(
+    id: string,
+    options: { reason?: string } & MutationOptions = {},
+  ): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `disable virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/disable`,
@@ -286,16 +421,17 @@ export class VirtualKeysApiService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+        ...mutationInit(options),
       },
     );
     return virtual_key;
   }
 
-  async enable(id: string): Promise<VirtualKey> {
+  async enable(id: string, options?: MutationOptions): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `enable virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/enable`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return virtual_key;
   }
@@ -308,11 +444,11 @@ export class VirtualKeysApiService {
    */
   async spend(
     id: string,
-    window?: { from?: number; to?: number },
+    options?: { from?: number; to?: number },
   ): Promise<VirtualKeySpendSummary> {
     const params = new URLSearchParams();
-    if (window?.from !== undefined) params.set("from", String(window.from));
-    if (window?.to !== undefined) params.set("to", String(window.to));
+    if (options?.from !== undefined) params.set("from", String(options.from));
+    if (options?.to !== undefined) params.set("to", String(options.to));
     const query = params.size > 0 ? `?${params.toString()}` : "";
     return this.request<VirtualKeySpendSummary>(
       `read virtual key spend "${id}"`,

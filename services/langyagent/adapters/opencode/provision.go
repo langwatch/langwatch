@@ -189,6 +189,62 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// home lives under the user's ~, which opencode flags as external and asks
 		// about on the very first file touch.
 		"permission": "allow",
+		// The build agent (opencode's default; PostMessage never selects another)
+		// gets Langy's own prompt, which REPLACES the stock coding-agent prompt,
+		// and a tool surface scoped to the role. A "deny" here removes the tool
+		// from the advertised schema, not just from execution: per-agent rules
+		// merge after the root "allow" and the last match wins.
+		//
+		// Both denials are "the product has no way to show this yet", not a
+		// judgement about the capability:
+		//   task     — a subagent runs opencode's stock coding-agent prompt, the
+		//              exact thing this block retires, and the panel has no way to
+		//              show a subagent's work. Re-enable once a subagent can
+		//              inherit this prompt and report into the turn;
+		//   question — opencode's interactive prompt has no surface in the panel,
+		//              so a headless worker blocks on an answer that can never
+		//              arrive. Langy asks through the choices card instead.
+		//              Re-enable if the panel ever renders opencode's own prompt.
+		//
+		// webfetch STAYS. Langy answers questions about the user's agents, and the
+		// answers are not all inside LangWatch's docs: a provider's error code, a
+		// framework's changelog, a model's release notes. Removing the tool would
+		// not remove the capability either, since bash reaches the network too.
+		//
+		// Be exact about what the per-worker egress adapter enforces on a stock
+		// install: rung 1 only, which is TLS required, SNI cross-checked, and
+		// throttled. DESTINATION policy is monitor-only until a project sets an
+		// allow-list or an operator turns on LANGY_EGRESS_ENFORCE_FLOOR (ADR-076),
+		// so out of the box the proxy decides HOW a request may leave and not
+		// WHERE it may go. Where it may go is the Scope rule in AGENTS.md.
+		//
+		// bash, read, grep, glob, edit/write, skill and todowrite stay: the CLI,
+		// the GitHub skill's repo work, dataset file preparation, and the plan
+		// panel all run on them.
+		//
+		// The skill rule is a different shape and does a different job. opencode
+		// ships one built-in skill, customize-opencode, which the two disable
+		// switches in buildWorkerEnv do not touch: they turn off the directory
+		// scans, and this one is embedded in the binary. Its own description
+		// scopes it to editing opencode's config, agents, plugins and permission
+		// rules, which is not something Langy does for a customer, so the 516
+		// characters it renders are prompt weight for nothing. A rule under "skill"
+		// removes it from <available_skills> as well as from execution, because
+		// opencode builds that block from the skills the agent's permission
+		// ruleset allows. The pattern is a name and not "*", so the skill tool
+		// itself stays enabled and every skill we ship still reaches the prompt.
+		"agent": map[string]any{
+			"build": map[string]any{
+				"prompt": langyAgentPrompt,
+				"permission": map[string]any{
+					"task":     "deny",
+					"question": "deny",
+					"skill": map[string]any{
+						"customize-opencode": "deny",
+					},
+				},
+			},
+		},
 	}
 	// opencode's NATIVE OTel export (traces + logs over standard
 	// OTEL_EXPORTER_OTLP_* env). Bootstraps in ~0s — unlike the removed external
@@ -271,26 +327,13 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("chown config: %w", err)
 	}
 
-	// The identity plugin (see langyIdentityPluginJS) rides the same config
-	// dir. opencode scans plugin/*.js there at boot, so dropping the file is
-	// the whole wiring.
-	pluginPath := filepath.Join(configDir, langyIdentityPluginFilename)
-	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
-		return fmt.Errorf("mkdir plugin dir: %w", err)
-	}
-	if err := in.Runner.Chown(filepath.Dir(pluginPath), in.UID); err != nil {
-		return fmt.Errorf("chown plugin dir: %w", err)
-	}
-	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
-		return fmt.Errorf("write identity plugin: %w", err)
-	}
-	// WriteFile's mode applies only on create; a plugin file surviving from an
-	// earlier provision keeps whatever mode it had, so tighten it explicitly.
-	if err := os.Chmod(pluginPath, 0o600); err != nil {
-		return fmt.Errorf("chmod identity plugin: %w", err)
-	}
-	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
-		return fmt.Errorf("chown identity plugin: %w", err)
+	// A worker home surviving from an earlier provision may still carry the
+	// retired identity plugin (it rewrote "OpenCode" to "Langy" in opencode's
+	// built-in prompt; the build agent's own prompt made it obsolete). opencode
+	// auto-loads every plugin/*.js under the config dir, so a leftover must be
+	// removed, not ignored.
+	if err := os.RemoveAll(filepath.Join(configDir, "plugin")); err != nil {
+		return fmt.Errorf("remove retired plugin dir: %w", err)
 	}
 
 	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
@@ -412,36 +455,28 @@ const mediatedLLMPlaceholderKey = "langy-mediated"
 // The name has no models.dev catalog entry, so nothing merges over it.
 const gatewayProviderID = "langwatch"
 
-// langyIdentityPluginFilename is where Provision writes the identity plugin,
-// relative to the worker's opencode config dir. opencode auto-discovers every
-// plugin/*.js file under its config directories, so no "plugin" entry is
-// needed in config.json (which stays free of plugin specs; see
-// TestProvision_WritesCLIOnlyConfig).
-const langyIdentityPluginFilename = "plugin/langy-identity.js"
-
-// langyIdentityPluginJS renames the agent's identity in opencode's stock
-// system prompt. opencode selects a per-model default prompt that opens with
-// "You are OpenCode, ..." and offers no config field to rename the agent, but
-// its plugin hook `experimental.chat.system.transform` receives the assembled
-// system prompt before the LLM call. The hook rewrites "OpenCode" to "Langy"
-// IN PLACE (the caller keeps using the same array instance, so reassigning
-// output.system would be lost) and leaves every other byte of whichever
-// default prompt opencode picked untouched. The file has zero imports and no
-// build step, so loading it costs nothing at worker bootstrap, unlike the
-// removed 2 MB external OTel plugin bundle.
-const langyIdentityPluginJS = `// Introduce the agent as Langy in opencode's default system prompt while
-// keeping the rest of the prompt exactly as opencode ships it.
-export default async () => ({
-  "experimental.chat.system.transform": async (_input, output) => {
-    if (!output || !Array.isArray(output.system)) return;
-    for (let i = 0; i < output.system.length; i++) {
-      if (typeof output.system[i] === "string") {
-        output.system[i] = output.system[i].replaceAll("OpenCode", "Langy");
-      }
-    }
-  },
-});
-`
+// langyAgentPrompt is the build agent's own system prompt. Setting a prompt on
+// an agent makes opencode drop its per-model coding-agent prompt entirely (the
+// "You are OpenCode, …" text) instead of appending to it, so this short block
+// is the whole persona slot. The operating contract stays in AGENTS.md, which
+// opencode appends as an instructions file regardless of the agent prompt —
+// keep the two non-overlapping: persona here, rules there.
+const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
+	"LangWatch project from inside the product. You work by running the `langwatch` " +
+	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
+	"document is your operating contract and applies to every reply. When a request " +
+	"maps to a real action, you act first and answer from the result. " +
+	// Without this the stock coding-agent persona leaks back in through the
+	// model's priors: asked to refactor a file, Langy answers "I can't find
+	// src/agent.py in this workspace, paste the contents and I'll fix it" —
+	// claiming to have searched a checkout it never had. Working on the user's
+	// source IS the job when they ask for it; the GitHub skill clones the
+	// repository first (see AGENTS.md). What is wrong is narrating a workspace
+	// that was never obtained, so this fixes the premise, not the capability.
+	"Your shell does not start with a copy of the user's code in it. When their " +
+	"source is the ask, the repository is cloned first and the work happens there, " +
+	"so never report a file as missing, never describe reading or editing one you " +
+	"have not obtained, and never ask the user to paste their code."
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker
@@ -492,6 +527,15 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// the world-readable /proc/<pid>/cmdline — only in /proc/<pid>/environ,
 		// which is 0400 and UID-gated.
 		"OPENCODE_SERVER_PASSWORD="+openCodePassword,
+		// opencode also scans ~/.claude/skills and ~/.agents/skills and folds
+		// whatever it finds into the system prompt. The worker's HOME is its
+		// own session dir, but those two scans resolve the real account home,
+		// so on a host-tier manager the operator's personal skills reach Langy.
+		// Measured on a dev box: 17 foreign skills, 8,191 characters, 22% of
+		// the assembled system message, one of them a credential broker. Langy
+		// runs exactly the skills we ship it.
+		"OPENCODE_DISABLE_EXTERNAL_SKILLS=1",
+		"OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1",
 	)
 	// Host-mediated worker telemetry (phase 1): opencode's native OTel export
 	// points at the manager's loopback relay. NO authorization header — the

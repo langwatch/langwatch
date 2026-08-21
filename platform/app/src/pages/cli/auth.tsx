@@ -74,7 +74,6 @@ type ActionState =
   | { kind: "submitting" }
   | {
       kind: "success";
-      vkLabel: string;
       organizationName: string;
       credentialType: CredentialType;
       projectName?: string;
@@ -350,7 +349,6 @@ export default function CliAuthPage() {
       });
       const data = (await r.json().catch(() => ({}))) as {
         ok?: boolean;
-        personal_vk_label?: string;
         error_description?: string;
         message?: string;
       };
@@ -372,7 +370,6 @@ export default function CliAuthPage() {
         : undefined;
       setAction({
         kind: "success",
-        vkLabel: data.personal_vk_label ?? "default",
         organizationName: orgName,
         credentialType,
         projectName,
@@ -424,7 +421,7 @@ export default function CliAuthPage() {
       <OnboardingContainer
         title={
           requiresProject
-            ? "Generate an SDK key"
+            ? "Connect a project to the CLI"
             : "Authorize the LangWatch CLI"
         }
         subTitle={
@@ -483,7 +480,7 @@ export default function CliAuthPage() {
               <>
                 <Text textStyle="sm" color="fg.muted" lineHeight="tall">
                   {requiresProject
-                    ? "Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
+                    ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
                     : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
                 </Text>
                 <Box
@@ -627,7 +624,7 @@ export default function CliAuthPage() {
                       !selectedOrgId || (requiresProject && !selectedProjectId)
                     }
                   >
-                    {requiresProject ? "Generate API key" : "Approve"}
+                    {requiresProject ? "Send API key" : "Approve"}
                   </Button>
                   <Button
                     variant="outline"
@@ -648,13 +645,13 @@ export default function CliAuthPage() {
                 <StatusCard
                   palette="green"
                   icon={CheckCircle2}
-                  title="API key generated!"
+                  title="API key approved"
                 >
-                  A fresh project API key has been minted for{" "}
+                  The API key for{" "}
                   <strong>{action.projectName ?? "your project"}</strong> (
-                  {action.organizationName}). The key flowed back to your
-                  terminal automatically, and your <code>.env</code> is updated.
-                  You can close this tab.
+                  {action.organizationName}) is on its way to your terminal, and
+                  the CLI will save it to your <code>.env</code>. You can close
+                  this tab.
                 </StatusCard>
               ) : (
                 <>
@@ -664,8 +661,7 @@ export default function CliAuthPage() {
                     title="You're signed in!"
                   >
                     LangWatch CLI is now authorized for{" "}
-                    <strong>{action.organizationName}</strong> using the{" "}
-                    <code>{action.vkLabel}</code> personal key. You can close
+                    <strong>{action.organizationName}</strong>. You can close
                     this tab and return to your terminal.
                   </StatusCard>
                   <FirstTraceRedirect />

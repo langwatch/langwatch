@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE
- * OCSF row keyed by (TenantId, EventId) so reactor replays of the
+ * OCSF row keyed by (TenantId, EventId) so subscriber replays of the
  * same event collapse at merge time.
  *
  * Read side is the SIEM export tRPC procedure (3f) which cursor-
@@ -95,6 +95,64 @@ export interface GovernanceOcsfEventInput {
   rawOcsfJson: string;
 }
 
+/** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
+export interface FindOcsfEventsInput {
+  tenantId: string;
+  /** Lower bound paired with sinceEventId — returns events after this watermark. */
+  sinceMs: number;
+  /** EventId watermark paired with sinceMs; disambiguates same-millisecond rows. */
+  sinceEventId: string;
+  limit: number;
+}
+
+export interface GovernanceOcsfExportRow {
+  eventId: string;
+  /**
+   * Forward-compat marker stamped at write time by
+   * {@link OCSF_SCHEMA_VERSION}. Pre-this-column rows decode as "1.1.0" via
+   * the CH DEFAULT (migration 00028). SIEM consumers can filter or
+   * version-gate downstream parsing on this value.
+   */
+  ocsfSchemaVersion: string;
+  traceId: string;
+  sourceId: string;
+  sourceType: string;
+  classUid: number;
+  categoryUid: number;
+  activityId: number;
+  typeUid: number;
+  severityId: number;
+  eventTimeMs: number;
+  actorUserId: string;
+  actorEmail: string;
+  actorEnduserId: string;
+  actionName: string;
+  targetName: string;
+  anomalyAlertId: string;
+  rawOcsfJson: string;
+}
+
+interface OcsfExportCHRow {
+  EventId: string;
+  OcsfSchemaVersion: string;
+  TraceId: string;
+  SourceId: string;
+  SourceType: string;
+  ClassUid: number | string;
+  CategoryUid: number | string;
+  ActivityId: number | string;
+  TypeUid: number | string;
+  SeverityId: number | string;
+  EventTimeMs: string;
+  ActorUserId: string;
+  ActorEmail: string;
+  ActorEnduserId: string;
+  ActionName: string;
+  TargetName: string;
+  AnomalyAlertId: string;
+  RawOcsfJson: string;
+}
+
 export class GovernanceOcsfEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -148,5 +206,82 @@ export class GovernanceOcsfEventsClickHouseRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * SIEM forwarding pull — the read side of `governance_ocsf_events`,
+   * deduped to the latest version of each (TenantId, EventId) and ordered
+   * EventTime ASC for cursor pagination.
+   *
+   * Spec: specs/ai-gateway/governance/siem-export.feature
+   */
+  async findAll(
+    input: FindOcsfEventsInput,
+  ): Promise<GovernanceOcsfExportRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          EventId,
+          OcsfSchemaVersion,
+          TraceId,
+          SourceId,
+          SourceType,
+          ClassUid,
+          CategoryUid,
+          ActivityId,
+          TypeUid,
+          SeverityId,
+          toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
+          ActorUserId,
+          ActorEmail,
+          ActorEnduserId,
+          ActionName,
+          TargetName,
+          AnomalyAlertId,
+          RawOcsfJson
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
+          AND (TenantId, EventId, LastUpdatedAt) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
+            GROUP BY TenantId, EventId
+          )
+        ORDER BY EventTime ASC, EventId ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        sinceMs: input.sinceMs,
+        sinceEventId: input.sinceEventId,
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as OcsfExportCHRow[];
+    return rows.map((r) => ({
+      eventId: r.EventId,
+      ocsfSchemaVersion: r.OcsfSchemaVersion,
+      traceId: r.TraceId,
+      sourceId: r.SourceId,
+      sourceType: r.SourceType,
+      classUid: Number(r.ClassUid),
+      categoryUid: Number(r.CategoryUid),
+      activityId: Number(r.ActivityId),
+      typeUid: Number(r.TypeUid),
+      severityId: Number(r.SeverityId),
+      eventTimeMs: Number(r.EventTimeMs),
+      actorUserId: r.ActorUserId,
+      actorEmail: r.ActorEmail,
+      actorEnduserId: r.ActorEnduserId,
+      actionName: r.ActionName,
+      targetName: r.TargetName,
+      anomalyAlertId: r.AnomalyAlertId,
+      rawOcsfJson: r.RawOcsfJson,
+    }));
   }
 }

@@ -5,7 +5,9 @@
  * telemetry-refresh.ts) can share it without import cycles.
  */
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import type { GovernanceConfig } from "./config";
+import { telemetryEnvVarNames } from "./otel-env-block";
 
 export interface ToolEnv {
 	/** Env-var name → value pairs to inject into the child process. */
@@ -34,7 +36,7 @@ export interface ToolEnv {
  * gateway already captures every request + response server-side
  * (full I/O, exact cost). Injecting OTEL_* on top would make the
  * wrapped tool emit its own telemetry for the SAME calls = double
- * trace + double cost in /messages. The OTLP ingest path is for
+ * trace + double cost in /traces. The OTLP ingest path is for
  * users who can't go through the gateway at all (Claude Max
  * subscription, no swappable API key); they paste the OTEL env
  * block from the /me drawer manually. See
@@ -42,7 +44,7 @@ export interface ToolEnv {
  * Path B).
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
-	const gw = cfg.gateway_url.replace(/\/+$/, "");
+	const gw = normalizeEndpoint(cfg.gateway_url);
 	const auth = cfg.default_personal_vk?.secret;
 	if (!auth) return { vars: {} };
 	switch (tool) {
@@ -100,6 +102,34 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
 					GEMINI_API_KEY: auth,
 					GOOGLE_API_KEY: auth,
 				},
+			};
+		case "copilot":
+			// GitHub Copilot CLI BYOK (>= 1.0.41): COPILOT_PROVIDER_* switches
+			// ALL LLM traffic off GitHub's backend onto the configured endpoint
+			// (without these, traffic goes to api.githubcopilot.com over GitHub
+			// auth and cannot be intercepted). Wire format is always
+			// OpenAI-compatible (ADR-039 Decision 4); the gateway routes to any
+			// configured upstream. The bundled SDK appends `/chat/completions`
+			// WITHOUT prepending `/v1` — the binary's own local-provider example
+			// is `localhost:11434/v1` — so the base must already include `/v1`,
+			// same convention as opencode. NOTE: routing copilot through the
+			// gateway bills the org's provider keys, not the user's Copilot
+			// seat — which is why copilot defaults to the ingestion path
+			// (wrapper-path-choice.ts) and only lands here on explicit choice
+			// or policy force.
+			// clears: a user who hand-exported the Path B telemetry block
+			// (COPILOT_OTEL_ENABLED + OTLP endpoint/headers + capture flag)
+			// would otherwise double-trace in gateway mode — the rc-function
+			// unset in buildShellReapply only covers the persisted-function
+			// vector, not bare global exports. Derived from the same builder
+			// that installs the Path B block so the two can never drift.
+			return {
+				vars: {
+					COPILOT_PROVIDER_TYPE: "openai",
+					COPILOT_PROVIDER_BASE_URL: `${gw}/v1`,
+					COPILOT_PROVIDER_API_KEY: auth,
+				},
+				clears: telemetryEnvVarNames("copilot"),
 			};
 		case "opencode":
 			// opencode 1.x is multi-provider; under the hood it uses the

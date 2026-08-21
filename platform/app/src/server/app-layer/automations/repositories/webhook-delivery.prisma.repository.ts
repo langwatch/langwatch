@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
 import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
@@ -6,14 +7,21 @@ import type {
   WebhookFailureResponse,
 } from "./webhook-delivery.repository";
 
+/**
+ * The automations channel's view of the shared delivery log. Both channels
+ * write one row per HTTP attempt into `WebhookEndpointDelivery`; `channel`
+ * says which pair of tenancy columns a row carries, and this repository only
+ * ever reads and writes its own.
+ */
 export class PrismaWebhookDeliveryRepository
   implements WebhookDeliveryRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(input: WebhookDeliveryInput): Promise<void> {
-    await this.prisma.webhookDelivery.create({
+    await this.prisma.webhookEndpointDelivery.create({
       data: {
+        channel: "automations",
         projectId: input.projectId,
         triggerId: input.triggerId,
         dispatchId: input.dispatchId,
@@ -37,14 +45,14 @@ export class PrismaWebhookDeliveryRepository
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]> {
-    const rows = await this.prisma.webhookDelivery.findMany({
-      where: { projectId, triggerId },
+    const rows = await this.prisma.webhookEndpointDelivery.findMany({
+      where: { channel: "automations", projectId, triggerId },
       orderBy: { firedAt: "desc" },
       take: limit,
     });
     return rows.map((row) => ({
       id: row.id,
-      triggerId: row.triggerId,
+      triggerId: row.triggerId ?? triggerId,
       dispatchId: row.dispatchId,
       responseStatus: row.responseStatus,
       latencyMs: row.latencyMs,
@@ -55,20 +63,13 @@ export class PrismaWebhookDeliveryRepository
     }));
   }
 
-  async deleteOlderThan({ before }: { before: Date }): Promise<number> {
-    // WebhookDelivery is project-scoped, so the Prisma tenancy guard rejects a
-    // global deleteMany. Enumerate the global Project table, then prune each
-    // tenant with projectId present in the destructive query.
-    const projects = await this.prisma.project.findMany({
-      select: { id: true },
-    });
-    let deleted = 0;
-    for (const project of projects) {
-      const result = await this.prisma.webhookDelivery.deleteMany({
-        where: { projectId: project.id, firedAt: { lt: before } },
-      });
-      deleted += result.count;
-    }
-    return deleted;
+  /**
+   * Retention runs through the shared sweep, which prunes both channels in one
+   * statement. The per-project loop this replaced existed only to satisfy the
+   * tenancy guard, and it deleted rows of one channel while the platform's own
+   * sweep deleted the other's — two passes over what is now one table.
+   */
+  async pruneExpired(now?: Date): Promise<number> {
+    return await pruneWebhookDeliveries({ prisma: this.prisma, now });
   }
 }

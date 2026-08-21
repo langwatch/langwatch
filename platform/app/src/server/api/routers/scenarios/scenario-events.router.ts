@@ -6,7 +6,6 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
 import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
-import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
@@ -39,7 +38,7 @@ const dateRangeFields = {
  *
  * Returns data from ClickHouse. Pending items are visible immediately
  * because SuiteRunService dispatches simulation startRun commands at
- * scheduling time (before BullMQ jobs begin processing).
+ * scheduling time (before queued jobs begin processing).
  *
  * Real-time updates are delivered via SSE (onSimulationUpdate subscription).
  */
@@ -105,7 +104,7 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
     .input(projectSchema.extend(dateRangeFields))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId },
@@ -131,7 +130,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -163,7 +162,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string().optional() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
@@ -175,7 +174,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       return { lastUpdatedAt };
     }),
 
-  // Get all run data for a scenario set (paginated, no BullMQ merge)
+  // Get all run data for a scenario set (paginated, no queued-job merge)
   getScenarioSetRunData: protectedProcedure
     .input(
       projectSchema
@@ -186,7 +185,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -218,7 +217,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
@@ -241,7 +240,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioRunId: z.string(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioRunId: input.scenarioRunId },
@@ -271,7 +270,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
@@ -298,7 +297,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -329,7 +328,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         runTimestamps: z.record(z.string(), z.number()).optional(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -354,7 +353,7 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get summaries for external (SDK/CI) scenario sets
   getExternalSetSummaries: protectedProcedure
     .input(projectSchema.extend(dateRangeFields))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId },
@@ -380,7 +379,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -411,7 +410,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         tabId: z.string().min(1).max(200).optional(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .subscription(async function* (opts) {
       const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
@@ -437,9 +436,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       // this generator suspended, its emitter listener attached, and its tab
       // registered forever.
       const signal =
-        opts.ctx.signal ??
-        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
-        (opts.signal as AbortSignal | undefined);
+        opts.ctx.signal ?? (opts.signal as AbortSignal | undefined);
 
       try {
         for await (const eventArgs of on(emitter, "simulation_updated", {

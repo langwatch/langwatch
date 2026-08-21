@@ -1,6 +1,6 @@
 import { HStack } from "@chakra-ui/react";
 import { RandomColorAvatar } from "../RandomColorAvatar";
-import type { AnnotationWithUser } from "./AnnotationsTable";
+import type { AnnotationWithUser } from "./annotationRow";
 
 type User = {
   id: string;

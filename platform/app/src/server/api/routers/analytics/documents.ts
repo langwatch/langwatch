@@ -1,13 +1,12 @@
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { getAnalyticsService } from "../../../app-layer/analytics";
-import { checkProjectPermission } from "../../rbac";
+import { getApp } from "../../../app-layer/app";
 import { protectedProcedure } from "../../trpc";
 
 export const topUsedDocuments = protectedProcedure
   .input(sharedFiltersInputSchema)
-  .use(checkProjectPermission("cost:view"))
+  .permission("cost:view")
   .query(async ({ input }) => {
-    const analyticsService = getAnalyticsService();
+    const analyticsService = getApp().analytics.service;
     return analyticsService.getTopUsedDocuments(
       input.projectId,
       input.startDate,

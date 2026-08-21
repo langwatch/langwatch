@@ -12,6 +12,7 @@ export {
   compileSecretPatterns,
   detectSecretsInText,
   isSensitiveAttributeKey,
+  overBroadSecretPatternProbe,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
   type SecretMatch,

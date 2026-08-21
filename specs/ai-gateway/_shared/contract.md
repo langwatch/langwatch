@@ -158,7 +158,7 @@ Request:
 Response (200):
 ```json
 {
-  "jwt": "<HS256 signed, TTL 15m>",
+  "jwt": "<HS256 signed, TTL 15m or the key's expiry, whichever is sooner>",
   "revision": 142,
   "key_id": "vk_01HZX...",
   "display_prefix": "vk-lw-01HZX9"
@@ -168,22 +168,29 @@ Response (200):
 JWT claims (short, hot-path-verified):
 ```
 {
-  "vk_id":        "vk_01HZX...",
-  "project_id":   "proj_01HZ...",
-  "team_id":      "team_01HZ...",
-  "org_id":       "org_01HZ...",
-  "principal_id": "user_01HZ... | svc_01HZ...",  // for trace attribution
-  "revision":     142,                            // bumped on any mutation
-  "iat":          1734567890,
-  "exp":          1734568790,                     // TTL 900s
-  "iss":          "langwatch-control-plane",
-  "aud":          "langwatch-gateway"
+  "vk_id":         "vk_01HZX...",
+  "project_id":    "proj_01HZ...",
+  "team_id":       "team_01HZ...",
+  "org_id":        "org_01HZ...",
+  "principal_id":  "user_01HZ... | svc_01HZ...",  // for trace attribution
+  "revision":      142,                            // bumped on any mutation
+  "vk_expires_at": 1734568790,                     // key's own expiry, null when it has none
+  "iat":           1734567890,
+  "exp":           1734568790,                     // TTL 900s, or vk_expires_at when sooner
+  "iss":           "langwatch-control-plane",
+  "aud":           "langwatch-gateway"
 }
 ```
 
 Gateway refreshes asynchronously at `exp - 5min` (so T+10min from issue).
 
-Errors: `401 invalid_api_key`, `403 virtual_key_revoked`.
+`vk_expires_at` is the terminal validity instant of the key itself, not a
+refresh boundary: the gateway caps both auth-cache deadlines at it and refuses
+a request past it with `403 virtual_key_expired`, without a round trip. That is
+what stops a key from serving through the stale-while-error window (§9) after
+its date has passed while the control plane is unreachable.
+
+Errors: `401 invalid_api_key`, `403 virtual_key_revoked`, `403 virtual_key_disabled`, `403 virtual_key_expired`.
 
 ### 4.2 `GET /api/internal/gateway/config/:vk_id`
 
@@ -220,10 +227,11 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
       "config": { /* per-provider tuning: deployment_name, rate_limit, health, etc */ }
     }
   ],
+  /* `chain` is the ordered provider slots; `max_attempts` bounds the walk.
+     Which failures walk it is not on the wire: the gateway decides that
+     from the real upstream outcome (§7), the same way for every key. */
   "fallback": {
-    "on": ["5xx", "timeout", "rate_limit_exceeded"],
     "chain": ["pc_primary", "pc_secondary", "pc_tertiary"],
-    "timeout_ms": 30000,
     "max_attempts": 3
   },
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
@@ -244,6 +252,23 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
                        so their behaviour is unchanged.
        policy        - ordering and rules come from the linked RoutingPolicy. */
   "routing_mode": "none",
+  /* Why a provider a request could resolve to is NOT in `providers[]`, so a
+     request-time block can name the reason instead of failing opaque. Each
+     entry is a ModelProvider id + its type, the same shape `providers[]`
+     carries, because the gateway matches a resolved request by provider type
+     and these rows are absent from `providers[]`.
+       routing_excluded_providers - reachable from the key's scope AND inside
+         provider access, but dropped by the routing policy (named by
+         routing_policy_name).
+       access_excluded_providers  - reachable from scope but outside
+         providers_allowed; empty when the key allows all providers.
+     A provider in neither list with no credential is not reachable from the
+     key's scope. */
+  "routing_excluded_providers": [{ "id": "pc_anthropic", "type": "anthropic" }],
+  "access_excluded_providers": [{ "id": "pc_gemini", "type": "gemini" }],
+  /* Display name of the key's routing policy, used to name the routing block.
+     null when the key is not on a routing policy. */
+  "routing_policy_name": null,
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
     /* Both fail-open flags default false (fail-closed). Flip to true per
@@ -263,7 +288,8 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
        (user messages, tool args, system prompts), strips trailing punctuation,
        dedupes. Models dimension is regex policy — distinct from the static
        glob `models_allowed` allowlist; both compose (request passes only
-       if both allow). */
+       if both allow), and both judge the RESOLVED model, in either
+       spelling, so an alias cannot route around either (§11b). */
     "tools":  { "deny": ["^shell\\.", "^filesystem\\.write$"], "allow": null },
     "mcp":    { "deny": ["^.*@mcp/unverified.*$"], "allow": null },
     "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] },
@@ -305,7 +331,19 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
       "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "block" }
   ],
-  "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." }
+  "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." },
+  /* The key's own expiration date in unix seconds, null for a key that never
+     expires. ALWAYS present: the gateway reads an explicit null as "this key
+     has no date" and an absent field as "an older control plane said nothing,
+     keep the date you hold", so the two must stay distinguishable.
+
+     The same date rides the auth token as `vk_expires_at` (§4.1), which is the
+     mint-time floor. Carrying it here as well is what bounds how stale the
+     gateway's copy can get: the ETag moves on every mutation, so a shortened or
+     extended date arrives on the next config revalidation (§9, ConfigTTL, 60s
+     by default) even while the change feed is unavailable. Shortening therefore
+     propagates faster than revocation does under the same failure. */
+  "expires_at": 1734568790
 }
 ```
 
@@ -351,6 +389,16 @@ evicted key refetches and enforces against the new totals. The 60s
 `CONFIG_TTL` on a cached bundle is the backstop rather than the mechanism: it
 bounds staleness when a change event is missed or arrives while the gateway is
 disconnected.
+
+**Routing policies and cache rules take the same route.** A policy edit or
+delete (`ROUTING_POLICY_UPDATED` / `ROUTING_POLICY_DELETED`) and any cache-rule
+mutation (`CACHE_RULE_CREATED` / `CACHE_RULE_UPDATED` / `CACHE_RULE_DELETED`)
+also evict every bundle of the polled organization. Both are folded into the
+bundle by the materialiser and neither leaves an id on it to join back on, so
+the organization is the finest key available, the same position a budget event
+without a `project_id` is in. Deleting a policy also releases the keys that
+pointed at it, in the same transaction: the pointer is cleared and the key's
+routing mode moves off `POLICY`, which cannot exist without one.
 
 **The one read a bundle cannot carry.** A per-end-user budget is a template:
 one budget row governs a separate allowance for every end user it has seen, a
@@ -589,7 +637,9 @@ All errors OpenAI-compatible:
 | `type` | HTTP | When |
 |---|---|---|
 | `invalid_api_key` | 401 | Unknown, malformed, or non-existent VK |
-| `virtual_key_revoked` | 403 | VK exists but is revoked |
+| `virtual_key_revoked` | 403 | VK exists but is revoked. Terminal: revocation is one-way |
+| `virtual_key_disabled` | 403 | VK exists but is disabled, the reversible stop. An administrator re-enables it and the same secret works again |
+| `virtual_key_expired` | 403 | VK exists, is ACTIVE, and its `expires_at` has passed. The key material is intact: extending the date puts it straight back in service |
 | `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `policy_rules.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
 | `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
 | `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
@@ -639,20 +689,22 @@ All errors OpenAI-compatible:
 
 ## 7. Fallback chain
 
-Triggers (configurable per VK in `config.fallback.on`):
+Triggers are **fixed, not per key**. The classification lives in one function, `classifyProviderError` in `services/aigateway/app/dispatch.go`, and is derived from the real upstream outcome; the retry engine's trigger set is `defaultTriggers` in `pkg/retry/retry.go`. A per-key trigger list could only ever narrow the set, and every narrowing turns a failure the gateway would have recovered from into a customer-visible one, so the wire carries no such field (§4.2).
 
-- `5xx` — any upstream 5xx.
-- `timeout` — upstream exceeds `config.fallback.timeout_ms`.
-- `rate_limit_exceeded` — upstream 429.
-- `network_error` — connection reset / DNS / TLS.
-- `circuit_breaker` — gateway-internal circuit breaker trips after N consecutive failures against a provider in the last M seconds (not a response trigger — preempts attempts).
+- `5xx`: any upstream 5xx, and any provider error the adapter could not classify more precisely.
+- `timeout`: the provider adapter reports the upstream never answered. A provider-reported `504` arrives as a status and classifies as `5xx`, which is retryable either way; the two differ only in the reason recorded on the attempt.
+- `rate_limit_exceeded`: upstream 429.
+- `network_error`: connection reset / DNS / TLS.
+- `404 Not Found`: in a multi-provider chain this usually means "this provider does not serve that model" (common with custom and OpenAI-compatible providers), and the next slot may.
+- `circuit_breaker`: gateway-internal circuit breaker trips after N consecutive failures against a provider in the last M seconds. Not a response trigger, it preempts attempts.
 
-**Does NOT trigger fallback** (these are client-fault and returned as-is):
+**Does NOT trigger fallback** (terminal, and returned as-is). Terminal is not the same as the caller's fault: a `401` or `403` is usually the operator's provider credential, and the point of not masking it is that switching credentials would hide the thing they have to fix.
 
 - `400 Bad Request` from upstream (malformed payload).
-- `401 Unauthorized` from upstream (provider credential bad — surface to customer so they fix their provider creds; don't mask by silently switching).
+- `401 Unauthorized` from upstream (provider credential bad: surface to customer so they fix their provider creds; don't mask by silently switching).
 - `403 Forbidden` from upstream.
-- `404 Not Found` (requested model doesn't exist at that provider).
+- Every other terminal 4xx.
+- A bare context cancellation or deadline: the CALLER abandoned the request, which is not a provider verdict, so it neither falls back nor feeds the circuit breaker.
 - `invalid_api_key` / `permission_denied` from our own auth layer (never reaches fallback).
 
 Behaviour:
@@ -690,13 +742,18 @@ Pattern (from Bifrost `ObservabilityPlugin.Inject(trace)`):
 
 ## 9. Auth cache strategy (gateway side)
 
-Three layers, documented here so Go code + infra agree:
+Documented here so Go code + infra agree:
 
-1. **L1 in-memory LRU:** 64k entries, TTL = JWT `exp`. Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path.
-2. **L2 Redis (optional):** same key, shared across gateway nodes. TTL = JWT `exp`. `$LW_GATEWAY_REDIS_URL` env toggles. When L2 miss, one node wins the resolve; others read cached.
-3. **L3 bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `$LW_GATEWAY_BOOTSTRAP_PULL=true`.
+1. **L1 in-memory LRU:** 10k entries by default (`Options.LRUSize`; the chart's `cache.lruSize` is not wired yet). Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
 
-Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate L1/L2 entries.
+   JWT `exp` bounds normal freshness, it is not the eviction point. Past `exp` an entry is refreshed before it serves, and if that refresh fails for transport reasons the entry keeps serving while its soft expiry is bumped, up to a hard cap of `exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 6h, negative disables the grace entirely). An auth-class rejection evicts immediately at any point.
+2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `LW_GATEWAY_BOOTSTRAP_PULL=true`, the same name §6 uses. Nothing reads it yet, so it is a name this document reserves rather than one the binary honors.
+
+Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
+
+Config staleness is bounded by a TTL refresh underneath the change feed, and that refresh is conditional: it sends `If-None-Match: <etag>` to §4.2 and takes the 304 as "keep the bundle, restart the staleness clock". A key nobody changed costs the control plane a revision lookup rather than a full config materialization.
+
+The same refresh bounds the staleness of the key's own expiration date, which §4.2 carries as `expires_at`. The token claim `vk_expires_at` is the mint-time floor and the config channel is the update path, so a date an admin shortens or extends reaches the gateway within one ConfigTTL even while the change feed is unavailable. A response with no `expires_at` field comes from a control plane older than it, and the gateway then keeps the date its bundle already holds; reading absent as "no expiry" would lift the cap off a key whose own token says it expires.
 
 No filesystem-persisted secrets. JWTs and configs are in-memory only; on restart we re-fetch.
 
@@ -763,6 +820,9 @@ Evaluated at the gateway **before** dispatch to the upstream provider. Each patt
 - **`tools`** — checked against every `tools[].function.name` in the request (OpenAI format) and every `tools[].name` (Anthropic format). First match in `deny` → 403 `tool_not_allowed` with `policies_triggered: ["policy_violation_tools"]`. If `allow` is non-null, any tool name not matching an `allow` entry is blocked.
 - **`mcp`** — checked against the `mcp_servers[].name` and `mcp_servers[].url` if the request declares MCP servers. Same allow/deny semantics.
 - **`urls`** — checked against any URL found inside tool-call arguments that look like outbound HTTP (heuristic: field name matches `/url|endpoint|uri/i`). Primarily advisory; hard enforcement requires egress proxy and is post-MVP.
+- **`models`**: evaluated **post-resolution**, against the model the resolver settled on, not the string the caller sent. It runs a step later than the other three, inside the model-resolve stage, because only there is the real model known. Both spellings of the resolved model are judged (bare id and `provider/model`), so a rule written either way reaches the same model. Two consequences follow and are the point: an alias pointing at a denied model **is** blocked, and a deny on a raw name that resolves elsewhere does **not** block, because nothing denied ever runs.
+
+The other three dimensions stay on the request body as sent: tools, MCP servers, and URLs are properties of what the client wrote, and resolution does not change them.
 
 OTel trace records each block with span attribute `langwatch.policy.violation=<kind>:<pattern>`.
 

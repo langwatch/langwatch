@@ -8,15 +8,20 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  declaredCodingAgent,
   detectCodingAgent,
   isCodingAgentMetricName,
+  liftCodingAgentLogFacts,
   mergeAliasTables,
   normalizeEventName,
   normalizeMetricName,
   normalizeTokenType,
   parseMcpToolName,
   resolveConversationKey,
+  resolveSpanConversationKey,
   resolveToolName,
+  SESSION_CONTEXT_EVENT_NAME,
+  sessionTitleFromPrompt,
 } from "../coding-agent-normalization";
 
 describe("detectCodingAgent", () => {
@@ -126,6 +131,50 @@ describe("resolveConversationKey", () => {
   });
 });
 
+describe("resolveSpanConversationKey", () => {
+  /**
+   * Live-verified on codex 0.147: the turn span's `gen_ai.conversation.id`
+   * is the id of the TURN, and the session rides `thread.id` — the exact
+   * value every codex log event carries as `conversation.id`. Reading the
+   * shared candidate order here split each turn into its own session.
+   */
+  it("keys a codex turn span on its thread id, not the per-turn id", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: {
+          "gen_ai.conversation.id": "01a00987-1926-74b1-b765-turn",
+          "thread.id": "01a00987-187a-7b23-b6d8-session",
+        },
+      }),
+    ).toBe("01a00987-187a-7b23-b6d8-session");
+  });
+
+  it("falls back to the shared order when the thread id is a tokio worker id", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: {
+          "gen_ai.conversation.id": "01a00987-1926-74b1-b765-turn",
+          "thread.id": "10",
+        },
+      }),
+    ).toBe("01a00987-1926-74b1-b765-turn");
+  });
+
+  it("leaves every other agent on the shared order", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "claude_code",
+        name: "claude_code.llm_request",
+        attrs: { "gen_ai.conversation.id": "s-1", "thread.id": "t-1" },
+      }),
+    ).toBe("s-1");
+  });
+});
+
 describe("normalizeEventName", () => {
   describe("given the same event from three agents", () => {
     // Two namespace it, one does not. That inconsistency is the whole reason
@@ -152,7 +201,11 @@ describe("normalizeEventName", () => {
      * broken registry merge would silently stop mapping a real event.
      */
     it("still lands them on the shared facts through the registry merge", () => {
-      expect(normalizeEventName("codex.sandbox_outcome")).toBe("tool_result");
+      expect(normalizeEventName("codex.turn_ttft")).toBe("turn_ttft");
+      // codex fires sandbox_outcome IN ADDITION to tool_result for a
+      // sandboxed shell command, so mapping it onto tool_result would count
+      // that command twice — it deliberately maps to nothing.
+      expect(normalizeEventName("codex.sandbox_outcome")).toBeNull();
       expect(
         normalizeEventName("github.copilot.session_compaction_complete"),
       ).toBe("compaction");
@@ -188,11 +241,124 @@ describe("normalizeEventName", () => {
     });
   });
 
+  describe("given the LangWatch companion event", () => {
+    it("lands the qualified and bare spellings on one fact", () => {
+      // `langwatch.` is nobody's agent prefix, so nothing is stripped and the
+      // dot-flattened spelling is what the alias table has to carry.
+      expect(normalizeEventName("langwatch.session_context")).toBe(
+        "session_context",
+      );
+      expect(normalizeEventName("session_context")).toBe("session_context");
+    });
+  });
+
+  describe("given Claude's response-body half of a model call", () => {
+    it("lands it on the same fact as Gemini's completion event", () => {
+      expect(normalizeEventName("claude_code.api_response_body")).toBe(
+        "api_response",
+      );
+      expect(normalizeEventName("gemini_cli.api_response")).toBe(
+        "api_response",
+      );
+    });
+  });
+
   describe("given an event we have no use for", () => {
     it("returns null instead of inventing a fact", () => {
       expect(normalizeEventName("codex.websocket_connect")).toBeNull();
       expect(normalizeEventName("")).toBeNull();
       expect(normalizeEventName(null)).toBeNull();
+    });
+  });
+});
+
+describe("liftCodingAgentLogFacts", () => {
+  describe("given a log record named langwatch.session_context under the langwatch hook scope", () => {
+    const attributes = {
+      "event.name": SESSION_CONTEXT_EVENT_NAME,
+      "session.id": "sess-ctx-1",
+      "coding_agent.name": "claude_code",
+      "vcs.repository.host": "github.com",
+      "vcs.repository.owner": "acme",
+      "vcs.repository.name": "widgets",
+      "vcs.ref.head.name": "feat/session-git-context",
+      "vcs.worktree.name": "widgets-feat",
+    };
+
+    /** @scenario A langwatch session context event passes the log lift without a vendor scope */
+    it("admits the record and lifts its vcs attributes", () => {
+      const facts = liftCodingAgentLogFacts({
+        scopeName: "langwatch.coding_agent.hook",
+        attributes,
+      });
+
+      expect(facts).toEqual(attributes);
+    });
+
+    /** @scenario "The session's name lifts from the session context record" */
+    it("lifts the name and the derived title alongside the vcs attributes", () => {
+      const titled = {
+        ...attributes,
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      };
+
+      const facts = liftCodingAgentLogFacts({
+        scopeName: "langwatch.coding_agent.hook",
+        attributes: titled,
+      });
+
+      expect(facts).toMatchObject({
+        "langwatch.session.title": "Read notes.txt",
+        "langwatch.session.name": "pr-reviewer",
+      });
+    });
+
+    /** @scenario A langwatch session context event passes the log lift without a vendor scope */
+    it("required no vendor instrumentation scope to be admitted", () => {
+      // The proof that the admission is the event name and nothing else: the
+      // same scope and event name identify no agent at all.
+      expect(
+        detectCodingAgent({
+          scopeName: "langwatch.coding_agent.hook",
+          recordName: SESSION_CONTEXT_EVENT_NAME,
+        }),
+      ).toBe("unknown");
+    });
+  });
+
+  describe("given an ordinary application log", () => {
+    it("declines it, so the firehose costs one name check", () => {
+      expect(
+        liftCodingAgentLogFacts({
+          scopeName: "express",
+          attributes: { "event.name": "http.request", "session.id": "s" },
+        }),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("declaredCodingAgent", () => {
+  describe("given a declaration naming an agent in the registry", () => {
+    it("answers that agent", () => {
+      expect(declaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe(
+        "claude_code",
+      );
+      expect(declaredCodingAgent({ "coding_agent.name": "codex" })).toBe(
+        "codex",
+      );
+    });
+  });
+
+  describe("given a declaration LangWatch cannot resolve", () => {
+    it("answers null rather than trusting the wire", () => {
+      expect(
+        declaredCodingAgent({ "coding_agent.name": "totally_new_agent" }),
+      ).toBeNull();
+      expect(declaredCodingAgent({ "coding_agent.name": "" })).toBeNull();
+      expect(declaredCodingAgent({ "coding_agent.name": 42 })).toBeNull();
+      expect(declaredCodingAgent({})).toBeNull();
     });
   });
 });
@@ -366,5 +532,33 @@ describe("isCodingAgentMetricName", () => {
     expect(isCodingAgentMetricName("http.server.duration")).toBe(false);
     // A coding agent's metric we have no mapping for is also not worth folding.
     expect(isCodingAgentMetricName("codex.websocket.request")).toBe(false);
+  });
+});
+
+describe("sessionTitleFromPrompt", () => {
+  describe("given the first thing a user typed", () => {
+    /** @scenario A session with no generated title is named by the first thing the user asked */
+    it("names the session by the prompt's first line, whitespace collapsed", () => {
+      expect(
+        sessionTitleFromPrompt(
+          "Fix the retry loop   in the outbox worker\nIt spins on lease loss.",
+        ),
+      ).toBe("Fix the retry loop in the outbox worker");
+    });
+
+    it("caps a run-on prompt", () => {
+      expect(sessionTitleFromPrompt("a".repeat(500))).toHaveLength(120);
+    });
+  });
+
+  describe("given text that is not the user's own words", () => {
+    /** @scenario A machine-injected first prompt does not name the session */
+    it("answers null for machine-injected turns, withheld text, and nothing", () => {
+      expect(
+        sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>"),
+      ).toBeNull();
+      expect(sessionTitleFromPrompt("[REDACTED]")).toBeNull();
+      expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
+    });
   });
 });

@@ -14,6 +14,10 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy";
 import {
+  AUTHZ_GRANTS_COMMAND_TYPES,
+  AUTHZ_GRANTS_EVENT_TYPES,
+} from "../pipelines/authz-grants/schemas/constants";
+import {
   AUTOMATIONS_COMMAND_TYPES,
   AUTOMATIONS_EVENT_TYPES,
 } from "../pipelines/automations/schemas/constants";
@@ -61,26 +65,24 @@ import {
 import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
-  TRACE_PROCESSING_STAGING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
 
 /**
  * Test-only event type identifiers. Minimal brands without full schemas, used
  * only to validate the pipeline in tests: `test.integration.event` for
- * integration coverage, and `test.referenced` for the enqueue-staging seam's
- * claim-check unit (a synthetic reference a `stage` hook returns).
+ * integration coverage. Staged queue payloads (what a `stage` hook returns)
+ * are plain job DTOs, not events, so they need no brand here — see
+ * `StagedJobPayload`.
  */
-const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
+const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 
 /**
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
+  ...AUTHZ_GRANTS_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
-  // Staging-only brands (ADR-069): valid Event types that a `stage` hook may
-  // return but that are never appended to the event log.
-  ...TRACE_PROCESSING_STAGING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
   ...LOG_PROCESSING_EVENT_TYPES,
   ...CODING_AGENT_PROCESSING_EVENT_TYPES,
@@ -100,6 +102,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  * All command type identifiers defined in schemas.
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
+  ...AUTHZ_GRANTS_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -129,6 +132,10 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
+  // ADR-110: a grant is its own aggregate, and so is a role. There is no
+  // organization-keyed authorization aggregate.
+  "authz_grant",
+  "authz_role",
   "trigger",
   "trace",
   "metric",

@@ -20,6 +20,7 @@
  * an error class). That invariant is what makes it safe to summarise a session of
  * unknown size — it is the same one that let us delete MAX_PROCESSED_SPANS.
  */
+import { z } from "zod";
 
 /** One thing the agent did, in the order it did it. */
 export interface SessionStep {
@@ -31,6 +32,17 @@ export interface SessionStep {
   /** Used to keep the sequence true even when spans arrive out of order. */
   startedAtMs: number;
 }
+
+/**
+ * Who set the session's `title`, in rank order: the harness's own session
+ * name beats the generated conversation title beats the prompt-derived name.
+ *
+ * A schema rather than a bare union because the value is also decoded back
+ * from a row column, so the names have to exist at runtime. One declaration
+ * serves both, and the two cannot drift apart.
+ */
+export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
+export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
 
 /**
  * One converged metric unit, as its contribution delivered it. A cumulative
@@ -68,6 +80,53 @@ export interface CodingAgentSessionData {
    * them this stays null rather than guessing.
    */
   userId: string | null;
+  /**
+   * Spawn lineage, when the agent stamps it: the session that spawned this
+   * one, and whether this session FORKED the parent's context (inheriting the
+   * whole window, and its cost) rather than starting fresh. No agent observed
+   * to date stamps lineage, so these stay null/false: empty means it was
+   * never reported, not that the session has no parent.
+   */
+  parentSessionId: string | null;
+  isFork: boolean;
+  /**
+   * Where the session ran and what it was called, from the LangWatch companion
+   * event (`langwatch.session_context`) and the agent's generated title.
+   *
+   * Semantics differ per field, on purpose:
+   *   - repository host / owner / name and worktree are ONCE-SET. A session is
+   *     one checkout; a later event naming a different repository is a
+   *     correlation accident, not a move, so the first answer stands.
+   *   - branch is LAST-WRITE-WINS. A session that starts on the default branch
+   *     and cuts a feature branch mid-run belongs to the branch it ended on,
+   *     which is the one its pull request comes from.
+   *   - `gitBranches` is the bounded first-seen set of EVERY branch reported,
+   *     the whole history the scalar above keeps only the present tense of. A
+   *     session that lands one change and moves on drove both branches, and
+   *     both of their pull requests.
+   *   - title is LAST-NON-EMPTY-WINS within its source rank: the harness's
+   *     own session name outranks the generated conversation title, which
+   *     outranks the prompt-derived name.
+   *
+   * Degradation, stated: agents with no companion emitter carry nulls here.
+   * Null means nothing reported it, never "this session has no repository".
+   */
+  repositoryHost: string | null;
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+  gitBranches: string[];
+  gitWorktree: string | null;
+  title: string | null;
+  /**
+   * Which source set `title`. Its own field rather than an inference,
+   * because the fold's state is decoded back from the row (ADR-066) and the
+   * title alone cannot say whether a later generated title may replace it —
+   * getting that wrong renames a session away from the name its harness
+   * holds. Null on a row from before the column, which ranks as `generated`
+   * (the strongest source that existed then).
+   */
+  titleSource: SessionTitleSource | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -146,6 +205,12 @@ export interface CodingAgentSessionData {
   compactionTokensBefore: number;
   compactionTokensAfter: number;
   /**
+   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}`. A session
+   * that keeps auto-compacting is out of headroom, one the user compacts is
+   * being STEERED; "unknown" buckets telemetry predating the attribute.
+   */
+  compactionTriggers: Record<string, number>;
+  /**
    * The biggest single model call's context (`cacheReadTokens +
    * cacheCreationTokens` for that ONE call) — "how big did the context
    * window get", as distinct from `cacheReadTokens`/`cacheCreationTokens`
@@ -178,6 +243,13 @@ export interface CodingAgentSessionData {
   apiErrors: number;
   /** Rate limits (429) — worth telling apart from every other failure. */
   rateLimited: number;
+  /**
+   * Rate-limit EVENTS the agent reported (`rate_limit_event` /
+   * `rate_limit_info`), kept apart from the 429-inferred `rateLimited` above:
+   * the event also fires on warnings and status updates, so the two counters
+   * answer different questions.
+   */
+  rateLimitEvents: number;
   retriesExhausted: number;
   /** Total wall-clock burned on retries. Time paid for nothing. */
   retryMs: number;

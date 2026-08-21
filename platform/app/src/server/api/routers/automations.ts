@@ -10,23 +10,28 @@ import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   AlertType,
   type Prisma,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
+import {
+  readPersistCapCounts,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
+  TriggerFiltersRequiredError,
 } from "~/server/app-layer/automations/errors";
 import {
   buildGraphAlertTriggerData,
@@ -41,6 +46,7 @@ import {
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   decryptWebhookHeaders,
+  decryptWebhookSigningSecrets,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import {
@@ -51,6 +57,7 @@ import {
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   type DraftProject,
+  type TestFireWebhookDestination,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
@@ -58,6 +65,7 @@ import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
+import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -65,7 +73,6 @@ import {
   triggerFiltersSchema,
 } from "../../filters/types";
 import { rateLimit } from "../../rateLimit";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
@@ -283,7 +290,7 @@ export const automationRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(checkProjectPermission("triggers:create"))
+    .permission("triggers:create")
     .mutation(async ({ ctx, input }) => {
       // This legacy mutation cannot carry the validated/encrypted webhook
       // destination shape. Never let a direct caller create a malformed or
@@ -297,10 +304,16 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
+      // This path only ever writes AUTOMATION rows (it carries no graph or
+      // report shape), so the condition is always required here.
+      if (!hasActionableTriggerFilters(input.filters)) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+      }
+
       const project = await getApp().projects.getById(input.projectId);
 
       if (!project) {
-        throw new Error(`Project with id ${input.projectId} not found`);
+        throw toTemplateTRPCError(new ProjectNotFoundError(input.projectId));
       }
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
@@ -365,7 +378,7 @@ export const automationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
-    .use(checkProjectPermission("triggers:delete"))
+    .permission("triggers:delete")
     .mutation(async ({ input }) => {
       await getApp().triggers.softDeleteById({
         triggerId: input.triggerId,
@@ -385,7 +398,7 @@ export const automationRouter = createTRPCRouter({
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const triggers = await getApp().triggers.getAllForProject({
         projectId: input.projectId,
@@ -453,9 +466,50 @@ export const automationRouter = createTRPCRouter({
 
       return enhancedTriggers;
     }),
+  /**
+   * The plan's daily ceiling on persist actions, on its own. The authoring
+   * drawer only advises against the ceiling and never reads a count, so it
+   * takes this rather than the status below and skips a scan it would discard.
+   */
+  getDailyCap: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("triggers:view")
+    .query(async ({ input }) => ({
+      cap: await resolvePersistDailyCap(input.projectId),
+    })),
+  /**
+   * Today's confirmed-match count and skipped count per automation, so the
+   * list can say "N matches skipped today" instead of leaving the customer to
+   * wonder why an automation they can see running produced nothing. A Redis
+   * outage degrades to showing no skips rather than failing the page.
+   *
+   * The automations it covers are read here rather than taken from the caller.
+   * The page renders every automation in the project, so a caller-supplied list
+   * either has to be unbounded, which puts the read's size in the caller's
+   * hands, or capped, which silently drops the badge from every automation past
+   * the cap. Reading the ids here bounds the work by what the project actually
+   * owns, which is the same set the page is already rendering.
+   */
+  getDailyCapStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("triggers:view")
+    .query(async ({ ctx, input }) => {
+      const cap = await resolvePersistDailyCap(input.projectId);
+      const triggers = await ctx.prisma.trigger.findMany({
+        where: { projectId: input.projectId },
+        select: { id: true },
+      });
+      const counts = await readPersistCapCounts({
+        projectId: input.projectId,
+        triggerIds: triggers.map((trigger) => trigger.id),
+        now: new Date(),
+        cap,
+      });
+      return { cap, counts };
+    }),
   getTriggerStats: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllFireStatsForProject({
@@ -470,7 +524,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(20).default(20),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllRecentFiresForTrigger({
@@ -490,7 +544,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(50).default(50),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const deliveries = WebhookDeliveryService.create(ctx.prisma);
       return deliveries.getRecentByTrigger({
@@ -507,7 +561,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(100),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllRecentFiresForProject({
@@ -522,7 +576,7 @@ export const automationRouter = createTRPCRouter({
    */
   getReportSchedules: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input }) => {
       return getApp().triggers.getReportSchedules({
         projectId: input.projectId,
@@ -536,7 +590,7 @@ export const automationRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ input }) => {
       const existing = await getApp().triggers.getById({
         triggerId: input.triggerId,
@@ -571,6 +625,11 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
         data: {
           active: input.active,
+          // Resuming clears the platform's pause record. Leaving it behind
+          // would make a running automation keep claiming it was paused for
+          // runaway volume, and the next genuine pause would be
+          // indistinguishable from the stale one.
+          ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
         },
       });
 
@@ -596,7 +655,7 @@ export const automationRouter = createTRPCRouter({
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input }) => {
       const trigger = await getApp().triggers.getById({
         triggerId: input.triggerId,
@@ -624,7 +683,7 @@ export const automationRouter = createTRPCRouter({
     )
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ input }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {
@@ -648,7 +707,7 @@ export const automationRouter = createTRPCRouter({
         filters: triggerFiltersPermissiveSchema,
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       const { sanitized, unknownFields } = sanitizeTriggerFilters(
         input.filters,
@@ -660,6 +719,30 @@ export const automationRouter = createTRPCRouter({
           message:
             "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
         });
+      }
+
+      // Editing is the other way to end up with a match-everything automation:
+      // create it with a real condition, then clear it here. The existing row
+      // decides whether that is allowed — an automation whose condition lives
+      // in its query keeps a legitimately empty structured set, and alerts and
+      // reports have no trace condition to require in the first place.
+      if (!hasActionableTriggerFilters(sanitized)) {
+        const existing = await getApp().triggers.getById({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+        });
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Automation not found in this project.",
+          });
+        }
+        if (
+          existing.triggerKind === TriggerKind.AUTOMATION &&
+          (existing.filterQuery ?? "").trim() === ""
+        ) {
+          throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+        }
       }
 
       const trigger = await getApp().triggers.update({
@@ -739,7 +822,7 @@ export const automationRouter = createTRPCRouter({
           .default(null),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       // ADR-031: test fire is no longer an open relay. The client-supplied
       // recipient list is gone from the input entirely — there is nothing to
@@ -827,7 +910,11 @@ export const automationRouter = createTRPCRouter({
         // against the stored ciphertext, exactly like the Slack bot token
         // above. Unresolvable kept values (fresh draft, renamed header) are
         // dropped rather than sent as the literal sentinel.
-        let webhookDestination = input.webhookDestination;
+        // Widened past the input schema on purpose: signingSecrets is
+        // resolved server-side from the saved trigger and is deliberately not
+        // accepted from the browser.
+        let webhookDestination: TestFireWebhookDestination | null | undefined =
+          input.webhookDestination;
         if (
           webhookDestination &&
           Object.values(webhookDestination.headers).includes(
@@ -862,6 +949,23 @@ export const automationRouter = createTRPCRouter({
             headers[name] = value;
           }
           webhookDestination = { ...webhookDestination, headers };
+        }
+
+        // The signing secret is a stored secret too, so the browser never has
+        // it and cannot send it. Resolve it from the saved trigger so a test
+        // fire signs exactly as a real one does, which is the only way an
+        // author can point the button at their receiver's verification.
+        if (webhookDestination && input.automationId) {
+          const row = await getApp().triggers.getById({
+            triggerId: input.automationId,
+            projectId: input.projectId,
+          });
+          const signingSecrets = decryptWebhookSigningSecrets(
+            (row?.actionParams ?? {}) as WebhookStoredActionParams,
+          );
+          if (signingSecrets.length > 0) {
+            webhookDestination = { ...webhookDestination, signingSecrets };
+          }
         }
 
         const project = await resolveProjectIdentity(input.projectId);
@@ -909,7 +1013,7 @@ export const automationRouter = createTRPCRouter({
         traceDebounceMs: traceDebounceMsSchema.optional(),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
       const isReport = !isGraphAlert && !!input.report;
@@ -1045,6 +1149,20 @@ export const automationRouter = createTRPCRouter({
             }`,
           });
         }
+      }
+
+      // A trace automation must say which traces it is about. Checked after
+      // the query is normalised, so a whitespace-only query counts as absent
+      // exactly as it does everywhere else. Graph alerts and reports are
+      // exempt: an alert's condition is its threshold and a report's is its
+      // schedule, and both persist `filters: {}` by construction.
+      if (
+        !isGraphAlert &&
+        !isReport &&
+        filterQuery === null &&
+        !hasActionableTriggerFilters(input.filters)
+      ) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
 
       // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or

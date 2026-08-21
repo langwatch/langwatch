@@ -2,10 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { FilterService } from "../../../filters/filter.service";
+import { getApp } from "../../../app-layer/app";
 import { availableFilters } from "../../../filters/registry";
 import { type FilterField, filterFieldsEnum } from "../../../filters/types";
-import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 
 export const dataForFilter = protectedProcedure
@@ -17,7 +16,7 @@ export const dataForFilter = protectedProcedure
       query: z.string().optional(),
     }),
   )
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 
@@ -40,8 +39,7 @@ export const dataForFilter = protectedProcedure
       Object.entries(input.filters).filter(([key]) => key !== field),
     ) as Partial<Record<FilterField, FilterParam>>;
 
-    const filterService = FilterService.create();
-    const results = await filterService.getFilterOptions({
+    const results = await getApp().filters.options.getFilterOptions({
       projectId: input.projectId,
       field,
       query: input.query,

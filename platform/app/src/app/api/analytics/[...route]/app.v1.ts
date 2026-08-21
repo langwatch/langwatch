@@ -1,14 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { getApp } from "~/server/app-layer/app";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 
@@ -67,7 +66,7 @@ export function registerAnalyticsRoutes(
       };
 
       try {
-        const analyticsService = getAnalyticsService();
+        const analyticsService = getApp().analytics.service;
         const timeseriesResult = await analyticsService.getTimeseries(input);
         return c.json(timeseriesResult);
       } catch (e) {

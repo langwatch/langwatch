@@ -8,11 +8,28 @@ import {
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
 import { readWindowAround } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
+import type {
+  CodingAgentSessionEventRow,
+  CodingAgentSessionEventsRepository,
+  SessionEventsCursor,
+} from "./repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "./repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,
   SessionMetricTotal,
 } from "./repositories/session-metric-series.repository";
+
+/**
+ * Ceiling on one session-events page. Every caller is clamped to it here, so
+ * a route that forgot to validate, a CLI flag or a future job can never ask
+ * ClickHouse for an unbounded scan.
+ */
+export const MAX_SESSION_EVENTS_PAGE_SIZE = 1000;
+
+function clampSessionEventsLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return MAX_SESSION_EVENTS_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_SESSION_EVENTS_PAGE_SIZE);
+}
 
 /** The "at a glance" personal-usage figures over a period. */
 export interface CodingAgentUsageTotals {
@@ -41,12 +58,119 @@ export interface CodingAgentUsageTotals {
  * counters, bounded sets, and the ids (`traceIds`, `sessionId`,
  * `finalRequestId`) that reach the heavy data where it already lives.
  */
+export interface CodingAgentSessionServiceDeps {
+  sessions: CodingAgentSessionRepository;
+  traceSessions: CodingAgentTraceSessionRepository;
+  metricSeries: SessionMetricSeriesRepository;
+  sessionEvents: CodingAgentSessionEventsRepository;
+}
+
 export class CodingAgentSessionService {
-  constructor(
-    private readonly sessions: CodingAgentSessionRepository,
-    private readonly traceSessions: CodingAgentTraceSessionRepository,
-    private readonly metricSeries: SessionMetricSeriesRepository,
-  ) {}
+  private readonly sessions: CodingAgentSessionRepository;
+  private readonly traceSessions: CodingAgentTraceSessionRepository;
+  private readonly metricSeries: SessionMetricSeriesRepository;
+  private readonly sessionEvents: CodingAgentSessionEventsRepository;
+
+  constructor(deps: CodingAgentSessionServiceDeps) {
+    this.sessions = deps.sessions;
+    this.traceSessions = deps.traceSessions;
+    this.metricSeries = deps.metricSeries;
+    this.sessionEvents = deps.sessionEvents;
+  }
+
+  /**
+   * One session's event sequence (model calls, compactions, rate limits,
+   * tool runs, prompts) in time order, keyset-paginated. The raw material
+   * for per-call analytics; content stays in the canonical rows.
+   *
+   * `limit` is clamped to {@link MAX_SESSION_EVENTS_PAGE_SIZE}: callers walk
+   * the cursor for more, and no caller gets to size the scan itself.
+   *
+   * A caller that names no window gets one resolved for it. `TimeUnixMs` is
+   * the fact table's partition key, so a read without a bound on it opens
+   * every weekly partition the retention holds, cold S3 ones included, to
+   * answer about a session that lived for minutes. The session row carries
+   * `startedAtMs`, and reading it is a keyed point lookup, so the cheap read
+   * buys the bound for the expensive one.
+   */
+  async getSessionEvents({
+    projectId,
+    sessionId,
+    kinds,
+    occurredAt,
+    cursor,
+    limit,
+  }: {
+    projectId: string;
+    sessionId: string;
+    kinds?: string[];
+    occurredAt?: { fromMs: number; toMs: number };
+    cursor?: SessionEventsCursor;
+    limit: number;
+  }): Promise<{
+    events: CodingAgentSessionEventRow[];
+    nextCursor: SessionEventsCursor | null;
+  }> {
+    const clampedLimit = clampSessionEventsLimit(limit);
+    const window =
+      occurredAt ?? (await this.resolveEventsWindow({ projectId, sessionId }));
+    const page = await this.sessionEvents.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+      kinds,
+      occurredAt: window,
+      cursor,
+      limit: clampedLimit,
+    });
+    // A derived window is a hint, not a fact: a session running longer than
+    // the declared width has events past its upper edge, so a first page that
+    // came back empty under a hint we invented is read again with that edge
+    // pushed out to now. Only the edge moves. The lower edge stays anchored
+    // on the session's own start, which is the earliest event the fold ever
+    // saw, and keeping it is what still prunes every partition from before
+    // the session began. Dropping the bound instead would walk the whole
+    // retention, and because `kinds` can filter a page to empty on its own,
+    // a caller asking for a kind this session never produced would pay that
+    // walk on every read. An explicit window is the caller's own bound and is
+    // never widened; a cursor page is already anchored by the cursor.
+    const derivedWindow = occurredAt === undefined ? window : undefined;
+    if (page.events.length > 0 || cursor !== undefined || !derivedWindow) {
+      return page;
+    }
+    return this.sessionEvents.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+      kinds,
+      occurredAt: {
+        fromMs: derivedWindow.fromMs,
+        toMs: Math.max(Date.now(), derivedWindow.toMs),
+      },
+      cursor,
+      limit: clampedLimit,
+    });
+  }
+
+  /**
+   * The partition-pruning window for a session's events, or undefined when
+   * the session has no row to anchor on and the read has to go unbounded.
+   */
+  private async resolveEventsWindow({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<{ fromMs: number; toMs: number } | undefined> {
+    const row = await this.sessions.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+    });
+    if (row === null) return undefined;
+    return readWindowAround({
+      anchorMs: row.startedAtMs,
+      widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS,
+    });
+  }
 
   /**
    * One session by its key, or null. `startedAtMs` is the partition-pruning

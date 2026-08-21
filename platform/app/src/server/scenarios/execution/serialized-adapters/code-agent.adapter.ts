@@ -9,12 +9,14 @@
  * as an execute_flow event.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
+import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
@@ -60,20 +62,67 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   private static readonly CODE_NODE_ID = "code_agent";
   private static readonly END_NODE_ID = "end";
 
-  constructor(
-    private readonly config: CodeAgentData,
-    private readonly nlpServiceUrl: string,
-    private readonly apiKey: string,
-  ) {
+  private readonly config: CodeAgentData;
+  private readonly nlpServiceUrl: string;
+  /**
+   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key
+   * on the synthesized entry->code->end workflow. nlpgo forwards it verbatim
+   * as the X-Auth-Token header on its callbacks into the platform
+   * (agentblock/workflow_runner.go, evaluatorblock/executor.go, engine.go),
+   * never an LLM provider credential, so it must not be sourced from litellm
+   * params (issue #6634).
+   */
+  private readonly projectApiKey: string;
+  /**
+   * The run's resolved parameter values, carried on the DSL as
+   * `workflow.params` beside `workflow.secrets`. The engine exposes them to
+   * the Python under test as `params.NAME`, keeping their native types: a
+   * boolean stays a boolean, a number stays a number.
+   */
+  private readonly parameters: RunParameterValues;
+
+  constructor({
+    config,
+    nlpServiceUrl,
+    projectApiKey,
+    parameters,
+  }: {
+    config: CodeAgentData;
+    nlpServiceUrl: string;
+    projectApiKey: string;
+    parameters?: RunParameterValues;
+  }) {
     super();
+    this.config = config;
+    this.nlpServiceUrl = nlpServiceUrl;
+    this.projectApiKey = projectApiKey;
+    this.parameters = parameters ?? {};
     this.name = "SerializedCodeAgentAdapter";
   }
 
   async call(input: AgentInput): Promise<string> {
     const inputRecord = this.resolveInputValues(input);
-    const workflow = this.buildWorkflow(inputRecord);
+    const workflow = this.buildWorkflow(inputRecord, this.turnParameters());
     const result = await this.executeOnNlpService(workflow, inputRecord);
     return result;
+  }
+
+  /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so the code under test can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
   }
 
   /**
@@ -82,7 +131,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * The /studio/execute_sync endpoint returns result.get("end"), so we need
    * an end node to capture the code node's outputs.
    */
-  private buildWorkflow(resolvedValues: Record<string, string>) {
+  private buildWorkflow(
+    resolvedValues: Record<string, string>,
+    params: RunParameterValues,
+  ) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
       SerializedCodeAgentAdapter;
 
@@ -107,7 +159,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         : [{ identifier: "output", type: "str" }];
 
     return {
-      api_key: this.apiKey,
+      api_key: this.projectApiKey,
       workflow_id: `scenario-code-${this.config.agentId}`,
       spec_version: LATEST_SPEC_VERSION,
       name: "Scenario Code Execution",
@@ -116,6 +168,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       version: "1.0",
       template_adapter: "default" as const,
       secrets: this.config.secrets,
+      params,
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),

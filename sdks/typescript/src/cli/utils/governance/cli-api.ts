@@ -13,6 +13,9 @@
  *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
  */
 
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
@@ -67,21 +70,85 @@ export interface GovernanceSetupState {
   governanceActive: boolean;
 }
 
+/**
+ * The CLI's fallback governance error — thrown for a failure the platform did
+ * NOT name (a bare status, an OAuth `error_description`, a proxy's text) and for
+ * the CLI's own client-side preconditions (no session, a disabled tool policy).
+ *
+ * It carries the ADR-045 handled-error surface — the `isLangWatchHandledError`
+ * brand plus `code` / `httpStatus` / `meta` — so `handledErrorFromThrown`
+ * (behind `reportCommandError`) reads it straight into the domain structure and
+ * the render pipeline treats it exactly like a server-named `HandledError`.
+ * `status` is kept as an alias of `httpStatus` so the existing
+ * `err.status === 404` / `err.code === "tool_disabled"` / `instanceof`
+ * control-flow keeps working unchanged.
+ *
+ * A failure the platform DID name never reaches here: the transports below run
+ * the parsed body through `throwIfHandledError` first, which raises a typed
+ * `LangWatchHandledError` carrying the server's real code / meta / trace id.
+ */
 export class GovernanceCliError extends Error {
+  /** Brands this for `handledErrorFromThrown` — see the SDK's LangWatchHandledError. */
+  readonly isLangWatchHandledError = true as const;
+  /** ADR-045 handled-error status; equals {@link status}, read by the render pipeline. */
+  readonly httpStatus: number;
+  /** Domain context, if any. Empty for the CLI's own client-side failures. */
+  readonly meta: Record<string, unknown>;
+
   constructor(
     public readonly status: number,
     public readonly code: string,
     message: string,
+    options: { meta?: Record<string, unknown> } = {},
   ) {
     super(message);
     this.name = "GovernanceCliError";
+    this.httpStatus = status;
+    this.meta = options.meta ?? {};
   }
+}
+
+/**
+ * The ADR-045 error path for a non-2xx governance response. Before throwing the
+ * CLI's own {@link GovernanceCliError}, hand the parsed body to
+ * `throwIfHandledError`: when the platform NAMED the failure (a domain-error
+ * envelope) that raises a typed `LangWatchHandledError` with the server's real
+ * `code` / `meta` / `traceId`, and the render pipeline surfaces it as such.
+ * When it did not — a bare status, an OAuth `error_description`, a proxy's text —
+ * this falls through to the GovernanceCliError the CLI has always thrown, so the
+ * existing `code` / `status` / `instanceof` control-flow keeps working. The
+ * `message` composed here is reused verbatim in both throws so nothing regresses.
+ *
+ * Mirrors `ApiKeysApiService.request()`.
+ */
+function throwGovernanceHttpError({
+  operation,
+  status,
+  body,
+  code,
+  message,
+}: {
+  operation: string;
+  status: number;
+  body: unknown;
+  code: string;
+  message: string;
+}): never {
+  throwIfHandledError({ operation, error: body, status, message });
+  throw new GovernanceCliError(status, code, message);
 }
 
 export interface CliApiOptions {
   fetchImpl?: typeof fetch;
   /** Seams for the automatic session refresh. Tests only. */
   refreshDeps?: SessionRefreshDeps;
+  /**
+   * Abort the request after this many milliseconds. Set it on any call
+   * a user is waiting behind: without it a connection that opens and
+   * never answers holds the CLI forever, since fetch has no default
+   * timeout of its own.
+   */
+  timeoutMs?: number;
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
@@ -110,9 +177,18 @@ async function authorizedFetch(
     fetchImpl: opts.fetchImpl,
     ...opts.refreshDeps,
   };
+  // Each attempt gets its own signal: one shared deadline would arm the
+  // clock before the refresh round-trip and abort the retry early.
+  const send = () =>
+    f(url, {
+      ...init(cfg.access_token!),
+      ...(opts.timeoutMs === undefined
+        ? {}
+        : { signal: AbortSignal.timeout(opts.timeoutMs) }),
+    });
   await refreshSessionIfExpired(cfg, deps);
 
-  const res = await f(url, init(cfg.access_token!));
+  const res = await send();
   if (res.status !== 401 || !canRefreshSession(cfg)) return res;
 
   const outcome = await refreshSession(cfg, deps);
@@ -122,7 +198,7 @@ async function authorizedFetch(
   // a 401 first attempt cannot have committed a write. That argument is
   // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
   // which can follow a partially applied write.
-  return f(url, init(cfg.access_token!));
+  return send();
 }
 
 async function getJSON<T>(
@@ -137,7 +213,7 @@ async function getJSON<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const res = await authorizedFetch(
     cfg,
     url,
@@ -151,7 +227,14 @@ async function getJSON<T>(
     opts,
   );
   if (res.status === 401) {
-    throw new GovernanceCliError(401, "unauthorized", SESSION_EXPIRED_MESSAGE);
+    const body = await res.json().catch(() => undefined);
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 401,
+      body,
+      code: "unauthorized",
+      message: SESSION_EXPIRED_MESSAGE,
+    });
   }
   if (res.status === 402) {
     const body = (await res.json().catch(() => ({}))) as {
@@ -163,29 +246,35 @@ async function getJSON<T>(
     const upgrade = body.upgrade_url
       ? `\n\n  Upgrade your organization at:\n    ${body.upgrade_url}`
       : "";
-    throw new GovernanceCliError(
-      402,
-      "payment_required",
-      `${description}${upgrade}`,
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 402,
+      body,
+      code: "payment_required",
+      message: `${description}${upgrade}`,
+    });
   }
   if (res.status === 404) {
     const body = (await res.json().catch(() => ({}))) as {
       error_description?: string;
     };
-    throw new GovernanceCliError(
-      404,
-      "not_found",
-      body.error_description ?? "Not found",
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 404,
+      body,
+      code: "not_found",
+      message: body.error_description ?? "Not found",
+    });
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new GovernanceCliError(
-      res.status,
-      "other",
-      `${res.status} ${body.slice(0, 200)}`,
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: res.status,
+      body,
+      code: "other",
+      message: `${res.status} ${body.slice(0, 200)}`,
+    });
   }
   return (await res.json()) as T;
 }
@@ -349,6 +438,61 @@ export async function getCliBootstrap(
   }
 }
 
+/**
+ * One budget that binds the user's key, labelled with its scope. Wire
+ * shape of `GET /api/auth/cli/budget-overview` items (which mirrors the
+ * tRPC `api.user.budgetOverview` procedure byte-for-byte).
+ */
+export interface BudgetOverviewItem {
+  id: string;
+  name: string;
+  /** e.g. "whole organization budget", "personal budget". */
+  scopePhrase: string;
+  /** "MONTH" | "WEEK" | "DAY" | "HOUR" | "MINUTE" | "TOTAL". */
+  window: string;
+  limitUsd: string;
+  spentUsd: string;
+  /** Display name when the budget counts a single provider only. */
+  providerLabel: string | null;
+  /** ISO timestamp of the next reset; null for TOTAL windows. */
+  resetsAt: string | null;
+  isPerMember: boolean;
+}
+
+export interface BudgetOverviewResponse {
+  /**
+   * False when the org gives this user no member-facing gateway path
+   * (governance flag off / not a member): render nothing budget-related.
+   */
+  gatewayAccess: boolean;
+  reason?: string;
+  /** Most binding first; empty when no budget applies. */
+  budgets: BudgetOverviewItem[];
+}
+
+/**
+ * Fetch every budget that binds the user's key for the login epilogue.
+ * Returns null on 404 (older server without the endpoint) so the caller
+ * can fall back to the /bootstrap collapsed budget line.
+ */
+export async function getBudgetOverview(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<BudgetOverviewResponse | null> {
+  try {
+    return await getJSON<BudgetOverviewResponse>(
+      cfg,
+      `/api/auth/cli/budget-overview`,
+      options,
+    );
+  } catch (err) {
+    if (err instanceof GovernanceCliError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 // ── Public REST: /api/governance/* ─────────────────────────────────────────
 //
 // IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.
@@ -383,7 +527,7 @@ async function requestREST<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const buildInit = (token: string): RequestInit => {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -405,35 +549,48 @@ async function requestREST<T>(
   const res = await authorizedFetch(cfg, url, buildInit, options);
   if (res.status === 204) return undefined as T;
   if (res.status === 401) {
-    throw new GovernanceCliError(401, "unauthorized", SESSION_EXPIRED_MESSAGE);
+    const body = await res.json().catch(() => undefined);
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 401,
+      body,
+      code: "unauthorized",
+      message: SESSION_EXPIRED_MESSAGE,
+    });
   }
   if (res.status === 403) {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string; code?: string };
     };
-    throw new GovernanceCliError(
-      403,
-      body.error?.code ?? "forbidden",
-      body.error?.message ?? "Forbidden",
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 403,
+      body,
+      code: body.error?.code ?? "forbidden",
+      message: body.error?.message ?? "Forbidden",
+    });
   }
   if (res.status === 404) {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
     };
-    throw new GovernanceCliError(
-      404,
-      "not_found",
-      body.error?.message ?? "Not found",
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 404,
+      body,
+      code: "not_found",
+      message: body.error?.message ?? "Not found",
+    });
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new GovernanceCliError(
-      res.status,
-      "other",
-      `${res.status} ${body.slice(0, 200)}`,
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: res.status,
+      body,
+      code: "other",
+      message: `${res.status} ${body.slice(0, 200)}`,
+    });
   }
   return (await res.json()) as T;
 }
@@ -441,7 +598,7 @@ async function requestREST<T>(
 // Ingestion key minting ------------------------------------------------------
 
 /**
- * Mint a personal-project ingest-only ApiKey (the `sk-lw-<...>` shape)
+ * Mint a personal-project ingest-only ApiKey (the `ik-lw-<...>` shape)
  * for a wrapped tool. Returns the plaintext key (shown once) plus the
  * OTLP endpoint the caller should point the tool's exporter at.
  *
@@ -462,6 +619,56 @@ export async function mintIngestionKey(
     "/api/auth/cli/governance/ingestion-key",
     { ...options, body: { source_type: sourceType }, mutating: true },
   );
+}
+
+/**
+ * Mint an ingest key scoped to a team project (id or slug within the
+ * caller's org). Unlike the personal mint, the server creates an
+ * ADDITIONAL key per device instead of rotating, so several machines can
+ * be instrumented against the same project. Requires the caller to hold
+ * `traces:create` on the target project.
+ */
+export async function mintProjectIngestionKey(
+  cfg: GovernanceConfig,
+  {
+    sourceType,
+    project,
+    deviceLabel,
+  }: { sourceType: string; project: string; deviceLabel?: string },
+  options: CliApiOptions = {},
+): Promise<{
+  token: string;
+  prefix: string;
+  endpoint: string;
+  project: { id: string; slug: string; name: string };
+}> {
+  return requestREST(cfg, "POST", "/api/auth/cli/governance/ingestion-key", {
+    ...options,
+    body: {
+      source_type: sourceType,
+      project,
+      ...(deviceLabel ? { device_label: deviceLabel } : {}),
+    },
+    mutating: true,
+  });
+}
+
+/**
+ * Issue the personal virtual key on demand. Called at the moment a tool
+ * actually resolves to the gateway path with no VK stored; login no
+ * longer auto-issues one, so subscription-only users never create VKs.
+ * The secret is returned exactly once; the caller persists it.
+ */
+export async function issuePersonalVirtualKey(
+  cfg: GovernanceConfig,
+  { deviceLabel }: { deviceLabel?: string } = {},
+  options: CliApiOptions = {},
+): Promise<{ id: string; secret: string; prefix: string }> {
+  return requestREST(cfg, "POST", "/api/auth/cli/virtual-key", {
+    ...options,
+    body: deviceLabel ? { device_label: deviceLabel } : {},
+    mutating: true,
+  });
 }
 
 
@@ -589,7 +796,7 @@ export async function cloneIngestionTemplateFromPlatform(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "POST",
-    "/api/governance/ingestion-templates/clone-from-platform",
+    "/api/governance/ingestion-templates/clone",
     {
       ...options,
       body: { source_template_id: sourceTemplateId },

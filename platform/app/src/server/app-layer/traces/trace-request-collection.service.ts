@@ -119,7 +119,7 @@ type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
 
 /**
  * Normalizes all ID fields in a span to hex strings before queuing.
- * This prevents issues with Uint8Array serialization through JSON (BullMQ/Redis),
+ * This prevents issues with Uint8Array serialization through JSON (queue/Redis),
  * where Uint8Array becomes {"0": 133, "1": 93, ...} objects.
  */
 function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {

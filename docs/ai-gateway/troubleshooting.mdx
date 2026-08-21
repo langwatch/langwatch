@@ -4,9 +4,9 @@ description: Diagnostic paths for the most common LangWatch AI Gateway failure m
 sidebarTitle: Troubleshooting
 ---
 
-When the gateway misbehaves, this page is the first stop. Each symptom below points to the diagnostic you'd run first and, where possible, the single log line or metric that nails the root cause.
+Each symptom below names the diagnostic to run first and, where possible, the single log line or metric that identifies the root cause.
 
-Every gateway response carries `X-LangWatch-Request-Id`. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
+Gateway responses carry `X-LangWatch-Gateway-Request-Id` once the request is authenticated. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
 
 ## `401 invalid_api_key`
 
@@ -175,7 +175,7 @@ Also check your client is actually sending `cache_control: {type: "ephemeral"}` 
 
 **Symptoms:**
 - `/v1/chat/completions` returned `200` with a real model response.
-- Response carried `X-LangWatch-Request-Id`.
+- Response carried `X-LangWatch-Gateway-Request-Id`.
 - But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
 
 **Diagnose:**
@@ -199,7 +199,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh, each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
 
-   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` Just Work, no env override needed. Override the endpoint only for prod/self-hosted.</Info>
+   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` need no env override. Override the endpoint only for prod/self-hosted.</Info>
 
 2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel`, if you've overridden to empty, you've disabled trace export.
 
@@ -213,7 +213,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active, and vice-versa).
 
-**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
+**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Gateway-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
 
 ## `auth_cache_refresh_transport_failure` WARN spew in logs
 
@@ -222,14 +222,14 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 - Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
 - Customers report no rejection, traffic flows normally.
 
-This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `6h`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default `21600`, 6 hours). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
 
 **What to do:**
 
 1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
 2. If it is, no operator action on the gateway side, wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
 3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected**: see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
-4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
+4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
 
 **What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
 
@@ -355,7 +355,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 
@@ -363,10 +363,10 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 
 When you don't know where to start:
 
-1. Take the `X-LangWatch-Request-Id` from the failing request → LangWatch search.
+1. Take the `X-LangWatch-Gateway-Request-Id` from the failing request → LangWatch search.
 2. Compare `X-LangWatch-Provider` to the VK's configured primary, if different, fallback fired.
 3. Check `X-LangWatch-Cache` response header: `hit`, `miss`, `bypass`, `force` (the last is v1.1, deferred in v1).
-4. Gateway pod logs filtered on `request_id=grq_...` for structured entries.
+4. Gateway pod logs filtered on `request_id=req_...` for structured entries.
 5. Control-plane logs filtered on `vk_id` for authorization decisions.
 
 If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.

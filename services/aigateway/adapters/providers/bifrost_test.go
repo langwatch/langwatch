@@ -344,6 +344,43 @@ func TestParseGeminiPassthroughUsage_CacheRead(t *testing.T) {
 	}
 }
 
+// Gemini reports thinking tokens outside candidatesTokenCount and bills them
+// at the output rate. Reading candidatesTokenCount alone billed a 47-token
+// answer for a 243-token turn and reported no reasoning at all.
+func TestParseGeminiPassthroughUsage_ThinkingTokens(t *testing.T) {
+	body := []byte(`{"candidates":[],"usageMetadata":{"promptTokenCount":25,` +
+		`"candidatesTokenCount":47,"thoughtsTokenCount":196,"totalTokenCount":268}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 196 {
+		t.Fatalf("ReasoningTokens: want 196, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 243 {
+		t.Fatalf("CompletionTokens: want 243 (47 visible + 196 thinking), got %d", u.CompletionTokens)
+	}
+	if u.PromptTokens+u.CompletionTokens != u.TotalTokens {
+		t.Fatalf("totals disagree: %d + %d != %d", u.PromptTokens, u.CompletionTokens, u.TotalTokens)
+	}
+}
+
+// A model that did not think reports no thoughtsTokenCount, and the
+// completion total stays exactly what the provider said.
+func TestParseGeminiPassthroughUsage_NoThinking(t *testing.T) {
+	body := []byte(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":4,"totalTokenCount":14}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 0 {
+		t.Fatalf("ReasoningTokens: want 0, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 4 {
+		t.Fatalf("CompletionTokens: want 4, got %d", u.CompletionTokens)
+	}
+}
+
 // Regression: opencode (Vercel AI SDK Anthropic provider) Zod-rejected
 // the OpenAI-shape `delta.choices` chunks Bifrost's ChatCompletionStream
 // emitted for /v1/messages with `No matching discriminator on 'type'`,
@@ -377,6 +414,67 @@ func TestParseAnthropicPassthroughUsage_MessageStartCarriesPromptAndCacheTokens(
 	}
 	if u.CacheCreationTokens == u.CacheReadTokens {
 		t.Fatalf("cache_creation must stay distinct from cache_read")
+	}
+}
+
+// Anthropic bills an hour-long cache entry at twice the input rate and a
+// five-minute one at 1.25x, and states which is which only in its own
+// `usage.cache_creation` breakdown. Reading the flat total alone prices an
+// hour-long write about a third under the bill.
+func TestParseAnthropicPassthroughUsage_MessageStartCarriesCacheWriteLifetime(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreationTokens != 17854 {
+		t.Fatalf("CacheCreationTokens: want 17854, got %d", u.CacheCreationTokens)
+	}
+	if u.CacheCreation1hTokens != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// A request that never asked for the extended TTL gets no breakdown at all,
+// and its writes must price short-lived rather than guess.
+func TestParseAnthropicPassthroughUsage_NoBreakdownLeavesLifetimeUnknown(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreation1hTokens != 0 {
+		t.Fatalf("CacheCreation1hTokens: want 0, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// The non-streaming /v1/messages lane returns the provider's body verbatim
+// but takes its usage from Bifrost's normalized struct, which has one flat
+// cache-write count. The lifetime has to come back off those same bytes.
+func TestAnthropicCacheCreation1h_ReadsTheBreakdownOffTheResponseBody(t *testing.T) {
+	body := []byte(`{"id":"msg_x","type":"message","role":"assistant","content":[],` +
+		`"model":"claude-opus-5","usage":{"input_tokens":2,` +
+		`"cache_creation_input_tokens":17854,"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":210}}`)
+	if got := anthropicCacheCreation1h(body); got != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", got)
+	}
+	if got := anthropicCacheCreation1h(nil); got != 0 {
+		t.Fatalf("empty body: want 0, got %d", got)
+	}
+	if got := anthropicCacheCreation1h([]byte(`{"usage":{"input_tokens":2}}`)); got != 0 {
+		t.Fatalf("no breakdown: want 0, got %d", got)
 	}
 }
 

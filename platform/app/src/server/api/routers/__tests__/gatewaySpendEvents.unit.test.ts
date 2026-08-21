@@ -3,8 +3,9 @@
  * passthrough to the repository, virtual-key display-name resolution, the
  * ClickHouse-disabled degrade, and RBAC denial.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
@@ -14,35 +15,53 @@ const PROJECT_ID = "project_1";
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
 
+// A denied query flows through auditLogTRPCErrors, whose real implementation
+// writes prisma.auditLog — no database in a unit test, and its crash would
+// replace the denial this file asserts on.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
+    resolveProjectPermission: vi.fn(
+      async (_ctx: unknown, _projectId: string, permission: string) => {
         seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
-        }
-        ctx.permissionChecked = true;
-        return next();
+        return {
+          permitted: !denied.has(permission),
+          organizationRole: "MEMBER",
+        };
       },
+    ),
   };
 });
 
-const clickHouseEnabled = vi.hoisted(() => ({ current: true }));
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  isClickHouseEnabled: () => clickHouseEnabled.current,
-  getClickHouseClientForProject: vi.fn().mockResolvedValue({}),
-}));
-
 const readSpendEventsPage = vi.hoisted(() => vi.fn());
-vi.mock("~/server/gateway/spendEvents.clickhouse.repository", () => ({
-  GatewaySpendEventsRepository: class {
-    readSpendEventsPage = readSpendEventsPage;
-  },
+
+// The router takes the spend-events repository from the App, so standing
+// in for the store means standing in for `getApp()`. `current` toggles
+// between the repository and undefined to stand in for a deployment
+// without ClickHouse.
+const spendEventsRepository = vi.hoisted(() => ({
+  current: undefined as
+    | { readSpendEventsPage: typeof readSpendEventsPage }
+    | undefined,
 }));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      gateway: { spendEvents: spendEventsRepository.current },
+    }),
+  };
+});
 
 const SPEND_ROW: SpendEventRow = {
   tenantId: PROJECT_ID,
@@ -109,7 +128,7 @@ describe("gatewaySpendEventsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    clickHouseEnabled.current = true;
+    spendEventsRepository.current = { readSpendEventsPage };
     readSpendEventsPage.mockResolvedValue({
       rows: [SPEND_ROW],
       nextCursor: null,
@@ -121,10 +140,15 @@ describe("gatewaySpendEventsRouter", () => {
     const caller = buildCaller();
     await caller.list({
       ...BASE_INPUT,
-      virtualKeyId: "vk_1",
-      endUserId: "enduser-9",
-      model: "gpt-5",
-      status: "error",
+      filters: {
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
+        status: "error",
+      },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
       limit: 25,
     });
@@ -133,9 +157,12 @@ describe("gatewaySpendEventsRouter", () => {
       fromMs: BASE_INPUT.fromMs,
       toMs: BASE_INPUT.toMs,
       filters: {
-        virtualKeyId: "vk_1",
-        endUserId: "enduser-9",
-        model: "gpt-5",
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
         status: "error",
       },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
@@ -155,7 +182,7 @@ describe("gatewaySpendEventsRouter", () => {
 
   /** @scenario The ledger degrades to an empty page without ClickHouse */
   it("degrades to an empty page when ClickHouse is disabled", async () => {
-    clickHouseEnabled.current = false;
+    spendEventsRepository.current = undefined;
     const caller = buildCaller();
     const result = await caller.list(BASE_INPUT);
     expect(result).toMatchObject({
@@ -170,7 +197,9 @@ describe("gatewaySpendEventsRouter", () => {
   it("denies without the gateway usage view scope", async () => {
     denied.add("gatewayUsage:view");
     const caller = buildCaller();
-    await expect(caller.list(BASE_INPUT)).rejects.toThrow("denied");
+    await expect(caller.list(BASE_INPUT)).rejects.toThrow(
+      "You do not have permission",
+    );
     expect(readSpendEventsPage).not.toHaveBeenCalled();
   });
 });

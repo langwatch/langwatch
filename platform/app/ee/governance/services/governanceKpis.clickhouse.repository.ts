@@ -2,15 +2,18 @@
 
 import { createLogger } from "@langwatch/observability";
 /**
- * GovernanceKpisClickHouseRepository — write side of the
- * `governance_kpis` fold projection. Each call inserts ONE row keyed
- * by (TenantId, SourceId, HourBucket, TraceId) so reactor replays of
- * the same trace collapse at merge time.
+ * GovernanceKpisClickHouseRepository — reads and writes the
+ * `governance_kpis` fold projection.
  *
- * Read side lives in ActivityMonitorService.summary() (and 3e anomaly
- * reactor) which aggregate via `sum(SpendUsd)` / `count(DISTINCT
- * TraceId)` over the (SourceId, HourBucket) group with the standard
- * IN-tuple dedup pattern when pre-merge state matters.
+ * Writes: `insertContribution` inserts ONE row keyed by (TenantId,
+ * SourceId, HourBucket, TraceId) so subscriber replays of the same trace
+ * collapse at merge time.
+ *
+ * Reads: `findSpendTotals` serves the spend-spike anomaly evaluator's
+ * current/baseline window comparison. ActivityMonitorService's own
+ * `sum(SpendUsd)` / `count(DISTINCT TraceId)` aggregation (with the IN-
+ * tuple dedup pattern for pre-merge state) is a separate, more involved
+ * read and stays in that service for now.
  *
  * Spec: specs/ai-gateway/governance/folds.feature
  * Migration: 00021_create_governance_kpis.sql
@@ -78,5 +81,52 @@ export class GovernanceKpisClickHouseRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Current-window and baseline-window spend totals from `governance_kpis`,
+   * for the spend-spike anomaly evaluator. `sourceFilter` narrows to a
+   * single SourceId / SourceType when the rule is scoped that way; org/
+   * team/project-scoped rules pass an empty filter since the TenantId
+   * predicate (the org's hidden Gov Project) already covers the whole
+   * tenant.
+   */
+  async findSpendTotals(input: {
+    tenantId: string;
+    windowStart: Date;
+    windowEnd: Date;
+    baselineStart: Date;
+    sourceFilter: { sql: string; params: Record<string, unknown> };
+  }): Promise<{ currentSpend: number; baselineSpend: number }> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          sumIf(SpendUsd, HourBucket >= fromUnixTimestamp64Milli({windowStartMs:UInt64})) AS currentSpend,
+          sumIf(SpendUsd, HourBucket < fromUnixTimestamp64Milli({windowStartMs:UInt64}) AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})) AS baselineSpend
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
+          AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
+          ${input.sourceFilter.sql}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        windowStartMs: input.windowStart.getTime(),
+        windowEndMs: input.windowEnd.getTime(),
+        baselineStartMs: input.baselineStart.getTime(),
+        ...input.sourceFilter.params,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      currentSpend: number | string | null;
+      baselineSpend: number | string | null;
+    }>;
+    const row = rows[0];
+    return {
+      currentSpend: Number(row?.currentSpend ?? 0),
+      baselineSpend: Number(row?.baselineSpend ?? 0),
+    };
   }
 }

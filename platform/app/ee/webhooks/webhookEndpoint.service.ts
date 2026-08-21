@@ -1,24 +1,41 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { randomBytes } from "node:crypto";
+import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
   PrismaClient,
   WebhookDeliveryOutcome,
   WebhookEndpoint,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
+import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
+import type { WebhookDestinationConfig } from "~/server/webhooks/destinations";
+import {
+  allowsAmbientAwsCredentials,
+  isRoleArn,
+  type SqsCredentialMode,
+  sqsCredentialMode,
+} from "~/server/webhooks/destinations/sqsCredentials";
+import {
+  inspectSqsQueueUrl,
+  parseSqsQueueUrl,
+} from "~/server/webhooks/destinations/sqsQueueUrl";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
+import {
+  allowsInsecureLocalUrls,
+  inspectWebhookUrl,
+} from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
+import type { WebhookDestinationKind } from "~/utils/webhookDestinations";
 import { isValidEventSelector } from "./eventRegistry";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 
 /** 72 hours of unbroken failures auto-disables an endpoint. */
 export const WEBHOOK_AUTO_DISABLE_AFTER_MS = 72 * 60 * 60 * 1000;
-/** Delivery-log retention, mirroring the automations webhook log. */
-export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const WEBHOOK_DISABLED_REASON_AUTO = "auto_failures_72h";
 export const WEBHOOK_DISABLED_REASON_MANUAL = "manual";
@@ -81,17 +98,51 @@ export function assertValidDeliveryControls(
   }
 }
 
-export class WebhookEndpointValidationError extends Error {}
-export class WebhookEndpointNotFoundError extends Error {
+/**
+ * The endpoint as asked for cannot be saved: the URL is refused by the
+ * admission policy, an event name is not in the catalog, or a delivery
+ * control is out of bounds. The message names which, because every one of
+ * them is something the caller can correct on the next attempt.
+ */
+export class WebhookEndpointValidationError extends HandledError {
+  declare readonly code: "webhook_endpoint_invalid";
+
+  constructor(message: string) {
+    super("webhook_endpoint_invalid", message, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointValidationError";
+  }
+}
+
+/**
+ * No live endpoint in this organization has that id.
+ *
+ * Archived endpoints answer the same as ids that never existed and as ids
+ * belonging to another organization: telling those apart would confirm the
+ * existence of another tenant's rows.
+ */
+export class WebhookEndpointNotFoundError extends HandledError {
+  declare readonly code: "webhook_endpoint_not_found";
+
   constructor() {
-    super("Webhook endpoint not found");
+    super("webhook_endpoint_not_found", "Webhook endpoint not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointNotFoundError";
   }
 }
 
 export interface WebhookEndpointView {
   id: string;
   organizationId: string;
-  url: string;
+  destinationKind: WebhookDestinationKind;
+  /** Null on every endpoint that is not an HTTPS one. The database's CHECK
+   *  constraint is what guarantees an `http` endpoint always has it. */
+  url: string | null;
+  sqs: SqsDestinationView | null;
   enabledEvents: string[];
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
@@ -110,7 +161,9 @@ function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
   return {
     id: endpoint.id,
     organizationId: endpoint.organizationId,
+    destinationKind: endpoint.destinationKind,
     url: endpoint.url,
+    sqs: toSqsView(endpoint),
     enabledEvents: endpoint.enabledEvents,
     status: endpoint.status,
     disabledReason: endpoint.disabledReason,
@@ -126,26 +179,395 @@ function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
   };
 }
 
+/**
+ * This surface's wording for each admission rule. The rule itself lives in the
+ * shared `urlPolicy`, which both webhook channels run; only the sentence is
+ * local, because a REST integrator reading `url must use https` and a trigger
+ * author reading "The webhook URL must use https." want different registers.
+ */
+const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
+  invalid_url: "url must be a valid URL",
+  scheme: "url must use https",
+  host: "url must have a host",
+  port: "url must use the default https port (443)",
+  credentials: "url must not carry credentials",
+};
+
 function assertValidUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new WebhookEndpointValidationError("url must be a valid URL");
+  // Same policy the sender enforces at dispatch, so an endpoint that saves is
+  // an endpoint that can deliver. Operator opt-in for local development and
+  // internal receivers relaxes the origin here exactly as it relaxes the
+  // local-address fence on the send.
+  const problem = inspectWebhookUrl({
+    url,
+    allowInsecureLocal: allowsInsecureLocalUrls(),
+  });
+  if (problem) {
+    throw new WebhookEndpointValidationError(
+      URL_PROBLEM_MESSAGES[problem.code],
+    );
   }
-  if (parsed.protocol === "https:") return;
-  // Operator opt-in for local development and internal receivers: plain
-  // http is accepted only when the deployment explicitly set the unsafe
-  // flag. The delivery path relaxes its local-address fence on the same
-  // flag; everything else about the sender stays strict.
-  if (parsed.protocol === "http:" && allowsInsecureLocalUrls()) return;
-  throw new WebhookEndpointValidationError("url must use https");
 }
 
-/** True only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1. */
-export function allowsInsecureLocalUrls(): boolean {
-  return process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1";
+/**
+ * The queue an endpoint delivers to, as the customer supplies it.
+ *
+ * `secretAccessKey` arrives in the clear from the write surface and is
+ * encrypted before it is stored; nothing reads it back out.
+ */
+export interface SqsDestinationInput {
+  queueUrl: string;
+  roleArn?: string | null;
+  externalId?: string | null;
+  accessKeyId?: string | null;
+  secretAccessKey?: string | null;
 }
+
+/** The queue, as any read surface may see it: everything but the secret. */
+export interface SqsDestinationView {
+  queueUrl: string;
+  /** Read off the queue URL, so it can never disagree with the queue. */
+  region: string;
+  /** Whose queue this is, surfaced so an operator can see it without
+   *  decoding a URL by eye. */
+  accountId: string;
+  queueName: string;
+  credentialMode: SqsCredentialMode;
+  roleArn: string | null;
+  /** Generated by us at save time, pasted by the customer into their role's
+   *  trust policy. Not a secret: it is worthless without the role. */
+  externalId: string | null;
+  /** The key id is an identifier, not a credential. The secret half is never
+   *  returned by anything. */
+  accessKeyId: string | null;
+}
+
+/** Where an endpoint delivers, in one line, for a log or a notification. */
+export function describeDestination(
+  endpoint: Pick<WebhookEndpoint, "destinationKind" | "url" | "sqsQueueUrl">,
+): string {
+  return endpoint.destinationKind === "sqs"
+    ? (endpoint.sqsQueueUrl ?? "an Amazon SQS queue")
+    : (endpoint.url ?? "an HTTPS endpoint");
+}
+
+function toSqsView(endpoint: WebhookEndpoint): SqsDestinationView | null {
+  if (endpoint.destinationKind !== "sqs" || !endpoint.sqsQueueUrl) return null;
+  const parsed = parseSqsQueueUrl(endpoint.sqsQueueUrl);
+  return {
+    queueUrl: endpoint.sqsQueueUrl,
+    // Every stored queue URL passed admission, so the parse succeeds. The
+    // fallbacks describe a row written around the service rather than a
+    // value invented here.
+    region: parsed?.region ?? "",
+    accountId: parsed?.accountId ?? "",
+    queueName: parsed?.queueName ?? "",
+    credentialMode: sqsCredentialMode({
+      roleArn: endpoint.sqsRoleArn,
+      accessKeyId: endpoint.sqsAccessKeyId,
+    }),
+    roleArn: endpoint.sqsRoleArn,
+    externalId: endpoint.sqsExternalId,
+    accessKeyId: endpoint.sqsAccessKeyId,
+  };
+}
+
+/**
+ * Admission for a queue destination: the URL shape, the credential mode, and
+ * the gate.
+ *
+ * The queue URL never passes through the SSRF fence, because we never dial
+ * it; the AWS SDK does. So the shape IS the fence, and it is pinned to a
+ * canonical Amazon SQS queue URL.
+ */
+function assertValidSqsDestination(sqs: SqsDestinationInput): void {
+  const inspection = inspectSqsQueueUrl(sqs.queueUrl);
+  if (!inspection.ok) {
+    throw new WebhookEndpointValidationError(
+      inspection.problem === "fifo"
+        ? "sqs.queue_url must name a standard queue; FIFO queues are not supported. Deliveries are at-least-once and deduplicated on the envelope id, which is what a standard queue provides."
+        : "sqs.queue_url must be an Amazon SQS queue URL, like https://sqs.<region>.amazonaws.com/<account id>/<queue name>",
+    );
+  }
+
+  if (sqs.roleArn && !isRoleArn(sqs.roleArn)) {
+    throw new WebhookEndpointValidationError(
+      "sqs.role_arn must be an IAM role ARN, like arn:aws:iam::<account id>:role/<role name>",
+    );
+  }
+  if (sqs.externalId && !sqs.roleArn) {
+    throw new WebhookEndpointValidationError(
+      "sqs.external_id only applies with sqs.role_arn, which names the role to assume",
+    );
+  }
+
+  const hasKeyId = Boolean(sqs.accessKeyId);
+  const hasSecret = Boolean(sqs.secretAccessKey);
+  if (hasKeyId !== hasSecret) {
+    throw new WebhookEndpointValidationError(
+      "sqs.access_key_id and sqs.secret_access_key are set together or not at all",
+    );
+  }
+
+  const mode = sqsCredentialMode({
+    roleArn: sqs.roleArn,
+    accessKeyId: sqs.accessKeyId,
+  });
+  if (mode === "ambient" && !allowsAmbientAwsCredentials()) {
+    // The single most important control here. Without credentials of its
+    // own, a queue endpoint writes with the deployment's identity, which can
+    // reach every queue that identity can reach, including other tenants'.
+    throw new WebhookEndpointValidationError(
+      "sqs needs credentials of its own: either sqs.role_arn for a role to assume, or sqs.access_key_id with sqs.secret_access_key",
+    );
+  }
+}
+
+/** The stored destination columns, all of them, so a write always states
+ *  every one and no stale field survives from another kind. */
+interface StoredDestination {
+  url: string | null;
+  sqsQueueUrl: string | null;
+  sqsRoleArn: string | null;
+  sqsExternalId: string | null;
+  sqsAccessKeyId: string | null;
+  sqsSecretAccessKeyEncrypted: string | null;
+}
+
+const EMPTY_DESTINATION: StoredDestination = {
+  url: null,
+  sqsQueueUrl: null,
+  sqsRoleArn: null,
+  sqsExternalId: null,
+  sqsAccessKeyId: null,
+  sqsSecretAccessKeyEncrypted: null,
+};
+
+/**
+ * The ExternalId a customer pastes into their role's trust policy.
+ *
+ * We generate it rather than letting the customer choose, because its whole
+ * job is to be unguessable by anyone who learned the role's ARN. It is not a
+ * secret of ours: it is worthless without the role that names it.
+ */
+function newExternalId(): string {
+  return `lw-${randomBytes(16).toString("hex")}`;
+}
+
+/** Validate the destination as asked for and render it as stored columns. */
+function assertValidDestination(params: {
+  destinationKind: WebhookDestinationKind;
+  url?: string;
+  sqs?: SqsDestinationInput;
+}): StoredDestination {
+  if (params.destinationKind === "http") {
+    if (!params.url) {
+      throw new WebhookEndpointValidationError(
+        "url is required for an http endpoint",
+      );
+    }
+    if (params.sqs) {
+      throw new WebhookEndpointValidationError(
+        "sqs does not apply to an http endpoint",
+      );
+    }
+    assertValidUrl(params.url);
+    return { ...EMPTY_DESTINATION, url: params.url };
+  }
+
+  if (!params.sqs?.queueUrl) {
+    throw new WebhookEndpointValidationError(
+      "sqs.queue_url is required for an sqs endpoint",
+    );
+  }
+  if (params.url) {
+    throw new WebhookEndpointValidationError(
+      "url does not apply to an sqs endpoint; name the queue in sqs.queue_url",
+    );
+  }
+  assertValidSqsDestination(params.sqs);
+  return storedSqsDestination(params.sqs);
+}
+
+function storedSqsDestination(sqs: SqsDestinationInput): StoredDestination {
+  return {
+    ...EMPTY_DESTINATION,
+    sqsQueueUrl: sqs.queueUrl.trim(),
+    sqsRoleArn: sqs.roleArn ?? null,
+    // Minted here when a role is named and none was supplied: the customer
+    // needs a value to put in their trust policy, and asking them to invent
+    // one invites a guessable one.
+    sqsExternalId: sqs.roleArn ? (sqs.externalId ?? newExternalId()) : null,
+    sqsAccessKeyId: sqs.accessKeyId ?? null,
+    sqsSecretAccessKeyEncrypted: sqs.secretAccessKey
+      ? encrypt(sqs.secretAccessKey)
+      : null,
+  };
+}
+
+/**
+ * An update may adjust the destination it has, never swap it for another.
+ *
+ * Batches already planned against the old transport are sitting in the outbox
+ * with the old endpoint's shape. Creating a new endpoint is the move, and it
+ * is also the only one that lets both run in parallel while the receiving side
+ * is cut over.
+ */
+function assertDestinationUnchanged({
+  endpoint,
+  params,
+}: {
+  endpoint: WebhookEndpoint;
+  params: {
+    destinationKind?: WebhookDestinationKind;
+    url?: string;
+    sqs?: Partial<SqsDestinationInput>;
+  };
+}): void {
+  if (
+    params.destinationKind !== undefined &&
+    params.destinationKind !== endpoint.destinationKind
+  ) {
+    throw new WebhookEndpointValidationError(
+      `destination_kind cannot be changed after an endpoint is created; create a new endpoint for the ${params.destinationKind} destination and archive this one once it has drained`,
+    );
+  }
+  if (params.url !== undefined && endpoint.destinationKind !== "http") {
+    throw new WebhookEndpointValidationError(
+      "url does not apply to this endpoint; it delivers to an Amazon SQS queue",
+    );
+  }
+  if (params.sqs !== undefined && endpoint.destinationKind !== "sqs") {
+    throw new WebhookEndpointValidationError(
+      "sqs does not apply to this endpoint; it delivers over HTTPS",
+    );
+  }
+}
+
+/** A credential field this request actually named, as opposed to one it left
+ *  out or cleared with null. */
+function selects(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * What one credential field becomes: nothing when the request chose the other
+ * mode, otherwise what the request named, otherwise what the row already held.
+ */
+function mergedCredentialField({
+  isCleared,
+  sent,
+  stored,
+}: {
+  isCleared: boolean;
+  sent: string | null | undefined;
+  stored: string | null;
+}): string | null {
+  if (isCleared) return null;
+  return sent !== undefined ? sent : stored;
+}
+
+/**
+ * A partial queue update, validated as the whole it will become. Fields the
+ * caller left out keep their stored values, so changing only the role never
+ * silently drops the queue URL.
+ *
+ * Which credential mode the update selects is read from what THIS request
+ * named, not from what the row already holds. Merging first and resolving
+ * after let a stored role outrank a key pair the caller had just sent: the
+ * endpoint kept assuming the role, the new key was dropped, and the API
+ * answered 200. A switch either takes or is refused, never both.
+ */
+function assertValidSqsUpdate({
+  endpoint,
+  sqs,
+}: {
+  endpoint: WebhookEndpoint;
+  sqs: Partial<SqsDestinationInput>;
+}): StoredDestination {
+  const selectsRole = selects(sqs.roleArn);
+  const selectsStatic = selects(sqs.accessKeyId);
+  if (selectsRole && selectsStatic) {
+    throw new WebhookEndpointValidationError(
+      "sqs.role_arn and sqs.access_key_id select different credential modes; send one of them, and null for the other",
+    );
+  }
+  const merged: SqsDestinationInput = {
+    queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
+    roleArn: mergedCredentialField({
+      isCleared: selectsStatic,
+      sent: sqs.roleArn,
+      stored: endpoint.sqsRoleArn,
+    }),
+    externalId: mergedCredentialField({
+      isCleared: selectsStatic,
+      sent: sqs.externalId,
+      stored: endpoint.sqsExternalId,
+    }),
+    accessKeyId: mergedCredentialField({
+      isCleared: selectsRole,
+      sent: sqs.accessKeyId,
+      stored: endpoint.sqsAccessKeyId,
+    }),
+    secretAccessKey: mergedCredentialField({
+      isCleared: selectsRole,
+      sent: sqs.secretAccessKey,
+      // The stored secret is only ever compared for presence here; its value
+      // never leaves the row except at dispatch.
+      stored: endpoint.sqsSecretAccessKeyEncrypted ? KEPT_SECRET : null,
+    }),
+  };
+  // One mode at a time. Adding a role to an endpoint that had static keys
+  // would otherwise leave the key pair stored, unused and unreachable through
+  // any read surface, while the view reports assume_role because the role
+  // wins. An unused secret sitting at rest indefinitely is exactly the thing
+  // a credential rotation was meant to remove.
+  const exclusive = withExclusiveCredentials(merged);
+  assertValidSqsDestination(exclusive);
+
+  const stored = storedSqsDestination(exclusive);
+  return {
+    ...stored,
+    // A caller that did not send a new secret keeps the encrypted one it
+    // already had, rather than re-encrypting the placeholder that stood in
+    // for it during validation.
+    sqsSecretAccessKeyEncrypted:
+      exclusive.secretAccessKey === KEPT_SECRET
+        ? endpoint.sqsSecretAccessKeyEncrypted
+        : stored.sqsSecretAccessKeyEncrypted,
+  };
+}
+
+/**
+ * The credentials of the mode this destination actually selected, and none
+ * of the other mode's.
+ *
+ * `sqsCredentialMode` resolves a role over a key pair, so the role winning is
+ * what makes the key pair dead weight rather than a second way in. Clearing it
+ * here means the row says what the read view says.
+ */
+function withExclusiveCredentials(
+  sqs: SqsDestinationInput,
+): SqsDestinationInput {
+  if (sqs.roleArn) {
+    return { ...sqs, accessKeyId: null, secretAccessKey: null };
+  }
+  if (sqs.accessKeyId) {
+    return { ...sqs, roleArn: null, externalId: null };
+  }
+  return {
+    ...sqs,
+    roleArn: null,
+    externalId: null,
+    accessKeyId: null,
+    secretAccessKey: null,
+  };
+}
+
+/** Stands in for a stored secret the caller did not resend, so the
+ *  all-or-nothing credential-pair rule is judged on the shape the endpoint
+ *  will actually have. */
+const KEPT_SECRET = "__langwatch_kept_secret__";
 
 function assertValidEvents(enabledEvents: string[]): void {
   if (enabledEvents.length === 0) {
@@ -176,7 +598,8 @@ export interface WebhookEndpointDeps {
   notifyAutoDisabled?: (params: {
     organizationId: string;
     endpointId: string;
-    url: string;
+    /** Where it was delivering, in words: the receiver URL, or the queue. */
+    destination: string;
     failingSince: Date;
   }) => Promise<void>;
 }
@@ -192,13 +615,18 @@ export class WebhookEndpointService {
 
   async create(params: {
     organizationId: string;
-    url: string;
+    /** Defaults to the transport every endpoint used before there was more
+     *  than one, so an unchanged caller keeps creating HTTPS endpoints. */
+    destinationKind?: WebhookDestinationKind;
+    url?: string;
+    sqs?: SqsDestinationInput;
     enabledEvents: string[];
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
-    assertValidUrl(params.url);
+    const destinationKind = params.destinationKind ?? "http";
+    const destination = assertValidDestination({ ...params, destinationKind });
     assertValidEvents(params.enabledEvents);
     assertValidDeliveryControls(params);
     const secret = newSecret();
@@ -206,7 +634,8 @@ export class WebhookEndpointService {
       data: {
         id: generate(KSUID_RESOURCES.WEBHOOK_ENDPOINT).toString(),
         organizationId: params.organizationId,
-        url: params.url,
+        destinationKind,
+        ...destination,
         enabledEvents: params.enabledEvents,
         secretEncrypted: encrypt(secret),
         ...(params.maxBatchSize !== undefined
@@ -243,20 +672,31 @@ export class WebhookEndpointService {
   async update(params: {
     organizationId: string;
     endpointId: string;
+    /** Only ever the kind the endpoint already has. Present so a caller that
+     *  echoes back the whole endpoint is not rejected for saying what is
+     *  already true. */
+    destinationKind?: WebhookDestinationKind;
     url?: string;
+    sqs?: Partial<SqsDestinationInput>;
     enabledEvents?: string[];
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.requireEndpoint(params);
+    assertDestinationUnchanged({ endpoint, params });
     if (params.url !== undefined) assertValidUrl(params.url);
+    const sqsUpdate =
+      params.sqs !== undefined
+        ? assertValidSqsUpdate({ endpoint, sqs: params.sqs })
+        : {};
     if (params.enabledEvents !== undefined)
       assertValidEvents(params.enabledEvents);
     assertValidDeliveryControls(params);
     const updated = await this.deps.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
       data: {
+        ...sqsUpdate,
         ...(params.url !== undefined ? { url: params.url } : {}),
         ...(params.enabledEvents !== undefined
           ? { enabledEvents: params.enabledEvents }
@@ -381,6 +821,35 @@ export class WebhookEndpointService {
     return endpoint ? toView(endpoint) : null;
   }
 
+  /**
+   * The endpoint's last hop, with its secrets decrypted, ready for the
+   * transport to use.
+   *
+   * The service owns the encryption and the delivery executor owns none of
+   * it, so this is the whole of what crosses between them.
+   */
+  async getDestinationConfig(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDestinationConfig> {
+    const endpoint = await this.requireEndpoint(params);
+    if (endpoint.destinationKind === "sqs") {
+      return {
+        kind: "sqs",
+        // The CHECK constraint guarantees an sqs row has its queue URL; the
+        // fallback describes a row written around this service.
+        queueUrl: endpoint.sqsQueueUrl ?? "",
+        roleArn: endpoint.sqsRoleArn,
+        externalId: endpoint.sqsExternalId,
+        accessKeyId: endpoint.sqsAccessKeyId,
+        secretAccessKey: endpoint.sqsSecretAccessKeyEncrypted
+          ? decrypt(endpoint.sqsSecretAccessKeyEncrypted)
+          : null,
+      };
+    }
+    return { kind: "http", url: endpoint.url ?? "" };
+  }
+
   /** Decrypted signing secret for the delivery path and test sends. */
   async getSigningSecret(params: {
     organizationId: string;
@@ -464,6 +933,7 @@ export class WebhookEndpointService {
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
     const where = {
+      channel: "platform" as const,
       organizationId: params.organizationId,
       endpointId: params.endpointId,
       firedAt: { gt: params.since },
@@ -559,6 +1029,7 @@ export class WebhookEndpointService {
 
     await this.deps.prisma.webhookEndpointDelivery.create({
       data: {
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         dispatchId: params.dispatchId,
@@ -645,7 +1116,10 @@ export class WebhookEndpointService {
    */
   private async autoDisableIfStreakExpired(params: {
     organizationId: string;
-    endpoint: { id: string; url: string };
+    endpoint: Pick<
+      WebhookEndpoint,
+      "id" | "destinationKind" | "url" | "sqsQueueUrl"
+    >;
     failingSince: Date;
     now: Date;
   }): Promise<void> {
@@ -682,7 +1156,7 @@ export class WebhookEndpointService {
       await this.deps.notifyAutoDisabled?.({
         organizationId,
         endpointId: endpoint.id,
-        url: endpoint.url,
+        destination: describeDestination(endpoint),
         failingSince,
       });
     } catch (error) {
@@ -717,6 +1191,11 @@ export class WebhookEndpointService {
     const limit = Math.min(params.limit ?? 25, 200);
     const rows = await this.deps.prisma.webhookEndpointDelivery.findMany({
       where: {
+        // The log is shared with the automations channel now. Those rows carry
+        // no organizationId or endpointId so they could not match anyway, but
+        // saying so keeps this reader's scope in the query rather than in a
+        // reader's head.
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         // Strictly after the cursor row in (firedAt desc, id desc) order,
@@ -742,8 +1221,12 @@ export class WebhookEndpointService {
       deliveries: page.map((r) => ({
         id: r.id,
         dispatchId: r.dispatchId,
-        attempt: r.attempt,
-        eventCount: r.eventCount,
+        // Nullable in the shared table because the automations channel records
+        // neither; every platform row carries both, and the query above only
+        // returns platform rows, so the fallbacks describe an unreachable row
+        // rather than a value this reader invents.
+        attempt: r.attempt ?? 1,
+        eventCount: r.eventCount ?? 0,
         outcome: r.outcome,
         responseStatus: r.responseStatus,
         latencyMs: r.latencyMs,
@@ -778,15 +1261,10 @@ export class WebhookEndpointService {
     };
   }
 
-  /** 30-day delivery-log prune; returns the deleted count. */
+  /** 30-day delivery-log prune; returns the deleted count. Runs the shared
+   *  sweep, so it clears both channels' rows from the one table. */
   async pruneDeliveries(now: Date = new Date()): Promise<number> {
-    const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
-    const deleted = await this.deps.prisma.$executeRaw`
-      DELETE FROM "WebhookEndpointDelivery"
-      WHERE "firedAt" < ${before}
-      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
-    `;
-    return deleted;
+    return await pruneWebhookDeliveries({ prisma: this.deps.prisma, now });
   }
 
   private async requireEndpoint(params: {

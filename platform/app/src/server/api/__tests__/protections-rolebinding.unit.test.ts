@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type Audience,
   type Disposition,
@@ -10,8 +10,8 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { getUserProtectionsForProject } from "../utils";
 
-vi.mock("../rbac", () => ({
-  hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+vi.mock("~/server/app-layer/permissions/imperative", () => ({
+  probeProjectPermission: vi.fn(() => Promise.resolve(true)),
   isDemoProject: vi.fn(() => false),
 }));
 
@@ -25,6 +25,8 @@ const mockOrgService = {
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ organizations: mockOrgService }),
+  // Reached through the TtlCache these paths read; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 const mockPrisma = {

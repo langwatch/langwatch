@@ -15,10 +15,17 @@ from typing import (
 )
 
 from pydantic import BaseModel, ConfigDict, Field
-from tenacity import Retrying, stop_after_attempt, wait_random_exponential
+import litellm
+from tenacity import (
+    Retrying,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
 from tqdm.auto import tqdm as tqdm_auto
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from langevals_core.litellm_patch import patch_litellm
+from langevals_core.request_env import bind_request_env, request_env
 
 import time
 import warnings
@@ -152,10 +159,16 @@ class EvaluationResult(BaseModel):
 class EvaluationResultSkipped(BaseModel):
     """
     Evaluation result marking an entry that was skipped with an optional details explanation.
+
+    An entry can be skipped after the evaluator has already paid for model
+    calls: an evaluator that cross-checks its own answer and finds the two
+    disagree has no result to report, but the calls were still billed. `cost`
+    carries that spend so it is accounted for rather than lost.
     """
 
     status: Literal["skipped"] = "skipped"
     details: Optional[str] = None
+    cost: Optional[Money] = None
 
 
 class EvaluationResultError(BaseModel):
@@ -226,7 +239,11 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         super().__init__(**kwargs)
         if not self.__preloaded:
             self.__class__.preload()
-        self.set_model_envs()
+        # Library callers construct an evaluator and call `evaluate` directly
+        # on the same thread; binding here is what makes their `env` reach the
+        # model call. `evaluate_batch` does not rely on it: every entry is
+        # scoped explicitly, whichever worker thread it lands on.
+        bind_request_env(self.env)
 
     @classmethod
     def preload(cls):
@@ -252,30 +269,28 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         except KeyError:
             raise EnvMissingException(f"Variable {var} not defined in environment.")
 
-    def set_model_envs(self):
-        # Those variables may be used non-explicitly, so we need to set them globally here for the arguments given
-        for key, value in (self.env or {}).items():
-            if key in models_env_vars or key.startswith("X_LITELLM_"):
-                os.environ[key] = value
-
-        # azure alias for litellm
-        if os.environ.get("AZURE_OPENAI_API_KEY") is not None:
-            os.environ["AZURE_API_KEY"] = os.environ["AZURE_OPENAI_API_KEY"]
-        if os.environ.get("AZURE_OPENAI_ENDPOINT") is not None:
-            os.environ["AZURE_API_BASE"] = os.environ["AZURE_OPENAI_ENDPOINT"]
-        # reverse azure alias for litellm
-        if os.environ.get("AZURE_API_KEY") is not None:
-            os.environ["AZURE_OPENAI_API_KEY"] = os.environ["AZURE_API_KEY"]
-        if os.environ.get("AZURE_API_BASE") is not None:
-            os.environ["AZURE_OPENAI_ENDPOINT"] = os.environ["AZURE_API_BASE"]
-
     def evaluate(self, entry: TEntry) -> SingleEvaluationResult:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def _evaluate_entry(self, entry, retries=0, restore_tqdm=True):
         _disable_tqdm()
+        # Every entry runs through here, on whatever worker thread the batch
+        # executor picked, so this is the one place that binds the request env
+        # for the model call underneath. Scoped, because executor threads are
+        # reused and must not carry one request's credentials into the next.
+        with request_env(self.env):
+            return self.__evaluate_entry_bound(entry, retries, restore_tqdm)
+
+    def __evaluate_entry_bound(self, entry, retries, restore_tqdm):
         try:
             retryer = Retrying(
+                # A 400 from the model provider is deterministic: a content
+                # policy block, a bad parameter, an oversized prompt. Retrying
+                # it only burns time and can push a single evaluation past the
+                # caller's request timeout, which turns a clear "content policy
+                # violation" into an opaque timeout. Fail fast and return the
+                # real error instead.
+                retry=retry_if_not_exception_type(litellm.BadRequestError),
                 stop=stop_after_attempt(retries),
                 wait=wait_random_exponential(multiplier=1, min=4, max=10),
                 reraise=True,

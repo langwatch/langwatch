@@ -17,10 +17,24 @@ export type LLMModelPricing = {
   outputCostPerToken: number;
   // Optional extended pricing fields
   inputCacheReadPerToken?: number;
+  // Writing to the prompt cache, priced by how long the entry lives.
+  // `inputCacheWritePerToken` is the short-lived rate (Anthropic's 5 minute
+  // entry, 1.25x the input rate); `inputCacheWrite1hPerToken` is the hour-long
+  // one (2x the input rate). Only the short-lived rate reaches us from the
+  // upstream catalog today, so the hour-long rate is derived for Anthropic
+  // models at load time; the field exists so a future sync can carry the real
+  // number and take precedence over the derivation.
   inputCacheWritePerToken?: number;
+  inputCacheWrite1hPerToken?: number;
   imageCostPerToken?: number;
   imageOutputCostPerToken?: number;
+  // Audio token rates. `audioCostPerToken` is the INPUT side, the only one
+  // the upstream catalog carries; `audioOutputCostPerToken` is the output
+  // side, hand-curated in llmModels.overlay.json and otherwise derived at
+  // load time for OpenAI's audio families, which price it at twice the
+  // input rate.
   audioCostPerToken?: number;
+  audioOutputCostPerToken?: number;
   internalReasoningCostPerToken?: number;
   webSearchCostPerQuery?: number;
   // Audio pricing: TTS models bill per input character synthesized,

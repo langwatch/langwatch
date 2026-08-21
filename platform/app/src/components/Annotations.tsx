@@ -71,7 +71,6 @@ export const Annotations = ({
                       action: "edit",
                       annotationId: annotation.id,
                       expectedOutput: annotation.expectedOutput,
-                      expectedOutputAction: "edit",
                     });
                   }
                 : undefined

@@ -22,7 +22,7 @@
  * project is how the Usage page rendered "No usage in this window" while
  * the keys table showed spend for the same keys.
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "./virtualKeySpend.clickhouse.repository";
@@ -218,6 +218,13 @@ export class GatewayUsageService {
     organizationId: string;
     virtualKeyId: string;
     window: UsageWindow;
+    /**
+     * Narrows the recent-activity list to one model, and only that list.
+     * The totals, the daily series and the per-model breakdown stay whole:
+     * the breakdown is the control the model is picked from, so filtering
+     * it with the table would leave the reader one row and no way back.
+     */
+    model?: string;
   }): Promise<VirtualKeyUsageSummary> {
     if (!this.spendRepo) return emptyVkSummary();
 
@@ -236,6 +243,7 @@ export class GatewayUsageService {
         tenantIds,
         window: args.window,
         virtualKeyIds: [args.virtualKeyId],
+        model: args.model,
         limit: RECENT_DEBITS_LIMIT,
       }),
     ]);

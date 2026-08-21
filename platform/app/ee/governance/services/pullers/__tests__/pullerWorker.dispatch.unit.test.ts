@@ -5,9 +5,9 @@
  *   adapter resolution (real registry) →
  *   adapter.runOnce (real adapter, stubbed fetch) →
  *   OCSF row composition (real mapToOcsfRow) →
- *   governance_ocsf_events insert (mock CH client)
+ *   governance_ocsf_events insert (mock App-provided repository)
  *
- * Mocks Prisma + the CH client at the module boundary so the test
+ * Mocks Prisma + the App's OCSF repository at the module boundary so the test
  * runs without Docker. The dispatch logic, adapter dispatch, OCSF
  * mapping, and cursor-persistence semantics are all covered with
  * real code; only the storage edges are stubbed.
@@ -41,15 +41,16 @@ beforeEach(() => {
       },
     },
   }));
-  vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForProject: async () => ({}),
+  // The worker takes the OCSF sink from the App, so standing in for the
+  // store means standing in for `getApp()`.
+  vi.doMock("~/server/app-layer/app", () => ({
+    getApp: () => ({
+      governance: {
+        ocsfEvents: { insertEvent: async (row: unknown) => ocsfInsert(row) },
+      },
+    }),
   }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
-    GovernanceOcsfEventsClickHouseRepository: class {
-      async insertEvent(row: unknown) {
-        return ocsfInsert(row);
-      }
-    },
     OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
     OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
   }));
@@ -58,6 +59,12 @@ beforeEach(() => {
   }));
   vi.doMock("~/utils/ssrfProtection", () => ({
     ssrfSafeFetch: fetchStub,
+  }));
+  // This test is about audit rows, not cost. The real service would reach for
+  // Redis through the App and throw, and a flag lookup that cannot answer now
+  // fails the run rather than filing the window at no cost.
+  vi.doMock("~/server/featureFlag", () => ({
+    featureFlagService: { isEnabled: async () => false },
   }));
 });
 
@@ -138,7 +145,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       const firstRow = ocsfInsert.mock.calls[0]![0];
       expect(firstRow).toMatchObject({
         // TenantId is the org's hidden internal_governance Project ID,
-        // resolved by the worker — same key as the trace-fold reactor +
+        // resolved by the worker — same key as the trace-fold subscriber +
         // OCSF export service. Org id is NOT used.
         tenantId: "gov-proj-1",
         eventId: `http_polling:${sourceId}:evt-1`,

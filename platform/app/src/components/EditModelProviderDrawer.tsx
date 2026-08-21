@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
   findModelProviderById,
@@ -6,7 +7,6 @@ import {
   useAllModelProvidersList,
 } from "../hooks/useAllModelProvidersList";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
-import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { modelProviders } from "../server/modelProviders/registry";
 import { EditModelProviderForm } from "./settings/ModelProviderForm";
 import { Drawer } from "./ui/drawer";

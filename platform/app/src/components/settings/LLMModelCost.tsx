@@ -18,6 +18,36 @@ import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { PageLayout } from "../ui/layouts/PageLayout";
 
+/**
+ * One per-token rate, rendered at full precision. Rates run to nine decimal
+ * places, so the default number formatting would round several of them to
+ * zero. Green marks a rate that comes from a stored cost rule, at whatever
+ * scope, rather than from the model catalog.
+ */
+function RateCell({
+  rate,
+  isCustom,
+}: {
+  rate: number | undefined;
+  isCustom: boolean;
+}) {
+  return (
+    <Table.Cell padding={0}>
+      <Text
+        justifyContent="space-between"
+        paddingX={4}
+        marginX={2}
+        color={isCustom ? "green.500" : undefined}
+      >
+        {rate?.toLocaleString("fullwide", {
+          useGrouping: false,
+          maximumSignificantDigits: 20,
+        })}
+      </Text>
+    </Table.Cell>
+  );
+}
+
 export function LLMModelCost(props: { projectId?: string }) {
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
@@ -66,14 +96,19 @@ export function LLMModelCost(props: { projectId?: string }) {
         >
           <Table.Header width="full">
             <Table.Row width="full">
-              <Table.ColumnHeader width="24%">Model name</Table.ColumnHeader>
-              <Table.ColumnHeader width="24%">
+              {/* The five rate columns share what these two leave. A rate runs
+                  to nine decimal places and breaks mid-number when its column
+                  is narrow, so the identifying columns give up some width to
+                  keep the prices readable. */}
+              <Table.ColumnHeader width="18%">Model name</Table.ColumnHeader>
+              <Table.ColumnHeader width="18%">
                 Regex match rule
               </Table.ColumnHeader>
               <Table.ColumnHeader>Input cost</Table.ColumnHeader>
               <Table.ColumnHeader>Output cost</Table.ColumnHeader>
               <Table.ColumnHeader>Cache read</Table.ColumnHeader>
-              <Table.ColumnHeader>Cache write</Table.ColumnHeader>
+              <Table.ColumnHeader>Cache write (5 minutes)</Table.ColumnHeader>
+              <Table.ColumnHeader>Cache write (1 hour)</Table.ColumnHeader>
               <Table.ColumnHeader width="64px" padding={1}></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
@@ -81,7 +116,7 @@ export function LLMModelCost(props: { projectId?: string }) {
             {llmModelCosts.isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
                 <Table.Row key={index}>
-                  {Array.from({ length: 6 }).map((_, index) => (
+                  {Array.from({ length: 7 }).map((_, index) => (
                     <Table.Cell key={index}>
                       <Skeleton height="20px" />
                     </Table.Cell>
@@ -122,58 +157,20 @@ export function LLMModelCost(props: { projectId?: string }) {
                     </Code>
                   </HStack>
                 </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.inputCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.outputCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.cacheReadCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.cacheCreationCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
+                <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
+                <RateCell
+                  rate={row.cacheReadCostPerToken}
+                  isCustom={!!row.id}
+                />
+                <RateCell
+                  rate={row.cacheCreationCostPerToken}
+                  isCustom={!!row.id}
+                />
+                <RateCell
+                  rate={row.cacheCreation1hCostPerToken}
+                  isCustom={!!row.id}
+                />
                 <Table.Cell padding={1}>
                   <ActionsMenu
                     id={row.id}
@@ -260,9 +257,6 @@ function ActionsMenu({
                       title: "Success",
                       description: `LLM model cost deleted successfully`,
                       type: "success",
-                      meta: {
-                        closable: true,
-                      },
                     });
                     void llmModelCosts.refetch();
                   },
@@ -272,9 +266,6 @@ function ActionsMenu({
                       title: "Error",
                       description: "Error deleting LLM model cost",
                       type: "error",
-                      meta: {
-                        closable: true,
-                      },
                     });
                   },
                 },

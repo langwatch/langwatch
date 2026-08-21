@@ -4,7 +4,7 @@ description: Pull LangWatch governance events into Splunk, Datadog Security, AWS
 sidebarTitle: OCSF / SIEM export
 ---
 
-Your security team already runs a SIEM. LangWatch governance events (per-user spend, per-source activity, anomaly alerts) belong in that SIEM alongside your other audit feeds — not in a separate tab they only check after an incident.
+LangWatch governance events (per-user spend, per-source activity, anomaly alerts) can be pulled into your security team's SIEM alongside your other audit feeds.
 
 The OCSF (Open Cybersecurity Schema Framework) v1.1 read API gives your SIEM a cursor-paginated source it can pull on a cron schedule. Six platforms supported as cron-pull targets out of the box (any platform with a generic JSON pull adapter works the same way).
 
@@ -15,7 +15,7 @@ The tRPC procedure `api.governance.ocsfExport`:
 ```typescript
 api.governance.ocsfExport({
   organizationId: string;
-  sinceMs?: number;     // optional cursor — only return events after this UNIX ms
+  sinceMs?: number;     // optional cursor, only return events after this UNIX ms
   limit?: number;       // default 1000, max 10000
 }) → {
   events: OcsfEvent[];  // OCSF v1.1 / OWASP AOS shape
@@ -42,8 +42,8 @@ OCSF event shape (per the v1.1 spec):
 Auth is scoped to **org admin** or **auditor** role. Both roles map to project-membership of the hidden Governance Project; customer-visible project members do NOT inherit OCSF read access.
 
 Use either:
-- **Personal access token (PAT)** — for org admins running ad-hoc pulls
-- **Bearer access token** from `langwatch login --device` — for SIEM cron-pull integrations (the recommended path)
+- **Personal access token (PAT)**: for org admins running ad-hoc pulls
+- **Bearer access token** from `langwatch login --device`: for SIEM cron-pull integrations (the recommended path)
 
 ## Cron-pull pattern (recommended for SIEM integrations)
 
@@ -53,24 +53,24 @@ Each pull cycle:
 2. Call `api.governance.ocsfExport({organizationId, sinceMs, limit: 1000})`
 3. Forward `events[]` into your SIEM's ingest pipeline (Splunk HEC, Datadog Logs API, etc.)
 4. Persist `nextCursor` for the next cycle
-5. If `nextCursor` came back non-null, the result was a full page — schedule another pull immediately to drain the backlog. Otherwise wait the cron interval (typically 5-15 minutes).
+5. If `nextCursor` came back non-null, the result was a full page. Schedule another pull immediately to drain the backlog. Otherwise wait the cron interval (typically 5-15 minutes).
 
 ## Supported SIEM platforms
 
 | SIEM | Adapter pattern |
 |---|---|
-| **Splunk Enterprise Security** | Splunk add-on with a REST modular input pointing at `api.governance.ocsfExport` — bring-your-own-add-on; works against any HTTP-pull source |
-| **Datadog Security** | Custom log source via `datadog-agent` HTTP-pull integration — same shape, different transport |
-| **AWS Security Hub** | Custom integration via the `BatchImportFindings` API — your cron worker maps OCSF events → Security Hub findings |
-| **Microsoft Sentinel** | Custom data connector (Logic App + REST pull) — Sentinel's native ingestion accepts OCSF v1.1 directly |
+| **Splunk Enterprise Security** | Splunk add-on with a REST modular input pointing at `api.governance.ocsfExport`; bring-your-own-add-on, works against any HTTP-pull source |
+| **Datadog Security** | Custom log source via `datadog-agent` HTTP-pull integration; same shape, different transport |
+| **AWS Security Hub** | Custom integration via the `BatchImportFindings` API; your cron worker maps OCSF events to Security Hub findings |
+| **Microsoft Sentinel** | Custom data connector (Logic App + REST pull); Sentinel's native ingestion accepts OCSF v1.1 directly |
 | **Elastic Security** | Filebeat with HTTP-input + ECS-OCSF mapping module |
-| **Sumo Logic CSE** | Hosted collector with HTTP-source — accepts OCSF v1.1 with the standard OWASP AOS schema mapping |
+| **Sumo Logic CSE** | Hosted collector with HTTP-source; accepts OCSF v1.1 with the standard OWASP AOS schema mapping |
 
 Other SIEM platforms with generic JSON-pull integrations (CrowdStrike NG-SIEM, Securonix, Exabeam, etc.) follow the same pattern.
 
 ## What's in scope vs deferred
 
-**In this PR**:
+**The export covers**:
 
 - ✅ Cursor-paginated read API (`api.governance.ocsfExport` tRPC procedure)
 - ✅ OCSF v1.1 shape (Actor / Action / Target / Time / Severity / Event ID)
@@ -81,9 +81,9 @@ Other SIEM platforms with generic JSON-pull integrations (CrowdStrike NG-SIEM, S
 
 **Named follow-ups**:
 
-- ⏳ **Heavyweight SIEM push infrastructure** (per-org SIEM push UI, DLQ + replay, managed Splunk/Datadog HEC integrations) — the OCSF read API + lightweight cursor-pull cron pattern covers the common case; rich push integrations land per-customer when sales pipeline justifies them
-- ⏳ **OCSF schema versioning** — v1.1 cooked into the fold today; v1.2 is in draft. When v1.2 lands the fold gets an `OcsfSchemaVersion` column for graceful upgrade
-- ⏳ **Cryptographic signing of exported rows** — deferred to the tamper-evidence follow-up; see [Compliance architecture / Tamper-evidence](/ai-gateway/governance/compliance-architecture#tamper-evidence-is-named-not-abandoned)
+- ⏳ **Heavyweight SIEM push infrastructure** (per-org SIEM push UI, DLQ + replay, managed Splunk/Datadog HEC integrations). The OCSF read API and the cursor-pull cron pattern cover the common case; rich push integrations land per-customer when sales pipeline justifies them
+- ⏳ **OCSF schema versioning**: v1.1 cooked into the fold today; v1.2 is in draft. When v1.2 lands the fold gets an `OcsfSchemaVersion` column for graceful upgrade
+- ⏳ **Cryptographic signing of exported rows**: deferred to the tamper-evidence follow-up; see [Compliance architecture / Tamper-evidence](/ai-gateway/governance/compliance-architecture#tamper-evidence-boundaries)
 
 ## Data shape per source type
 
@@ -129,7 +129,7 @@ Replace the `splunk_hec_send` shim with your SIEM's appropriate HTTP-pull or ing
 
 ## Cross-references
 
-- [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; OCSF events are subject to the same retention as their source spans
-- [Anomaly rules](/ai-gateway/governance/anomaly-rules) — how AnomalyAlerts propagate into OCSF events with elevated severity
-- [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion) — picking the right OTel URL for your scenario
+- [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
+- [Governance data retention](/ai-gateway/governance/retention): OCSF events are kept as long as the spans they were derived from
+- [Anomaly rules](/ai-gateway/governance/anomaly-rules): how AnomalyAlerts propagate into OCSF events with elevated severity
+- [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion): picking the right OTel URL for your scenario

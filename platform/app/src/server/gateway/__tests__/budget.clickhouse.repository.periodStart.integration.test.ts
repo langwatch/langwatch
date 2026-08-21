@@ -17,15 +17,20 @@
  * a confident $0.00 spent. Any future drift fails here instead of in a
  * customer's gateway.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import {
-  CURRENT_ROLLUP_REBUILD_MIGRATION,
   replayGooseMigrationUp,
+  replayRollupRebuild,
 } from "~/server/clickhouse/__tests__/migrationReplay";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -48,6 +53,9 @@ const ALL_WINDOWS: GatewayBudgetWindow[] = [
 ];
 
 const DEBIT_USD = "0.0010000000";
+// The BudgetDebitRow the repo actually takes: same amount as DEBIT_USD,
+// stated once as the integer nano-USD the repository derives AmountUSD from.
+const DEBIT_NANO_USD = 1_000_000;
 const LIMIT_USD = "0.0001";
 
 function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
@@ -72,6 +80,11 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
     createdById: `usr-${suffix}`,
   } as GatewayBudget;
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("given a debit recorded against a budget in ClickHouse", () => {
   const budgets = ALL_WINDOWS.map(budgetFor);
@@ -107,7 +120,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     });
 
     repo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     });
@@ -127,7 +140,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
           window: budget.window,
           virtualKeyId: `vk_${suffix}`,
           gatewayRequestId: `grq_${budget.window}_${nanoid()}`,
-          amountUsd: DEBIT_USD,
+          amountNanoUsd: DEBIT_NANO_USD,
           tokensInput: 300,
           tokensOutput: 150,
           tokensCacheRead: 0,
@@ -201,7 +214,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     const tzOccurredAt = new Date();
 
     beforeAll(async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const occurredAt = tzOccurredAt.getTime();
       await client!.insert({
         table: "gateway_budget_ledger_events",
@@ -278,7 +291,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     // them. UpdatedAt is bookkeeping the rebuild re-stamps by design, so
     // it stays out of the comparison.
     const captureUtcRows = async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const result = await client!.query({
         query: `
           SELECT
@@ -305,7 +318,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     };
 
     beforeAll(async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
 
       utcRowsBeforeRebuild = await captureUtcRows();
 
@@ -361,10 +374,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       // the one that first fixed the timezone is what keeps this scenario
       // honest as the rollup evolves: the claim is that history folded by
       // any older view survives the upgrade a deployment actually runs.
-      await replayGooseMigrationUp({
-        client: client!,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      await replayRollupRebuild(client!);
 
       utcRowsAfterRebuild = await captureUtcRows();
     }, 120_000);
@@ -374,11 +384,8 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       // Re-apply the current migration unconditionally so a failure
       // anywhere in this describe can never leave later suites running
       // against the 00055 view. Idempotent by the migration's own design.
-      const client = await getClickHouseClientForProject(TENANT_ID);
-      await replayGooseMigrationUp({
-        client: client!,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      const client = await getClickHouseClientForTenant(TENANT_ID);
+      await replayRollupRebuild(client!);
     }, 120_000);
 
     /** @scenario "Spend recorded before the rollup rebuild still counts after it" */
@@ -418,7 +425,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
 
   describe("when comparing the periods the two sides use", () => {
     it("buckets every window into a period the read path asks for", async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const result = await client!.query({
         query: `
           SELECT Window, count() AS buckets

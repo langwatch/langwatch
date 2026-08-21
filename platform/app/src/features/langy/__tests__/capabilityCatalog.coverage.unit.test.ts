@@ -51,8 +51,9 @@ const EXCLUDED_COMMANDS = new Set([
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).
   "navigate",
-  "init-shell",
-  "request-increase",
+  // Local telemetry-wiring setup: writes agent config files on the user's
+  // machine (settings.json, config.toml, shell rc), not a platform resource.
+  "instrument",
   // Documentation fetchers: their output is prose for the agent, and the
   // docs helpers already render as clean activity lines.
   "docs",
@@ -61,12 +62,19 @@ const EXCLUDED_COMMANDS = new Set([
   // machine the CLI runs on, not a platform resource a card could deep-link.
   "skills",
   // Gateway tool wrappers: they exec another AI tool (claude/codex/cursor/
-  // gemini/opencode) rather than returning a LangWatch result.
+  // gemini/opencode/copilot) rather than returning a LangWatch result.
   "claude",
   "codex",
   "cursor",
   "gemini",
   "opencode",
+  "copilot",
+  // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
+  // returning no LangWatch result. ADR-039 §Extension #2.
+  "code",
+  // Local capture setup for the standalone GitHub Copilot app: installs an
+  // OS login agent on the user's machine, not a platform resource.
+  "copilot-app",
   // Sends a support report to the LangWatch team; the confirmation is a
   // message and an opaque id, not a platform resource a card could open.
   "report",

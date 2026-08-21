@@ -24,14 +24,14 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
 } from "~/server/app-layer/analytics/routing/field-availability";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
@@ -495,20 +495,18 @@ async function loadProjectRecency({
 export function defaultGraphTriggerHeartbeatDeps({
   triggers,
   prisma = defaultPrisma,
+  resolveClickHouseClient,
 }: {
   triggers: TriggerService;
   prisma?: PrismaClient;
+  /** The composition root's resolver, passed in rather than imported: this
+   *  factory has no business deciding which ClickHouse a tenant reads. */
+  resolveClickHouseClient: ClickHouseClientResolver;
 }): GraphTriggerHeartbeatDeps {
   return {
     triggers,
     prisma,
-    resolveClickHouseClient: async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) {
-        throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-      }
-      return client;
-    },
+    resolveClickHouseClient,
     lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {
       // The graph is the only place the metric key lives; the trigger's
       // `actionParams.seriesName` carries the series INDEX. Classify from the
@@ -516,7 +514,7 @@ export function defaultGraphTriggerHeartbeatDeps({
       // eval-backed series, and reading series 0 for a trigger on series 1
       // probes the wrong slim table's recency, which suppresses the alert.
       const graph = await prisma.customGraph.findFirst({
-        where: { id: customGraphId, projectId },
+        where: { id: customGraphId, projectId, kind: BUILDER_CHART_KIND },
         select: { graph: true },
       });
       if (!graph) return undefined;

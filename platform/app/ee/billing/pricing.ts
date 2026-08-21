@@ -1,8 +1,8 @@
-import { Currency } from "@prisma/client";
+import { Currency } from "~/generated/prisma/client";
 import { prices, stripePricesFile } from "./stripe/stripePriceCatalog";
 import type { StripePriceName } from "./stripe/stripePrices.types";
 
-export type { Currency } from "@prisma/client";
+export type { Currency } from "~/generated/prisma/client";
 
 function getUnitAmountCents(name: StripePriceName): number {
   const priceId = prices[name];

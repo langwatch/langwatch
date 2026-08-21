@@ -10,9 +10,9 @@ import { z } from "zod";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { LangWatchCallbackHandler } from "../..";
-import { setupObservability } from "../../../../setup/node";
+import type { setupObservability } from "../../../../setup/node";
 import { getLangWatchTracer } from "../../../../tracer";
-import { NoOpLogger } from "../../../../../logger";
+import { createIntegrationObservability } from "../../../../setup/node/__tests__/createIntegrationObservability";
 
 const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
 
@@ -37,13 +37,10 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     spanExporter = new InMemorySpanExporter();
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
-    observabilityHandle = setupObservability({
-      langwatch: "disabled",
+    observabilityHandle = createIntegrationObservability({
       serviceName: "langchain-integration-test",
-      debug: { logger: new NoOpLogger() },
       spanProcessors: [spanProcessor],
       advanced: {
-        throwOnSetupError: true,
         UNSAFE_forceOpenTelemetryReinitialization: true,
       },
       attributes: {

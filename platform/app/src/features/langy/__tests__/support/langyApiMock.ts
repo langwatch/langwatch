@@ -26,9 +26,8 @@
 export const idleQuery = () => ({
   data: undefined,
   isLoading: false,
-  isInitialLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isFetched: true,
   isError: false,
   error: null,
@@ -94,5 +93,5 @@ export const createTrpcUtils = ({
     messages: { invalidate: () => Promise.resolve() },
     detail: { setData: () => undefined },
   },
-  langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
+  github: { getConnectionStatus: { invalidate: () => Promise.resolve() } },
 });

@@ -49,7 +49,7 @@ let evaluatorsData: unknown[] = [mockEvaluator];
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       evaluators: { getAll: { invalidate: vi.fn() } },
     }),
     evaluators: {
@@ -80,10 +80,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("../EvaluatorApiUsageDialog", () => ({
   EvaluatorApiUsageDialog: () => null,
-}));
-
-vi.mock("../../checks/EvaluatorSelection", () => ({
-  evaluatorTempNameMap: {},
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

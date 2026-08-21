@@ -7,6 +7,7 @@ on:
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
       - ".github/scripts/guard-pull-request-target*.ts"
+      - ".github/scripts/guard-path-filters*.ts"
   push:
     branches:
       - main
@@ -15,7 +16,13 @@ on:
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
       - ".github/scripts/guard-pull-request-target*.ts"
+      - ".github/scripts/guard-path-filters*.ts"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Never on main: a commit that lands keeps its own verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -26,7 +33,7 @@ jobs:
     steps:
       - name: Checkout PR head for scanning
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: pr
@@ -34,7 +41,7 @@ jobs:
 
       - name: Checkout trusted guard script
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
@@ -53,7 +60,7 @@ jobs:
           fi
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
 
@@ -65,9 +72,31 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node --test --experimental-strip-types pr/.github/scripts/guard-pull-request-target.test.ts
 
+      # Same trusted-script rule as above: run the BASE copy of the path-filter
+      # guard against the PR's workflows, so a pull request cannot disable the
+      # guard in the same commit that breaks a filter. Falls back to the PR's
+      # copy only when base has none, which is the commit that adds it.
+      - name: Resolve trusted path-filter guard
+        if: github.event_name == 'pull_request'
+        id: path-filter-script
+        run: |
+          if [ -f base/.github/scripts/guard-path-filters.ts ]; then
+            echo "path=base/.github/scripts/guard-path-filters.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=pr/.github/scripts/guard-path-filters.ts" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check path filters on PR
+        if: github.event_name == 'pull_request'
+        run: node --experimental-strip-types "${{ steps.path-filter-script.outputs.path }}" pr/.github/workflows
+
+      - name: Check path-filter guard tests on PR
+        if: github.event_name == 'pull_request'
+        run: node --test --experimental-strip-types pr/.github/scripts/guard-path-filters.test.ts
+
       - name: Checkout repository
         if: github.event_name != 'pull_request'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
 
@@ -78,3 +107,11 @@ jobs:
       - name: Check guard tests
         if: github.event_name != 'pull_request'
         run: node --test --experimental-strip-types .github/scripts/guard-pull-request-target.test.ts
+
+      - name: Check path filters
+        if: github.event_name != 'pull_request'
+        run: node --experimental-strip-types .github/scripts/guard-path-filters.ts
+
+      - name: Check path-filter guard tests
+        if: github.event_name != 'pull_request'
+        run: node --test --experimental-strip-types .github/scripts/guard-path-filters.test.ts

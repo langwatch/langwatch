@@ -7,23 +7,17 @@
  */
 
 import { z } from "zod";
-import type { Span } from "../../tracer/types";
+import { FieldMappingSchema } from "../field-mapping";
+import { runParameterValuesSchema } from "../parameters";
 
 // ============================================================================
 // Field Mapping Types
 // (defined first so adapter schemas can reference them)
 // ============================================================================
 
-/** Field mapping for agent inputs — maps to a scenario source or a static value */
-export const FieldMappingSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("source"),
-    sourceId: z.string(),
-    path: z.array(z.string()),
-  }),
-  z.object({ type: z.literal("value"), value: z.string() }),
-]);
-export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+// FieldMappingSchema lives in ../field-mapping: it is the one thing here that
+// the suite schema and the studio DSL also need, and keeping it out means this
+// module has no importers outside the child's own code.
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
@@ -43,6 +37,25 @@ export const PromptConfigDataSchema = z.object({
       content: z.string(),
     }),
   ),
+  /**
+   * The prompt's declared input variables. Without these the adapter cannot
+   * know a template's `{{question}}` was meant to be bound to anything, and it
+   * rendered as an empty string instead (#6590). Defaulted so a job queued by
+   * an older worker still parses.
+   */
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .default([]),
+  /**
+   * Explicit bindings from the suite target for this prompt. Declared inputs
+   * these leave out are matched to a scenario source by name.
+   */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Model configured on prompt (if any). Used for model selection logic. */
   model: z.string().optional(),
   temperature: z.number().optional(),
@@ -102,6 +115,13 @@ export const HttpAgentDataSchema = z.object({
   outputPath: z.string().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * The project's decrypted secrets, so `{{ secrets.NAME }}` resolves in the
+   * url, the header values and the auth fields, the places a credential
+   * belongs. Defaulted so a job queued before secrets reached http targets
+   * still parses.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -215,6 +235,8 @@ export const ScenarioConfigSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  maxTurns: z.number().int().optional(),
+  minTurns: z.number().int().optional(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 
@@ -253,16 +275,6 @@ export const TargetConfigSchema = z.object({
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 // ============================================================================
-// Span Query Types
-// ============================================================================
-
-/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
-export type SpanQueryFn = (params: {
-  projectId: string;
-  traceId: string;
-}) => Promise<Span[]>;
-
-// ============================================================================
 // Result Types
 // ============================================================================
 
@@ -286,26 +298,81 @@ export type ScenarioExecutionResult = z.infer<
 /**
  * Complete data package for child process execution.
  * Contains everything needed to run a scenario without DB access.
+ *
+ * All three model-params fields are individually optional because the
+ * producer and the consumer of a job payload can be on different builds: a
+ * job queued just before the simulator/judge model split carries only
+ * `modelParams`, and it must still parse and run after the deploy that
+ * introduced the split. What is NOT optional is that every role ends up with
+ * a model — the refinement below rejects a payload from which the simulator
+ * or the judge could not be built, so that failure is a named schema error at
+ * the process boundary rather than an opaque "undefined has no properties"
+ * crash three layers into model construction (issue #6634).
+ *
+ * `selectRoleModelParams` (job-model-params.ts) applies the fallback the
+ * refinement guarantees is available.
  */
-export const ChildProcessJobDataSchema = z.object({
-  context: ExecutionContextSchema,
-  scenario: ScenarioConfigSchema,
-  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
-  scenarioRunId: z.string().optional(),
-  adapterData: TargetAdapterDataSchema,
-  /** Model params for the target adapter (prompt / workflow under test). */
-  modelParams: LiteLLMParamsSchema,
-  /**
-   * Model params for the user-simulator agent. Resolved from the run-plan /
-   * scenario override or the scenarios.user_simulator default. Optional so a
-   * job queued by an older worker (which only carried modelParams) still
-   * parses; the child falls back to modelParams when absent.
-   */
-  simulatorModelParams: LiteLLMParamsSchema.optional(),
-  /** Model params for the judge agent — same resolution + fallback as the
-   *  simulator, from the scenarios.judge default. */
-  judgeModelParams: LiteLLMParamsSchema.optional(),
-  nlpServiceUrl: z.string(),
-  target: TargetConfigSchema,
-});
+export const ChildProcessJobDataSchema = z
+  .object({
+    context: ExecutionContextSchema,
+    scenario: ScenarioConfigSchema,
+    /**
+     * The values the run resolved for this scenario. The scenario's own text
+     * arrives already rendered against them; the target under test reads them
+     * as `params.NAME`. Defaulted so a job queued before parameters existed
+     * still parses.
+     */
+    parameters: runParameterValuesSchema.default({}),
+    /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+    scenarioRunId: z.string().optional(),
+    adapterData: TargetAdapterDataSchema,
+    /**
+     * Model params for the target adapter (the prompt under test). Only a
+     * prompt target ever resolves one — workflow / code / http targets send
+     * the project's platform API key instead (see
+     * serialized-adapter.registry.ts) and never consume an LLM key for the
+     * agent under test, so this is absent for them.
+     *
+     * Doubles as the legacy fallback for the two fields below: before the
+     * model split this single value drove all three agents.
+     */
+    modelParams: LiteLLMParamsSchema.optional(),
+    /**
+     * Model params for the user-simulator agent. Resolved from the run-plan /
+     * scenario override or the scenarios.user_simulator default. Absent only
+     * on a pre-split payload, which falls back to `modelParams`.
+     */
+    simulatorModelParams: LiteLLMParamsSchema.optional(),
+    /** Model params for the judge agent — same resolution and same pre-split
+     *  fallback as the simulator, from the scenarios.judge default. */
+    judgeModelParams: LiteLLMParamsSchema.optional(),
+    nlpServiceUrl: z.string(),
+    target: TargetConfigSchema,
+    /**
+     * Total time in milliseconds the judge waits at verdict time for an http
+     * target's remote traces to arrive and stabilize. Computed by the
+     * prefetcher from the project's own ingest lag; absent for non-http
+     * targets and on jobs queued before the budget existed, in which case
+     * the scenario SDK's default applies.
+     */
+    traceWaitTimeoutMs: z.number().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.simulatorModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["simulatorModelParams"],
+        message:
+          "No model params for the user simulator, and no modelParams to fall back to",
+      });
+    }
+    if (!data.judgeModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["judgeModelParams"],
+        message:
+          "No model params for the judge, and no modelParams to fall back to",
+      });
+    }
+  });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

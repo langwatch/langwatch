@@ -1,14 +1,14 @@
 ---
 title: Capturing RAG
 sidebarTitle: Python
-description: Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
+description: LangWatch captures Retrieval-Augmented Generation (RAG) data for evaluations and agent testing.
 icon: python
 keywords: RAG, Retrieval Augmented Generation, LangChain, LangWatch, LangChain RAG, RAG Span, RAG Chunk, RAG Tool
 ---
 
 Retrieval Augmented Generation (RAG) is a common pattern in LLM applications where you first retrieve relevant context from a knowledge base and then use that context to generate a response. LangWatch provides specific ways to capture RAG data, enabling better observability and evaluation of your RAG pipelines.
 
-By capturing the `contexts` (retrieved documents) used by the LLM, you unlock several benefits in LangWatch:
+Capturing the `contexts` (retrieved documents) used by the LLM enables the following in LangWatch:
 - Specialized RAG evaluators (e.g., Faithfulness, Context Relevancy).
 - Analytics on document usage (e.g., which documents are retrieved most often, which ones lead to better responses).
 - Deeper insights into the retrieval step of your pipeline.
@@ -227,4 +227,4 @@ def main():
 ```
 The `capture_rag_from_tool` approach is generally less direct for RAG from retrievers because you have to parse the tool's output (which is usually a string) to extract structured context information. `capture_rag_from_retriever` is preferred when dealing directly with LangChain retrievers.
 
-By effectively capturing RAG spans, you gain much richer data in LangWatch, enabling more powerful analysis and evaluation of your RAG systems. Refer to the SDK examples for more detailed implementations.
+Refer to the SDK examples for more detailed implementations.

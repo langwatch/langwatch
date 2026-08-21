@@ -3,6 +3,7 @@ import { env } from "../../../src/env.mjs";
 import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
 import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
+import { USAGE_UNIT_DISPLAY_LABELS } from "../../../src/server/app-layer/usage/usage-meter-policy";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { USAGE_UNKNOWN } from "../../../src/server/traces/usage-count";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
@@ -155,6 +156,9 @@ export class UsageLimitService {
   async notifyPlanLimitReached({
     organizationId,
     planName,
+    usageUnit,
+    current,
+    max,
   }: PlanLimitNotifierInput): Promise<void> {
     if (!env.IS_SAAS) {
       return;
@@ -203,6 +207,9 @@ export class UsageLimitService {
         adminName: admin?.name ?? undefined,
         adminEmail: admin?.email ?? undefined,
         planName,
+        limitType: USAGE_UNIT_DISPLAY_LABELS[usageUnit],
+        current,
+        max,
       };
 
       // Both sends are fire-and-forget (errors swallowed internally),
