@@ -291,9 +291,7 @@ describe("mintLangySessionApiKey", () => {
         const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
         const permissions = arg.permissions as string[];
         // Secrets: not even the read.
-        expect(permissions.filter((p) => p.startsWith("secrets:"))).toEqual(
-          [],
-        );
+        expect(permissions.filter((p) => p.startsWith("secrets:"))).toEqual([]);
         // Auth scope: reads only. (The reads themselves ARE expected — that
         // half of the rule lives in the coverage test's boundary block.)
         for (const family of [

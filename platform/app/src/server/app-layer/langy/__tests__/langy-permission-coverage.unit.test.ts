@@ -32,9 +32,9 @@ import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
 import {
   ALL_PERMISSION_ACTIONS,
   ALL_PERMISSION_FAMILIES,
+  classifyForLangy,
   LANGY_CLASSIFIED_ACTIONS,
   LANGY_CLASSIFIED_FAMILIES,
-  classifyForLangy,
 } from "../langyPermissionPolicy";
 import {
   experimentRoutePermissions,
@@ -60,7 +60,9 @@ function grantedByPolicyButNotByTheMint(): string[] {
     .filter(
       ([permission]) => classifyForLangy(permission).disposition === "granted",
     )
-    .filter(([permission]) => !isOrgExclusivePermission(permission as Permission))
+    .filter(
+      ([permission]) => !isOrgExclusivePermission(permission as Permission),
+    )
     .map(
       ([permission, routes]) =>
         `${permission} — demanded by ${routes.join(", ")}`,
@@ -88,7 +90,9 @@ function reachableOnlyWithAnOrgScopedBinding(): string[] {
     .filter(
       ([permission]) => classifyForLangy(permission).disposition === "granted",
     )
-    .filter(([permission]) => isOrgExclusivePermission(permission as Permission))
+    .filter(([permission]) =>
+      isOrgExclusivePermission(permission as Permission),
+    )
     .map(([permission]) => permission)
     .sort();
 }
@@ -202,9 +206,16 @@ describe("Langy permission coverage", () => {
         const authScopeWrites = LANGY_CANDIDATE_PERMISSIONS.filter((p) => {
           const [family, action] = p.split(":");
           return (
-            ["organization", "team", "project", "virtualKeys", "gatewayProviders", "webhookEndpoints", "auditLog", "complianceExport"].includes(
-              family!,
-            ) && action !== "view"
+            [
+              "organization",
+              "team",
+              "project",
+              "virtualKeys",
+              "gatewayProviders",
+              "webhookEndpoints",
+              "auditLog",
+              "complianceExport",
+            ].includes(family!) && action !== "view"
           );
         });
         expect(authScopeWrites).toEqual([]);

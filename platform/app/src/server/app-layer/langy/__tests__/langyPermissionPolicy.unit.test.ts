@@ -117,12 +117,13 @@ describe("classifyForLangy", () => {
 
   describe("given the secrets family", () => {
     describe("when any grain of it is classified", () => {
-      it.each(["secrets:view", "secrets:create", "secrets:manage"])(
-        "refuses %s — there is no safe read of a stored credential",
-        (permission) => {
-          expect(classifyForLangy(permission).disposition).toBe("excluded");
-        },
-      );
+      it.each([
+        "secrets:view",
+        "secrets:create",
+        "secrets:manage",
+      ])("refuses %s — there is no safe read of a stored credential", (permission) => {
+        expect(classifyForLangy(permission).disposition).toBe("excluded");
+      });
     });
   });
 
