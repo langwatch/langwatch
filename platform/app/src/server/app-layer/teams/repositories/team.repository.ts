@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
 import type { Team, TeamUserRole } from "~/generated/prisma/client";
 
 export interface CreateTeamInput {

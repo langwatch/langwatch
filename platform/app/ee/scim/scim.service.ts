@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DepartmentService } from "@ee/governance/services/department/department.service";
+import { SYSTEM_ACTORS } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
@@ -12,7 +13,6 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {

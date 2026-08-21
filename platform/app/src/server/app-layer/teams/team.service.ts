@@ -1,7 +1,5 @@
-import {
-  DuplicateBindingError,
-  type LedgerActor,
-} from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import type { Team, TeamUserRole } from "~/generated/prisma/client";

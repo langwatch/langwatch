@@ -1,8 +1,7 @@
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import { declareAuthzMiddleware, ledgerActorFor } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import type { Session } from "~/server/auth";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";

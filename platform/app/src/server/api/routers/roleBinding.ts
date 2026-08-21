@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
 import { z } from "zod";
 import {
   type PrismaClient,

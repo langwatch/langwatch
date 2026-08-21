@@ -52,7 +52,8 @@
  * index — the same derivation the cutover import uses, so the two converge
  * rather than duplicate.
  */
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
+import { SYSTEM_ACTORS } from "@langwatch/authz";
 import { deriveGrantId } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -63,7 +64,6 @@ import {
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
 import { prisma as appPrisma } from "~/server/db";
 import type { ApiKeyWithBindings } from "./api-key.repository";

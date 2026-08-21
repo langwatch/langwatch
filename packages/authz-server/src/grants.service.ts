@@ -9,11 +9,11 @@
  * ./grant-validation.ts owns what a write must satisfy, and ./offboard.ts
  * owns the offboarding flow and its proof.
  */
+import type { LedgerActor } from "@langwatch/authz";
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
-  LedgerActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "./authz-grants.repository";

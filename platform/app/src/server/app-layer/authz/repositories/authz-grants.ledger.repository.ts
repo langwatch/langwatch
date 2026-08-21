@@ -16,11 +16,11 @@
  * proof failure rolls back the membership deletes but the revocations stand
  * — again the fail-safe direction — and the retry converges.
  */
+import type { LedgerActor } from "@langwatch/authz";
 import type {
   AuthzGrantsRepository,
   AuthzReadRepository,
   BindingPrincipalWhere,
-  LedgerActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";

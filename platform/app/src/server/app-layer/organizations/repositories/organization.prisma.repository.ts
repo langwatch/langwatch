@@ -1,4 +1,5 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
+import { ledgerActorFor } from "@langwatch/authz";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { User } from "~/generated/prisma/client";
@@ -17,7 +18,6 @@ import {
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";

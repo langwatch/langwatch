@@ -1,9 +1,9 @@
+import { ledgerActorFor } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,

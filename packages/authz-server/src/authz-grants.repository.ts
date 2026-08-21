@@ -4,7 +4,8 @@
  * while validation, failure naming, and the offboarding proof stay in
  * GrantsService.
  */
-import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
+import type {
+  LedgerActor, RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
 import type {
   AuthzReadRepository,
   ScopeLineageRepository,
@@ -76,8 +77,6 @@ export class BindingMissingError extends Error {
   }
 }
 
-/** Who performed a grant write — stamped onto the emitted ledger fact. */
-export type LedgerActor = { type: "user" | "system"; id: string | null };
 
 export type OffboardCounts = {
   bindings: number;

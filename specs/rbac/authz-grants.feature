@@ -469,6 +469,26 @@ Feature: Authorization grants
     Then nothing that runs at import time on the server comes with it
     And the client bundle boots
 
+  # ═══ Attribution ══════════════════════════════════════════════════════
+  # One actor vocabulary (the package's Actor union): who caused an action is
+  # minted at the boundary that authenticated it, and serialized to the
+  # ledger record through one seam. No call site builds a "system:..." or
+  # "apikey:..." string by hand.
+
+  @unit
+  Scenario: Every ledger fact names its actor from one vocabulary
+    Given an action attributed to a person, a credential, a named surface, or the platform itself
+    When the fact is stamped for the ledger
+    Then each actor kind serializes through the one seam
+    And no identifier string is assembled at a call site
+
+  @unit
+  Scenario: A platform-initiated fact is attributed to the code that made it
+    Given the platform acts with no person or credential behind it
+    When the fact is stamped
+    Then the actor names the code path that decided to act
+    And the platform is never an anonymous actor
+
   # ═══ Audit ════════════════════════════════════════════════════════════
 
   @integration

@@ -13,7 +13,8 @@
  * POSTCONDITION rather than a shape, so what it enumerates and what it proves
  * against are the two things worth pinning.
  */
-import type { AuthzReadRepository, LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
+import type { AuthzReadRepository } from "@langwatch/authz-server";
 import {
   BindingMissingError,
   DuplicateBindingError,

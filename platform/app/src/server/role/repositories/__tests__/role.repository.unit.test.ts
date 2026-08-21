@@ -8,7 +8,7 @@
  * the name. `assertNameFree` is the read that moved that refusal back in
  * front of the append, and these are its semantics.
  */
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/authz";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";

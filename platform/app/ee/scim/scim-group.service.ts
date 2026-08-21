@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { SYSTEM_ACTORS } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
@@ -6,7 +8,6 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {

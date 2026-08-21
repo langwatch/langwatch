@@ -19,8 +19,8 @@
  * row, and the compat column is a mirror this repository maintains so an
  * organization rolled back to legacy keeps counting from where it got to.
  */
+import type { LedgerActor } from "@langwatch/authz";
 import {
-  type LedgerActor,
   SHARE_LINK_PERMISSION,
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
