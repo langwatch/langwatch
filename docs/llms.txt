@@ -226,6 +226,21 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/python/tutorials/capturing-metadata.md): The LangWatch Python SDK attaches custom metadata and attributes to traces and spans.
 - [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-metadata.md): The LangWatch TypeScript SDK attaches custom metadata and attributes to traces and spans.
 
+#### Capturing Images
+
+- [Capturing Images](https://langwatch.ai/docs/integration/python/tutorials/capturing-images.md): LangWatch captures the images your Python application sends to a model and shows them on the trace.
+- [Capturing Images](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-images.md): LangWatch captures the images your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Documents
+
+- [Capturing Documents](https://langwatch.ai/docs/integration/python/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your Python application sends to a model and shows them on the trace.
+- [Capturing Documents](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Audio and Voice
+
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/python/tutorials/capturing-audio.md): LangWatch captures the audio your Python application sends to a model and plays it back on the trace.
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-audio.md): LangWatch captures the audio your TypeScript application sends to a model and plays it back on the trace.
+
 #### Tracking LLM Costs
 
 - [Tracking LLM Costs and Tokens](https://langwatch.ai/docs/integration/python/tutorials/tracking-llm-costs.md): How LangWatch counts input, output, cached, and reasoning tokens, calculates costs from a daily-updated price registry of 350+ models, and how to adjust any of it manually.
@@ -449,6 +464,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [POST /v1/messages](https://langwatch.ai/docs/ai-gateway/api/messages.md): Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
 - [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+- [Realtime voice](https://langwatch.ai/docs/ai-gateway/api/realtime.md): Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor.
 - [GET /v1/models](https://langwatch.ai/docs/ai-gateway/api/models.md): List the models a virtual key can access through the LangWatch AI Gateway.
 - [Error Envelope](https://langwatch.ai/docs/ai-gateway/api/errors.md): OpenAI-compatible error shapes and a complete type enum.
 - [Management REST API](https://langwatch.ai/docs/ai-gateway/api/management.md): Manage virtual keys, budgets, and routing policies programmatically via /api/gateway/v1/*.

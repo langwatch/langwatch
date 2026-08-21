@@ -282,6 +282,17 @@ async function chRowFor(id: string): Promise<{
   return null;
 }
 
+/** How many objects the project stores for one content hash. Dedup is the point. */
+async function countStoredObjectsWithSha(sha256: string): Promise<number> {
+  const result = await ch.query({
+    query: `SELECT count() AS n FROM (SELECT id FROM stored_objects WHERE project_id = {projectId:String} AND sha256 = {sha256:String} GROUP BY id)`,
+    query_params: { projectId: PROJECT, sha256 },
+    format: "JSONEachRow",
+  });
+  const rows = await result.json<{ n: string }>();
+  return Number(rows[0]?.n ?? 0);
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -452,6 +463,111 @@ describe("trace media extraction at the ingestion edge", () => {
     });
   });
 
+  describe("given a span input recorded in a provider's own vocabulary", () => {
+    /** @scenario "An Anthropic image block inside a span input is externalized before staging" */
+    it("externalizes the bytes of an Anthropic base64 image block", async () => {
+      // What the Anthropic instrumentation records is the request the customer
+      // sent, so the block arrives in Anthropic's shape, not in ours.
+      const span = makeSpan([
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              model: "claude-haiku-4-5-20251001",
+              max_tokens: 1024,
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "What is in this picture?" },
+                    {
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: "image/png",
+                        data: PNG_BYTES.toString("base64"),
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      const request = parseAttr(result, "langwatch.input") as {
+        messages: Array<{
+          content: Array<{ source?: { type: string; value: string } }>;
+        }>;
+      };
+      const block = request.messages[0]!.content[1]!;
+      expect(block.source?.type).toBe("url");
+      expect(block.source?.value).toMatch(
+        new RegExp(`^/api/files/${PROJECT}/`),
+      );
+      const id = block.source!.value.split("/").pop()!;
+      expect((await chRowFor(id))?.media_type).toBe("image/png");
+      expect(JSON.stringify(result)).not.toContain(
+        PNG_BYTES.toString("base64"),
+      );
+    });
+
+    /** @scenario "A Gemini inline-data part inside a span input is externalized before staging" */
+    it("externalizes the bytes of a Gemini inline-data part", async () => {
+      const span = makeSpan([
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              model: "gemini-2.5-flash",
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    { text: "What is in this picture?" },
+                    {
+                      inline_data: {
+                        mime_type: "image/png",
+                        data: PNG_BYTES.toString("base64"),
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      const request = parseAttr(result, "langwatch.input") as {
+        contents: Array<{
+          parts: Array<{ type?: string; source?: { value: string } }>;
+        }>;
+      };
+      const part = request.contents[0]!.parts[1]!;
+      expect(part.type).toBe("image");
+      expect(part.source?.value).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
+      // The carrier held the bytes, so replacing the source alone would have
+      // left them behind.
+      expect(JSON.stringify(result)).not.toContain(
+        PNG_BYTES.toString("base64"),
+      );
+    });
+  });
+
   describe("given a data-URI image and a PDF file part", () => {
     /** @scenario "A data-URI image inside an image_url part is externalized" */
     it("externalizes the image keeping the image_url shape", async () => {
@@ -491,6 +607,62 @@ describe("trace media extraction at the ingestion edge", () => {
       const id = part.image_url.url.split("/").pop()!;
       const row = await chRowFor(id);
       expect(row?.media_type).toBe("image/png");
+    });
+
+    /** @scenario "The same bytes in two attributes of one span are stored once" */
+    it("stores one object when the same image rides two attributes of one span", async () => {
+      // What a managed-prompt run produces: the engine compiles the prompt from
+      // the dataset value (prompt variables), then sends the message built from
+      // it. The same picture legitimately appears twice in one span.
+      const dataUrl = `data:image/png;base64,${PNG_BYTES.toString("base64")}`;
+      const span = makeSpan([
+        {
+          key: "langwatch.prompt.variables",
+          value: {
+            stringValue: JSON.stringify({
+              type: "json",
+              value: { input: dataUrl },
+            }),
+          },
+        },
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify([
+              {
+                role: "user",
+                content: [{ type: "image_url", image_url: { url: dataUrl } }],
+              },
+            ]),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      const messages = parseAttr(result, "langwatch.input") as Array<{
+        content: Array<{ image_url: { url: string } }>;
+      }>;
+      const fromMessage = messages[0]!.content[0]!.image_url.url;
+      const variables = parseAttr(result, "langwatch.prompt.variables") as {
+        value: { input: string };
+      };
+      const fromVariables = variables.value.input;
+
+      expect(fromMessage).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
+      // Content addressing is what makes this one object rather than two: the
+      // bytes hash the same, so both attributes point at the same id and the
+      // trace pays for the picture once.
+      expect(fromVariables).toBe(fromMessage);
+
+      const id = fromMessage.split("/").pop()!;
+      const row = await chRowFor(id);
+      expect(row?.sha256).toBe(sha256Of(PNG_BYTES));
+      expect(await countStoredObjectsWithSha(sha256Of(PNG_BYTES))).toBe(1);
     });
 
     /** @scenario "A PDF file part is externalized to a binary reference preserving the filename" */

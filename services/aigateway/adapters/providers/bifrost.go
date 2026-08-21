@@ -69,6 +69,12 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// realtimeClient makes the one bounded REST call a voice session mint
+	// needs. Its own client because the mint must not follow redirects and
+	// re-checks every dialed address against the endpoint policy: it carries
+	// the customer's provider key in a header Go does not strip across
+	// hosts.
+	realtimeClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -129,19 +135,21 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
 	return &BifrostRouter{
-		bf:           bf,
-		logger:       opts.Logger,
-		voyageClient: newVoyageClient(),
-		endpointPolicy: newCustomerEndpointPolicy(
-			opts.BlockLocalHTTPCalls,
-			opts.RequireHTTPSCustomerEndpoints,
-			opts.AllowedEndpointHosts,
-		),
+		bf:              bf,
+		logger:          opts.Logger,
+		voyageClient:    newVoyageClient(),
+		endpointPolicy:  endpointPolicy,
 		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		realtimeClient:  newRealtimeClient(endpointPolicy),
 	}, nil
 }
 
@@ -193,6 +201,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
+	// A realtime session mint is a bounded REST call to the vendor's own
+	// mint endpoint, not an inference request: no Bifrost translation, no
+	// model dispatch, no usage on the answer. It branches before the
+	// provider mapping because the route already named the vendor.
+	if req.Type == domain.RequestTypeRealtimeSession {
+		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID

@@ -87,26 +87,73 @@ func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, up
 // Body, path, method, query, and forwarded headers ride on req.Passthrough;
 // the provider router's raw-forward dispatch hands them to Bifrost's
 // Passthrough endpoint verbatim.
-func (a *App) HandlePassthrough(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*CompletionResult, error) {
-	return a.pipeline.Sync(ctx, bundle, &domain.Request{
-		Type:        domain.RequestTypePassthrough,
-		Model:       model,
-		BodyReader:  body,
-		Passthrough: meta,
-	})
+func (a *App) HandlePassthrough(ctx context.Context, bundle *domain.Bundle, in PassthroughDispatch) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, in.request())
 }
 
 // HandlePassthroughStream is the streaming sibling of HandlePassthrough.
 // Upstream emits pre-framed SSE (Gemini streamGenerateContent); the
 // iterator's RawFraming() returns true so the writer forwards chunks
 // unchanged rather than re-wrapping them.
-func (a *App) HandlePassthroughStream(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*StreamResult, error) {
-	return a.pipeline.Stream(ctx, bundle, &domain.Request{
+func (a *App) HandlePassthroughStream(ctx context.Context, bundle *domain.Bundle, in PassthroughDispatch) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, in.request())
+}
+
+// PassthroughDispatch is one raw-forward request: the body, the model the
+// route named, the HTTP context the vendor call is rebuilt from, and the
+// providers that route may reach.
+type PassthroughDispatch struct {
+	Body    io.Reader
+	Model   string
+	Meta    domain.PassthroughRequest
+	Surface domain.Surface
+}
+
+func (in PassthroughDispatch) request() *domain.Request {
+	return &domain.Request{
 		Type:        domain.RequestTypePassthrough,
-		Model:       model,
-		BodyReader:  body,
-		Passthrough: meta,
+		Model:       in.Model,
+		BodyReader:  in.Body,
+		Passthrough: in.Meta,
+		Surface:     in.Surface,
+	}
+}
+
+// HandleRealtimeSession dispatches a realtime voice session mint (ADR-097).
+// The gateway checks the budget, mints the vendor's own short-lived session
+// credential and hands it back; the media socket runs client to vendor and
+// never touches this process.
+//
+// Both mint routes come through here. The OpenAI one forwards the caller's
+// session body with the resolved model written back into it; the ElevenLabs
+// one carries a synthesized body, the same way HandleTranscription does, so
+// the body-reading stages of the pipeline see well-formed JSON instead of a
+// bare query string.
+func (a *App) HandleRealtimeSession(ctx context.Context, bundle *domain.Bundle, in RealtimeMintDispatch) (*CompletionResult, error) {
+	session := in.Session
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:            domain.RequestTypeRealtimeSession,
+		Model:           in.Model,
+		Body:            in.Body,
+		RealtimeSession: &session,
+		Surface:         in.Surface,
 	})
+}
+
+// RealtimeMintDispatch is one session mint: the body the vendor receives,
+// the model it bills under, which family to mint for, and the providers the
+// route may reach.
+type RealtimeMintDispatch struct {
+	Body    []byte
+	Model   string
+	Session domain.RealtimeSessionRequest
+	Surface domain.Surface
+}
+
+// RealtimeUsagePost is a usage report a client read off its own socket.
+type RealtimeUsagePost struct {
+	SessionID string
+	Body      []byte
 }
 
 func PeekStream(body []byte) bool {

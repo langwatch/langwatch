@@ -339,6 +339,27 @@
                     ]
                   },
                   {
+                    "group": "Capturing Images",
+                    "pages": [
+                      "integration/python/tutorials/capturing-images",
+                      "integration/typescript/tutorials/capturing-images"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Documents",
+                    "pages": [
+                      "integration/python/tutorials/capturing-documents",
+                      "integration/typescript/tutorials/capturing-documents"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Audio and Voice",
+                    "pages": [
+                      "integration/python/tutorials/capturing-audio",
+                      "integration/typescript/tutorials/capturing-audio"
+                    ]
+                  },
+                  {
                     "group": "Tracking LLM Costs",
                     "pages": [
                       "integration/python/tutorials/tracking-llm-costs",
@@ -649,6 +670,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -1496,7 +1518,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1787230152",
+      "source": "/ci/cache/busted/1787288091",
       "destination": "/"
     },
     {

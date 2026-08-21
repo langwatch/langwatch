@@ -136,18 +136,26 @@ var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
 //     the host itself, so a name that answers with a public address then
 //     a private one (DNS rebinding) would otherwise slip past it.
 func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
-	dialer := &net.Dialer{
-		Timeout:   modelsDiscoveryTimeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(_ context.Context, _, address string, _ syscall.RawConn) error {
-			return policy.allowsDialAddress(address)
-		},
-	}
+	dialer := policyDialer(policy, modelsDiscoveryTimeout)
 	return &http.Client{
 		Timeout:   modelsDiscoveryTimeout,
 		Transport: &http.Transport{DialContext: dialer.DialContext},
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
+		},
+	}
+}
+
+// policyDialer builds a dialer that re-checks every resolved address against
+// the endpoint policy immediately before connecting. Shared by the direct
+// HTTP lanes that carry a customer credential to a customer-configured host:
+// catalog discovery and the realtime session mint.
+func policyDialer(policy customerEndpointPolicy, timeout time.Duration) *net.Dialer {
+	return &net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+		ControlContext: func(_ context.Context, _, address string, _ syscall.RawConn) error {
+			return policy.allowsDialAddress(address)
 		},
 	}
 }

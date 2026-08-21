@@ -91,6 +91,87 @@ export interface GatewaySpendState {
  * request. Re-pricing is a correction against the log, never a side
  * effect of whichever consumer happened to run after a catalog deploy.
  */
+/**
+ * Attribution the outcome carries, for a row whose admission has not landed.
+ *
+ * Admission is the authority and wins wherever the state already holds a
+ * value, so a normal request folds exactly as before. It matters when the
+ * outcome is folded first, or alone: a brokered voice session is admitted by
+ * the gateway and confirmed by the control plane, which are different
+ * emitters on different paths, so the confirmation can reach the fold before
+ * the admission does. Without this the row is priced correctly and named
+ * nothing, which reads as spend belonging to no organization and no key.
+ */
+interface AttributionWire {
+  organization_id: string;
+  virtual_key_id: string;
+  principal_user_id: string;
+  end_user_id: string;
+  trace_id: string;
+  request_type: string;
+  labels: string[];
+  metadata: string;
+}
+
+type AttributionFields = Pick<
+  GatewaySpendState,
+  | "organizationId"
+  | "virtualKeyId"
+  | "principalUserId"
+  | "endUserId"
+  | "traceId"
+  | "requestType"
+  | "labels"
+  | "metadataJson"
+>;
+
+function attributionFromOutcome(
+  state: GatewaySpendState,
+  d: AttributionWire,
+): AttributionFields {
+  return {
+    organizationId: state.organizationId || d.organization_id,
+    virtualKeyId: state.virtualKeyId || d.virtual_key_id,
+    principalUserId: state.principalUserId || d.principal_user_id,
+    endUserId: state.endUserId || d.end_user_id,
+    traceId: state.traceId || d.trace_id,
+    requestType: state.requestType || d.request_type,
+    // Read defensively: this runs on every priced outcome, and a fold that
+    // throws stops the projection rather than losing one field.
+    labels: state.labels?.length ? state.labels : (d.labels ?? []),
+    metadataJson: state.metadataJson || d.metadata,
+  };
+}
+
+/**
+ * Attribution the admission states, for a row an outcome may already have
+ * named.
+ *
+ * The mirror of {@link attributionFromOutcome}, and the same rule from the
+ * other side: admission is the authority, so its value wins wherever it
+ * states one, and what the outcome already recorded stands where it does not.
+ * An admission that overwrote unconditionally would erase a field it never
+ * carried. The trace id is exactly that field: it is only known once the
+ * customer span opens, which is after admission, so a late admission on a
+ * brokered voice session used to blank the trace the settlement had just
+ * named.
+ */
+function attributionFromAdmission(
+  state: GatewaySpendState,
+  d: AttributionWire,
+): AttributionFields {
+  return {
+    organizationId: d.organization_id || state.organizationId,
+    virtualKeyId: d.virtual_key_id || state.virtualKeyId,
+    principalUserId: d.principal_user_id || state.principalUserId,
+    endUserId: d.end_user_id || state.endUserId,
+    traceId: d.trace_id || state.traceId,
+    requestType: d.request_type || state.requestType,
+    labels: d.labels?.length ? d.labels : (state.labels ?? []),
+    metadataJson: d.metadata || state.metadataJson,
+  };
+}
+
 export class GatewaySpendFoldProjection
   extends AbstractFoldProjection<
     GatewaySpendState,
@@ -177,20 +258,13 @@ export class GatewaySpendFoldProjection
     const outcomeResolved = state.status !== "" && state.status !== "admitted";
     return {
       ...state,
+      ...attributionFromAdmission(state, d),
       status: state.status === "" ? "admitted" : state.status,
-      organizationId: d.organization_id,
-      virtualKeyId: d.virtual_key_id,
-      principalUserId: d.principal_user_id,
-      endUserId: d.end_user_id,
       model: outcomeResolved && state.model !== "" ? state.model : d.model,
       providerKey:
         outcomeResolved && state.providerKey !== ""
           ? state.providerKey
           : d.model_provider_id,
-      traceId: d.trace_id,
-      requestType: d.request_type,
-      labels: d.labels,
-      metadataJson: d.metadata,
       podId: d.pod_id,
       podSeq: d.pod_seq,
       occurredAtMs: d.occurred_at,
@@ -208,6 +282,7 @@ export class GatewaySpendFoldProjection
     const providerKey = d.model_provider_id || state.providerKey;
     return {
       ...state,
+      ...attributionFromOutcome(state, d),
       status: "confirmed",
       model,
       providerKey,
@@ -232,6 +307,7 @@ export class GatewaySpendFoldProjection
     const providerKey = d.model_provider_id || state.providerKey;
     return {
       ...state,
+      ...attributionFromOutcome(state, d),
       status: "failed",
       model,
       providerKey,
@@ -260,6 +336,7 @@ export class GatewaySpendFoldProjection
     }
     return {
       ...state,
+      ...attributionFromOutcome(state, event.data),
       status: "settled",
       needsReconciliation: true,
       settleReason: event.data.reason,

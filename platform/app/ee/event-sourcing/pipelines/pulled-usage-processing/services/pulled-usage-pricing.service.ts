@@ -36,9 +36,10 @@ export interface PulledUsageQuantities {
 
 /**
  * A provider that hands us a cost. `costStatus` is the adapter's call and not
- * derivable from the basis: an Anthropic cost report is the invoice figure,
- * while a metered-unit charge reported by another provider is still an
- * approximation of one.
+ * derivable from the basis: only the adapter knows whether the provider's
+ * figure is the invoice or an approximation of one (Anthropic's cost report,
+ * for instance, excludes Priority Tier usage, so it is provider-reported yet
+ * still an estimate).
  */
 interface ProviderReportedPrice {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;
