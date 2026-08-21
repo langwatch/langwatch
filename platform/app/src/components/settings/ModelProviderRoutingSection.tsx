@@ -1,4 +1,4 @@
-import { Box, Field, HStack, Input, Text } from "@chakra-ui/react";
+import { Box, Field, Input, Text } from "@chakra-ui/react";
 import { ROUTING_HANDLE_MAX_LENGTH } from "../../server/modelProviders/routingHandle";
 import { SmallLabel } from "../SmallLabel";
 
@@ -35,20 +35,18 @@ export function ModelProviderRoutingSection({
         />
       </Box>
       <Field.HelperText>
-        <HStack gap={1} flexWrap="wrap" align="baseline">
-          <Text>Requests reach this provider as</Text>
+        <Text>
+          Requests reach this provider as{" "}
           <RoutingSpelling spelling={`${providerKey}/<model>`} />
           {handle ? (
             <>
-              <Text>or</Text>
+              {" or "}
               <RoutingSpelling spelling={`${handle}/<model>`} />
             </>
           ) : null}
-          <Text>
-            , or by the exact model name when this provider is the one that
-            serves it.
-          </Text>
-        </HStack>
+          , or by the exact model name when this provider is the one that serves
+          it.
+        </Text>
       </Field.HelperText>
       <Field.HelperText>
         {handle
@@ -59,14 +57,25 @@ export function ModelProviderRoutingSection({
   );
 }
 
+/**
+ * One addressable spelling, set apart from the sentence around it.
+ *
+ * The background is a semantic token rather than a fixed grey. A fixed light
+ * grey keeps its value in dark mode, where the muted helper-text colour sits on
+ * top of it at about 1.3:1, so the spelling becomes unreadable. It is the one
+ * part of this sentence a reader has to copy, so it has to stay legible in both
+ * themes.
+ */
 function RoutingSpelling({ spelling }: { spelling: string }) {
   return (
     <Text
       as="code"
       fontSize="xs"
-      background="gray.100"
+      background="bg.muted"
+      color="fg"
       paddingX={1}
       rounded="sm"
+      whiteSpace="nowrap"
     >
       {spelling}
     </Text>

@@ -874,6 +874,22 @@ export class ModelProviderService {
       });
     }
 
+    // A running gateway is serving a bundle that predates this row, so until it
+    // is evicted the new provider is not in any key's chain and its routing
+    // handle is not a handle the resolver knows. An unknown first segment is
+    // read as part of the model name, so "eu/claude-sonnet-5" does not fail
+    // loudly: it becomes a model nobody declares and lands on whichever bound
+    // provider declared no catalog. Creating a provider therefore evicts on the
+    // same terms as updating one.
+    await this.changeEvents.append(
+      {
+        organizationId: result.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: result.id,
+      },
+      tx,
+    );
+
     return result;
   }
 

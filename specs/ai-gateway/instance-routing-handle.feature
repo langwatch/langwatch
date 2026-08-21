@@ -121,6 +121,20 @@ Feature: AI Gateway — a routing handle names one provider instance
       Then the gateway configuration is evicted
       And the change is recorded in the audit log
 
+  Rule: A handle works as soon as the provider exists
+
+    A handle set when the provider is CREATED has to reach the gateway on the
+    same terms as one set later. A running gateway serves a cached bundle, and
+    an unqualified first segment is read as part of the model name rather than
+    refused, so an unevicted handle does not fail loudly: "eu/claude-sonnet-5"
+    becomes a model nobody declares and lands on whichever bound provider
+    declared no catalog.
+
+    @integration
+    Scenario: Creating a provider evicts the gateway configuration
+      When an administrator creates a provider with the handle "eu"
+      Then the gateway configuration is evicted
+
   Rule: The gateway config carries the handle
 
     @unit

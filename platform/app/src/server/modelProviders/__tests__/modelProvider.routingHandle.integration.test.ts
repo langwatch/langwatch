@@ -281,6 +281,35 @@ describe.skipIf(!hasCredentialsSecret)(
       });
     });
 
+    describe("when a provider is created with a handle", () => {
+      /** @scenario "Creating a provider evicts the gateway configuration" */
+      it("evicts the gateway config so the handle resolves immediately", async () => {
+        const eventsBefore = await prisma.gatewayChangeEvent.count({
+          where: { organizationId, kind: "MODEL_PROVIDER_UPDATED" },
+        });
+
+        const created = await createProvider({
+          project: projectId,
+          handle: "created-evicts",
+          suffix: `${ns}-create-evict`,
+        });
+
+        const eventsAfter = await prisma.gatewayChangeEvent.count({
+          where: { organizationId, kind: "MODEL_PROVIDER_UPDATED" },
+        });
+        expect(eventsAfter).toBeGreaterThan(eventsBefore);
+
+        const event = await prisma.gatewayChangeEvent.findFirst({
+          where: {
+            organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: created.id,
+          },
+        });
+        expect(event).not.toBeNull();
+      });
+    });
+
     describe("when the handle is not a name the gateway can read", () => {
       it("refuses a reserved provider family name", async () => {
         await expect(
