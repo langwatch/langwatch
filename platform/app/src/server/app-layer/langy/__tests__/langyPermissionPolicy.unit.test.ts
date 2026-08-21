@@ -31,7 +31,6 @@ const AUTH_SCOPE_WRITES = ["create", "update", "delete", "manage"].flatMap(
       "organization",
       "team",
       "project",
-      "virtualKeys",
       "gatewayProviders",
       "webhookEndpoints",
       "auditLog",
@@ -67,8 +66,13 @@ const DELEGABLE_GRAINS = [
   // tightening quietly take the reads with it.
   "organization:view",
   "team:view",
-  "virtualKeys:view",
   "auditLog:view",
+  // virtualKeys is full-access (owner decision, 2026-08-21): people drive the
+  // AI Gateway through Langy, and minting keys is bounded by the caller's own
+  // grant. `:rotate` alone stays excluded (asserted above).
+  "virtualKeys:view",
+  "virtualKeys:create",
+  "virtualKeys:delete",
 ];
 
 describe("classifyForLangy", () => {

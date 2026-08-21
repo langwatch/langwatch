@@ -133,8 +133,15 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
  * withheld, not just the manage grain. `:manage` implies `:delete` AND
  * `:rotate` through the hierarchy (`rbac.ts:545-555`), so a family whose
  * writes are credential operations cannot be half-granted — handing over
- * `:update` on `virtualKeys` to withhold `:manage` would be a distinction the
- * route layer is under no obligation to respect.
+ * `:update` on `gatewayProviders` to withhold `:manage` would be a distinction
+ * the route layer is under no obligation to respect.
+ *
+ * `virtualKeys` is deliberately NOT here (owner decision, 2026-08-21): virtual
+ * keys are gateway credentials, but issuing them is the day job of anyone
+ * driving the gateway, and the ceiling bounds it — Langy can only mint keys
+ * for a caller who could mint them by hand. `:rotate` stays excluded via
+ * `ACTION_EXCLUSIONS` (though note `:manage` implies `:rotate` through the
+ * hierarchy, so a manage-holding caller's Langy can reach rotation).
  */
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   organization: "org membership and role administration IS the auth scope",
@@ -142,7 +149,6 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   project:
     "`project:update` stores model-provider credentials and `project:manage` " +
     "regenerates the project's own API key",
-  virtualKeys: "issues live gateway credentials; `:manage` implies `:rotate`",
   gatewayProviders: "stores provider credentials",
   webhookEndpoints:
     "endpoints carry signing secrets and stream org-wide event families out " +
@@ -191,6 +197,7 @@ const FULL_ACCESS_FAMILIES = new Set([
   "scenarios",
   "traces",
   "triggers",
+  "virtualKeys",
   "workflows",
 ]);
 
@@ -258,27 +265,37 @@ export function langyCandidatePermissions(): Permission[] {
   for (const family of ALL_PERMISSION_FAMILIES) {
     for (const action of ALL_PERMISSION_ACTIONS) {
       const permission = `${family}:${action}` as Permission;
-      if (classifyForLangy(permission).disposition !== "granted") continue;
-      // `Permission` is a template literal type, so the cross-product
-      // TYPECHECKS whether or not the grain means anything — `analytics:attach`
-      // is a well-typed string describing nothing. Such an entry is inert (no
-      // role grants it, so the intersection drops it) but it is still 46 dead
-      // rows for `batchProjectPermissions` to carry and one more way for a
-      // reader to over-read what Langy holds. `attach`/`detach` are the only
-      // actions narrow enough to pin precisely: they police guardrails
-      // (rbac.ts:34-40) and mean nothing anywhere else.
-      if (
-        (action === Actions.ATTACH || action === Actions.DETACH) &&
-        family !== Resources.GATEWAY_GUARDRAILS
-      ) {
-        continue;
+      if (isCandidateGrain(family, action, permission)) {
+        candidates.push(permission);
       }
-      // Inert at project scope — see above.
-      if (isOrgExclusivePermission(permission)) continue;
-      candidates.push(permission);
     }
   }
   return candidates;
+}
+
+/** The per-grain filter `langyCandidatePermissions` runs over the cross-product. */
+function isCandidateGrain(
+  family: string,
+  action: string,
+  permission: Permission,
+): boolean {
+  if (classifyForLangy(permission).disposition !== "granted") return false;
+  // `Permission` is a template literal type, so the cross-product
+  // TYPECHECKS whether or not the grain means anything — `analytics:attach`
+  // is a well-typed string describing nothing. Such an entry is inert (no
+  // role grants it, so the intersection drops it) but it is still 46 dead
+  // rows for `batchProjectPermissions` to carry and one more way for a
+  // reader to over-read what Langy holds. `attach`/`detach` are the only
+  // actions narrow enough to pin precisely: they police guardrails
+  // (rbac.ts:34-40) and mean nothing anywhere else.
+  if (
+    (action === Actions.ATTACH || action === Actions.DETACH) &&
+    family !== Resources.GATEWAY_GUARDRAILS
+  ) {
+    return false;
+  }
+  // Inert at project scope — see above.
+  return !isOrgExclusivePermission(permission);
 }
 
 /** Splits `resource:action`, tolerating anything that is not in that shape. */

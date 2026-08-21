@@ -120,7 +120,7 @@ roles, API keys and credentials, the org's billing and plan.** (Owner decision,
 
 | Scenario | Side of the line | Why |
 |---|---|---|
-| declines an API key request | refusal | `secrets` has no safe read; issuing keys writes the auth scope |
+| declines a LangWatch API key request | refusal | `secrets` has no safe read; a project key is `project:manage` (gateway VIRTUAL keys are different: Langy mints those) |
 | declines a member or role change | refusal | `organization` / `team` writes ARE the auth scope |
 | declines a plan change | refusal | the org's contract is `organization:manage` territory |
 | serves a delete request | capability | `:delete`/`:manage` on tenant data are ordinary operations now |

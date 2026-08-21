@@ -30,23 +30,23 @@ const model = openai("gpt-5-mini");
 
 describe("Langy current-surfaces coverage", () => {
   describe("when the user asks about the AI Gateway", () => {
-    // Langy's session key deliberately excludes the virtualKeys family — it
-    // issues and reads live gateway credentials (langyPermissionPolicy.ts). The
-    // passing outcome is the boundary handled plainly, not the listing.
-    it("states the virtual-keys permission boundary plainly", async () => {
+    // virtualKeys is full-access for Langy (owner decision, 2026-08-21:
+    // people drive the AI Gateway through Langy). The passing outcome is the
+    // listing — a permission refusal here is the regression this catches.
+    it("lists the gateway's virtual keys instead of claiming a boundary", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog(
         {
           name: "virtual keys permission boundary",
           description:
-            "The user wants to see the virtual keys configured on their AI Gateway, a surface Langy's credentials deliberately cannot read.",
+            "The user wants to see the virtual keys configured on their AI Gateway, a surface Langy can read and administer on the caller's behalf.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
             scenario.judgeAgent({
               model,
               criteria: [
-                "Langy says plainly that it cannot read the gateway's virtual keys with its current permissions and gives the user a real path forward (grant the permission, or view them themselves in the app); it does not invent keys, does not pretend the list is empty, and does not deflect into unrelated offers.",
+                "Langy retrieves and reports the gateway's virtual keys (or a clear 'none configured yet' answer). It does NOT claim to lack permission to read them, does not invent keys, and does not deflect into unrelated offers.",
                 ...LANGY_CORE_RULE_CRITERIA,
               ],
             }),
