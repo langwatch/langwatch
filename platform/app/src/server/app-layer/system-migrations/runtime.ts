@@ -101,35 +101,47 @@ export function registeredMigrations(): SystemMigration[] {
   return [
     new AuthzEngineMigration({
       store: new PrismaAuthzMigrationRepository(prisma),
-      ledger: authzEngineLedger(),
+      ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
   ];
 }
 
+const senders = async () => (await authzGrantsCommands()).commands;
+
 /** The migration's door into the grants ledger — one command, one entity
- *  (ADR-110), over the same lazy senders every live write uses. */
-function authzEngineLedger(): AuthzEngineLedger {
-  const senders = async () => (await authzGrantsCommands()).commands;
-  return {
-    attachGrant: async ({ organizationId, commandId, grant }) => {
-      await (await senders()).attachGrant.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        grant,
-      });
-    },
-    defineRole: async ({ organizationId, commandId, role, actor }) => {
-      await (await senders()).defineRole.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        role,
-        actor,
-      });
-    },
-    changeGrantRole: async ({
+ *  (ADR-110), over the same lazy senders every live write uses. Stateless:
+ *  every method resolves the senders at send time, so one module-level
+ *  object serves every pass. */
+const authzEngineLedger: AuthzEngineLedger = {
+  attachGrant: async ({ organizationId, commandId, grant }) => {
+    await (await senders()).attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grant,
+    });
+  },
+  defineRole: async ({ organizationId, commandId, role, actor }) => {
+    await (await senders()).defineRole.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      role,
+      actor,
+    });
+  },
+  changeGrantRole: async ({
+    organizationId,
+    commandId,
+    grantId,
+    from,
+    to,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).changeGrantRole.send({
+      tenantId: organizationId,
       organizationId,
       commandId,
       grantId,
@@ -137,72 +149,43 @@ function authzEngineLedger(): AuthzEngineLedger {
       to,
       actor,
       occurredAtMs,
-    }) => {
-      await (await senders()).changeGrantRole.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        grantId,
-        from,
-        to,
-        actor,
-        occurredAtMs,
-      });
-    },
-    changeRolePermissions: async ({
-      organizationId,
-      commandId,
-      roleId,
-      permissions,
-      actor,
-      occurredAtMs,
-    }) => {
-      await (await senders()).changeRolePermissions.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        roleId,
-        permissions,
-        actor,
-        occurredAtMs,
-      });
-    },
-    revokeGrant: async ({
+    });
+  },
+  revokeGrant: async ({
+    organizationId,
+    commandId,
+    grantId,
+    reason,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).revokeGrant.send({
+      tenantId: organizationId,
       organizationId,
       commandId,
       grantId,
       reason,
       actor,
       occurredAtMs,
-    }) => {
-      await (await senders()).revokeGrant.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        grantId,
-        reason,
-        actor,
-        occurredAtMs,
-      });
-    },
-    deleteRole: async ({
+    });
+  },
+  deleteRole: async ({
+    organizationId,
+    commandId,
+    roleId,
+    actor,
+    occurredAtMs,
+  }) => {
+    await (await senders()).deleteRole.send({
+      tenantId: organizationId,
       organizationId,
       commandId,
       roleId,
       actor,
       occurredAtMs,
-    }) => {
-      await (await senders()).deleteRole.send({
-        tenantId: organizationId,
-        organizationId,
-        commandId,
-        roleId,
-        actor,
-        occurredAtMs,
-      });
-    },
-  };
-}
+    });
+  },
+};
 
 /**
  * The runner's cohort for one pass, per (tenant, migration). On cloud every

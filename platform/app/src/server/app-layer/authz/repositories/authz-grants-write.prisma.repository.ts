@@ -43,7 +43,7 @@ import type {
   GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsWrite.projection";
-import { MIGRATION_OWNED_SOURCES } from "../authz-engine.migration";
+import { MIGRATION_OWNED_SOURCES } from "../authz-engine.facts";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 

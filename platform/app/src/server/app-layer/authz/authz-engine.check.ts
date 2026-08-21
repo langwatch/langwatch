@@ -1,0 +1,319 @@
+/**
+ * The authz-engine migration's proof (ADR-110): the heads the fold wrote,
+ * compared against the facts this pass assembled. Pure functions over one
+ * projection read — what they cannot see is `outstanding` (stated but not
+ * folded); what they see and disagree with is a named diff. The migration
+ * itself lives in ./authz-engine.migration.ts; the facts in
+ * ./authz-engine.facts.ts.
+ *
+ * @see specs/migration/authz-grants-rollout.feature
+ */
+import { createHash } from "node:crypto";
+import type {
+  GrantFact,
+  ResourceGrantRow,
+  RoleFact,
+  RoleHeadRow,
+} from "@langwatch/authz-server";
+import {
+  PRINCIPAL_TO_DB,
+  shareVisibilityAudience,
+} from "@langwatch/authz-server";
+import {
+  type ExpectedFacts,
+  type ExpectedShareLink,
+  isMigrationOwned,
+  permissionStrings,
+} from "./authz-engine.facts";
+
+/** One non-resource Grant head row, as the proof reads it. */
+export type GrantHeadRow = {
+  id: string;
+  principalType: string;
+  principalId: string | null;
+  roleKey: string | null;
+  legacyRole: string | null;
+  source: string;
+  scopeType: string;
+  scopeId: string;
+  revoked: boolean;
+};
+
+/** One named disagreement between a head and the legacy row it mirrors.
+ *  Missing and extra rows are not diffs: they are `outstanding` — the fold
+ *  has not caught up with what this pass stated or revoked. */
+export type AuthzEngineDiff = {
+  kind: "grant_revoked" | "grant_changed" | "role_changed" | "resource_changed";
+  id: string;
+  field?: string;
+  expected?: string | null;
+  actual?: string | null;
+};
+
+export type HeadState = {
+  grantRows: GrantHeadRow[];
+  roleHeads: RoleHeadRow[];
+  resourceRows: ResourceGrantRow[];
+};
+
+export type CheckResult = { outstanding: string[]; diffs: AuthzEngineDiff[] };
+
+export function checkGrantHeads({
+  expected,
+  heads,
+}: {
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.grantRows.map((row) => [row.id, row]));
+  for (const fact of expected.nonResourceFacts) {
+    const head = headById.get(fact.grantId);
+    if (!head) {
+      outstanding.push(fact.grantId);
+      continue;
+    }
+    if (head.revoked) {
+      diffs.push({ kind: "grant_revoked", id: fact.grantId });
+      continue;
+    }
+    diffs.push(...grantDiffs({ fact, head }));
+  }
+  // Stale rows revoked this pass, not yet folded: outstanding, never a diff.
+  outstanding.push(
+    ...heads.grantRows
+      .filter(
+        (row) =>
+          !row.revoked &&
+          isMigrationOwned(row.source) &&
+          !expected.grantIds.has(row.id),
+      )
+      .map((row) => row.id),
+  );
+  return { outstanding, diffs };
+}
+
+export function checkRoleHeads({
+  expected,
+  heads,
+}: {
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.roleHeads.map((head) => [head.id, head]));
+  const expectedRoleIds = new Set(expected.roles.map((role) => role.roleId));
+  for (const role of expected.roles) {
+    const head = headById.get(role.roleId);
+    if (!head) {
+      outstanding.push(role.roleId);
+      continue;
+    }
+    diffs.push(...roleDiffs({ role, head }));
+  }
+  for (const head of heads.roleHeads) {
+    if (!expectedRoleIds.has(head.id)) {
+      outstanding.push(head.id);
+    }
+  }
+  return { outstanding, diffs };
+}
+
+export function checkResourceHeads({
+  organizationId,
+  expected,
+  heads,
+}: {
+  organizationId: string;
+  expected: ExpectedFacts;
+  heads: HeadState;
+}): CheckResult {
+  const outstanding: string[] = [];
+  const diffs: AuthzEngineDiff[] = [];
+  const headById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
+  const expectedLinkIds = new Set(
+    expected.shareLinks.map((link) => link.row.id),
+  );
+  for (const link of expected.shareLinks) {
+    const head = headById.get(link.row.id);
+    if (!head) {
+      outstanding.push(link.row.id);
+      continue;
+    }
+    const result = resourceDiffs({ organizationId, link, head });
+    outstanding.push(...result.outstanding);
+    diffs.push(...result.diffs);
+  }
+  for (const row of heads.resourceRows) {
+    // Only rows the migration owns: a live-write row (a ledger-first share
+    // whose compat write was stepped over) is not this migration's to hold
+    // an organization on, and never its to revoke.
+    if (isMigrationOwned(row.source) && !expectedLinkIds.has(row.grantId)) {
+      outstanding.push(row.grantId);
+    }
+  }
+  return { outstanding, diffs };
+}
+
+export function roleDrifted({
+  role,
+  head,
+}: {
+  role: RoleFact;
+  head: RoleHeadRow;
+}): boolean {
+  return (
+    head.name !== role.name ||
+    (head.description ?? null) !== (role.description ?? null) ||
+    permissionStrings(head.permissions).join(",") !==
+      role.permissions.join(",") ||
+    (head.kind === "system_api_key" ? "system_api_key" : "custom") !== role.kind
+  );
+}
+
+/** Field equality for one stated fact against its head row — against what
+ *  the migration SAID, since that is what the head is supposed to hold. */
+function grantDiffs({
+  fact,
+  head,
+}: {
+  fact: GrantFact;
+  head: GrantHeadRow;
+}): AuthzEngineDiff[] {
+  const compared: Array<[string, string | null, string | null]> = [
+    ["principalType", PRINCIPAL_TO_DB[fact.principal.type], head.principalType],
+    ["principalId", fact.principal.id, head.principalId],
+    ["roleKey", fact.roleKey, head.roleKey],
+    ["legacyRole", fact.legacyRole ?? null, head.legacyRole],
+    ["scopeType", fact.scope.type, head.scopeType],
+    ["scopeId", fact.scope.id, head.scopeId],
+  ];
+  return compared.flatMap(([field, expected, actual]) =>
+    expected === actual
+      ? []
+      : [
+          {
+            kind: "grant_changed" as const,
+            id: fact.grantId,
+            field,
+            expected,
+            actual,
+          },
+        ],
+  );
+}
+
+function roleDiffs({
+  role,
+  head,
+}: {
+  role: RoleFact;
+  head: RoleHeadRow;
+}): AuthzEngineDiff[] {
+  const compared: Array<[string, string | null, string | null]> = [
+    ["name", role.name, head.name],
+    ["description", role.description ?? null, head.description],
+    [
+      "permissions",
+      role.permissions.join(","),
+      permissionStrings(head.permissions).join(","),
+    ],
+    [
+      "kind",
+      role.kind,
+      head.kind === "system_api_key" ? "system_api_key" : "custom",
+    ],
+  ];
+  return compared.flatMap(([field, expected, actual]) =>
+    expected === actual
+      ? []
+      : [
+          {
+            kind: "role_changed" as const,
+            id: role.roleId,
+            field,
+            expected,
+            actual,
+          },
+        ],
+  );
+}
+
+/**
+ * Field equality for one imported link against its RESOURCE head row, and
+ * the id when its head lags. The stored spellings differ (the head keeps
+ * the database's uppercase), so the comparison is against what the import
+ * said, mapped to that spelling.
+ *
+ * The view budget cuts both ways and the two directions mean different
+ * things. A head BEHIND the legacy count is convergence lag — views land
+ * legacy-side between passes and the monotonic seed raises the usage row
+ * next pass — so it is `outstanding`, not a disagreement; reporting it as
+ * one made an actively-viewed link re-hold the organization forever. A
+ * head AHEAD of the legacy count is a budget that grew back, which nothing
+ * legitimate produces, so that is the named diff.
+ *
+ * Tokens are bearer credentials and the report is persisted and rendered
+ * on the ops page, so a token disagreement reports fingerprints, never the
+ * values.
+ */
+function resourceDiffs({
+  organizationId,
+  link,
+  head,
+}: {
+  organizationId: string;
+  link: ExpectedShareLink;
+  head: ResourceGrantRow;
+}): CheckResult {
+  const { row } = link;
+  const principal = shareVisibilityAudience({
+    visibility: row.visibility,
+    organizationId,
+    projectId: row.projectId,
+  });
+  const compared: Array<[string, string | null, string | null]> = [
+    ["token", tokenFingerprint(row.token), tokenFingerprint(head.token)],
+    ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
+    ["resourceId", row.resourceId, head.resourceId],
+    ["projectId", row.projectId, head.projectId],
+    ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
+    ["principalId", principal.id, head.principalId],
+    ["expiresAt", numberField(row.expiresAtMs), numberField(head.expiresAtMs)],
+    ["maxViews", numberField(row.maxViews), numberField(head.maxViews)],
+  ];
+  if (head.viewCount > row.viewCount) {
+    compared.push([
+      "viewCount",
+      numberField(row.viewCount),
+      numberField(head.viewCount),
+    ]);
+  }
+  return {
+    outstanding: head.viewCount < row.viewCount ? [row.id] : [],
+    diffs: compared.flatMap(([field, expected, actual]) =>
+      expected === actual
+        ? []
+        : [
+            {
+              kind: "resource_changed" as const,
+              id: row.id,
+              field,
+              expected,
+              actual,
+            },
+          ],
+    ),
+  };
+}
+
+function tokenFingerprint(token: string | null): string | null {
+  if (token === null) return null;
+  return createHash("sha256").update(token).digest("hex").slice(0, 12);
+}
+
+function numberField(value: number | null): string | null {
+  return value === null ? null : String(value);
+}

@@ -20,11 +20,12 @@ import type {
   RoleHeadRow,
   ShareLinkFactRow,
 } from "@langwatch/authz-server";
+import { PRINCIPAL_TO_DB } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
+import type { GrantHeadRow } from "../authz-engine.check";
 import {
   AuthzEngineMigration,
   type AuthzEngineMigrationStore,
-  type GrantHeadRow,
 } from "../authz-engine.migration";
 
 const ORG_ID = "org_acme";
@@ -36,7 +37,6 @@ type Sent = {
     | "attachGrant"
     | "defineRole"
     | "changeGrantRole"
-    | "changeRolePermissions"
     | "revokeGrant"
     | "deleteRole";
   commandId: string;
@@ -52,15 +52,21 @@ type Data = {
   shareLinks?: ShareLinkFactRow[];
   externalMembers?: ExternalMemberFact[];
   credentials?: ProjectCredentialFact[];
+  groupMemberships?: Array<{ userId: string; groupId: string }>;
   grantHeads?: GrantHeadRow[];
   roleHeads?: RoleHeadRow[];
   resourceRows?: ResourceGrantRow[];
 };
 
-function harness(data: Data = {}) {
+type Ledger = ConstructorParameters<typeof AuthzEngineMigration>[0]["ledger"];
+
+function harness(
+  data: Data = {},
+  options: { wrapLedger?: (ledger: Ledger) => Ledger } = {},
+) {
   const sent: Sent[] = [];
   const seeded: ResourceGrantUsageSeed[][] = [];
-  const reads = { heads: 0 };
+  const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
   const store: AuthzEngineMigrationStore = {
     findOrganizationCreatedAtMs: async () =>
       data.organizationCreatedAtMs === undefined
@@ -73,12 +79,19 @@ function harness(data: Data = {}) {
     findShareLinkRows: async () => data.shareLinks ?? [],
     findExternalMemberFacts: async () => data.externalMembers ?? [],
     findProjectCredentialFacts: async () => data.credentials ?? [],
+    findGroupMemberships: async () => data.groupMemberships ?? [],
     findGrantHeadRows: async () => {
-      reads.heads += 1;
+      reads.grantHeads += 1;
       return data.grantHeads ?? [];
     },
-    findRoleHeads: async () => data.roleHeads ?? [],
-    findResourceGrantRows: async () => data.resourceRows ?? [],
+    findRoleHeads: async () => {
+      reads.roleHeads += 1;
+      return data.roleHeads ?? [];
+    },
+    findResourceGrantRows: async () => {
+      reads.resourceRows += 1;
+      return data.resourceRows ?? [];
+    },
     seedResourceGrantUsage: async ({ seeds }) => {
       seeded.push([...seeds]);
     },
@@ -91,16 +104,16 @@ function harness(data: Data = {}) {
     }: { commandId: string } & Record<string, unknown>) => {
       sent.push({ kind, commandId, payload });
     };
+  const recording: Ledger = {
+    attachGrant: record("attachGrant"),
+    defineRole: record("defineRole"),
+    changeGrantRole: record("changeGrantRole"),
+    revokeGrant: record("revokeGrant"),
+    deleteRole: record("deleteRole"),
+  };
   const migration = new AuthzEngineMigration({
     store,
-    ledger: {
-      attachGrant: record("attachGrant"),
-      defineRole: record("defineRole"),
-      changeGrantRole: record("changeGrantRole"),
-      changeRolePermissions: record("changeRolePermissions"),
-      revokeGrant: record("revokeGrant"),
-      deleteRole: record("deleteRole"),
-    },
+    ledger: options.wrapLedger ? options.wrapLedger(recording) : recording,
     now: () => NOW,
   });
   return { migration, sent, seeded, reads };
@@ -151,20 +164,13 @@ function shareLink(
 }
 
 /** The head row a folded attach of `fact` would produce — for tests that
- *  start from a converged projection. */
+ *  start from a converged projection. Spelled through the same mapping the
+ *  production check compares against, so the fixture cannot drift from what
+ *  a real fold writes. */
 function foldedHead(fact: GrantFact): GrantHeadRow {
-  const stored: Record<string, string> = {
-    user: "USER",
-    group: "GROUP",
-    apiKey: "API_KEY",
-    team: "TEAM",
-    project: "PROJECT",
-    organization: "ORGANIZATION",
-    anyone: "ANYONE",
-  };
   return {
     id: fact.grantId,
-    principalType: stored[fact.principal.type] ?? fact.principal.type,
+    principalType: PRINCIPAL_TO_DB[fact.principal.type],
     principalId: fact.principal.id,
     roleKey: fact.roleKey,
     legacyRole: fact.legacyRole ?? null,
@@ -347,7 +353,7 @@ describe("given an organization with legacy access rows", () => {
 
       await migration.migrateTenant({ tenantId: ORG_ID });
 
-      expect(reads.heads).toBe(1);
+      expect(reads).toEqual({ grantHeads: 1, roleHeads: 1, resourceRows: 1 });
     });
 
     /** @scenario "A projection that has not caught up holds the organization" */
@@ -408,13 +414,17 @@ describe("given an organization with legacy access rows", () => {
           field: "roleKey",
         }),
       );
-      // And the drift is repaired for the next pass, as a proper role change.
+      // And the drift is repaired for the next pass, as a proper role change
+      // stamped with TODAY'S business time — the head's upsert guard refuses
+      // an event that is not strictly newer than the row, so a repair pinned
+      // to the legacy createdAt would be permanently inert.
       expect(
         sent.some(
           (entry) =>
             entry.kind === "changeGrantRole" &&
             entry.payload.grantId === "binding_1" &&
-            entry.payload.to === "member",
+            entry.payload.to === "member" &&
+            entry.payload.occurredAtMs === NOW,
         ),
       ).toBe(true);
     });
@@ -473,35 +483,90 @@ describe("given an organization with legacy access rows", () => {
     });
 
     /** @scenario "A pass that failed partway is safe to repeat" */
-    it("restates every fact under the command id the first attempt used", async () => {
-      const data: Data = {
-        bindings: [binding()],
-        organizationCreatedAtMs: null,
-      };
-      const failing = harness(data);
-      let calls = 0;
-      const ledgerAttach = failing.migration as unknown as {
-        deps: { ledger: { attachGrant: (args: unknown) => Promise<void> } };
-      };
-      const original = ledgerAttach.deps.ledger.attachGrant;
-      ledgerAttach.deps.ledger.attachGrant = async (args) => {
-        calls += 1;
-        if (calls === 1) throw new Error("queue hiccup");
-        return original(args);
-      };
+    it("restates every fact under the command id the failed attempt used", async () => {
+      const attempted: string[] = [];
+      let failFirst = true;
+      const { migration, sent } = harness(
+        { bindings: [binding()], organizationCreatedAtMs: null },
+        {
+          wrapLedger: (ledger) => ({
+            ...ledger,
+            attachGrant: async (args) => {
+              attempted.push(args.commandId);
+              if (failFirst) {
+                failFirst = false;
+                throw new Error("queue hiccup");
+              }
+              return ledger.attachGrant(args);
+            },
+          }),
+        },
+      );
 
       await expect(
-        failing.migration.migrateTenant({ tenantId: ORG_ID }),
+        migration.migrateTenant({ tenantId: ORG_ID }),
       ).rejects.toThrow("queue hiccup");
 
-      const retry = await failing.migration.migrateTenant({ tenantId: ORG_ID });
+      const retry = await migration.migrateTenant({ tenantId: ORG_ID });
       expect(retry.status).toBe("migrated");
-      const commandIds = failing.sent
-        .filter((entry) => entry.kind === "attachGrant")
-        .map((entry) => entry.commandId);
-      // The retry's command id equals what the failed attempt would have
-      // sent, so the event store dedupes rather than duplicating.
-      expect(new Set(commandIds).size).toBe(1);
+      // The retry sends the exact command id the failed attempt tried, so
+      // the event store dedupes rather than duplicating.
+      expect(attempted).toHaveLength(2);
+      expect(attempted[1]).toBe(attempted[0]);
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
+        1,
+      );
+    });
+
+    /** @scenario "Re-running the migration states the same facts" */
+    it("appends a changed legacy row under a NEW command id", async () => {
+      // Content is part of the key: identity alone would let the first
+      // pass's dedupe silently swallow a row edited between passes.
+      const before = harness({
+        bindings: [binding({ role: "MEMBER" })],
+        organizationCreatedAtMs: null,
+      });
+      const after = harness({
+        bindings: [binding({ role: "ADMIN" })],
+        organizationCreatedAtMs: null,
+      });
+
+      await before.migration.migrateTenant({ tenantId: ORG_ID });
+      await after.migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(before.sent[0]?.commandId).not.toBe(after.sent[0]?.commandId);
+    });
+
+    it("aborts between chunks, parking the organization with sends stopped", async () => {
+      const controller = new AbortController();
+      const manyBindings = Array.from({ length: 150 }, (_, index) =>
+        binding({ id: `binding_${index}` }),
+      );
+      const { migration, sent } = harness(
+        { bindings: manyBindings, organizationCreatedAtMs: null },
+        {
+          wrapLedger: (ledger) => ({
+            ...ledger,
+            attachGrant: async (args) => {
+              controller.abort();
+              return ledger.attachGrant(args);
+            },
+          }),
+        },
+      );
+
+      await expect(
+        migration.migrateTenant({
+          tenantId: ORG_ID,
+          signal: controller.signal,
+        }),
+      ).rejects.toThrow("parked for retry");
+
+      // The first chunk of 100 was already in flight; the second never
+      // started — the abort boundary is the chunk.
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
+        100,
+      );
     });
 
     /** @scenario "A row deleted on the legacy side is revoked, not left behind" */
@@ -559,16 +624,432 @@ describe("given an organization with legacy access rows", () => {
   });
 
   describe("when share links carry a view budget", () => {
-    it("hands the budget over on every pass", async () => {
+    it("hands the budget over on every pass, not just the first", async () => {
       const { migration, seeded } = harness({
         shareLinks: [shareLink({ maxViews: 10, viewCount: 3 })],
       });
 
       await migration.migrateTenant({ tenantId: ORG_ID });
+      await migration.migrateTenant({ tenantId: ORG_ID });
 
-      expect(seeded).toEqual([
-        [{ grantId: "share_1", projectId: "project_1", viewCount: 3 }],
+      // Legacy keeps counting while the organization is held; re-seeding
+      // every pass is what lets the proof heal.
+      const seed = [
+        { grantId: "share_1", projectId: "project_1", viewCount: 3 },
+      ];
+      expect(seeded).toEqual([seed, seed]);
+    });
+
+    it("refuses to finalize a link whose view budget grew back", async () => {
+      const row = shareLink({ maxViews: 10, viewCount: 3 });
+      const { migration } = harness({
+        shareLinks: [row],
+        organizationCreatedAtMs: null,
+        resourceRows: [
+          {
+            grantId: row.id,
+            source: "migration",
+            token: row.token,
+            resourceKind: "TRACE",
+            resourceId: row.resourceId,
+            projectId: row.projectId,
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: 10,
+            // The head counts MORE spent views than legacy remembers: a
+            // budget that grew back, which nothing legitimate produces.
+            viewCount: 5,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        diffs: Array<{ kind: string; id: string; field?: string }>;
+      };
+      expect(report.diffs).toContainEqual(
+        expect.objectContaining({
+          kind: "resource_changed",
+          id: row.id,
+          field: "viewCount",
+        }),
+      );
+    });
+
+    it("treats a head behind the legacy view count as lag, not disagreement", async () => {
+      // Views land legacy-side between passes and the monotonic seed raises
+      // the usage row next pass — outstanding, so the organization heals
+      // instead of re-holding forever on an actively-viewed link.
+      const row = shareLink({ maxViews: 10, viewCount: 3 });
+      const { migration } = harness({
+        shareLinks: [row],
+        organizationCreatedAtMs: null,
+        resourceRows: [
+          {
+            grantId: row.id,
+            source: "migration",
+            token: row.token,
+            resourceKind: "TRACE",
+            resourceId: row.resourceId,
+            projectId: row.projectId,
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: 10,
+            viewCount: 1,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        totalDiffs: number;
+        outstandingSample: string[];
+      };
+      expect(report.totalDiffs).toBe(0);
+      expect(report.outstandingSample).toContain(row.id);
+    });
+
+    /** @scenario "A row deleted on the legacy side is revoked, not left behind" */
+    it("revokes a deleted share link's live resource head", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        resourceRows: [
+          {
+            grantId: "share_orphan",
+            source: "migration",
+            token: "token_orphan",
+            resourceKind: "TRACE",
+            resourceId: "trace_1",
+            projectId: "project_1",
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: null,
+            viewCount: 0,
+          },
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(
+        sent.filter(
+          (entry) =>
+            entry.kind === "revokeGrant" &&
+            entry.payload.grantId === "share_orphan",
+        ),
+      ).toHaveLength(1);
+    });
+
+    it("finalizes a link whose head matches field for field", async () => {
+      const row = shareLink({ maxViews: 10, viewCount: 3 });
+      const { migration } = harness({
+        shareLinks: [row],
+        organizationCreatedAtMs: null,
+        resourceRows: [
+          {
+            grantId: row.id,
+            source: "migration",
+            token: row.token,
+            resourceKind: "TRACE",
+            resourceId: row.resourceId,
+            projectId: row.projectId,
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: 10,
+            viewCount: 3,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("finalized");
+    });
+  });
+
+  describe("when the heads disagree with legacy in other directions", () => {
+    /** @scenario "The check that precedes finalizing is proven, not assumed" */
+    it("holds when a stated grant's head is revoked while legacy still holds the row", async () => {
+      const row = binding();
+      const { migration } = harness({
+        bindings: [row],
+        organizationCreatedAtMs: null,
+        grantHeads: [
+          {
+            ...foldedHead({
+              grantId: row.id,
+              principal: { type: "user", id: "user_1" },
+              roleKey: "member",
+              scope: { type: "PROJECT", id: "project_1" },
+              source: "migration",
+              occurredAtMs: CREATED,
+            }),
+            revoked: true,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        diffs: Array<{ kind: string; id: string }>;
+      };
+      expect(report.diffs).toContainEqual(
+        expect.objectContaining({ kind: "grant_revoked", id: row.id }),
+      );
+    });
+
+    /** @scenario "The check that precedes finalizing is proven, not assumed" */
+    it("repairs a role whose head permissions drifted, and names the drift", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roles: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view", "traces:share"],
+            kind: "custom",
+            createdAtMs: CREATED,
+          },
+        ],
+        roleHeads: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      // Repaired by restating the role WHOLE at today's business time, so
+      // the head's strictly-newer guard admits it.
+      expect(
+        sent.some(
+          (entry) =>
+            entry.kind === "defineRole" &&
+            entry.commandId.startsWith("authz-engine:redefine:role_1:") &&
+            (entry.payload.role as RoleFact).permissions.join(",") ===
+              "traces:view,traces:share" &&
+            (entry.payload.role as RoleFact).occurredAtMs === NOW,
+        ),
+      ).toBe(true);
+      const report = outcome.report as {
+        diffs: Array<{ kind: string; field?: string }>;
+      };
+      expect(report.diffs).toContainEqual(
+        expect.objectContaining({ kind: "role_changed", field: "permissions" }),
+      );
+    });
+
+    it("holds on a renamed role head and names the field", async () => {
+      const { migration } = harness({
+        organizationCreatedAtMs: null,
+        roles: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+            createdAtMs: CREATED,
+          },
+        ],
+        roleHeads: [
+          {
+            id: "role_1",
+            name: "Inspector",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        diffs: Array<{ kind: string; field?: string }>;
+      };
+      expect(report.diffs).toContainEqual(
+        expect.objectContaining({ kind: "role_changed", field: "name" }),
+      );
+    });
+
+    /** @scenario "A row deleted on the legacy side is revoked, not left behind" */
+    it("deletes role heads whose legacy row is gone, whatever their kind", async () => {
+      // The migration only runs before an organization finalizes, and until
+      // then every role head — system_api_key included — mirrors a legacy
+      // CustomRole row; a head with no such row is stale whatever its kind.
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roleHeads: [
+          {
+            id: "role_gone",
+            name: "Retired",
+            description: null,
+            permissions: [],
+            kind: "custom",
+          },
+          {
+            id: "role_system",
+            name: "API key role",
+            description: null,
+            permissions: [],
+            kind: "system_api_key",
+          },
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      const deletions = sent.filter((entry) => entry.kind === "deleteRole");
+      expect(deletions.map((entry) => entry.payload.roleId).sort()).toEqual([
+        "role_gone",
+        "role_system",
       ]);
+    });
+  });
+
+  describe("when legacy rows cannot be expressed as grants", () => {
+    /** @scenario "Every legacy table is a source of facts" */
+    it("skips a binding naming no principal, on both the state and the check side", async () => {
+      const { migration, sent } = harness({
+        bindings: [binding({ userId: null, groupId: null, apiKeyId: null })],
+        organizationCreatedAtMs: null,
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(sent.filter((entry) => entry.kind === "attachGrant")).toHaveLength(
+        0,
+      );
+      // Nothing stated means nothing outstanding: the row holds nothing up.
+      expect(outcome.status).toBe("finalized");
+    });
+
+    /** @scenario "Team membership is stated directly, not promoted first" */
+    it("never states a CUSTOM membership row: the legacy fallback denies that shape", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        teamRows: [
+          {
+            userId: "user_1",
+            teamId: "team_1",
+            role: "CUSTOM",
+            customRoleId: "role_1",
+            createdAtMs: CREATED,
+          },
+          {
+            userId: "user_2",
+            teamId: "team_1",
+            role: "CUSTOM",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(attachedFacts(sent)).toHaveLength(0);
+    });
+
+    /** @scenario "Team membership is stated directly, not promoted first" */
+    it("suppresses a membership beside a binding of ANY role, matching the resolver", async () => {
+      // Legacy suppresses its fallback on any binding at the scopes in
+      // play, whatever role it carries — keying the suppression on role
+      // stated an extra admin grant legacy never answers.
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        teamRows: [
+          {
+            userId: "user_1",
+            teamId: "team_1",
+            role: "ADMIN",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+        bindings: [
+          binding({
+            id: "binding_team",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+            role: "VIEWER",
+          }),
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      const teamFacts = attachedFacts(sent).filter(
+        (fact) => fact.scope.type === "TEAM",
+      );
+      expect(teamFacts.map((fact) => fact.grantId)).toEqual(["binding_team"]);
+    });
+
+    /** @scenario "Team membership is stated directly, not promoted first" */
+    it("counts a binding held through a group as suppressing too", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        teamRows: [
+          {
+            userId: "user_1",
+            teamId: "team_1",
+            role: "MEMBER",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+        groupMemberships: [{ userId: "user_1", groupId: "group_1" }],
+        bindings: [
+          binding({
+            id: "binding_group",
+            userId: null,
+            groupId: "group_1",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+            role: "VIEWER",
+          }),
+        ],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      const teamFacts = attachedFacts(sent).filter(
+        (fact) => fact.scope.type === "TEAM" && fact.principal.type === "user",
+      );
+      expect(teamFacts).toHaveLength(0);
+    });
+
+    /** @scenario "The organization member floor is stated once" */
+    it("does not double-grant an ADMIN who already holds a binding", async () => {
+      const { migration, sent } = harness({
+        members: [member("user_admin", "ADMIN")],
+        bindings: [binding({ userId: "user_admin" })],
+        organizationCreatedAtMs: null,
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      const facts = attachedFacts(sent);
+      expect(facts.some((fact) => fact.roleKey === "legacy-admin")).toBe(false);
     });
   });
 });

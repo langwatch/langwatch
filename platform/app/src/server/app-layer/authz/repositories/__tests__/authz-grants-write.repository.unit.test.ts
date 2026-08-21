@@ -15,6 +15,7 @@
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { GrantProjectionWrite } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsWrite.projection";
+import { MIGRATION_OWNED_SOURCES } from "../../authz-engine.facts";
 import { PrismaAuthzGrantsWriteRepository } from "../authz-grants-write.prisma.repository";
 
 const ORG = "org_acme";
@@ -301,12 +302,18 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
     // while a derived fact (a team membership, the org floor) matches no
     // row and must not be given one. Update-only is what makes both true.
     /** @scenario "Nothing legacy changes before an organization finalizes" */
-    it("updates the compat binding in place and never creates one", async () => {
+    // All four owned sources take the update-only path: the three-stage
+    // rollout's rows are this migration's too, and a check regressed to
+    // `source === "migration"` would silently resume minting bindings for
+    // them.
+    it.each(
+      MIGRATION_OWNED_SOURCES,
+    )("updates the compat binding in place and never creates one (%s)", async (source) => {
       const { repository, prisma } = build();
 
       await repository.append({
         kind: "grant.upsert",
-        row: grantRow({ source: "migration" }),
+        row: grantRow({ source }),
       } as GrantProjectionWrite);
 
       expect(prisma.roleBinding.upsert).not.toHaveBeenCalled();

@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import type { GrantHeadRow } from "../authz-engine.migration";
+import type { GrantHeadRow } from "../authz-engine.check";
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**
@@ -230,6 +230,20 @@ export class PrismaAuthzMigrationRepository
       customRoleId: row.assignedRoleId,
       createdAtMs: row.createdAt.getTime(),
     }));
+  }
+
+  /** Every (userId, groupId) membership in the organization — what lets the
+   *  migration mirror the legacy fallback's suppression predicate, which
+   *  counts bindings held THROUGH a group as bindings the user holds. */
+  async findGroupMemberships({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Array<{ userId: string; groupId: string }>> {
+    return this.prisma.groupMembership.findMany({
+      where: { group: { organizationId } },
+      select: { userId: true, groupId: true },
+    });
   }
 
   async findExistingTeamBindings({
@@ -490,6 +504,7 @@ export class PrismaAuthzMigrationRepository
       where: { organizationId, scopeType: "RESOURCE", revokedAt: null },
       select: {
         id: true,
+        source: true,
         token: true,
         resourceKind: true,
         scopeId: true,
@@ -513,6 +528,7 @@ export class PrismaAuthzMigrationRepository
     );
     return rows.map((row) => ({
       grantId: row.id,
+      source: row.source,
       token: row.token,
       resourceKind: row.resourceKind,
       resourceId: row.scopeId,

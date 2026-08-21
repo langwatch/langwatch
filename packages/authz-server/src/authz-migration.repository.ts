@@ -162,6 +162,9 @@ export type ProjectCredentialFact = {
  *  uppercase spellings, and the proof is where they meet the source row's. */
 export type ResourceGrantRow = {
   grantId: string;
+  /** Which writer emitted the fact — what tells the migration's sweep and
+   *  completeness check a row is theirs to own. */
+  source: string;
   token: string | null;
   resourceKind: string | null;
   /** The RESOURCE scope's id: the shared resource itself. */
