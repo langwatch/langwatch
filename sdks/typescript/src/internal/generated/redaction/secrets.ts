@@ -1153,7 +1153,7 @@ function matchesOfRule(rule: ValueRule, text: string): SecretMatch[] {
     found.push({
       ruleId: rule.id,
       description: rule.description,
-      start: matchStart - lengthPrecedingMatch(rule, text, matchStart),
+      start: matchStart - lengthPrecedingMatch({ rule, text, matchStart }),
       end: matchStart + kept,
     });
   }
@@ -1164,11 +1164,15 @@ function matchesOfRule(rule: ValueRule, text: string): SecretMatch[] {
  * How much of the credential sits in front of the match, for a rule that reads
  * part of it in a lookbehind. Zero for every rule whose match covers all of it.
  */
-function lengthPrecedingMatch(
-  rule: ValueRule,
-  text: string,
-  matchStart: number,
-): number {
+function lengthPrecedingMatch({
+  rule,
+  text,
+  matchStart,
+}: {
+  rule: ValueRule;
+  text: string;
+  matchStart: number;
+}): number {
   if (!rule.precededBy) return 0;
   return rule.precededBy.exec(text.slice(0, matchStart))?.[0].length ?? 0;
 }
