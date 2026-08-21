@@ -93,6 +93,28 @@ export async function listEvaluators(): Promise<
   return toArray(await lwGet("/api/evaluators"));
 }
 
+/**
+ * The named evaluator, created through the API when the project does not have
+ * it yet. A scenario premise that names a resource seeds it here so the premise
+ * holds on any project state, and a rerun reuses the existing one.
+ */
+export async function ensureEvaluator({
+  name,
+  evaluatorType,
+}: {
+  name: string;
+  evaluatorType: string;
+}): Promise<void> {
+  const existing = (await listEvaluators()).find(
+    (evaluator) => evaluator.name === name,
+  );
+  if (existing) return;
+  await lwPost({
+    path: "/api/evaluators",
+    body: { name, config: { evaluatorType } },
+  });
+}
+
 export async function listScenarios(): Promise<
   Array<{ id: string; name: string }>
 > {
