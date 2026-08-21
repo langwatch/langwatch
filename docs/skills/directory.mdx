@@ -632,6 +632,17 @@ langwatch monitor get <monitor-id> --format json
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
 
+## If Monitor Create Is Refused with `unauthorized`
+
+Creating a monitor requires the `evaluations:manage` permission, because a monitor starts evaluating every ingested trace on its own the moment it exists. Some keys — including assistant session keys — deliberately never hold that permission: they may create inert definitions (evaluators) but not stand up standing processes. If `langwatch monitor create` returns `unauthorized` (401/403):
+
+1. Do not retry, drop flags, or route around it. This is a designed boundary, not an outage.
+2. Create and verify the evaluator — that part is allowed and useful on its own.
+3. Hand the user the exact, fully-flagged `langwatch monitor create ...` command you would have run, plus the platform path (Online Evaluations page), so one paste or one click finishes the job with their own access.
+4. State plainly which single step is left for them and why: turning the monitor on is a standing process, and that decision stays with a person.
+
+In that case the task is complete when the evaluator exists and the user has the ready-to-run command.
+
 ## Add a Guardrail
 
 For platform-managed guardrails, create or edit the monitor with `AS_GUARDRAIL` after reading `langwatch monitor create --help` or `langwatch monitor update --help`.
@@ -3358,6 +3369,17 @@ langwatch monitor get <monitor-id> --format json
 ```
 
 The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
+
+## If Monitor Create Is Refused with `unauthorized`
+
+Creating a monitor requires the `evaluations:manage` permission, because a monitor starts evaluating every ingested trace on its own the moment it exists. Some keys — including assistant session keys — deliberately never hold that permission: they may create inert definitions (evaluators) but not stand up standing processes. If `langwatch monitor create` returns `unauthorized` (401/403):
+
+1. Do not retry, drop flags, or route around it. This is a designed boundary, not an outage.
+2. Create and verify the evaluator — that part is allowed and useful on its own.
+3. Hand the user the exact, fully-flagged `langwatch monitor create ...` command you would have run, plus the platform path (Online Evaluations page), so one paste or one click finishes the job with their own access.
+4. State plainly which single step is left for them and why: turning the monitor on is a standing process, and that decision stays with a person.
+
+In that case the task is complete when the evaluator exists and the user has the ready-to-run command.
 
 ## Add a Guardrail
 

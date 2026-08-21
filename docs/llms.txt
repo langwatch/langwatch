@@ -35,6 +35,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-simulations/voice-agents.md)
 - [Red Teaming](https://langwatch.ai/docs/agent-simulations/red-teaming.md)
+- [Agent Diagnostics Playbook](https://langwatch.ai/docs/agent-simulations/agent-diagnostics-playbook.md): A seven-dimension, cheapest-first playbook for diagnosing WHY an agent misbehaves or a scenario keeps failing — from rubric hygiene to model strength
 
 ## Observability
 

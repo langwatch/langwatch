@@ -14,6 +14,7 @@ export const FEATURE_SKILLS = [
   "connect-agent",
   "prompts",
   "agent-performance",
+  "agent-diagnostics",
   "agent-improve",
   "level-up",
   "datasets",

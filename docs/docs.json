@@ -87,7 +87,8 @@
               "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
               "agent-simulations/voice-agents",
-              "agent-simulations/red-teaming"
+              "agent-simulations/red-teaming",
+              "agent-simulations/agent-diagnostics-playbook"
             ]
           },
           {

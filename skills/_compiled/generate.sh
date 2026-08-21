@@ -22,7 +22,7 @@ fi
 COMPILER="$TSX skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
-SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-improve level-up datasets"
+SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-diagnostics agent-improve level-up datasets"
 
 for skill in $SKILLS; do
   echo "Compiling $skill..."
