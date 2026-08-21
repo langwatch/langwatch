@@ -650,6 +650,11 @@ const presentations = {
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
   },
+  model_provider_credentials_unreadable: {
+    title: "The stored credentials can't be read",
+    describe: () =>
+      "This provider holds credentials the server can no longer decrypt, so saving without new ones would replace them with nothing. Enter the credentials again to fix it.",
+  },
   model_provider_credentials_would_be_dropped: {
     title: "That save would delete the stored credentials",
     describe: () =>

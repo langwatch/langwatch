@@ -11,6 +11,7 @@ import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsUnreadableError,
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
@@ -1465,6 +1466,7 @@ export class ModelProviderService {
     existingProvider: {
       id: string;
       customKeys: unknown;
+      customKeysUnreadable?: boolean;
       extraHeaders: unknown;
     },
     data: {
@@ -1492,6 +1494,7 @@ export class ModelProviderService {
         provider: data.provider,
         validatedKeys,
         existingKeys,
+        existingUnreadable: existingProvider.customKeysUnreadable === true,
       });
       customKeysToSave = mergeStoredCustomKeys({
         incoming: validatedKeys,
@@ -1577,13 +1580,13 @@ export class ModelProviderService {
     provider,
     validatedKeys,
     existingKeys,
+    existingUnreadable,
   }: {
     provider: string;
     validatedKeys: Record<string, unknown> | null;
     existingKeys: Record<string, unknown> | null;
+    existingUnreadable: boolean;
   }): void {
-    if (!existingKeys) return;
-
     const definition =
       modelProviders[provider as keyof typeof modelProviders] ?? undefined;
     const schemaKeys = new Set([
@@ -1591,6 +1594,22 @@ export class ModelProviderService {
       "MANAGED",
     ]);
     if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
+
+    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
+      schemaKeys.has(key),
+    );
+    if (incomingCredentials.length > 0) return;
+
+    // A row whose stored credentials will not decrypt reads back as keyless,
+    // so without this branch the same save that is refused on a readable row
+    // goes through here and replaces ciphertext that a restored
+    // CREDENTIALS_SECRET would have recovered. Sending a credential is the way
+    // out, and it is already allowed by the check above.
+    if (existingUnreadable) {
+      throw new ModelProviderCredentialsUnreadableError({ provider });
+    }
+
+    if (!existingKeys) return;
 
     // Only a credential that actually holds something is worth protecting. A
     // field already sitting empty has nothing to lose, and counting it would
@@ -1600,11 +1619,6 @@ export class ModelProviderService {
         schemaKeys.has(key) && typeof value === "string" && value !== "",
     );
     if (storedCredentials.length === 0) return;
-
-    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
-      schemaKeys.has(key),
-    );
-    if (incomingCredentials.length > 0) return;
 
     throw new ModelProviderCredentialsWouldBeDroppedError({ provider });
   }

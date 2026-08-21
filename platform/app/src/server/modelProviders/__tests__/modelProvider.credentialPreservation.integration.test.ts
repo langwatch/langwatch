@@ -521,5 +521,101 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
         });
       });
     });
+
+    // A row whose stored bag will not decrypt reads back as null, exactly like
+    // a row that never had one, so every guard above waved such a save through
+    // and replaced ciphertext a restored CREDENTIALS_SECRET would have brought
+    // back.
+    describe("given a provider whose stored credentials no longer decrypt", () => {
+      // Azure again, because its schema accepts a payload that names none of
+      // its credential fields. That is what lets the save reach the guard
+      // instead of being turned back by key validation first.
+      async function createAzureRow() {
+        return await service().updateModelProvider(
+          {
+            projectId,
+            provider: "azure",
+            enabled: true,
+            customKeys: {
+              AZURE_OPENAI_API_KEY: STORED_KEY,
+              AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+            },
+            scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
+          ctx(),
+        );
+      }
+
+      const CIPHERTEXT = "not-a-value-this-secret-can-decrypt";
+
+      async function corruptStoredKeys(id: string) {
+        await prisma.modelProvider.update({
+          where: { id },
+          data: { customKeys: CIPHERTEXT },
+        });
+      }
+
+      async function rawKeysOf(id: string) {
+        const row = await prisma.modelProvider.findUnique({
+          where: { id },
+          select: { customKeys: true },
+        });
+        return row?.customKeys;
+      }
+
+      describe("when the payload names no credential field", () => {
+        /** @scenario An unreadable credential is not replaced by a save that carries none */
+        it("is refused and the stored ciphertext survives", async () => {
+          const created = await createAzureRow();
+          await corruptStoredKeys(created.id);
+
+          await expect(
+            service().updateModelProvider(
+              {
+                projectId,
+                id: created.id,
+                provider: "azure",
+                enabled: true,
+                customKeys: {},
+                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+              },
+              ctx(),
+            ),
+          ).rejects.toThrow(/cannot be read/i);
+
+          expect(await rawKeysOf(created.id)).toBe(CIPHERTEXT);
+        });
+      });
+
+      describe("when the payload carries a new credential", () => {
+        it("goes through, because that is the way back", async () => {
+          const created = await createAzureRow();
+          await corruptStoredKeys(created.id);
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_OPENAI_API_KEY: "sk-fresh",
+                AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          const row = await new ModelProviderRepository(
+            prisma,
+          ).findByIdWithDecryptedKeys(created.id);
+          expect(row?.customKeys).toEqual({
+            AZURE_OPENAI_API_KEY: "sk-fresh",
+            AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+          });
+        });
+      });
+    });
   },
 );

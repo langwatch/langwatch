@@ -261,3 +261,30 @@ export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
     this.name = "ModelProviderCredentialsWouldBeDroppedError";
   }
 }
+
+/**
+ * A save would replace credentials the server holds but cannot read.
+ *
+ * Separate from `ModelProviderCredentialsWouldBeDroppedError` because the
+ * advice differs. There the stored value is fine and the save just has to stop
+ * leaving it out; here the stored value will not decrypt, usually because
+ * CREDENTIALS_SECRET changed after the row was written, so the only way
+ * forward is a new credential. Letting the save through would overwrite
+ * ciphertext that restoring the old secret would have recovered.
+ */
+export class ModelProviderCredentialsUnreadableError extends HandledError {
+  declare readonly code: "model_provider_credentials_unreadable";
+
+  constructor({ provider }: { provider: string }) {
+    super(
+      "model_provider_credentials_unreadable",
+      "The credentials stored for this provider cannot be read, so this save would replace them with nothing. Send new credentials with it.",
+      {
+        meta: { provider },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderCredentialsUnreadableError";
+  }
+}

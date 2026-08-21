@@ -6,9 +6,10 @@ import type {
 } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { decrypt, encrypt } from "../../utils/encryption";
+import { encrypt } from "../../utils/encryption";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
+import { readCustomKeys } from "./customKeys";
 import type { CustomModelsInput } from "./customModel.schema";
 
 /**
@@ -19,6 +20,15 @@ import type { CustomModelsInput } from "./customModel.schema";
  */
 export type ModelProviderWithScopes = ModelProvider & {
   scopes: ModelProviderScope[];
+  /**
+   * True when the row holds credentials that will not decrypt or parse.
+   *
+   * `customKeys` reads back as null in that case, the same as a row that holds
+   * none, and this flag is the only thing that separates them. A write path
+   * must not treat the two alike: one row has nothing to lose and the other
+   * still holds ciphertext that a restored CREDENTIALS_SECRET would recover.
+   */
+  customKeysUnreadable?: boolean;
 };
 
 export type ScopeInput = {
@@ -454,56 +464,26 @@ export class ModelProviderRepository {
   }
 
   /**
-   * Decrypts customKeys after reading from the database.
-   * Handles the migration transition where some rows may still have plaintext JSON objects.
-   *
-   * @returns Decrypted object, or null if input is null/undefined or undecryptable.
-   *
-   * Undecryptable rows (typically: CREDENTIALS_SECRET rotated since the row
-   * was written) used to throw and crash the whole `getAllForProject` query —
-   * blocking the entire UI behind a 500 response. We now log a warning and
-   * return null so the provider is treated as keyless, the user can re-enter
-   * keys, and the rest of the providers list still loads.
-   */
-  private decryptCustomKeys(
-    customKeys: unknown,
-  ): Record<string, unknown> | null {
-    if (customKeys === null || customKeys === undefined) return null;
-
-    // Plaintext object (migration compatibility): return as-is
-    if (typeof customKeys === "object") {
-      return customKeys as Record<string, unknown>;
-    }
-
-    // Encrypted string: decrypt and parse
-    if (typeof customKeys === "string") {
-      try {
-        const decrypted = decrypt(customKeys);
-        return JSON.parse(decrypted) as Record<string, unknown>;
-      } catch (err) {
-        console.warn(
-          "[ModelProviderRepository] dropping unreadable customKeys (likely CREDENTIALS_SECRET rotated since row was written):",
-          err instanceof Error ? err.message : String(err),
-        );
-        return null;
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * Returns a copy of the ModelProvider with decrypted customKeys.
    * Preserves the `scopes` relation as-is.
+   *
+   * A row whose credentials will not decrypt (typically CREDENTIALS_SECRET
+   * changed after the row was written) reads back with `customKeys: null` so
+   * the providers list still loads and the operator can enter new keys, rather
+   * than the whole query throwing and blocking the UI behind a 500. That makes
+   * it look exactly like a row that stores no credentials, so
+   * `customKeysUnreadable` carries the difference for the callers that have to
+   * act on it.
    */
   private withDecryptedKeys(
     provider: ModelProviderWithScopes,
   ): ModelProviderWithScopes {
+    const read = readCustomKeys(provider.customKeys);
     return {
       ...provider,
-      customKeys: this.decryptCustomKeys(
-        provider.customKeys,
-      ) as Prisma.JsonValue | null,
+      customKeys:
+        read.state === "read" ? (read.keys as Prisma.JsonValue) : null,
+      customKeysUnreadable: read.state === "unreadable",
     };
   }
 }
