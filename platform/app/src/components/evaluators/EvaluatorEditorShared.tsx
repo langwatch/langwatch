@@ -14,7 +14,12 @@ import {
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  Controller,
+  FormProvider,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
 import { z } from "zod";
 
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
@@ -811,10 +816,17 @@ export function EvaluatorEditorBody({
 
         <Field.Root required invalid={!!form.formState.errors.name}>
           <Field.Label>Evaluator Name</Field.Label>
-          <Input
-            {...form.register("name")}
-            placeholder="Enter evaluator name"
-            data-testid="evaluator-name-input"
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value ?? ""}
+                placeholder="Enter evaluator name"
+                data-testid="evaluator-name-input"
+              />
+            )}
           />
           <Field.ErrorText>
             {form.formState.errors.name?.message}

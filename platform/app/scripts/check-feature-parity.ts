@@ -66,6 +66,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // Build configuration is behavior: which passes run over the frontend
+  // decides what ships. Its tests sit beside the config rather than under
+  // `src`, so without this root a scenario about the build could only ever be
+  // @unimplemented.
+  "platform/app/vite",
   // The Langy dogfood scenario suite (e2e/langy) runs against a live stack, so
   // it is not in any CI vitest lane — but its scenario tests are still the
   // binding surface for @e2e-tagged specs about Langy's conversational

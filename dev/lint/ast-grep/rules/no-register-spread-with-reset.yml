@@ -1,0 +1,76 @@
+id: no-register-spread-with-reset
+message: >
+  A spread `{...register(name)}` in a component that also calls `reset()` is
+  broken under the React Compiler. `register` is a stable reference, so the
+  call is memoized and runs once; `reset()` then empties react-hook-form's
+  field registry and nothing re-registers. Typing stops reaching form state —
+  silently, and validation goes with it. Bind the field through
+  `<Controller>` / `useController`, which re-registers from an effect the
+  compiler cannot elide. See specs/setup/react-compiler.feature.
+severity: warning
+language: Tsx
+# The receiver must look like a react-hook-form form object. ast-grep cannot
+# see types, and the repo names these `form`/`formA`/`scenarioForm` without
+# exception, so the name is the provenance check — a `registry` or `api`
+# object that happens to carry register()/reset() methods stays quiet.
+constraints:
+  FORM:
+    regex: "[Ff]orm"
+rule:
+  any:
+    # Reached through the form object: `form.register(...)` spread into JSX
+    # props, with `form.reset(...)` called on the SAME object — $FORM unifies
+    # across both patterns, so `formA.register` + `formB.reset` stays quiet.
+    - all:
+        - pattern: $FORM.register($$$ARGS)
+        - inside:
+            kind: spread_element
+            stopBy: end
+        - inside:
+            stopBy: end
+            any:
+              - kind: arrow_function
+              - kind: function_declaration
+              - kind: function_expression
+            has:
+              stopBy: end
+              pattern: $FORM.reset($$$RESET_ARGS)
+    # Reached through a destructure: a bare `register(...)` spread, in a
+    # component that calls the bare `reset(...)` it pulled out of the SAME
+    # destructuring statement. Requiring the shared statement is what keeps
+    # unrelated local `register`/`reset` functions — and two independent
+    # forms — from matching. `reset()` is what empties the registry, so
+    # register-without-reset is not this bug and stays quiet — the repo has
+    # ~29 such files and flagging them would bury this.
+    - all:
+        - pattern: register($$$ARGS)
+        - inside:
+            kind: spread_element
+            stopBy: end
+        - inside:
+            stopBy: end
+            any:
+              - kind: arrow_function
+              - kind: function_declaration
+              - kind: function_expression
+            all:
+              - has:
+                  stopBy: end
+                  pattern: reset($$$RESET_ARGS)
+              - has:
+                  stopBy: end
+                  kind: variable_declarator
+                  has:
+                    kind: object_pattern
+                    all:
+                      - has:
+                          kind: shorthand_property_identifier_pattern
+                          regex: ^register$
+                      - has:
+                          kind: shorthand_property_identifier_pattern
+                          regex: ^reset$
+files:
+  - "platform/app/src/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"

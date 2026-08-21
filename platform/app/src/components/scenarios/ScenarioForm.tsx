@@ -36,6 +36,30 @@ export const scenarioFormSchema = z.object({
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 
 /**
+ * Every field here binds through `Controller`, never `{...register(name)}`.
+ *
+ * `register` is a stable reference, so the React Compiler memoizes the call and
+ * the element it feeds, and the registration runs once. `reset()` then empties
+ * react-hook-form's field registry, nothing re-registers, and typing stops
+ * reaching form state while the input still shows the text — silently, and
+ * taking validation with it. `useController` re-registers from an effect, which
+ * the compiler cannot memoize away.
+ *
+ * See specs/setup/react-compiler.feature.
+ */
+
+/**
+ * `<input type="number">` reports a string, and an empty box means "not set"
+ * rather than 0. This was `register`'s `setValueAs`, which has no `Controller`
+ * equivalent, so the coercion moves onto the change itself.
+ */
+const toNullableNumber = (value: string): number | null => {
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+/**
  * Initial data passed to ScenarioFormDrawer via complexProps when creating
  * a new scenario. The scenario is NOT persisted until the user clicks Save.
  */
@@ -67,7 +91,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
   });
 
   const {
-    register,
     control,
     reset,
     formState: { errors },
@@ -90,9 +113,16 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         {/* Name */}
         <Field.Root invalid={!!errors.name}>
           <SectionHeader>Name</SectionHeader>
-          <Input
-            {...register("name")}
-            placeholder="e.g., Angry refund request"
+          <Controller
+            name="name"
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value ?? ""}
+                placeholder="e.g., Angry refund request"
+              />
+            )}
           />
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
         </Field.Root>
@@ -108,11 +138,18 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           </Text>
         </VStack>
         <Field.Root invalid={!!errors.situation}>
-          <Textarea
-            {...register("situation")}
-            placeholder="e.g., A frustrated premium subscriber who was charged twice..."
-            rows={5}
-            _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+          <Controller
+            name="situation"
+            control={control}
+            render={({ field }) => (
+              <Textarea
+                {...field}
+                value={field.value ?? ""}
+                placeholder="e.g., A frustrated premium subscriber who was charged twice..."
+                rows={5}
+                _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+              />
+            )}
           />
           <Field.ErrorText>{errors.situation?.message}</Field.ErrorText>
         </Field.Root>
@@ -140,7 +177,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         />
       </VStack>
 
-      <AdvancedSection register={register} errors={errors} />
+      <AdvancedSection control={control} errors={errors} />
     </VStack>
   );
 }
@@ -189,10 +226,10 @@ function useResetOnDefaultsChange({
 }
 
 function AdvancedSection({
-  register,
+  control,
   errors,
 }: {
-  register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
+  control: ReturnType<typeof useForm<ScenarioFormData>>["control"];
   errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
 }) {
   const [open, setOpen] = useState(false);
@@ -217,17 +254,20 @@ function AdvancedSection({
               <Text fontSize="13px" fontWeight="medium">
                 Max Turns
               </Text>
-              <Input
-                {...register("maxTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
-                })}
-                type="number"
-                placeholder="Default: 10"
+              <Controller
+                name="maxTurns"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(event) =>
+                      field.onChange(toNullableNumber(event.target.value))
+                    }
+                    type="number"
+                    placeholder="Default: 10"
+                  />
+                )}
               />
               <Field.ErrorText>{errors.maxTurns?.message}</Field.ErrorText>
             </Field.Root>
@@ -235,17 +275,20 @@ function AdvancedSection({
               <Text fontSize="13px" fontWeight="medium">
                 Min Turns
               </Text>
-              <Input
-                {...register("minTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
-                })}
-                type="number"
-                placeholder="Default: none"
+              <Controller
+                name="minTurns"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(event) =>
+                      field.onChange(toNullableNumber(event.target.value))
+                    }
+                    type="number"
+                    placeholder="Default: none"
+                  />
+                )}
               />
               <Field.ErrorText>{errors.minTurns?.message}</Field.ErrorText>
             </Field.Root>

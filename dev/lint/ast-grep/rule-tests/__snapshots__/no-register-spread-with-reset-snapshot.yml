@@ -1,0 +1,82 @@
+id: no-register-spread-with-reset
+snapshots:
+  ? |
+    function Hazard({ defaults }: Props) {
+      const { register, reset } = useForm<Values>();
+      useEffect(() => {
+        reset({ ...defaults });
+      }, [defaults, reset]);
+      return <Input {...register("name")} placeholder="x" />;
+    }
+  : labels:
+    - source: register("name")
+      style: primary
+      start: 181
+      end: 197
+    - source: '...register("name")'
+      style: secondary
+      start: 178
+      end: 197
+    - source: reset({ ...defaults })
+      style: secondary
+      start: 112
+      end: 134
+    - source: register
+      style: secondary
+      start: 49
+      end: 57
+    - source: reset
+      style: secondary
+      start: 59
+      end: 64
+    - source: '{ register, reset }'
+      style: secondary
+      start: 47
+      end: 66
+    - source: '{ register, reset } = useForm<Values>()'
+      style: secondary
+      start: 47
+      end: 86
+    - source: |-
+        function Hazard({ defaults }: Props) {
+          const { register, reset } = useForm<Values>();
+          useEffect(() => {
+            reset({ ...defaults });
+          }, [defaults, reset]);
+          return <Input {...register("name")} placeholder="x" />;
+        }
+      style: secondary
+      start: 0
+      end: 220
+  ? |
+    function HazardOnForm({ defaults }: Props) {
+      const form = useForm<Values>();
+      useEffect(() => {
+        form.reset({ ...defaults });
+      }, [defaults, form]);
+      return <Input {...form.register("name")} />;
+    }
+  : labels:
+    - source: form.register("name")
+      style: primary
+      start: 176
+      end: 197
+    - source: '...form.register("name")'
+      style: secondary
+      start: 173
+      end: 197
+    - source: form.reset({ ...defaults })
+      style: secondary
+      start: 103
+      end: 130
+    - source: |-
+        function HazardOnForm({ defaults }: Props) {
+          const form = useForm<Values>();
+          useEffect(() => {
+            form.reset({ ...defaults });
+          }, [defaults, form]);
+          return <Input {...form.register("name")} />;
+        }
+      style: secondary
+      start: 0
+      end: 204

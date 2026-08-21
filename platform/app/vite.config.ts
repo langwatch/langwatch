@@ -146,7 +146,26 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
+  plugins: [
+    // React Compiler. It memoizes components and hooks at build time, which is
+    // what `useMemo`/`useCallback`/`memo` are hand-written to do — so the win
+    // is on the render paths nobody got around to memoizing by hand, and this
+    // codebase has plenty (large tables, the trace drawer, the studio canvas).
+    //
+    // `compiler: true` adds a `vite:react-compiler` pass that runs the Rust
+    // port (`oxc-transform-react`, an optional peer). The alternative was the
+    // Babel plugin, which would put a Babel parse of every file on top of the
+    // oxc transform vite already performs; this keeps the whole pipeline on
+    // oxc. It is still a pass of its own — the plugin has no existing
+    // transform to fold it into — which is what the ~2.4s costs.
+    //
+    // The compiler bails out per-component when it cannot prove a component
+    // follows the rules of React, so an offending file loses the optimization
+    // rather than breaking the build.
+    react({ compiler: true }),
+    patchObjectInspectBrowserStub(),
+    havenHmrGate(),
+  ],
   resolve: {
     alias: {
       // The generated Prisma client's `client.ts` entry hard-imports the node

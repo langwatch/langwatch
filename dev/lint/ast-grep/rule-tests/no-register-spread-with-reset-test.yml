@@ -1,0 +1,96 @@
+id: no-register-spread-with-reset
+valid:
+  # The fix: the field binds through Controller, so registration happens in
+  # useController's effect and survives the reset.
+  - |
+    function Editor({ control }: Props) {
+      const { reset } = useForm<Values>();
+      useEffect(() => reset({}), [reset]);
+      return (
+        <Controller
+          name="name"
+          control={control}
+          render={({ field }) => <Input {...field} />}
+        />
+      );
+    }
+  # register() with no reset() anywhere: the registry is never emptied, so the
+  # memoized registration is never invalidated. Not this bug — and staying
+  # quiet here is what keeps the rule readable, since ~29 files look like this.
+  - |
+    function Simple() {
+      const { register } = useForm<Values>();
+      return <Input {...register("name")} placeholder="x" />;
+    }
+  # reset() with no register() spread: nothing to un-register.
+  - |
+    function ResetOnly() {
+      const { reset, control } = useForm<Values>();
+      useEffect(() => reset({}), [reset]);
+      return <Controller name="a" control={control} render={() => <Input />} />;
+    }
+  # Two independent forms reached through their own objects: formB's reset
+  # cannot un-register formA's fields, so this is not the bug.
+  - |
+    function Independent({ formA, formB }: Props) {
+      return (
+        <>
+          <Input {...formA.register("name")} />
+          <button onClick={() => formB.reset({})}>reset</button>
+        </>
+      );
+    }
+  # Two independent forms destructured separately: reset() empties formB's
+  # registry, not the one register() writes to.
+  - |
+    function IndependentDestructured() {
+      const formA = useForm<Values>();
+      const formB = useForm<Values>();
+      const { register } = formA;
+      const { reset } = formB;
+      useEffect(() => reset({}), [reset]);
+      return <Input {...register("name")} />;
+    }
+  # Local functions that merely share react-hook-form's names.
+  - |
+    function Unrelated() {
+      function register(name: string) { return { name }; }
+      function reset() {}
+      useEffect(() => reset(), []);
+      return <Input {...register("name")} />;
+    }
+  # A non-form API that happens to carry register()/reset() methods on one
+  # receiver: the receiver is not named like a form, so it is not this bug.
+  - |
+    function UnrelatedApi() {
+      const registry = {
+        register(name: string) { return { name }; },
+        reset() {},
+      };
+      return (
+        <>
+          <Input {...registry.register("name")} />
+          <button onClick={() => registry.reset()}>reset</button>
+        </>
+      );
+    }
+invalid:
+  # The failing shape: a destructured register() spread into props, in a
+  # component that resets. This is the ScenarioForm bug.
+  - |
+    function Hazard({ defaults }: Props) {
+      const { register, reset } = useForm<Values>();
+      useEffect(() => {
+        reset({ ...defaults });
+      }, [defaults, reset]);
+      return <Input {...register("name")} placeholder="x" />;
+    }
+  # Same hazard reached through the form object rather than a destructure.
+  - |
+    function HazardOnForm({ defaults }: Props) {
+      const form = useForm<Values>();
+      useEffect(() => {
+        form.reset({ ...defaults });
+      }, [defaults, form]);
+      return <Input {...form.register("name")} />;
+    }

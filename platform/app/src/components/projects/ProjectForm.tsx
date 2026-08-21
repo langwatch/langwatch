@@ -74,7 +74,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     },
   });
   const {
-    register,
     handleSubmit,
     formState: { errors },
     reset,
@@ -166,12 +165,20 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
 
         <Field.Root invalid={!!errors.name}>
           <Field.Label>Project Name</Field.Label>
-          <Input
-            {...register("name", {
+          <Controller
+            name="name"
+            control={control}
+            rules={{
               required: "Project name is required",
               validate: validateProjectName,
-            })}
-            placeholder="AI Project"
+            }}
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value ?? ""}
+                placeholder="AI Project"
+              />
+            )}
           />
           {errors.name && (
             <Field.ErrorText>{errors.name.message}</Field.ErrorText>
@@ -192,11 +199,19 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             {teamId === NEW_TEAM_VALUE && (
               <Field.Root invalid={!!errors.newTeamName}>
                 <Field.Label>New Team Name</Field.Label>
-                <Input
-                  {...register("newTeamName", {
+                <Controller
+                  name="newTeamName"
+                  control={control}
+                  rules={{
                     validate: (value) => validateNewTeamName(teamId, value),
-                  })}
-                  placeholder="Engineering Team"
+                  }}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Engineering Team"
+                    />
+                  )}
                 />
                 {errors.newTeamName && (
                   <Field.ErrorText>

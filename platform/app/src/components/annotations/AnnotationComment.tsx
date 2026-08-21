@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
+  Controller,
   type UseFormSetValue,
   type UseFormWatch,
   useForm,
@@ -77,13 +78,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     scoreOptions: {},
   };
 
-  const { register, handleSubmit, watch, setValue, reset } =
-    useForm<Annotation>({
+  const { control, handleSubmit, watch, setValue, reset } = useForm<Annotation>(
+    {
       defaultValues: {
         comment: "",
         scoreOptions: {},
       },
-    });
+    },
+  );
 
   // Set form values when data is available
   useEffect(() => {
@@ -305,12 +307,19 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     </Menu.Root>
                   )}
                 </HStack>
-                <Input
-                  {...register("comment")}
-                  autoFocus={action === "new"}
-                  placeholder={
-                    action === "new" ? "Leave your comment here" : ""
-                  }
+                <Controller
+                  name="comment"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      autoFocus={action === "new"}
+                      placeholder={
+                        action === "new" ? "Leave your comment here" : ""
+                      }
+                    />
+                  )}
                 />
 
                 <HStack gap={2} width="full" wrap="wrap">
