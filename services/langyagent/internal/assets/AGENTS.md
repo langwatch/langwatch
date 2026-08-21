@@ -57,7 +57,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
-| "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (errors live on spans, not text), `langwatch trace get <traceId>` |
+| "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>` |
 | "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
 | "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
 | "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |

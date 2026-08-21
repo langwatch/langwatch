@@ -255,6 +255,21 @@ function parseHandledStreamError(entry: {
   };
 }
 
+/**
+ * The manager reduces oversized tool outputs STRUCTURALLY for the panel
+ * (toolmap.TruncateToolOutput): array tails are elided behind an
+ * "… N more items truncated" marker while the AGENT read the full payload.
+ * The judge grades from these frames, so without a note it reads an elided
+ * item as a nonexistent one and fails a genuinely grounded reply as
+ * fabrication (it did: real seeded trace ids, cited from the elided tail,
+ * were judged hallucinated). The note states the elision; it adds no
+ * evidence.
+ */
+function annotateReducedOutput(output: string): string {
+  if (!output.includes("more items truncated")) return output;
+  return `${output}\n\n[Display note: this tool output was reduced for display. The agent read the full payload, so items beyond the ones shown here existed. A reply citing an item that is not visible here is citing the elided part, not fabricating.]`;
+}
+
 /** One settled tool call observed on the turn stream, as the panel showed it. */
 export interface SettledToolCall {
   id: string;
@@ -510,7 +525,7 @@ export function makeLangyAdapter(): AgentAdapter & {
             // has cost a judge the very count a reply was grounded on.
             output: {
               type: call.isError ? ("error-text" as const) : ("text" as const),
-              value: call.output.slice(0, 8192),
+              value: annotateReducedOutput(call.output.slice(0, 8192)),
             },
           })),
         },
