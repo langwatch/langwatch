@@ -1,5 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 
@@ -19,11 +20,15 @@ export type SavePromptButtonProps = {
 };
 
 /**
- * Shared save button for prompts with "Update to vX" logic.
- * Shows:
- * - "Save" for new prompts
- * - "Update to vX" for existing prompts with changes OR not at latest version
- * - "Saved" when no changes AND at latest version
+ * Shared save button for prompts.
+ *
+ * The button covers two different actions, so it is labelled for the action
+ * rather than for the version number the action happens to produce:
+ * - "Save changes" when the editor holds edits, which become a new version
+ * - "Make this the latest version" when there are no edits but an older
+ *   version is loaded, which republishes that version as the latest one
+ * - "Saved" when there is nothing to do
+ * - "Save" for a prompt that has no versions yet
  *
  * Button is enabled when:
  * - There are unsaved changes, OR
@@ -62,11 +67,13 @@ export function SavePromptButton({
   const getButtonLabel = () => {
     // Show "Saved" only when no changes AND at latest version
     if (!hasUnsavedChanges && isAtLatestVersion) return "Saved";
-    if (nextVersion !== undefined) return `Update to v${nextVersion}`;
-    return "Save";
+    // A prompt with no versions yet has nothing to be the latest of.
+    if (nextVersion === undefined) return "Save";
+    if (hasUnsavedChanges) return "Save changes";
+    return "Make this the latest version";
   };
 
-  return (
+  const button = (
     <Button
       {...(variant === "primary"
         ? { colorPalette: "blue" }
@@ -79,5 +86,18 @@ export function SavePromptButton({
     >
       {getButtonLabel()}
     </Button>
+  );
+
+  // The version number is the result, not the action, so it supports the
+  // label rather than replacing it.
+  if (!canSave || nextVersion === undefined) return button;
+
+  return (
+    <Tooltip
+      content={`Saves as version ${nextVersion}`}
+      positioning={{ placement: "top" }}
+    >
+      {button}
+    </Tooltip>
   );
 }

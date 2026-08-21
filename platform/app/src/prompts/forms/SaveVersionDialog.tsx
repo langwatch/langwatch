@@ -23,7 +23,7 @@ export interface SaveVersionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: SaveDialogFormValues) => Promise<void>;
-  /** Next version number to display in button (e.g., "Update to v5") */
+  /** The version number these changes will be saved as, shown as helper text. */
   nextVersion?: number;
 }
 
@@ -68,7 +68,7 @@ export function SaveVersionDialog({
     >
       <Dialog.Content bg="bg">
         <Dialog.Header>
-          <Dialog.Title>Save Version</Dialog.Title>
+          <Dialog.Title>Save changes</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
@@ -88,10 +88,18 @@ export function SaveVersionDialog({
                   required: "Description is required",
                 })}
               />
-              {errors.commitMessage && (
+              {errors.commitMessage ? (
                 <Field.ErrorText>
                   {errors.commitMessage.message?.toString()}
                 </Field.ErrorText>
+              ) : (
+                nextVersion !== undefined && (
+                  // The version number is the result of saving, so it reads as
+                  // supporting detail here rather than as the button's label.
+                  <Field.HelperText>
+                    Saves as version {nextVersion}
+                  </Field.HelperText>
+                )
               )}
             </Field.Root>
           </form>
@@ -106,7 +114,7 @@ export function SaveVersionDialog({
             loading={isSubmitting}
             disabled={!isDirty}
           >
-            {nextVersion !== undefined ? `Update to v${nextVersion}` : "Save"}
+            Save changes
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
