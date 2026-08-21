@@ -14,7 +14,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
  */
 function CostsPage() {
   return (
-    <GovernanceLayout pageTitle="Costs · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <Heading size="md">Costs</Heading>
         <Text color="fg.muted">

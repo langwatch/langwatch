@@ -14,7 +14,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
  */
 function BilledPage() {
   return (
-    <GovernanceLayout pageTitle="Billed · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Billed · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <Heading size="md">Billed</Heading>
         <Text color="fg.muted">
