@@ -1375,6 +1375,42 @@ jobs:
       - name: Test guard-deployment-impact.ts
         run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
 
+  # The npm artifact's staging filters, run over the real tree.
+  #
+  # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
+  # receives. Its filters are rsync patterns, and a pattern that is broader than
+  # it means to be drops application source: twice already the published server
+  # died at first boot ~20 minutes in on exactly that. The guard inside the
+  # script compares what git tracks against what staging kept, and `--check-filters`
+  # runs it without a build and without packing, in about ten seconds.
+  #
+  # It used to run only inside npx-server-smoke, which does not run on main and
+  # whose path filter names none of the trees the guard reads. A `.gitignore`
+  # added under dev/scripts therefore merged green and turned every branch that
+  # merged main red.
+  #
+  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # package.json names, and a path filter listing them would be a second copy of
+  # that list, stale the day someone edits it. A minute on an unrelated pull
+  # request is the cheaper mistake.
+  pack-filters:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # None of it is in the package's `files`.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - name: Check the npm pack filters
+        run: bash dev/scripts/pack-npm.sh --check-filters
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1500,7 +1536,7 @@ jobs:
           path: vitest.durations.json
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test, pack-filters]
     if: always()
     runs-on: ubuntu-latest
     steps:

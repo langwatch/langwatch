@@ -7,7 +7,13 @@
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
 # - nightly schedule (04:00 UTC)
-# - push to non-main branches when key files change (PR validation)
+# - push, on any branch INCLUDING main, when key files change
+#
+# main was excluded from the push trigger for as long as this file has existed,
+# which left the nightly as its only cover. A defect that lands after the
+# nightly sits on main for up to a day while main reads green, and every branch
+# that merges main in that window goes red on work it did not do. The
+# concurrency block below already assumed a per-commit run on main.
 #
 # This workflow is intentionally not in the langwatch-app-complete required
 # checks — postgres/clickhouse/uv downloads are heavy and flaky-prone. Treat
@@ -25,8 +31,6 @@ on:
   schedule:
     - cron: "0 4 * * *"
   push:
-    branches-ignore:
-      - main
     paths:
       - "package.json"
       - "pnpm-workspace.yaml"
