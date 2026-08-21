@@ -95,3 +95,26 @@ Feature: Secret run parameters
     Given a run started with parameter values
     When the audit trail records the action
     Then the entry keeps the parameter names and replaces every value
+
+  # --- In the platform ---
+
+  @integration
+  Scenario: The definitions editor disables the default value for a secret parameter
+    Given the parameters editor of a scenario, with a row holding a default
+    When the row is marked secret
+    Then the default value is cleared and the field takes no more input
+    And the saved scenario declares the parameter as secret with no default
+
+  @integration
+  Scenario: The run dialog requires a value for every secret parameter
+    Given a run plan whose scenarios declare a secret parameter
+    When the run confirmation opens
+    Then the field for that parameter hides what is typed and starts empty
+    And the run cannot start until the field holds a value
+
+  @integration
+  Scenario: The run detail drawer masks secret parameter names
+    Given a recorded run that used a secret parameter
+    When its detail drawer opens
+    Then the parameters section names the parameter after the plain ones
+    And it shows a mask in place of a value

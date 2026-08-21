@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
+import { Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
@@ -783,9 +784,9 @@ function FooterParameters({
   const parameters = useWatch({ control: form.control, name: "parameters" });
   const { errors } = useFormState({ control: form.control });
   const invalid = !!errors.parameters;
-  const names = (parameters ?? [])
-    .map((definition) => definition.name)
-    .filter((name) => name.length > 0);
+  const declared = (parameters ?? []).filter(
+    (definition) => definition.name.length > 0,
+  );
 
   return (
     <HStack
@@ -804,8 +805,13 @@ function FooterParameters({
         Parameters
       </Text>
       <HStack gap={1} flexWrap="wrap">
-        {names.map((name, index) => (
-          <ParameterChip key={`${name}-${index}`} name={name} onOpen={onOpen} />
+        {declared.map((definition, index) => (
+          <ParameterChip
+            key={`${definition.name}-${index}`}
+            name={definition.name}
+            secret={definition.secret === true}
+            onOpen={onOpen}
+          />
         ))}
         <Button
           type="button"
@@ -826,12 +832,22 @@ function FooterParameters({
 
 const ChipButton = chakra("button");
 
-function ParameterChip({ name, onOpen }: { name: string; onOpen: () => void }) {
+function ParameterChip({
+  name,
+  secret,
+  onOpen,
+}: {
+  name: string;
+  secret: boolean;
+  onOpen: () => void;
+}) {
   return (
     <ChipButton
       type="button"
       onClick={onOpen}
-      aria-label={`Edit parameter ${name}`}
+      aria-label={
+        secret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
+      }
       data-testid={`scenario-parameter-chip-${name}`}
       bg="bg.muted"
       paddingX={2}
@@ -839,8 +855,12 @@ function ParameterChip({ name, onOpen }: { name: string; onOpen: () => void }) {
       borderRadius="full"
       fontSize="xs"
       cursor="pointer"
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
       _hover={{ bg: "bg.emphasized" }}
     >
+      {secret && <Lock size={10} />}
       {name}
     </ChipButton>
   );

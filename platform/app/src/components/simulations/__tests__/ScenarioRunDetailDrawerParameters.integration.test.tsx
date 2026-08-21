@@ -5,6 +5,7 @@
  * no such section for a run that resolved none.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -137,6 +138,59 @@ describe("<ScenarioRunDetailDrawer/> parameters", () => {
         expect(section).toHaveTextContent("platinum");
         expect(section).toHaveTextContent("seats");
         expect(section).toHaveTextContent("12");
+      });
+    });
+  });
+
+  describe("given a run that used a secret parameter", () => {
+    describe("when the drawer opens", () => {
+      /** @scenario "The run detail drawer masks secret parameter names" */
+      it("names the secret and shows a mask in place of a value", () => {
+        mocks.runState = buildRunState({
+          parameters: { account_tier: "platinum" },
+          secretParameterNames: ["api_token"],
+        });
+
+        renderDrawer();
+
+        const section = screen.getByTestId("run-parameters");
+        expect(section).toHaveTextContent("api_token");
+        expect(section).toHaveTextContent("••••••••");
+        expect(section).toHaveTextContent("account_tier");
+      });
+
+      /** @scenario "The run detail drawer masks secret parameter names" */
+      it("carries no value for the secret anywhere in the section", () => {
+        mocks.runState = buildRunState({
+          secretParameterNames: ["api_token"],
+          // A run recorded by a build that wrote more than the names must not
+          // put any of it on screen.
+          secretParameters: { api_token: "tok-live-1" },
+        });
+
+        renderDrawer();
+
+        expect(screen.getByTestId("run-parameters").textContent).toBe(
+          "api_token••••••••",
+        );
+      });
+
+      it("shows the section for a run whose only parameters are secret", () => {
+        mocks.runState = buildRunState({
+          secretParameterNames: ["api_token"],
+        });
+
+        renderDrawer();
+
+        expect(screen.getByTestId("run-parameters")).toBeInTheDocument();
+      });
+
+      it("ignores a recorded shape it cannot read", () => {
+        mocks.runState = buildRunState({ secretParameterNames: "api_token" });
+
+        renderDrawer();
+
+        expect(screen.queryByTestId("run-parameters")).toBeNull();
       });
     });
   });

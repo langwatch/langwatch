@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -53,6 +54,20 @@ export interface ScenarioRunDetailDrawerProps {
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
 }
+
+/**
+ * The names of the secrets the run used, as recorded on it.
+ *
+ * Read defensively, like the plain values beside them: a run recorded by an
+ * older build has nothing here, and the section is simply shorter.
+ */
+const secretParameterNamesSchema = z.array(z.string());
+
+/**
+ * What a secret parameter shows in place of a value. There is no value to
+ * show: the run records the name and nothing else.
+ */
+const SECRET_VALUE_MASK = "••••••••";
 
 export function ScenarioRunDetailDrawer({
   open,
@@ -233,6 +248,15 @@ export function ScenarioRunDetailDrawer({
     );
     if (!parsed.success) return [];
     return Object.entries(parsed.data);
+  }, [scenarioState?.metadata]);
+
+  // The credentials the run needed, by name. The values are not recorded, so
+  // the section shows the names and a mask in place of a value.
+  const secretParameterNames = useMemo(() => {
+    const parsed = secretParameterNamesSchema.safeParse(
+      scenarioState?.metadata?.secretParameterNames,
+    );
+    return parsed.success ? parsed.data : [];
   }, [scenarioState?.metadata]);
 
   const hasConversation =
@@ -538,11 +562,11 @@ export function ScenarioRunDetailDrawer({
                   </Box>
                 </RunDetailSection>
 
-                {parameters.length > 0 && (
+                {parameters.length + secretParameterNames.length > 0 && (
                   <RunDetailSection
                     value="parameters"
                     title="Parameters"
-                    count={parameters.length}
+                    count={parameters.length + secretParameterNames.length}
                   >
                     <VStack
                       align="stretch"
@@ -550,24 +574,19 @@ export function ScenarioRunDetailDrawer({
                       data-testid="run-parameters"
                     >
                       {parameters.map(([name, value]) => (
-                        <HStack key={name} gap={3} align="start">
-                          <Text
-                            fontSize="xs"
-                            fontFamily="mono"
-                            color="fg.muted"
-                            width="180px"
-                            flexShrink={0}
-                          >
-                            {name}
-                          </Text>
-                          <Text
-                            fontSize="xs"
-                            fontFamily="mono"
-                            wordBreak="break-word"
-                          >
-                            {String(value)}
-                          </Text>
-                        </HStack>
+                        <ParameterRow
+                          key={name}
+                          name={name}
+                          value={String(value)}
+                        />
+                      ))}
+                      {secretParameterNames.map((name) => (
+                        <ParameterRow
+                          key={name}
+                          name={name}
+                          value={SECRET_VALUE_MASK}
+                          muted={true}
+                        />
                       ))}
                     </VStack>
                   </RunDetailSection>
@@ -593,5 +612,38 @@ export function ScenarioRunDetailDrawer({
         scenarioId={scenarioId}
       />
     </>
+  );
+}
+
+/** One name and what the run recorded for it. */
+function ParameterRow({
+  name,
+  value,
+  muted = false,
+}: {
+  name: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <HStack gap={3} align="start">
+      <Text
+        fontSize="xs"
+        fontFamily="mono"
+        color="fg.muted"
+        width="180px"
+        flexShrink={0}
+      >
+        {name}
+      </Text>
+      <Text
+        fontSize="xs"
+        fontFamily="mono"
+        wordBreak="break-word"
+        color={muted ? "fg.subtle" : undefined}
+      >
+        {value}
+      </Text>
+    </HStack>
   );
 }

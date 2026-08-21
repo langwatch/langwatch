@@ -1,5 +1,6 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
+import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
@@ -17,7 +18,7 @@ type ParameterDefinitionsInputProps = {
 
 /**
  * Editor for the parameters a scenario declares: a name, an optional
- * description, and an optional default value per row.
+ * description, an optional default value, and whether the value is secret.
  *
  * The editor always shows a row to type in, so an empty list renders one blank
  * row. That row becomes a declaration on the first keystroke, which keeps a
@@ -25,6 +26,7 @@ type ParameterDefinitionsInputProps = {
  * name before it could save.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 export function ParameterDefinitionsInput({
   value,
@@ -49,7 +51,7 @@ export function ParameterDefinitionsInput({
     const definition = rows[index];
     if (!definition) return;
     const updated = [...rows];
-    updated[index] = { ...definition, ...patch };
+    updated[index] = withoutEmptyFields({ ...definition, ...patch });
     onChange(updated);
   };
 
@@ -59,6 +61,7 @@ export function ParameterDefinitionsInput({
         <ColumnLabel flex={NAME_FLEX}>Name</ColumnLabel>
         <ColumnLabel flex={DESCRIPTION_FLEX}>Description</ColumnLabel>
         <ColumnLabel flex={DEFAULT_VALUE_FLEX}>Default value</ColumnLabel>
+        <ColumnLabel width={SECRET_WIDTH}>Secret</ColumnLabel>
       </HStack>
 
       {rows.map((definition, index) => (
@@ -96,15 +99,40 @@ export function ParameterDefinitionsInput({
 const BLANK_DEFINITION: ScenarioParameterDefinition = { name: "" };
 
 /**
- * How the three fields share the row.
+ * How the fields share the row.
  *
  * The name column carries a monospace example placeholder, so it needs more
  * room than the quarter of the row an even split with the description would
- * leave it.
+ * leave it. The secret switch takes a fixed width instead of a share, because
+ * it holds one control of a known size.
  */
 const NAME_FLEX = 1.35;
 const DESCRIPTION_FLEX = 1.65;
 const DEFAULT_VALUE_FLEX = 1;
+const SECRET_WIDTH = "52px";
+
+/** Why a secret parameter's default value input is not writable. */
+const SECRET_DEFAULT_TOOLTIP =
+  "A secret parameter has no default value. Supply the value when the run starts.";
+
+/** What the secret switch does, on the switch itself. */
+const SECRET_SWITCH_TOOLTIP =
+  "The value is a credential. The run delivers it to the target as secrets.NAME, and records the name without the value.";
+
+/**
+ * The declaration with every field the row left empty taken out of it.
+ *
+ * A key holding undefined survives as an own key, so a default value cleared
+ * by the secret switch would still be read as a declared field by anything
+ * that counts keys rather than values.
+ */
+function withoutEmptyFields(
+  definition: ScenarioParameterDefinition,
+): ScenarioParameterDefinition {
+  return Object.fromEntries(
+    Object.entries(definition).filter(([, value]) => value !== undefined),
+  ) as ScenarioParameterDefinition;
+}
 
 function ParameterRow({
   index,
@@ -124,6 +152,8 @@ function ParameterRow({
   ) => void;
   onRemove: (index: number) => void;
 }) {
+  const isSecret = definition.secret === true;
+
   return (
     <VStack align="stretch" gap={1}>
       <HStack gap={2}>
@@ -153,22 +183,57 @@ function ParameterRow({
           aria-label={`Parameter ${index + 1} description`}
           data-testid={`scenario-parameter-description-${index}`}
         />
-        <Input
-          value={displayOptionalValue(definition.defaultValue)}
-          onChange={(e) =>
-            onUpdate(index, {
-              defaultValue: serializeOptionalScalarValue(e.target.value),
-            })
-          }
-          placeholder="gold"
-          size="sm"
-          flex={DEFAULT_VALUE_FLEX}
-          fontFamily="mono"
-          fontSize="13px"
-          disabled={disabled}
-          aria-label={`Parameter ${index + 1} default value`}
-          data-testid={`scenario-parameter-default-${index}`}
-        />
+        <Tooltip
+          content={SECRET_DEFAULT_TOOLTIP}
+          disabled={!isSecret}
+          positioning={{ placement: "top" }}
+        >
+          <Box flex={DEFAULT_VALUE_FLEX} minWidth={0}>
+            <Input
+              value={displayOptionalValue(definition.defaultValue)}
+              onChange={(e) =>
+                onUpdate(index, {
+                  defaultValue: serializeOptionalScalarValue(e.target.value),
+                })
+              }
+              placeholder={isSecret ? "" : "gold"}
+              size="sm"
+              width="full"
+              fontFamily="mono"
+              fontSize="13px"
+              disabled={disabled || isSecret}
+              aria-label={`Parameter ${index + 1} default value`}
+              data-testid={`scenario-parameter-default-${index}`}
+            />
+          </Box>
+        </Tooltip>
+        <Tooltip
+          content={SECRET_SWITCH_TOOLTIP}
+          positioning={{ placement: "top" }}
+        >
+          <Box width={SECRET_WIDTH} flexShrink={0}>
+            <Switch
+              size="sm"
+              checked={isSecret}
+              disabled={disabled}
+              onCheckedChange={({ checked }) =>
+                onUpdate(
+                  index,
+                  // A secret carries no default: the value is supplied when the
+                  // run starts, so whatever was typed is dropped here rather
+                  // than kept out of sight until the save is refused.
+                  checked
+                    ? { secret: true, defaultValue: undefined }
+                    : { secret: undefined },
+                )
+              }
+              inputProps={{
+                "aria-label": `Parameter ${index + 1} secret`,
+                "data-testid": `scenario-parameter-secret-${index}`,
+              }}
+            />
+          </Box>
+        </Tooltip>
         {!disabled && (
           <Tooltip
             content="Remove parameter"
@@ -205,12 +270,20 @@ function ParameterRow({
 function ColumnLabel({
   children,
   flex,
+  width,
 }: {
   children: React.ReactNode;
-  flex: number;
+  flex?: number;
+  width?: string;
 }) {
   return (
-    <Text fontSize="11px" color="fg.subtle" flex={flex}>
+    <Text
+      fontSize="11px"
+      color="fg.subtle"
+      flex={flex}
+      width={width}
+      flexShrink={width ? 0 : undefined}
+    >
       {children}
     </Text>
   );
