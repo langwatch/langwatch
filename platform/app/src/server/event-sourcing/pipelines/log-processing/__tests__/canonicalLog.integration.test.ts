@@ -138,6 +138,42 @@ describe("canonical log preparation", () => {
     expect(result.accepted[0]!.record.canonicalPayload).toContain("[REDACTED]");
   });
 
+  /** @scenario "A credential-named log attribute is redacted by name" */
+  it("hands the redactor each attribute's real name, not just its path", async () => {
+    let seen: Record<string, string> | undefined;
+    await prepareCanonicalLogRecords({
+      tenantId: "project_test",
+      organizationId: "organization_test",
+      request: request([
+        {
+          attributes: [
+            { key: "authorization", value: { stringValue: "Bearer zzz" } },
+            {
+              key: "langwatch.api_key.id",
+              value: { stringValue: "key_abc123" },
+            },
+          ],
+        },
+      ]),
+      piiRedactionLevel: "STRICT",
+      redactionService: {
+        redactLog: async (log) => {
+          seen = log.attributeNames;
+        },
+      },
+      acceptedAt: 1_700_000_000_000,
+    });
+
+    // The keys stay JSON paths, because two attributes may share a name and
+    // each value still needs its own address. The names ride alongside.
+    expect(Object.values(seen ?? {})).toEqual(
+      expect.arrayContaining(["authorization", "langwatch.api_key.id"]),
+    );
+    expect(Object.keys(seen ?? {})).toEqual(
+      expect.arrayContaining([expect.stringContaining("value.stringValue")]),
+    );
+  });
+
   it("keeps wire ids separate when synthesizing provider correlation", async () => {
     const result = await prepare(
       [
