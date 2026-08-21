@@ -30,6 +30,14 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   }),
 }));
 
+// useVisibleSectionNavItems resolves flags with org context; give it one.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    isLoading: false,
+    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
+  }),
+}));
+
 vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
   SectionNavigationLayout: ({
     navigationItems,

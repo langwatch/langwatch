@@ -1,4 +1,5 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { SectionNavItemData } from "./sectionNavItems";
 
@@ -18,8 +19,17 @@ import type { SectionNavItemData } from "./sectionNavItems";
 export function useVisibleSectionNavItems(
   items: readonly SectionNavItemData[],
 ): SectionNavItemData[] {
+  // Flags roll out per organization (PostHog release conditions / rule
+  // matching fails closed without ctx.organizationId), so the check must
+  // carry the same org context the page guards pass — otherwise a per-org
+  // enable shows the pages but never their nav items.
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const billedCost = useFeatureFlag(
     "release_ui_governance_billed_cost_enabled",
+    { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
   const flagEnabled = (
