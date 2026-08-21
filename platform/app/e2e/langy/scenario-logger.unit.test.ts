@@ -32,7 +32,7 @@ import { runScenarioAndLog } from "./scenario-logger";
 
 const CONFIG = { name: "a scenario" } as Parameters<
   typeof runScenarioAndLog
->[0];
+>[0]["config"];
 
 describe("runScenarioAndLog", () => {
   beforeEach(() => {
@@ -60,7 +60,8 @@ describe("runScenarioAndLog", () => {
           return Promise.resolve({ success: true });
         });
 
-      await runScenarioAndLog(CONFIG, {
+      await runScenarioAndLog({
+        config: CONFIG,
         beforeRetry: async () => {
           order.push("beforeRetry");
         },
@@ -76,7 +77,7 @@ describe("runScenarioAndLog", () => {
         .mockRejectedValueOnce(new Error("worker died"))
         .mockResolvedValueOnce({ success: true });
 
-      const result = await runScenarioAndLog(CONFIG);
+      const result = await runScenarioAndLog({ config: CONFIG });
 
       expect(scenarioRun).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ success: true });
@@ -89,7 +90,7 @@ describe("runScenarioAndLog", () => {
     const beforeRetry = vi.fn();
     scenarioRun.mockResolvedValueOnce({ success: true });
 
-    await runScenarioAndLog(CONFIG, { beforeRetry });
+    await runScenarioAndLog({ config: CONFIG, beforeRetry });
 
     expect(beforeRetry).not.toHaveBeenCalled();
     expect(scenarioRun).toHaveBeenCalledTimes(1);
@@ -103,9 +104,9 @@ describe("runScenarioAndLog", () => {
     isTransient.mockReturnValue(false);
     scenarioRun.mockRejectedValueOnce(new Error("real bug"));
 
-    await expect(runScenarioAndLog(CONFIG, { beforeRetry })).rejects.toThrow(
-      "real bug",
-    );
+    await expect(
+      runScenarioAndLog({ config: CONFIG, beforeRetry }),
+    ).rejects.toThrow("real bug");
 
     expect(beforeRetry).not.toHaveBeenCalled();
     expect(scenarioRun).toHaveBeenCalledTimes(1);

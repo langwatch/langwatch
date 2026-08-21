@@ -35,8 +35,8 @@ describe("Langy current-surfaces coverage", () => {
     // listing — a permission refusal here is the regression this catches.
     it("lists the gateway's virtual keys instead of claiming a boundary", async () => {
       const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog(
-        {
+      const result = await runScenarioAndLog({
+        config: {
           name: "virtual keys read capability",
           description:
             "The user wants to see the virtual keys configured on their AI Gateway, a surface Langy can read and administer on the caller's behalf.",
@@ -57,19 +57,17 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        {
-          label: "surfaces-gateway-virtual-keys",
-          path: "/gateway/virtual-keys",
-        },
-      );
+        label: "surfaces-gateway-virtual-keys",
+        path: "/gateway/virtual-keys",
+      });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
 
     it("reports AI Gateway usage without asking for a time range", async () => {
       const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog(
-        {
+      const result = await runScenarioAndLog({
+        config: {
           name: "AI Gateway usage report",
           description:
             "The user wants a quick summary of their AI Gateway usage/cost.",
@@ -91,8 +89,9 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        { label: "surfaces-gateway-usage", path: "/gateway/usage" },
-      );
+        label: "surfaces-gateway-usage",
+        path: "/gateway/usage",
+      });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
@@ -111,8 +110,8 @@ describe("Langy current-surfaces coverage", () => {
   describe("when the user asks for instrumentation help", () => {
     it("finds traces with broken or missing instrumentation", async () => {
       const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog(
-        {
+      const result = await runScenarioAndLog({
+        config: {
           name: "debug instrumentation gaps",
           description:
             "The user's traces look incomplete and they want Langy to find what's wrong.",
@@ -135,8 +134,8 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        { label: "surfaces-debug-instrumentation" },
-      );
+        label: "surfaces-debug-instrumentation",
+      });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
@@ -150,27 +149,29 @@ describe("Langy current-surfaces coverage", () => {
       const beforeIds = new Set(before.map((d) => d.id));
 
       const result = await runScenarioAndLog({
-        name: "generate a RAG evaluation dataset",
-        description: `The user wants a synthetic evaluation dataset for their RAG (retrieval-augmented generation) pipeline, named "${uniqueName}".`,
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy actually creates the dataset (reports success / an id / a name) rather than only describing the RAG-dataset-generation process.",
-              "Langy uses the exact requested name for the dataset.",
-              ...LANGY_CORE_RULE_CRITERIA,
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `generate a RAG evaluation dataset called "${uniqueName}" for my retrieval pipeline`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          name: "generate a RAG evaluation dataset",
+          description: `The user wants a synthetic evaluation dataset for their RAG (retrieval-augmented generation) pipeline, named "${uniqueName}".`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy actually creates the dataset (reports success / an id / a name) rather than only describing the RAG-dataset-generation process.",
+                "Langy uses the exact requested name for the dataset.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `generate a RAG evaluation dataset called "${uniqueName}" for my retrieval pipeline`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -188,30 +189,32 @@ describe("Langy current-surfaces coverage", () => {
       const langy = makeLangyAdapter();
 
       const result = await runScenarioAndLog({
-        name: "create a comparison evaluator",
-        description:
-          "The user wants an evaluator that judges which of two candidate LLM outputs is better, and wants it named " +
-          uniqueName +
-          ".",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy creates (or reports creating) a comparison-style evaluator that judges between two or more candidate outputs.",
-              "Langy uses the exact requested name for the evaluator.",
-              ...LANGY_CORE_RULE_CRITERIA,
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `set up an evaluator called "${uniqueName}" that compares two candidate responses and picks the better one`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          name: "create a comparison evaluator",
+          description:
+            "The user wants an evaluator that judges which of two candidate LLM outputs is better, and wants it named " +
+            uniqueName +
+            ".",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy creates (or reports creating) a comparison-style evaluator that judges between two or more candidate outputs.",
+                "Langy uses the exact requested name for the evaluator.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `set up an evaluator called "${uniqueName}" that compares two candidate responses and picks the better one`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -232,8 +235,8 @@ describe("Langy current-surfaces coverage", () => {
     // per the "verify a real capability exists before testing it" rule above.
     it("lists annotations without asking which trace first", async () => {
       const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog(
-        {
+      const result = await runScenarioAndLog({
+        config: {
           name: "list annotations",
           description:
             "The user wants to see the annotations left on their traces.",
@@ -254,8 +257,9 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        { label: "surfaces-list-annotations", path: "/annotations" },
-      );
+        label: "surfaces-list-annotations",
+        path: "/annotations",
+      });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
@@ -275,27 +279,29 @@ describe("Langy current-surfaces coverage", () => {
       const beforeIds = new Set(before.map((a) => a.id));
 
       const result = await runScenarioAndLog({
-        name: "annotate a specific trace",
-        description: `The user wants to leave a thumbs-up annotation on trace "${traceId}".`,
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy actually creates the annotation (reports success / an id) rather than only describing what an annotation is.",
-              "Langy uses the exact trace id the user gave it.",
-              ...LANGY_CORE_RULE_CRITERIA,
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `leave a thumbs-up annotation on trace "${traceId}" with the comment "looks correct"`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          name: "annotate a specific trace",
+          description: `The user wants to leave a thumbs-up annotation on trace "${traceId}".`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy actually creates the annotation (reports success / an id) rather than only describing what an annotation is.",
+                "Langy uses the exact trace id the user gave it.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `leave a thumbs-up annotation on trace "${traceId}" with the comment "looks correct"`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -319,27 +325,29 @@ describe("Langy current-surfaces coverage", () => {
       const langy = makeLangyAdapter();
 
       const result = await runScenarioAndLog({
-        name: "trigger creation capability",
-        description: `The user wants a trigger named "${uniqueName}" that emails on new failing traces — a write Langy's credentials now carry.`,
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              `Langy creates the trigger named "${uniqueName}" (or clearly reports the concrete result of attempting it), rather than refusing on permission grounds or handing the user a CLI command to run themselves.`,
-              "Langy does not fake the trigger through some other write (no workflow, monitor, or other resource stood up as a substitute the user did not ask for).",
-              ...LANGY_CORE_RULE_CRITERIA,
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `create a trigger called "${uniqueName}" that emails me when a new trace fails`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          name: "trigger creation capability",
+          description: `The user wants a trigger named "${uniqueName}" that emails on new failing traces — a write Langy's credentials now carry.`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                `Langy creates the trigger named "${uniqueName}" (or clearly reports the concrete result of attempting it), rather than refusing on permission grounds or handing the user a CLI command to run themselves.`,
+                "Langy does not fake the trigger through some other write (no workflow, monitor, or other resource stood up as a substitute the user did not ask for).",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `create a trigger called "${uniqueName}" that emails me when a new trace fails`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -356,8 +364,8 @@ describe("Langy current-surfaces coverage", () => {
   describe("when the user asks about a simulation run's outcome", () => {
     it("reports pass/fail on the most recent scenario run", async () => {
       const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog(
-        {
+      const result = await runScenarioAndLog({
+        config: {
           name: "most recent scenario run outcome",
           description:
             "The user wants to know whether their most recent scenario/simulation run passed.",
@@ -378,8 +386,9 @@ describe("Langy current-surfaces coverage", () => {
             scenario.judge(),
           ],
         },
-        { label: "surfaces-simulation-run-outcome", path: "/simulations" },
-      );
+        label: "surfaces-simulation-run-outcome",
+        path: "/simulations",
+      });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
