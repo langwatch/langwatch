@@ -398,7 +398,7 @@ export function RunHistoryPanel({
                   passedCount: totals.passedCount,
                   failedCount: totals.failedCount,
                   stalledCount: 0,
-                  cancelledCount: 0,
+                  cancelledCount: totals.cancelledCount,
                   completedCount: totals.passedCount + totals.failedCount,
                   inProgressCount: totals.pendingCount,
                   queuedCount: 0,

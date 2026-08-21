@@ -448,6 +448,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       TotalCount: string;
       PassCount: string;
       FailCount: string;
+      CancelledCount: string;
       RunningCount: string;
       LastUpdatedAt: string;
       LastRunAt: string;
@@ -460,15 +461,23 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         BatchRunId,
         toString(count())                                               AS TotalCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        -- Cancelled is neither pass nor fail (#6834) — it gets its own count
+        -- below instead of inflating FailCount. 'FAILURE' stays for rows
+        -- written before the fold started emitting the FAILED enum member.
+        toString(countIf(Status IN ('FAILED','FAILURE','ERROR')))      AS FailCount,
+        toString(countIf(Status = 'CANCELLED'))                        AS CancelledCount,
         toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
         toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
         toString(toUnixTimestamp64Milli(
           minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
         )) AS FirstCompletedAt,
+        -- QUEUED belongs with the other not-yet-completed states: a batch
+        -- still holding a queued run has not all completed, and counting one
+        -- stamped a completion time on a batch that was still waiting to
+        -- start (#6834).
         toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
+          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING','QUEUED'))
         )) AS AllCompletedAt,
         toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
@@ -623,6 +632,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         totalCount: Number(b.TotalCount),
         passCount: Number(b.PassCount),
         failCount: Number(b.FailCount),
+        cancelledCount: Number(b.CancelledCount),
         runningCount: Math.max(0, runningCount),
         stalledCount,
         lastRunAt: Number(b.LastRunAt),
@@ -1100,10 +1110,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT
            NormalizedSetId,
            BatchRunId,
-           -- Settled = all terminal states (excludes in-progress/queued)
-           countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING')) AS SettledCount,
+           -- Settled = terminal states that say something about the agent.
+           -- Cancelled is excluded from both sides (#6834): a user
+           -- cancellation is neither a pass nor a fail, and counting it
+           -- either way distorts the sidebar pass rate. Keep in sync with
+           -- computeGroupSummary in run-history-transforms.ts.
+           countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING', 'CANCELLED')) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
-           countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
+           countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED')) AS FailCount,
            -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
            toUnixTimestamp64Milli(min(if(StartedAt IS NOT NULL, StartedAt, CreatedAt))) AS MinStartedAtMs
          FROM (

@@ -73,7 +73,8 @@ export type BatchHistoryItem = {
   batchRunId: string;
   totalCount: number;
   passCount: number; // SUCCESS
-  failCount: number; // FAILED | FAILURE | ERROR | CANCELLED
+  failCount: number; // FAILED | FAILURE | ERROR — stalled and cancelled have their own buckets below (#6834)
+  cancelledCount: number; // CANCELLED — neither passed nor failed
   runningCount: number; // IN_PROGRESS | PENDING
   stalledCount: number; // STALLED
   lastRunAt: number; // max CreatedAt (display / sort)

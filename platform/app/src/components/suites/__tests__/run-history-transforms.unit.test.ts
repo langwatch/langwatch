@@ -407,7 +407,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when all runs are cancelled", () => {
-    it("returns 0% pass rate (cancelled is terminal)", () => {
+    it("returns null pass rate — cancelled is neither pass nor fail (#6834)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({
@@ -418,9 +418,32 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBe(0);
+      expect(summary.passRate).toBeNull();
       expect(summary.completedCount).toBe(0);
       expect(summary.cancelledCount).toBe(1);
+    });
+  });
+
+  describe("when passed and cancelled runs are mixed", () => {
+    it("keeps the cancelled run out of the pass-rate denominator (#6834)", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_1",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            scenarioRunId: "run_2",
+          }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBe(100);
+      expect(summary.passedCount).toBe(1);
+      expect(summary.cancelledCount).toBe(1);
+      expect(summary.failedCount).toBe(0);
     });
   });
 
@@ -507,7 +530,9 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBe(50);
+      // 3 passed / 5 settled (3 passed + 1 failed + 1 stalled) — the
+      // cancelled run is neither pass nor fail (#6834).
+      expect(summary.passRate).toBe(60);
       expect(summary.completedCount).toBe(4);
       expect(summary.passedCount).toBe(3);
       expect(summary.failedCount).toBe(1);
@@ -654,7 +679,7 @@ describe("computeRunHistoryTotals()", () => {
   });
 
   describe("when given stalled and cancelled runs", () => {
-    it("counts them as failed", () => {
+    it("counts stalled as failed and cancelled in its own bucket (#6834)", () => {
       const runs = [
         makeScenarioRunData({
           status: ScenarioRunStatus.SUCCESS,
@@ -673,7 +698,8 @@ describe("computeRunHistoryTotals()", () => {
       const totals = computeRunHistoryTotals({ runs });
       expect(totals.runCount).toBe(3);
       expect(totals.passedCount).toBe(1);
-      expect(totals.failedCount).toBe(2);
+      expect(totals.failedCount).toBe(1);
+      expect(totals.cancelledCount).toBe(1);
     });
   });
 });

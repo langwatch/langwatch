@@ -39,6 +39,7 @@ interface ClickHouseSuiteRunRecord {
   StartedCount: number;
   CompletedCount: number;
   FailedCount: number;
+  CancelledCount: number;
   Progress: number;
   PassRateBps: number | null;
   PassedCount: number;
@@ -75,6 +76,7 @@ export class SuiteRunStateRepositoryClickHouse<
       StartedCount: record.StartedCount,
       CompletedCount: record.CompletedCount,
       FailedCount: record.FailedCount,
+      CancelledCount: record.CancelledCount ?? 0,
       Progress: record.Progress,
       PassRateBps: record.PassRateBps,
       PassedCount: record.PassedCount ?? 0,
@@ -106,6 +108,7 @@ export class SuiteRunStateRepositoryClickHouse<
       StartedCount: data.StartedCount,
       CompletedCount: data.CompletedCount,
       FailedCount: data.FailedCount,
+      CancelledCount: data.CancelledCount,
       Progress: data.Progress,
       PassRateBps: data.PassRateBps,
       PassedCount: data.PassedCount,
@@ -148,7 +151,8 @@ export class SuiteRunStateRepositoryClickHouse<
             t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
             t.Version AS Version, t.Status AS Status, t.Total AS Total,
             t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
-            t.FailedCount AS FailedCount, t.Progress AS Progress,
+            t.FailedCount AS FailedCount,
+            t.CancelledCount AS CancelledCount, t.Progress AS Progress,
             t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
             t.GradedCount AS GradedCount,
             toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,

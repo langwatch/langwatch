@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { mapStatus } from "../../../../simulations/simulation-run.mappers";
 import { isSuiteSetId } from "../../../../suites/suite-set-id";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
@@ -102,7 +103,16 @@ export function createSuiteRunSyncSubscriber(
       batchRunId: data.batchRunId,
       scenarioRunId: data.scenarioRunId,
       scenarioId: data.scenarioId,
-      status: data.status,
+      // Normalize before crossing the pipeline boundary: `data.status` is an
+      // unconstrained string on the event and the command schema, so it can
+      // still carry the non-enum "FAILURE" written by older callers (#6834).
+      // The suite fold's ladder matches "FAILURE" as a legacy alias, so this
+      // is not what keeps the counts right — it keeps the status *recorded*
+      // on SuiteRunItemCompletedEvent inside `ScenarioRunStatus`, so the
+      // alias stays a replay concession rather than a live input. Every enum
+      // member round-trips unchanged; `mapStatus` only rewrites "FAILURE",
+      // and falls back to IN_PROGRESS for a string it does not recognise.
+      status: mapStatus(data.status),
       verdict: data.results?.verdict,
       durationMs: data.durationMs,
       reasoning: data.results?.reasoning,

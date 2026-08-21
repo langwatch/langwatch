@@ -18,7 +18,10 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
-import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import {
+  categorizeRunStatus,
+  type RunStatusCategory,
+} from "~/server/scenarios/scenario-run-category";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 /** Valid values for the grouping dimension. */
@@ -90,7 +93,10 @@ export type BatchRunSummary = RunGroupSummary;
 export type RunHistoryTotals = {
   runCount: number;
   passedCount: number;
+  /** Failed, errored, and stalled runs. Cancelled is NOT a failure (#6834). */
   failedCount: number;
+  /** User-cancelled runs — neither passed nor failed. */
+  cancelledCount: number;
   pendingCount: number;
 };
 
@@ -278,9 +284,12 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
- * (all terminal states). Only in-progress and queued runs are excluded from the
- * denominator since we don't know their outcome yet.
+ * Pass rate = passed / settled. "Settled" = passed + failed + stalled — the
+ * terminal states that say something about the agent. Cancelled runs are
+ * excluded from the denominator (#6834): a user cancellation is neither a
+ * pass nor a fail, and counting it as a non-pass silently reads "someone hit
+ * stop" as "the agent failed". In-progress and queued runs are excluded since
+ * we don't know their outcome yet.
  * When no runs have settled yet (settledCount == 0), passRate is null.
  *
  * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
@@ -324,8 +333,7 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
-  const settledCount =
-    passedCount + failedCount + stalledCount + cancelledCount;
+  const settledCount = passedCount + failedCount + stalledCount;
   const totalCount = group.scenarioRuns.length;
   const passRate =
     settledCount > 0
@@ -497,28 +505,24 @@ export function computeRunHistoryTotals({
 }: {
   runs: ScenarioRunData[];
 }): RunHistoryTotals {
-  let passedCount = 0;
-  let failedCount = 0;
-  let pendingCount = 0;
-
+  const counts: Record<RunStatusCategory, number> = {
+    success: 0,
+    failure: 0,
+    stalled: 0,
+    cancelled: 0,
+    in_progress: 0,
+    queued: 0,
+  };
   for (const run of runs) {
-    const category = categorizeRunStatus(run.status);
-    if (category === "success") passedCount++;
-    else if (
-      category === "failure" ||
-      category === "stalled" ||
-      category === "cancelled"
-    )
-      failedCount++;
-    else if (category === "queued" || category === "in_progress")
-      pendingCount++;
+    counts[categorizeRunStatus(run.status)]++;
   }
 
   return {
     runCount: runs.length,
-    passedCount,
-    failedCount,
-    pendingCount,
+    passedCount: counts.success,
+    failedCount: counts.failure + counts.stalled,
+    cancelledCount: counts.cancelled,
+    pendingCount: counts.queued + counts.in_progress,
   };
 }
 

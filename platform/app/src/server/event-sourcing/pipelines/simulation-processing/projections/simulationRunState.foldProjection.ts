@@ -192,6 +192,23 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  *      finished event's `status` is only typed `z.string().optional()` on the
  *      internal event schema — any string can reach the fold.
  */
+/**
+ * "FAILURE" was never a `ScenarioRunStatus` member — the enum has FAILED.
+ * Accept it from loose senders, pre-fix events, and historical fold state
+ * read back from ClickHouse, but never write it anew (#6834).
+ */
+function normalizeLegacyFailure(status: string): string {
+  return status === "FAILURE" ? "FAILED" : status;
+}
+
+/**
+ * The single choke point every non-`finished` handler writes Status through.
+ * Normalizing here rather than at each call site covers the retained branch
+ * too: a finished run keeps its stored status verbatim, and a historical row
+ * read back from ClickHouse is exactly the state that arrives finished and
+ * still carrying "FAILURE" (#6834). The `finished` handler writes Status
+ * directly and normalizes its own explicit input.
+ */
 function statusAfter({
   state,
   candidate,
@@ -199,7 +216,9 @@ function statusAfter({
   state: SimulationRunStateData;
   candidate: string;
 }): string {
-  return state.FinishedAt != null ? state.Status : candidate;
+  return normalizeLegacyFailure(
+    state.FinishedAt != null ? state.Status : candidate,
+  );
 }
 
 /**
@@ -394,6 +413,8 @@ export class SimulationRunStateFoldProjection
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
+      // `statusAfter` normalizes both of its branches, so the event's own
+      // status needs no separate pass here (#6834).
       Status: statusAfter({
         state,
         candidate: event.data.status ?? state.Status,
@@ -540,13 +561,17 @@ export class SimulationRunStateFoldProjection
     let status: string;
     const explicit = event.data.status?.toUpperCase();
     if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
+      // Never write the legacy string — see normalizeLegacyFailure (#6834).
+      status = normalizeLegacyFailure(explicit);
     } else if (verdict === "success") {
       status = "SUCCESS";
     } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
+      // DELIBERATE: inconclusive folds to FAILED until the SDK can emit it
+      // truthfully (langwatch/scenario#886/#889) — at that point this arm
+      // decides what INCONCLUSIVE means platform-side.
+      status = "FAILED";
     } else {
-      status = "FAILURE";
+      status = "FAILED";
     }
 
     return {

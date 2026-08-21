@@ -129,6 +129,43 @@ describe("suiteRunSync subscriber", () => {
         occurredAt: 5_000,
       });
     });
+
+    it("normalizes a legacy FAILURE status to the FAILED enum member (#6834)", async () => {
+      // `data.status` is an unconstrained string on the event and on the
+      // command schema, so events written before #6834 still carry "FAILURE".
+      // The suite fold matches it as a legacy replay alias, so the counts
+      // survive either way — normalizing here keeps the alias out of newly
+      // recorded events, so it stays a replay concession, not a live input.
+      const deps = makeDeps();
+      const subscriber = createSuiteRunSyncSubscriber(deps);
+
+      await subscriber.handler(finishedEvent({ status: "FAILURE" }), CONTEXT);
+
+      expect(deps.completeSuiteRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "FAILED" }),
+      );
+    });
+
+    // "FAILURE" is the only value the normalization is allowed to rewrite.
+    // Every status the suite fold's ladder buckets on has to survive the hop
+    // byte-identical, or normalizing here would silently move an item between
+    // the failed, cancelled and completed counts.
+    it.each([
+      "SUCCESS",
+      "FAILED",
+      "ERROR",
+      "STALLED",
+      "CANCELLED",
+    ])("passes a %s status through unchanged", async (status) => {
+      const deps = makeDeps();
+      const subscriber = createSuiteRunSyncSubscriber(deps);
+
+      await subscriber.handler(finishedEvent({ status }), CONTEXT);
+
+      expect(deps.completeSuiteRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({ status }),
+      );
+    });
   });
 
   describe("when the run does not belong to a suite", () => {
