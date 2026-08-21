@@ -16,6 +16,8 @@ import {
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
+  ModelProviderRoutingHandleInvalidError,
+  ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
@@ -39,6 +41,11 @@ import {
   modelProviders,
   providerDeprecation,
 } from "./registry";
+import {
+  isRoutingHandleConflict,
+  normalizeRoutingHandle,
+  routingHandleProblem,
+} from "./routingHandle";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 /**
@@ -84,6 +91,13 @@ export type UpdateModelProviderInput = {
   customKeys?: Record<string, unknown> | null;
   customModels?: CustomModelsInput | null;
   customEmbeddingsModels?: CustomModelsInput | null;
+  /**
+   * The slug that addresses THIS instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Omit to leave the stored handle alone; send an
+   * empty string or null to clear it, which releases the name for another
+   * provider in the organization.
+   */
+  routingHandle?: string | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
   /**
@@ -590,6 +604,7 @@ export class ModelProviderService {
       extraHeaders,
       defaultModel,
       name,
+      routingHandle,
       rateLimitRpm,
       rateLimitTpm,
       rateLimitRpd,
@@ -612,6 +627,21 @@ export class ModelProviderService {
     // Validate provider exists
     if (!(provider in modelProviders)) {
       throw new Error("Invalid provider");
+    }
+
+    // The handle is checked before any database work: a name that is not a
+    // handle, or one that already means a provider family, is refused whatever
+    // else the save carries.
+    const handleProvided = routingHandle !== undefined;
+    const normalizedHandle = normalizeRoutingHandle(routingHandle);
+    if (handleProvided) {
+      const problem = routingHandleProblem(normalizedHandle);
+      if (problem) {
+        throw new ModelProviderRoutingHandleInvalidError({
+          handle: normalizedHandle ?? "",
+          problem,
+        });
+      }
     }
 
     // Validate and clean custom keys
@@ -706,6 +736,83 @@ export class ModelProviderService {
       throw new ModelProviderScopesRequiredError();
     }
 
+    return await this.withRoutingHandleConflict(normalizedHandle, () =>
+      this.writeModelProvider({
+        existingProvider,
+        createScopes,
+        handleProvided,
+        normalizedHandle,
+        input,
+        validatedKeys,
+        customKeysProvided,
+        scopes,
+      }),
+    );
+  }
+
+  /**
+   * Turns the routing-handle unique-index violation into the refusal a person
+   * reads. The index is what actually makes the name unique, because two saves
+   * racing each other both pass any read-then-write check; this is only the
+   * translation.
+   */
+  private async withRoutingHandleConflict<T>(
+    handle: string | null,
+    write: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (handle !== null && isRoutingHandleConflict(error)) {
+        throw new ModelProviderRoutingHandleTakenError({ handle });
+      }
+      throw error;
+    }
+  }
+
+  private async writeModelProvider({
+    existingProvider,
+    createScopes,
+    handleProvided,
+    normalizedHandle,
+    input,
+    validatedKeys,
+    customKeysProvided,
+    scopes,
+  }: {
+    existingProvider: Awaited<
+      ReturnType<ModelProviderService["findExistingProvider"]>
+    >;
+    createScopes: ScopeInput[] | undefined;
+    handleProvided: boolean;
+    normalizedHandle: string | null;
+    input: UpdateModelProviderInput;
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+    scopes: ScopeInput[] | undefined;
+  }) {
+    const {
+      provider,
+      enabled,
+      customModels,
+      customEmbeddingsModels,
+      extraHeaders,
+      defaultModel,
+      name,
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      providerConfig,
+    } = input;
+    const advanced = {
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      providerConfig,
+    };
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -720,6 +827,7 @@ export class ModelProviderService {
             customModels: customModels ?? [],
             customEmbeddingsModels: customEmbeddingsModels ?? [],
             extraHeaders: extraHeaders ?? [],
+            ...(handleProvided && { routingHandle: normalizedHandle }),
             advanced,
           },
           validatedKeys,
@@ -749,6 +857,7 @@ export class ModelProviderService {
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
+            ...(handleProvided && { routingHandle: normalizedHandle }),
             advanced,
           },
           validatedKeys,
@@ -1199,6 +1308,9 @@ export class ModelProviderService {
       name: mp.name,
       provider: mp.provider,
       enabled: mp.enabled,
+      // Surfaced so the drawer can show the prefix that reaches THIS instance,
+      // and so the settings list can show which instance owns a handle.
+      routingHandle: mp.routingHandle,
       // Whether the credential has been withdrawn. The gateway already
       // refuses to route to a withdrawn provider; surfacing it lets the
       // frontend surfaces that preview routing agree with that decision
@@ -1561,6 +1673,7 @@ export class ModelProviderService {
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1600,6 +1713,9 @@ export class ModelProviderService {
         ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
@@ -1618,6 +1734,7 @@ export class ModelProviderService {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       scopes: ScopeInput[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1635,6 +1752,9 @@ export class ModelProviderService {
         // instead of being stored literally.
         extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
         ...pickAdvancedFields(data.advanced),

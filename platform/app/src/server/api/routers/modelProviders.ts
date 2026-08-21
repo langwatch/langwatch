@@ -174,6 +174,11 @@ export const modelProviderRouter = createTRPCRouter({
             .optional()
             .nullable(),
           defaultModel: z.string().optional(),
+          // The slug that addresses THIS instance in a gateway model string
+          // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone;
+          // an empty string clears it. The shape and the reserved names are
+          // checked in the service, which owns the rule the gateway reads.
+          routingHandle: z.string().max(64).optional().nullable(),
           // Multi-scope writes (iter 109). `scopes` is the canonical shape;
           // `scopeType`/`scopeId` remain for the transition period so older
           // callers still compile. When both arrive, `scopes` wins. The
@@ -215,6 +220,7 @@ export const modelProviderRouter = createTRPCRouter({
           customEmbeddingsModels: input.customEmbeddingsModels,
           extraHeaders: input.extraHeaders,
           defaultModel: input.defaultModel,
+          routingHandle: input.routingHandle,
           scopes: input.scopes,
           scopeType: input.scopeType,
           scopeId: input.scopeId,

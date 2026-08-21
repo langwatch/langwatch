@@ -50,6 +50,7 @@ import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 // section on the model-providers settings page (DefaultModelsSection). See
 // specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ModelProviderRoutingSection } from "./ModelProviderRoutingSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
@@ -453,6 +454,14 @@ export const EditModelProviderForm = ({
             Dev").
           </Field.HelperText>
         </Field.Root>
+
+        {isLlmProvider && (
+          <ModelProviderRoutingSection
+            providerKey={provider.provider}
+            routingHandle={state.routingHandle}
+            onRoutingHandleChange={actions.setRoutingHandle}
+          />
+        )}
 
         {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>

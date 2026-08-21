@@ -246,6 +246,8 @@ export class ModelProviderRepository {
        * project it wrote through.
        */
       scopes: ScopeInput[];
+      /** Normalized routing handle, or null to store none. */
+      routingHandle?: string | null;
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
@@ -285,6 +287,9 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(data.rateLimitRpm !== undefined && {
           rateLimitRpm: data.rateLimitRpm,
         }),
@@ -334,6 +339,8 @@ export class ModelProviderRepository {
        * inserted; when omitted the scope set is untouched.
        */
       scopes?: ScopeInput[];
+      /** Normalized routing handle. null clears it and releases the name. */
+      routingHandle?: string | null;
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;

@@ -1151,6 +1151,13 @@ model ModelProvider {
   // scope for a project.
   name                   String
   provider               String
+  // Operator-chosen slug that addresses THIS instance in a gateway model
+  // string ("eu/claude-sonnet-5"). A provider family prefix names a kind, so
+  // with two Anthropic rows on one key "anthropic/..." matches both and the
+  // chain order decides; a handle is the name that pins one row. Lowercase
+  // [a-z0-9][a-z0-9_-]*, at most 32 characters, unique per organization, and
+  // never a provider family spelling. Null when the operator set none.
+  routingHandle          String?
   enabled                Boolean
   customKeys             Json?
   // Provider-side custom headers - appended on every request the

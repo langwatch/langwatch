@@ -15,6 +15,7 @@ import type {
 } from "../../hooks/useModelProviderForm";
 import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { RESERVED_ROUTING_HANDLES } from "../../server/modelProviders/routingHandle";
 import { SmallLabel } from "../SmallLabel";
 import { Menu } from "../ui/menu";
 import { AddCustomEmbeddingsModelDialog } from "./AddCustomEmbeddingsModelDialog";
@@ -30,6 +31,19 @@ import { RegistryModelsModal } from "./RegistryModelsModal";
  * @param actions - Form actions for managing custom models
  * @param provider - The model provider configuration
  */
+/**
+ * A declared model whose first segment spells a provider type can never be
+ * reached by its own name: the AI Gateway reads that segment as the provider,
+ * the same way "openai/gpt-5-mini" is read. Warned rather than refused,
+ * because the customer's server really may serve a model under that name and
+ * the "custom/" prefix still reaches it.
+ */
+function shadowedByProviderType(modelId: string): boolean {
+  const [first, ...rest] = modelId.split("/");
+  if (!first || rest.length === 0) return false;
+  return RESERVED_ROUTING_HANDLES.has(first.toLowerCase());
+}
+
 export const CustomModelInputSection = ({
   state,
   actions,
@@ -158,6 +172,13 @@ export const CustomModelInputSection = ({
               <Table.Row key={`${entry.mode}-${entry.modelId}`}>
                 <Table.Cell>
                   <Text fontSize="sm">{entry.modelId}</Text>
+                  {shadowedByProviderType(entry.modelId) ? (
+                    <Text fontSize="xs" color="orange.600">
+                      The first part of this name is a provider type, so the AI
+                      Gateway reads it as one. A request has to write this model
+                      as {`custom/${entry.modelId}`} to reach this provider.
+                    </Text>
+                  ) : null}
                 </Table.Cell>
                 <Table.Cell>
                   <Text fontSize="sm">{entry.displayName}</Text>

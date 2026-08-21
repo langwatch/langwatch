@@ -31,6 +31,7 @@ import {
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { computeConfigETag } from "./configETag";
 import { withTierFallthrough } from "./modelTierFallthrough";
+import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
   eligibleModelProvidersForVk,
   scopeReachableModelProvidersForVk,
@@ -76,6 +77,20 @@ export type ProviderSlot = {
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
+  /**
+   * The operator-chosen routing handle of this ModelProvider row. A caller
+   * writes it where a provider family goes ("eu/claude-sonnet-5") to reach
+   * THIS instance rather than whichever instance of the family the key's chain
+   * order reaches first. Absent when the operator set none.
+   */
+  handle?: string;
+  /**
+   * What this provider declares it serves, for ROUTING a bare model name to
+   * the provider that owns it. Absent when the row declares nothing, which the
+   * gateway reads as "this provider said nothing" rather than "this provider
+   * serves nothing". Authorization stays with `models_allowed`.
+   */
+  models?: string[];
   config: Record<string, unknown>;
 };
 
@@ -88,6 +103,12 @@ export type ProviderSlot = {
 export type ProviderExclusionWire = {
   id: string;
   type: string;
+  /**
+   * The dropped row's routing handle, carried so a request naming it is told
+   * which of the key's settings dropped the provider instead of being told the
+   * operator's own handle means nothing.
+   */
+  handle?: string;
 };
 
 export type GatewayConfigPayload = {
@@ -769,6 +790,7 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)
     : undefined;
+  const declaredModels = declaredModelsForProvider(mp);
   return {
     id: mp.id,
     slot: index === 0 ? "primary" : `fallback_${index}`,
@@ -777,6 +799,8 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+    ...(declaredModels ? { models: declaredModels } : {}),
     config: buildProviderConfig(mp),
   };
 }
@@ -843,7 +867,11 @@ function routingModeToWire(
 }
 
 function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
-  return { id: mp.id, type: mp.provider };
+  return {
+    id: mp.id,
+    type: mp.provider,
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+  };
 }
 
 /**

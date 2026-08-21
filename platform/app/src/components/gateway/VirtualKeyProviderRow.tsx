@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Text,
+  VStack,
+  Wrap,
+} from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
@@ -32,6 +40,7 @@ export function ProviderRow({
   scopeName,
   modelsAllowed,
   onModelsAllowedChange,
+  winsProviderTypePrefix,
 }: {
   mp: EligibleModelProvider;
   raw: OrgModelProvider | undefined;
@@ -41,6 +50,12 @@ export function ProviderRow({
   scopeName: string | undefined;
   modelsAllowed: string[];
   onModelsAllowedChange: (next: string[]) => void;
+  /**
+   * Whether a request writing the bare provider type ("anthropic/…") reaches
+   * THIS provider. True for the first provider of its type in the key's own
+   * order. Only meaningful per key, because the order is the key's.
+   */
+  winsProviderTypePrefix: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const models = providerModels(raw);
@@ -89,9 +104,23 @@ export function ProviderRow({
         >
           {icon}
         </Box>
-        <Text fontSize="sm" fontWeight="medium">
-          {mp.label}
-        </Text>
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm" fontWeight="medium">
+            {mp.label}
+          </Text>
+          <HStack gap={1} color="fg.muted" fontSize="2xs">
+            <Text>Reached as</Text>
+            {raw?.routingHandle ? (
+              <Text as="code">{`${raw.routingHandle}/<model>`}</Text>
+            ) : null}
+            <Text as="code">{`${mp.provider}/<model>`}</Text>
+            {winsProviderTypePrefix ? (
+              <Badge size="xs" colorPalette="green">
+                first for {mp.provider}
+              </Badge>
+            ) : null}
+          </HStack>
+        </VStack>
         <Box flex={1} />
         <ProviderScopeChips
           size="xs"

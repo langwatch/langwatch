@@ -198,6 +198,8 @@ export const APP_ERROR_CODES = [
   "model_provider_deprecated",
   "model_provider_disabled",
   "model_provider_not_found",
+  "model_provider_routing_handle_invalid",
+  "model_provider_routing_handle_taken",
   "model_provider_scope_forbidden",
   "model_provider_scopes_required",
   "model_provider_test_rate_limited",
