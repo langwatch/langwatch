@@ -882,6 +882,79 @@ describe("automationRouter", () => {
   });
 
   describe("getTriggers", () => {
+    describe("when a trace automation has conditions that fail closed", () => {
+      it("returns a field-only unreachable diagnostic", async () => {
+        mockTriggerFindMany.mockResolvedValueOnce([
+          {
+            id: "trigger_unreachable",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            triggerKind: "AUTOMATION",
+            customGraphId: null,
+            filterQuery: null,
+            filters: JSON.stringify({
+              "evaluations.state": { evaluator_1: ["finished"] },
+            }),
+          },
+        ]);
+        mockMonitorFindMany.mockResolvedValueOnce([]);
+
+        const result = await caller.getTriggers({ projectId: "proj_123" });
+
+        expect(result[0]?.reachability).toEqual({
+          status: "unreachable",
+          reasons: [
+            {
+              code: "invalid_evaluation_state",
+              fields: ["evaluations.state"],
+            },
+          ],
+        });
+        expect(JSON.stringify(result[0]?.reachability)).not.toContain(
+          "finished",
+        );
+      });
+    });
+
+    describe("when automations are reports or graph alerts", () => {
+      it("returns no reachability diagnostic", async () => {
+        mockTriggerFindMany.mockResolvedValueOnce([
+          {
+            id: "trigger_report",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            triggerKind: "REPORT",
+            customGraphId: null,
+            filterQuery: null,
+            filters: JSON.stringify({
+              "evaluations.state": { evaluator_1: ["finished"] },
+            }),
+          },
+          {
+            id: "trigger_graph",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            triggerKind: "AUTOMATION",
+            customGraphId: "graph-1",
+            filterQuery: null,
+            filters: JSON.stringify({
+              "evaluations.state": { evaluator_1: ["finished"] },
+            }),
+          },
+        ]);
+        mockMonitorFindMany.mockResolvedValueOnce([]);
+        mockCustomGraphFindMany.mockResolvedValueOnce([
+          { id: "graph-1", name: "p95 latency" },
+        ]);
+
+        const result = await caller.getTriggers({ projectId: "proj_123" });
+
+        expect(result.find((row) => row.id === "trigger_report")).toMatchObject(
+          { reachability: null },
+        );
+        expect(result.find((row) => row.id === "trigger_graph")).toMatchObject({
+          reachability: null,
+        });
+      });
+    });
+
     describe("when some triggers point at custom graphs", () => {
       it("enriches only the graph-alert row with its customGraph", async () => {
         mockTriggerFindMany.mockResolvedValueOnce([

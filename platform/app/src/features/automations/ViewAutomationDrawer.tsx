@@ -16,6 +16,7 @@ import { Calendar, TrendingUp } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import { AutomationReachabilityWarning } from "~/features/automations/components/AutomationReachabilityWarning";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
@@ -282,6 +283,9 @@ export function ViewAutomationDrawer({
                 Conditions
               </Text>
               {conditionsSummary()}
+              <AutomationReachabilityWarning
+                diagnostic={trigger?.reachability}
+              />
             </VStack>
 
             <VStack align="start" gap={2} width="full">
