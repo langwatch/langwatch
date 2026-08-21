@@ -370,7 +370,7 @@ A first-party [Model Context Protocol](https://modelcontextprotocol.io) server f
 - **`lwql_schema`** — the dataset catalog your key can see, ready for the model's context
 - **`lwql_query`** — run one read-only SQL statement and get typed rows, statistics, and diagnostics back
 
-Because LWQL is already read-only, tenant-isolated, and resource-capped at the database, connecting it to an agent through MCP doesn't require any additional sandboxing on your side.
+LWQL is read-only, tenant-isolated and resource-capped at the database, so an agent connected through MCP cannot write, cannot reach another tenant's rows, and cannot exhaust the server. Those are the guarantees the database enforces; whatever your agent then does with the rows it legitimately reads is your side of the boundary.
 
 ## Until then
 
@@ -393,7 +393,7 @@ LWQL accepts arbitrary SQL from customers and agents, so its access model is lay
 
 ## Tenant isolation lives in the database
 
-Every query runs as a restricted ClickHouse identity, and every LWQL view carries a **row policy** that scopes reads to the calling project. The tenant is resolved from a capability derived from your project's key, sent by the server — never from the SQL, never from the request body, and never from the project id in the URL (that one is only a cross-check; naming a different project returns 404).
+Every query runs as a restricted ClickHouse identity, and every **source table** the LWQL views read carries a **row policy** that scopes reads to the calling project. The policies sit on the source tables rather than on the views because the views are declared `SQL SECURITY INVOKER` — they read their sources *as the caller*, so the source-table policy is the boundary that actually enforces, and it holds no matter which view reaches the data. The tenant is resolved from a capability derived from your project's key, sent by the server — never from the SQL, never from the request body, and never from the project id in the URL (that one is only a cross-check; naming a different project returns 404).
 
 The consequence: there is no statement you can write that reads another tenant's rows. A bug in the API gateway can cost a caller a wrong refusal or acceptance of a malformed query — it cannot cross tenants, because the gateway was never the boundary.
 
@@ -401,7 +401,7 @@ The consequence: there is no statement you can write that reads another tenant's
 
 - LWQL requires an API key with the **`analytics:view`** scope, and the project must have LWQL enabled.
 - Access is **read-only by construction**: the database identity has `readonly = 1` pinned as a constant, and the validator refuses every write and DDL form before it ever reaches the database anyway.
-- The identity can see **only the LWQL views**. Raw tables, other databases, `system.*`, and `information_schema` are unreachable at the database and refused by name at the gateway.
+- The identity is granted `SELECT` on the **LWQL views** and on **exactly the source columns those views read** — nothing else. The source-column grant is deliberate: it is what makes an unauthorised column a database-level `ACCESS_DENIED` rather than something only the gateway refuses. Other databases and any table outside that set carry no grant at all. `system.*` and `information_schema` are refused by name at the gateway.
 
 ## Column-level permission gates
 
@@ -536,7 +536,7 @@ LWQL support for self-hosted deployments is early. This page documents the archi
 
 ## Architecture in one paragraph
 
-Customer SQL never runs as the application. It runs as a dedicated **restricted ClickHouse identity** whose settings profile pins `readonly = 1` and all resource ceilings as constants, and which holds `SELECT` on a set of **LWQL views** in a dedicated analytics database — and on nothing else. **Row policies** on those views scope every read to the calling project, resolved through a tenant capability the application sends per query as a custom setting. PostgreSQL-resident datasets (prompts, experiments, annotations, ...) reach ClickHouse through **approved views** in PostgreSQL read by **PostgreSQL-engine tables** in the analytics database, so the same row policies apply to them too.
+Customer SQL never runs as the application. It runs as a dedicated **restricted ClickHouse identity** whose settings profile pins `readonly = 1` and all resource ceilings as constants, and which holds `SELECT` on a set of **LWQL views** in a dedicated analytics database, plus the exact source columns those views read — and on nothing else. **Row policies** on the *source tables* those views read scope every read to the calling project (the views are `SQL SECURITY INVOKER`, so they read as the caller and the source-table policy is what enforces), resolved through a tenant capability the application sends per query as a custom setting. PostgreSQL-resident datasets (prompts, experiments, annotations, ...) reach ClickHouse through **approved views** in PostgreSQL read by **PostgreSQL-engine tables** in the analytics database, so the same row policies apply to them too.
 
 A deployment that provisions none of this simply has no LWQL: the API answers `503 lwql_unavailable` and everything else works normally.
 
@@ -576,7 +576,7 @@ The access model itself is deployed out of band (in LangWatch Cloud, by Terrafor
 
 - The **restricted user** and its **settings profile** — `readonly = 1`, `max_execution_time`, `max_memory_usage`, `max_threads`, `max_concurrent_queries_for_user`, `max_rows_to_read`, `max_bytes_to_read`, all `CONST`, plus the tenant setting declared `CHANGEABLE_IN_READONLY`
 - **Grants** — `SELECT` on the LWQL views (and the exact source columns the views read), nothing else
-- **Row policies** binding each view to the tenant capability
+- **Row policies** binding each *source table* to the tenant capability — not the views, which are `SQL SECURITY INVOKER` and read as the caller
 - For PostgreSQL-resident datasets: a **read-only PostgreSQL role** granted `SELECT` on the approved views only, a ClickHouse **named collection** holding that role's connection, and the **PostgreSQL-engine tables** mapping the approved views into the analytics database
 
 ## Gotchas
@@ -793,15 +793,26 @@ LIMIT 50
 ```sql
 SELECT e.EvaluatorName,
        countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed) AS Agree,
-       count() AS Overlap,
+       count() AS Pairs,
        round((countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed)) / count(), 3) AS Agreement
 FROM annotations AS a
 JOIN evaluations AS e ON a.TraceId = e.TraceId
 WHERE a.CreatedAt >= now() - INTERVAL 30 DAY
   AND e.Passed IS NOT NULL
 GROUP BY e.EvaluatorName
-ORDER BY Overlap DESC
+ORDER BY Pairs DESC
 ```
+
+<Note>
+  The unit here is an **(annotation, evaluation) pair**, not a trace. Both
+  datasets are one row per event — one human annotation, one evaluation run —
+  so a trace annotated twice and evaluated three times by the same evaluator
+  contributes six pairs, and weighs six times as much as a trace with one of
+  each. That is why the column is `Pairs` rather than a trace count. The
+  `POSSIBLE_FANOUT` diagnostic flags this on the result. For a trace-weighted
+  answer, restrict to one annotation and one evaluation per trace before
+  comparing.
+</Note>
 
 ### Simulation verdicts across recent batches
 
@@ -1006,7 +1017,7 @@ Refused, always with a structured violation rather than a database error:
 
 - Anything that writes or defines: `INSERT`, `ALTER`, `CREATE`, `DROP`, ...
 - `SETTINGS` in any position
-- Table functions (`url`, `s3`, `remote`, `file`, ...)
+- Table functions — **all** of them, refused positionally rather than by a name list, so `numbers(10)` is refused just as `url(...)` is
 - The `system` and `information_schema` databases
 - Functions outside the allowlist — the allowlist covers the aggregation, date/time, string, array, map, JSON, and math functions analytics questions need, and omits introspection (`currentUser`, `hostName`, `version`, `getSetting`, ...) by construction
 - Columns your permissions gate (see [Privacy & RBAC](/observability/lwql/privacy-and-rbac))
@@ -1019,8 +1030,8 @@ Two layers of ceilings apply, and they behave differently:
 
 | Ceiling | Default | Error code |
 |---|---|---|
-| Execution time | 10 s | `query_timeout` |
-| Memory | 1 GB | `query_memory_exceeded` |
+| Execution time | 10 s | HTTP 504 — no specific code (see the 5xx warning below) |
+| Memory | 1 GB | `query_memory_exceeded` (HTTP 422) |
 | Rows / bytes scanned | 1B rows / 10 GB | `query_scan_limit_exceeded` (HTTP 422) |
 
 **Response ceilings** (truncate rather than fail; always flagged):
@@ -1079,6 +1090,7 @@ Every 4xx carries a stable `code`:
 | 400 | `lwql_reserved_parameter_type` | A reserved parameter declared as a non-date-time | Declare `:DateTime` |
 | 401 | `invalid_credentials` | Bad or missing API key | Check `X-Auth-Token` |
 | 403 | `lwql_not_enabled` | LWQL isn't enabled for this project | Ask your admin, or [contact us](/support) |
+| 404 | `not_found` | The project id in the URL isn't one this key can reach | Check the id — an existing project you cannot see answers identically to one that doesn't exist |
 | 422 | `query_scan_limit_exceeded` | The query would read more than the scan ceiling | Filter the time column, or use a `*_by_minute` dataset |
 | 422 | `query_memory_exceeded` | The query exceeded the memory ceiling | Narrow or pre-aggregate — retrying as-is will fail identically |
 

@@ -96,7 +96,7 @@ Refused, always with a structured violation rather than a database error:
 
 - Anything that writes or defines: `INSERT`, `ALTER`, `CREATE`, `DROP`, ...
 - `SETTINGS` in any position
-- Table functions (`url`, `s3`, `remote`, `file`, ...)
+- Table functions — **all** of them, refused positionally rather than by a name list, so `numbers(10)` is refused just as `url(...)` is
 - The `system` and `information_schema` databases
 - Functions outside the allowlist — the allowlist covers the aggregation, date/time, string, array, map, JSON, and math functions analytics questions need, and omits introspection (`currentUser`, `hostName`, `version`, `getSetting`, ...) by construction
 - Columns your permissions gate (see [Privacy & RBAC](/observability/lwql/privacy-and-rbac))
@@ -109,8 +109,8 @@ Two layers of ceilings apply, and they behave differently:
 
 | Ceiling | Default | Error code |
 |---|---|---|
-| Execution time | 10 s | `query_timeout` |
-| Memory | 1 GB | `query_memory_exceeded` |
+| Execution time | 10 s | HTTP 504 — no specific code (see the 5xx warning below) |
+| Memory | 1 GB | `query_memory_exceeded` (HTTP 422) |
 | Rows / bytes scanned | 1B rows / 10 GB | `query_scan_limit_exceeded` (HTTP 422) |
 
 **Response ceilings** (truncate rather than fail; always flagged):
@@ -169,6 +169,7 @@ Every 4xx carries a stable `code`:
 | 400 | `lwql_reserved_parameter_type` | A reserved parameter declared as a non-date-time | Declare `:DateTime` |
 | 401 | `invalid_credentials` | Bad or missing API key | Check `X-Auth-Token` |
 | 403 | `lwql_not_enabled` | LWQL isn't enabled for this project | Ask your admin, or [contact us](/support) |
+| 404 | `not_found` | The project id in the URL isn't one this key can reach | Check the id — an existing project you cannot see answers identically to one that doesn't exist |
 | 422 | `query_scan_limit_exceeded` | The query would read more than the scan ceiling | Filter the time column, or use a `*_by_minute` dataset |
 | 422 | `query_memory_exceeded` | The query exceeded the memory ceiling | Narrow or pre-aggregate — retrying as-is will fail identically |
 

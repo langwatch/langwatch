@@ -14,7 +14,7 @@ A first-party [Model Context Protocol](https://modelcontextprotocol.io) server f
 - **`lwql_schema`** — the dataset catalog your key can see, ready for the model's context
 - **`lwql_query`** — run one read-only SQL statement and get typed rows, statistics, and diagnostics back
 
-Because LWQL is already read-only, tenant-isolated, and resource-capped at the database, connecting it to an agent through MCP doesn't require any additional sandboxing on your side.
+LWQL is read-only, tenant-isolated and resource-capped at the database, so an agent connected through MCP cannot write, cannot reach another tenant's rows, and cannot exhaust the server. Those are the guarantees the database enforces; whatever your agent then does with the rows it legitimately reads is your side of the boundary.
 
 ## Until then
 

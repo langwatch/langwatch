@@ -185,15 +185,26 @@ LIMIT 50
 ```sql
 SELECT e.EvaluatorName,
        countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed) AS Agree,
-       count() AS Overlap,
+       count() AS Pairs,
        round((countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed)) / count(), 3) AS Agreement
 FROM annotations AS a
 JOIN evaluations AS e ON a.TraceId = e.TraceId
 WHERE a.CreatedAt >= now() - INTERVAL 30 DAY
   AND e.Passed IS NOT NULL
 GROUP BY e.EvaluatorName
-ORDER BY Overlap DESC
+ORDER BY Pairs DESC
 ```
+
+<Note>
+  The unit here is an **(annotation, evaluation) pair**, not a trace. Both
+  datasets are one row per event — one human annotation, one evaluation run —
+  so a trace annotated twice and evaluated three times by the same evaluator
+  contributes six pairs, and weighs six times as much as a trace with one of
+  each. That is why the column is `Pairs` rather than a trace count. The
+  `POSSIBLE_FANOUT` diagnostic flags this on the result. For a trace-weighted
+  answer, restrict to one annotation and one evaluation per trace before
+  comparing.
+</Note>
 
 ### Simulation verdicts across recent batches
 

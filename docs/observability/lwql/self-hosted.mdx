@@ -11,7 +11,7 @@ LWQL support for self-hosted deployments is early. This page documents the archi
 
 ## Architecture in one paragraph
 
-Customer SQL never runs as the application. It runs as a dedicated **restricted ClickHouse identity** whose settings profile pins `readonly = 1` and all resource ceilings as constants, and which holds `SELECT` on a set of **LWQL views** in a dedicated analytics database — and on nothing else. **Row policies** on those views scope every read to the calling project, resolved through a tenant capability the application sends per query as a custom setting. PostgreSQL-resident datasets (prompts, experiments, annotations, ...) reach ClickHouse through **approved views** in PostgreSQL read by **PostgreSQL-engine tables** in the analytics database, so the same row policies apply to them too.
+Customer SQL never runs as the application. It runs as a dedicated **restricted ClickHouse identity** whose settings profile pins `readonly = 1` and all resource ceilings as constants, and which holds `SELECT` on a set of **LWQL views** in a dedicated analytics database, plus the exact source columns those views read — and on nothing else. **Row policies** on the *source tables* those views read scope every read to the calling project (the views are `SQL SECURITY INVOKER`, so they read as the caller and the source-table policy is what enforces), resolved through a tenant capability the application sends per query as a custom setting. PostgreSQL-resident datasets (prompts, experiments, annotations, ...) reach ClickHouse through **approved views** in PostgreSQL read by **PostgreSQL-engine tables** in the analytics database, so the same row policies apply to them too.
 
 A deployment that provisions none of this simply has no LWQL: the API answers `503 lwql_unavailable` and everything else works normally.
 
@@ -51,7 +51,7 @@ The access model itself is deployed out of band (in LangWatch Cloud, by Terrafor
 
 - The **restricted user** and its **settings profile** — `readonly = 1`, `max_execution_time`, `max_memory_usage`, `max_threads`, `max_concurrent_queries_for_user`, `max_rows_to_read`, `max_bytes_to_read`, all `CONST`, plus the tenant setting declared `CHANGEABLE_IN_READONLY`
 - **Grants** — `SELECT` on the LWQL views (and the exact source columns the views read), nothing else
-- **Row policies** binding each view to the tenant capability
+- **Row policies** binding each *source table* to the tenant capability — not the views, which are `SQL SECURITY INVOKER` and read as the caller
 - For PostgreSQL-resident datasets: a **read-only PostgreSQL role** granted `SELECT` on the approved views only, a ClickHouse **named collection** holding that role's connection, and the **PostgreSQL-engine tables** mapping the approved views into the analytics database
 
 ## Gotchas

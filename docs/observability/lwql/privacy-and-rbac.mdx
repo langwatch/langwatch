@@ -9,7 +9,7 @@ LWQL accepts arbitrary SQL from customers and agents, so its access model is lay
 
 ## Tenant isolation lives in the database
 
-Every query runs as a restricted ClickHouse identity, and every LWQL view carries a **row policy** that scopes reads to the calling project. The tenant is resolved from a capability derived from your project's key, sent by the server — never from the SQL, never from the request body, and never from the project id in the URL (that one is only a cross-check; naming a different project returns 404).
+Every query runs as a restricted ClickHouse identity, and every **source table** the LWQL views read carries a **row policy** that scopes reads to the calling project. The policies sit on the source tables rather than on the views because the views are declared `SQL SECURITY INVOKER` — they read their sources *as the caller*, so the source-table policy is the boundary that actually enforces, and it holds no matter which view reaches the data. The tenant is resolved from a capability derived from your project's key, sent by the server — never from the SQL, never from the request body, and never from the project id in the URL (that one is only a cross-check; naming a different project returns 404).
 
 The consequence: there is no statement you can write that reads another tenant's rows. A bug in the API gateway can cost a caller a wrong refusal or acceptance of a malformed query — it cannot cross tenants, because the gateway was never the boundary.
 
@@ -17,7 +17,7 @@ The consequence: there is no statement you can write that reads another tenant's
 
 - LWQL requires an API key with the **`analytics:view`** scope, and the project must have LWQL enabled.
 - Access is **read-only by construction**: the database identity has `readonly = 1` pinned as a constant, and the validator refuses every write and DDL form before it ever reaches the database anyway.
-- The identity can see **only the LWQL views**. Raw tables, other databases, `system.*`, and `information_schema` are unreachable at the database and refused by name at the gateway.
+- The identity is granted `SELECT` on the **LWQL views** and on **exactly the source columns those views read** — nothing else. The source-column grant is deliberate: it is what makes an unauthorised column a database-level `ACCESS_DENIED` rather than something only the gateway refuses. Other databases and any table outside that set carry no grant at all. `system.*` and `information_schema` are refused by name at the gateway.
 
 ## Column-level permission gates
 
