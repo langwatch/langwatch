@@ -540,7 +540,7 @@ describe("ApiKeyService", () => {
     });
 
     describe("when the caller leaves the projection hold to a later write", () => {
-      /** @scenario "A hard-cut rotation holds once, on the new key's grants" */
+      /** @scenario "Rotating a key answers without waiting on the old key's cleanup" */
       it("passes the skipped hold through to the role deletion", async () => {
         const keyWithCustomRole = {
           ...existingKey,

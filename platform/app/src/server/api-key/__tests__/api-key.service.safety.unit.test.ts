@@ -220,7 +220,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
         );
       });
 
-      /** @scenario "A restricted key's private role lands before its binding attaches" */
+      /** @scenario "A new restricted key is usable the moment it is returned" */
       it("finishes the role definition before attaching the binding", async () => {
         const order: string[] = [];
         ledger.defineRole.mockImplementation(async () => {

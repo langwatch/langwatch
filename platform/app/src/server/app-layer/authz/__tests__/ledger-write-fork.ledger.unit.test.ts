@@ -356,7 +356,7 @@ describe("given an organization whose genesis import has landed", () => {
   });
 
   describe("when a caller only needs the role retired", () => {
-    /** @scenario "Deleting a role that nothing reads again can skip the hold" */
+    /** @scenario "Retiring the old key's private role does not hold the answer" */
     it("appends the deletion without polling for the row's disappearance", async () => {
       const { writer, db, sent } = harness({ onLedger: true });
 

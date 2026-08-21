@@ -50,7 +50,7 @@ describe("IngestionKeyService.ensureForProject", () => {
   });
 
   describe("when a prior key exists for the project and source type", () => {
-    /** @scenario "A hard-cut rotation holds once, on the new key's grants" */
+    /** @scenario "Rotating a key answers without waiting on the old key's cleanup" */
     it("revokes it without a projection hold of its own", async () => {
       apiKeyRepo.findIngestKey.mockResolvedValue({ id: "ak_prior" });
 
