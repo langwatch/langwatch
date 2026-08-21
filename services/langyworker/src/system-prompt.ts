@@ -1,6 +1,13 @@
 /**
- * Per-turn system prompt composition: persona + AGENTS.md + the turn's
- * `system` block, in that order.
+ * Per-turn system prompt composition: persona + the turn's `system` block +
+ * AGENTS.md, in that order. AGENTS.md goes LAST on purpose: its Replies rules
+ * sit at the file's end, and the model weighs the end of the system prompt the
+ * most. This mirrors the opencode layout (instructions files append after the
+ * per-message system block), which is the layout the reply-style suite was
+ * tuned green against; with AGENTS.md mid-prompt the model slid back to
+ * closing replies with next-action menus. Both blocks are byte-stable across
+ * a conversation's turns, so the order does not affect provider prompt
+ * caching.
  *
  * Mechanism (measured against pi 0.84.2 internals, verified against captured
  * provider requests): direct assignment to `session.agent.state.systemPrompt`
@@ -22,7 +29,7 @@ export type SystemPromptParts = {
 };
 
 export function composeSystemPrompt({ personaPrompt, agentsMd, turnSystem }: SystemPromptParts): string {
-  const sections = [personaPrompt, agentsMd, turnSystem]
+  const sections = [personaPrompt, turnSystem, agentsMd]
     .map((section) => section?.trim() ?? "")
     .filter((section) => section.length > 0);
   return sections.join("\n\n");

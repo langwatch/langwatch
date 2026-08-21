@@ -83,15 +83,19 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * times, and any drift between the copies became a contradiction it had to
  * arbitrate.
  *
- * The one rule kept here is grounding, because it is the measured defect: in
- * production, 40% of turns that reach `status: "completed"` make zero tool
- * calls, so the answer came from the model rather than from the project. Last
- * position in the prompt is the right place to spend on it.
+ * The rules kept here are the measured defects, because last position in the
+ * prompt is the right place to spend on them. Grounding: in production, 40% of
+ * turns that reach `status: "completed"` make zero tool calls, so the answer
+ * came from the model rather than from the project. Ending: on the pi harness
+ * the model closes replies with a next-actions question, which AGENTS.md bans;
+ * mid-prompt the ban loses to the model's own habit, so the pointer rides
+ * here.
  */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "You are Langy, the in-product LangWatch assistant.",
   "AGENTS.md is your operating contract and applies to every reply.",
   "Facts about the user's project come from what you retrieve this turn, never from memory.",
+  "End on the answer: no closing question or next-actions menu (AGENTS.md names the exceptions).",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {

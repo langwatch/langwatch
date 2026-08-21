@@ -3,14 +3,16 @@ import { composeSystemPrompt, prependResumeSeed } from "./system-prompt.js";
 
 describe("composeSystemPrompt", () => {
   describe("given persona, AGENTS.md and a turn system block", () => {
-    it("joins them in that order with blank lines", () => {
+    // AGENTS.md last is deliberate: its ending Replies rules take the
+    // recency-max position, the layout the reply-style suite is green against.
+    it("joins them persona first, turn system middle, AGENTS.md last", () => {
       expect(
         composeSystemPrompt({
           personaPrompt: "You are Langy.",
           agentsMd: "# Rules",
           turnSystem: "Turn context.",
         }),
-      ).toBe("You are Langy.\n\n# Rules\n\nTurn context.");
+      ).toBe("You are Langy.\n\nTurn context.\n\n# Rules");
     });
   });
 
