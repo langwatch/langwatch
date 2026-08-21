@@ -33,6 +33,26 @@ export type DualAuthVariables = {
   userId?: string;
 };
 
+/**
+ * Whether the Authorization material claims the request. A prefix-less token
+ * is either a legacy project key (pre-`sk-lw-`, still valid) or a reverse
+ * proxy's own Basic header riding along on an <img>/<audio> fetch — the
+ * prefix cannot tell them apart. So: with a live session, an unknown-prefix
+ * token abstains and the session decides; with no session it claims and the
+ * DB lookup decides. A recognized LangWatch prefix always claims.
+ */
+function apiKeyClaims({
+  token,
+  sessionUserId,
+}: {
+  token: string | null;
+  sessionUserId: string | null;
+}): boolean {
+  if (token == null) return false;
+  if (getTokenType(token) !== "unknown") return true;
+  return sessionUserId == null;
+}
+
 /** The two credential kinds a browser-served byte endpoint accepts. */
 type ByteEndpointClaim =
   | { kind: "api-key" }
@@ -87,23 +107,10 @@ export const dualAuth: MiddlewareHandler<{
   // API-key request.
   const session = await getServerAuthSession({ req: c.req.raw });
   const sessionUserId = session?.user?.id;
-  // A prefix-less token is ambiguous: it may be a legacy project key (minted
-  // before the `sk-lw-` prefix, still valid, resolved by the legacy lookup in
-  // TokenResolver), or a foreign proxy's Basic header — a reverse proxy that
-  // terminates its own `auth_basic` makes the browser send a well-formed
-  // Basic header on every <img>/<audio> request, and without a gate it would
-  // contest with the session cookie and 401 every avatar and media fetch on
-  // proxy-fronted deployments. The prefix alone cannot tell the two apart,
-  // so the abstention is scoped to what it protects: with a live session
-  // present, an unknown-prefix token abstains and the session decides (the
-  // proxy case); with no session there is nothing to defer to, the token
-  // claims, and authMiddleware's DB lookup is what decides (the legacy-key
-  // case — an actual foreign header just gets its own 401). A real
-  // `sk-lw-`/`pat-lw-`/`ik-lw-` credential always claims and still contests
-  // a co-present session, which is the point.
-  const apiKeyClaimed =
-    apiKeyCredentials != null &&
-    (getTokenType(apiKeyCredentials.token) !== "unknown" || !sessionUserId);
+  const apiKeyClaimed = apiKeyClaims({
+    token: apiKeyCredentials?.token ?? null,
+    sessionUserId: sessionUserId ?? null,
+  });
 
   const arbitration = arbitrateClaims<ByteEndpointClaim>([
     apiKeyClaimed ? { kind: "api-key" } : null,

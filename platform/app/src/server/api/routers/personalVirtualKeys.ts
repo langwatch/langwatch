@@ -21,7 +21,8 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { authorizeInResolver, hasOrganizationPermission } from "../rbac";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -96,7 +97,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       if (input.targetUserId === callerId) {
         principalUserId = callerId;
       } else {
-        const canViewOthers = await hasOrganizationPermission(
+        const canViewOthers = await probeOrganizationPermission(
           { prisma: ctx.prisma, session: ctx.session },
           input.organizationId,
           "virtualKeys:viewOtherPersonal",

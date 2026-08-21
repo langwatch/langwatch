@@ -14,7 +14,7 @@ import {
 } from "~/prompts/schemas";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
-import { hasProjectPermission } from "../../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**
@@ -90,7 +90,7 @@ export const promptsRouter = createTRPCRouter({
       // Filter copies based on user's prompts:update permission
       const copiesWithPermissions = await Promise.all(
         copies.map(async (copy) => {
-          const hasPermission = await hasProjectPermission(
+          const hasPermission = await probeProjectPermission(
             ctx,
             copy.projectId,
             "prompts:update",
@@ -383,7 +383,7 @@ export const promptsRouter = createTRPCRouter({
     .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least prompts:create permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "prompts:create",
@@ -517,7 +517,7 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Check permissions on source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         sourcePromptRaw.projectId,
         "prompts:view",
@@ -675,7 +675,7 @@ export const promptsRouter = createTRPCRouter({
       // Push to each copy
       for (const copy of copiesToPush) {
         // Check permissions on copy's project
-        const hasCopyPermission = await hasProjectPermission(
+        const hasCopyPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "prompts:update",

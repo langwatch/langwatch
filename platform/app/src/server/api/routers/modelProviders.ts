@@ -38,11 +38,8 @@ import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "../../modelProviders/providerValidation";
-import {
-  checkOrganizationPermission,
-  checkProjectPermission,
-  hasProjectPermission,
-} from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   getProjectModelProviders,
@@ -119,7 +116,7 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      const hasSetupPermission = await hasProjectPermission(
+      const hasSetupPermission = await probeProjectPermission(
         ctx,
         projectId,
         "project:update",
@@ -136,7 +133,7 @@ export const modelProviderRouter = createTRPCRouter({
     .permission("project:view")
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const hasSetupPermission = await hasProjectPermission(
+      const hasSetupPermission = await probeProjectPermission(
         ctx,
         projectId,
         "project:update",

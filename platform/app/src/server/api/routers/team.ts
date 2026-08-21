@@ -9,7 +9,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import { hasOrganizationPermission } from "../rbac";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -72,7 +72,7 @@ export const teamRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const callerId = ctx.session.user.id;
-      const callerHasManage = await hasOrganizationPermission(
+      const callerHasManage = await probeOrganizationPermission(
         ctx,
         input.organizationId,
         "organization:manage",
@@ -131,7 +131,7 @@ export const teamRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const callerId = ctx.session.user.id;
-      const callerHasManage = await hasOrganizationPermission(
+      const callerHasManage = await probeOrganizationPermission(
         ctx,
         input.organizationId,
         "organization:manage",

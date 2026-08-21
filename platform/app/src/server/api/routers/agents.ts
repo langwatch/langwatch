@@ -14,7 +14,7 @@ import {
   agentTypeSchema,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -283,7 +283,7 @@ export const agentsRouter = createTRPCRouter({
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
           copy: c,
-          hasPermission: await hasProjectPermission(
+          hasPermission: await probeProjectPermission(
             ctx,
             c.projectId,
             "evaluations:view",
@@ -316,7 +316,7 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -398,7 +398,7 @@ export const agentsRouter = createTRPCRouter({
         await Promise.all(
           copies.map(async (c) => ({
             id: c.id,
-            hasPermission: await hasProjectPermission(
+            hasPermission: await probeProjectPermission(
               ctx,
               c.projectId,
               "evaluations:manage",
@@ -471,7 +471,7 @@ export const agentsRouter = createTRPCRouter({
           message: "Source agent has been deleted",
         });
       }
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         source.projectId,
         "evaluations:manage",

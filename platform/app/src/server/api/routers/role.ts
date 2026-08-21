@@ -7,7 +7,7 @@ import type { Session } from "~/server/auth";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { hasOrganizationPermission } from "../rbac";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const permissionSchema = permissionFormatSchema;
@@ -49,7 +49,7 @@ const roleOrganizationPermission = ({
     }) => {
       const role = await new RoleService(ctx.prisma).getRoleById(input.roleId);
       if (
-        !(await hasOrganizationPermission(ctx, role.organizationId, permission))
+        !(await probeOrganizationPermission(ctx, role.organizationId, permission))
       ) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
@@ -203,7 +203,7 @@ export const roleRouter = createTRPCRouter({
           }
 
           if (
-            !(await hasOrganizationPermission(
+            !(await probeOrganizationPermission(
               ctx,
               team.organizationId,
               "organization:manage",

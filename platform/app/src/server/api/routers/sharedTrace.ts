@@ -15,7 +15,10 @@ import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redac
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
-import { hasOrganizationPermission, hasProjectPermission } from "../rbac";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
 import {
@@ -117,13 +120,13 @@ export const sharedTraceRouter = createTRPCRouter({
       const viewer: ShareViewer = {
         isOrgMember: async (organizationId) =>
           !!ctx.session?.user &&
-          hasOrganizationPermission(
+          probeOrganizationPermission(
             { prisma: ctx.prisma, session: ctx.session },
             organizationId,
             "organization:view",
           ),
         isProjectMember: async (projectId) =>
-          hasProjectPermission(
+          probeProjectPermission(
             { prisma: ctx.prisma, session: ctx.session },
             projectId,
             "traces:view",

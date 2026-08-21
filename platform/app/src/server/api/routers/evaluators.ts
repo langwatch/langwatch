@@ -6,7 +6,7 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
@@ -421,7 +421,7 @@ export const evaluatorsRouter = createTRPCRouter({
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
           copy: c,
-          hasPermission: await hasProjectPermission(
+          hasPermission: await probeProjectPermission(
             ctx,
             c.projectId,
             "evaluations:view",
@@ -454,7 +454,7 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -530,7 +530,7 @@ export const evaluatorsRouter = createTRPCRouter({
 
       let pushedTo = 0;
       for (const copy of copiesToPush) {
-        const hasPermission = await hasProjectPermission(
+        const hasPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "evaluations:manage",
@@ -593,7 +593,7 @@ export const evaluatorsRouter = createTRPCRouter({
         });
       }
 
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         source.projectId,
         "evaluations:manage",

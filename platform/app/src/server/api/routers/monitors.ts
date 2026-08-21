@@ -16,7 +16,7 @@ import {
 import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { currentVsPreviousDates } from "./analytics/common";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
@@ -267,7 +267,7 @@ export const monitorsRouter = createTRPCRouter({
       const { monitorId, projectId, sourceProjectId } = input;
       const prisma = ctx.prisma;
 
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         sourceProjectId,
         "evaluations:manage",

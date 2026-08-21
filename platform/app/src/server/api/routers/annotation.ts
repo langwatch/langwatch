@@ -23,7 +23,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -230,7 +230,7 @@ const carrySuggestionToOverlay = async ({
   });
   if (!target) return;
 
-  if (!(await hasProjectPermission(ctx, projectId, "annotations:update"))) {
+  if (!(await probeProjectPermission(ctx, projectId, "annotations:update"))) {
     return;
   }
 

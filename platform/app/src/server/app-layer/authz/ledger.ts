@@ -1767,8 +1767,7 @@ function roleKeyFromCustomRoleFilter(
   value: NonNullable<Prisma.RoleBindingWhereInput["customRoleId"]>,
 ): Prisma.GrantWhereInput["roleKey"] | null {
   if (typeof value === "string") return `custom:${value}`;
-  if (Array.isArray((value as { in?: unknown }).in)) {
-    return { in: (value as { in: string[] }).in.map((id) => `custom:${id}`) };
-  }
-  return null;
+  const ids = value.in;
+  if (!Array.isArray(ids)) return null;
+  return { in: ids.map((id) => `custom:${id}`) };
 }

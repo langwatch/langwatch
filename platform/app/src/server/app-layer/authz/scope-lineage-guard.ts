@@ -12,26 +12,17 @@ import type { PrismaClient } from "~/generated/prisma/client";
 const logger = createLogger("langwatch:authz:scope-lineage");
 
 /**
- * The cross-tenant half of the shadowing class the declaration sweep closes
- * statically (specs/rbac/typed-permission-declarations.feature): a check that
- * passes on one scope id while the handler acts on another is only an
- * EXPLOIT when the two ids belong to different tenants — your own projectId
- * satisfying the check while someone else's organizationId anchors the
- * query. The sweep can refuse that shape for declarations it can see
- * through; a custom middleware's enforcement is a black box to it, and a
- * future resolver bug is invisible to any static check.
+ * Runtime backstop for the tier-shadowing class the declaration sweep closes
+ * statically (specs/rbac/typed-permission-declarations.feature): every scope
+ * id one request carries must resolve to the SAME organization, or the
+ * request is refused before any permission check runs — whatever the
+ * declaration kind in front of it. Cross-team moves inside one organization
+ * still pass; aiming any id at another tenant cannot, anywhere.
  *
- * So this guard removes the precondition instead: every scope id one request
- * carries must resolve to the SAME organization, or the request is refused
- * before any permission check runs — whatever the declaration kind in front
- * of it. Cross-team moves inside one organization still pass; aiming any id
- * at another tenant no longer can, anywhere.
- *
- * Fail closed: an id that resolves to no organization at all cannot prove
- * agreement, so a mixed request carrying one is refused too. The refusal is
- * indistinguishable from an ordinary permission denial — same code, same
- * shape — so no probe can pair ids to learn which organization a project
- * belongs to. The real cause goes to the log line.
+ * Fail closed: an id resolving to no organization refuses a mixed request
+ * too. The refusal is shaped exactly like an ordinary permission denial so
+ * probing cannot pair ids to learn which organization a project belongs to;
+ * the real cause goes to the log line.
  */
 
 export type LineagePrisma = Pick<PrismaClient, "team" | "project">;

@@ -48,11 +48,11 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import {
   batchScopePermissions,
   checkOrganizationPermission,
   checkProjectPermission,
-  hasOrganizationPermission,
   type PermissionMiddlewareParams,
 } from "../rbac";
 
@@ -247,7 +247,7 @@ export const organizationRouter = createTRPCRouter({
       // per-project fan-out would scale with the org's project count.
       const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
       for (const organization of organizations) {
-        const canManage = await hasOrganizationPermission(
+        const canManage = await probeOrganizationPermission(
           ctx,
           organization.id,
           "organization:manage",
@@ -519,7 +519,7 @@ export const organizationRouter = createTRPCRouter({
       // strip their personal-workspace teamMemberships (existence of
       // someone else's personal workspace is itself private). The
       // caller's own email + own personal workspace stay visible.
-      const callerHasManage = await hasOrganizationPermission(
+      const callerHasManage = await probeOrganizationPermission(
         ctx,
         input.organizationId,
         "organization:manage",

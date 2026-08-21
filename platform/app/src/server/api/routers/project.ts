@@ -18,11 +18,8 @@ import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import {
-  checkOrganizationPermission,
-  checkTeamPermission,
-  hasProjectPermission,
-} from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
@@ -418,7 +415,7 @@ export const projectRouter = createTRPCRouter({
           message: "You cannot archive the current project",
         });
       }
-      const canDeleteTarget = await hasProjectPermission(
+      const canDeleteTarget = await probeProjectPermission(
         ctx,
         input.projectToArchiveId,
         "project:delete",
@@ -501,7 +498,7 @@ async function checkCapturedDataVisibilityPermission({
 }) {
   if (
     input.traceSharingEnabled !== void 0 &&
-    !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
+    !(await probeProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",

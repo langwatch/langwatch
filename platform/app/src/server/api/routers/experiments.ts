@@ -37,7 +37,7 @@ import {
 import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
 import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   type createInnerTRPCContext,
   createTRPCRouter,
@@ -815,7 +815,7 @@ export const experimentsRouter = createTRPCRouter({
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least evaluations:manage permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",

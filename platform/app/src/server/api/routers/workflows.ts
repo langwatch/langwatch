@@ -33,7 +33,7 @@ import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
@@ -130,7 +130,7 @@ export const workflowRouter = createTRPCRouter({
     .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least workflows:create permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "workflows:create",
@@ -269,7 +269,7 @@ export const workflowRouter = createTRPCRouter({
         fn: async (projectId) => {
           const isVisible =
             projectId === input.projectId ||
-            (await hasProjectPermission(ctx, projectId, "workflows:view"));
+            (await probeProjectPermission(ctx, projectId, "workflows:view"));
           visibleProjects.set(projectId, isVisible);
         },
       });
@@ -319,7 +319,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Verify the user has view permission on the workflow's project
-      const hasPermission = await hasProjectPermission(
+      const hasPermission = await probeProjectPermission(
         ctx,
         workflow.projectId,
         "workflows:view",
@@ -383,7 +383,7 @@ export const workflowRouter = createTRPCRouter({
       // Filter copies based on user's workflows:update permission
       const copiesWithPermissions = await Promise.all(
         copies.map(async (copy) => {
-          const hasPermission = await hasProjectPermission(
+          const hasPermission = await probeProjectPermission(
             ctx,
             copy.projectId,
             "workflows:update",
@@ -749,7 +749,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Check that the user has at least workflows:view permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         sourceWorkflow.projectId,
         "workflows:view",
@@ -869,7 +869,7 @@ export const workflowRouter = createTRPCRouter({
       // Push to each copy
       for (const copy of copiesToPush) {
         // Check that the user has workflows:update permission on the copy's project
-        const hasCopyPermission = await hasProjectPermission(
+        const hasCopyPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "workflows:update",

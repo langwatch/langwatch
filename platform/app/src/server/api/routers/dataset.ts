@@ -10,7 +10,7 @@ import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,
 } from "../../datasets/types";
-import { hasProjectPermission } from "../rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -247,7 +247,7 @@ export const datasetRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least datasets:create permission on the source project
       // (having create permission implies you can view/copy from that project)
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "datasets:create",
