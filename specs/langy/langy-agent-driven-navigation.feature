@@ -192,6 +192,20 @@ Feature: Langy opens the resource it surfaced in the browser
       Then no navigation happens
       And the turn continues unaffected
 
+    # "Take me to my prompts" names a page, not a resource: there is no id to
+    # look up, so the platform resolves a closed set of page names to its own
+    # project-scoped addresses. A name outside that set is not a destination.
+
+    @unit
+    Scenario: A page name navigates to the project's own page
+      When the navigate instruction names a page such as "prompts"
+      Then the browser navigates to that page under the project's own address
+
+    @unit
+    Scenario: A name outside the page set is not a destination
+      When the navigate instruction names a word that is neither a page nor a resolvable id
+      Then no navigation happens
+
   Rule: Navigation is a live-edge instruction, fired at most once
 
     @integration

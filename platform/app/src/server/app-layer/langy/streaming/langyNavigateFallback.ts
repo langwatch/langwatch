@@ -13,11 +13,12 @@
  * that doesn't resolve in this project yields null: the navigate drops,
  * exactly as an unknown destination should.
  *
- * One resolver per id prefix; a prefix this table doesn't know is not a
- * navigate target the fallback will ever invent. Each resolver returns a
- * project-slug→URL builder on a hit (the slug is fetched once, after the
- * resource is confirmed to exist) or null on a miss; any lookup error also
- * resolves to null rather than tearing down the relay stream.
+ * One resolver per id prefix, plus a closed table of page destinations; a
+ * name neither table knows is not a navigate target the fallback will ever
+ * invent. Each resolver returns a project-slug→URL builder on a hit (the slug
+ * is fetched once, after the resource is confirmed to exist) or null on a
+ * miss; any lookup error also resolves to null rather than tearing down the
+ * relay stream.
  */
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
 import { platformUrl } from "~/app/api/shared/platform-url";
@@ -30,6 +31,31 @@ import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
 type UrlForProjectSlug = (projectSlug: string) => string;
+
+/**
+ * Page destinations `langwatch navigate open <page>` can name directly: the
+ * project's own top-level pages, for "take me to the prompts page" asks that
+ * name no single resource. Static paths under the project slug, so no lookup
+ * beyond the project itself is needed and tenancy holds by construction. The
+ * keys are the canonical names AGENTS.md documents; anything else still goes
+ * through the id-prefix table below (page names contain no underscore, so the
+ * two namespaces cannot collide).
+ */
+const NAVIGATE_PAGES: Record<string, string> = {
+  prompts: "/prompts",
+  datasets: "/datasets",
+  evaluations: "/evaluations",
+  "online-evaluations": "/online-evaluations",
+  evaluators: "/evaluators",
+  traces: "/traces",
+  simulations: "/simulations",
+  experiments: "/experiments",
+  workflows: "/workflows",
+  agents: "/agents",
+  analytics: "/analytics",
+  annotations: "/annotations",
+  automations: "/automations",
+};
 
 /**
  * Look one id up with the project's own access; on a hit, return how to build
@@ -168,12 +194,16 @@ export async function resolveNavigateFallbackUrl({
   projectId: string;
   resourceId: string;
 }): Promise<string | null> {
-  const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
-    resourceId.startsWith(prefix),
-  )?.[1];
-  if (!resolver) return null;
-
-  const buildUrl = await resolver({ projectId, resourceId }).catch(() => null);
+  const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
+  const buildUrl = pagePath
+    ? (projectSlug: string) => platformUrl({ projectSlug, path: pagePath })
+    : await (async () => {
+        const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
+          resourceId.startsWith(prefix),
+        )?.[1];
+        if (!resolver) return null;
+        return resolver({ projectId, resourceId }).catch(() => null);
+      })();
   if (!buildUrl) return null;
 
   const project = await getApp()

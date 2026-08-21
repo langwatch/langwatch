@@ -123,4 +123,32 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
       ).toBeNull();
     });
   });
+
+  describe("when the agent asks to open a page rather than one resource", () => {
+    /** @scenario A page name navigates to the project's own page */
+    it("resolves a page name to the project's own page address", async () => {
+      const url = await resolveNavigateFallbackUrl({
+        projectId: project.id,
+        resourceId: "prompts",
+      });
+      expect(url).toContain(`/${project.slug}/prompts`);
+
+      expect(
+        await resolveNavigateFallbackUrl({
+          projectId: project.id,
+          resourceId: "online-evaluations",
+        }),
+      ).toContain(`/${project.slug}/online-evaluations`);
+    });
+
+    /** @scenario A name outside the page set is not a destination */
+    it("returns null for a word that is neither a page nor a resolvable id", async () => {
+      expect(
+        await resolveNavigateFallbackUrl({
+          projectId: project.id,
+          resourceId: "settings",
+        }),
+      ).toBeNull();
+    });
+  });
 });

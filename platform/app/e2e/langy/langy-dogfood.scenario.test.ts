@@ -135,8 +135,35 @@ async function seedFailingApplicationTraces(): Promise<void> {
   );
 }
 
+/**
+ * The navigation flow needs at least one prompt to exist: on an empty project
+ * `langwatch prompt list` returns nothing, there is no `prompt_<id>` to
+ * navigate to, and the model has no correct move left. The handle is fixed so
+ * a re-run hits the 409 duplicate path and keeps the existing prompt.
+ */
+async function seedNavigablePrompt(): Promise<void> {
+  const res = await fetch(`${LW_BASE_URL}/api/prompts`, {
+    method: "POST",
+    headers: {
+      "X-Auth-Token": LANGWATCH_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      handle: "langy-dogfood-support-reply",
+      prompt: "You reply to customer support tickets in a friendly tone.",
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok && res.status !== 409) {
+    throw new Error(
+      `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
+    );
+  }
+}
+
 describe("Langy dogfood: named flows", () => {
   beforeAll(async () => {
+    await seedNavigablePrompt();
     await seedFailingApplicationTraces();
   }, 90_000);
 
