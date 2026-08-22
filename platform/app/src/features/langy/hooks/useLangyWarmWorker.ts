@@ -117,9 +117,18 @@ function fireWarm({
     },
     {
       onSuccess: (result) => {
-        // Only a mint (a fresh warm with no target) has an id worth holding,
-        // and only when no newer warm has been fired since.
+        // Only the newest warm may write anything back.
         if (generationRef.current !== generation) return;
+        if (latestProjectIdRef.current !== projectId) return;
+        // A warm that PROVED a worker alive is what lets the thinking line say
+        // "Thinking…" from the first frame of the next send instead of the
+        // cold-boot ladder.
+        if (result.warmed && result.conversationId) {
+          useLangyStore
+            .getState()
+            .markConversationWarmed(result.conversationId);
+        }
+        // Only a mint (a fresh warm with no target) has an id worth holding.
         if (targetConversationId || !result.conversationId) return;
         // The held id becomes the next render's warm target; remember it as
         // already warmed so holding it does not immediately re-fire.

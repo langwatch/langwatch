@@ -183,15 +183,19 @@ function silenceEscalation({
 function waitingLine({
   messages,
   elapsedMs,
+  workerReady,
 }: {
   messages: ThinkingMessage[];
   elapsedMs: number;
+  workerReady: boolean;
 }): LangyThinkingLine {
-  // A FOLLOW-UP IS WAITING. The manager's own "Thinking…" status lands moments
-  // later and takes over either way. The startup ladder here would claim a boot
-  // that is not happening, and a connection-flavoured line read as a lost
-  // connection. Long silence still escalates, because a follow-up can wedge.
-  if (hasPriorReply(messages)) {
+  // A FOLLOW-UP IS WAITING — or a first message whose worker a panel-open warm
+  // already PROVED alive (`workerReady`). Either way the model is working, not
+  // booting; the manager's own "Thinking…" status lands moments later and
+  // takes over. The startup ladder here would claim a boot that is not
+  // happening, and a connection-flavoured line read as a lost connection. Long
+  // silence still escalates, because a live worker can wedge too.
+  if (hasPriorReply(messages) || workerReady) {
     return (
       silenceEscalation({
         elapsedMs,
@@ -236,6 +240,7 @@ export function langyThinkingLine({
   messages,
   elapsedMs,
   hasLiveReasoning = false,
+  workerReady = false,
 }: {
   messages: ThinkingMessage[];
   /** Time since the turn was sent. */
@@ -247,6 +252,15 @@ export function langyThinkingLine({
    * claim: the model is provably working.
    */
   hasLiveReasoning?: boolean;
+  /**
+   * A panel-open warm proved this conversation's worker alive before the send
+   * (`warmed: true` from `langy.warmWorker`). A first message then skips the
+   * startup ladder — the workspace it would claim to be preparing already
+   * exists — and reads "Thinking…" like a follow-up. If the proof went stale
+   * (the worker was reaped since), the manager's readiness status corrects
+   * the line moments later, the same recovery a follow-up relies on.
+   */
+  workerReady?: boolean;
 }): LangyThinkingLine | null {
   const last = currentTurnAssistant(messages);
 
@@ -292,6 +306,7 @@ export function langyThinkingLine({
   }
 
   // 5. NOTHING IS ON THE WIRE. What the silence means, and how it escalates,
-  //    depends on whether this conversation has answered before.
-  return waitingLine({ messages, elapsedMs });
+  //    depends on whether this conversation has answered before — or already
+  //    holds a warm-proven worker.
+  return waitingLine({ messages, elapsedMs, workerReady });
 }

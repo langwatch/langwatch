@@ -57,6 +57,7 @@ describe("useLangyWarmWorker", () => {
     useLangyStore.setState({
       pendingConversationId: null,
       activeConversationId: null,
+      warmedConversationId: null,
     });
   });
 
@@ -94,6 +95,29 @@ describe("useLangyWarmWorker", () => {
         "conv-warmed",
       );
       expect(useLangyStore.getState().activeConversationId).toBeNull();
+    });
+
+    /** @scenario A warmed fresh chat says Thinking from the first frame */
+    it("records which conversation's worker the warm proved alive", () => {
+      renderHook(useLangyWarmWorker, { initialProps: props() });
+
+      const opts = mutate.mock.calls[0]![1]!;
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-warmed", warmed: true });
+      });
+
+      expect(useLangyStore.getState().warmedConversationId).toBe("conv-warmed");
+    });
+
+    it("records nothing when the warm could not boot a worker", () => {
+      renderHook(useLangyWarmWorker, { initialProps: props() });
+
+      const opts = mutate.mock.calls[0]![1]!;
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-cold", warmed: false });
+      });
+
+      expect(useLangyStore.getState().warmedConversationId).toBeNull();
     });
 
     it("drops the returned id when a send already made a conversation active", () => {

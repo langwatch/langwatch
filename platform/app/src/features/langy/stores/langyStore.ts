@@ -289,6 +289,19 @@ interface LangyState extends TurnPhaseState {
   /** The warm hook stores the id its mutation returned; null clears it. */
   setPendingConversationId: (id: string | null) => void;
   /**
+   * The conversation whose worker the last warm PROVED alive (`warmed: true`
+   * from `langy.warmWorker`). The thinking line reads it: a first message to a
+   * warmed worker skips the cold-boot ladder and says "Thinking…" from the
+   * first frame, because the workspace it would claim to be preparing already
+   * exists. Only ever compared against the ids on screen, so a stale value is
+   * inert; if the worker was reaped since, the manager's own readiness status
+   * corrects the line moments later, exactly as it does on a follow-up.
+   * Session-only, never persisted.
+   */
+  warmedConversationId: string | null;
+  /** A warm answered `warmed: true` for this conversation's worker. */
+  markConversationWarmed: (id: string) => void;
+  /**
    * The conversation whose durable server history should hydrate the chat
    * engine. Set only when the USER selects a conversation; cleared once the
    * panel has applied it. Deliberately NOT set on `adoptConversation`: a turn
@@ -748,6 +761,8 @@ export const useLangyStore = create<LangyState>()(
       historyLoadConversationId: null,
       pendingConversationId: null,
       setPendingConversationId: (id) => set({ pendingConversationId: id }),
+      warmedConversationId: null,
+      markConversationWarmed: (id) => set({ warmedConversationId: id }),
       selectConversation: (id) =>
         set({
           activeConversationId: id,

@@ -57,6 +57,18 @@ Feature: Langy worker pre-warm on panel open
       Then the turn is started under that conversation id
       And the turn reuses the warmed worker instead of spawning a new one
 
+    # The warm's answer is proof the worker is alive, so the panel does not
+    # perform a boot it is not doing. The startup ladder stays for genuinely
+    # cold sends; a stale proof (the worker was reaped since) is corrected by
+    # the manager's own readiness status moments later, the same recovery a
+    # follow-up relies on.
+    @unit
+    Scenario: A warmed fresh chat says Thinking from the first frame
+      Given the panel-open warm answered that a worker is running
+      When the user sends the first message of that fresh chat
+      Then the waiting line reads "Thinking…" immediately
+      And the cold-boot startup ladder never shows
+
     @unit
     Scenario: A conversation id that cannot be adopted never warms
       Given a caller supplies a conversation id with an invalid shape

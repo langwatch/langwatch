@@ -479,6 +479,7 @@ function LangyPanel({
     (s) => s.interruptedConversationId,
   );
   const pendingConversationId = useLangyStore((s) => s.pendingConversationId);
+  const warmedConversationId = useLangyStore((s) => s.warmedConversationId);
   const historyLoadConversationId = useLangyStore(
     (s) => s.historyLoadConversationId,
   );
@@ -2960,6 +2961,17 @@ function LangyPanel({
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // The panel-open warm proved this
+                                  // conversation's worker alive, so the first
+                                  // message reads "Thinking…" instead of the
+                                  // cold-boot ladder.
+                                  workerReady={
+                                    warmedConversationId != null &&
+                                    (warmedConversationId ===
+                                      activeConversationId ||
+                                      warmedConversationId ===
+                                        pendingConversationId)
+                                  }
                                 />
                               ) : null}
                             </VStack>

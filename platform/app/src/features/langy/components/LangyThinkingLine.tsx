@@ -55,6 +55,7 @@ const ELAPSED_TICK_MS = 1_000;
 export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
+  workerReady = false,
 }: {
   messages: UIMessage[];
   /**
@@ -64,6 +65,12 @@ export function LangyThinkingLine({
    * shown; see the module doc.
    */
   hasLiveReasoning?: boolean;
+  /**
+   * A panel-open warm proved this conversation's worker alive, so a first
+   * message reads "Thinking…" instead of the startup ladder. See
+   * `logic/langyThinkingLine`.
+   */
+  workerReady?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -83,6 +90,7 @@ export function LangyThinkingLine({
     messages,
     elapsedMs,
     hasLiveReasoning,
+    workerReady,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

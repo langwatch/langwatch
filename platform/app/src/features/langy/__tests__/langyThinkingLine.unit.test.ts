@@ -59,6 +59,30 @@ describe("langyThinkingLine", () => {
       expect(line?.allowWhimsy).toBe(false);
     });
 
+    /** @scenario A warmed fresh chat says Thinking from the first frame */
+    it("says thinking on a first message whose worker a warm proved alive", () => {
+      // The panel-open warm answered `warmed: true`, so the workspace the
+      // startup ladder would claim to be preparing already exists.
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 500,
+        workerReady: true,
+      });
+      expect(line?.text).toBe("Thinking…");
+      expect(line?.tone).toBe("waiting");
+      expect(line?.allowWhimsy).toBe(false);
+    });
+
+    it("still escalates a warmed first message that stays silent too long", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: THINKING_STUCK_MS,
+        workerReady: true,
+      });
+      expect(line?.text).toBe("Langy still hasn't answered — it may be stuck.");
+      expect(line?.tone).toBe("stuck");
+    });
+
     it("never reads the previous reply as the current turn's output", () => {
       // The last assistant overall is the PREVIOUS completed reply. Its text
       // used to make the line claim "Writing…" for a turn that had produced
