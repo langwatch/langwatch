@@ -1627,16 +1627,20 @@ function LatestSettledActivityCard({
           isExpanded={resultOpen}
           onToggle={() => setResultOpen((value) => !value)}
         >
-          <SettledActivityLabel label={group.label} detail={detail} />
+          {/* The truncated command gives way to the full one below it. */}
+          <SettledActivityLabel
+            label={group.label}
+            detail={resultOpen ? undefined : detail}
+          />
         </ResultDisclosureButton>
       ) : (
         <SettledActivityLabel label={group.label} detail={detail} />
       )}
 
       {resultOpen ? (
-        <VStack align="stretch" gap={1}>
+        <VStack align="stretch" gap={1.5}>
           {callsWithResult.map((call, index) => (
-            <ToolResultBlock key={call.toolCallId ?? index} call={call} />
+            <OpenedToolCall key={call.toolCallId ?? index} call={call} />
           ))}
         </VStack>
       ) : null}

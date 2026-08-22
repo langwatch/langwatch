@@ -142,6 +142,28 @@ describe("a turn's activity cards", () => {
         ).toBeTruthy();
       });
 
+      /** @scenario An opened result names the command that produced it */
+      it("names the command under which each result came back", () => {
+        useLangyStore.setState({ turnPhase: "active" });
+        renderTurn(
+          turnFromParts([
+            {
+              type: "tool-langwatch.trace.search",
+              toolCallId: "call-1",
+              state: "output-available",
+              input: { command: 'langwatch trace search --limit "5"' },
+              output: JSON.stringify({ kind: "json", payload: { count: 5 } }),
+            },
+          ]),
+        );
+
+        fireEvent.click(screen.getByRole("button", { expanded: false }));
+
+        expect(
+          screen.getByText('$ langwatch trace search --limit "5"'),
+        ).toBeTruthy();
+      });
+
       it("offers no disclosure when the call recorded no result", () => {
         useLangyStore.setState({ turnPhase: "active" });
         const { container } = renderTurn(

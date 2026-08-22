@@ -65,6 +65,37 @@ function startsAtDocumentBoundary(text: string, start: number): boolean {
 }
 
 /**
+ * Whether what follows the bracket at `start` can begin a JSON document: a key
+ * inside `{`, any value inside `[`, or the matching close for an empty one.
+ *
+ * A log line can open a line with a bracket too (`[retrying request`), and a
+ * bracket the rest of the output never closes is otherwise read as a truncated
+ * document, which stops the scan. Reading its first token tells the two apart.
+ */
+function opensJsonContent(text: string, start: number): boolean {
+  const opensObject = text[start] === "{";
+  const close = opensObject ? "}" : "]";
+
+  for (let i = start + 1; i < text.length; i++) {
+    const char = text[i]!;
+    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
+    if (char === close) return true;
+    if (opensObject) return char === '"';
+    return (
+      char === '"' ||
+      char === "{" ||
+      char === "[" ||
+      char === "-" ||
+      (char >= "0" && char <= "9") ||
+      char === "t" ||
+      char === "f" ||
+      char === "n"
+    );
+  }
+  return false;
+}
+
+/**
  * The JSON document a CLI command printed, or null when its output holds none —
  * a human table, an error message, an empty string. Null reads as "leave the raw
  * output alone".
@@ -102,7 +133,11 @@ export function parseCliJson(output: string): unknown | null {
       // nested object (for example one trace's {"output":{"value":"…"}}) into
       // the result for the whole command. That was how an oversized trace
       // search rendered an unrelated sentence as its card.
-      return null;
+      //
+      // A log line that opens with a bracket and never closes it is not that
+      // result, so it must not stop the scan before the document under it.
+      if (opensJsonContent(output, i)) return null;
+      continue;
     }
     const parsed = tryParse(output.slice(i, end + 1));
     if (parsed) return parsed.value;

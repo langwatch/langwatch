@@ -105,7 +105,7 @@ describe("the completed receipt's tool results", () => {
   });
 
   describe("when the call came through the CLI envelope", () => {
-    /** @scenario An opened row shows the data a tool returned, not its envelope */
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
     it("shows the payload, indented, without the transport around it", () => {
       renderMessage(
         assistantMessage([
@@ -132,7 +132,7 @@ describe("the completed receipt's tool results", () => {
       expect(shown).not.toContain("payload");
     });
 
-    /** @scenario An opened row names the command behind each result */
+    /** @scenario An opened result names the command that produced it */
     it("names the command of every call the row grouped", () => {
       renderMessage(
         assistantMessage([
@@ -165,7 +165,7 @@ describe("the completed receipt's tool results", () => {
   });
 
   describe("when the call is a plain shell command", () => {
-    /** @scenario An opened row shows the data a tool returned, not its envelope */
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
     it("keeps stdout exactly as the model read it", () => {
       const stdout = "zsh:1: command not found: langwatch\n";
       renderMessage(
@@ -186,7 +186,7 @@ describe("the completed receipt's tool results", () => {
       expect(screen.getByText(stdout.trim())).toBeDefined();
     });
 
-    /** @scenario An opened row shows the data a tool returned, not its envelope */
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
     it("keeps a log line that came before the JSON", () => {
       const stdout = 'connecting…\n{"total":2}\n';
       renderMessage(

@@ -54,6 +54,12 @@ describe("parseCliJson", () => {
       ]);
     });
 
+    it("lifts the document under a log line that opens a bracket it never closes", () => {
+      const output = '[retrying request\n{"total": 2}\n';
+
+      expect(parseCliJson(output)).toEqual({ total: 2 });
+    });
+
     it("lifts a document a spinner frame left on the same line", () => {
       expect(parseCliJson('⠋ Searching traces...\r{"traces":[]}')).toEqual({
         traces: [],
@@ -104,6 +110,13 @@ describe("parseCliJson", () => {
     it("does not mistake a nested object inside a truncated result for the document", () => {
       const truncated =
         '{"traces":[{"trace_id":"trace_1","output":{"value":"unrelated nested answer"}},{"trace_id":"trace_2"';
+
+      expect(parseCliJson(truncated)).toBeNull();
+    });
+
+    it("still stops on a truncated array of results, log line or not", () => {
+      const truncated =
+        'reading…\n[{"trace_id":"trace_1","output":{"value":"unrelated nested answer"}},{"trace_id":"trace_2"';
 
       expect(parseCliJson(truncated)).toBeNull();
     });
