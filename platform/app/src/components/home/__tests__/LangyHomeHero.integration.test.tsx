@@ -12,7 +12,7 @@
  * and store, the ambient dev state, and the project's reach.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,6 +40,26 @@ vi.mock("../WelcomeHeader", () => ({
 const reachMock = vi.fn();
 vi.mock("../useProjectReach", () => ({
   useProjectReach: () => reachMock(),
+}));
+
+// The pill's menu is `AgentActionsMenu`, which reads the project for its
+// key and fetches the skill the copy hands over.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project_1", apiKey: "sk-lw-home" },
+    organization: { id: "org_1" },
+  }),
+}));
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: { BASE_HOST: "https://app.langwatch.ai" } }),
+}));
+const SKILL_BODY = "# Add LangWatch Tracing to Your Code";
+vi.mock("~/utils/api", () => ({
+  api: {
+    setupSkills: {
+      getPrompt: { useQuery: () => ({ data: { body: SKILL_BODY } }) },
+    },
+  },
 }));
 
 import { LangyHomeHero } from "../LangyHomeHero";
@@ -97,17 +117,44 @@ describe("LangyHomeHero onboarding control", () => {
     });
 
     describe("when the pill's menu is opened with ask access", () => {
-      it("offers the walkthrough, the coding-agent prompt, and the docs", async () => {
+      it("offers the coding-agent prompt first, then the walkthrough, then the docs", async () => {
         reachMock.mockReturnValue(NEW_PROJECT_REACH);
         renderHero();
 
         await userEvent.click(onboardingTriggers()[0]!);
 
-        expect(await screen.findByText("Walk me through it")).toBeDefined();
-        expect(
-          screen.getByText("Copy a prompt for your coding agent"),
-        ).toBeDefined();
-        expect(screen.getByText("Read the integration guide")).toBeDefined();
+        const copy = await screen.findByText(
+          "Copy a prompt for your coding agent",
+        );
+        const walkthrough = screen.getByText("Walk me through it");
+        const docs = screen.getByText("Read the integration guide");
+
+        // The same order every empty page's setup menu offers.
+        expect(renders_before(copy, walkthrough)).toBe(true);
+        expect(renders_before(walkthrough, docs)).toBe(true);
+      });
+
+      it("copies the tracing skill led by the project's keys", async () => {
+        reachMock.mockReturnValue(NEW_PROJECT_REACH);
+        const writeText = vi.fn((_text: string) => Promise.resolve());
+        Object.defineProperty(navigator, "clipboard", {
+          value: { writeText },
+          configurable: true,
+        });
+        renderHero();
+
+        await userEvent.click(onboardingTriggers()[0]!);
+        await userEvent.click(
+          await screen.findByText("Copy a prompt for your coding agent"),
+        );
+
+        await waitFor(() => expect(writeText).toHaveBeenCalled());
+        const copied = writeText.mock.calls[0]?.[0] ?? "";
+        expect(copied.indexOf("Use these keys to instrument:")).toBe(0);
+        expect(copied).toContain('LANGWATCH_API_KEY="sk-lw-home"');
+        expect(copied.indexOf(SKILL_BODY)).toBeGreaterThan(0);
+        // Cloud is the SDK default, so no endpoint line to get wrong.
+        expect(copied).not.toContain("LANGWATCH_ENDPOINT");
       });
     });
 
