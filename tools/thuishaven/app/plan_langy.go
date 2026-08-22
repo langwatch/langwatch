@@ -50,7 +50,7 @@ const langyWorkerIdleEnv = "LANGY_WORKER_IDLE_MS"
 // it has a real cost when you are working on Langy itself: production reaps
 // idle workers after ten minutes, so locally every message sent more than
 // fifteen seconds after the last one hits a freshly-spawned worker and shows the
-// cold "Waking Langy up…" copy. Warm-path behaviour is therefore untestable
+// cold "Starting up…" copy. Warm-path behaviour is therefore untestable
 // locally by default, and the difference is invisible — nothing in the UI says
 // the worker was reaped.
 //

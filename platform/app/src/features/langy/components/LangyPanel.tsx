@@ -983,6 +983,7 @@ function LangyPanel({
     projectId,
     isOpen,
     conversationId: activeConversationId,
+    pendingConversationId,
     model: modelQueriesSettled
       ? modelOverride || langyDefaultModel || null
       : null,

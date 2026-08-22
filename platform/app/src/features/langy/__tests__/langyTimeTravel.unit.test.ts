@@ -214,7 +214,7 @@ describe("buildTimeTravelView", () => {
       const records = [
         send(1_000, "hey"),
         accepted(1_100, "t1", 1_100),
-        status(1_150, "t1", "Giving Langy a pep talk…"),
+        status(1_150, "t1", "Starting up…"),
         delta(1_300, "t1", "How can "),
         delta(1_400, "t1", "I help?"),
         // No terminal on the tape yet — catch-up has not run at this moment.

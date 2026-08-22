@@ -52,23 +52,21 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # ---------------------------------------------------------------------------
 
   # Between the prompt POST and the agent's first frame the worker prepares its
-  # tools and produces nothing. The manager fills that silence with a status —
-  # but the status must name what is actually happening, and it must not repeat
-  # the same line on every message of a conversation.
+  # tools and produces nothing. The manager fills that silence with a status,
+  # and the status must name what is actually happening: a boot, a round-trip
+  # to a running worker, or a resume.
 
   @unit
-  Scenario: A worker that has not served a turn yet says Langy is waking up
+  Scenario: A worker that has not served a turn yet says it is starting up
     Given a turn is dispatched to a worker that has not served a turn yet
     When the manager opens the turn
-    Then it emits a wake-up status such as "Waking Langy up…", "Giving Langy a pep talk…" or "Poking Langy…" before the first agent frame
-    And the line varies between conversations instead of repeating one phrase
+    Then it emits the status "Starting up…" before the first agent frame
 
   @unit
-  Scenario: A warm worker gets a short reaching-Langy line that varies
+  Scenario: A warm worker says it is connecting
     Given a turn is dispatched to a worker that has already served a turn
     When the manager opens the turn
-    Then it emits a short status such as "Paging Langy…" or "Pinging Langy…"
-    And the line varies between turns instead of repeating one phrase
+    Then it emits the status "Connecting…" and never the starting-up line
 
   @unit
   Scenario: A resumed turn says it is picking up where it left off

@@ -110,7 +110,7 @@ export function LangyThinkingLine({
     // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
     // StreamingStatusLine): same gap, same padding, and the same leading orb
     // slot as the status rows this line alternates with — so "Starting up…" →
-    // "Waking Langy up…" → "Thinking…" reads as one line changing its words,
+    // "Starting up…" → "Thinking…" reads as one line changing its words,
     // never a line hopping between layouts.
     <HStack
       gap={STATUS_LINE_ROW.gap}

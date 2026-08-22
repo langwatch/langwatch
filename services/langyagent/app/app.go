@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"hash/fnv"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -24,45 +23,26 @@ import (
 // carries no internals — the stack is logged by the goroutine's recover.
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
-// wakingLangyStatuses are the cold pre-first-frame lines: this worker has never
-// answered, so the wait really is a boot. Varied by turn (see readyStatusFor)
-// because one phrase repeated under every conversation start reads as a looping
-// machine.
-var wakingLangyStatuses = []string{
-	"Waking Langy up…",
-	"Giving Langy a pep talk…",
-	"Poking Langy…",
-}
-
-// reachingLangyStatuses are the warm-worker pre-first-frame lines: the worker
-// has answered before, so the wait is a round-trip, not a boot.
-var reachingLangyStatuses = []string{
-	"Paging Langy…",
-	"Pinging Langy…",
-	"Getting Langy's attention…",
-	"Nudging Langy…",
-}
+// Pre-first-frame status lines. Plain and factual: the cold line names a boot
+// that is really happening, the warm line names a round-trip, and the resume
+// line names a checkpointed turn being picked back up (ADR-048).
+const (
+	statusStartingUp = "Starting up…"
+	statusConnecting = "Connecting…"
+	statusResuming   = "Picking up where it left off…"
+)
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
-// never answered, or reaching one that has. Lines rotate deterministically off
-// the turn id — stable for a re-drive of the same turn, different across turns.
+// happening: resuming a checkpointed turn, booting a worker that has never
+// answered, or reaching one that has.
 func readyStatusFor(req ChatRequest, worker Worker) string {
 	if req.ResumeToken != "" {
-		return "Picking up where it left off…"
+		return statusResuming
 	}
 	if !worker.HasServedTurn() {
-		return wakingLangyStatuses[statusIndexOf(req.TurnID, len(wakingLangyStatuses))]
+		return statusStartingUp
 	}
-	return reachingLangyStatuses[statusIndexOf(req.TurnID, len(reachingLangyStatuses))]
-}
-
-// statusIndexOf maps a turn id onto [0, n) with FNV-1a — cheap, deterministic,
-// and evenly spread, which is all a copy rotation needs.
-func statusIndexOf(turnID string, n int) int {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(turnID))
-	return int(h.Sum32() % uint32(n))
+	return statusConnecting
 }
 
 // App is the langyagent application. It composes the worker pool and the

@@ -14,7 +14,7 @@ const MotionBox = motion.create(Box);
  * ONE geometry for every pre-work / thinking / status line of a live turn.
  *
  * The startup sequence used to hop between layouts: "Starting up…" drew as the
- * bare thinking line, "Waking Langy up…" as an orb-led status row with its own
+ * bare thinking line, "Starting up…" as an orb-led status row with its own
  * gap and no padding, and the first real work line flipped back — three
  * different left offsets and baselines for what reads as one evolving line.
  * Both components (LangyThinkingLine, StreamingStatusLine) now share this row

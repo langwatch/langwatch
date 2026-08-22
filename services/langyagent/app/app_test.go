@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -541,48 +540,27 @@ func statusOf(fs []frames.Frame) string {
 	return ""
 }
 
-// A worker that has never answered says Langy is waking up — one of the
-// wake-flavored lines, never a warm reaching line.
-func TestApp_Turn_NeverServedWorkerEmitsWakingUpStatus(t *testing.T) {
+// A worker that has never answered says it is starting up — never the
+// connecting line, which would hide that a boot is happening.
+func TestApp_Turn_NeverServedWorkerEmitsStartingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	got := statusOf(relay.stream.emitted)
-	if !slices.Contains(wakingLangyStatuses, got) {
-		t.Errorf("cold readiness status = %q, want one of %v", got, wakingLangyStatuses)
+	if got := statusOf(relay.stream.emitted); got != statusStartingUp {
+		t.Errorf("cold readiness status = %q, want %q", got, statusStartingUp)
 	}
 }
 
-// A warm worker gets a short reaching-Langy line, chosen from the rotation —
-// never the waking-up line, which would claim a boot that isn't happening.
-func TestApp_Turn_WarmWorkerEmitsReachingLangyStatus(t *testing.T) {
+// A warm worker gets the connecting line — never the starting-up line, which
+// would claim a boot that isn't happening.
+func TestApp_Turn_WarmWorkerEmitsConnectingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true, servedTurn: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	got := statusOf(relay.stream.emitted)
-	if !slices.Contains(reachingLangyStatuses, got) {
-		t.Errorf("warm readiness status = %q, want one of %v", got, reachingLangyStatuses)
-	}
-}
-
-// The warm rotation is deterministic per turn (a re-drive repeats its line) and
-// actually varies across turn ids.
-func TestApp_ReadyStatus_WarmRotationVariesByTurn(t *testing.T) {
-	worker := &fakeWorker{servedTurn: true}
-	seen := map[string]struct{}{}
-	for _, turnID := range []string{"turn-a", "turn-b", "turn-c", "turn-d", "turn-e", "turn-f"} {
-		r := req()
-		r.TurnID = turnID
-		first := readyStatusFor(r, worker)
-		if again := readyStatusFor(r, worker); again != first {
-			t.Fatalf("ready status for %q not deterministic: %q then %q", turnID, first, again)
-		}
-		seen[first] = struct{}{}
-	}
-	if len(seen) < 2 {
-		t.Errorf("six turn ids produced %d distinct warm lines, want at least 2", len(seen))
+	if got := statusOf(relay.stream.emitted); got != statusConnecting {
+		t.Errorf("warm readiness status = %q, want %q", got, statusConnecting)
 	}
 }
 

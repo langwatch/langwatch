@@ -111,6 +111,7 @@ export function useLangyWarmWorker({
   projectId,
   isOpen,
   conversationId,
+  pendingConversationId,
   model,
 }: {
   projectId: string | undefined;
@@ -118,6 +119,15 @@ export function useLangyWarmWorker({
   isOpen: boolean;
   /** The active conversation, or null for a fresh chat. */
   conversationId: string | null;
+  /**
+   * The id an earlier fresh-chat warm minted and the first send will adopt.
+   * A fresh-chat re-arm (the model changed, the panel flipped through an
+   * active conversation and back) warms THIS id again instead of minting
+   * another: the server's probe answers alive for its running worker, so the
+   * re-warm is a cheap no-op instead of a new conversation id, a new session
+   * key and a new worker filling the pool.
+   */
+  pendingConversationId: string | null;
   /**
    * The model the composer's picker shows, passed as the warm's override so
    * the warmed worker's signature matches the turn the user is about to send.
@@ -163,10 +173,13 @@ export function useLangyWarmWorker({
       generationRef.current += 1;
       return;
     }
+    // A fresh chat re-warms the id an earlier warm already minted, so the
+    // server probes its running worker instead of minting a sibling.
+    const targetConversationId = conversationId ?? pendingConversationId;
     const claimed = claimWarm({
       fired: firedRef.current,
       projectId,
-      conversationId,
+      conversationId: targetConversationId,
       model,
     });
     if (!claimed) return;
@@ -174,19 +187,30 @@ export function useLangyWarmWorker({
     generationRef.current += 1;
     const generation = generationRef.current;
     const forProjectId = projectId;
-    const forConversationId = conversationId;
+    const forModel = model;
     mutateRef.current(
       {
         projectId: forProjectId,
-        ...(forConversationId ? { conversationId: forConversationId } : {}),
+        ...(targetConversationId
+          ? { conversationId: targetConversationId }
+          : {}),
         modelOverride: model,
       },
       {
         onSuccess: (result) => {
-          // Only a fresh-chat warm has an id worth holding, and only when no
-          // newer warm has been fired since.
+          // Only a mint (a fresh warm with no target) has an id worth
+          // holding, and only when no newer warm has been fired since.
           if (generationRef.current !== generation) return;
-          if (forConversationId || !result.conversationId) return;
+          if (targetConversationId || !result.conversationId) return;
+          // The held id becomes the next render's warm target; remember it as
+          // already warmed so holding it does not immediately re-fire.
+          firedRef.current.add(
+            warmKey({
+              projectId: forProjectId,
+              conversationId: result.conversationId,
+              model: forModel,
+            }),
+          );
           holdPendingConversation({
             conversationId: result.conversationId,
             projectId: forProjectId,
@@ -198,5 +222,5 @@ export function useLangyWarmWorker({
         },
       },
     );
-  }, [isOpen, projectId, conversationId, model]);
+  }, [isOpen, projectId, conversationId, pendingConversationId, model]);
 }

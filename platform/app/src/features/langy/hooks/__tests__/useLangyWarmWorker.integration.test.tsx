@@ -45,6 +45,7 @@ const props = (over: Partial<HookProps> = {}): HookProps => ({
   projectId: "proj-1",
   isOpen: true,
   conversationId: null,
+  pendingConversationId: null,
   model: "openai/gpt-5-mini",
   ...over,
 });
@@ -134,6 +135,69 @@ describe("useLangyWarmWorker", () => {
       });
 
       expect(useLangyStore.getState().pendingConversationId).toBeNull();
+    });
+
+    it("re-warms the held pending id instead of minting another", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      expect(mutate).toHaveBeenCalledTimes(1);
+
+      const opts = mutate.mock.calls[0]![1]!;
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-warmed", warmed: true });
+      });
+
+      // The panel re-renders with the held id; the warm it names already ran,
+      // so nothing fires again.
+      rerender(props({ pendingConversationId: "conv-warmed" }));
+      expect(mutate).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps one pending id across a flip through an active conversation", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      const opts = mutate.mock.calls[0]![1]!;
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-warmed", warmed: true });
+      });
+
+      rerender(
+        props({
+          conversationId: "conv-selected",
+          pendingConversationId: "conv-warmed",
+        }),
+      );
+      expect(mutate).toHaveBeenCalledTimes(2);
+
+      // Back to the fresh chat: the pending id's worker is already warm, so
+      // no third warm and no second mint.
+      rerender(props({ pendingConversationId: "conv-warmed" }));
+      expect(mutate).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-warms the pending id on a model change, never a new mint", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      const opts = mutate.mock.calls[0]![1]!;
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-warmed", warmed: true });
+      });
+
+      rerender(
+        props({
+          pendingConversationId: "conv-warmed",
+          model: "anthropic/claude-opus-5",
+        }),
+      );
+      expect(mutate).toHaveBeenCalledTimes(2);
+      expect(mutate.mock.calls[1]![0]).toEqual({
+        projectId: "proj-1",
+        conversationId: "conv-warmed",
+        modelOverride: "anthropic/claude-opus-5",
+      });
     });
 
     /** @scenario Starting a new chat after a conversation warms again */

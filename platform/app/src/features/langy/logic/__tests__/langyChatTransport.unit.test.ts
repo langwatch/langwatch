@@ -244,7 +244,7 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       // The manager's cold-window placeholder, then the first real output (plan).
-      onData({ type: "status", status: "Waking Langy up…" });
+      onData({ type: "status", status: "Starting up…" });
       onData({
         type: "plan",
         items: [{ content: "Find the slow traces", status: "in_progress" }],
