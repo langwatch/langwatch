@@ -1,0 +1,308 @@
+---
+title: "LWQL Use Cases"
+description: "Copy-paste LangWatchQL queries for cost attribution, latency, quality, adoption, and experiment analysis"
+sidebarTitle: Use cases
+keywords: langwatchql, lwql, examples, sql, cost, latency, evaluations, analytics
+---
+
+Every query below runs as-is through `POST /api/v1/projects/{projectId}/analytics/query/clickhouse`. They all filter the dataset's time column — keep that habit; it's what makes queries fast and keeps them under the scan ceilings. Column names come from the [schema endpoint](/observability/lwql/writing-queries#start-with-the-schema), which is always the source of truth.
+
+## Cost
+
+### What is each model costing us per day?
+
+`model_usage_by_minute` is pre-aggregated per (minute, model, span type), so this scans almost nothing:
+
+```sql
+SELECT toStartOfDay(BucketStart) AS Day,
+       Model,
+       round(sum(CostSum), 4) AS CostUSD,
+       sum(PromptTokensSum) AS PromptTokens,
+       sum(CompletionTokensSum) AS CompletionTokens
+FROM model_usage_by_minute
+WHERE BucketStart >= now() - INTERVAL 14 DAY
+GROUP BY Day, Model
+ORDER BY Day, CostUSD DESC
+```
+
+### Which customers and users drive our cost?
+
+`trace_metrics` carries the user, conversation, and customer identifiers from your trace metadata:
+
+```sql
+SELECT CustomerId,
+       uniq(UserId) AS Users,
+       uniq(ConversationId) AS Conversations,
+       count() AS Traces,
+       round(sum(TotalCost), 2) AS CostUSD,
+       round(sum(TotalCost) / count(), 5) AS CostPerTrace
+FROM trace_metrics
+WHERE OccurredAt >= now() - INTERVAL 30 DAY
+GROUP BY CustomerId
+ORDER BY CostUSD DESC
+LIMIT 25
+```
+
+### How much is prompt caching saving us?
+
+```sql
+SELECT toStartOfDay(BucketStart) AS Day,
+       sum(CacheReadTokensSum) AS CachedTokens,
+       sum(PromptTokensSum) AS PromptTokens,
+       round(sum(CacheReadTokensSum) / (sum(PromptTokensSum) + sum(CacheReadTokensSum)), 3) AS CacheHitShare
+FROM trace_metrics_by_minute
+WHERE BucketStart >= now() - INTERVAL 14 DAY
+GROUP BY Day
+ORDER BY Day
+```
+
+### Did cost per conversation change week over week?
+
+```sql
+WITH weekly AS (
+  SELECT toStartOfWeek(OccurredAt) AS Week,
+         sum(TotalCost) / uniq(ConversationId) AS CostPerConversation
+  FROM trace_metrics
+  WHERE OccurredAt >= now() - INTERVAL 8 WEEK
+  GROUP BY Week
+)
+SELECT Week,
+       round(CostPerConversation, 4) AS CostPerConversation,
+       round(CostPerConversation - lagInFrame(CostPerConversation) OVER (ORDER BY Week), 4) AS ChangeVsPriorWeek
+FROM weekly
+ORDER BY Week
+```
+
+## Latency & reliability
+
+### p50 / p95 / p99 latency and time-to-first-token
+
+```sql
+SELECT quantile(0.5)(TotalDurationMs)  AS P50Ms,
+       quantile(0.95)(TotalDurationMs) AS P95Ms,
+       quantile(0.99)(TotalDurationMs) AS P99Ms,
+       quantile(0.95)(TimeToFirstTokenMs) AS P95FirstTokenMs,
+       avg(TokensPerSecond) AS AvgTokensPerSec
+FROM traces
+WHERE OccurredAt >= now() - INTERVAL 24 HOUR
+```
+
+### Error rate trend, hour by hour
+
+```sql
+SELECT toStartOfHour(BucketStart) AS Hour,
+       sum(TraceCount) AS Traces,
+       sum(ErrorCount) AS Errors,
+       round(sum(ErrorCount) / sum(TraceCount), 4) AS ErrorRate
+FROM trace_metrics_by_minute
+WHERE BucketStart >= now() - INTERVAL 48 HOUR
+GROUP BY Hour
+ORDER BY Hour
+```
+
+### Which operation regressed? Latency by trace name, this week vs last
+
+```sql
+SELECT TraceName,
+       quantile(0.95)(if(OccurredAt >= now() - INTERVAL 7 DAY, TotalDurationMs, NULL)) AS P95ThisWeek,
+       quantile(0.95)(if(OccurredAt <  now() - INTERVAL 7 DAY, TotalDurationMs, NULL)) AS P95LastWeek
+FROM traces
+WHERE OccurredAt >= now() - INTERVAL 14 DAY
+GROUP BY TraceName
+HAVING P95ThisWeek > P95LastWeek * 1.2
+ORDER BY P95ThisWeek DESC
+```
+
+### The slowest step inside slow traces
+
+Join spans to traces on their published join key to see where the time goes:
+
+```sql
+SELECT s.SpanName,
+       count() AS Occurrences,
+       round(avg(s.DurationMs)) AS AvgMs,
+       round(quantile(0.95)(s.DurationMs)) AS P95Ms
+FROM spans AS s
+JOIN traces AS t ON s.TraceId = t.TraceId
+WHERE s.StartTime >= now() - INTERVAL 24 HOUR
+  AND t.OccurredAt >= now() - INTERVAL 24 HOUR
+  AND t.TotalDurationMs > 10000
+GROUP BY s.SpanName
+ORDER BY P95Ms DESC
+LIMIT 20
+```
+
+## Quality
+
+### Pass rate per evaluator
+
+```sql
+SELECT EvaluatorName,
+       count() AS Runs,
+       countIf(Passed) AS Passed,
+       round(countIf(Passed) / count(), 3) AS PassRate,
+       round(avg(Score), 3) AS AvgScore
+FROM evaluations
+WHERE ScheduledAt >= now() - INTERVAL 7 DAY
+  AND Status = 'processed'
+GROUP BY EvaluatorName
+ORDER BY PassRate ASC
+```
+
+### Evaluation pass-rate trend (pre-aggregated)
+
+```sql
+SELECT toStartOfDay(BucketStart) AS Day,
+       EvaluatorType,
+       sum(PassCount) AS Passed,
+       sum(FailCount) AS Failed,
+       round(sum(PassCount) / (sum(PassCount) + sum(FailCount)), 3) AS PassRate,
+       round(sum(ScoreSum) / sum(ScoreCount), 3) AS AvgScore
+FROM evaluation_metrics_by_minute
+WHERE BucketStart >= now() - INTERVAL 30 DAY
+GROUP BY Day, EvaluatorType
+ORDER BY Day, EvaluatorType
+```
+
+### Which conversations keep failing a guardrail?
+
+```sql
+SELECT ConversationId,
+       countIf(NOT Passed) AS Failures,
+       count() AS Checks,
+       round(countIf(NOT Passed) / count(), 3) AS FailureRate
+FROM evaluation_metrics
+WHERE OccurredAt >= now() - INTERVAL 7 DAY
+  AND IsGuardrail
+GROUP BY ConversationId
+HAVING Failures >= 3
+ORDER BY Failures DESC
+LIMIT 50
+```
+
+### Do human annotations agree with the evaluators?
+
+```sql
+SELECT e.EvaluatorName,
+       countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed) AS Agree,
+       count() AS Pairs,
+       round((countIf(a.IsThumbsUp AND e.Passed) + countIf(NOT a.IsThumbsUp AND NOT e.Passed)) / count(), 3) AS Agreement
+FROM annotations AS a
+JOIN evaluations AS e ON a.TraceId = e.TraceId
+WHERE a.CreatedAt >= now() - INTERVAL 30 DAY
+  AND e.Passed IS NOT NULL
+GROUP BY e.EvaluatorName
+ORDER BY Pairs DESC
+```
+
+<Note>
+  The unit here is an **(annotation, evaluation) pair**, not a trace. Both
+  datasets are one row per event — one human annotation, one evaluation run —
+  so a trace annotated twice and evaluated three times by the same evaluator
+  contributes six pairs, and weighs six times as much as a trace with one of
+  each. That is why the column is `Pairs` rather than a trace count. The
+  `POSSIBLE_FANOUT` diagnostic flags this on the result. For a trace-weighted
+  answer, restrict to one annotation and one evaluation per trace before
+  comparing.
+</Note>
+
+### Simulation verdicts across recent batches
+
+```sql
+SELECT BatchRunId,
+       min(StartedAt) AS BatchStart,
+       count() AS Runs,
+       countIf(Verdict = 'success') AS Successes,
+       round(countIf(Verdict = 'success') / count(), 3) AS SuccessRate
+FROM simulations
+WHERE StartedAt >= now() - INTERVAL 14 DAY
+GROUP BY BatchRunId
+ORDER BY BatchStart DESC
+LIMIT 5
+```
+
+### Which criteria fail most often?
+
+```sql
+SELECT arrayJoin(UnmetCriteria) AS Criterion,
+       count() AS Failures
+FROM simulations
+WHERE StartedAt >= now() - INTERVAL 14 DAY
+GROUP BY Criterion
+ORDER BY Failures DESC
+LIMIT 10
+```
+
+## Adoption & product
+
+### Daily active users and conversations
+
+```sql
+SELECT toStartOfDay(OccurredAt) AS Day,
+       uniq(UserId) AS ActiveUsers,
+       uniq(ConversationId) AS Conversations,
+       count() AS Traces
+FROM trace_metrics
+WHERE OccurredAt >= now() - INTERVAL 30 DAY
+GROUP BY Day
+ORDER BY Day
+```
+
+### What are people talking about? Traces by topic
+
+```sql
+SELECT TopicId,
+       count() AS Traces,
+       round(avg(TotalDurationMs)) AS AvgDurationMs,
+       round(sum(TotalCost), 2) AS CostUSD
+FROM traces
+WHERE OccurredAt >= now() - INTERVAL 7 DAY
+  AND TopicId IS NOT NULL
+GROUP BY TopicId
+ORDER BY Traces DESC
+LIMIT 20
+```
+
+### User satisfaction by day
+
+```sql
+SELECT toStartOfDay(OccurredAt) AS Day,
+       round(avg(SatisfactionScore), 3) AS AvgSatisfaction,
+       count() AS ScoredTraces
+FROM traces
+WHERE OccurredAt >= now() - INTERVAL 30 DAY
+  AND SatisfactionScore IS NOT NULL
+GROUP BY Day
+ORDER BY Day
+```
+
+## Prompts & experiments
+
+### Which prompt versions are actually serving traffic?
+
+```sql
+SELECT p.PromptHandle,
+       t.LastUsedPromptVersionNumber AS Version,
+       count() AS Traces,
+       round(quantile(0.95)(t.TotalDurationMs)) AS P95Ms,
+       round(sum(t.TotalCost), 4) AS CostUSD
+FROM traces AS t
+JOIN prompts AS p ON t.LastUsedPromptId = p.PromptId
+WHERE t.OccurredAt >= now() - INTERVAL 7 DAY
+  AND t.ContainsPrompt
+GROUP BY p.PromptHandle, Version
+ORDER BY Traces DESC
+```
+
+## Reusable, period-aware statements
+
+Any of the above becomes a reusable report by swapping the hard-coded interval for the reserved time-window parameters, and letting the caller supply the period:
+
+```json
+{
+  "sql": "SELECT toStartOfDay(BucketStart) AS Day, sum(CostSum) AS CostUSD FROM trace_metrics_by_minute WHERE BucketStart >= {period_start:DateTime} AND BucketStart < {period_end:DateTime} GROUP BY Day ORDER BY Day",
+  "timeWindow": { "start": "2026-08-01T00:00:00Z", "end": "2026-08-18T00:00:00Z" }
+}
+```
+
+See [Writing queries](/observability/lwql/writing-queries#the-reserved-time-window) for the contract, and check each response's `diagnostics` — `POSSIBLE_FANOUT` on the join examples and `MISSING_TIME_BUCKETS` on the trend examples are exactly the situations they exist to catch.

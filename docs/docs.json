@@ -279,6 +279,19 @@
             ]
           },
           {
+            "group": "LangWatchQL (LWQL)",
+            "pages": [
+              "observability/lwql/introduction",
+              "observability/lwql/writing-queries",
+              "observability/lwql/querying-with-agents",
+              "observability/lwql/mcp",
+              "observability/lwql/cli",
+              "observability/lwql/self-hosted",
+              "observability/lwql/privacy-and-rbac",
+              "observability/lwql/use-cases"
+            ]
+          },
+          {
             "group": "SDKs",
             "pages": [
               {
