@@ -15,17 +15,17 @@
 /** Give up scanning a huge stdout after this many `{`/`[` candidates. */
 const MAX_CANDIDATES = 32;
 
-/**
- * A JSON scalar and the separator a document puts after it.
- *
- * Sticky rather than `^`-anchored: it reads the token AT `lastIndex` without
- * copying the rest of stdout to get there, and `$` keeps meaning the end of
- * the output. Reading a fixed window instead made `$` match the end of the
- * WINDOW, so a scalar padded that far from its prose read as a truncated
- * result. `^` cannot be used with `y`, since it would pin the match to index 0.
- */
-const SCALAR_THEN_SEPARATOR =
-  /(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(?:[,\]]|$)/y;
+/** The scalars a document can spell out, as opposed to a number. */
+const JSON_LITERALS = ["true", "false", "null"];
+
+/** The four characters JSON counts as whitespace. */
+function isWhitespace(char: string | undefined): boolean {
+  return char === " " || char === "\t" || char === "\n" || char === "\r";
+}
+
+function isDigit(char: string | undefined): boolean {
+  return char !== undefined && char >= "0" && char <= "9";
+}
 
 function tryParse(candidate: string): { value: unknown } | null {
   try {
@@ -109,9 +109,7 @@ function opensJsonContent({
 
   for (let i = start + 1; i < text.length; i++) {
     const char = text[i]!;
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") {
-      continue;
-    }
+    if (isWhitespace(char)) continue;
     if (char === close) return true;
     // An object opens with a key, and with nothing else.
     if (opensObject) return char === '"';
@@ -132,8 +130,56 @@ function opensJsonContent({
 function opensJsonValue({ text, at }: { text: string; at: number }): boolean {
   const char = text[at]!;
   if (char === '"' || char === "{" || char === "[") return true;
-  SCALAR_THEN_SEPARATOR.lastIndex = at;
-  return SCALAR_THEN_SEPARATOR.test(text);
+
+  const scalar = scalarEnd({ text, at });
+  if (scalar === -1) return false;
+
+  let i = scalar;
+  while (isWhitespace(text[i])) i++;
+  // Nothing after the scalar means the output ended on it, which is a result
+  // cut short rather than a sentence.
+  return i === text.length || text[i] === "," || text[i] === "]";
+}
+
+/** Index just past the scalar that starts at `at`, or -1 when none does. */
+function scalarEnd({ text, at }: { text: string; at: number }): number {
+  for (const literal of JSON_LITERALS) {
+    if (text.startsWith(literal, at)) return at + literal.length;
+  }
+  return numberEnd({ text, at });
+}
+
+/**
+ * Index just past the number that starts at `at`, or -1 when none does.
+ *
+ * One forward pass that never reconsiders a character. A regular expression
+ * reads better but backtracks over a long run of digits, and this runs on
+ * whatever a tool wrote to its stdout.
+ */
+function numberEnd({ text, at }: { text: string; at: number }): number {
+  let i = at;
+  if (text[i] === "-") i++;
+
+  const integerFrom = i;
+  while (isDigit(text[i])) i++;
+  if (i === integerFrom) return -1;
+
+  if (text[i] === ".") {
+    i++;
+    const fractionFrom = i;
+    while (isDigit(text[i])) i++;
+    if (i === fractionFrom) return -1;
+  }
+
+  if (text[i] === "e" || text[i] === "E") {
+    i++;
+    if (text[i] === "+" || text[i] === "-") i++;
+    const exponentFrom = i;
+    while (isDigit(text[i])) i++;
+    if (i === exponentFrom) return -1;
+  }
+
+  return i;
 }
 
 /**
