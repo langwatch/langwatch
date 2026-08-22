@@ -129,6 +129,10 @@ const DEFAULT_SHELL_TEST_ROOTS: string[] = [
   // workflow, because that job is what the gateway chart's path filter
   // already triggers.
   "charts/gateway/tests",
+  // ClickHouse serverless Helm sub-chart rendering tests, verifying that
+  // keeper-backed access storage configuration is correctly rendered at all
+  // replica counts through template assertions in e2e.sh and e2e-overlays.sh.
+  "charts/clickhouse-serverless/tests",
 ];
 
 /**
@@ -167,6 +171,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // ClickHouse serverless chart configuration rendering. Scenarios describing
+  // keeper-backed replicated access storage binding through unit tests in
+  // internal/render/render_test.go that verify the XML config is generated
+  // correctly across topology transitions.
+  "infra/clickhouse-serverless",
 ];
 
 /**

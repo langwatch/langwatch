@@ -850,6 +850,34 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
 
+{{/* LangWatchQL self-provisioning (issue #6635). The app derives the
+     restricted connection from CLICKHOUSE_URL/DATABASE_URL and converges the
+     whole access model at boot; the chart contributes only the mode switch and
+     the two stable passwords. `optional: true` is deliberate: an operator
+     Secret without these keys means LangWatchQL simply stays unprovisioned
+     (fail-closed refusals) instead of the pod dying in
+     CreateContainerConfigError — a default-on feature must degrade, not brick
+     an upgrade. For chart-managed ClickHouse, access entities and named
+     collections are stored in keeper and replicated across all nodes,
+     enabling self-provisioning at any replica count. */}}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+{{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+- name: LWQL_SELF_PROVISION
+  value: "true"
+- name: LWQL_CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_CLICKHOUSE_PASSWORD
+      optional: true
+- name: LWQL_POSTGRES_READER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_POSTGRES_READER_PASSWORD
+      optional: true
+{{- end }}
+
 # Credentials encryption key
 {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
 - name: CREDENTIALS_SECRET
@@ -1212,6 +1240,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+  Whether LangWatchQL self-provisioning is wired into the pods (issue #6635).
+  Enabled whenever lwql.enabled is true. For chart-managed clustered ClickHouse
+  (replicas > 1), access entities and named collections are stored in ClickHouse
+  Keeper and replicated across all nodes; topology-safe self-provisioning is
+  therefore supported at any replica count. External ClickHouse is wired
+  regardless — the chart cannot see its topology, and the app degrades to a
+  logged, fail-closed refusal if the server rejects access-management DDL.
+*/}}
+{{- define "langwatch.lwql.selfProvisionActive" -}}
+{{- if .Values.lwql.enabled -}}
 true
 {{- end -}}
 {{- end -}}

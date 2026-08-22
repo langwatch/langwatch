@@ -58,10 +58,12 @@ export interface PostgresNamedCollection {
  * Dropped first rather than `IF NOT EXISTS`, so re-provisioning against a host
  * whose address has changed converges instead of silently keeping the old one.
  *
- * Not called from any production path in this repo: the real objects are owned
- * by infra (langwatch-saas#1126). This is the reference implementation that
- * terraform must match — keep it and its tests in sync, do not delete as dead
- * code.
+ * Two callers, two ownership models. Self-hosted deployments run this for
+ * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
+ * so it is a production path. On cloud the same objects are
+ * owned by infra (langwatch-saas#1126) and this stays the reference
+ * implementation terraform must match — keep it and its tests in sync with
+ * both.
  */
 export function postgresNamedCollectionStatements({
   connection,
@@ -236,8 +238,9 @@ export interface PostgresReaderRole {
  * `lwqlPostgresReaderConnectionLimit` from `../views.ts`, which does that —
  * this constant is what a caller mapping a single table by hand would want.
  *
- * No production caller in this repo — input to the infra-owned reader role
- * (langwatch-saas#1126); reference implementation, not dead code.
+ * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
+ * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
+ * is the reference implementation terraform must match.
  */
 export const DEFAULT_POSTGRES_READER_LIMITS = {
   connectionLimit: 5,
@@ -261,10 +264,11 @@ export const DEFAULT_POSTGRES_READER_LIMITS = {
  * Idempotent: existence is settled once, then every property is converged with
  * `ALTER`, so re-provisioning an already-configured server is a no-op.
  *
- * Not called from any production path in this repo: the real role is owned by
- * infra (langwatch-saas#1126). This is the reference implementation that
- * terraform must match — keep it and its tests in sync, do not delete as dead
- * code.
+ * Two callers, two ownership models. Self-hosted deployments run this for real
+ * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
+ * a production path. On cloud the same role is owned by infra
+ * (langwatch-saas#1126) and this stays the reference implementation terraform
+ * must match — so keep it and its tests in sync with both.
  */
 export function postgresReaderRoleStatements({
   reader,

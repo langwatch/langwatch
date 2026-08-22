@@ -52,16 +52,30 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"password", func() error { return renderDefaultPassword(input, usersD) }},
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},
+		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
+		{"access-management", func() error { return renderAccessManagement(usersD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	// Replicated mode: render zookeeper client, macros, and remote_servers.
+	// Replicated mode: zookeeper client, macros and remote_servers, plus the
+	// two keeper-backed stores that make per-node state cluster-wide.
+	//
+	// renderCustomSettingsPrefixes and renderAccessManagement stay above and
+	// unconditional on purpose: the permission to run access DDL and the
+	// declared `custom_` prefix are properties of every server regardless of
+	// topology, and replicated storage does not carry either of them.
 	if input.Replicated {
 		if err := renderKeeper(input, configD); err != nil {
 			return fmt.Errorf("keeper: %w", err)
+		}
+		if err := renderUserDirectories(input, configD); err != nil {
+			return fmt.Errorf("user-directories: %w", err)
+		}
+		if err := renderNamedCollectionsStorage(input, configD); err != nil {
+			return fmt.Errorf("named-collections-storage: %w", err)
 		}
 	}
 

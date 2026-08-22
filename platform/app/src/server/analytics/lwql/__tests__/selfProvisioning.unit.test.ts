@@ -1,0 +1,400 @@
+/**
+ * `selfProvisioning.ts` is pure over its inputs — env derivation over an
+ * explicit `env` argument, statement composition with no I/O — so the
+ * self-hosted deployment contract (issue #6635) is unit-testable end to end.
+ * What this file pins:
+ *
+ * 1. Derivation fails *closed*: every incomplete or contradictory
+ *    configuration returns `null` (queries refused), never a guessed
+ *    connection — and a `LWQL_DATABASE` naming a database other than the
+ *    admin URL's own is contradictory, because the key-map row policies and
+ *    the key-map backfill would target different tables.
+ * 2. The derived connection never carries the admin credentials: the URL is
+ *    stripped to its origin, and the identity is the SaaS-convention
+ *    restricted user.
+ * 3. The ClickHouse composition keeps the harness-proven order: the
+ *    restricted user is created before every grant and row policy that names
+ *    it (`CREATE USER OR REPLACE` mints a new access-entity id), the named
+ *    collection before the engine tables that reference it, and the engine
+ *    tables are dropped first so a changed catalog converges on upgrade.
+ *
+ * @see ../selfProvisioning.ts — the module under test
+ * @see specs/analytics/lwql-api.feature
+ */
+
+import { describe, expect, it } from "vitest";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import { lwqlPostgresViews } from "../catalog/types";
+import { productionLangWatchQLNames } from "../productionProvisioning";
+import { qualified } from "../provisioning";
+import {
+  LWQL_SELF_PROVISION_DEFAULTS,
+  lwqlDerivedConnectionFromEnv,
+  lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlSelfProvisionFromEnv,
+  selfHostedClickHouseProvisioningStatements,
+  selfHostedPostgresReaderStatements,
+} from "../selfProvisioning";
+import { lwqlSourceTables } from "../views";
+
+// Single character class, reused rather than interpolated into a pattern:
+// building a RegExp out of an identifier means escaping it, and a hand-rolled
+// escape that misses backslashes is exactly what CodeQL flags as incomplete
+// sanitization.
+const IDENTIFIER_CHARACTER = /[A-Za-z0-9_]/;
+
+const ENABLED_ENV: NodeJS.ProcessEnv = {
+  LWQL_SELF_PROVISION: "true",
+  LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
+  LWQL_POSTGRES_READER_PASSWORD: "reader-secret",
+  CLICKHOUSE_URL: "http://default:admin-secret@ch.internal:8123/langwatch",
+  DATABASE_URL: "postgresql://postgres:pg-admin@pg.internal:5432/mydb",
+};
+
+describe("lwqlDerivedConnectionFromEnv", () => {
+  it("returns null when self-provisioning is not enabled", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_SELF_PROVISION: undefined,
+      }),
+    ).toBeNull();
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_SELF_PROVISION: "1",
+      }),
+    ).toBeNull();
+  });
+
+  it("derives the connection from the admin URL with SaaS-convention defaults", () => {
+    const connection = lwqlDerivedConnectionFromEnv(ENABLED_ENV);
+    expect(connection).toEqual({
+      url: "http://ch.internal:8123/",
+      username: LWQL_SELF_PROVISION_DEFAULTS.restrictedUser,
+      password: "restricted-secret",
+      database: "langwatch",
+      tenantSetting: LWQL_SELF_PROVISION_DEFAULTS.tenantSetting,
+    });
+  });
+
+  it("strips the admin credentials from the derived URL", () => {
+    const connection = lwqlDerivedConnectionFromEnv(ENABLED_ENV);
+    expect(connection?.url).not.toContain("admin-secret");
+    expect(connection?.url).not.toContain("default");
+  });
+
+  it("lets explicit LWQL_* variables override individual defaults", () => {
+    const connection = lwqlDerivedConnectionFromEnv({
+      ...ENABLED_ENV,
+      LWQL_CLICKHOUSE_USER: "custom_user",
+      LWQL_TENANT_SETTING: "custom_other_setting",
+    });
+    expect(connection?.username).toBe("custom_user");
+    expect(connection?.tenantSetting).toBe("custom_other_setting");
+  });
+
+  // @scenario "Provisioning does not alter the migrated database"
+  it("accepts LWQL_DATABASE only when it names the admin URL's own database", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_DATABASE: "langwatch",
+      })?.database,
+    ).toBe("langwatch");
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_DATABASE: "elsewhere",
+      }),
+    ).toBeNull();
+  });
+
+  // The split-brain this guard exists to prevent: `provisionLwql` builds the
+  // access model on the connection derived here, so a deployment that also set
+  // `LWQL_CLICKHOUSE_URL` would provision one server and query another, and
+  // every query would fail against a server holding none of the objects.
+  // Refused rather than silently overridden, so the operator is told which
+  // variable to drop.
+  it("refuses a LWQL_CLICKHOUSE_URL pointing somewhere other than the admin URL", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "http://elsewhere.internal:8123/",
+      }),
+    ).toBeNull();
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "not a url",
+      }),
+    ).toBeNull();
+  });
+
+  // Same origin, spelled the way an operator would rather than the way the
+  // derivation normalises it (admin credentials, a database path, no trailing
+  // slash) — that is agreement, not a conflict, and must still resolve.
+  it("accepts a LWQL_CLICKHOUSE_URL naming the admin URL's own server", () => {
+    expect(
+      lwqlDerivedConnectionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_CLICKHOUSE_URL: "http://ch.internal:8123",
+      })?.url,
+    ).toBe("http://ch.internal:8123/");
+  });
+
+  it.each([
+    ["no restricted password", { LWQL_CLICKHOUSE_PASSWORD: undefined }],
+    ["no admin URL", { CLICKHOUSE_URL: undefined }],
+    ["unparseable admin URL", { CLICKHOUSE_URL: "not a url" }],
+    [
+      "admin URL without a database path",
+      { CLICKHOUSE_URL: "http://ch:8123/" },
+    ],
+  ] as const)("fails closed with %s", (_label, overrides) => {
+    expect(
+      lwqlDerivedConnectionFromEnv({ ...ENABLED_ENV, ...overrides }),
+    ).toBeNull();
+  });
+});
+
+describe("lwqlSelfProvisionFromEnv", () => {
+  it("additionally requires the PostgreSQL reader password", () => {
+    expect(
+      lwqlSelfProvisionFromEnv({
+        ...ENABLED_ENV,
+        LWQL_POSTGRES_READER_PASSWORD: undefined,
+      }),
+    ).toBeNull();
+    const selfProvision = lwqlSelfProvisionFromEnv(ENABLED_ENV);
+    expect(selfProvision?.postgresReaderPassword).toBe("reader-secret");
+    expect(selfProvision?.connection.database).toBe("langwatch");
+  });
+});
+
+describe("lwqlPostgresEndpointFromDatabaseUrl", () => {
+  it("reads host, port and database from the URL", () => {
+    expect(
+      lwqlPostgresEndpointFromDatabaseUrl(
+        "postgresql://user:pw@pg.internal:5433/mydb?schema=custom",
+      ),
+    ).toEqual({ host: "pg.internal", port: 5433, database: "mydb" });
+  });
+
+  it("defaults the port to 5432", () => {
+    expect(
+      lwqlPostgresEndpointFromDatabaseUrl("postgresql://u:p@pg.internal/mydb")
+        ?.port,
+    ).toBe(5432);
+  });
+
+  it.each([
+    undefined,
+    "not a url",
+    "postgresql://host-only:5432/",
+  ])("returns null for %s", (url) => {
+    expect(lwqlPostgresEndpointFromDatabaseUrl(url)).toBeNull();
+  });
+});
+
+const NAMES = productionLangWatchQLNames({
+  connection: {
+    url: "http://ch.internal:8123/",
+    username: LWQL_SELF_PROVISION_DEFAULTS.restrictedUser,
+    password: "restricted-secret",
+    database: "langwatch",
+    tenantSetting: LWQL_SELF_PROVISION_DEFAULTS.tenantSetting,
+  },
+});
+
+// The self-hosted composition requires the LangWatchQL database to be the
+// application's own, so one constant serves as both.
+const SOURCE_DATABASE = "langwatch";
+
+function selfHostedStatements(): string[] {
+  return selfHostedClickHouseProvisioningStatements({
+    names: NAMES,
+    restrictedPassword: "restricted-secret",
+    sourceDatabase: SOURCE_DATABASE,
+    postgres: {
+      endpoint: { host: "pg.internal", port: 5432, database: "mydb" },
+      readerPassword: "reader-secret",
+    },
+  });
+}
+
+describe("selfHostedClickHouseProvisioningStatements", () => {
+  it("refuses a LangWatchQL database other than the application's own", () => {
+    expect(() =>
+      selfHostedClickHouseProvisioningStatements({
+        names: { ...NAMES, database: "elsewhere" },
+        restrictedPassword: "restricted-secret",
+        sourceDatabase: "langwatch",
+        postgres: {
+          endpoint: { host: "pg.internal", port: 5432, database: "mydb" },
+          readerPassword: "reader-secret",
+        },
+      }),
+    ).toThrow(/must be the application's own ClickHouse database/);
+  });
+
+  it("creates the restricted user before every grant and row policy naming it", () => {
+    const statements = selfHostedStatements();
+    const userIndex = statements.findIndex((statement) =>
+      statement.startsWith("CREATE USER OR REPLACE"),
+    );
+    expect(userIndex).toBeGreaterThanOrEqual(0);
+    for (const [index, statement] of statements.entries()) {
+      if (
+        statement.startsWith("GRANT") ||
+        statement.startsWith("CREATE ROW POLICY")
+      ) {
+        expect(index).toBeGreaterThan(userIndex);
+      }
+    }
+  });
+
+  // The tenant boundary, pinned as an ordering property rather than a presence
+  // one. A table carrying a SELECT grant and no row policy returns every row,
+  // and this list executes statement by statement, so grant-first would leave
+  // a partial run readable across tenants — the one failure the design rules
+  // out. Policy-first makes the same partial run refuse instead.
+  //
+  // Asserted per table rather than globally: the statements arrive in two
+  // blocks (identity + key map, then the views), so "every policy precedes
+  // every grant" is false by construction and would say nothing about whether
+  // any individual table is exposed. Per table is the real property.
+  it("creates each table's row policy before that table's grant", () => {
+    const targetOf = (statement: string): string | null =>
+      / ON ([A-Za-z0-9_]+\.[A-Za-z0-9_]+)/.exec(statement)?.[1] ?? null;
+
+    const firstGrant = new Map<string, number>();
+    const firstPolicy = new Map<string, number>();
+    selfHostedStatements().forEach((statement, index) => {
+      const target = targetOf(statement);
+      if (!target) return;
+      if (statement.startsWith("GRANT") && !firstGrant.has(target)) {
+        firstGrant.set(target, index);
+      }
+      if (
+        statement.startsWith("CREATE ROW POLICY") &&
+        !firstPolicy.has(target)
+      ) {
+        firstPolicy.set(target, index);
+      }
+    });
+
+    // The expected set comes from the catalog, not from the statements, so
+    // that deleting a policy fails here instead of quietly shrinking what the
+    // test checks. Every physical table the restricted identity can read is
+    // listed: the key map, plus one entry per distinct catalog source table.
+    // Views are deliberately absent — a view is granted but never policed, the
+    // policies sitting on the source tables it reads, so requiring a policy on
+    // one would be false by design.
+    const expectedProtected = [
+      qualified(NAMES, NAMES.keyMapTable, SOURCE_DATABASE),
+      ...lwqlSourceTables({
+        names: NAMES,
+        sourceDatabase: SOURCE_DATABASE,
+      }).map((lwqlTable) =>
+        qualified(NAMES, lwqlTable.table, lwqlTable.database),
+      ),
+    ];
+
+    // Both statements must exist for every protected table...
+    expect(
+      expectedProtected.filter(
+        (table) => !firstPolicy.has(table) || !firstGrant.has(table),
+      ),
+    ).toEqual([]);
+
+    // ...and on each one the policy must land first. A table granted before it
+    // is policed returns every row to the restricted identity for the width of
+    // the gap, and this list executes statement by statement, so a partial run
+    // would leave exactly that window open.
+    expect(
+      expectedProtected.filter(
+        (table) => (firstPolicy.get(table) ?? 0) > (firstGrant.get(table) ?? 0),
+      ),
+    ).toEqual([]);
+  });
+
+  it("creates the named collection before the engine tables referencing it, dropping stale tables first", () => {
+    const statements = selfHostedStatements();
+    const collectionIndex = statements.findIndex((statement) =>
+      statement.startsWith("CREATE NAMED COLLECTION"),
+    );
+    expect(collectionIndex).toBeGreaterThanOrEqual(0);
+    for (const view of lwqlPostgresViews(LWQL_VIEW_CATALOG)) {
+      const dropIndex = statements.findIndex((statement) =>
+        statement.startsWith(
+          `DROP TABLE IF EXISTS langwatch.${view.sourceTable}`,
+        ),
+      );
+      const createIndex = statements.findIndex(
+        (statement) =>
+          statement.startsWith(
+            `CREATE TABLE IF NOT EXISTS langwatch.${view.sourceTable}`,
+          ) && statement.includes("ENGINE = PostgreSQL"),
+      );
+      expect(dropIndex).toBeGreaterThan(collectionIndex);
+      expect(createIndex).toBeGreaterThan(dropIndex);
+    }
+  });
+
+  it("dials PostgreSQL as the reader role, never the application's admin", () => {
+    const collection = selfHostedStatements().find((statement) =>
+      statement.startsWith("CREATE NAMED COLLECTION"),
+    );
+    expect(collection).toContain(
+      `user='${LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole}'`,
+    );
+    expect(collection).toContain("password='reader-secret'");
+  });
+
+  // Per catalog entry, not a count: a `toBeGreaterThan(0)` over the whole set
+  // stays green when a single view or its grant goes missing, which is the
+  // one failure this test exists to catch. `it.each` so the report names the
+  // view that regressed rather than "provisions every catalog view".
+  it.each(
+    LWQL_VIEW_CATALOG.map((view) => [view.name, view] as const),
+  )("provisions the %s view with its own grant", (_name, view) => {
+    const statements = selfHostedStatements();
+    const target = qualified(NAMES, view.name);
+
+    // Anchored, with a trailing non-identifier guard, rather than a substring
+    // match: view names nest (`trace_metrics` is a prefix of
+    // `trace_metrics_by_minute`), so `includes` matches two statements and the
+    // assertion fails against a perfectly correct catalog. Plain string
+    // comparison rather than an interpolated RegExp so the identifier never
+    // has to be escaped into a pattern.
+    const prefix = `CREATE OR REPLACE VIEW ${target}`;
+    const createsTarget = (statement: string) => {
+      if (!statement.startsWith(prefix)) return false;
+      const next = statement.charAt(prefix.length);
+      return next === "" || !IDENTIFIER_CHARACTER.test(next);
+    };
+    expect(statements.filter(createsTarget)).toHaveLength(1);
+    expect(statements).toContain(
+      `GRANT SELECT ON ${target} TO ${NAMES.restrictedUser}`,
+    );
+  });
+});
+
+describe("selfHostedPostgresReaderStatements", () => {
+  it("converges the lwql_ro role with a catalog-derived connection limit and grants on every approved view", () => {
+    const statements = selfHostedPostgresReaderStatements({
+      schema: "public",
+      readerPassword: "reader-secret",
+    });
+    const alter = statements.find((statement) =>
+      statement.startsWith('ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD'),
+    );
+    expect(alter).toBeDefined();
+    expect(alter).toMatch(/CONNECTION LIMIT \d+/);
+    const grants = statements.filter((statement) =>
+      statement.startsWith("GRANT SELECT ON"),
+    );
+    expect(grants.length).toBe(lwqlPostgresViews(LWQL_VIEW_CATALOG).length);
+  });
+});

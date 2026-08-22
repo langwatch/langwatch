@@ -805,6 +805,12 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `clickhouse.scheduling.affinity`                                    | Affinity rules for ClickHouse pods.                                                                                                                                                                                                                             | `{}`             |
 | `clickhouse.scheduling.tolerations`                                 | Tolerations for ClickHouse pods.                                                                                                                                                                                                                                | `[]`             |
 
+### LangWatchQL (LWQL)
+
+| Name           | Description                                                                                                        | Value  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views) when the application starts. Supported at any replica count via keeper-backed replicated access storage (requires clickhouse-serverless image newer than 0.3.0). The feature flag still gates the endpoint. | `true` |
+
 ### Redis
 
 | Name                                           | Description                                                                                                                                                                                              | Value          |

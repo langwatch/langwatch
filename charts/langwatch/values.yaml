@@ -1961,6 +1961,25 @@ clickhouse:
     tolerations: []
 
 # =============================================================================
+# LangWatchQL (LWQL) Configuration
+# =============================================================================
+# The governed analytics SQL API. When enabled, the app self-provisions the
+# whole backend on every boot — restricted ClickHouse identity, settings
+# profile, row policies, PostgreSQL reader role, named collection, views —
+# from two chart-generated passwords. The `release_lwql_workbench` feature
+# flag still gates the HTTP endpoint; backend objects exist regardless.
+#
+# Requires a ClickHouse whose admin user may run access-management DDL
+# (`langwatch/clickhouse-serverless` ships this). Chart-managed ClickHouse
+# at any replica count is supported via keeper-backed replicated access
+# storage (requires clickhouse-serverless image newer than 0.3.0). External
+# ClickHouse is supported unchanged.
+## @section LangWatchQL (LWQL)
+lwql:
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, views) when the application starts. The feature flag still gates the endpoint.
+  enabled: true
+
+# =============================================================================
 # Redis Configuration
 # =============================================================================
 # In-memory data store for caching and session management

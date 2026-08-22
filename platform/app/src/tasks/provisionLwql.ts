@@ -1,10 +1,20 @@
 /**
  * Deploy-time provisioning for LangWatchQL: creates the ClickHouse-native
  * views and the PostgreSQL approved views, and backfills the key-map table
- * from every project's `lwqlKey`. The ClickHouse access model (restricted
- * user, settings profile, grants, row policies) and the PostgreSQL-mapped
- * views are infra's job — terraform provisions both out of band, and this
- * task never touches either.
+ * from every project's `lwqlKey`. In the explicit five-`LWQL_*`-variables
+ * deployment (the SaaS cloud), the ClickHouse access model (restricted user,
+ * settings profile, grants, row policies) and the PostgreSQL-mapped views are
+ * infra's job — terraform provisions both out of band, and this task touches
+ * neither.
+ *
+ * Under `LWQL_SELF_PROVISION=true` (issue #6635 — the Helm chart and other
+ * self-hosted distributions) there is no terraform, and this task owns the
+ * whole model: it additionally converges the PostgreSQL reader role, the
+ * restricted identity, the named collection, and the PostgreSQL-engine
+ * tables, from `../server/analytics/lwql/selfProvisioning.ts`'s composition.
+ * That path is deliberately non-fatal — a default-on feature must never turn
+ * a server-side provisioning failure into a boot crashloop; the endpoint
+ * simply stays fail-closed ("unavailable") until the next boot converges.
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
  * this task writes into) in `start:prepare:db`. A deploy with no `LWQL_*`
@@ -15,6 +25,7 @@
  *
  * @see ../server/analytics/lwql/productionProvisioning.ts — the pure
  *   composition this orchestrates
+ * @see ../server/analytics/lwql/selfProvisioning.ts — the self-hosted extras
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
@@ -38,6 +49,13 @@ import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
 } from "../server/analytics/lwql/provisioning";
+import {
+  type LwqlSelfProvisionEnv,
+  lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlSelfProvisionFromEnv,
+  selfHostedClickHouseProvisioningStatements,
+  selfHostedPostgresReaderStatements,
+} from "../server/analytics/lwql/selfProvisioning";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 
@@ -159,8 +177,132 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * One statement per round trip rather than a single batched command: a failure
+ * here is an operator's problem to fix, and ClickHouse reports only that *the*
+ * command failed. Sending them individually is what lets the log name which
+ * one, which is the difference between an actionable error and "provisioning
+ * failed".
+ */
+async function runClickHouseStatements({
+  client,
+  statements,
+}: {
+  client: ClickHouseClient;
+  statements: string[];
+}): Promise<void> {
+  for (const [index, statement] of statements.entries()) {
+    try {
+      await client.command({ query: statement });
+    } catch (error) {
+      logger.error(
+        {
+          error: errorMessage(error),
+          statement: `${index + 1}/${statements.length}`,
+        },
+        "lwql provisioning failed creating ClickHouse objects",
+      );
+      throw error;
+    }
+  }
+}
+
+/**
+ * The `LWQL_SELF_PROVISION=true` path: the whole model, and never a thrown
+ * error. This mode ships default-on in the Helm chart, so a ClickHouse server
+ * that refuses access-model DDL (say, an external one without
+ * `access_management` for the admin user) must degrade to a loud log and a
+ * fail-closed endpoint, not a crashlooping deployment.
+ */
+async function selfProvisionAll({
+  selfProvision,
+  names,
+  sourceDatabase,
+}: {
+  selfProvision: LwqlSelfProvisionEnv;
+  names: LangWatchQLNames;
+  sourceDatabase: string;
+}): Promise<void> {
+  logger.info(
+    { database: names.database, sourceDatabase },
+    "self-provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views (LWQL_SELF_PROVISION)",
+  );
+
+  const endpoint = lwqlPostgresEndpointFromDatabaseUrl(
+    process.env.DATABASE_URL,
+  );
+  if (!endpoint) {
+    logger.error(
+      "lwql self-provisioning: DATABASE_URL is absent or unparseable, cannot derive the PostgreSQL endpoint for the named collection — skipping",
+    );
+    return;
+  }
+
+  try {
+    await runPostgresStatements([
+      ...productionPostgresApprovedViewStatements({
+        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+      }),
+      // After the views: the reader role's grants name them.
+      ...selfHostedPostgresReaderStatements({
+        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+        readerPassword: selfProvision.postgresReaderPassword,
+      }),
+    ]);
+
+    await withAdminClickHouseClient(async (client) => {
+      await runClickHouseStatements({
+        client,
+        statements: selfHostedClickHouseProvisioningStatements({
+          names,
+          restrictedPassword: selfProvision.connection.password,
+          sourceDatabase,
+          postgres: {
+            endpoint,
+            readerPassword: selfProvision.postgresReaderPassword,
+          },
+        }),
+      });
+
+      // Same non-fatal contract as the explicit path: the backfill is
+      // convergent, so a slow key-map table must not undo the provisioning
+      // above (which this run already committed).
+      try {
+        await backfillKeyMap({ client, names, sourceDatabase });
+      } catch (error) {
+        logger.error(
+          { error: errorMessage(error) },
+          "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+        );
+      }
+    });
+    logger.info("LangWatchQL self-provisioning complete");
+  } catch (error) {
+    logger.error(
+      { error: errorMessage(error) },
+      "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
+    );
+  }
+}
+
 export default async function execute() {
-  const connection = lwqlConnectionFromEnv();
+  // The mode is whichever one the operator asked for, never whichever one's
+  // inputs happen to have arrived. `LWQL_SELF_PROVISION=true` with an
+  // incomplete Secret (both passwords are `optional: true` in the chart) used
+  // to fall through to the explicit path below — which is fatal on error,
+  // rethrown by the task runner into `start.sh`'s `set -e`, i.e. a
+  // CrashLoopBackOff for a feature the chart promises will "degrade, not brick
+  // an upgrade". Self-provisioning declines loudly and lets the pod boot.
+  const selfProvisionRequested = process.env.LWQL_SELF_PROVISION === "true";
+  const selfProvision = lwqlSelfProvisionFromEnv();
+  if (selfProvisionRequested && !selfProvision) {
+    logger.warn(
+      "LWQL_SELF_PROVISION is true but its inputs are incomplete — skipping provisioning this boot; LangWatchQL queries stay refused (fail-closed) until the configuration is complete",
+    );
+    return;
+  }
+
+  const connection = selfProvision?.connection ?? lwqlConnectionFromEnv();
   if (!connection) {
     logger.info("LWQL not configured, skipping");
     return;
@@ -168,6 +310,11 @@ export default async function execute() {
 
   const names = productionLangWatchQLNames({ connection });
   const { database: sourceDatabase } = parseConnectionUrl();
+
+  if (selfProvision) {
+    await selfProvisionAll({ selfProvision, names, sourceDatabase });
+    return;
+  }
 
   logger.info(
     { database: names.database, sourceDatabase },
@@ -206,25 +353,13 @@ export default async function execute() {
   }
 
   await withAdminClickHouseClient(async (client) => {
-    const statements = productionClickHouseObjectStatements({
-      names,
-      sourceDatabase,
+    await runClickHouseStatements({
+      client,
+      statements: productionClickHouseObjectStatements({
+        names,
+        sourceDatabase,
+      }),
     });
-
-    for (const [index, statement] of statements.entries()) {
-      try {
-        await client.command({ query: statement });
-      } catch (error) {
-        logger.error(
-          {
-            error: errorMessage(error),
-            statement: `${index + 1}/${statements.length}`,
-          },
-          "lwql provisioning failed creating ClickHouse objects",
-        );
-        throw error;
-      }
-    }
 
     // Fatal, exactly like the views above. The inline sync on project
     // creation only ever covers projects created *after* a failure, so a

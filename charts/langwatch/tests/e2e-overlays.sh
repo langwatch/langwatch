@@ -945,6 +945,8 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
+# @scenario "Self-provisioning is enabled for chart-managed ClickHouse at any replica count"
+# @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
 
@@ -981,6 +983,30 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-replicated.yaml")
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
+
+  # LWQL self-provisioning: enabled at replicas=3 via keeper-backed access storage
+  assert_contains "repl-ch: LWQL_SELF_PROVISION enabled at replicas=3" "$ch_repl" "name: LWQL_SELF_PROVISION"
+
+  # LWQL self-provisioning: also enabled at replicas=1
+  local ch_single
+  ch_single=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-dev.yaml" \
+    -f "${OVERLAYS}/access-nodeport.yaml")
+  assert_contains "single-ch: LWQL_SELF_PROVISION enabled at replicas=1" "$ch_single" "name: LWQL_SELF_PROVISION"
+
+  # Mode transition: app Deployment env differs between replicas=1 and replicas=3
+  if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then
+    pass "mode-transition: app pod template differs between replicas=1 and replicas=3"
+  else
+    fail "mode-transition: CLICKHOUSE_CLUSTER env presence did not differ"
+  fi
+
+  # NOTES no longer warn about skipped LWQL at replicas>1
+  if ! grep -q "chart did NOT wire LangWatchQL" <<< "$ch_repl"; then
+    pass "repl-ch: NOTES does not warn about skipped LWQL"
+  else
+    fail "repl-ch: NOTES still contains old LWQL-skip warning"
+  fi
 
   # local-images: pullPolicy Never
   local local_img

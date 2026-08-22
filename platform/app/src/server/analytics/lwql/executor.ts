@@ -41,6 +41,7 @@ import { toError } from "~/utils/posthogErrorCapture";
 
 import { LangWatchQLUnavailableError } from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
+import { lwqlDerivedConnectionFromEnv } from "./selfProvisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -298,6 +299,18 @@ export function createLangWatchQLExecutor(
  * required would refuse to boot every deployment that does not run this API.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
+  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
+  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
+  // so resolving a *different* connection here would query a server where none
+  // of it exists. Checked before `absent` rather than after: a deployment that
+  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
+  // through to the explicit values and split provisioning from querying.
+  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
+  // and refuses outright on one that cannot be honoured.
+  if (process.env.LWQL_SELF_PROVISION === "true") {
+    return lwqlDerivedConnectionFromEnv();
+  }
+
   const url = process.env.LWQL_CLICKHOUSE_URL;
   const username = process.env.LWQL_CLICKHOUSE_USER;
   const password = process.env.LWQL_CLICKHOUSE_PASSWORD;

@@ -281,8 +281,162 @@ test_replicated() {
   assert_eq "Row replicated to pod-1" \
     "$(ch_query "$pod1" 'SELECT count() FROM e2e.events')" "1"
 
+  test_replicated_access_config_applied
+  test_replicated_access_entity_visible_everywhere
+  test_replicated_named_collection_visible_everywhere
+  test_replicated_recreated_replica_keeps_access
+
+  # Best-effort teardown of the probe entities.
+  ch_query "$pod" "DROP ROW POLICY IF EXISTS e2e_access_probe_policy ON e2e.events" || true
+  ch_query "$pod" "DROP ROW POLICY IF EXISTS e2e_access_probe_allow_others ON e2e.events" || true
+  ch_query "$pod" "DROP NAMED COLLECTION IF EXISTS e2e_probe_collection" || true
+  ch_query "$pod" "DROP USER IF EXISTS e2e_access_probe" || true
+
   helm_uninstall
   pass "helm uninstall (3-node)"
+}
+
+# The preprocessed config is what the server actually merged, not what the
+# chart wrote. Asserting on it is the only way to catch the inert-merge trap:
+# without the `replace` attribute the block merges with the server default and
+# `<local_directory>` survives, so entities keep landing node-local while the
+# rendered file still looks correct.
+#
+# @scenario "Every replica starts with the keeper-backed access configuration applied"
+test_replicated_access_config_applied() {
+  local pod="${RELEASE}-clickhouse-0"
+  local pod1="${RELEASE}-clickhouse-1"
+  local pod2="${RELEASE}-clickhouse-2"
+
+  local merged_pod merged_config
+  for merged_pod in "$pod" "$pod1" "$pod2"; do
+    wait_ch_ready "$merged_pod"
+    merged_config=$(kc exec "$merged_pod" -- \
+      cat /var/lib/clickhouse/preprocessed_configs/config.xml)
+
+    if ! grep -qE '<user_directories[^>]+replace=' <<< "$merged_config"; then
+      fail "$merged_pod: merged config has no <user_directories> with a replace attribute"
+    fi
+    if ! grep -q '<replicated>' <<< "$merged_config"; then
+      fail "$merged_pod: merged config has no <replicated> user directory"
+    fi
+    if ! grep -q '<zookeeper_path>/clickhouse/langwatch/access/</zookeeper_path>' <<< "$merged_config"; then
+      fail "$merged_pod: replicated user directory does not point at the cluster access path"
+    fi
+    if grep -q '<local_directory>' <<< "$merged_config"; then
+      fail "$merged_pod: default <local_directory> survived the merge — @replace did not take effect"
+    fi
+    if ! grep -q '<named_collections_storage>' <<< "$merged_config"; then
+      fail "$merged_pod: merged config has no <named_collections_storage>"
+    fi
+    if ! grep -qE '<named_collections_storage>.*<type>zookeeper</type>' \
+         <<< "$(tr -d '\n' <<< "$merged_config")"; then
+      fail "$merged_pod: named collections storage is not keeper-backed"
+    fi
+    pass "$merged_pod applied the keeper-backed access configuration"
+  done
+}
+
+# Deliberately plain SQL, no ON CLUSTER: replication here is a property of the
+# keeper-backed access storage, and an ON CLUSTER DDL would create the entity on
+# each node independently and pass even with the storage misconfigured.
+#
+# @scenario "An access entity created on one replica is visible on every replica"
+test_replicated_access_entity_visible_everywhere() {
+  local pod="${RELEASE}-clickhouse-0"
+  local pod1="${RELEASE}-clickhouse-1"
+  local pod2="${RELEASE}-clickhouse-2"
+
+  ch_query "$pod" "CREATE USER IF NOT EXISTS e2e_access_probe IDENTIFIED WITH no_password"
+  ch_query "$pod" "GRANT SELECT ON e2e.events TO e2e_access_probe"
+  ch_query "$pod" "
+    CREATE ROW POLICY IF NOT EXISTS e2e_access_probe_policy ON e2e.events
+      USING msg = 'no such message' TO e2e_access_probe"
+  # Row visibility is an OR over the permissive policies that APPLY to the user,
+  # so once any policy exists on a table every user not covered by one sees zero
+  # rows. Without this counter-policy the probe policy would also blank the admin
+  # and the enforcement assertions below could not tell the two users apart.
+  ch_query "$pod" "
+    CREATE ROW POLICY IF NOT EXISTS e2e_access_probe_allow_others ON e2e.events
+      USING 1 TO ALL EXCEPT e2e_access_probe"
+  pass "access entities created on pod-0 (no ON CLUSTER)"
+
+  local other_pod attempts
+  for other_pod in "$pod1" "$pod2"; do
+    attempts=0
+    until [[ $(ch_query "$other_pod" \
+                "SELECT count() FROM system.users WHERE name = 'e2e_access_probe'") == "1" ]] \
+          || [[ $attempts -ge 12 ]]; do
+      sleep 5; attempts=$((attempts + 1))
+    done
+    assert_eq "User replicated to $other_pod" \
+      "$(ch_query "$other_pod" \
+          "SELECT count() FROM system.users WHERE name = 'e2e_access_probe'")" "1"
+    # Both policies, not just the restrictive one: the enforcement assertions
+    # below depend on the counter-policy having landed here too, and asserting
+    # only the first would let them race a half-replicated pair.
+    attempts=0
+    until [[ $(ch_query "$other_pod" \
+                "SELECT count() FROM system.row_policies WHERE short_name LIKE 'e2e_access_probe%'") == "2" ]] \
+          || [[ $attempts -ge 12 ]]; do
+      sleep 5; attempts=$((attempts + 1))
+    done
+    assert_eq "Row policies replicated to $other_pod" \
+      "$(ch_query "$other_pod" \
+          "SELECT count() FROM system.row_policies WHERE short_name LIKE 'e2e_access_probe%'")" "2"
+  done
+
+  # Enforcement on a replica that never ran the DDL. Catalog visibility alone
+  # would still pass if the policy replicated but was not applied at query time.
+  assert_eq "Admin sees the row on pod-2" \
+    "$(ch_query "$pod2" 'SELECT count() FROM e2e.events')" "1"
+  local probe_visible
+  probe_visible=$(kc exec "$pod2" -- \
+    clickhouse-client --user e2e_access_probe -q 'SELECT count() FROM e2e.events')
+  assert_eq "Row policy filters the probe user on pod-2" "$probe_visible" "0"
+}
+
+# @scenario "A named collection created on one replica is visible on every replica"
+test_replicated_named_collection_visible_everywhere() {
+  local pod="${RELEASE}-clickhouse-0"
+  local pod1="${RELEASE}-clickhouse-1"
+  local pod2="${RELEASE}-clickhouse-2"
+
+  ch_query "$pod1" "CREATE NAMED COLLECTION IF NOT EXISTS e2e_probe_collection AS k = 'v'"
+  pass "named collection created on pod-1"
+
+  local other_pod attempts
+  for other_pod in "$pod" "$pod2"; do
+    attempts=0
+    until [[ $(ch_query "$other_pod" \
+                "SELECT count() FROM system.named_collections WHERE name = 'e2e_probe_collection'") == "1" ]] \
+          || [[ $attempts -ge 12 ]]; do
+      sleep 5; attempts=$((attempts + 1))
+    done
+    assert_eq "Named collection replicated to $other_pod" \
+      "$(ch_query "$other_pod" \
+          "SELECT count() FROM system.named_collections WHERE name = 'e2e_probe_collection'")" "1"
+  done
+}
+
+# Nothing re-creates the entities between the delete and the assertions: a fresh
+# pod reads them out of keeper, which is what makes scaling the replica count
+# safe.
+#
+# @scenario "A recreated replica reports existing access entities without re-provisioning"
+test_replicated_recreated_replica_keeps_access() {
+  local pod2="${RELEASE}-clickhouse-2"
+
+  kc delete pod "$pod2" --wait=true
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" "$TIMEOUT"
+  wait_ch_ready "$pod2"
+
+  assert_eq "Recreated pod-2 still reports the user" \
+    "$(ch_query "$pod2" \
+        "SELECT count() FROM system.users WHERE name = 'e2e_access_probe'")" "1"
+  assert_eq "Recreated pod-2 still reports the named collection" \
+    "$(ch_query "$pod2" \
+        "SELECT count() FROM system.named_collections WHERE name = 'e2e_probe_collection'")" "1"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

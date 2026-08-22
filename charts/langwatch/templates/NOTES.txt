@@ -258,6 +258,11 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
+{{- if .Values.lwql.enabled }}
+    - LWQL_CLICKHOUSE_PASSWORD        (lwql.enabled=true; optional — if
+    - LWQL_POSTGRES_READER_PASSWORD    absent, LangWatchQL simply stays
+                                       unprovisioned instead of failing)
+{{- end }}
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
 {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
@@ -293,7 +298,11 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+{{- end }}
+{{- if .Values.lwql.enabled }}
+      --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
+      --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
@@ -305,4 +314,34 @@ message.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+8. LangWatchQL (LWQL) — governed analytics SQL
+──────────────────────────────────────────────────────────────────────
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+The app self-provisions the LangWatchQL backend on every boot: a
+restricted ClickHouse identity, settings profile, row policies, a
+read-only PostgreSQL role, and the analytics views. The
+`release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with
+`lwql_not_enabled` while the backend objects sit ready.
+
+{{- if not .Values.clickhouse.chartManaged }}
+Your ClickHouse is external: self-provisioning needs its admin user to
+be allowed access-management DDL (`access_management`,
+`named_collection_control`) and the server to declare the `custom_`
+settings prefix. The `langwatch/clickhouse-serverless` image ships
+both; on other servers, add them or set lwql.enabled=false. If the
+server refuses the DDL the app logs it and LangWatchQL stays
+unavailable — nothing else breaks.
+{{- else }}
+For chart-managed ClickHouse, LangWatchQL access entities are stored in
+ClickHouse Keeper and shared by all replicas. Changing the replica count
+across the 1↔N boundary rolls the application automatically (its environment
+changes), requiring no operator action.
+{{- end }}
+{{- else }}
+Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
+and the endpoints refuse every query.
 {{- end }}
