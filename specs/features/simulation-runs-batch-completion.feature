@@ -11,6 +11,7 @@ Feature: A batch of simulation runs reports when it is complete
     Given a batch holds one finished run and one queued run
     When the batch aggregate is read
     Then the running count is one and the settled count is one
+    And the batch reports itself as not complete
 
   Scenario: A batch is complete when every run is terminal
     Given a batch holds only runs in a terminal status

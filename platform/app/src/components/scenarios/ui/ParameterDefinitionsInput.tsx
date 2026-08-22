@@ -44,10 +44,7 @@ export function ParameterDefinitionsInput({
     onChange(value.filter((_, i) => i !== index));
   };
 
-  const handleUpdate = (
-    index: number,
-    patch: Partial<ScenarioParameterDefinition>,
-  ) => {
+  const handleUpdate: UpdateRow = ({ index, patch }) => {
     const definition = rows[index];
     if (!definition) return;
     const updated = [...rows];
@@ -156,7 +153,7 @@ function ParameterRow({
       <HStack gap={2}>
         <Input
           value={definition.name}
-          onChange={(e) => onUpdate(index, { name: e.target.value })}
+          onChange={(e) => onUpdate({ index, patch: { name: e.target.value } })}
           placeholder="e.g. account_tier"
           size="sm"
           flex={NAME_FLEX}
@@ -169,8 +166,11 @@ function ParameterRow({
         <Input
           value={definition.description ?? ""}
           onChange={(e) =>
-            onUpdate(index, {
-              description: e.target.value === "" ? undefined : e.target.value,
+            onUpdate({
+              index,
+              patch: {
+                description: e.target.value === "" ? undefined : e.target.value,
+              },
             })
           }
           placeholder="Which plan the customer is on"
@@ -226,11 +226,10 @@ function ParameterRow({
   );
 }
 
-/** Update callback a row cell calls with the fields it owns. */
-type UpdateRow = (
-  index: number,
-  patch: Partial<ScenarioParameterDefinition>,
-) => void;
+type UpdateRow = (update: {
+  index: number;
+  patch: Partial<ScenarioParameterDefinition>;
+}) => void;
 
 function DefaultValueCell({
   index,
@@ -255,8 +254,11 @@ function DefaultValueCell({
         <Input
           value={displayOptionalValue(definition.defaultValue)}
           onChange={(e) =>
-            onUpdate(index, {
-              defaultValue: serializeOptionalScalarValue(e.target.value),
+            onUpdate({
+              index,
+              patch: {
+                defaultValue: serializeOptionalScalarValue(e.target.value),
+              },
             })
           }
           placeholder={isSecret ? "" : "gold"}
@@ -292,15 +294,15 @@ function SecretSwitchCell({
           checked={isSecret}
           disabled={disabled}
           onCheckedChange={({ checked }) =>
-            onUpdate(
+            onUpdate({
               index,
               // A secret carries no default: the value is supplied when the
               // run starts, so whatever was typed is dropped here rather than
               // kept out of sight until the save is refused.
-              checked
+              patch: checked
                 ? { secret: true, defaultValue: undefined }
                 : { secret: undefined },
-            )
+            })
           }
           inputProps={{
             "aria-label": `Parameter ${index + 1} secret`,

@@ -74,6 +74,28 @@ describe("redactAuditArgs", () => {
         ]);
       });
 
+      // A header that does not carry the `{ key, value }` shape the schema
+      // declares still carries whatever was typed into it.
+      /** @scenario "A credential typed as a header is never persisted either" */
+      it("replaces a header entry of any other shape", () => {
+        const redacted = redactAuditArgs({
+          input: {
+            extraHeaders: [
+              "Authorization: Bearer sk-a-bare-string",
+              { raw: "Bearer sk-in-another-field" },
+              { key: 7, value: "sk-under-a-numeric-name" },
+            ],
+          },
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("sk-");
+        expect(redacted.extraHeaders).toEqual([
+          "[redacted]",
+          "[redacted]",
+          "[redacted]",
+        ]);
+      });
+
       /** A passthrough object, so its contents cannot be assumed harmless. */
       it("redacts providerConfig values", () => {
         const redacted = redactAuditArgs({

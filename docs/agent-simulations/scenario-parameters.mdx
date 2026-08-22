@@ -217,7 +217,7 @@ console.log(result.batchRunId);
 
 ## Secret parameters
 
-A secret parameter is a run parameter whose value the platform encrypts before it stores anything, and never shows in clear. Use one for an API key, a bearer token, or a password that changes per run.
+A secret parameter is a run parameter that carries a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
 
 Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
 
@@ -237,7 +237,7 @@ langwatch suite run <suite-id> --param api_token="$TENANT_API_TOKEN"
 
 Read the value from a CI secret variable, as above. A value typed in full on the command line stays in the shell history and in the process list of the machine that runs it, which is outside what the platform can protect.
 
-The run records the name `api_token`. The value is encrypted on its way to the target under test, and no plain copy of it is kept: it is not in the stored run, the runs API, the CSV export or the audit log. The run detail drawer lists the name with a mask.
+The run records the name `api_token`. The value stays encrypted until the platform builds the request to the target, and it keeps no readable copy of it: the value is not in the stored run, the runs API, the CSV export or the audit log. The run detail drawer lists the name with a mask.
 
 A run value takes the place of a project secret of the same name, for that run only. The project secret keeps its value for every other run.
 

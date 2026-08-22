@@ -75,31 +75,44 @@ Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCou
 
 The same asynchronous creation makes the first read answer `404`. The batch becomes readable when its first run is stored, which is a moment after the trigger returns. Treat a `404` as "not stored yet" and poll again until your own timeout expires. A `404` is a missing batch only after that timeout.
 
+Every other status stops the job at once. A wrong token answers `401` and a failed read answers `5xx`, and a loop that polls through them reports a batch timeout thirty minutes later for a fault that was clear on the first read.
+
 Exit the CI job nonzero when `failCount` is above zero **or** `stalledCount` is above zero. A stalled run settles without passing, so it counts in `settledCount` but not in `failCount`, and a job that reads `failCount` alone reports success for a batch that never finished its work. Open the batch in the platform for the run details.
 
 ```bash
 # Poll until the batch is complete, then set the exit code.
 deadline=$(( $(date +%s) + 1800 ))
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  body=$(curl -s -w '\n%{http_code}' \
+  body=$(curl -s -w '\n%{http_code}' --connect-timeout 10 --max-time 30 \
     "https://app.langwatch.ai/api/simulation-runs/batches/${BATCH_RUN_ID}" \
     -H "X-Auth-Token: ${LANGWATCH_API_KEY}")
   status=$(printf '%s' "$body" | tail -n1)
   summary=$(printf '%s' "$body" | sed '$d')
 
-  # 404 means the first run is not stored yet. Keep polling.
-  if [ "$status" = "200" ] \
-    && [ "$(printf '%s' "$summary" | jq '.isComplete')" = "true" ] \
-    && [ "$(printf '%s' "$summary" | jq ".totalCount >= ${JOB_COUNT}")" = "true" ]; then
-    printf '%s' "$summary" | jq -e '.failCount == 0 and .stalledCount == 0'
-    exit $?
-  fi
+  case "$status" in
+    200)
+      if [ "$(printf '%s' "$summary" | jq '.isComplete')" = "true" ] \
+        && [ "$(printf '%s' "$summary" | jq ".totalCount >= ${JOB_COUNT}")" = "true" ]; then
+        printf '%s' "$summary" | jq -e '.failCount == 0 and .stalledCount == 0'
+        exit $?
+      fi
+      ;;
+    # 404 is a batch whose first run is not stored yet, 000 is a request that
+    # did not complete. Both are read again.
+    404|000) ;;
+    *)
+      echo "The batch read answered ${status}: ${summary}"
+      exit 1
+      ;;
+  esac
   sleep 10
 done
 
 echo "The batch did not finish before the timeout."
 exit 1
 ```
+
+The request carries its own time limits, so a read that hangs cannot hold the job past the deadline.
 
 ## Or let the CLI wait
 

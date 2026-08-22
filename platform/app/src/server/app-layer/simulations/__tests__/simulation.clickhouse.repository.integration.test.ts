@@ -1376,7 +1376,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
 
-    describe("getBatchSummary()", () => {
+    describe("when one batch is read by its batch run id", () => {
       it("returns the same counts as the history page, without items", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
@@ -1406,8 +1406,10 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(summary!.runningCount).toBe(0);
         expect(summary!.allCompletedAt).not.toBeNull();
       });
+    });
 
-      it("returns null for an unknown batch run id", async () => {
+    describe("when the batch run id belongs to no run of the project", () => {
+      it("returns null", async () => {
         const summary = await repo.getBatchSummary({
           projectId: tenantId,
           batchRunId: `batch-unknown-${nanoid()}`,

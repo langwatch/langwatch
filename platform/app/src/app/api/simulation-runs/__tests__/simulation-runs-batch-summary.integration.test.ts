@@ -119,6 +119,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
 
   describe("when the batch still holds a queued run", () => {
     /** @scenario "A batch summary is addressable by its batch run id" */
+    /** @scenario "A batch with queued runs is not complete" */
     it("serves the counts of that batch and reports it as not complete", async () => {
       const repository = withSummary(makeSummary());
 
@@ -142,6 +143,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
   });
 
   describe("when every run of the batch reached a terminal status", () => {
+    /** @scenario "A batch is complete when every run is terminal" */
     it("reports the batch as complete", async () => {
       withSummary(
         makeSummary({ settledCount: 2, runningCount: 0, allCompletedAt: 2000 }),

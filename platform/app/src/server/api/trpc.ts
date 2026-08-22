@@ -642,14 +642,18 @@ function redactObjectField(value: unknown): unknown {
  * The redacted form of an `extraHeaders` list.
  *
  * A list of `{ key, value }` pairs rather than an object, so the header name
- * survives and only what it carries is dropped.
+ * survives and only what it carries is dropped. An entry of any other shape is
+ * replaced whole: a redactor cannot tell a name from a value in a shape it does
+ * not know, and a header is where an `Authorization: Bearer …` is typed.
  */
 function redactHeaderValues(headers: readonly unknown[]): unknown[] {
-  return headers.map((header) =>
-    typeof header === "object" && header !== null && "value" in header
-      ? { ...header, value: "[redacted]" }
-      : header,
-  );
+  return headers.map((header) => {
+    if (typeof header !== "object" || header === null) return "[redacted]";
+    const { key } = header as Record<string, unknown>;
+    return typeof key === "string"
+      ? { key, value: "[redacted]" }
+      : "[redacted]";
+  });
 }
 
 /**
