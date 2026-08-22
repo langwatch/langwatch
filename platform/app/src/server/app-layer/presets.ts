@@ -541,7 +541,7 @@ export function initializeDefaultApp(options?: {
     "LogRecordStorageService",
   );
   const experiments = traced(
-    ExperimentService.create(prisma),
+    ExperimentService.create(prisma, { broadcaster: broadcast }),
     "ExperimentService",
   );
   const organizations = traced(
@@ -2029,7 +2029,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         legacyBackend: new ClickHouseAnalyticsService(null),
       }),
     },
-    experiments: ExperimentService.create(testPrisma),
+    experiments: ExperimentService.create(testPrisma, {
+      broadcaster: testBroadcast,
+    }),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),

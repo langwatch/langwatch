@@ -513,6 +513,28 @@ const presentations = {
     title: "Experiment not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  experiment_stale_workbench_state: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This evaluation changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  experiment_workbench_missing_reference: {
+    title: "This evaluation points at something that no longer exists",
+    describe: () =>
+      "One of its targets, evaluators or datasets was deleted. Remove it or pick another one, then save again.",
+  },
+  experiment_invalid_workbench_state: {
+    title: "This evaluation's setup could not be saved",
+    describe: () =>
+      "Part of it is incomplete. Check the targets, evaluators and datasets, then save again.",
+  },
+  experiment_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the version list to see what this evaluation still has.",
+  },
   invalid_experiment_configuration: {
     // fault: platform. The saved workbench state stopped matching its schema,
     // which nobody typed and nobody can repair through the API — so the copy

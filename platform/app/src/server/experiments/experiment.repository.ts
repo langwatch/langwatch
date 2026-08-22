@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import type {
   Experiment,
+  ExperimentType,
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
@@ -231,6 +232,181 @@ export class ExperimentRepository {
     });
     if (!row) return { exists: false };
     return { exists: true, archived: row.archivedAt !== null, slug: row.slug };
+  }
+
+  /** Runs `fn` inside one transaction. The seam's compare-and-set needs it. */
+  async runInTransaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return await this.prisma.$transaction(fn);
+  }
+
+  /**
+   * The columns the workbench seam reads, for an active row addressed by id
+   * or by slug. Archived rows are excluded like every other read here, which
+   * is what makes an archived experiment read as gone rather than editable.
+   */
+  async findWorkbenchRow(
+    input: { projectId: string; id?: string; slug?: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<{
+    id: string;
+    slug: string;
+    name: string | null;
+    type: ExperimentType;
+    workbenchState: Prisma.JsonValue;
+    workbenchVersion: number;
+    updatedAt: Date;
+  } | null> {
+    if (!input.id && !input.slug) return null;
+    return this.findFirstActive(
+      {
+        where: {
+          projectId: input.projectId,
+          ...(input.id ? { id: input.id } : {}),
+          ...(input.slug ? { slug: input.slug } : {}),
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          type: true,
+          workbenchState: true,
+          workbenchVersion: true,
+          updatedAt: true,
+        },
+      },
+      options,
+    );
+  }
+
+  /**
+   * Writes the workbench state only while the stored version still equals
+   * `expectedVersion`, which is the compare-and-set itself: the version rides
+   * in the WHERE, so a racing writer that already bumped it makes this update
+   * match no row and Prisma raises P2025 rather than overwriting newer state.
+   */
+  async casUpdateWorkbenchState(
+    input: {
+      id: string;
+      projectId: string;
+      expectedVersion: number;
+      nextVersion: number;
+      name?: string | null;
+      workbenchState: Prisma.InputJsonValue;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<Experiment> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experiment.update({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        archivedAt: null,
+        workbenchVersion: input.expectedVersion,
+      },
+      data: {
+        workbenchState: input.workbenchState,
+        workbenchVersion: input.nextVersion,
+        ...(input.name === undefined ? {} : { name: input.name }),
+      },
+    });
+  }
+
+  /**
+   * The single rolling autosave row for an experiment, if it has one. There
+   * is at most one by construction: the seam updates it in place instead of
+   * inserting, so a long editing session leaves one row behind, not hundreds.
+   */
+  async findRollingAutosaveVersion(
+    input: { projectId: string; experimentId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<{ id: string } | null> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        autoSaved: true,
+      },
+      select: { id: true },
+      orderBy: { version: "desc" },
+    });
+  }
+
+  async createVersion(
+    input: { data: Prisma.ExperimentVersionUncheckedCreateInput },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<void> {
+    const client = options?.tx ?? this.prisma;
+    await client.experimentVersion.create({ data: input.data });
+  }
+
+  async updateVersionById(
+    input: {
+      id: string;
+      projectId: string;
+      data: Prisma.ExperimentVersionUncheckedUpdateInput;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<void> {
+    const client = options?.tx ?? this.prisma;
+    await client.experimentVersion.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: input.data,
+    });
+  }
+
+  async findVersionByNumber(input: {
+    projectId: string;
+    experimentId: string;
+    version: number;
+  }): Promise<{ version: number; state: Prisma.JsonValue } | null> {
+    return await this.prisma.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        version: input.version,
+      },
+      select: { version: true, state: true },
+    });
+  }
+
+  /** Version list, newest first. `beforeVersion` pages backwards through it. */
+  async findVersions(input: {
+    projectId: string;
+    experimentId: string;
+    take: number;
+    beforeVersion?: number;
+  }): Promise<
+    Array<{
+      version: number;
+      autoSaved: boolean;
+      commitMessage: string | null;
+      authorId: string | null;
+      authorLabel: string;
+      createdAt: Date;
+    }>
+  > {
+    return await this.prisma.experimentVersion.findMany({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        ...(input.beforeVersion === undefined
+          ? {}
+          : { version: { lt: input.beforeVersion } }),
+      },
+      select: {
+        version: true,
+        autoSaved: true,
+        commitMessage: true,
+        authorId: true,
+        authorLabel: true,
+        createdAt: true,
+      },
+      orderBy: { version: "desc" },
+      take: input.take,
+    });
   }
 
   async updateById(

@@ -159,4 +159,50 @@ describe("loadExecutionData", () => {
       }
     });
   });
+
+  describe("given a target naming an agent this project does not have", () => {
+    describe("when the execution data is loaded", () => {
+      /** @scenario A run stops when a target's agent was deleted */
+      it("fails and names the missing agent", async () => {
+        const missingAgentId = `test_agent_${nanoid(8)}`;
+
+        const result = await loadExecutionData(
+          projectId,
+          { type: "inline", columns: [], inline: { columns: [], records: {} } },
+          [{ type: "agent", dbAgentId: missingAgentId }],
+          [],
+        );
+
+        expect("error" in result).toBe(true);
+        if ("error" in result) {
+          expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
+          expect(result.status).toBe(404);
+        }
+      });
+    });
+  });
+
+  describe("given an evaluator config naming an evaluator this project does not have", () => {
+    describe("when the execution data is loaded", () => {
+      /** @scenario A run stops when an evaluator was deleted */
+      it("fails and names the missing evaluator", async () => {
+        const missingEvaluatorId = `test_eval_${nanoid(8)}`;
+
+        const result = await loadExecutionData(
+          projectId,
+          { type: "inline", columns: [], inline: { columns: [], records: {} } },
+          [],
+          [{ dbEvaluatorId: missingEvaluatorId }],
+        );
+
+        expect("error" in result).toBe(true);
+        if ("error" in result) {
+          expect(result.error).toBe(
+            `Evaluator "${missingEvaluatorId}" not found`,
+          );
+          expect(result.status).toBe(404);
+        }
+      });
+    });
+  });
 });

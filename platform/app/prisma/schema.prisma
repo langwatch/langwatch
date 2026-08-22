@@ -1082,10 +1082,52 @@ model Experiment {
   workbenchState   Json?
   monitor          Monitor?
 
+  // Monotonic counter for the workbench state. Every accepted write bumps it
+  // by one, and the bump is the compare-and-set guard: a writer names the
+  // version it read, and a write whose expected version no longer matches the
+  // stored one is refused before anything is written. Existing rows read 0.
+  workbenchVersion Int               @default(0)
+
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([projectId, archivedAt])
+}
+
+// One snapshot of an experiment's workbench state, at one version.
+//
+// Ordinary typing in the workbench writes a single rolling row with
+// `autoSaved = true`, updated in place so a long editing session does not
+// leave one row per keystroke behind. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, which is what a person sees in
+// the version list. `version` matches the `Experiment.workbenchVersion` the
+// write produced, so history and the live row share one number line.
+//
+// `state` never carries run results: those live only on the live experiment
+// row, because a snapshot exists to restore a setup, not to replay an old run.
+model ExperimentVersion {
+  id           String @id @default(nanoid())
+  experimentId String
+  projectId    String
+  version      Int
+
+  autoSaved     Boolean @default(false)
+  commitMessage String?
+
+  authorId String?
+  /// Who wrote this version: "user", "langy" or "api".
+  authorLabel String
+
+  state Json
+  /// Schema version of `state`, so a later shape change can be read forward.
+  schemaVersion String @default("1")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([experimentId, version])
+  @@index([projectId, experimentId, autoSaved])
+  @@index([createdAt])
 }
 
 // Annotation - a reviewer's comment on a trace, or on one part of it.

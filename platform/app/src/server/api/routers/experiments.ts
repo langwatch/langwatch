@@ -11,7 +11,6 @@ import {
   type Prisma,
 } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,
@@ -24,6 +23,7 @@ import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
+import { ExperimentTypeMismatchError } from "../../experiments/errors";
 import { ExperimentService } from "../../experiments/experiment.service";
 import type {
   DSPyRunsSummary,
@@ -50,10 +50,19 @@ import {
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
-/** Maps experiment handled errors to TRPCError using the code discriminant. */
+/**
+ * Maps experiment domain errors to TRPCError using the code discriminant.
+ *
+ * Only the two that have to change shape are listed. Every other handled
+ * error travels on unchanged, which is what keeps its code and its meta
+ * reaching the client instead of being flattened into prose here.
+ */
 const mapExperimentError = (error: unknown): never => {
   if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  }
+  if (error instanceof ExperimentTypeMismatchError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
   }
   throw error;
 };
@@ -223,74 +232,32 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string().optional(),
         state: persistedEvaluationsV3StateSchema,
+        /**
+         * The version the client last read. Sending it turns the save into a
+         * compare-and-set: a save on top of someone else's newer state is
+         * refused instead of overwriting it. Omitted means last-write-wins,
+         * which is what the existing autosave does until it tracks versions.
+         */
+        expectedVersion: z.number().int().optional(),
       }),
     )
-    .permission("workflows:create")
+    .permission("experiments:update")
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
-      const experimentId =
-        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      // Check if experiment actually exists in DB to determine if this is a
-      // create or update. The service rejects archived rows with NOT_FOUND so
-      // a stale client autosaving an archived experiment cannot silently
-      // resurrect or mutate it through `prisma.upsert`.
-      const existingSlug = await experiments
-        .getExistingSlugForUpsert({
+      const saved = await experiments
+        .saveWorkbenchState({
           projectId: input.projectId,
-          id: experimentId,
+          id: input.experimentId,
+          state: input.state,
+          expectedVersion: input.expectedVersion,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
         })
         .catch(mapExperimentError);
-      const isNewExperiment = existingSlug === null;
-
-      // For new experiments, deduplicate the slug to avoid constraint violations
-      // For existing experiments, keep the same slug to avoid breaking URLs
-      const name =
-        input.state.name ||
-        (await experiments.findNextDraftName({
-          projectId: input.projectId,
-        }));
-
-      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
-      let slug: string;
-      if (isNewExperiment) {
-        slug = await experiments.generateUniqueSlug({
-          baseSlug: rawSlug,
-          projectId: input.projectId,
-        });
-      } else {
-        slug = existingSlug;
-      }
-
-      // Convert to plain JSON for Prisma storage
-      const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
-
-      await experiments.saveWithSlugRetry({
-        initialSlug: slug,
-        execute: (s) => {
-          const data = {
-            name,
-            slug: s,
-            projectId: input.projectId,
-            type: ExperimentType.EVALUATIONS_V3,
-            workbenchState: workbenchStateJson,
-          };
-          return prisma.experiment.upsert({
-            where: { id: experimentId, projectId: input.projectId },
-            update: data,
-            create: { ...data, id: experimentId },
-          });
-        },
-        regenerateSlug: () =>
-          experiments.generateUniqueSlug({
-            baseSlug: rawSlug,
-            projectId: input.projectId,
-          }),
-      });
 
       const updatedExperiment = await experiments.findById({
         projectId: input.projectId,
-        id: experimentId,
+        id: saved.experimentId,
       });
 
       if (!updatedExperiment) {
@@ -300,7 +267,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      return updatedExperiment;
+      return { ...updatedExperiment, version: saved.version };
     }),
 
   getEvaluationsV3BySlug: protectedProcedure
@@ -312,26 +279,92 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("experiments:view")
     .query(async ({ input }) => {
-      const experiment = await experimentService()
-        .getBySlug({
-          projectId: input.projectId,
-          slug: input.experimentSlug,
-        })
-        .catch(mapExperimentError);
-
-      if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Experiment is not an EVALUATIONS_V3 type",
-        });
-      }
+      // The seam decides what a workbench read means (archived reads as gone,
+      // a row of another type is refused) and owns the version. The full row
+      // rides alongside it because clients still read `name`, `createdAt` and
+      // the rest of the experiment; both are point lookups on the same row, so
+      // they go out together rather than one after the other.
+      const [experiment, workbench] = await Promise.all([
+        experimentService()
+          .getBySlug({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError),
+        experimentService()
+          .getWorkbenchState({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError),
+      ]);
 
       return {
         ...experiment,
-        workbenchState: experiment.workbenchState as z.infer<
-          typeof persistedEvaluationsV3StateSchema
-        > | null,
+        workbenchState: workbench.state,
+        version: workbench.version,
       };
+    }),
+
+  listWorkbenchVersions: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.number().int().optional(),
+      }),
+    )
+    .permission("experiments:view")
+    .query(async ({ input }) => {
+      return await experimentService()
+        .listWorkbenchVersions({
+          projectId: input.projectId,
+          id: input.experimentId,
+          limit: input.limit,
+          cursor: input.cursor,
+        })
+        .catch(mapExperimentError);
+    }),
+
+  commitWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        commitMessage: z.string().min(1),
+      }),
+    )
+    .permission("experiments:update")
+    .mutation(async ({ ctx, input }) => {
+      return await experimentService()
+        .commitWorkbenchVersion({
+          projectId: input.projectId,
+          id: input.experimentId,
+          commitMessage: input.commitMessage,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
+        })
+        .catch(mapExperimentError);
+    }),
+
+  restoreWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        version: z.number().int().min(1),
+      }),
+    )
+    .permission("experiments:update")
+    .mutation(async ({ ctx, input }) => {
+      return await experimentService()
+        .restoreWorkbenchVersion({
+          projectId: input.projectId,
+          id: input.experimentId,
+          version: input.version,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
+        })
+        .catch(mapExperimentError);
     }),
 
   saveAsMonitor: protectedProcedure
