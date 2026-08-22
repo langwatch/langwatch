@@ -54,17 +54,17 @@ describe("parseCommand", () => {
 
 describe("boundText", () => {
   it("passes small strings through untouched", () => {
-    expect(boundText("hello")).toBe("hello");
+    expect(boundText({ text: "hello" })).toBe("hello");
   });
 
   it("caps oversized strings at the limit with the marker appended", () => {
-    const bounded = boundText("x".repeat(MAX_FIELD_BYTES + 10));
+    const bounded = boundText({ text: "x".repeat(MAX_FIELD_BYTES + 10) });
     expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(MAX_FIELD_BYTES);
     expect(bounded.endsWith(TRUNCATION_MARKER)).toBe(true);
   });
 
   it("never splits a multi-byte code point", () => {
-    const bounded = boundText("é".repeat(100), 41);
+    const bounded = boundText({ text: "é".repeat(100), maxBytes: 41 });
     expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(41);
     expect(bounded.endsWith(TRUNCATION_MARKER)).toBe(true);
     // Round trip must not contain a replacement char from a split code point.
@@ -72,7 +72,7 @@ describe("boundText", () => {
   });
 
   it("keeps the cap when the budget is smaller than the marker", () => {
-    const bounded = boundText("é".repeat(100), 21);
+    const bounded = boundText({ text: "é".repeat(100), maxBytes: 21 });
     expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(21);
     expect(bounded.includes("�")).toBe(false);
   });
@@ -80,11 +80,11 @@ describe("boundText", () => {
 
 describe("boundJsonValue", () => {
   it("passes small values through as-is", () => {
-    expect(boundJsonValue({ a: 1 })).toEqual({ a: 1 });
+    expect(boundJsonValue({ value: { a: 1 } })).toEqual({ a: 1 });
   });
 
   it("replaces oversized values with a truncated marked string", () => {
-    const bounded = boundJsonValue({ big: "x".repeat(MAX_FIELD_BYTES) }, 1024);
+    const bounded = boundJsonValue({ value: { big: "x".repeat(MAX_FIELD_BYTES) }, maxBytes: 1024 });
     expect(typeof bounded).toBe("string");
     expect((bounded as string).endsWith(TRUNCATION_MARKER)).toBe(true);
     expect(Buffer.byteLength(bounded as string, "utf8")).toBeLessThanOrEqual(1024);
@@ -93,18 +93,18 @@ describe("boundJsonValue", () => {
   it("handles unserializable values", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    expect(typeof boundJsonValue(cyclic)).toBe("string");
+    expect(typeof boundJsonValue({ value: cyclic })).toBe("string");
   });
 });
 
 describe("truncateToBytes", () => {
   it("returns the string unchanged when it fits", () => {
-    expect(truncateToBytes("abc", 10)).toBe("abc");
+    expect(truncateToBytes({ text: "abc", maxBytes: 10 })).toBe("abc");
   });
 
   it("cuts on a byte budget without splitting code points", () => {
     // "é" is 2 bytes; a 3-byte budget can only hold one whole "é".
-    expect(truncateToBytes("ééé", 3)).toBe("é");
-    expect(truncateToBytes("abc", 0)).toBe("");
+    expect(truncateToBytes({ text: "ééé", maxBytes: 3 })).toBe("é");
+    expect(truncateToBytes({ text: "abc", maxBytes: 0 })).toBe("");
   });
 });

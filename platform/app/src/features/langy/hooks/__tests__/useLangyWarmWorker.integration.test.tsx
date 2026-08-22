@@ -221,6 +221,36 @@ describe("useLangyWarmWorker", () => {
       expect(mutate).toHaveBeenCalledTimes(1);
     });
 
+    it("drops a warm that answers after the panel closed", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      const opts = mutate.mock.calls[0]![1]!;
+
+      rerender(props({ isOpen: false }));
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-stale", warmed: true });
+      });
+
+      // The next open warms again; adopting this id would silently reuse a
+      // worker the user's close already abandoned.
+      expect(useLangyStore.getState().pendingConversationId).toBeNull();
+    });
+
+    it("drops a warm that answers after the model went away", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      const opts = mutate.mock.calls[0]![1]!;
+
+      rerender(props({ model: null }));
+      act(() => {
+        opts.onSuccess?.({ conversationId: "conv-stale", warmed: true });
+      });
+
+      expect(useLangyStore.getState().pendingConversationId).toBeNull();
+    });
+
     it("re-arms after a close, so the next open warms again", () => {
       const { rerender } = renderHook(useLangyWarmWorker, {
         initialProps: props(),

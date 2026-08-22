@@ -99,8 +99,13 @@ runs:
         if [ "$INSTALL" = "all" ]; then
           CI=true pnpm install --frozen-lockfile
         else
+          # read -ra splits on whitespace WITHOUT pathname expansion. An
+          # unquoted `for target in $INSTALL` would glob, and a filter carrying
+          # a `*` would become however many paths happen to match in the
+          # checkout, which is not what the caller asked to install.
+          read -ra targets <<< "$INSTALL"
           filters=()
-          for target in $INSTALL; do
+          for target in "${targets[@]}"; do
             filters+=(--filter "$target")
           done
           CI=true pnpm install --frozen-lockfile "${filters[@]}"

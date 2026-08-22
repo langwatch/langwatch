@@ -144,15 +144,25 @@ export function useLangyWarmWorker({
   // Every warm carries a number, and only the newest one may claim the pending
   // id. Two warms can be in flight at once (a model switch fires a second while
   // the first is still going), and answers can land out of order, so without
-  // this an older fresh-chat mint could overwrite a newer one.
+  // this an older fresh-chat mint could overwrite a newer one. Bumping it
+  // without firing a warm invalidates whatever is still in flight.
   const generationRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) {
       firedRef.current.clear();
+      // A warm started before the close would otherwise still answer and hold
+      // its id, which the next open would adopt as though the user had just
+      // warmed it.
+      generationRef.current += 1;
       return;
     }
-    if (!projectId || !model) return;
+    if (!projectId || !model) {
+      // The project or the model went away mid-flight: the id an earlier warm
+      // is about to return belongs to a state the panel has left.
+      generationRef.current += 1;
+      return;
+    }
     const claimed = claimWarm({
       fired: firedRef.current,
       projectId,

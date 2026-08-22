@@ -130,12 +130,18 @@ export type TerminalEvent = TurnDoneEvent | HandoffEvent;
 // ---- bounding -----------------------------------------------------------
 
 /** Cap a string field at MAX_FIELD_BYTES, appending the truncation marker. */
-export function boundText(text: string, maxBytes: number = MAX_FIELD_BYTES): string {
+export function boundText({
+  text,
+  maxBytes = MAX_FIELD_BYTES,
+}: {
+  text: string;
+  maxBytes?: number;
+}): string {
   if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
   const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8");
   // Below the marker's own size there is no room to say "truncated": the cap wins.
-  if (budget <= 0) return truncateToBytes(text, maxBytes);
-  return truncateToBytes(text, budget) + TRUNCATION_MARKER;
+  if (budget <= 0) return truncateToBytes({ text, maxBytes });
+  return truncateToBytes({ text, maxBytes: budget }) + TRUNCATION_MARKER;
 }
 
 /**
@@ -143,7 +149,13 @@ export function boundText(text: string, maxBytes: number = MAX_FIELD_BYTES): str
  * through untouched; oversized values are replaced by a truncated JSON string
  * carrying the marker, so the field stays valid JSON either way.
  */
-export function boundJsonValue(value: unknown, maxBytes: number = MAX_FIELD_BYTES): unknown {
+export function boundJsonValue({
+  value,
+  maxBytes = MAX_FIELD_BYTES,
+}: {
+  value: unknown;
+  maxBytes?: number;
+}): unknown {
   let serialized: string;
   try {
     serialized = JSON.stringify(value) ?? "null";
@@ -152,12 +164,18 @@ export function boundJsonValue(value: unknown, maxBytes: number = MAX_FIELD_BYTE
   }
   if (Buffer.byteLength(serialized, "utf8") <= maxBytes) return value;
   const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8");
-  if (budget <= 0) return truncateToBytes(serialized, maxBytes);
-  return truncateToBytes(serialized, budget) + TRUNCATION_MARKER;
+  if (budget <= 0) return truncateToBytes({ text: serialized, maxBytes });
+  return truncateToBytes({ text: serialized, maxBytes: budget }) + TRUNCATION_MARKER;
 }
 
 /** Byte-accurate truncation that never splits a code point. */
-export function truncateToBytes(text: string, maxBytes: number): string {
+export function truncateToBytes({
+  text,
+  maxBytes,
+}: {
+  text: string;
+  maxBytes: number;
+}): string {
   if (maxBytes <= 0) return "";
   const buffer = Buffer.from(text, "utf8");
   if (buffer.byteLength <= maxBytes) return text;

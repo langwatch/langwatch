@@ -82,15 +82,21 @@ type agentCloser interface {
 	Close()
 }
 
-// closeAgentOf releases an agent's own pipes, if it holds any. Idempotent, so
-// the kill path and the exit watcher can both call it.
+// closeAgent releases an agent's own pipes, if it holds any. Idempotent, so
+// the failed-spawn rollback, the kill path and the exit watcher can all call
+// it.
+func closeAgent(agent app.CodingAgent) {
+	if closer, ok := agent.(agentCloser); ok {
+		closer.Close()
+	}
+}
+
+// closeAgentOf is closeAgent for a registered worker.
 func closeAgentOf(w *Worker) {
 	if w == nil {
 		return
 	}
-	if closer, ok := w.agent.(agentCloser); ok {
-		closer.Close()
-	}
+	closeAgent(w.agent)
 }
 
 // CredentialRevoker revokes the session key a dead worker was carrying.
@@ -986,6 +992,11 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		if !success {
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
+			// The agent's own pipes go with the process. This worker never
+			// reached the registry, so neither kill() nor onWorkerExit will
+			// ever see it, and a readiness or session failure would otherwise
+			// leave the pi agent's stdin pipe held for the manager's life.
+			closeAgent(agent)
 		}
 	}()
 

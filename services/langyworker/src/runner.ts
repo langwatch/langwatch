@@ -198,7 +198,7 @@ export class TurnRunner {
         type: "turn_done",
         turnId: command.turnId,
         outcome: "error",
-        errorMessage: boundText(error instanceof Error ? error.message : String(error)),
+        errorMessage: boundText({ text: error instanceof Error ? error.message : String(error) }),
       };
     }
 
@@ -227,7 +227,7 @@ export class TurnRunner {
         type: "turn_done",
         turnId: state.turnId,
         outcome: "error",
-        errorMessage: boundText(thrown instanceof Error ? thrown.message : String(thrown)),
+        errorMessage: boundText({ text: thrown instanceof Error ? thrown.message : String(thrown) }),
       };
     }
     const assistantError = lastAssistantError(session.agent.state.messages);
@@ -239,7 +239,7 @@ export class TurnRunner {
         type: "turn_done",
         turnId: state.turnId,
         outcome: "error",
-        errorMessage: boundText(assistantError.message),
+        errorMessage: boundText({ text: assistantError.message }),
       };
     }
     return { type: "turn_done", turnId: state.turnId, outcome: "ok" };

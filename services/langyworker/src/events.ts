@@ -92,14 +92,14 @@ export class TurnEventMapper {
           | { type?: string; delta?: string }
           | undefined;
         if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText(delta.delta) }];
+          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
         }
         if (
           delta?.type === "thinking_delta" &&
           typeof delta.delta === "string" &&
           delta.delta !== ""
         ) {
-          return [{ type: "reasoning", turnId: this.turnId, text: boundText(delta.delta) }];
+          return [{ type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
         }
         return [];
       }
@@ -113,7 +113,7 @@ export class TurnEventMapper {
             turnId: this.turnId,
             id,
             name,
-            input: boundJsonValue(event.args),
+            input: boundJsonValue({ value: event.args }),
           },
         ];
       }
@@ -125,7 +125,7 @@ export class TurnEventMapper {
             turnId: this.turnId,
             id: String(event.toolCallId ?? ""),
             name: String(event.toolName ?? ""),
-            ...(output !== "" ? { output: boundText(output) } : {}),
+            ...(output !== "" ? { output: boundText({ text: output }) } : {}),
           },
         ];
       }
@@ -141,9 +141,9 @@ export class TurnEventMapper {
             turnId: this.turnId,
             id,
             name,
-            input: boundJsonValue(input),
+            input: boundJsonValue({ value: input }),
             isError,
-            output: boundText(settledToolOutput(event.result)),
+            output: boundText({ text: settledToolOutput(event.result) }),
           },
         ];
         if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {

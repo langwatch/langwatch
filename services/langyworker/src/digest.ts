@@ -58,7 +58,7 @@ export function renderMessageLine(message: DigestibleMessage): string | undefine
       : role;
   const line = `${label}: ${body}`;
   if (Buffer.byteLength(line, "utf8") <= DIGEST_MESSAGE_MAX_BYTES) return line;
-  return `${truncateToBytes(line, DIGEST_MESSAGE_MAX_BYTES)}\n[message truncated]`;
+  return `${truncateToBytes({ text: line, maxBytes: DIGEST_MESSAGE_MAX_BYTES })}\n[message truncated]`;
 }
 
 export function buildHandoffDigest({
