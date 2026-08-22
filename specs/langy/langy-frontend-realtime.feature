@@ -105,6 +105,26 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then the row expands to show the result the model saw
     And a row whose calls recorded no result does not pretend to open
 
+  # A LangWatch result travels as a JSON string holding a {kind, payload}
+  # envelope, so the first version of the disclosure quoted the transport at
+  # the reader on one unindented line and left the answer as a fragment inside
+  # it. The reader wants the data.
+  @integration
+  Scenario: An opened row shows the data a tool returned, not its envelope
+    Given a finished call whose result came through the CLI envelope
+    When the user opens that row
+    Then the row shows the payload indented, without the envelope around it
+    And a plain shell command's output stays exactly the text the model read
+
+  # A row groups calls by what they DID, so two searches that differ only in
+  # their flags share one label. Which result belongs to which is then only
+  # answerable from the command.
+  @integration
+  Scenario: An opened row names the command behind each result
+    Given a row that grouped two calls of the same capability
+    When the user opens that row
+    Then each result is shown under the command that produced it
+
   # The live view of a turn is driven by two independent cursors toward the
   # same durable event log: the freshness signal (push, low latency) and the
   # polled history snapshot (pull, always running while a turn is in flight).

@@ -34,7 +34,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { parseCliJson, readCliErrorDocument } from "@langwatch/langy";
+import {
+  cliToolResultPayload,
+  cliToolResultSchema,
+  parseCliJson,
+  readCliErrorDocument,
+} from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -54,7 +59,11 @@ import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../logic/langyToolFailure";
-import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import {
+  commandOf,
+  describeToolCall,
+  effectiveToolName,
+} from "../logic/langyToolLabel";
 import { useLangyStore } from "../stores/langyStore";
 import {
   type CapabilityProgress,
@@ -1006,7 +1015,8 @@ function CompletedActivityRow({
             onToggle={() => setResultOpen((value) => !value)}
           >
             {label}
-            {detail}
+            {/* The truncated command gives way to the full one below it. */}
+            {resultOpen ? null : detail}
           </ResultDisclosureButton>
         ) : (
           <>
@@ -1022,9 +1032,9 @@ function CompletedActivityRow({
         ) : null}
       </HStack>
       {resultOpen ? (
-        <VStack align="stretch" gap={1} paddingBottom={1.5}>
+        <VStack align="stretch" gap={1.5} paddingBottom={1.5}>
           {callsWithResult.map((call, index) => (
-            <ToolResultBlock key={call.toolCallId ?? index} call={call} />
+            <OpenedToolCall key={call.toolCallId ?? index} call={call} />
           ))}
         </VStack>
       ) : null}
@@ -1116,18 +1126,84 @@ function RawDataToggle({
  * What one finished call returned, as the model read it. A failed call's
  * result IS its error text. Null when the record kept no result at all —
  * the caller uses that to withhold the disclosure, not to render "nothing".
+ *
+ * The DATA, not the transport. A CLI result travels as a JSON string holding
+ * the `{ kind, payload }` envelope (see `cliToolResultSchema`), so printing
+ * `call.output` verbatim showed the reader `{"kind":"json","payload":[]}` on
+ * one unindented line: the envelope quoted at them, with the answer they came
+ * for as a fragment inside it. Unwrap to the payload and indent it.
+ *
+ * Only an output that is JSON *whole* is reformatted, which is why this parses
+ * strictly instead of reaching for `parseCliJson`. That reader lifts the first
+ * balanced document out of surrounding console noise, which is right for a card
+ * (it wants the document) and wrong here (the noise is part of what the model
+ * read). A shell call that logs a line and then prints JSON keeps both.
  */
 function toolResultText(call: ToolCall): string | null {
   if (call.errorText) return call.errorText;
-  if (call.output === undefined || call.output === null) return null;
-  if (typeof call.output === "string") {
-    return call.output.trim().length > 0 ? call.output : null;
-  }
+  const raw = call.output;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "string") return renderResultValue(unwrapCliEnvelope(raw));
+  if (raw.trim().length === 0) return null;
+
+  const parsed = parseWholeJson(raw);
+  return parsed === undefined
+    ? raw
+    : renderResultValue(unwrapCliEnvelope(parsed.value));
+}
+
+/** The payload a CLI envelope carries, or the document when it is not one. */
+function unwrapCliEnvelope(document: unknown): unknown {
+  const envelope = cliToolResultSchema.safeParse(document);
+  return envelope.success ? cliToolResultPayload(envelope.data) : document;
+}
+
+/** A result value as text: a string as it stands, anything else indented. */
+function renderResultValue(value: unknown): string | null {
+  if (typeof value === "string") return value.trim().length > 0 ? value : null;
   try {
-    return JSON.stringify(call.output, null, 2);
+    return JSON.stringify(value, null, 2);
   } catch {
-    return String(call.output);
+    return String(value);
   }
+}
+
+/** The value a string holds when the WHOLE string is JSON, else undefined. */
+function parseWholeJson(text: string): { value: unknown } | undefined {
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * One finished call, opened: what ran, and then what came back.
+ *
+ * The command is shown again here rather than left to the row's label, because
+ * a row groups calls by what they DID: two `langwatch trace search` calls that
+ * differ only in their flags share the single label "Searched traces", and the
+ * command is then the only thing that says which result belongs to which. That
+ * is not a corner case. Asking for one day and then for everything is how the
+ * agent answers a question about a time range.
+ */
+function OpenedToolCall({ call }: { call: ToolCall }) {
+  const command = commandOf(call.input);
+  return (
+    <VStack align="stretch" gap={1}>
+      {command ? (
+        <Text
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          wordBreak="break-all"
+        >
+          $ {command}
+        </Text>
+      ) : null}
+      <ToolResultBlock call={call} />
+    </VStack>
+  );
 }
 
 function ToolResultBlock({ call }: { call: ToolCall }) {
