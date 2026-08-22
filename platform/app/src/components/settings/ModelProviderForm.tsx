@@ -455,14 +455,6 @@ export const EditModelProviderForm = ({
           </Field.HelperText>
         </Field.Root>
 
-        {isLlmProvider && (
-          <ModelProviderRoutingSection
-            providerKey={provider.provider}
-            routingHandle={state.routingHandle}
-            onRoutingHandleChange={actions.setRoutingHandle}
-          />
-        )}
-
         {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch
@@ -544,6 +536,14 @@ export const EditModelProviderForm = ({
           actions={actions}
           provider={provider}
         />
+
+        {isLlmProvider && (
+          <ModelProviderRoutingSection
+            providerKey={provider.provider}
+            routingHandle={state.routingHandle}
+            onRoutingHandleChange={actions.setRoutingHandle}
+          />
+        )}
 
         {isLlmProvider && !isOAuthDeviceProvider && (
           <CustomModelInputSection
