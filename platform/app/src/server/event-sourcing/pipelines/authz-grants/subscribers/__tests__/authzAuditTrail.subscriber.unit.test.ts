@@ -37,7 +37,9 @@ function event(
 ): AuthzGrantsEvent {
   return {
     id: overrides?.id ?? "evt_2Zk",
-    aggregateId: ORG,
+    // A grant's aggregate is the grant, never the organization (ADR-110):
+    // the row's organizationId must come from the tenant.
+    aggregateId: "grant_1",
     aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
     tenantId: createTenantId(ORG),
     createdAt: 1_800_000_000_000,

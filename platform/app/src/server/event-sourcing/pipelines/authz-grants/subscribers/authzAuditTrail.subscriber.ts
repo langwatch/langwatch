@@ -208,8 +208,9 @@ export function toAuthzAuditRow(event: AuthzGrantsEvent): AuthzAuditRow {
     // actually changed.
     createdAt: new Date(event.occurredAt),
     userId: actor?.type === "user" ? actor.id : null,
-    // One aggregate per organization (ADR-092 §13).
-    organizationId: event.aggregateId,
+    // The organization is the tenant of every authorization event; the
+    // aggregate is the grant or the role (ADR-110).
+    organizationId: String(event.tenantId),
     action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
     metadata: auditMetadata(event),
   };
