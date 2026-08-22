@@ -40,6 +40,7 @@ export function MobileShell({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreFocus = useRef(false);
   const pathname = usePathname();
 
   // A tap on any menu entry navigates, and the new page is the reason
@@ -48,9 +49,18 @@ export function MobileShell({
     setIsMenuOpen(false);
   }, [pathname]);
 
-  const closeMenu = () => {
-    setIsMenuOpen(false);
+  // The bar is inert while the menu covers it, and an inert element
+  // takes no focus, so the button gets it back only after the render
+  // that lifts the inert.
+  useEffect(() => {
+    if (isMenuOpen || !shouldRestoreFocus.current) return;
+    shouldRestoreFocus.current = false;
     menuButtonRef.current?.focus();
+  }, [isMenuOpen]);
+
+  const closeMenu = () => {
+    shouldRestoreFocus.current = true;
+    setIsMenuOpen(false);
   };
 
   return (
@@ -174,14 +184,22 @@ function MobileMenuOverlay({
   }, []);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const overlay = overlayRef.current;
+      // A menu the overlay opens portals its list out of this box and
+      // takes the focus with it. While it holds the keyboard the keys
+      // are its own: Escape closes that menu, not the whole overlay.
+      if (ownsKeyboardElsewhere(overlay)) return;
       if (event.key === "Escape") {
         onClose();
         return;
       }
-      if (event.key === "Tab") trapTab({ event, overlay: overlayRef.current });
+      if (event.key === "Tab") trapTab({ event, overlay });
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    // Capture phase: a menu that answers this key restores focus to its
+    // own trigger while it handles it, so by the bubble phase the focus
+    // no longer says who owned the key.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [onClose]);
 
   return (
@@ -233,10 +251,19 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * True while a real element outside the overlay holds the focus, which
+ * is what an open portaled menu looks like. An empty focus (the body,
+ * or nothing) is not somebody else's keyboard.
+ */
+function ownsKeyboardElsewhere(overlay: HTMLElement | null) {
+  const active = document.activeElement;
+  if (!overlay || !active || active === document.body) return false;
+  return !overlay.contains(active);
+}
+
+/**
  * Keeps Tab and Shift+Tab inside the open menu: the last entry wraps to
- * the first and back. A menu the overlay opens portals its list outside
- * this box and drives its own keyboard, so focus that already left is
- * left where it is.
+ * the first and back.
  */
 function trapTab({
   event,

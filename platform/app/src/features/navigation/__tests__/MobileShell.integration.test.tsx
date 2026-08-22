@@ -509,6 +509,34 @@ describe("the mobile chrome", () => {
       expect(last).toHaveFocus();
     });
 
+    /** @scenario Escape closes only the menu on top */
+    it("leaves Escape to the menu the overlay opened", async () => {
+      mockOrganizations = [orgA, orgB];
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(
+        screen.getByRole("button", { name: "Open navigation menu" }),
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: "Switch organization" }),
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Beta Corp")).toBeInTheDocument();
+      });
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(screen.queryByText("Beta Corp")).not.toBeInTheDocument();
+      });
+      expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
+    });
+
     /** @scenario Escape closes the overlay and returns focus to the menu button */
     it("closes on Escape and moves focus back to the menu button", async () => {
       const user = userEvent.setup();
