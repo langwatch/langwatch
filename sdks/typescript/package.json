@@ -98,7 +98,7 @@
     "openapi-msw": "^1.2.0",
     "openapi-typescript": "7.13.0",
     "tsup": "^8.5.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.38.0",
     "vitest": "^4.1.0",
     "vitest-mock-extended": "^5.1.1",
