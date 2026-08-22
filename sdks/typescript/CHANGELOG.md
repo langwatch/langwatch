@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.8.0...typescript-sdk@v1.9.0) (2026-08-22)
+
+
+### Features
+
+* **cli-auth:** langwatch login mints a user-scoped key that inherits the user's permissions ([#7410](https://github.com/langwatch/langwatch/issues/7410)) ([c935339](https://github.com/langwatch/langwatch/commit/c935339ca69bbbc9e0272f8a0f71eadf170c0ce6))
+
+
+### Bug Fixes
+
+* **cli:** the codex harvest reads the checkout, so a session reports the branch it is on ([#7415](https://github.com/langwatch/langwatch/issues/7415)) ([b1bc36f](https://github.com/langwatch/langwatch/commit/b1bc36fef3e787d4152a7e3bb2ecdd7e51519704))
+
 ## [1.8.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.7.0...typescript-sdk@v1.8.0) (2026-08-22)
 
 
