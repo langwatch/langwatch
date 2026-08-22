@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.17.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.16.0...langwatch@v3.17.0) (2026-08-22)
+
+
+### Features
+
+* **ai-gateway:** catalog model routing and per-instance provider handles ([#7396](https://github.com/langwatch/langwatch/issues/7396)) ([f1c9f8e](https://github.com/langwatch/langwatch/commit/f1c9f8e25e6721b77249b57fbc30cc7a60c9fde1))
+* **aigateway:** serve ElevenLabs' own speech and text routes ([#7405](https://github.com/langwatch/langwatch/issues/7405)) ([680e2fd](https://github.com/langwatch/langwatch/commit/680e2fdc79b89ab31d5a860641f25b9cc3280250))
+* **authz:** the ADR-110 authz-engine migration — every legacy table stated, proven, and finishing is the switch ([#7404](https://github.com/langwatch/langwatch/issues/7404)) ([159e24c](https://github.com/langwatch/langwatch/commit/159e24c5b7a0774388af12dcdb6666cfcb8772a3))
+* **cli-auth:** langwatch login mints a user-scoped key that inherits the user's permissions ([#7410](https://github.com/langwatch/langwatch/issues/7410)) ([c935339](https://github.com/langwatch/langwatch/commit/c935339ca69bbbc9e0272f8a0f71eadf170c0ce6))
+* **langy:** pi harness on by default, and panel-open pre-warm ([#7407](https://github.com/langwatch/langwatch/issues/7407)) ([6ce6cbb](https://github.com/langwatch/langwatch/commit/6ce6cbb33f46ff576cbadab622326c6b3477f7e7))
+* **navigation:** project and scope selector search, and a phone-width chrome ([#7401](https://github.com/langwatch/langwatch/issues/7401)) ([a0119d5](https://github.com/langwatch/langwatch/commit/a0119d531d4465e704e5ff60fa14d08da819be8c))
+* **scenarios:** secret run parameters and a truthful batch completion signal ([#7397](https://github.com/langwatch/langwatch/issues/7397)) ([ab564c0](https://github.com/langwatch/langwatch/commit/ab564c0e01afefeebe1864e2990d0c9afebfe806))
+* **traces:** one path at a time on the no-traces page ([#7411](https://github.com/langwatch/langwatch/issues/7411)) ([1464af8](https://github.com/langwatch/langwatch/commit/1464af8658711a9873dbfe7d7d11785bef45ec06))
+
+
+### Bug Fixes
+
+* **cli:** the codex harvest reads the checkout, so a session reports the branch it is on ([#7415](https://github.com/langwatch/langwatch/issues/7415)) ([b1bc36f](https://github.com/langwatch/langwatch/commit/b1bc36fef3e787d4152a7e3bb2ecdd7e51519704))
+* **cli:** the session-context hook follows a native worktree switch ([#7400](https://github.com/langwatch/langwatch/issues/7400)) ([f7efa27](https://github.com/langwatch/langwatch/commit/f7efa275f61ef878ec5f3c23da9fdb048b2e36e1))
+* **governance:** one projection hold per ingestion-key rotation, and a spinner while the wrapper sets up ([#7395](https://github.com/langwatch/langwatch/issues/7395)) ([a22237f](https://github.com/langwatch/langwatch/commit/a22237fd016181469d1cdc450a3f7b26829739be))
+* **langy:** composer typing performance, session resume, and cards that tell the truth ([#7403](https://github.com/langwatch/langwatch/issues/7403)) ([6dc0d81](https://github.com/langwatch/langwatch/commit/6dc0d8153995d263a2f0ca5a5c4218380e3a6777))
+* **langy:** show what a tool returned, and stop reading a rejected command as an empty result ([#7408](https://github.com/langwatch/langwatch/issues/7408)) ([7d59ad8](https://github.com/langwatch/langwatch/commit/7d59ad8f7bf68fb01a5fd769e3f372b5c12f9c41))
+
+
+### Code Refactoring
+
+* **authz:** a grant is its own aggregate, and finishing the migration is the switch ([#7358](https://github.com/langwatch/langwatch/issues/7358)) ([f51e773](https://github.com/langwatch/langwatch/commit/f51e773e311e404ace8dabecc44b39b5e3b4a2ef))
+
 ## [3.16.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.15.0...langwatch@v3.16.0) (2026-08-21)
 
 
