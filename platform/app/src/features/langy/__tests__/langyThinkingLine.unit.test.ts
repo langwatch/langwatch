@@ -85,12 +85,12 @@ describe("langyThinkingLine", () => {
         messages,
         elapsedMs: THINKING_SLOW_MS,
       });
-      expect(slow.text).toBe("This is taking longer than usual…");
+      expect(slow?.text).toBe("This is taking longer than usual…");
       const stuck = langyThinkingLine({
         messages,
         elapsedMs: THINKING_STUCK_MS,
       });
-      expect(stuck.tone).toBe("stuck");
+      expect(stuck?.tone).toBe("stuck");
     });
 
     it("moves to starting Langy once the workspace phase should be over", () => {
