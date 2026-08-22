@@ -152,6 +152,24 @@ Feature: Coding-agent sessions
     Then the session counts one model call for the turn
     And the token buckets stay disjoint, with the cached input counted once
 
+  Scenario: a codex session is priced from the tokens it reported
+    Given a codex session, whose telemetry states no price of its own
+    When its turn span reports the model and the token totals
+    Then the session's cost is worked out from those tokens at that model's price
+    And a second turn adds its own price to the session's total
+    # Without this a codex session reads as free, while the same turn's trace
+    # states a figure: the trace pipeline prices the identical span.
+
+  Scenario: a turn priced at an unknown model costs nothing rather than guessing
+    Given a codex turn whose model is in no price list
+    When the turn is folded
+    Then the session's tokens are counted and its cost stays at zero
+
+  Scenario: an agent that states its own price keeps it
+    Given a session whose telemetry reports what it was billed
+    When its model calls are folded
+    Then the session's cost is the reported one, never a second estimate
+
   Scenario: a codex shell command counts once despite its sandbox outcome event
     When a codex session runs one shell command that reports a tool result and a sandbox outcome
     Then the session counts one tool run
