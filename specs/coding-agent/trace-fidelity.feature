@@ -30,6 +30,22 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the span carries the reasoning tokens under the canonical usage key
     And the trace summary reasoning token total includes them
 
+  # --- Which conversation a codex turn belongs to ---------------------------
+
+  # A codex turn span names two ids: the session it belongs to, and the turn
+  # itself. Filing the trace under the turn gave every turn a conversation of
+  # its own, so a session's turns never grouped and the session, which is keyed
+  # by the session id, resolved none of its own traces. A reader opening such a
+  # session was told nothing had been stored, while the traces were there under
+  # ids nothing looked up.
+
+  @unit
+  Scenario: A codex turn is filed under its session, not under itself
+    Given a codex turn span that names both its session and the turn
+    When the span is canonicalised
+    Then the trace belongs to the session's conversation
+    And a turn span that names no session keeps the turn's own id
+
   # --- Reasoning effort (the request setting, not the token count) -----------
 
   @unit

@@ -35,7 +35,7 @@
  *   - codex.turn.token_usage.reasoning_output_tokens (a.k.a. reasoning)
  *   - codex.turn.token_usage.total_tokens
  *   - codex.turn.reasoning_effort (the request setting, e.g. "high")
- *   - turn.id (a.k.a. thread / turn identifier)
+ *   - thread.id (the session) and turn.id (this one turn)
  * This extractor lifts those to gen_ai.* canonical so the trace
  * summary fold mirrors them to the top-level columns and the
  * receiver-side pricing lookup computes cost (codex never emits cost
@@ -49,7 +49,7 @@
  * - langwatch.input_tokens
  * - langwatch.output_tokens
  * - langwatch.cache_read_tokens
- * - langwatch.thread.id (from conversation.id OR turn.id)
+ * - langwatch.thread.id (the session: thread.id, or turn.id when absent)
  * - langwatch.principal.email (from user.email)
  * - langwatch.input (from codex.user_prompt prompt)
  */
@@ -107,6 +107,30 @@ const positiveOrNull = (n: number | null): number | null =>
 
 /** A canonical key and the codex-spelled value to lift onto it, if reported. */
 type CanonicalLift = readonly [string, string | number | null];
+
+/**
+ * Which conversation a turn belongs to. The turn span carries two ids, and
+ * they are one character apart to read: `thread.id` is the SESSION, the same
+ * id codex's log records spell `conversation.id` and the id its transcript
+ * on disk is filed under, while `turn.id` names this one turn. Both are
+ * time-ordered UUIDs minted seconds apart, so they share a prefix.
+ *
+ * Filing the trace under the turn gave every turn a conversation of its own:
+ * a codex session's turns never grouped, and a coding-agent session, which is
+ * keyed by the session id, resolved none of its own traces and read as having
+ * stored nothing. The session id is what groups them.
+ *
+ * Guarded to UUID-shaped values because codex's other spans stamp the tokio
+ * worker id ("10") under the same key; the turn id stays the answer when
+ * `thread.id` is one of those.
+ */
+function conversationIdOf(attrs: {
+  take: (key: string) => unknown;
+}): string | null {
+  const sessionId = asString(attrs.take("thread.id"));
+  const turnId = asString(attrs.take("turn.id"));
+  return sessionId?.includes("-") ? sessionId : turnId;
+}
 
 /**
  * Write every reported lift onto its canonical key, leaving an already-present
@@ -210,7 +234,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
         asString(attrs.take("codex.turn.reasoning_effort")),
       ],
-      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, asString(attrs.take("turn.id"))],
+      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversationIdOf(attrs)],
     ];
 
     if (applyCanonicalLifts(ctx, lifts)) {

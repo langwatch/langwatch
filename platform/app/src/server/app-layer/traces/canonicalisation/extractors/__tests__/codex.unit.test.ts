@@ -157,6 +157,50 @@ describe("CodexExtractor.applyLog", () => {
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
     });
 
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("files the turn under the session id when the span carries one", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "thread.id": "019e9bfe-7749-7440-8506-39152afbc9ff",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-7749-7440-8506-39152afbc9ff",
+      );
+    });
+
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("keeps the turn id when the span's thread is a worker rather than a session", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "thread.id": "10",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+      );
+    });
+
     /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
     it("canonicalises codex.turn.reasoning_effort to gen_ai.request.reasoning_effort", () => {
       const ctx = createExtractorContext(
