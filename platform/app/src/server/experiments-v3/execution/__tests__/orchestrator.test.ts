@@ -152,6 +152,38 @@ describe("orchestrator", () => {
       expect(cells.every((c) => c.targetId === "target-1")).toBe(true);
     });
 
+    it("generates cells for target-rows scope crossing the two filters", () => {
+      const state = createTestState(3, 1);
+      const datasetRows = createTestDataset(5);
+      const scope: ExecutionScope = {
+        type: "target-rows",
+        targetIds: ["target-2"],
+        rowIndices: [0, 3],
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(2); // 2 rows × 1 target
+      expect(cells.every((c) => c.targetId === "target-2")).toBe(true);
+      expect(new Set(cells.map((c) => c.rowIndex))).toEqual(new Set([0, 3]));
+    });
+
+    it("covers every row for a target-rows scope without rowIndices", () => {
+      const state = createTestState(3, 1);
+      const datasetRows = createTestDataset(4);
+      const scope: ExecutionScope = {
+        type: "target-rows",
+        targetIds: ["target-1", "target-3"],
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(8); // 4 rows × 2 targets
+      expect(new Set(cells.map((c) => c.targetId))).toEqual(
+        new Set(["target-1", "target-3"]),
+      );
+    });
+
     it("generates single cell for cell scope", () => {
       const state = createTestState(2, 1);
       const datasetRows = createTestDataset(3);
@@ -443,6 +475,21 @@ describe("orchestrator", () => {
           rowCount: 3,
         }),
       ).toEqual([1]);
+    });
+
+    it("keeps a target-rows scope on its row subset, and spans without one", () => {
+      expect(
+        resolveScopedRowIndices({
+          scope: { type: "target-rows", targetIds: ["t1"], rowIndices: [0, 2] },
+          rowCount: 3,
+        }),
+      ).toEqual([0, 2]);
+      expect(
+        resolveScopedRowIndices({
+          scope: { type: "target-rows", targetIds: ["t1"] },
+          rowCount: 3,
+        }),
+      ).toEqual([0, 1, 2]);
     });
 
     // These two scopes re-run one evaluator over outputs that already exist.

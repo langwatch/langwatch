@@ -98,3 +98,10 @@ Feature: Langy drives the open page through typed UI actions
   Scenario: The worker env carries the conversation id for the UI channel
     Given a worker is spawned for a conversation on either harness
     Then its environment names that conversation for the CLI's ui call
+
+  @unit
+  Scenario: A run scoped to a target and a row subset covers only those cells
+    Given the agent dispatches workbench.run naming one target and a row subset
+    When the run starts on either the browser or the backend path
+    Then only that target's cells for those rows execute
+    And neither filter is silently dropped in favor of the other

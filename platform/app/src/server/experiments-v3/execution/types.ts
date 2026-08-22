@@ -21,6 +21,12 @@ export type ExecutionScope =
   | { type: "full" }
   | { type: "rows"; rowIndices: number[] }
   | { type: "target"; targetId: string }
+  | {
+      type: "target-rows";
+      targetIds: string[];
+      /** Omitted means every row of the dataset. */
+      rowIndices?: number[];
+    }
   | { type: "cell"; targetId: string; rowIndex: number }
   | {
       type: "evaluator";

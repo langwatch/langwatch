@@ -20,7 +20,7 @@ export type CellId = {
  * Parameters for computing execution cells.
  */
 export type ComputeExecutionCellsParams = {
-  /** The execution scope (full, rows, target, or cell) */
+  /** The execution scope (full, rows, target, target-rows, or cell) */
   scope: ExecutionScope;
   /** All target IDs in the workbench */
   targetIds: string[];
@@ -65,6 +65,11 @@ export const computeExecutionCells = ({
         (i) => i >= 0 && i < datasetRows.length,
       );
       break;
+    case "target-rows":
+      rowIndices = scope.rowIndices
+        ? scope.rowIndices.filter((i) => i >= 0 && i < datasetRows.length)
+        : datasetRows.map((_, i) => i);
+      break;
     case "target":
       rowIndices = datasetRows.map((_, i) => i);
       break;
@@ -85,6 +90,9 @@ export const computeExecutionCells = ({
     case "target":
     case "cell":
       scopeTargetIds = [scope.targetId];
+      break;
+    case "target-rows":
+      scopeTargetIds = scope.targetIds;
       break;
     default:
       scopeTargetIds = [];

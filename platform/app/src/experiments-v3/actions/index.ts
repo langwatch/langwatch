@@ -12,5 +12,6 @@ export {
   type ProjectedWorkbenchState,
   projectWorkbenchState,
 } from "./projection";
+export { scopeFromRunPayload } from "./runScope";
 export * from "./schemas";
 export * from "./transforms";

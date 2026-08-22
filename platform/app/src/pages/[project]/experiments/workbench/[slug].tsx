@@ -7,6 +7,7 @@ import {
   WORKBENCH_ACTIONS,
 } from "~/experiments-v3/actions/manifest";
 import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
+import { scopeFromRunPayload } from "~/experiments-v3/actions/runScope";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
@@ -359,14 +360,9 @@ export default function ExperimentsWorkbenchPage() {
       run: (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
         // Fire-and-forget like the run proposal: the run streams into the
         // table the user is watching, and the agent polls the runs API for
-        // completion. Scope maps best-effort onto ExecutionScope — a target
-        // AND a row subset cannot be expressed together yet, rows win.
-        const scope = payload.rowIndices?.length
-          ? { type: "rows" as const, rowIndices: payload.rowIndices }
-          : payload.targetIds?.length === 1 && payload.targetIds[0]
-            ? { type: "target" as const, targetId: payload.targetIds[0] }
-            : { type: "full" as const };
-        void executeEvaluation(scope);
+        // completion. The payload-to-scope mapping is shared with the backend
+        // fallback so both dispatch paths cover the same cells.
+        void executeEvaluation(scopeFromRunPayload(payload));
         return { status: "running" as const };
       },
     };

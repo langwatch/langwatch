@@ -142,6 +142,8 @@ export const resolveScopedRowIndices = ({
       return allRows();
     case "rows":
       return scope.rowIndices.filter(inRange);
+    case "target-rows":
+      return scope.rowIndices ? scope.rowIndices.filter(inRange) : allRows();
     case "cell":
     case "evaluator":
       return [scope.rowIndex].filter(inRange);
@@ -287,25 +289,28 @@ export const generateCells = (
         ? state.targets.map((t: TargetConfig) => t.id)
         : scope.type === "target"
           ? expandComparisonDeps(scope.targetId)
-          : scope.type === "cell"
-            ? expandComparisonDeps(scope.targetId)
-            : [];
+          : scope.type === "target-rows"
+            ? Array.from(new Set(scope.targetIds.flatMap(expandComparisonDeps)))
+            : scope.type === "cell"
+              ? expandComparisonDeps(scope.targetId)
+              : [];
 
-  const scopedComparisonDeps =
-    scope.type === "target" || scope.type === "cell"
-      ? new Set(
-          (() => {
-            const scopedTarget = state.targets.find(
-              (target) => target.id === scope.targetId,
-            );
-            if (!scopedTarget) return [];
-
-            return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
-              (variant): variant is string => !!variant,
-            );
-          })(),
-        )
-      : new Set<string>();
+  const scopedComparisonDeps = new Set(
+    (scope.type === "target" || scope.type === "cell"
+      ? [scope.targetId]
+      : scope.type === "target-rows"
+        ? scope.targetIds
+        : []
+    ).flatMap((scopedId) => {
+      const scopedTarget = state.targets.find(
+        (target) => target.id === scopedId,
+      );
+      if (!scopedTarget) return [];
+      return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
+        (variant): variant is string => !!variant,
+      );
+    }),
+  );
 
   // Generate cells, skipping empty rows
   for (const rowIndex of rowIndices) {

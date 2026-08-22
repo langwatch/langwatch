@@ -122,6 +122,56 @@ describe("executionScope utilities", () => {
       });
     });
 
+    describe("target-rows scope", () => {
+      it("returns only the requested target's cells for the requested rows", () => {
+        const scope: ExecutionScope = {
+          type: "target-rows",
+          targetIds: ["target-2"],
+          rowIndices: [0, 1],
+        };
+        const cells = computeExecutionCells({ scope, targetIds, datasetRows });
+
+        expect(cells).toHaveLength(2);
+        expect(cells).toContainEqual({ rowIndex: 0, targetId: "target-2" });
+        expect(cells).toContainEqual({ rowIndex: 1, targetId: "target-2" });
+      });
+
+      it("covers all non-empty rows when rowIndices is omitted", () => {
+        const scope: ExecutionScope = {
+          type: "target-rows",
+          targetIds: ["target-1", "target-2"],
+        };
+        const cells = computeExecutionCells({ scope, targetIds, datasetRows });
+
+        // 3 non-empty rows * 2 targets
+        expect(cells).toHaveLength(6);
+      });
+
+      it("crosses multiple targets with the row subset", () => {
+        const scope: ExecutionScope = {
+          type: "target-rows",
+          targetIds: ["target-1", "target-2"],
+          rowIndices: [3],
+        };
+        const cells = computeExecutionCells({ scope, targetIds, datasetRows });
+
+        expect(cells).toHaveLength(2);
+        expect(cells).toContainEqual({ rowIndex: 3, targetId: "target-1" });
+        expect(cells).toContainEqual({ rowIndex: 3, targetId: "target-2" });
+      });
+
+      it("skips empty and out-of-range rows like the rows scope", () => {
+        const scope: ExecutionScope = {
+          type: "target-rows",
+          targetIds: ["target-1"],
+          rowIndices: [0, 2, 100],
+        };
+        const cells = computeExecutionCells({ scope, targetIds, datasetRows });
+
+        expect(cells).toEqual([{ rowIndex: 0, targetId: "target-1" }]);
+      });
+    });
+
     describe("cell scope", () => {
       it("returns exactly one cell for a single cell execution", () => {
         const scope: ExecutionScope = {

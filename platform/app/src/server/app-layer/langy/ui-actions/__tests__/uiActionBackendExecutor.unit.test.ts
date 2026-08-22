@@ -237,5 +237,41 @@ describe("executeBackendAction", () => {
       const scope = vi.mocked(startPollingRun).mock.calls[0]![0].scope;
       expect(scope).toEqual({ type: "rows", rowIndices: [0] });
     });
+
+    /** @scenario A run scoped to a target and a row subset covers only those cells */
+    it("keeps both the target and the row filters when the payload carries both", async () => {
+      const experiments = makeExperiments();
+      vi.mocked(prepareSavedStateExecution).mockResolvedValue({
+        experiment: { id: "experiment_1", slug: "my-exp" },
+        workbenchState: BASE_STATE,
+        state: BASE_STATE,
+        datasetRows: [{ input: "hi" }, { input: "again" }],
+        datasetColumns: [{ id: "input", name: "input", type: "string" }],
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+        loadedEvaluators: new Map(),
+        loadedWorkflows: new Map(),
+      } as never);
+      vi.mocked(startPollingRun).mockResolvedValue({
+        runId: "run-2",
+        runUrl: "https://example/run-2",
+        total: 2,
+      } as never);
+
+      await executeBackendAction({
+        experiments,
+        context: CONTEXT,
+        kind: "workbench.run",
+        definition: WORKBENCH_ACTIONS["workbench.run"],
+        payload: { targetIds: ["target-1"], rowIndices: [0, 1] },
+      });
+
+      const scope = vi.mocked(startPollingRun).mock.calls[0]![0].scope;
+      expect(scope).toEqual({
+        type: "target-rows",
+        targetIds: ["target-1"],
+        rowIndices: [0, 1],
+      });
+    });
   });
 });

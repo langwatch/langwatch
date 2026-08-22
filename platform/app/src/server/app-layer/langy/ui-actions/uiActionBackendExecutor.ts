@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
+import { scopeFromRunPayload } from "~/experiments-v3/actions/runScope";
 import {
   getStatePayloadSchema,
   runPayloadSchema,
@@ -11,7 +12,6 @@ import { StaleWorkbenchStateError } from "~/server/experiments/errors";
 import type { ExperimentService } from "~/server/experiments/experiment.service";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
-import type { ExecutionScope } from "~/server/experiments-v3/execution/types";
 import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
@@ -212,24 +212,6 @@ async function startSavedStateRun({
   });
 
   return { runId, status: "running", total };
-}
-
-/**
- * The run payload maps onto the execution scopes the saved-state path offers:
- * rows win over targets (same rule as the browser handler), a single target
- * runs as a target scope, and everything else is a full run.
- */
-function scopeFromRunPayload(parsed: {
-  targetIds?: string[];
-  rowIndices?: number[];
-}): ExecutionScope {
-  if (parsed.rowIndices && parsed.rowIndices.length > 0) {
-    return { type: "rows", rowIndices: parsed.rowIndices };
-  }
-  if (parsed.targetIds && parsed.targetIds.length === 1) {
-    return { type: "target", targetId: parsed.targetIds[0]! };
-  }
-  return { type: "full" };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
