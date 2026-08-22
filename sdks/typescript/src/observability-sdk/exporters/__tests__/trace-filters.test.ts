@@ -13,7 +13,7 @@ import {
 } from "../trace-filters";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
-function createMockSpan(name: string, scopeName: string): ReadableSpan {
+function createMockSpan({ name, scopeName }: { name: string; scopeName: string }): ReadableSpan {
   return {
     name,
     instrumentationScope: { name: scopeName, version: "1.0.0", schemaUrl: "" },
@@ -151,7 +151,7 @@ describe("trace-filters", () => {
 
   describe("matchesCriteria", () => {
     it("matches when instrumentationScopeName criteria is met", () => {
-      const span = createMockSpan("operation", "ai");
+      const span = createMockSpan({ name: "operation", scopeName: "ai" });
       const criteria: Criteria = {
         instrumentationScopeName: [{ equals: "ai" }],
       };
@@ -159,7 +159,7 @@ describe("trace-filters", () => {
     });
 
     it("does not match when instrumentationScopeName criteria is not met", () => {
-      const span = createMockSpan("operation", "http");
+      const span = createMockSpan({ name: "operation", scopeName: "http" });
       const criteria: Criteria = {
         instrumentationScopeName: [{ equals: "ai" }],
       };
@@ -167,7 +167,7 @@ describe("trace-filters", () => {
     });
 
     it("matches when name criteria is met", () => {
-      const span = createMockSpan("chat.completion", "ai");
+      const span = createMockSpan({ name: "chat.completion", scopeName: "ai" });
       const criteria: Criteria = {
         name: [{ startsWith: "chat." }],
       };
@@ -175,7 +175,7 @@ describe("trace-filters", () => {
     });
 
     it("does not match when name criteria is not met", () => {
-      const span = createMockSpan("llm.completion", "ai");
+      const span = createMockSpan({ name: "llm.completion", scopeName: "ai" });
       const criteria: Criteria = {
         name: [{ startsWith: "chat." }],
       };
@@ -183,7 +183,7 @@ describe("trace-filters", () => {
     });
 
     it("matches when both criteria are met (AND semantics)", () => {
-      const span = createMockSpan("chat.completion", "ai");
+      const span = createMockSpan({ name: "chat.completion", scopeName: "ai" });
       const criteria: Criteria = {
         instrumentationScopeName: [{ equals: "ai" }],
         name: [{ startsWith: "chat." }],
@@ -192,7 +192,7 @@ describe("trace-filters", () => {
     });
 
     it("does not match when only one criteria is met", () => {
-      const span = createMockSpan("llm.completion", "ai");
+      const span = createMockSpan({ name: "llm.completion", scopeName: "ai" });
       const criteria: Criteria = {
         instrumentationScopeName: [{ equals: "ai" }],
         name: [{ startsWith: "chat." }],
@@ -201,8 +201,8 @@ describe("trace-filters", () => {
     });
 
     it("uses OR semantics for multiple matchers in same field", () => {
-      const span1 = createMockSpan("chat.completion", "ai");
-      const span2 = createMockSpan("llm.completion", "ai");
+      const span1 = createMockSpan({ name: "chat.completion", scopeName: "ai" });
+      const span2 = createMockSpan({ name: "llm.completion", scopeName: "ai" });
       const criteria: Criteria = {
         name: [{ startsWith: "chat." }, { startsWith: "llm." }],
       };
@@ -211,7 +211,7 @@ describe("trace-filters", () => {
     });
 
     it("handles empty criteria (match all)", () => {
-      const span = createMockSpan("anything", "any-scope");
+      const span = createMockSpan({ name: "anything", scopeName: "any-scope" });
       const criteria: Criteria = {};
       expect(matchesCriteria(span, criteria)).toBe(true);
     });
@@ -225,7 +225,7 @@ describe("trace-filters", () => {
     });
 
     it("handles missing span name", () => {
-      const span = createMockSpan("", "ai");
+      const span = createMockSpan({ name: "", scopeName: "ai" });
       const criteria: Criteria = {
         name: [{ equals: "" }],
       };
@@ -235,16 +235,16 @@ describe("trace-filters", () => {
 
   describe("isVercelAiSpan", () => {
     it("returns true for ai scope (case-insensitive)", () => {
-      expect(isVercelAiSpan(createMockSpan("op", "ai"))).toBe(true);
-      expect(isVercelAiSpan(createMockSpan("op", "AI"))).toBe(true);
-      expect(isVercelAiSpan(createMockSpan("op", "Ai"))).toBe(true);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "ai" }))).toBe(true);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "AI" }))).toBe(true);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "Ai" }))).toBe(true);
     });
 
     it("returns false for non-ai scopes", () => {
-      expect(isVercelAiSpan(createMockSpan("op", "http"))).toBe(false);
-      expect(isVercelAiSpan(createMockSpan("op", "custom"))).toBe(false);
-      expect(isVercelAiSpan(createMockSpan("op", "ai-sdk"))).toBe(false);
-      expect(isVercelAiSpan(createMockSpan("op", ""))).toBe(false);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "http" }))).toBe(false);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "custom" }))).toBe(false);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "ai-sdk" }))).toBe(false);
+      expect(isVercelAiSpan(createMockSpan({ name: "op", scopeName: "" }))).toBe(false);
     });
 
     it("handles missing instrumentation scope", () => {
@@ -255,54 +255,54 @@ describe("trace-filters", () => {
 
   describe("isHttpRequestSpan", () => {
     it("returns true for HTTP verb patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api/users", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("POST /data", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PUT /resource/123", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("DELETE /item", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PATCH /update", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("OPTIONS /", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("HEAD /check", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GET /api/users", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "POST /data", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "PUT /resource/123", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "DELETE /item", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "PATCH /update", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "OPTIONS /", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "HEAD /check", scopeName: "http" }))).toBe(true);
     });
 
     it("is case-insensitive for HTTP verbs", () => {
-      expect(isHttpRequestSpan(createMockSpan("get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("Get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GeT /api", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "get /api", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "Get /api", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GeT /api", scopeName: "http" }))).toBe(true);
     });
 
     it("returns false for non-HTTP patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("chat.completion", "ai"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("database query", "db"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("", ""))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "chat.completion", scopeName: "ai" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "database query", scopeName: "db" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GETAWAY", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "", scopeName: "" }))).toBe(false);
     });
 
     it("requires word boundary after verb", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "http"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETTING", "http"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GET /api", scopeName: "http" }))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GETAWAY", scopeName: "http" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GETTING", scopeName: "http" }))).toBe(false);
     });
 
     it("requires whitespace or end-of-string after the verb, not any word boundary", () => {
       // Hyphen, dot, slash etc. are word boundaries but not OTel HTTP span shapes.
-      expect(isHttpRequestSpan(createMockSpan("post-process", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("get-user-profile", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("delete-account", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("patch-config", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("head-request-handler", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("options-resolver", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("put-record.v2", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "post-process", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "get-user-profile", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "delete-account", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "patch-config", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "head-request-handler", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "options-resolver", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "put-record.v2", scopeName: "custom" }))).toBe(false);
       // Bare verb at end-of-string is still a valid OTel shape.
-      expect(isHttpRequestSpan(createMockSpan("POST", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan({ name: "POST", scopeName: "http" }))).toBe(true);
     });
   });
 
   describe("applyPreset", () => {
     const spans = [
-      createMockSpan("GET /users", "http"),
-      createMockSpan("chat.completion", "ai"),
-      createMockSpan("custom.operation", "custom"),
-      createMockSpan("POST /data", "http"),
+      createMockSpan({ name: "GET /users", scopeName: "http" }),
+      createMockSpan({ name: "chat.completion", scopeName: "ai" }),
+      createMockSpan({ name: "custom.operation", scopeName: "custom" }),
+      createMockSpan({ name: "POST /data", scopeName: "http" }),
     ];
 
     it("applies vercelAIOnly preset", () => {
@@ -320,10 +320,10 @@ describe("trace-filters", () => {
 
   describe("applyFilterRule", () => {
     const spans = [
-      createMockSpan("GET /users", "http"),
-      createMockSpan("chat.completion", "ai"),
-      createMockSpan("llm.generate", "ai"),
-      createMockSpan("custom.operation", "custom"),
+      createMockSpan({ name: "GET /users", scopeName: "http" }),
+      createMockSpan({ name: "chat.completion", scopeName: "ai" }),
+      createMockSpan({ name: "llm.generate", scopeName: "ai" }),
+      createMockSpan({ name: "custom.operation", scopeName: "custom" }),
     ];
 
     it("applies preset rule", () => {
@@ -360,10 +360,10 @@ describe("trace-filters", () => {
 
   describe("applyFilters", () => {
     const spans = [
-      createMockSpan("GET /users", "http"),
-      createMockSpan("chat.completion", "ai"),
-      createMockSpan("llm.generate", "ai"),
-      createMockSpan("custom.operation", "custom"),
+      createMockSpan({ name: "GET /users", scopeName: "http" }),
+      createMockSpan({ name: "chat.completion", scopeName: "ai" }),
+      createMockSpan({ name: "llm.generate", scopeName: "ai" }),
+      createMockSpan({ name: "custom.operation", scopeName: "custom" }),
     ];
 
     it("returns all spans when filters is undefined", () => {
@@ -426,13 +426,13 @@ describe("trace-filters", () => {
   describe("integration scenarios", () => {
     it("handles complex real-world scenario", () => {
       const spans = [
-        createMockSpan("GET /health", "http"),
-        createMockSpan("POST /api/data", "http"),
-        createMockSpan("ai.chat.completions.create", "ai"),
-        createMockSpan("ai.embeddings.create", "ai"),
-        createMockSpan("database.query", "prisma"),
-        createMockSpan("redis.get", "redis"),
-        createMockSpan("custom.business.logic", "app"),
+        createMockSpan({ name: "GET /health", scopeName: "http" }),
+        createMockSpan({ name: "POST /api/data", scopeName: "http" }),
+        createMockSpan({ name: "ai.chat.completions.create", scopeName: "ai" }),
+        createMockSpan({ name: "ai.embeddings.create", scopeName: "ai" }),
+        createMockSpan({ name: "database.query", scopeName: "prisma" }),
+        createMockSpan({ name: "redis.get", scopeName: "redis" }),
+        createMockSpan({ name: "custom.business.logic", scopeName: "app" }),
       ];
 
       const filters: TraceFilter[] = [
@@ -451,9 +451,9 @@ describe("trace-filters", () => {
 
     it("handles case sensitivity properly across filters", () => {
       const spans = [
-        createMockSpan("ChatCompletion", "AI"),
-        createMockSpan("chat.completion", "ai"),
-        createMockSpan("CHAT.COMPLETION", "Ai"),
+        createMockSpan({ name: "ChatCompletion", scopeName: "AI" }),
+        createMockSpan({ name: "chat.completion", scopeName: "ai" }),
+        createMockSpan({ name: "CHAT.COMPLETION", scopeName: "Ai" }),
       ];
 
       const filters: TraceFilter[] = [
