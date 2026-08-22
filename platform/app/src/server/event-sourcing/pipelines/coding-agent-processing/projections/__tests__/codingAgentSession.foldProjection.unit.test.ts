@@ -189,10 +189,19 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
 
     /** @scenario "an agent that states its own price keeps it" */
-    it("charges nothing for a call by an agent that reports its own cost", () => {
+    it("keeps the reported cost and adds no estimate for the same turn", () => {
       const projection = makeProjection();
+      let state = initStateOf(projection);
 
-      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+      // What the agent states it was billed for the turn.
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_request", cost_usd: 0.25 },
+        }),
+        state,
+      );
+
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
           name: "claude_code.llm_request",
           spanId: "llm-priced",
@@ -203,13 +212,15 @@ describe("CodingAgentSessionFoldProjection", () => {
             cache_read_tokens: 900,
           },
         }),
-        initStateOf(projection),
+        state,
       );
 
-      // The cost comes from the api_request event, which states what the
-      // agent was billed. Estimating this span too would charge the turn
-      // twice, at two different rates.
-      expect(state.costUsd).toBe(0);
+      // The reported cost survives and the span adds nothing on top.
+      // Estimating this span too would charge the turn twice, at two
+      // different rates. Folding the span alone and expecting 0 would pass
+      // just as well if the reported amount were dropped, so both halves
+      // are folded here.
+      expect(state.costUsd).toBe(0.25);
     });
   });
 

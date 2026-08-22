@@ -120,10 +120,16 @@ type CanonicalLift = readonly [string, string | number | null];
  * keyed by the session id, resolved none of its own traces and read as having
  * stored nothing. The session id is what groups them.
  *
- * Guarded to UUID-shaped values because codex's other spans stamp the tokio
- * worker id ("10") under the same key; the turn id stays the answer when
- * `thread.id` is one of those.
+ * Guarded to the full UUID shape because codex's other spans stamp the tokio
+ * worker id under the same key, and those are not session ids. A bare "10"
+ * fails any check, but "worker-10" would pass a looser one and then become a
+ * conversation id no session could ever resolve, which is the same defect
+ * this function exists to fix. Anything that is not UUID-shaped, or absent,
+ * leaves the turn id as the answer.
  */
+const UUID_SHAPE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function conversationIdOf(attrs: {
   get: (key: string) => unknown;
   take: (key: string) => unknown;
@@ -132,7 +138,7 @@ function conversationIdOf(attrs: {
   // same attribute.
   const sessionId = asString(attrs.get("thread.id"));
   const turnId = asString(attrs.take("turn.id"));
-  return sessionId?.includes("-") ? sessionId : turnId;
+  return sessionId !== null && UUID_SHAPE.test(sessionId) ? sessionId : turnId;
 }
 
 /**

@@ -244,6 +244,31 @@ describe("CodexExtractor.applyLog", () => {
       );
     });
 
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("keeps the turn id when the thread is hyphenated but not a session id", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          // Hyphenated but not a UUID. A bare "10" fails even a loose check,
+          // so only this shape catches a guard that tests for a hyphen rather
+          // than for the session id shape.
+          "thread.id": "worker-10",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+      );
+    });
+
     /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
     it("canonicalises codex.turn.reasoning_effort to gen_ai.request.reasoning_effort", () => {
       const ctx = createExtractorContext(
