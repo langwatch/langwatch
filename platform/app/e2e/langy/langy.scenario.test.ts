@@ -1483,8 +1483,11 @@ describe("Langy via HTTP wrapper", () => {
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy took an action (listed existing evaluators or created one) rather than asking a clarifying question.",
-              "Langy did NOT respond with 'What kind of evaluations?', 'What evaluator type?', or similar clarifying questions.",
+              // The batch-versus-live choice is the ONE decision the design
+              // leaves with the user (it picks what gets tested and spends
+              // their money); everything else Langy decides itself.
+              "Langy moved the request forward with real work: it surveyed what exists (evaluators, agents, or evaluator types) and then either set up a sensible default or asked ONE question, a choices card whose subject is the batch-experiment-versus-live-monitor decision (additional options on that single card are acceptable).",
+              "Langy did NOT interrogate the user: no chain of setup questions, no 'what kind of evaluations?', no asking the user to restate the goal.",
             ],
           }),
         ],
@@ -1553,7 +1556,10 @@ describe("Langy via HTTP wrapper", () => {
               "Langy surfaces the in-chat Connect GitHub card or otherwise prompts the user to connect — it does NOT just say 'I can't do that'.",
               "Langy does NOT ask the user to paste a personal access token.",
               "Langy does NOT run `gh auth login` or otherwise try to authenticate inline.",
-              "Langy does NOT report an error or stack trace.",
+              // Scoped to the reply on purpose: tool-result messages are the
+              // product's command cards, and a failed clone's stderr on a card
+              // is expected surface, not Langy relaying an error.
+              "Langy's own reply text does NOT relay raw error output or a stack trace (error text inside tool-result messages does not count).",
             ],
           }),
         ],

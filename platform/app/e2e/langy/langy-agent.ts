@@ -50,12 +50,23 @@ let cachedCookie: Promise<string> | null = null;
 function getSessionCookie(): Promise<string> {
   cachedCookie ??= (async () => {
     try {
-      const res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_BASE },
-        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-        signal: AbortSignal.timeout(15_000),
-      });
+      let res: Response;
+      for (let attempt = 1; ; attempt++) {
+        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: APP_BASE },
+          body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        // Every vitest run signs in once, so a burst of runs (a suite driven
+        // in chunks) can land on the auth rate limiter. That is the runner
+        // being throttled, not a scenario failing: wait out the window.
+        if (res.status !== 429 || attempt >= 6) break;
+        console.log(
+          `[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20_000));
+      }
       if (!res.ok) {
         throw new Error(
           `Langy test sign-in failed: ${res.status} ${await res.text()}`,
