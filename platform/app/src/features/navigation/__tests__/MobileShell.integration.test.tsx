@@ -472,6 +472,43 @@ describe("the mobile chrome", () => {
       expect(screen.getByTestId("page-body")).toBeInTheDocument();
     });
 
+    /** @scenario The overlay keeps the keyboard inside it */
+    it("marks the page behind it inert and wraps Tab inside itself", async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(
+        screen.getByRole("button", { name: "Open navigation menu" }),
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
+      });
+
+      // Everything the shell renders under the overlay is inert, so the
+      // page behind carries no tab stop and no reader can reach it.
+      const overlay = screen.getByTestId("mobile-menu-overlay");
+      expect(
+        screen.getByTestId("page-body").closest("[inert]"),
+      ).toBeInTheDocument();
+      expect(overlay.closest("[inert]")).toBeNull();
+
+      const focusable = Array.from(
+        overlay.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      const last = focusable.at(-1);
+      const first = focusable[0];
+      expect(last).toBeDefined();
+      last?.focus();
+
+      await user.tab();
+      expect(first).toHaveFocus();
+
+      await user.tab({ shift: true });
+      expect(last).toHaveFocus();
+    });
+
     /** @scenario Escape closes the overlay and returns focus to the menu button */
     it("closes on Escape and moves focus back to the menu button", async () => {
       const user = userEvent.setup();

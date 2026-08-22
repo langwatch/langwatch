@@ -55,24 +55,29 @@ export function MobileShell({
 
   return (
     <>
-      <MobileTopBar
-        activeProductId={state.activeProductId}
-        isMenuOpen={false}
-        onMenuButtonPress={() => setIsMenuOpen(true)}
-        menuButtonRef={menuButtonRef}
-      />
-      <Box
-        width="full"
-        background="bg.surface"
-        borderTopWidth="1px"
-        borderColor="border"
-        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-        maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-        overflow="auto"
-        display="flex"
-        position="relative"
-      >
-        {children}
+      {/* While the menu covers the screen the page behind it is inert:
+          out of the tab order and out of the accessibility tree, so the
+          modal keeps both the focus and the reader. */}
+      <Box inert={isMenuOpen ? true : undefined}>
+        <MobileTopBar
+          activeProductId={state.activeProductId}
+          isMenuOpen={false}
+          onMenuButtonPress={() => setIsMenuOpen(true)}
+          menuButtonRef={menuButtonRef}
+        />
+        <Box
+          width="full"
+          background="bg.surface"
+          borderTopWidth="1px"
+          borderColor="border"
+          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          overflow="auto"
+          display="flex"
+          position="relative"
+        >
+          {children}
+        </Box>
       </Box>
       {isMenuOpen && <MobileMenuOverlay state={state} onClose={closeMenu} />}
     </>
@@ -159,6 +164,7 @@ function MobileMenuOverlay({
   state: NavigationV2ShellReadyState;
   onClose: () => void;
 }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // The overlay is a modal: it takes focus on open, and Escape closes
@@ -168,7 +174,11 @@ function MobileMenuOverlay({
   }, []);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key === "Tab") trapTab({ event, overlay: overlayRef.current });
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -176,6 +186,7 @@ function MobileMenuOverlay({
 
   return (
     <Box
+      ref={overlayRef}
       data-testid="mobile-menu-overlay"
       role="dialog"
       aria-modal="true"
@@ -216,4 +227,39 @@ function MobileMenuOverlay({
       </Box>
     </Box>
   );
+}
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Keeps Tab and Shift+Tab inside the open menu: the last entry wraps to
+ * the first and back. A menu the overlay opens portals its list outside
+ * this box and drives its own keyboard, so focus that already left is
+ * left where it is.
+ */
+function trapTab({
+  event,
+  overlay,
+}: {
+  event: KeyboardEvent;
+  overlay: HTMLElement | null;
+}) {
+  const active = document.activeElement;
+  if (!overlay || !active || !overlay.contains(active)) return;
+
+  const focusable = Array.from(
+    overlay.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!first || !last) return;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }

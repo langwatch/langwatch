@@ -59,6 +59,12 @@ Feature: Mobile chrome
     And the menu button holds focus
 
   @integration
+  Scenario: The overlay keeps the keyboard inside it
+    Given the navigation overlay is open
+    Then the page behind it is inert
+    And tabbing past the last entry returns to the first one
+
+  @integration
   Scenario: Tablet and desktop widths keep the sidebar chrome
     Given I am on an LLM Ops page on a desktop-width viewport
     Then the sidebar renders and no menu button shows
