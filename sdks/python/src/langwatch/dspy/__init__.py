@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import inspect
 import random
 import re
 import time
@@ -803,7 +804,7 @@ class DSPyTracer:
         self_ = self
 
         @langwatch.span(ignore_missing_trace_warning=True, type="llm", capture_output=False)
-        def call(self: dspy.LM, prompt=None, messages=None, **kwargs):
+        def call(self: dspy.LM, *items, prompt=None, messages=None, request=None, **kwargs):
             all_kwargs = self.kwargs | kwargs
             model = self.model
             span_params = {}
@@ -834,23 +835,45 @@ class DSPyTracer:
 
             span = self_.safe_get_current_span()
             if span:
+                request_input = messages
+                if not request_input and prompt:
+                    request_input = [{"role": "user", "content": prompt}]
+                if not request_input and items:
+                    # dspy >= 3.3 typed calls pass an LMRequest positionally
+                    first = items[0]
+                    request_input = getattr(first, "messages", None) or [
+                        {"role": "user", "content": str(first)}
+                    ]
                 span.update(
                     name=model,
                     model=model,
-                    input=(
-                        messages if messages else [{"role": "user", "content": prompt}]
-                    ),
+                    input=request_input,
                     params=span_params,
                 )
 
-            # Both go by name. DSPy made `prompt` and `messages` keyword-only
-            # and put positional arguments into `*items`, so `(self, prompt,
-            # messages)` sent two items and the call ended with a TypeError
-            # about legacy BaseLM calls. By name the call reads the same on
-            # every version in the supported range.
-            result = self.__class__.__original_call__(  # type: ignore
-                self, prompt=prompt, messages=messages, **kwargs
+            original_call = self.__class__.__original_call__
+            original_parameters = inspect.signature(original_call).parameters
+            supports_typed_call = "request" in original_parameters or any(
+                parameter.kind is inspect.Parameter.VAR_POSITIONAL
+                for parameter in original_parameters.values()
             )
+            call_kwargs = dict(kwargs)
+            if request is not None and "request" in original_parameters:
+                call_kwargs["request"] = request
+
+            if supports_typed_call:
+                result = original_call(
+                    self, *items, prompt=prompt, messages=messages, **call_kwargs
+                )  # type: ignore
+            else:
+                if items:
+                    result = original_call(self, *items, **call_kwargs)  # type: ignore
+                else:
+                    if prompt is not None:
+                        call_kwargs["prompt"] = prompt
+                    if messages is not None:
+                        call_kwargs["messages"] = messages
+                    result = original_call(self, **call_kwargs)  # type: ignore
 
             history = self.history[-1] if len(self.history) > 0 else None
 
