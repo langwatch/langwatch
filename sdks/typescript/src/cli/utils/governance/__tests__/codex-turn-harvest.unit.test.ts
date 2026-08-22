@@ -623,7 +623,12 @@ describe("harvestCodexThread", () => {
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
-					userMessage("hi"),
+					// Injected context, not a typed prompt: it leaves the session with
+					// nothing to name it while still giving the turn a conversation to
+					// post.
+					userMessage(
+						"<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>",
+					),
 					agentFinal("hello"),
 				]);
 				const { urls, impl } = recordingFetch();
