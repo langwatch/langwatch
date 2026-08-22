@@ -191,9 +191,49 @@ export class CliLoginKeyService {
       };
     }
 
-    // Team-scoped role bindings carry only a scopeId (no relation to Team by
-    // design), so membership is the union of TeamUser rows and TEAM-scoped
-    // bindings, resolved against the team table in one pass.
+    const teamIdsOfUser = await this.teamsTheUserCanScopeTo({
+      userId,
+      organizationId,
+    });
+    if (teamIdsOfUser.length === 0) return null;
+
+    const heldByTeam = await batchTeamsPermissions(
+      { prisma: this.prisma, session: sessionFor(userId) },
+      {
+        organizationId,
+        teamIds: teamIdsOfUser,
+        permissions: defaults.filter(
+          (permission) => !isOrgExclusivePermission(permission),
+        ),
+      },
+    );
+
+    const narrowed = intersectAcrossTeams(heldByTeam);
+    if (!narrowed) return null;
+
+    return {
+      bindings: narrowed.teamIds.map((teamId) => ({
+        scopeType: "TEAM" as const,
+        scopeId: teamId,
+      })),
+      permissions: narrowed.permissions,
+    };
+  }
+
+  /**
+   * The teams whose scope this user's key may carry.
+   *
+   * Team-scoped role bindings carry only a scopeId (no relation to Team by
+   * design), so membership is the union of TeamUser rows and TEAM-scoped
+   * bindings, resolved against the team table in one pass.
+   */
+  private async teamsTheUserCanScopeTo({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<string[]> {
     const boundTeamIds = await this.prisma.roleBinding.findMany({
       where: {
         organizationId,
@@ -218,50 +258,7 @@ export class CliLoginKeyService {
       },
       select: { id: true },
     });
-    if (teams.length === 0) return null;
-
-    const candidate = defaults.filter(
-      (permission) => !isOrgExclusivePermission(permission),
-    );
-    const heldByTeam = await batchTeamsPermissions(
-      { prisma: this.prisma, session: sessionFor(userId) },
-      {
-        organizationId,
-        teamIds: teams.map((team) => team.id),
-        permissions: candidate,
-      },
-    );
-
-    // One permission list serves every binding, and the mint asserts it at
-    // every stamped scope — so the list is the intersection across the teams
-    // that grant anything at all, and a team granting nothing (for example a
-    // personal team whose owner grant has not projected yet) is dropped
-    // instead of zeroing the key.
-    let permissions: Set<string> | null = null;
-    const teamIds: string[] = [];
-    for (const [teamId, held] of heldByTeam) {
-      if (held.length === 0) continue;
-      teamIds.push(teamId);
-      if (permissions === null) {
-        permissions = new Set(held);
-      } else {
-        const kept: ReadonlySet<string> = permissions;
-        permissions = new Set(
-          held.filter((permission) => kept.has(permission)),
-        );
-      }
-    }
-    if (!permissions || permissions.size === 0 || teamIds.length === 0) {
-      return null;
-    }
-
-    return {
-      bindings: teamIds.map((teamId) => ({
-        scopeType: "TEAM" as const,
-        scopeId: teamId,
-      })),
-      permissions: [...permissions].sort(),
-    };
+    return teams.map((team) => team.id);
   }
 
   /**
@@ -416,6 +413,34 @@ export class CliLoginKeyService {
       projectIds: projects.map((project) => project.id).sort(),
     };
   }
+}
+
+/**
+ * Narrow the per-team held permissions to the one list a key can carry.
+ *
+ * One permission list serves every binding, and the mint asserts it at every
+ * stamped scope — so the list is the intersection across the teams that grant
+ * anything at all, and a team granting nothing (for example a personal team
+ * whose owner grant has not projected yet) is dropped instead of zeroing the
+ * key. Returns null when nothing mintable remains.
+ */
+function intersectAcrossTeams(
+  heldByTeam: Map<string, string[]>,
+): { teamIds: string[]; permissions: string[] } | null {
+  const teamIds: string[] = [];
+  let kept: string[] | null = null;
+  for (const [teamId, held] of heldByTeam) {
+    if (held.length === 0) continue;
+    teamIds.push(teamId);
+    if (kept === null) {
+      kept = [...held];
+      continue;
+    }
+    const heldHere = new Set(held);
+    kept = kept.filter((permission) => heldHere.has(permission));
+  }
+  if (!kept || kept.length === 0) return null;
+  return { teamIds, permissions: [...kept].sort() };
 }
 
 function dedupeBindings(

@@ -149,7 +149,13 @@ async function exchange({
   return { status: res.status, json: (await res.json()) as ExchangeSuccess };
 }
 
-/** Full device flow as the current identity: mint, approve, exchange. */
+/**
+ * Full device flow as the current identity: mint, approve, exchange.
+ *
+ * A failed step throws with the body the server answered, rather than
+ * asserting: the assertion belongs to the test, and a helper that swallows a
+ * 403 into a bare "expected 403 to be 200" hides why it was refused.
+ */
 async function runFlow(args: {
   as: IdentityUser;
   hostname: string;
@@ -161,12 +167,20 @@ async function runFlow(args: {
     userCode: dc.user_code,
     keySelection: args.keySelection,
   });
-  expect(approved.status).toBe(200);
+  if (approved.status !== 200) {
+    throw new Error(
+      `approve answered ${approved.status}: ${JSON.stringify(approved.json)}`,
+    );
+  }
   const exchanged = await exchange({
     deviceCode: dc.device_code,
     hostname: args.hostname,
   });
-  expect(exchanged.status).toBe(200);
+  if (exchanged.status !== 200) {
+    throw new Error(
+      `exchange answered ${exchanged.status}: ${JSON.stringify(exchanged.json)}`,
+    );
+  }
   return exchanged.json;
 }
 
