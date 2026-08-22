@@ -487,7 +487,7 @@ describe("parseCodexRollout", () => {
 
   describe("given an exec session, which emits no user_message event at all", () => {
     describe("when the rollout is parsed", () => {
-      /** @scenario "A session that emits no user_message event is still named" */
+      /** @scenario "A codex exec session is named by the prompt it was given" */
       it("names it by the prompt in the conversation", () => {
         const { meta } = parseCodexRollout(
           rollout(
@@ -532,6 +532,21 @@ describe("parseCodexRollout", () => {
             taskStarted("abc123", "t1"),
             userMsg("<environment_context>\ncwd: /w\n"),
             userMsg("a later user turn, which must not rename the session"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "An injected event does not shut out the prompt in the conversation" */
+      it("skips an injected event and takes the conversation's typed prompt", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-5555", cwd: "/w" } },
+            typedEvent("<environment_context>\ncwd: /w\n</environment_context>"),
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
             assistantMsg("done"),
           ),
         );

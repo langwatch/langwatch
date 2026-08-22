@@ -583,7 +583,7 @@ describe("harvestCodexThread", () => {
 			});
 
 			/** @scenario "A machine-injected first prompt does not name the session" */
-			it("posts no title when the first prompt is an injected tag", async () => {
+			it("names it by the typed prompt, not the injected tag", async () => {
 				writeRollout(THREAD, [
 					sessionMeta(GIT),
 					typedPrompt("<environment_context>...</environment_context>"),
@@ -596,9 +596,12 @@ describe("harvestCodexThread", () => {
 				await harvest(impl);
 
 				expect(urls).toContain("https://e/v1/logs");
+				// The injected block is skipped wherever it appears, so the prompt
+				// the person actually typed names the session rather than the
+				// session going unnamed with a usable prompt sitting right there.
 				expect(
 					contextAttr({ bodies, urls, key: "langwatch.session.title" }),
-				).toBeUndefined();
+				).toBe("hi");
 			});
 		});
 	});

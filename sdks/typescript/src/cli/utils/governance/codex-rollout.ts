@@ -332,25 +332,27 @@ class CodexTurnAccumulator {
 	}
 
 	private onUserMessage(payload: Record<string, unknown>): void {
-		if (this.firstUserMessage !== null) return;
 		const msg = payload.message;
-		if (typeof msg === "string" && msg.trim()) {
-			this.firstUserMessage = msg.trim();
-		}
+		if (typeof msg === "string") this.rememberTypedPrompt(msg);
 	}
 
 	/**
-	 * The typed prompt as it appears in the conversation itself, which is the
-	 * only place `codex exec` records it: an exec session emits no `user_message`
-	 * event at all, so without this it reaches the sessions screen unnamed.
-	 * A session that does emit the event keeps it, since the event precedes the
-	 * turn and this never overwrites a prompt already found.
+	 * The first thing the person typed, from whichever place records it.
 	 *
-	 * Codex also speaks to itself in this role, injecting its context as
-	 * user-role messages, each wrapped in a tag of its own
-	 * (`<environment_context>`, `<recommended_plugins>`, ...). Only what the
-	 * person typed arrives untagged, and a 10k-character plugin catalogue makes
-	 * a poor session title.
+	 * Both places reach this. The `user_message` event carries it in a TUI
+	 * session; the conversation carries it in a `codex exec` session, which
+	 * emits no such event at all and so reached the sessions screen unnamed.
+	 * The event still wins whenever there is one, because it is read before a
+	 * turn opens while a conversation message is only read inside one, and a
+	 * turn opens at `task_started`, after the submission that emits the event.
+	 *
+	 * Codex also speaks to itself in both places, injecting its context as
+	 * user-role text wrapped in a tag of its own (`<environment_context>`,
+	 * `<recommended_plugins>`, ...). Only what the person typed arrives
+	 * untagged, and a 10k-character plugin catalogue makes a poor session
+	 * title. Filtering here rather than at either call site is what keeps an
+	 * injected event from claiming the name and locking out the real prompt
+	 * waiting in the conversation.
 	 */
 	private rememberTypedPrompt(text: string): void {
 		if (this.firstUserMessage !== null) return;
