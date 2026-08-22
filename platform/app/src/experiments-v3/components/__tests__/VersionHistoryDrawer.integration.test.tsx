@@ -35,10 +35,16 @@ vi.mock("~/hooks/useCan", () => ({
 }));
 
 const mockLoadState = vi.fn();
+const mockSetWorkbenchVersion = vi.fn();
+const mockSetStaleWorkbench = vi.fn();
 vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useEvaluationsV3Store: (selector: (state: any) => unknown) =>
-    selector({ loadState: mockLoadState }),
+    selector({
+      loadState: mockLoadState,
+      setWorkbenchVersion: mockSetWorkbenchVersion,
+      setStaleWorkbench: mockSetStaleWorkbench,
+    }),
 }));
 
 const mockToast = vi.fn();

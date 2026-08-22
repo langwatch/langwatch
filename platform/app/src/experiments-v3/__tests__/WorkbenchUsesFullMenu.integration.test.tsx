@@ -70,6 +70,12 @@ vi.mock("~/experiments-v3/hooks/useSavedDatasetLoader", () => ({
   useSavedDatasetLoader: () => ({ isLoading: false }),
 }));
 
+// The freshness listener subscribes over SSE with a real tRPC procedure ref;
+// this layout test has no api.experiments surface, so stub the whole hook.
+vi.mock("~/experiments-v3/hooks/useWorkbenchUpdateListener", () => ({
+  useWorkbenchUpdateListener: () => ({ stale: undefined, reload: vi.fn() }),
+}));
+
 vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
   useLambdaWarmup: () => undefined,
 }));
