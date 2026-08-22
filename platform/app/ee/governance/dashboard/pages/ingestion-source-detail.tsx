@@ -20,6 +20,7 @@ import {
   CircleX,
   Copy,
   KeyRound,
+  Pencil,
   RotateCw,
   Trash2,
 } from "lucide-react";
@@ -59,6 +60,7 @@ import {
   useSourceEventsPager,
 } from "../components/useSourceEventsPager";
 import type { PageRequest } from "../logic/eventsPager";
+import { SourceEditDrawer } from "./ingestion-sources";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -114,6 +116,7 @@ function SourceDetailHeader({
   isArchiving,
   onRotate,
   onArchive,
+  onEdit,
 }: {
   source: Source;
   canManage: boolean;
@@ -121,6 +124,7 @@ function SourceDetailHeader({
   isArchiving: boolean;
   onRotate: () => void;
   onArchive: () => void;
+  onEdit: () => void;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -161,10 +165,18 @@ function SourceDetailHeader({
         )}
       </VStack>
       <Spacer />
-      {/* Rotating a secret and archiving are both
+      {/* Editing, rotating a secret and archiving are all
           `ingestionSources:manage`. */}
       {canManage && (
         <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onEdit}
+            title="Edit this source's configuration"
+          >
+            <Pencil size={14} /> Edit
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -335,21 +347,38 @@ function SourceDetailShell({
 }
 
 /**
- * The two writes this page offers. Both are `ingestionSources:manage`; a
+ * The three writes this page offers. All are `ingestionSources:manage`; a
  * rotate reveals the new secret once, an archive sends the admin back to the
- * list.
+ * list, and an edit reopens the same drawer the source list uses.
  */
 function useSourceDetailMutations({
   orgId,
   sourceId,
   onSecretRevealed,
+  onEdited,
 }: {
   orgId: string;
   sourceId: string | undefined;
   onSecretRevealed: (details: { secret: string; sourceName: string }) => void;
+  onEdited: () => void;
 }) {
   const router = useRouter();
   const utils = api.useUtils();
+  const update = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void utils.ingestionSources.get.invalidate({
+        organizationId: orgId,
+        id: sourceId,
+      });
+      toaster.create({ title: "Source updated", type: "success" });
+      onEdited();
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the source",
+      }),
+  });
   const rotate = api.ingestionSources.rotateSecret.useMutation({
     onSuccess: (data) => {
       void utils.ingestionSources.get.invalidate({
@@ -375,7 +404,7 @@ function useSourceDetailMutations({
         fallbackTitle: "Couldn't archive the source",
       }),
   });
-  return { rotate, archive };
+  return { rotate, archive, update };
 }
 
 /**
@@ -428,12 +457,18 @@ function useIngestionSourceDetailPage() {
     sourceName: string;
   } | null>(null);
 
-  const { rotate: rotateMutation, archive: archiveMutation } =
-    useSourceDetailMutations({
-      orgId,
-      sourceId,
-      onSecretRevealed: setSecretReveal,
-    });
+  const [isEditing, setIsEditing] = useState(false);
+
+  const {
+    rotate: rotateMutation,
+    archive: archiveMutation,
+    update: updateMutation,
+  } = useSourceDetailMutations({
+    orgId,
+    sourceId,
+    onSecretRevealed: setSecretReveal,
+    onEdited: () => setIsEditing(false),
+  });
 
   return {
     sourceId,
@@ -448,6 +483,9 @@ function useIngestionSourceDetailPage() {
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   };
 }
 
@@ -465,6 +503,9 @@ function IngestionSourceDetailPage() {
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   } = useIngestionSourceDetailPage();
 
   if (!sourceId) {
@@ -517,6 +558,17 @@ function IngestionSourceDetailPage() {
           onArchive={() =>
             archiveMutation.mutate({ organizationId: orgId, id: source.id })
           }
+          onEdit={() => setIsEditing(true)}
+        />
+
+        {/* The same drawer the source list opens, so the two surfaces cannot
+            drift into offering different edits of the same row. */}
+        <SourceEditDrawer
+          organizationId={orgId}
+          source={isEditing ? source : null}
+          onClose={() => setIsEditing(false)}
+          onSubmit={(input) => updateMutation.mutate(input)}
+          isPending={updateMutation.isPending}
         />
 
         <SourceActivityPanels
