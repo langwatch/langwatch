@@ -834,6 +834,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		if err := piAgent.Provision(pi.ProvisionInput{
 			Home:           workerHome,
 			WorkspaceRoot:  p.workspaceRoot,
+			SessionDir:     p.piSessionDir(conversationID),
 			Creds:          creds,
 			UID:            uid,
 			AgentsTemplate: p.agentsTemplate,
@@ -1280,5 +1281,78 @@ func (p *Pool) reapIdle() {
 	p.mu.Unlock()
 	for _, id := range candidates {
 		p.kill(id, "idle timeout")
+	}
+	p.sweepSessionStashes()
+}
+
+// piSessionStashDirName holds every conversation's persistent pi session
+// storage, one subdirectory per conversation, as a SIBLING of the worker homes
+// under sessionsRoot. The home is wiped on every worker death; the session
+// files here survive it, so a respawned worker resumes the conversation's pi
+// session — same messages, same provider prompt-cache prefix — instead of
+// re-reading the whole conversation from a folded transcript. The leading dot
+// keeps the name outside the validated conversation-id charset, so a home and
+// the stash can never collide. Boot still wipes sessionsRoot whole, same
+// hygiene as before.
+const piSessionStashDirName = ".pi-sessions"
+
+// sessionStashTTL bounds how long a conversation's session files may sit with
+// no live worker: conversation content must not linger on the manager's disk
+// indefinitely after the user moved on. Well past the 1h provider cache tier
+// it exists to serve; a conversation resumed later than this re-seeds from the
+// durable transcript exactly as before.
+const sessionStashTTL = 24 * time.Hour
+
+func (p *Pool) piSessionDir(conversationID string) string {
+	return filepath.Join(p.sessionsRoot, piSessionStashDirName, conversationID)
+}
+
+// stashLastWrite is the newest mtime of the stash directory or anything in it.
+func stashLastWrite(dir string) time.Time {
+	newest := time.Time{}
+	if info, err := os.Stat(dir); err == nil {
+		newest = info.ModTime()
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return newest
+	}
+	for _, entry := range entries {
+		if info, err := entry.Info(); err == nil && info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	return newest
+}
+
+// sweepSessionStashes removes session storage whose conversation has gone
+// quiet: no live worker and nothing written for sessionStashTTL. Runs on the
+// reaper's clock, off the pool lock except for the live-worker check.
+func (p *Pool) sweepSessionStashes() {
+	stashRoot := filepath.Join(p.sessionsRoot, piSessionStashDirName)
+	entries, err := os.ReadDir(stashRoot)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for _, entry := range entries {
+		p.mu.Lock()
+		_, live := p.workers[entry.Name()]
+		p.mu.Unlock()
+		if live {
+			continue
+		}
+		// Freshness is the newest mtime INSIDE the stash: appending to a
+		// session file updates the file, not its directory, so the directory
+		// mtime alone would sweep a conversation that wrote minutes ago.
+		if now.Sub(stashLastWrite(filepath.Join(stashRoot, entry.Name()))) < sessionStashTTL {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(stashRoot, entry.Name())); err != nil {
+			clog.Get(p.baseCtx).Warn("remove stale session stash failed",
+				zap.String("conversation", entry.Name()),
+				zap.Error(err),
+			)
+		}
 	}
 }

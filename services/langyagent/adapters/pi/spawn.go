@@ -40,8 +40,17 @@ const defaultModel = "openai/gpt-5-mini"
 // ProvisionInput is everything Provision needs to lay down a worker's home.
 // Mirrors opencode.ProvisionInput; Runner selects the isolation substrate.
 type ProvisionInput struct {
-	Home           string
-	WorkspaceRoot  string // holds the materialized skills/ tree the config points at
+	Home          string
+	WorkspaceRoot string // holds the materialized skills/ tree the config points at
+	// SessionDir is the conversation's PERSISTENT pi session storage, outside
+	// the worker home. The home is wiped on every worker death (reap,
+	// eviction, crash), and the session JSONL living there died with it — so
+	// every respawn started a fresh session, re-read the whole conversation
+	// as a folded transcript, and rewrote the provider's prompt-cache prefix
+	// from scratch. Living outside the home, the session survives the worker,
+	// the wrapper resumes it on respawn, and the rebuilt context matches the
+	// provider's cached prefix byte for byte.
+	SessionDir     string
 	Creds          domain.Credentials
 	UID            uint32
 	AgentsTemplate string
@@ -114,13 +123,28 @@ func modelLane(model string) workerModelConfig {
 	case strings.HasPrefix(model, "anthropic/"):
 		lane.API = "anthropic-messages"
 		lane.Reasoning = true
+		// Long cache retention (with PI_CACHE_RETENTION=long in the worker
+		// env) makes pi stamp its cache_control breakpoints with ttl "1h"
+		// instead of the 5-minute default. A langy conversation's rhythm is
+		// bursts of follow-ups separated by pauses well past five minutes
+		// (the idle reap alone is longer), so the 5m tier expired before the
+		// next message on exactly the turns caching exists for. The 1h write
+		// costs 2x input on the cached prefix once; every follow-up inside
+		// the hour then reads it at a tenth of the price.
+		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	case strings.HasPrefix(model, "openai_codex/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
-		lane.Compat = map[string]any{"supportsStore": false}
+		lane.Compat = map[string]any{
+			"supportsStore": false,
+			// With retention long, pi sets prompt_cache_retention "24h" on
+			// the Responses lane; OpenAI charges no write premium for it.
+			"supportsLongCacheRetention": true,
+		}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
+		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	default:
 		lane.API = "openai-completions"
 		lane.Compat = map[string]any{"supportsDeveloperRole": false}
@@ -136,9 +160,30 @@ func skillsDir(workspaceRoot string) string {
 	return filepath.Join(workspaceRoot, "skills")
 }
 
-// sessionDir is the wrapper's pi session storage, inside the 0700 home.
-func sessionDir(workerHome string) string {
-	return filepath.Join(workerHome, "sessions")
+// provisionSessionDir stages the conversation's persistent session storage:
+// the directory (and any session files a previous worker left in it) is owned
+// by THIS worker's UID and 0700, the same boundary as the home. The chown
+// covers the existing files too — a respawned worker runs under a fresh UID,
+// and a session file still owned by the dead worker's UID would be unreadable,
+// silently breaking the resume it exists for.
+func provisionSessionDir(in ProvisionInput) error {
+	if err := os.MkdirAll(in.SessionDir, 0o700); err != nil {
+		return fmt.Errorf("mkdir sessions: %w", err)
+	}
+	if err := in.Runner.Chown(in.SessionDir, in.UID); err != nil {
+		return fmt.Errorf("chown sessions: %w", err)
+	}
+	entries, err := os.ReadDir(in.SessionDir)
+	if err != nil {
+		return fmt.Errorf("list sessions: %w", err)
+	}
+	for _, entry := range entries {
+		path := filepath.Join(in.SessionDir, entry.Name())
+		if err := in.Runner.Chown(path, in.UID); err != nil {
+			return fmt.Errorf("chown session file: %w", err)
+		}
+	}
+	return nil
 }
 
 // Provision creates a per-worker home with the wrapper's config file, the
@@ -167,14 +212,11 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("chown tmp: %w", err)
 	}
 
-	// pi session storage. The session JSONL holds the conversation's content,
-	// so it gets the same boundary.
-	sessions := sessionDir(in.Home)
-	if err := os.MkdirAll(sessions, 0o700); err != nil {
-		return fmt.Errorf("mkdir sessions: %w", err)
-	}
-	if err := in.Runner.Chown(sessions, in.UID); err != nil {
-		return fmt.Errorf("chown sessions: %w", err)
+	// pi session storage: persistent, outside the home (see ProvisionInput).
+	// The session JSONL holds the conversation's content, so it gets the same
+	// UID + 0700 boundary as everything in the home.
+	if err := provisionSessionDir(in); err != nil {
+		return err
 	}
 
 	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted, the same
@@ -208,7 +250,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		PersonaPrompt:  opencode.LangyAgentPrompt,
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
-		SessionDir:     sessions,
+		SessionDir:     in.SessionDir,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -333,6 +375,11 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// deliberate stance as the opencode worker env).
 		"LANGWATCH_API_KEY="+in.Creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+in.Creds.LangwatchEndpoint,
+		// Long provider-cache retention: only takes effect on lanes whose
+		// model carries compat.supportsLongCacheRetention (see modelLane) —
+		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
+		// Responses lane asks for 24h prompt_cache_retention.
+		"PI_CACHE_RETENTION=long",
 	)
 	for _, c := range in.Capabilities {
 		env = append(env, c.Contribute()...)

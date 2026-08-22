@@ -392,3 +392,83 @@ func TestPool_SurvivesPanicInBackgroundGoroutine(t *testing.T) {
 	// And the pool's internal sweep machinery still runs without deadlock.
 	p.reapIdle()
 }
+
+// @scenario "The session store survives the worker's teardown"
+func TestPool_TombstoneLeavesSessionStashIntact(t *testing.T) {
+	p := newTestPool(2)
+	p.sessionsRoot = t.TempDir()
+	conv := "langyconv_stash1"
+	home := filepath.Join(p.sessionsRoot, conv)
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatalf("mkdir home: %v", err)
+	}
+	stash := p.piSessionDir(conv)
+	if err := os.MkdirAll(stash, 0o700); err != nil {
+		t.Fatalf("mkdir stash: %v", err)
+	}
+	sessionFile := filepath.Join(stash, "session.jsonl")
+	if err := os.WriteFile(sessionFile, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+
+	tombstone := tombstoneWorkerHome(context.Background(), p.sessionsRoot, conv)
+	if tombstone == "" {
+		t.Fatalf("tombstone failed for a valid conversation home")
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Fatalf("the home should be renamed away, stat err = %v", err)
+	}
+	if _, err := os.Stat(sessionFile); err != nil {
+		t.Fatalf("the session file must survive the home's teardown: %v", err)
+	}
+}
+
+// @scenario "A quiet conversation's session store is swept after a day"
+func TestPool_SweepSessionStashes(t *testing.T) {
+	p := newTestPool(2)
+	p.sessionsRoot = t.TempDir()
+	old := time.Now().Add(-sessionStashTTL - time.Hour)
+
+	makeStash := func(conv string, mtime time.Time) string {
+		dir := p.piSessionDir(conv)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("mkdir stash: %v", err)
+		}
+		file := filepath.Join(dir, "session.jsonl")
+		if err := os.WriteFile(file, []byte("{}\n"), 0o600); err != nil {
+			t.Fatalf("write session: %v", err)
+		}
+		if err := os.Chtimes(file, mtime, mtime); err != nil {
+			t.Fatalf("chtimes file: %v", err)
+		}
+		if err := os.Chtimes(dir, mtime, mtime); err != nil {
+			t.Fatalf("chtimes dir: %v", err)
+		}
+		return dir
+	}
+
+	stale := makeStash("langyconv_stale1", old)
+	// The directory is old but its session file was written minutes ago — an
+	// active conversation whose stash dir simply never changed shape.
+	recent := makeStash("langyconv_fresh1", old)
+	now := time.Now()
+	if err := os.Chtimes(filepath.Join(recent, "session.jsonl"), now, now); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+	live := makeStash("langyconv_live11", old)
+	withLocked(p, func() {
+		p.workers["langyconv_live11"] = &Worker{conversationID: "langyconv_live11"}
+	})
+
+	p.sweepSessionStashes()
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale stash should be swept, stat err = %v", err)
+	}
+	if _, err := os.Stat(recent); err != nil {
+		t.Errorf("a stash with a recent session write must be kept: %v", err)
+	}
+	if _, err := os.Stat(live); err != nil {
+		t.Errorf("a live worker's stash must be kept: %v", err)
+	}
+}

@@ -81,7 +81,7 @@ func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 // the session its home still held. A wrapper that says nothing (or an older
 // binary that never emits the field) reads as false and keeps the seed path.
 //
-// @scenario "A respawned pi worker resumes the session its home still holds"
+// @scenario "A respawned pi worker resumes the conversation's persisted session"
 func TestAgent_OpenSession_RelaysWrapperSessionResume(t *testing.T) {
 	for _, tc := range []struct {
 		mode string

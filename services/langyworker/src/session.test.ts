@@ -46,7 +46,7 @@ describe("openSessionManager", () => {
   });
 
   describe("when a home holding a previous session with history", () => {
-    /** @scenario A respawned pi worker resumes the session its home still holds */
+    /** @scenario A respawned pi worker resumes the conversation's persisted session */
     it("continues that session and reports resumed true", () => {
       const { home, sessionDir } = tempHome();
       const previous = SessionManager.create(home, sessionDir);

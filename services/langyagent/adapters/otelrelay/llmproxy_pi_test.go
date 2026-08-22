@@ -286,6 +286,101 @@ func TestLLMProxy_PiHarnessReadsAnthropicStreamUsage(t *testing.T) {
 	}
 }
 
+// Cached-token usage lands on the retold span under the same attribute names
+// the gateway's customer span uses, across the provider spellings: Anthropic
+// states reads and writes next to input_tokens (message_start on the stream,
+// a bare usage on the non-stream body) with the hour-long write share nested
+// under cache_creation; the OpenAI Responses API reports reads as
+// input_tokens_details.cached_tokens.
+// @scenario "The retold LLM span carries the provider's cached-token usage"
+func TestLLMProxy_PiHarnessReadsCachedTokenUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		path         string
+		handler      http.HandlerFunc
+		wantInput    int64
+		wantOutput   int64
+		wantRead     int64
+		wantCreate   int64
+		wantCreate1h int64
+	}{
+		{
+			name: "anthropic stream keeps the message_start cache counts past message_delta",
+			path: "/v1/messages",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				_, _ = io.WriteString(w, "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10,\"output_tokens\":1,\"cache_read_input_tokens\":300,\"cache_creation_input_tokens\":40,\"cache_creation\":{\"ephemeral_5m_input_tokens\":10,\"ephemeral_1h_input_tokens\":30}}}}\n\n")
+				_, _ = io.WriteString(w, "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":12}}\n\n")
+			},
+			wantInput:    10,
+			wantOutput:   12,
+			wantRead:     300,
+			wantCreate:   40,
+			wantCreate1h: 30,
+		},
+		{
+			name: "anthropic non-stream body states the cache counts once",
+			path: "/v1/messages",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"id":"msg_1","usage":{"input_tokens":5,"output_tokens":7,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":20}}}`)
+			},
+			wantInput:    5,
+			wantOutput:   7,
+			wantRead:     100,
+			wantCreate:   20,
+			wantCreate1h: 20,
+		},
+		{
+			name: "openai responses body reports its cached read share",
+			path: "/responses",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"id":"resp_1","usage":{"input_tokens":50,"output_tokens":9,"input_tokens_details":{"cached_tokens":32}}}`)
+			},
+			wantInput:  50,
+			wantOutput: 9,
+			wantRead:   32,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gateway := httptest.NewServer(tc.handler)
+			defer gateway.Close()
+
+			relay := startRelay(t)
+			ingest := startSignallingIngest(t)
+			token := registerPiWorker(t, relay, gateway.URL, ingest.srv.URL)
+
+			resp, err := http.Post(relay.LLMBaseURLFor(token)+tc.path, "application/json", strings.NewReader(`{}`))
+			if err != nil {
+				t.Fatalf("proxied LLM call: %v", err)
+			}
+			_, _ = io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			_, span := firstSpan(t, ingest.await(t))
+			assertIntAttr := func(key string, want int64) {
+				t.Helper()
+				v, ok := span.Attributes().Get(key)
+				if want == 0 {
+					if ok {
+						t.Errorf("%s = %v, want the attribute absent", key, v.Int())
+					}
+					return
+				}
+				if !ok || v.Int() != want {
+					t.Errorf("%s = %v, want %d", key, v.Int(), want)
+				}
+			}
+			assertIntAttr("gen_ai.usage.input_tokens", tc.wantInput)
+			assertIntAttr("gen_ai.usage.output_tokens", tc.wantOutput)
+			assertIntAttr("gen_ai.usage.cache_read.input_tokens", tc.wantRead)
+			assertIntAttr("gen_ai.usage.cache_creation.input_tokens", tc.wantCreate)
+			assertIntAttr("gen_ai.usage.cache_creation_1h.input_tokens", tc.wantCreate1h)
+		})
+	}
+}
+
 // Synthesis is GATED on the pi harness: an opencode worker exports its own
 // spans, and the relay must not add a duplicate retelling.
 func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {

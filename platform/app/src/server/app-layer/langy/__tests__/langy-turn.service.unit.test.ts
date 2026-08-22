@@ -629,9 +629,12 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     // The volatile transcript must NOT ride the system lane: a per-turn
     // system re-writes the provider's cached prefix every turn.
     expect(system).not.toContain("THE CONVERSATION SO FAR");
-    // The ask is labelled so the manager-folded seed can never blur into the
-    // user's own words.
-    expect(prompt).toContain("THE USER'S MESSAGE:\nwhat is my name?");
+    // The label travels at the SEED's tail, not on the prompt: the manager
+    // folds `seed + prompt` into a fresh session's first message, so the
+    // label lands between the transcript and the user's words exactly when
+    // the fold happens — and a resumed session's follow-up stays a bare ask.
+    expect(historySeed.trimEnd().endsWith("THE USER'S MESSAGE:")).toBe(true);
+    expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
     const stashed = (

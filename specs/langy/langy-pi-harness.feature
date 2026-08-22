@@ -73,18 +73,52 @@ Feature: Langy can run a conversation on the pi harness
     Then nothing is aborted
     And the running turn continues untouched
 
-  # The worker home outlives the process on an idle reap or a crash. A
-  # respawn that started a fresh session used to be re-seeded the whole
-  # transcript, which changed every turn and broke the provider prompt cache;
-  # resuming the persisted session keeps the conversation's own context as
-  # the single copy. The transcript seed remains the fallback for a home that
-  # is genuinely gone (fleet roll, model switch).
+  # The session storage lives OUTSIDE the worker home, in a per-conversation
+  # store the manager keeps. The home is wiped on every worker death (idle
+  # reap, eviction, model switch, crash), and when the session lived inside
+  # it, every respawn started fresh: the whole transcript was re-seeded as one
+  # folded block, which both re-read the conversation at full input price and
+  # rewrote the provider's prompt-cache prefix. Resuming the persisted session
+  # rebuilds the same messages, so the provider's cached prefix still matches.
+  # The transcript seed remains the fallback for a session store that is
+  # genuinely gone (manager restart, the staleness sweep).
   @unit
-  Scenario: A respawned pi worker resumes the session its home still holds
-    Given a worker home holding the previous session with at least one completed turn
-    When the worker respawns in that home
+  Scenario: A respawned pi worker resumes the conversation's persisted session
+    Given a persisted session with at least one completed turn
+    When the worker respawns for that conversation
     Then it continues that session instead of starting fresh
     And it announces the resume on its ready handshake, so the manager skips the transcript seed
+
+  @unit
+  Scenario: The session store survives the worker's teardown
+    Given a conversation with a persisted session and a live worker
+    When the worker dies and its home is wiped
+    Then the session store is untouched
+
+  @unit
+  Scenario: A respawned worker can read the previous worker's session files
+    Given a persisted session written by a worker that ran under another identity
+    When a fresh worker is provisioned for the conversation
+    Then every session file is owned by the fresh worker's identity
+
+  # Conversation content must not sit on the manager's disk indefinitely
+  # after the user moved on; a day covers every cache tier the store serves.
+  @unit
+  Scenario: A quiet conversation's session store is swept after a day
+    Given a persisted session whose conversation has no worker and no recent writes
+    When the sweep runs
+    Then that session store is removed
+    And a session with recent writes or a live worker is kept
+
+  # Provider prompt caching is what makes a long conversation affordable, and
+  # the default cache tier expires faster than the pauses between a user's
+  # messages. The worker asks for the long tier: anthropic's hour-long
+  # cache_control, the Responses lane's day-long retention.
+  @unit
+  Scenario: The worker asks the provider for long cache retention
+    Given a pi worker provisioned for an anthropic or openai model
+    When its config and environment are assembled
+    Then the model allows long cache retention and the environment selects it
 
   @unit
   Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn
@@ -99,3 +133,17 @@ Feature: Langy can run a conversation on the pi harness
     When a turn arrives carrying a shutdown-handoff digest
     Then the digest is not folded into the prompt
     And the session's own history remains the single copy of the conversation
+
+  # Telemetry: the pi harness exports no OTLP of its own, so the relay retells
+  # each mediated LLM call as one gen_ai span. Provider prompt caching serves
+  # most of a follow-up's prompt at a fraction of the input price, and a retold
+  # span without the cache breakdown reads as a full-price call. See also
+  # specs/ai-gateway/cache-token-telemetry.feature for the gateway span, which
+  # stays the meter; the retold copy is descriptive.
+  @unit
+  Scenario: The retold LLM span carries the provider's cached-token usage
+    Given a pi worker's mediated LLM call whose response reports cached-token usage
+    When the relay retells the call as a gen_ai span
+    Then the span carries the cache-read and cache-write token counts
+    And the hour-long share of the writes when the provider states it
+    And the counts use the same attribute names the gateway's own span uses

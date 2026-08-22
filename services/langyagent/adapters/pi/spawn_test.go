@@ -32,6 +32,7 @@ func provisionHome(t *testing.T, creds domain.Credentials) (home string, cfg map
 	if err := agent.Provision(ProvisionInput{
 		Home:           home,
 		WorkspaceRoot:  workspace,
+		SessionDir:     filepath.Join(t.TempDir(), "conv-1"),
 		Creds:          creds,
 		UID:            0,
 		AgentsTemplate: "Operating contract. Endpoint: ${LANGWATCH_ENDPOINT}.",
@@ -92,8 +93,11 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	if info.Mode().Perm() != 0o700 {
 		t.Errorf("sessionDir mode = %v, want 0700", info.Mode().Perm())
 	}
-	if !strings.HasPrefix(sessions, home) {
-		t.Errorf("sessionDir %q must live inside the 0700 home", sessions)
+	// OUTSIDE the home: the home dies with the worker, and the session must
+	// survive it so a respawn resumes the conversation (and the provider's
+	// cached prefix) instead of re-seeding from a folded transcript.
+	if strings.HasPrefix(sessions, home) {
+		t.Errorf("sessionDir %q must live outside the worker home", sessions)
 	}
 
 	skills, _ := cfg["skillsDir"].(string)
@@ -118,6 +122,8 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 // gateway's native messages route, openai + codex the Responses lane (codex
 // pins supportsStore off), and everything else the chat-completions lane with
 // the developer-role compat flag.
+//
+// @scenario "The worker asks the provider for long cache retention"
 func TestProvision_ModelLanes(t *testing.T) {
 	compatOf := func(model map[string]any) map[string]any {
 		compat, _ := model["compat"].(map[string]any)
@@ -135,8 +141,10 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if model["id"] != creds.Model {
 			t.Errorf("model id must ride verbatim with its provider prefix, got %v", model["id"])
 		}
-		if compatOf(model) != nil {
-			t.Errorf("anthropic-messages needs no compat flags, got %v", compatOf(model))
+		// With PI_CACHE_RETENTION=long in the worker env, this is what makes
+		// pi stamp ttl "1h" on its anthropic cache_control breakpoints.
+		if compatOf(model)["supportsLongCacheRetention"] != true {
+			t.Errorf("anthropic lane must allow long cache retention, got %v", compatOf(model))
 		}
 		if model["reasoning"] != true {
 			t.Errorf("anthropic lane should enable reasoning")
@@ -149,8 +157,8 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if model["api"] != "openai-responses" {
 			t.Errorf("api = %v", model["api"])
 		}
-		if compatOf(model) != nil {
-			t.Errorf("the responses lane works by default, got compat %v", compatOf(model))
+		if compatOf(model)["supportsLongCacheRetention"] != true {
+			t.Errorf("responses lane must allow long cache retention, got %v", compatOf(model))
 		}
 	})
 
@@ -164,6 +172,9 @@ func TestProvision_ModelLanes(t *testing.T) {
 		}
 		if compatOf(model)["supportsStore"] != false {
 			t.Errorf("codex must pin supportsStore false, got %v", compatOf(model))
+		}
+		if compatOf(model)["supportsLongCacheRetention"] != true {
+			t.Errorf("codex lane must allow long cache retention, got %v", compatOf(model))
 		}
 		if model["id"] != "openai_codex/gpt-5-codex" {
 			t.Errorf("codex id must ride verbatim, got %v", model["id"])
@@ -191,6 +202,57 @@ func TestProvision_ModelLanes(t *testing.T) {
 			t.Errorf("default model = %v", modelOf(t, cfg)["id"])
 		}
 	})
+}
+
+// recordingRunner is testRunner with a chown ledger, for pinning that every
+// file a previous worker left in the persistent session dir gets re-owned.
+type recordingRunner struct {
+	testRunner
+	chowned []string
+}
+
+func (r *recordingRunner) Chown(path string, _ uint32) error {
+	r.chowned = append(r.chowned, path)
+	return nil
+}
+
+// @scenario "A respawned worker can read the previous worker's session files"
+func TestProvision_ChownsLeftoverSessionFiles(t *testing.T) {
+	sessionDir := filepath.Join(t.TempDir(), "conv-1")
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	leftover := filepath.Join(sessionDir, "session.jsonl")
+	if err := os.WriteFile(leftover, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	runner := &recordingRunner{}
+	agent := NewAgent(0)
+	if err := agent.Provision(ProvisionInput{
+		Home:           t.TempDir(),
+		WorkspaceRoot:  t.TempDir(),
+		SessionDir:     sessionDir,
+		Creds:          testCreds(),
+		UID:            4242,
+		AgentsTemplate: "contract ${LANGWATCH_ENDPOINT}",
+		Runner:         runner,
+	}); err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+
+	// The respawned worker runs under a fresh UID; a session file still owned
+	// by the dead worker's UID would be unreadable and silently break the
+	// resume the persistent dir exists for.
+	found := false
+	for _, path := range runner.chowned {
+		if path == leftover {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the leftover session file was never chowned; chowned = %v", runner.chowned)
+	}
 }
 
 func envMap(t *testing.T, env []string) map[string]string {
@@ -231,6 +293,9 @@ func TestBuildWorkerEnv_Contract(t *testing.T) {
 	}
 	if env["OPENAI_API_KEY"] != mediatedLLMPlaceholderKey {
 		t.Errorf("mediated key = %q, want the non-credential placeholder", env["OPENAI_API_KEY"])
+	}
+	if env["PI_CACHE_RETENTION"] != "long" {
+		t.Errorf("PI_CACHE_RETENTION = %q, want long (the 1h anthropic cache tier)", env["PI_CACHE_RETENTION"])
 	}
 	if env["LANGWATCH_API_KEY"] != "sk-lw-session" || env["LANGWATCH_ENDPOINT"] != "http://app.internal:5560" {
 		t.Errorf("langwatch CLI pair = %q/%q", env["LANGWATCH_API_KEY"], env["LANGWATCH_ENDPOINT"])

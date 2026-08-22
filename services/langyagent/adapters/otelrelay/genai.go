@@ -18,6 +18,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -46,6 +47,12 @@ const maxGenAIJSONBodyBytes = 256 * 1024
 // under response.usage on the response.completed event), and Anthropic
 // messages (input_tokens on message_start under message.usage, cumulative
 // output_tokens on message_delta under a bare usage).
+//
+// The cache paths follow the same lanes: Anthropic states cache reads and
+// writes next to input_tokens (message_start on the stream, a bare usage on
+// the non-stream body), with the hour-long share of the writes nested under
+// usage.cache_creation; OpenAI reports only reads, as cached_tokens under
+// prompt_tokens_details (chat) or input_tokens_details (responses).
 var (
 	genAIInputTokenPaths = []string{
 		"usage.input_tokens",
@@ -58,6 +65,21 @@ var (
 		"usage.completion_tokens",
 		"response.usage.output_tokens",
 		"message.usage.output_tokens",
+	}
+	genAICacheReadTokenPaths = []string{
+		"usage.cache_read_input_tokens",
+		"usage.prompt_tokens_details.cached_tokens",
+		"usage.input_tokens_details.cached_tokens",
+		"response.usage.input_tokens_details.cached_tokens",
+		"message.usage.cache_read_input_tokens",
+	}
+	genAICacheCreationTokenPaths = []string{
+		"usage.cache_creation_input_tokens",
+		"message.usage.cache_creation_input_tokens",
+	}
+	genAICacheCreation1hTokenPaths = []string{
+		"usage.cache_creation.ephemeral_1h_input_tokens",
+		"message.usage.cache_creation.ephemeral_1h_input_tokens",
 	}
 )
 
@@ -80,12 +102,15 @@ type genAICall struct {
 	isTransportFailure bool
 
 	// Body scanning state. Reads are sequential per response body, so no lock.
-	sse          bool
-	line         []byte
-	lineOverflow bool
-	jsonBody     []byte
-	inputTokens  int64
-	outputTokens int64
+	sse                   bool
+	line                  []byte
+	lineOverflow          bool
+	jsonBody              []byte
+	inputTokens           int64
+	outputTokens          int64
+	cacheReadTokens       int64
+	cacheCreationTokens   int64
+	cacheCreation1hTokens int64
 
 	finishOnce sync.Once
 }
@@ -209,18 +234,26 @@ func (g *genAICall) inspectSSELine(line []byte) {
 
 // takeUsage reads the usage fields out of one JSON payload. Latest non-zero
 // wins per field: the counters are totals (or cumulative on the Anthropic
-// stream), so the newest observation is the closest to final.
+// stream), so the newest observation is the closest to final. The same rule
+// keeps the cache counts intact across the Anthropic stream, matching the
+// gateway's own merge: message_start carries the input-side counters
+// including the cache breakdown, message_delta re-states only output_tokens,
+// and an absent field never overwrites a captured one.
 func (g *genAICall) takeUsage(payload []byte) {
-	for _, path := range genAIInputTokenPaths {
+	takeTokenCount(payload, genAIInputTokenPaths, &g.inputTokens)
+	takeTokenCount(payload, genAIOutputTokenPaths, &g.outputTokens)
+	takeTokenCount(payload, genAICacheReadTokenPaths, &g.cacheReadTokens)
+	takeTokenCount(payload, genAICacheCreationTokenPaths, &g.cacheCreationTokens)
+	takeTokenCount(payload, genAICacheCreation1hTokenPaths, &g.cacheCreation1hTokens)
+}
+
+// takeTokenCount stores the first non-zero number found at paths into dst,
+// leaving dst untouched when no path matches.
+func takeTokenCount(payload []byte, paths []string, dst *int64) {
+	for _, path := range paths {
 		if v := gjson.GetBytes(payload, path); v.Type == gjson.Number && v.Int() > 0 {
-			g.inputTokens = v.Int()
-			break
-		}
-	}
-	for _, path := range genAIOutputTokenPaths {
-		if v := gjson.GetBytes(payload, path); v.Type == gjson.Number && v.Int() > 0 {
-			g.outputTokens = v.Int()
-			break
+			*dst = v.Int()
+			return
 		}
 	}
 }
@@ -289,6 +322,17 @@ func (g *genAICall) forwardSpan() {
 	}
 	if g.outputTokens > 0 {
 		span.Attributes().PutInt("gen_ai.usage.output_tokens", g.outputTokens)
+	}
+	// Cache usage rides the same attribute names the gateway's customer span
+	// uses, so downstream canonicalisation reads both spans identically.
+	if g.cacheReadTokens > 0 {
+		span.Attributes().PutInt(customertracebridge.AttrGenAIUsageCacheRead, g.cacheReadTokens)
+	}
+	if g.cacheCreationTokens > 0 {
+		span.Attributes().PutInt(customertracebridge.AttrGenAIUsageCacheCreate, g.cacheCreationTokens)
+	}
+	if g.cacheCreation1hTokens > 0 {
+		span.Attributes().PutInt(customertracebridge.AttrGenAIUsageCacheCreate1h, g.cacheCreation1hTokens)
 	}
 	// The gateway's gen_ai span is the meter for this same call; the retold
 	// copy is structure, not a second bill.
