@@ -191,18 +191,20 @@ func TestExcludeHTTPRequests(t *testing.T) {
 	assert.Contains(t, names, "fetch-user")
 }
 
-func TestExcludeHTTPRequests_CaseInsensitive(t *testing.T) {
+// Regression test for #7413: OpenTelemetry HTTP instrumentation emits
+// uppercase verbs, so lowercase names are user spans and must survive the
+// filter (they used to be dropped case-insensitively).
+func TestExcludeHTTPRequests_KeepsLowercaseVerbNames(t *testing.T) {
 	filter := ExcludeHTTPRequests()
 
 	spans := []sdktrace.ReadOnlySpan{
 		testutil.CreateMockSpan("get /api", "any"),
 		testutil.CreateMockSpan("Get /api", "any"),
-		testutil.CreateMockSpan("GET /api", "any"),
 	}
 
 	result := filter.Apply(spans)
 
-	assert.Len(t, result, 0)
+	assert.Len(t, result, 2)
 }
 
 func TestLangWatchOnly(t *testing.T) {

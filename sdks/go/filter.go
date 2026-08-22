@@ -164,11 +164,19 @@ func Exclude(criteria Criteria) Filter {
 	})
 }
 
-// httpVerbRegex matches HTTP request span names (e.g., "GET /api/users", "POST /data")
-var httpVerbRegex = regexp.MustCompile(`(?i)^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b`)
+// httpVerbRegex matches HTTP request span names in the shapes OpenTelemetry
+// HTTP instrumentation emits: an uppercase verb on its own, or an uppercase
+// verb followed by a space and the route (e.g., "GET /api/users", "POST /data").
+//
+// Matching is case-sensitive and requires a space or end-of-string after the
+// verb: a case-insensitive or word-boundary match also swallows ordinary user
+// span names such as "post-process" or "get-user-profile"
+// ((?i)^post\b matches them), silently dropping them from exports.
+var httpVerbRegex = regexp.MustCompile(`^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?: |$)`)
 
 // ExcludeHTTPRequests creates a filter that removes HTTP request spans.
-// This matches spans whose names start with HTTP verbs (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD).
+// This matches spans whose names are an uppercase HTTP verb, optionally
+// followed by a route ("GET", "POST /api/users").
 func ExcludeHTTPRequests() Filter {
 	return FilterFunc(func(spans []sdktrace.ReadOnlySpan) []sdktrace.ReadOnlySpan {
 		result := make([]sdktrace.ReadOnlySpan, 0, len(spans))

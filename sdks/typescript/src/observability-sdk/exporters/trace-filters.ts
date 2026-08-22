@@ -233,8 +233,14 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
 
 /**
  * Checks if a span appears to be an HTTP request based on its name.
- * A span is considered an HTTP request if its name starts with a common HTTP verb
- * (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD) followed by a word boundary.
+ *
+ * Only the shapes that OpenTelemetry HTTP instrumentation actually emits are
+ * matched: an uppercase verb on its own, or an uppercase verb followed by a
+ * space and the route ("GET", "POST /api/users"). Matching is case-sensitive
+ * and requires a space or end-of-string after the verb: a case-insensitive or
+ * word-boundary match also swallows ordinary user span names such as
+ * "post-process" or "get-user-profile" (^post\b / ^GET\b match them), which
+ * silently drops them from exports.
  *
  * @param span - Span to check
  * @returns True if the span appears to be an HTTP request, false otherwise
@@ -246,6 +252,10 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
  * // span.name = "POST /api/data"
  * // span.name = "DELETE /resource/123"
  *
+ * // These would return false (user spans, not HTTP requests):
+ * // span.name = "post-process"
+ * // span.name = "get-user-profile"
+ *
  * if (isHttpRequestSpan(span)) {
  *   console.log('This is an HTTP request span');
  * }
@@ -253,6 +263,6 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
  */
 export function isHttpRequestSpan(span: ReadableSpan): boolean {
   const name = span.name ?? "";
-  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
+  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?: |$)/.test(name);
   return verbMatch;
 }
