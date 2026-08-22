@@ -217,6 +217,21 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario The first message of a new conversation does not wait for its own projection */
+  it("skips the projection and handoff reads for a new conversation", async () => {
+    mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Both reads are lag-tolerant: asked about a conversation whose projection
+    // cannot exist yet, findByIdVisible spends its whole handoff grace window
+    // (3 x 400ms) before answering "not found", which put a flat 1.2 seconds
+    // in front of every first message.
+    expect(deps.conversations.findByIdVisible).not.toHaveBeenCalled();
+    expect(deps.conversations.getPendingHandoff).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
+  });
+
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
     await LangyTurnService.create(deps).startConversationTurn(
       input({ isRetry: true }),

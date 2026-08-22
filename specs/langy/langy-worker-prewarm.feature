@@ -186,6 +186,18 @@ Feature: Langy worker pre-warm on panel open
       Then the panel warms the fresh chat again
       And the first message of that new chat reaches the freshly warmed worker
 
+    # The reads that tolerate projection lag exist for conversations that may
+    # be mid-dispatch. A NEW conversation has no projection row by
+    # construction, and asking anyway made the read spend its whole grace
+    # window before answering "not found": a flat 1.2 seconds in front of
+    # every first message, warmed worker or not.
+    @unit
+    Scenario: The first message of a new conversation does not wait for its own projection
+      Given a first message starts a new conversation
+      When the turn is accepted
+      Then no lag-tolerant projection read runs for the new conversation
+      And the turn is admitted and dispatched without that wait
+
   Rule: An unused warm worker is reaped and its key dies with it
 
     # The reap itself is the manager's idle sweep, and the revoke-on-death plus

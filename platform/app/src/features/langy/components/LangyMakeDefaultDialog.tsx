@@ -13,13 +13,16 @@ import type { MakeDefaultWritePlan } from "../logic/langyMakeDefaultOffer";
  */
 export function LangyMakeDefaultDialog({
   plan,
-  isBusy,
   onDecline,
   onConfirm,
 }: {
   /** The write a yes would perform; null when nothing is being asked. */
   plan: MakeDefaultWritePlan | null;
-  isBusy: boolean;
+  /**
+   * Both handlers close the dialog at once — a yes runs its write in the
+   * background and reports a failure as a toast. Holding the dialog open on a
+   * spinner made answering a yes/no question feel like submitting a form.
+   */
   onDecline: () => void;
   onConfirm: () => void;
 }) {
@@ -70,19 +73,10 @@ export function LangyMakeDefaultDialog({
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
-              <Button
-                ref={declineRef}
-                variant="ghost"
-                onClick={onDecline}
-                disabled={isBusy}
-              >
+              <Button ref={declineRef} variant="ghost" onClick={onDecline}>
                 Just this conversation
               </Button>
-              <Button
-                colorPalette="orange"
-                onClick={onConfirm}
-                loading={isBusy}
-              >
+              <Button colorPalette="orange" onClick={onConfirm}>
                 Make it the default
               </Button>
             </HStack>

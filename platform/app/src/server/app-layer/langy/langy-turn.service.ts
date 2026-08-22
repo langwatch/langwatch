@@ -894,15 +894,25 @@ export class LangyTurnService {
         memoryResult,
         overrideResult,
       ] = await Promise.allSettled([
-        conversationService.findByIdVisible({
-          id: conversation.id,
-          projectId,
-          userId,
-        }),
-        conversationService.getPendingHandoff({
-          projectId,
-          conversationId: conversation.id,
-        }),
+        // The busy-hint read, for EXISTING conversations only. A new
+        // conversation has no projection row by construction, and this read
+        // tolerates dispatch lag: asked about a row that cannot exist yet it
+        // spends its whole handoff grace window (3 x 400ms) before answering
+        // "not found" — which put a flat 1.2 seconds in front of every first
+        // message. isNew already answers the question the read would.
+        conversation.isNew
+          ? Promise.resolve(null)
+          : conversationService.findByIdVisible({
+              id: conversation.id,
+              projectId,
+              userId,
+            }),
+        conversation.isNew
+          ? Promise.resolve(null)
+          : conversationService.getPendingHandoff({
+              projectId,
+              conversationId: conversation.id,
+            }),
         mintedRunToken
           ? Promise.resolve(mintedRunToken)
           : conversationService.getRunToken({

@@ -911,8 +911,6 @@ function LangyPanel({
   // Declines are per model per panel session: refusing once must not nag on
   // the next pick of the same model, and must not mute the ask forever.
   const makeDefaultDeclinedRef = useRef<Set<string>>(new Set());
-  const isMakeDefaultBusy =
-    setRoleAssignment.isPending || setFeatureOverride.isPending;
 
   const offerMakeDefault = (picked: string) => {
     if (makeDefaultDeclinedRef.current.has(picked)) return;
@@ -933,47 +931,54 @@ function LangyPanel({
     if (plan) setMakeDefaultPlan(plan);
   };
 
-  const confirmMakeDefault = async () => {
+  const confirmMakeDefault = () => {
     if (!makeDefaultPlan || !projectId) return;
     const plan = makeDefaultPlan;
-    try {
-      // The write mirrors what it replaces: a feature-level default moves via
-      // the feature override, a role-level one via the LANGY role.
-      if (plan.kind === "feature-override") {
-        await setFeatureOverride.mutateAsync({
-          scopeType: plan.scopeType,
-          scopeId: plan.scopeId,
-          featureKey: LANGY_GATE_FEATURE_KEY,
-          model: plan.model,
+    // The dialog closes the moment the question is answered; the write runs
+    // behind it. Holding it open on a spinner made a yes/no feel like a form
+    // submit, and the pick is already live for this conversation either way —
+    // only a genuine write failure has anything to say, and it says it as a
+    // toast.
+    setMakeDefaultPlan(null);
+    // The dialog took the cursor for one question about the model. Answering
+    // it gives the cursor back to the message being written.
+    requestComposerFocus();
+    void (async () => {
+      try {
+        // The write mirrors what it replaces: a feature-level default moves via
+        // the feature override, a role-level one via the LANGY role.
+        if (plan.kind === "feature-override") {
+          await setFeatureOverride.mutateAsync({
+            scopeType: plan.scopeType,
+            scopeId: plan.scopeId,
+            featureKey: LANGY_GATE_FEATURE_KEY,
+            model: plan.model,
+          });
+        } else {
+          await setRoleAssignment.mutateAsync({
+            scopeType: plan.scopeType,
+            scopeId: plan.scopeId,
+            role: "LANGY",
+            model: plan.model,
+          });
+        }
+        await syncLangyAfterDefaultModelWrite({
+          utils,
+          projectId,
+          fallbackModel: plan.model,
         });
-      } else {
-        await setRoleAssignment.mutateAsync({
-          scopeType: plan.scopeType,
-          scopeId: plan.scopeId,
-          role: "LANGY",
-          model: plan.model,
+        toaster.create({
+          title: "Langy default updated",
+          type: "success",
+          duration: 2500,
+        });
+      } catch (error) {
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't update the Langy default",
         });
       }
-      await syncLangyAfterDefaultModelWrite({
-        utils,
-        projectId,
-        fallbackModel: plan.model,
-      });
-      toaster.create({
-        title: "Langy default updated",
-        type: "success",
-        duration: 2500,
-      });
-      setMakeDefaultPlan(null);
-      // The dialog took the cursor for one question about the model. Answering
-      // it gives the cursor back to the message being written.
-      requestComposerFocus();
-    } catch (error) {
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't update the Langy default",
-      });
-    }
+    })();
   };
 
   const declineMakeDefault = () => {
@@ -2221,9 +2226,8 @@ function LangyPanel({
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
       <LangyMakeDefaultDialog
         plan={makeDefaultPlan}
-        isBusy={isMakeDefaultBusy}
         onDecline={declineMakeDefault}
-        onConfirm={() => void confirmMakeDefault()}
+        onConfirm={confirmMakeDefault}
       />
       <MotionBox
         ref={panelRef}
