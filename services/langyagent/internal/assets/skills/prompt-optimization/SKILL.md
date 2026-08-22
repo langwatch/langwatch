@@ -76,6 +76,8 @@ langwatch experiment status <slug> -o json
 
 Check every 30 to 60 seconds, and post a progress line each time the count moves. Long single sleeps make the turn look dead and tell the user nothing.
 
+Do not start the run with `--wait`. It blocks for as long as the run takes, and the command timeout kills it first, so you lose the shell and learn nothing about the run you started.
+
 ## Stop conditions
 
 Stop and report when any of these holds: the pass rate reaches the user's goal or 100%; three consecutive attempts fail to beat the best candidate; you have spent the 6 attempt budget; the remaining failures are dataset problems (a wrong golden answer is reported as such, never prompt-fitted around); or the user says stop. Stopping with numbers is success; churning is not.
