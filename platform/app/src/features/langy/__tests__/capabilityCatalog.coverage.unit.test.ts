@@ -51,12 +51,6 @@ const EXCLUDED_COMMANDS = new Set([
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).
   "navigate",
-  // Agent-driven page control (specs/langy/langy-ui-actions.feature): the
-  // dispatch's effect is the page changing in front of the user, and the
-  // result the agent reads is protocol payload, not a platform resource, so
-  // no card renders for either group.
-  "ui",
-  "workbench",
   // Local telemetry-wiring setup: writes agent config files on the user's
   // machine (settings.json, config.toml, shell rc), not a platform resource.
   "instrument",
