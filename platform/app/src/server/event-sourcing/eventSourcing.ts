@@ -299,7 +299,7 @@ export class EventSourcing {
         // Create the pipeline
         const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
           name: definition.metadata.name,
-          aggregateType: definition.metadata.aggregateType,
+          aggregateScope: definition.metadata.aggregateScope,
           eventStore,
           ...serviceOptions,
           globalQueue: this._globalQueue,

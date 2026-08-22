@@ -2,6 +2,7 @@ import type { ProcessRole } from "../../app-layer/config";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
+import type { AggregateScope } from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
@@ -22,7 +23,10 @@ import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.typ
  */
 export interface PipelineMetadata {
   name: string;
+  /** The first declared aggregate type — the label single-type surfaces keep. */
   aggregateType: AggregateType;
+  /** Every aggregate type the pipeline owns, and their event ownership (ADR-113). */
+  aggregateScope: AggregateScope;
   projections: Array<{
     name: string;
     handlerClassName: string;
@@ -55,7 +59,7 @@ export interface EventSourcingPipelineDefinition<
   >,
 > {
   name: string;
-  aggregateType: AggregateType;
+  aggregateScope: AggregateScope;
   eventStore: EventStore<EventType>;
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   stateProjections?: StateProjectionDefinition<any, EventType>[];

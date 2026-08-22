@@ -25,7 +25,11 @@ function definitionWith({
   stateOptions?: { killSwitch?: { customKey?: string } };
 } = {}) {
   return {
-    metadata: { name: "authz_grants", aggregateType: "authz_grants" },
+    metadata: {
+      name: "authz_grants",
+      aggregateType: "authz_grants",
+      aggregateScope: { types: ["authz_grants"] },
+    },
     foldProjections: new Map([
       ["grantsFold", { definition: { name: "grantsFold" } }],
     ]),

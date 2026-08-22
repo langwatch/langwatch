@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { singleAggregateScope } from "../../domain/aggregateScope";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event, Projection } from "../../domain/types";
 import type { EventSourcingPipelineDefinition } from "../../pipeline/types";
@@ -29,7 +30,7 @@ describe("EventSourcingPipeline", () => {
     it("creates instance with correct name property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
@@ -41,7 +42,7 @@ describe("EventSourcingPipeline", () => {
     it("creates instance with correct aggregateType property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
@@ -53,7 +54,7 @@ describe("EventSourcingPipeline", () => {
     it("creates instance with service property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
@@ -82,7 +83,7 @@ describe("EventSourcingPipeline", () => {
 
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
         foldProjections: [mockFoldProjection],
         mapProjections: [mockMapProjection],
@@ -98,7 +99,7 @@ describe("EventSourcingPipeline", () => {
     it("works with minimal definition containing only required fields", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "minimal-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
@@ -129,7 +130,7 @@ describe("EventSourcingPipeline", () => {
 
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "full-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
         foldProjections: [mockFoldProjection],
         mapProjections: [mockMapProjection],
@@ -151,7 +152,7 @@ describe("EventSourcingPipeline", () => {
 
       const definition: EventSourcingPipelineDefinition<TestEvent> = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: testEventStore,
       };
 
@@ -171,7 +172,7 @@ describe("EventSourcingPipeline", () => {
         { testProjection: TestProjection }
       > = {
         name: "test-pipeline",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
@@ -184,13 +185,13 @@ describe("EventSourcingPipeline", () => {
     it("creates different service instances for different pipelines", () => {
       const definition1: EventSourcingPipelineDefinition<Event> = {
         name: "pipeline-1",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 
       const definition2: EventSourcingPipelineDefinition<Event> = {
         name: "pipeline-2",
-        aggregateType,
+        aggregateScope: singleAggregateScope(aggregateType),
         eventStore: mockEventStore,
       };
 

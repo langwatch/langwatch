@@ -12,6 +12,16 @@ import type {
   CommandHandlerClassStatic,
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass";
+import {
+  type AggregateScope,
+  type AggregateScopeDeclaration,
+  AggregateScopeError,
+  commandAggregateType,
+  declaredAggregateScope,
+  isMultiAggregate,
+  primaryAggregateType,
+  singleAggregateScope,
+} from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type {
@@ -94,7 +104,43 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
     never,
     Record<never, never>
   > {
-    return new StaticPipelineBuilderWithNameAndType(this.name, aggregateType);
+    return new StaticPipelineBuilderWithNameAndType(
+      this.name,
+      singleAggregateScope(aggregateType),
+    );
+  }
+
+  /**
+   * Declare the set of aggregate types this pipeline owns, each with the
+   * event types it owns (ADR-113). With one entry this is `withAggregateType`
+   * plus event ownership validation at append; with several, commands must
+   * name the aggregate they write, fold state is keyed by type and id, and
+   * projection kill-switches use the pipeline name.
+   */
+  withAggregateTypes(
+    declaration: AggregateScopeDeclaration,
+  ): StaticPipelineBuilderWithNameAndType<
+    EventType,
+    Record<string, Projection>,
+    NoCommands,
+    never,
+    never,
+    Record<never, never>
+  > {
+    try {
+      return new StaticPipelineBuilderWithNameAndType(
+        this.name,
+        declaredAggregateScope(declaration),
+      );
+    } catch (error) {
+      if (error instanceof AggregateScopeError) {
+        throw new ConfigurationError("StaticPipelineBuilder", error.message, {
+          pipelineName: this.name,
+          ...error.details,
+        });
+      }
+      throw error;
+    }
   }
 
   build(): never {
@@ -163,8 +209,62 @@ export class StaticPipelineBuilderWithNameAndType<
 
   constructor(
     private readonly name: string,
-    private readonly aggregateType: AggregateType,
+    private readonly aggregateScope: AggregateScope,
   ) {}
+
+  private get aggregateType(): AggregateType {
+    return primaryAggregateType(this.aggregateScope);
+  }
+
+  /**
+   * Every command on a multi-aggregate pipeline names its aggregate, and it is
+   * one the pipeline declares. Checked at registration so the failure names
+   * the command, not a queue key at dispatch.
+   */
+  private assertCommandAggregate(
+    name: string,
+    options: CommandHandlerOptions | undefined,
+  ): void {
+    try {
+      commandAggregateType({
+        scope: this.aggregateScope,
+        commandName: name,
+        declared: options?.aggregateType,
+      });
+    } catch (error) {
+      if (error instanceof AggregateScopeError) {
+        throw new ConfigurationError("StaticPipelineBuilder", error.message, {
+          pipelineName: this.name,
+          commandHandlerName: name,
+          ...error.details,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * A fold with its own event loader on a multi-aggregate pipeline would read
+   * one aggregate's history for every type unless the loader is type-aware;
+   * the auto-wired loaders are, a custom one must say so.
+   */
+  private assertFoldLoaderIsTypeAware(
+    name: string,
+    definition: FoldProjectionDefinition<any, EventType>,
+  ): void {
+    if (!isMultiAggregate(this.aggregateScope)) return;
+    if (definition.eventLoader && !definition.eventLoaderIsAggregateTypeAware) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Fold projection "${name}" registers a custom eventLoader on a pipeline that declares ${this.aggregateScope.types.join(", ")}; the loader must read ctx.aggregateType and set eventLoaderIsAggregateTypeAware, or it conflates the aggregates' histories`,
+        {
+          pipelineName: this.name,
+          projectionName: name,
+          aggregateTypes: this.aggregateScope.types,
+        },
+      );
+    }
+  }
 
   /**
    * Register a fold projection (stateful, reduces events into accumulated state).
@@ -194,6 +294,7 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
+    this.assertFoldLoaderIsTypeAware(name, definition);
     this.foldProjections.set(name, { definition, options });
 
     return this;
@@ -476,6 +577,7 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
+    this.assertCommandAggregate(name, options);
     this.commands.push({ name, handlerClass: handlerClass, options });
     return this as StaticPipelineBuilderWithNameAndType<
       EventType,
@@ -525,6 +627,7 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
+    this.assertCommandAggregate(name, options);
     // Cast TStatic to CommandHandlerClass for storage — the static properties match,
     // and the zero-arg constructor won't be called since handlerInstance is provided.
     this.commands.push({
@@ -563,6 +666,7 @@ export class StaticPipelineBuilderWithNameAndType<
     const metadata: PipelineMetadata = {
       name: this.name,
       aggregateType: this.aggregateType,
+      aggregateScope: this.aggregateScope,
       projections: Array.from(this.foldProjections.entries()).map(
         ([name, def]) => ({
           name,

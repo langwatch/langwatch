@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { primaryAggregateType } from "./domain/aggregateScope";
 import type { AggregateType } from "./domain/aggregateType";
 import type { Event, Projection } from "./domain/types";
 import type {
@@ -29,10 +30,11 @@ export class EventSourcingPipeline<
     },
   ) {
     this.name = definition.name;
-    this.aggregateType = definition.aggregateType;
+    this.aggregateType = primaryAggregateType(definition.aggregateScope);
     this.metadata = definition.metadata ?? {
       name: definition.name,
-      aggregateType: definition.aggregateType,
+      aggregateType: this.aggregateType,
+      aggregateScope: definition.aggregateScope,
       projections: [],
       mapProjections: [],
       commands: [],
@@ -45,7 +47,7 @@ export class EventSourcingPipeline<
 
     this.service = new EventSourcingService<EventType, ProjectionTypes>({
       pipelineName: definition.name,
-      aggregateType: definition.aggregateType,
+      aggregateScope: definition.aggregateScope,
       eventStore: definition.eventStore,
       foldProjections: definition.foldProjections,
       stateProjections: definition.stateProjections,

@@ -1,6 +1,7 @@
 import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
+import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type {
   FoldProjectionDefinition,
@@ -77,6 +78,12 @@ export interface CommandSerializationOptions<Payload = any> {
  */
 export interface CommandHandlerOptions<Payload = any>
   extends CommandSerializationOptions<Payload> {
+  /**
+   * The aggregate this command writes. Optional on a single-type pipeline
+   * (it is that type); required on a multi-aggregate pipeline, where the
+   * queue key needs it before any handler runs (ADR-113).
+   */
+  aggregateType?: AggregateType;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
