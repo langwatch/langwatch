@@ -54,7 +54,14 @@ export function declaredAggregateScope(
   }
   const eventOwners: Record<string, AggregateType> = {};
   for (const type of types) {
-    for (const eventType of declaration[type] ?? []) {
+    const owned = declaration[type] ?? [];
+    if (owned.length === 0) {
+      throw new AggregateScopeError(
+        `Aggregate type "${type}" owns no event types; every append for it would be refused`,
+        { aggregateType: type },
+      );
+    }
+    for (const eventType of owned) {
       const existing = eventOwners[eventType];
       if (existing !== undefined && existing !== type) {
         throw new AggregateScopeError(
@@ -154,18 +161,27 @@ export function commandAggregateType({
 }
 
 /**
- * The fold-state key for an event. Two aggregates sharing a pipeline share its
- * fold stores and their ids are not disjoint by construction, so on a
- * multi-aggregate pipeline the key is qualified by type. A single-type
- * pipeline keeps the bare id, which is what every existing row is keyed by.
+ * The projection-state key for an event — the one expression live dispatch,
+ * reads and replay all use, so a rebuilt row lands where the live row did.
+ *
+ * Two aggregates sharing a pipeline share its fold stores and their ids are
+ * not disjoint by construction, so on a multi-aggregate pipeline the key is
+ * qualified by type — a projection's custom `key(event)` included, or two
+ * families would still fold into one row. A single-type pipeline keeps the
+ * bare id (or the custom key), which is what every existing row is keyed by;
+ * `undefined` there means "the aggregate id", matching an unset context key.
  */
-export function foldStateKey(
-  scope: AggregateScope,
-  event: Pick<Event, "aggregateType" | "aggregateId">,
-): string | undefined {
-  return isMultiAggregate(scope)
-    ? `${event.aggregateType}:${String(event.aggregateId)}`
-    : undefined;
+export function projectionStateKey({
+  scope,
+  event,
+  customKey,
+}: {
+  scope: AggregateScope;
+  event: Pick<Event, "aggregateType" | "aggregateId">;
+  customKey?: string;
+}): string | undefined {
+  const base = customKey ?? String(event.aggregateId);
+  return isMultiAggregate(scope) ? `${event.aggregateType}:${base}` : customKey;
 }
 
 /**

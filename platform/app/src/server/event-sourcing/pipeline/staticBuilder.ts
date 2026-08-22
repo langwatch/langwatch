@@ -253,6 +253,17 @@ export class StaticPipelineBuilderWithNameAndType<
     definition: FoldProjectionDefinition<any, EventType>,
   ): void {
     if (!isMultiAggregate(this.aggregateScope)) return;
+    if (definition.store.honoursContextKey !== true) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Fold projection "${name}" is on a pipeline that declares ${this.aggregateScope.types.join(", ")}, where rows are keyed by aggregate type and id through context.key, but its store does not declare honoursContextKey; a store that derives its row key from the state cannot hold two aggregates`,
+        {
+          pipelineName: this.name,
+          projectionName: name,
+          aggregateTypes: this.aggregateScope.types,
+        },
+      );
+    }
     if (definition.eventLoader && !definition.eventLoaderIsAggregateTypeAware) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",

@@ -124,12 +124,13 @@ export function createReplayRuntime(config: {
   // their own (Postgres) StateProjectionStore rather than a CH fold store — so
   // discovery is independent of the CH-store map above.
   for (const def of definitions) {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
     for (const [, stateDef] of def.stateProjections ?? []) {
       stateProjections.push({
         projectionName: stateDef.name,
         pipelineName,
         aggregateType,
+        aggregateScope,
         source: "pipeline",
         definition: stateDef,
         // State projections enqueue with `__jobType=stateProjection`.
@@ -140,7 +141,7 @@ export function createReplayRuntime(config: {
   }
 
   for (const def of definitions) {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
     const store = storeByPipeline.get(pipelineName);
     if (!store && !STORELESS_REPLAYABLE.has(pipelineName)) continue;
 
@@ -154,6 +155,7 @@ export function createReplayRuntime(config: {
           projectionName: foldDef.name,
           pipelineName,
           aggregateType,
+          aggregateScope,
           source: "pipeline",
           definition: replayDef,
           // Folds enqueue with `__jobType=projection`; pause middle segment matches.
@@ -170,6 +172,7 @@ export function createReplayRuntime(config: {
         projectionName: mapDef.name,
         pipelineName,
         aggregateType,
+        aggregateScope,
         source: "pipeline",
         definition: mapDef,
         // Maps enqueue with `__jobType=handler`; the dispatcher Lua script

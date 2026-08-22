@@ -36,6 +36,8 @@ function sameRetention(
  * ```
  */
 export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
+  readonly honoursContextKey = true;
+
   constructor(
     private readonly repo: ProjectionStore<Projection>,
     private readonly version: string,

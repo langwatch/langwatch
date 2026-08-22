@@ -290,6 +290,15 @@ export interface FoldProjectionOptions {
  * Handles persistence and retrieval of fold state.
  */
 export interface FoldProjectionStore<State> {
+  /**
+   * True when `store()` keys the row by `context.key` (falling back to
+   * `context.aggregateId`) and `get(key)` reads by that same key. A
+   * multi-aggregate pipeline (ADR-113) keys every row by type and id through
+   * `context.key`, so it refuses a store that does not say so; a store that
+   * derives its row key from the state itself cannot host two aggregates.
+   */
+  readonly honoursContextKey?: boolean;
+
   /** Persists the current fold state for an aggregate. */
   store(state: State, context: ProjectionStoreContext): Promise<void>;
 

@@ -16,7 +16,7 @@ const ROLE_EVENTS = ["lw.authz.role.defined", "lw.authz.role.deleted"];
 
 function authzPipeline() {
   return definePipeline<Event>()
-    .withName("authz_grant")
+    .withName("authz")
     .withAggregateTypes({ [GRANT]: GRANT_EVENTS, [ROLE]: ROLE_EVENTS });
 }
 
@@ -39,7 +39,7 @@ describe("StaticPipelineBuilder with several aggregate types", () => {
     it("refuses an event type owned twice", () => {
       expect(() =>
         definePipeline<Event>()
-          .withName("authz_grant")
+          .withName("authz")
           .withAggregateTypes({
             [GRANT]: GRANT_EVENTS,
             [ROLE]: [...ROLE_EVENTS, "lw.authz.grant.attached"],
@@ -99,6 +99,19 @@ describe("StaticPipelineBuilder with several aggregate types", () => {
         .build();
 
       expect(definition.commands[0]?.options?.aggregateType).toBe(ROLE);
+    });
+  });
+
+  describe("when a fold whose store does not honour the context key is registered", () => {
+    /** @scenario "A fold store must honour the context key on a multi-aggregate pipeline" */
+    it("refuses it, naming the projection and the aggregate types", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("ledger", {
+        store: { get: async () => null, store: async () => {} },
+      });
+
+      expect(() => authzPipeline().withFoldProjection("ledger", fold)).toThrow(
+        /"ledger" is on a pipeline that declares authz_grant, authz_role.*honoursContextKey/,
+      );
     });
   });
 

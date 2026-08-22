@@ -15,6 +15,8 @@ import type { AggregateType } from "../../domain/aggregateType";
 import type { EventType } from "../../domain/eventType";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, Projection } from "../../domain/types";
+import type { ReplayEvent } from "../../replay/replayEventLoader";
+import { FoldAccumulator } from "../../replay/replayExecutor";
 import {
   createTestEvent,
   createTestTenantId,
@@ -115,7 +117,7 @@ describe("projections on a multi-aggregate pipeline", () => {
       const eventStore = new EventStoreMemory<Event>();
       const service = buildService({
         scope: authzScope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         eventStore,
         fold: ledgerFold(repo, [GRANT_ATTACHED, ROLE_DEFINED]),
       });
@@ -143,7 +145,7 @@ describe("projections on a multi-aggregate pipeline", () => {
     it("refuses a read that does not say which aggregate it wants", async () => {
       const service = buildService({
         scope: authzScope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         eventStore: new EventStoreMemory<Event>(),
         fold: ledgerFold(new MemoryProjectionRepository(), [GRANT_ATTACHED]),
       });
@@ -184,7 +186,7 @@ describe("projections on a multi-aggregate pipeline", () => {
       const getEvents = vi.spyOn(eventStore, "getEvents");
       const service = buildService({
         scope: authzScope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         eventStore,
         fold: ledgerFold(repo, [GRANT_ATTACHED, ROLE_DEFINED]),
       });
@@ -221,33 +223,84 @@ describe("projections on a multi-aggregate pipeline", () => {
       fold.options = { refoldOnStoreMiss: true, refoldOnOutOfOrder: false };
       const service = buildService({
         scope: authzScope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         eventStore,
         fold,
       });
-      const first = createTestEvent(
-        "g1",
-        GRANT,
-        tenantId,
-        GRANT_ATTACHED,
-        1_000,
-      );
-      const second = createTestEvent(
-        "g1",
-        GRANT,
-        tenantId,
-        GRANT_ATTACHED,
-        2_000,
-      );
+      const first = createTestEvent("r1", ROLE, tenantId, ROLE_DEFINED, 1_000);
+      const second = createTestEvent("r1", ROLE, tenantId, ROLE_DEFINED, 2_000);
+      // A grant with the same id makes a type-blind page observable.
+      const decoy = createTestEvent("r1", GRANT, tenantId, GRANT_ATTACHED, 500);
 
-      await service.storeEvents([first], context);
+      await service.storeEvents([decoy, first], context);
       repo.clear();
       await service.storeEvents([second], context);
 
       expect(getEventsUpToPaged).toHaveBeenCalledWith(
-        expect.objectContaining({ aggregateId: "g1", aggregateType: GRANT }),
+        expect.objectContaining({ aggregateId: "r1", aggregateType: ROLE }),
       );
       expect(getEventsUpTo).not.toHaveBeenCalled();
+      const role = await service.getProjectionByName("ledger", "r1", context, {
+        aggregateType: ROLE,
+      });
+      expect(role?.data.seen).toEqual([first.id, second.id]);
+    });
+  });
+
+  describe("given a fold with a custom key shared by both aggregates", () => {
+    /** @scenario "A fold projection with a custom key is still keyed by aggregate type on a multi-aggregate pipeline" */
+    it("qualifies the custom key by aggregate type", async () => {
+      const repo = new MemoryProjectionRepository();
+      const fold = ledgerFold(repo, [GRANT_ATTACHED, ROLE_DEFINED]);
+      fold.key = () => "org_1";
+      const service = buildService({
+        scope: authzScope,
+        pipelineName: "authz",
+        eventStore: new EventStoreMemory<Event>(),
+        fold,
+      });
+
+      await service.storeEvents(
+        [
+          createTestEvent("g1", GRANT, tenantId, GRANT_ATTACHED, 1_000),
+          createTestEvent("r1", ROLE, tenantId, ROLE_DEFINED, 2_000),
+        ],
+        context,
+      );
+
+      expect(repo.rowKeys.sort()).toEqual([
+        "authz_grant:org_1",
+        "authz_role:org_1",
+      ]);
+    });
+  });
+
+  describe("given the pipeline is replayed", () => {
+    /** @scenario "A replay rebuilds a multi-aggregate fold row under the key live dispatch used" */
+    it("writes the rebuilt rows under the type-qualified keys", async () => {
+      const repo = new MemoryProjectionRepository();
+      const fold = ledgerFold(repo, [GRANT_ATTACHED, ROLE_DEFINED]);
+      const accumulator = new FoldAccumulator(fold, {
+        aggregateScope: authzScope,
+      });
+      const toReplayEvent = (event: Event): ReplayEvent => ({
+        ...event,
+        tenantId: String(event.tenantId),
+        aggregateId: String(event.aggregateId),
+        timestamp: event.createdAt,
+        idempotencyKey: event.idempotencyKey ?? event.id,
+        data: event.data ?? {},
+      });
+
+      accumulator.apply(
+        toReplayEvent(createTestEvent("x1", GRANT, tenantId, GRANT_ATTACHED)),
+      );
+      accumulator.apply(
+        toReplayEvent(createTestEvent("x1", ROLE, tenantId, ROLE_DEFINED)),
+      );
+      await accumulator.flush();
+
+      expect(repo.rowKeys.sort()).toEqual(["authz_grant:x1", "authz_role:x1"]);
     });
   });
 
@@ -257,7 +310,7 @@ describe("projections on a multi-aggregate pipeline", () => {
       const isEnabled = vi.fn().mockResolvedValue(false);
       const service = buildService({
         scope: authzScope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         eventStore: new EventStoreMemory<Event>(),
         fold: ledgerFold(new MemoryProjectionRepository(), [GRANT_ATTACHED]),
         featureFlagService: {
@@ -271,7 +324,7 @@ describe("projections on a multi-aggregate pipeline", () => {
       );
 
       expect(isEnabled).toHaveBeenCalledWith(
-        "es-authz_grant-projection-ledger-killswitch",
+        "es-authz-projection-ledger-killswitch",
         expect.anything(),
       );
     });

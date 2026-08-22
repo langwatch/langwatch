@@ -92,6 +92,7 @@ export function createMockFoldProjectionStore<
   State,
 >(): FoldProjectionStore<State> {
   return {
+    honoursContextKey: true,
     get: vi.fn().mockResolvedValue(null),
     store: vi.fn().mockResolvedValue(void 0),
   };

@@ -1,5 +1,10 @@
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import {
+  type AggregateScope,
+  projectionStateKey,
+} from "../domain/aggregateScope";
+import type { AggregateType } from "../domain/aggregateType";
 import type { TenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
@@ -19,6 +24,40 @@ import type { ReplayEvent } from "./replayEventLoader";
 const DEFAULT_WRITE_BATCH_SIZE = 5000;
 
 /** Resolves a tenant's effective retention for a replay-built store context. */
+/** What a replay accumulator needs beyond the projection it rebuilds. */
+export interface ReplayAccumulatorOptions {
+  retentionResolver?: RetentionPolicyResolver;
+  /**
+   * The pipeline's aggregate scope (ADR-113). Without it a rebuilt row on a
+   * multi-aggregate pipeline would land under the bare id, where the live
+   * read path never looks.
+   */
+  aggregateScope?: AggregateScope;
+}
+
+/** The row key a replay writes — the same one live dispatch wrote. */
+function replayProjectionKey({
+  scope,
+  event,
+  customKey,
+}: {
+  scope: AggregateScope | undefined;
+  event: Pick<ReplayEvent, "aggregateType" | "aggregateId">;
+  customKey: string | undefined;
+}): string {
+  if (!scope) return customKey ?? event.aggregateId;
+  return (
+    projectionStateKey({
+      scope,
+      event: {
+        aggregateType: event.aggregateType as AggregateType,
+        aggregateId: event.aggregateId,
+      },
+      customKey,
+    }) ?? event.aggregateId
+  );
+}
+
 export type ReplayRetentionResolver = (
   tenantId: string,
 ) => Promise<ResolvedRetention | null>;
@@ -71,12 +110,15 @@ export class FoldAccumulator {
   private readonly eventTypeSet: Set<string>;
   private readonly resolveRetention: ReplayRetentionResolver;
 
+  private readonly aggregateScope: AggregateScope | undefined;
+
   constructor(
     private readonly projection: FoldProjectionDefinition<any, any>,
-    opts?: { retentionResolver?: RetentionPolicyResolver },
+    opts?: ReplayAccumulatorOptions,
   ) {
     this.eventTypeSet = new Set(projection.eventTypes);
     this.resolveRetention = makeRetentionResolver(opts?.retentionResolver);
+    this.aggregateScope = opts?.aggregateScope;
   }
 
   get processed(): number {
@@ -92,7 +134,11 @@ export class FoldAccumulator {
     // declared and `apply()` would corrupt or crash.
     if (!this.eventTypeSet.has(event.type)) return;
 
-    const projectionKey = this.projection.key?.(event) ?? event.aggregateId;
+    const projectionKey = replayProjectionKey({
+      scope: this.aggregateScope,
+      event,
+      customKey: this.projection.key?.(event),
+    });
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
     // ADR-022: events arrive already leaned — rowToEvent applies
@@ -327,6 +373,7 @@ interface StateEntry {
  * projections this path targets (ADR-049).
  */
 export class StateAccumulator {
+  private readonly aggregateScope: AggregateScope | undefined;
   private entries = new Map<string, StateEntry>();
   private _processed = 0;
   private readonly eventTypeSet: Set<string>;
@@ -334,10 +381,11 @@ export class StateAccumulator {
 
   constructor(
     private readonly projection: StateProjectionDefinition<any, any>,
-    opts?: { retentionResolver?: RetentionPolicyResolver },
+    opts?: ReplayAccumulatorOptions,
   ) {
     this.eventTypeSet = new Set(projection.eventTypes);
     this.resolveRetention = makeRetentionResolver(opts?.retentionResolver);
+    this.aggregateScope = opts?.aggregateScope;
   }
 
   get processed(): number {
@@ -354,8 +402,11 @@ export class StateAccumulator {
     // dispatch leans before its handlers, so a rebuilt row matches the
     // live-folded one.
     const domainEvent = event as unknown as Event;
-    const projectionKey =
-      this.projection.key?.(domainEvent) ?? event.aggregateId;
+    const projectionKey = replayProjectionKey({
+      scope: this.aggregateScope,
+      event,
+      customKey: this.projection.key?.(domainEvent),
+    });
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
     const existing = this.entries.get(scopedKey);

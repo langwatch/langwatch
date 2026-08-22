@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import type { AggregateScope } from "../domain/aggregateScope";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
@@ -11,6 +12,11 @@ export interface RegisteredFoldProjection {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
+  /**
+   * Every aggregate type the pipeline owns (ADR-113). Absent only for a
+   * hand-built registration, which is then treated as single-type.
+   */
+  aggregateScope?: AggregateScope;
   source: "pipeline" | "global";
   definition: FoldProjectionDefinition<any, Event>;
   /**
@@ -27,6 +33,11 @@ export interface RegisteredMapProjection {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
+  /**
+   * Every aggregate type the pipeline owns (ADR-113). Absent only for a
+   * hand-built registration, which is then treated as single-type.
+   */
+  aggregateScope?: AggregateScope;
   source: "pipeline" | "global";
   definition: MapProjectionDefinition<any, Event>;
   /**
@@ -50,6 +61,11 @@ export interface RegisteredStateProjection {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
+  /**
+   * Every aggregate type the pipeline owns (ADR-113). Absent only for a
+   * hand-built registration, which is then treated as single-type.
+   */
+  aggregateScope?: AggregateScope;
   source: "pipeline" | "global";
   definition: StateProjectionDefinition<any, Event>;
   /**

@@ -29,9 +29,9 @@ import type { RetentionPolicyResolver } from "../../data-retention/retentionPoli
 import {
   type AggregateScope,
   componentKillSwitchAggregate,
-  foldStateKey,
   isMultiAggregate,
   primaryAggregateType,
+  projectionStateKey,
   toAggregateScope,
 } from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
@@ -2340,10 +2340,9 @@ export class ProjectionRouter<
     options?: { key?: string; aggregateType?: AggregateType },
   ): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
-    // On a multi-aggregate pipeline the row is keyed by type and id, so the
-    // caller must say which aggregate it is reading.
+    // On a multi-aggregate pipeline the row is keyed by type and id (a custom
+    // key included), so the caller must say which aggregate it is reading.
     if (
-      options?.key === undefined &&
       options?.aggregateType === undefined &&
       isMultiAggregate(this.aggregateScope)
     ) {
@@ -2365,14 +2364,15 @@ export class ProjectionRouter<
     }
 
     const lookupKey =
-      options?.key ??
-      (options?.aggregateType !== undefined
-        ? foldStateKey(this.aggregateScope, {
-            aggregateType: options.aggregateType,
-            aggregateId,
-          })
-        : undefined) ??
-      aggregateId;
+      projectionStateKey({
+        scope: this.aggregateScope,
+        event: {
+          aggregateType:
+            options?.aggregateType ?? primaryAggregateType(this.aggregateScope),
+          aggregateId,
+        },
+        customKey: options?.key,
+      }) ?? aggregateId;
     const storeContext: ProjectionStoreContext = {
       aggregateId,
       tenantId: context.tenantId,
@@ -2400,7 +2400,7 @@ export class ProjectionRouter<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
+    options?: { key?: string; aggregateType?: AggregateType },
   ): Promise<boolean> {
     const projection = await this.getProjectionByName(
       projectionName,
@@ -2469,7 +2469,11 @@ export class ProjectionRouter<
     isDeliveryContinuation?: boolean;
   }): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
-    const stateKey = key ?? foldStateKey(this.aggregateScope, event);
+    const stateKey = projectionStateKey({
+      scope: this.aggregateScope,
+      event,
+      customKey: key,
+    });
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,

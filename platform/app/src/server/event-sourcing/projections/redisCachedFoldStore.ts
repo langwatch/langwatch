@@ -111,6 +111,11 @@ function readUpdatedAt<State>(state: State): number {
  * degrading to a blind re-apply, not to something worse.
  */
 export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
+  /** Keys the cache by `context.key` and defers durable reads to the inner store. */
+  get honoursContextKey(): boolean {
+    return this.inner.honoursContextKey === true;
+  }
+
   private readonly keyPrefix: string;
   private readonly ttlSeconds: number;
   private readonly updatedAtOf: (state: State) => number;

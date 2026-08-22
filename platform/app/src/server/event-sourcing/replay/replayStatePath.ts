@@ -144,10 +144,10 @@ export async function replayStateProjection({
   for (const [tenantId, tenantAggregates] of tenants) {
     // One accumulator per tenant: a projection key may group several aggregates,
     // so we fold the whole tenant before writing one row per key.
-    const accumulator = new StateAccumulator(
-      projection.definition,
-      ctx.accumulatorOpts,
-    );
+    const accumulator = new StateAccumulator(projection.definition, {
+      ...ctx.accumulatorOpts,
+      aggregateScope: projection.aggregateScope,
+    });
 
     const totalBatches = Math.ceil(
       tenantAggregates.length / aggregateBatchSize,

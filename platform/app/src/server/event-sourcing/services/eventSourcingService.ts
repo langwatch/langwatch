@@ -476,7 +476,7 @@ export class EventSourcingService<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
+    options?: { key?: string; aggregateType?: AggregateType },
   ): Promise<boolean> {
     return await this.router.hasProjectionByName(
       projectionName,

@@ -852,7 +852,10 @@ function buildAccumulators({
     if (foldProj) {
       foldAccumulators.set(
         projName,
-        new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts),
+        new FoldAccumulator(foldProj.definition, {
+          ...ctx.accumulatorOpts,
+          aggregateScope: foldProj.aggregateScope,
+        }),
       );
     }
     const mapProj = selected.mapProjectionByName.get(projName);
