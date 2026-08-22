@@ -277,12 +277,6 @@ describe("trace-filters", () => {
       expect(isHttpRequestSpan(createMockSpan({ name: "", scopeName: "" }))).toBe(false);
     });
 
-    it("requires word boundary after verb", () => {
-      expect(isHttpRequestSpan(createMockSpan({ name: "GET /api", scopeName: "http" }))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan({ name: "GETAWAY", scopeName: "http" }))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan({ name: "GETTING", scopeName: "http" }))).toBe(false);
-    });
-
     it("requires whitespace or end-of-string after the verb, not any word boundary", () => {
       // Hyphen, dot, slash etc. are word boundaries but not OTel HTTP span shapes.
       expect(isHttpRequestSpan(createMockSpan({ name: "post-process", scopeName: "custom" }))).toBe(false);
@@ -292,6 +286,9 @@ describe("trace-filters", () => {
       expect(isHttpRequestSpan(createMockSpan({ name: "head-request-handler", scopeName: "custom" }))).toBe(false);
       expect(isHttpRequestSpan(createMockSpan({ name: "options-resolver", scopeName: "custom" }))).toBe(false);
       expect(isHttpRequestSpan(createMockSpan({ name: "put-record.v2", scopeName: "custom" }))).toBe(false);
+      // No word after the verb at all — rejected by both old and new patterns.
+      expect(isHttpRequestSpan(createMockSpan({ name: "GETAWAY", scopeName: "custom" }))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan({ name: "GETTING", scopeName: "custom" }))).toBe(false);
       // Bare verb at end-of-string is still a valid OTel shape.
       expect(isHttpRequestSpan(createMockSpan({ name: "POST", scopeName: "http" }))).toBe(true);
     });
