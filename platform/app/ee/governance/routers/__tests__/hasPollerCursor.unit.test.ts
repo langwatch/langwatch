@@ -7,8 +7,11 @@
  * answer "no" too eagerly and the form accepts a start date the usage cursor
  * will ignore, because that cursor deliberately never rewinds.
  *
- * The column is a Prisma Json field, which is why this is not a `!= null`
- * check — the shapes below are the ones that reach it in practice.
+ * The column is a Prisma `Json?` field. The current writer stores either
+ * `Prisma.JsonNull` or a string, both of which `!= null` would handle; the
+ * object cases below are the ones it would not, and `cursorOf` in
+ * ingestionPullLifecycle.ts still handles object-shaped cursors, so they are
+ * not hypothetical.
  *
  * Spec: specs/governance/edit-pull-source-config.feature
  */
@@ -27,16 +30,6 @@ describe("hasPollerCursor", () => {
       expect(hasPollerCursor(undefined)).toBe(false);
     });
 
-    /**
-     * The trap this predicate exists for. Prisma represents JSON null as a
-     * sentinel object on some versions, and every truthiness or `!= null`
-     * check reads that as a real cursor.
-     */
-    it("treats a Prisma JSON-null sentinel as no cursor", () => {
-      class JsonNullSentinel {}
-      expect(hasPollerCursor(new JsonNullSentinel())).toBe(false);
-    });
-
     it("treats JSON null that arrived as a string as no cursor", () => {
       expect(hasPollerCursor("null")).toBe(false);
     });
@@ -45,7 +38,7 @@ describe("hasPollerCursor", () => {
       expect(hasPollerCursor("")).toBe(false);
     });
 
-    it("treats an empty object as no cursor", () => {
+    it("treats an object with no content as no cursor", () => {
       expect(hasPollerCursor({})).toBe(false);
     });
   });

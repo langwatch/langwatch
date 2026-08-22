@@ -43,16 +43,21 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
 /**
  * Whether `pollerCursor` holds a real cursor.
  *
- * Not a `!= null` check, because the column is never SQL NULL in practice: a
- * source that has not pulled stores JSON `null`. Prisma surfaces JSON null as
- * either JS `null` or a sentinel object depending on version, so betting on one
- * of those is how this silently answers "yes" for every source and locks a
- * backfill start that was still editable.
+ * `pollerCursor` is `Json?`, and the write path stores either `Prisma.JsonNull`
+ * or a string — see ingestion-pull-run-projection.prisma.repository.ts. Both
+ * SQL NULL and JSON null read back as JS `null`, so `!= null` would be correct
+ * for everything that writer produces.
  *
- * The cursor itself has been seen both as a JSON object and as a JSON *string*
- * of serialised JSON, so neither is assumed. Both are handled by asking whether
- * there is any content, rather than by trusting a particular null
- * representation or a particular encoding.
+ * It is not the only thing that has produced values here: `cursorOf` in
+ * ingestionPullLifecycle.ts still stringifies an object-shaped cursor, which
+ * only makes sense if object-shaped rows exist. So the question asked is
+ * whether there is any content, which answers correctly for the string and
+ * JSON-null cases the writer produces *and* for the object case it does not.
+ *
+ * Getting this wrong is quiet in both directions: answer "yes" for a source
+ * that never pulled and an editable backfill start disappears; answer "no" for
+ * one that did and the form accepts a start the usage cursor will ignore,
+ * because that cursor deliberately never rewinds.
  */
 export function hasPollerCursor(value: unknown): boolean {
   if (value == null) return false;
