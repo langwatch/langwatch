@@ -572,7 +572,6 @@ const LEGACY_INERT: string[] = [
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
-  "specs/skills/empty-state-skill-setup.feature",
   "specs/skills/onboarding-skills-architecture.feature",
   "specs/skills/platform-integration.feature",
   "specs/skills/prompt-compiler.feature",

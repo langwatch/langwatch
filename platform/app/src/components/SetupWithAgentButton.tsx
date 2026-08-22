@@ -10,6 +10,7 @@ import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { withCredentials } from "~/features/skills/logic/setupPrompt";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -286,6 +287,10 @@ export function AgentActionsMenu({
  * opens so the reader is not waiting on 94 kB of markdown they may
  * never copy. Null until it answers, which is what falls the copy back
  * to the install line.
+ *
+ * The token goes above the body here rather than being sent along with
+ * the request: the query travels as a GET, so a token in its input
+ * would be written into every log that records a URL.
  */
 function useSetupSkillPrompt({
   skill,
@@ -304,10 +309,14 @@ function useSetupSkillPrompt({
   });
   const projectId = project?.id;
   const { data } = api.setupSkills.getPrompt.useQuery(
-    { projectId: projectId!, skill: skill!, apiKey, endpoint },
+    { projectId: projectId!, skill: skill! },
     { enabled: enabled && !!skill && !!projectId, staleTime: Infinity },
   );
-  return data?.prompt ?? null;
+  if (!data || !projectId) return null;
+  return withCredentials({
+    body: data.body,
+    credentials: apiKey ? { apiKey, projectId, endpoint } : undefined,
+  });
 }
 
 /** The icon + label + hint row every agent-menu entry renders. */

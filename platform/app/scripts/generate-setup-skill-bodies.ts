@@ -2,10 +2,8 @@
  * Generate the setup-skill bodies the "copy a prompt" menu hands to a
  * coding agent.
  *
- * The menu used to copy a line telling the agent to install the skill
- * itself. That costs the reader a round trip and fails whenever the
- * agent has no network or no `npx`. It now copies the skill, so the
- * text pasted into the agent is the whole instruction set.
+ * The menu copies the skill itself, so the text pasted into the agent
+ * is the whole instruction set and needs no network or `npx` to read.
  *
  * The bodies come from the same compiled skills the Langy image ships
  * (`skills/_compiled/native/<id>/SKILL.md`), so the prompt a customer
@@ -20,7 +18,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -75,7 +73,10 @@ export function deriveSetupSkillBodies(
   return bodies;
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+// `pathToFileURL` rather than a `file://` template: it percent-encodes
+// spaces, `%` and `#`, so a checkout under such a path still generates.
+const entry = process.argv[1];
+const isMain = !!entry && import.meta.url === pathToFileURL(entry).href;
 if (isMain) {
   // The published @langwatch/server artifact excludes the skills tree,
   // so the committed bodies are the source there.

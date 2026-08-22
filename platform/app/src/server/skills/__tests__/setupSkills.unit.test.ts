@@ -1,6 +1,6 @@
 /**
- * The setup prompt handed to a coding agent: the skill's own text, with
- * the project's credentials above it when one was minted.
+ * The skill bodies the setup menus serve to a coding agent, and the
+ * generated file staying in step with the skills on disk.
  *
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
@@ -14,7 +14,7 @@ import {
 } from "../../../../scripts/generate-setup-skill-bodies";
 import { SETUP_SURFACES } from "../../../components/SetupWithAgentButton";
 import bodies from "../setupSkillBodies.generated.json";
-import { isSetupSkillId, setupPrompt } from "../setupSkills.service";
+import { isSetupSkillId, setupSkillBody } from "../setupSkills.service";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
@@ -54,43 +54,21 @@ describe("the setup skill bodies", () => {
       expect(body.startsWith("---")).toBe(false);
     });
   });
-});
 
-describe("setupPrompt()", () => {
-  describe("given no token was minted", () => {
-    it("hands over the skill on its own", () => {
-      const prompt = setupPrompt({ skill: "tracing" });
+  describe("setupSkillBody()", () => {
+    /** @scenario The copied prompt carries the skill's own instructions */
+    it("serves the whole skill rather than a line pointing at it", () => {
+      const body = setupSkillBody("tracing");
 
-      expect(prompt).toBe(bodies.tracing);
-      expect(prompt).not.toContain("LANGWATCH_API_KEY");
-    });
-  });
-
-  describe("given a token was minted", () => {
-    it("puts the keys above the skill", () => {
-      const prompt = setupPrompt({
-        skill: "tracing",
-        credentials: {
-          apiKey: "sk-lw-abc",
-          projectId: "project_1",
-          endpoint: "https://app.langwatch.ai",
-        },
-      });
-
-      expect(prompt.indexOf("Use these keys to instrument:")).toBe(0);
-      expect(prompt).toContain('LANGWATCH_API_KEY="sk-lw-abc"');
-      expect(prompt).toContain('LANGWATCH_PROJECT_ID="project_1"');
-      expect(prompt).toContain('LANGWATCH_ENDPOINT="https://app.langwatch.ai"');
-      expect(prompt.indexOf(bodies.tracing)).toBeGreaterThan(0);
+      expect(body).toBe(bodies.tracing);
+      expect(body).toContain("# Add LangWatch Tracing to Your Code");
+      expect(body).not.toContain("npx skills add");
     });
 
-    it("leaves the endpoint out when the surface does not know it", () => {
-      const prompt = setupPrompt({
-        skill: "tracing",
-        credentials: { apiKey: "sk-lw-abc", projectId: "project_1" },
-      });
-
-      expect(prompt).not.toContain("LANGWATCH_ENDPOINT");
+    it("carries no credentials of its own", () => {
+      for (const id of SETUP_SKILL_IDS) {
+        expect(setupSkillBody(id)).not.toContain("LANGWATCH_API_KEY=");
+      }
     });
   });
 });
