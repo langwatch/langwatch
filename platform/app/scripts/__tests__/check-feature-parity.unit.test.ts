@@ -32,6 +32,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   collectGoBindings,
   discoverFeatureFiles,
+  findScenarioAnnotations,
+  formatFailureBanner,
+  formatUnknownAnnotations,
   isEntryModule,
   isInert,
 } from "../check-feature-parity";
@@ -289,6 +292,222 @@ describe("isInert", () => {
         // Nothing was claimed, so nothing is being overclaimed.
         expect(isInert({ scenarios: [], totalScenarios: 0 })).toBe(false);
       });
+    });
+  });
+});
+
+describe("findScenarioAnnotations", () => {
+  const titles = (src: string): string[] =>
+    findScenarioAnnotations(src).map((a) => a.title);
+
+  describe("given the annotation opens its comment", () => {
+    it("reads a quoted title from a jsdoc block", () => {
+      expect(titles('/** @scenario "Quoted title" */')).toEqual([
+        "Quoted title",
+      ]);
+    });
+
+    it("reads an indented quoted title", () => {
+      expect(titles('    /** @scenario "Indented" */')).toEqual(["Indented"]);
+    });
+
+    it("reads an unquoted title from a jsdoc continuation line", () => {
+      expect(titles(" * @scenario Unquoted continuation")).toEqual([
+        "Unquoted continuation",
+      ]);
+    });
+
+    it("reads a title from a line comment", () => {
+      expect(titles("  // @scenario Line comment form")).toEqual([
+        "Line comment form",
+      ]);
+    });
+
+    it("reads a title through a continuation that opens a nested block", () => {
+      expect(titles("  *   /** @scenario Nested marker */")).toEqual([
+        "Nested marker",
+      ]);
+    });
+
+    it("reads an unquoted title from a hash comment", () => {
+      // Python and Bats tests bind through this form, and their own
+      // hash-specific pattern only accepts quoted titles. Drop `#` from the
+      // markers this accepts and every unquoted hash binding in the repo goes
+      // silently unbound, which the whole-repo run does not surface when the
+      // same scenario is also bound from another language.
+      expect(titles("# @scenario Unquoted hash form")).toEqual([
+        "Unquoted hash form",
+      ]);
+    });
+  });
+
+  describe("given the comment is open but the line carries no marker", () => {
+    it("reads a title from a block comment line with no continuation marker", () => {
+      // The marker run is allowed to be empty for this form, and the scanner
+      // has no comment state to tell it why: it sees one line at a time, so a
+      // line inside an already-open block reaches it with nothing in front of
+      // the token. Requiring at least one marker drops this form, and drops it
+      // silently, since the annotation simply stops being collected.
+      expect(titles("/*\n@scenario No continuation marker\n*/")).toEqual([
+        "No continuation marker",
+      ]);
+    });
+
+    it("reads a title from a python docstring", () => {
+      expect(titles('    """\n    @scenario Docstring form\n    """')).toEqual([
+        "Docstring form",
+      ]);
+    });
+  });
+
+  describe("given punctuation that is not a comment marker", () => {
+    it("binds nothing behind a lone slash", () => {
+      expect(titles("/ @scenario Not a comment")).toEqual([]);
+    });
+
+    it("binds nothing behind a marker run that closes rather than opens", () => {
+      expect(titles("*/ @scenario Not a comment")).toEqual([]);
+    });
+  });
+
+  describe("given a line of comment punctuation that never reaches the token", () => {
+    it("gives up in linear time instead of backtracking", () => {
+      // Each marker in the prefix is a fixed width for this reason. Allowing
+      // `/*+` there makes `/**` splittable two ways, so this input has 2^30
+      // parses and the engine walks them all: measured at 6.8s for this line
+      // alone, against a whole repo of files per run.
+      const src = `/${"**/".repeat(30)}x`;
+      const started = performance.now();
+      expect(titles(src)).toEqual([]);
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+  });
+
+  describe("given the token appears mid-sentence in prose", () => {
+    it("binds nothing when a comment explains that it carries no annotation", () => {
+      // The regression this guards: the sentence saying there is no binding
+      // was itself parsed as one, and the run then failed naming a scenario
+      // nobody wrote, at a line whose comment says the opposite.
+      expect(
+        titles(
+          "// Deliberately carries no @scenario annotation: this guards a temporary\n// exclusion, not a behaviour the spec describes.",
+        ),
+      ).toEqual([]);
+    });
+
+    it("binds nothing when the token is quoted inside prose", () => {
+      expect(
+        titles(" * individually via the `@scenario` token in prose"),
+      ).toEqual([]);
+    });
+
+    it("binds nothing when the token trails code on the same line", () => {
+      expect(
+        titles("const x = 1; // see @scenario Something for context"),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given several annotations in one source", () => {
+    it("reports each one with an offset past its own match", () => {
+      const src = [
+        '/** @scenario "First" */',
+        '/** @scenario "Second" */',
+      ].join("\n");
+      const found = findScenarioAnnotations(src);
+
+      expect(found.map((a) => a.title)).toEqual(["First", "Second"]);
+      // `end` is what the proximity checks scan forward from, so it has to sit
+      // past the match rather than at its start.
+      expect(found.every((a) => a.end > a.index)).toBe(true);
+      expect(found[1]!.index).toBeGreaterThan(found[0]!.end - 1);
+    });
+  });
+});
+
+describe("formatFailureBanner", () => {
+  describe("given the run passes", () => {
+    it("prints nothing, so a green run reads exactly as it did before", () => {
+      expect(formatFailureBanner([])).toEqual([]);
+    });
+  });
+
+  describe("given the run fails", () => {
+    it("states the verdict before any per-file section is printed", () => {
+      const lines = formatFailureBanner(["4 unknown annotation(s)"]);
+
+      expect(lines.join("\n")).toContain("THIS RUN FAILS");
+      expect(lines.join("\n")).toContain("4 unknown annotation(s)");
+    });
+
+    it("says what a per-file tick does and does not mean", () => {
+      // The whole point. Without this the reader sees `✓ all bound` next to
+      // their own feature file and concludes the run passed, while the exit
+      // code says otherwise.
+      expect(
+        formatFailureBanner(["1 unknown annotation(s)"]).join("\n"),
+      ).toContain("not that the run passed");
+    });
+
+    it("carries every reason the exit code was built from", () => {
+      const reasons = [
+        "2 unbound scenario(s) in enforced files",
+        "1 unknown annotation(s)",
+      ];
+
+      const text = formatFailureBanner(reasons).join("\n");
+
+      for (const reason of reasons) expect(text).toContain(reason);
+    });
+  });
+});
+
+describe("formatUnknownAnnotations", () => {
+  const entry = (file: string, title: string, line: number) => ({
+    title,
+    ref: { file, line },
+  });
+
+  describe("given nothing is unknown", () => {
+    it("prints nothing", () => {
+      expect(formatUnknownAnnotations([])).toEqual([]);
+    });
+  });
+
+  describe("given unknown annotations across several files", () => {
+    it("groups them under the file each was written in", () => {
+      const lines = formatUnknownAnnotations([
+        entry("b.test.ts", "Second", 20),
+        entry("a.test.ts", "First", 10),
+        entry("b.test.ts", "Third", 30),
+      ]);
+
+      const text = lines.join("\n");
+      expect(text).toContain("▸ a.test.ts");
+      expect(text).toContain("▸ b.test.ts");
+      // One heading per file, not one per annotation.
+      expect(lines.filter((l) => l.includes("▸ b.test.ts"))).toHaveLength(1);
+    });
+
+    it("orders files so the same input always reports the same way", () => {
+      const text = formatUnknownAnnotations([
+        entry("z.test.ts", "Last", 1),
+        entry("a.test.ts", "First", 1),
+      ]).join("\n");
+
+      expect(text.indexOf("a.test.ts")).toBeLessThan(text.indexOf("z.test.ts"));
+    });
+
+    it("keeps every annotation and its line", () => {
+      const text = formatUnknownAnnotations([
+        entry("a.test.ts", "First", 10),
+        entry("a.test.ts", "Second", 42),
+      ]).join("\n");
+
+      expect(text).toContain("✗ @scenario First");
+      expect(text).toContain("line 10");
+      expect(text).toContain("✗ @scenario Second");
+      expect(text).toContain("line 42");
     });
   });
 });

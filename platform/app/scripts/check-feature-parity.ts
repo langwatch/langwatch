@@ -830,8 +830,49 @@ export function discoverFeatureFiles(
 // Non-backtracking: find `@scenario <title>` tokens, then verify proximity
 // to an `it(` / `test(` call with a linear forward scan (see
 // `isFollowedByTestCall`). Doing it all in the regex invites ReDoS.
+//
+// The token has to open its comment. The unquoted alternative below accepts a
+// bare title, so without the anchor any sentence containing the word binds to
+// whatever follows it: a comment reading "carries no @scenario annotation:
+// this guards a temporary exclusion" bound a scenario named "annotation: this
+// guards a temporary", and the failure then named a scenario nobody wrote at a
+// line whose comment says the opposite. The prefix allows the comment markers
+// actually used in this repo, including a `*` continuation that opens a nested
+// `/**`, and a `#` for the Python and Bats forms.
+//
+// Each marker there is a fixed two characters or one, never `/*+`. A variable
+// repeat inside the alternation makes `/**` splittable both as one `/*+` and
+// as `/*` then `*`, which gives a line of `/**/**/...` exponentially many
+// parses: measured at 6.8s for thirty repetitions, against every source file
+// in the repo on every run. Spelled this way each marker is consumed exactly
+// once, so there is nothing to backtrack over, and the accepted set is the
+// same because `/**` is just `/*` followed by one more iteration.
 const ANNOTATION_RE =
-  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+  /^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+
+/**
+ * Every `@scenario` annotation in `src`, with the offset just past each match so
+ * callers can run their own proximity check.
+ *
+ * Exported because this is where the "the token has to open its comment" rule
+ * lives, and that rule is easy to get wrong in both directions: too loose and
+ * prose binds, too tight and the hash-comment form used by Python tests stops
+ * binding. Three collectors shared this loop verbatim before; they now share it
+ * for real, so the rule cannot drift between languages.
+ */
+export function findScenarioAnnotations(
+  src: string,
+): { title: string; index: number; end: number }[] {
+  const found: { title: string; index: number; end: number }[] = [];
+  let m: RegExpExecArray | null;
+  ANNOTATION_RE.lastIndex = 0;
+  while ((m = ANNOTATION_RE.exec(src)) !== null) {
+    const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    if (!title) continue;
+    found.push({ title, index: m.index, end: m.index + m[0].length });
+  }
+  return found;
+}
 
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -872,15 +913,11 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByTestCall(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByTestCall(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1133,15 +1170,11 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByGoTestFunc(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByGoTestFunc(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1219,15 +1252,11 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
     const src = readFileSync(file, "utf8");
 
     // Block-comment form (mirrors TS / Go).
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByPythonTestFunc(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByPythonTestFunc(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1473,15 +1502,57 @@ function printNewInert(reports: InertReport[]): void {
   }
 }
 
-function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
-  if (unknown.length === 0) return;
-  console.log(
+/**
+ * The verdict, above the per-file sections as well as below them.
+ *
+ * Every `✓ all bound` under a `▸` heading is scoped to one feature file, and a
+ * run can fail on something belonging to no heading at all, so reading the tick
+ * next to your own change and stopping there is the obvious mistake. Takes the
+ * same reasons the exit code is built from, so the banner and the trailing FAIL
+ * line cannot disagree.
+ */
+export function formatFailureBanner(reasons: string[]): string[] {
+  if (reasons.length === 0) return [];
+  return [
+    `\n✗ THIS RUN FAILS: ${reasons.join(", ")}.`,
+    `  A ✓ below means that feature file is fully bound, not that the run passed.`,
+  ];
+}
+
+/**
+ * Unknown annotations, grouped under the file they were written in.
+ *
+ * They belong to no `▸` feature section, because the scenario they name is in
+ * no feature file at all, so a flat trailing list leaves them unattributed and
+ * far from the change that introduced them.
+ */
+export function formatUnknownAnnotations(
+  unknown: UnknownAnnotation[],
+): string[] {
+  if (unknown.length === 0) return [];
+  const lines = [
     `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
-  );
+  ];
+  const byFile = new Map<string, UnknownAnnotation[]>();
   for (const a of unknown) {
-    console.log(`  ✗ @scenario ${a.title}`);
-    console.log(`    ${a.ref.file}:${a.ref.line}`);
+    const list = byFile.get(a.ref.file);
+    if (list) list.push(a);
+    else byFile.set(a.ref.file, [a]);
   }
+  for (const [file, entries] of [...byFile].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    lines.push(`\n  ▸ ${file}`);
+    for (const a of entries) {
+      lines.push(`    ✗ @scenario ${a.title}`);
+      lines.push(`      line ${a.ref.line}`);
+    }
+  }
+  return lines;
+}
+
+function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
+  for (const line of formatUnknownAnnotations(unknown)) console.log(line);
 }
 
 function validateExemptionList({
@@ -1617,6 +1688,14 @@ function printParityReport(a: ParityAnalysis): void {
   console.log(
     `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
+
+  // The verdict goes above the per-file sections as well as below them. Every
+  // `✓ all bound` under a `▸` heading is scoped to that one feature file, and a
+  // run can fail on something that belongs to no heading at all, so reading the
+  // tick next to your own change and stopping there is the obvious mistake. The
+  // reasons come from the same function the exit code does, so this banner and
+  // the trailing FAIL line cannot disagree.
+  for (const line of formatFailureBanner(fatalReasons(a))) console.log(line);
 
   for (const r of a.enforced) printEnforcedReport(r);
   printLegacySummary(a.legacy);
