@@ -35444,7 +35444,7 @@ echo "The batch did not finish before the timeout."
 exit 1
 ```
 
-The request carries its own time limits, so a read that hangs cannot hold the job past the deadline.
+The request carries its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
 
 ## Or let the CLI wait
 
