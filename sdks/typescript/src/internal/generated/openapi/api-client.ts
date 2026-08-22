@@ -3061,6 +3061,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulation-runs/batches/{batchRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get the summary of a single batch run, including its completion flag */
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/suites": {
         parameters: {
             query?: never;
@@ -10290,6 +10307,15 @@ export interface operations {
                         };
                         /**
                          * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
+                        };
+                        /**
+                         * @default {
                          *       "tags": []
                          *     }
                          */
@@ -10717,6 +10743,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -21270,7 +21305,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21343,11 +21381,14 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
-                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
                     }[];
                 };
             };
@@ -21368,7 +21409,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21451,7 +21495,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21536,11 +21583,14 @@ export interface operations {
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
-                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
                     }[];
                 };
             };
@@ -21561,7 +21611,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -22738,11 +22791,18 @@ export interface operations {
                             passCount: number;
                             failCount: number;
                             runningCount: number;
+                            settledCount: number;
                             stalledCount: number;
                             lastRunAt: number;
                             lastUpdatedAt: number;
                             firstCompletedAt: number | null;
+                            /**
+                             * @deprecated
+                             * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                             */
                             allCompletedAt: number | null;
+                            /** @description True when every run of the batch reached a terminal status. */
+                            isComplete: boolean;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -22763,6 +22823,106 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSimulationRunsBatchesByBatchRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        batchRunId: string;
+                        totalCount: number;
+                        passCount: number;
+                        failCount: number;
+                        runningCount: number;
+                        settledCount: number;
+                        stalledCount: number;
+                        lastRunAt: number;
+                        lastUpdatedAt: number;
+                        firstCompletedAt: number | null;
+                        /**
+                         * @deprecated
+                         * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                         */
+                        allCompletedAt: number | null;
+                        /** @description True when every run of the batch reached a terminal status. */
+                        isComplete: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Batch run not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

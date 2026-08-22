@@ -6,6 +6,12 @@
  * Assert each hop in one place, against a real ClickHouse, because a break in
  * any of them looks identical from the outside: a run that started fine and
  * shows nothing.
+ *
+ * A secret parameter travels the same path with the opposite requirement: the
+ * name has to arrive and the value has to not, in any form, at every hop.
+ *
+ * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -25,6 +31,7 @@ import {
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
@@ -70,6 +77,7 @@ afterAll(async () => {
 async function queuedCommandFor(params: {
   scenarioId: string;
   parameters?: Record<string, string | number | boolean>;
+  secretParameters?: Record<string, string>;
 }): Promise<QueueRunCommandData> {
   const queued: QueueRunCommandData[] = [];
   const service = new SuiteRunService(
@@ -91,6 +99,11 @@ async function queuedCommandFor(params: {
     idempotencyKey: `idem-${nanoid()}`,
     ...(params.parameters && {
       parametersByScenarioId: new Map([[params.scenarioId, params.parameters]]),
+    }),
+    ...(params.secretParameters && {
+      secretParametersByScenarioId: new Map([
+        [params.scenarioId, encryptRunSecretValues(params.secretParameters)],
+      ]),
     }),
   });
 
@@ -176,6 +189,77 @@ describe("Feature: recording a run's resolved parameters", () => {
       expect(run!.metadata).toMatchObject({
         langwatch: { targetReferenceId: "agent-1" },
       });
+    });
+  });
+
+  describe("given a run started with a secret parameter value", () => {
+    const SECRET_VALUE = "tok-live-abc123";
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("records the name and neither the value nor its encrypted form", async () => {
+      const scenarioId = `scenario-${nanoid()}`;
+      const command = await queuedCommandFor({
+        scenarioId,
+        parameters: { region: "eu-central" },
+        secretParameters: { api_token: SECRET_VALUE },
+      });
+
+      // The command carries the encrypted value beside the metadata, never
+      // inside it: what the fold projection stores is built from the metadata.
+      expect(command.secretParameters?.api_token).toBeDefined();
+      expect(command.secretParameters?.api_token).not.toContain(SECRET_VALUE);
+      expect(JSON.stringify(command.metadata)).not.toContain(SECRET_VALUE);
+
+      // The command schema strips what it does not declare, so a field the
+      // dispatch path drops would never reach execution at all.
+      const validated = QueueRunCommand.schema.validate(command);
+      expect(validated.success).toBe(true);
+      expect(
+        (validated as { data: { secretParameters?: Record<string, string> } })
+          .data.secretParameters,
+      ).toEqual(command.secretParameters);
+
+      await recordQueuedRun(command);
+
+      const stored = await ch.query({
+        query: `SELECT Metadata FROM simulation_runs WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}`,
+        query_params: { tenantId, scenarioRunId: command.scenarioRunId },
+        format: "JSONEachRow",
+      });
+      const rows = (await stored.json()) as { Metadata: string }[];
+      const metadata = rows[0]!.Metadata;
+
+      expect(metadata).not.toContain(SECRET_VALUE);
+      expect(metadata).not.toContain(command.secretParameters!.api_token!);
+      expect(metadata).not.toContain('secretParameters"');
+      expect(JSON.parse(metadata)).toMatchObject({
+        parameters: { region: "eu-central" },
+        secretParameterNames: ["api_token"],
+      });
+    });
+
+    /** @scenario "The runs API never returns a secret value" */
+    it("serves the run back without a value or an encrypted form", async () => {
+      const scenarioId = `scenario-${nanoid()}`;
+      const command = await queuedCommandFor({
+        scenarioId,
+        secretParameters: { api_token: SECRET_VALUE },
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const served = JSON.stringify(run);
+      expect(served).not.toContain(SECRET_VALUE);
+      expect(served).not.toContain(command.secretParameters!.api_token!);
+      expect(run!.metadata).toMatchObject({
+        secretParameterNames: ["api_token"],
+      });
+      expect(run!.metadata).not.toHaveProperty("secretParameters");
     });
   });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { EventSchema } from "../../../domain/types";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -20,6 +21,15 @@ export const simulationRunQueuedEventDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  /**
+   * The run's secret parameter values, encrypted, keyed by name.
+   *
+   * A sibling of `metadata`, not a member of it: the fold projection copies
+   * the metadata object into the runs store, so a worker on an older build
+   * would carry anything inside it into that store and a sibling is dropped
+   * instead. The names, in clear, ride `metadata.secretParameterNames`.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
   target: z
     .object({

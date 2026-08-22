@@ -1443,6 +1443,43 @@ const presentations = {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
   },
+  // ---- secret run parameters ----
+  // Only names reach these strings. The value is the thing the whole feature
+  // exists to keep out of anything a person or a log can read.
+  scenario_secret_parameter_missing: {
+    title: "This run needs a secret value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are secret parameters" : "is a secret parameter"} with no value.`
+          : "A secret parameter has no value.";
+      return `${subject} A secret has no default, so ${plural ? "each value" : "the value"} has to be typed in for this run.`;
+    },
+  },
+  scenario_secret_parameter_conflict: {
+    title: "One name is secret in one scenario and plain in another",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${listLabels(names)} ${names.length > 1 ? "are" : "is"} declared secret by one scenario in this run and plain by another.`
+          : "A name is declared secret by one scenario in this run and plain by another.";
+      return `${subject} Declare it the same way in every scenario, or rename one of them, then start the run again.`;
+    },
+  },
+  scenario_secret_parameter_in_text: {
+    title: "A scenario reads a secret parameter in its own text",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${scenarioFieldLabel(error)} reads ${listLabels(names)}, which ${names.length > 1 ? "are secret parameters" : "is a secret parameter"}.`
+          : `${scenarioFieldLabel(error)} reads a secret parameter.`;
+      return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
+    },
+  },
   // ---- billing ----
   billing_customer_email_required: {
     title: "Add a billing email first",

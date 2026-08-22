@@ -35,7 +35,7 @@ const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
 });
 
 const parametersDescription =
-  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME.";
+  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
 
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),

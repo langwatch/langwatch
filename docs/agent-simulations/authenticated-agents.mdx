@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, auth0, oauth2, client credentials, code 
 description: Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
 ---
 
-# Testing Agents Behind Authentication
+## Static credential or token exchange
 
 Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 
@@ -35,6 +35,8 @@ Auth fields typed in directly still work exactly as typed. A value with no `{{ s
 Code agents and workflow targets read the same `secrets.NAME` namespace.
 
 A value that is not a credential, for example a tenant or a fixture id, goes in a [run parameter](/agent-simulations/scenario-parameters). A run parameter is read as `{{ params.NAME }}`. You can change it when the run starts, and it is recorded on the run.
+
+Also check: [Secret parameters](/agent-simulations/scenario-parameters#secret-parameters), for a credential that changes per run. You supply the value when the run starts, the target reads it as `{{ secrets.NAME }}`, and the run records the name without the value. A run value takes the place of a project secret of the same name, for that run only.
 
 ## How it fits together
 

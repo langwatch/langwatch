@@ -18,6 +18,7 @@ import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
+import { encryptRunSecretValues } from "../scenarios/run-secret-values";
 import {
   ScenarioRepository,
   type ScenarioRunConfig,
@@ -316,10 +317,29 @@ export class SuiteService {
 
         // Every parameter check runs before the first job is scheduled, so a
         // rejected run leaves nothing half-started behind it.
-        const parametersByScenarioId = await resolveRunParameters({
+        const resolvedParameters = await resolveRunParameters({
           scenarios: resolved.scenarioConfigs,
           values: params.parameters,
         });
+        const parametersByScenarioId = new Map(
+          [...resolvedParameters].map(([scenarioId, scenarioParameters]) => [
+            scenarioId,
+            scenarioParameters.parameters,
+          ]),
+        );
+        // Encrypted here, at the last point that holds the values in clear, so
+        // the queued event and everything folded from it carry ciphertext.
+        const secretParametersByScenarioId = new Map(
+          [...resolvedParameters]
+            .filter(
+              ([, scenarioParameters]) =>
+                Object.keys(scenarioParameters.secretParameters).length > 0,
+            )
+            .map(([scenarioId, scenarioParameters]) => [
+              scenarioId,
+              encryptRunSecretValues(scenarioParameters.secretParameters),
+            ]),
+        );
 
         const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
@@ -332,6 +352,7 @@ export class SuiteService {
           idempotencyKey: params.idempotencyKey,
           batchRunId: params.batchRunId,
           parametersByScenarioId,
+          secretParametersByScenarioId,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);

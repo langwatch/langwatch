@@ -468,7 +468,11 @@ const auditLogTRPCErrors = t.middleware(
         organizationId: (input as any)?.organizationId,
         projectId: (input as any)?.projectId,
         action: path,
-        args: input,
+        // Through the same redaction as the success path. This middleware
+        // sits before the input parser, so `input` is unset here today; the
+        // call is what keeps a chain that changes from storing in clear what
+        // the other middleware takes out.
+        args: redactAuditArgs({ input, action: path }),
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
@@ -609,11 +613,72 @@ function isAuditLogExempt(path: string): boolean {
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
+/**
+ * Action paths whose input carries values a person typed for one run, keyed by
+ * the field that holds them.
+ *
+ * `parameters` on a run can hold a credential: a scenario can declare a
+ * parameter secret, and the value is supplied when the run starts.
+ * `templateVariables` on the http test button is where the same person types a
+ * test token. Both field names are ordinary words other mutations use for
+ * harmless things, so the rule is bound to the action rather than to the name.
+ *
+ * The names are kept: "which parameters did this run set" is the part of the
+ * record worth having.
+ */
+const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "suites.run": ["parameters"],
+  "scenarios.run": ["parameters"],
+  "httpProxy.execute": ["templateVariables"],
+};
+
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
     Object.keys(source).map((name) => [name, "[redacted]"]),
   );
+}
+
+/** The object fields whose values this action must not store. */
+function redactedObjectFieldsFor(action?: string): readonly string[] {
+  if (!action) return CREDENTIAL_OBJECT_FIELDS;
+  return [
+    ...CREDENTIAL_OBJECT_FIELDS,
+    ...(REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []),
+  ];
+}
+
+/**
+ * The redacted form of one field, or undefined when the field holds nothing to
+ * redact.
+ *
+ * No schema produces an array here, but a redactor has to fail safe on a shape
+ * it did not expect rather than wave it through: the cost of guessing wrong is
+ * a secret in a durable table.
+ */
+function redactObjectField(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Array.isArray(value)
+    ? value.map(() => "[redacted]")
+    : redactValues(value as Record<string, unknown>);
+}
+
+/**
+ * The redacted form of an `extraHeaders` list.
+ *
+ * A list of `{ key, value }` pairs rather than an object, so the header name
+ * survives and only what it carries is dropped. An entry of any other shape is
+ * replaced whole: a redactor cannot tell a name from a value in a shape it does
+ * not know, and a header is where an `Authorization: Bearer …` is typed.
+ */
+function redactHeaderValues(headers: readonly unknown[]): unknown[] {
+  return headers.map((header) => {
+    if (typeof header !== "object" || header === null) return "[redacted]";
+    const { key } = header as Record<string, unknown>;
+    return typeof key === "string"
+      ? { key, value: "[redacted]" }
+      : "[redacted]";
+  });
 }
 
 /**
@@ -624,8 +689,17 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
  * key out of a URL. A secret in a durable, queryable table is worse than one
  * in a request line, so the values go. The field names stay, because "which
  * credentials were set" is the part of the record worth having.
+ *
+ * `action` is the tRPC path. It selects the rules that only apply to one
+ * mutation, such as a run's parameter values.
  */
-export function redactAuditArgs(input: unknown): unknown {
+export function redactAuditArgs({
+  input,
+  action,
+}: {
+  input: unknown;
+  action?: string;
+}): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
@@ -638,32 +712,13 @@ export function redactAuditArgs(input: unknown): unknown {
     redacted[field] = value;
   };
 
-  for (const field of CREDENTIAL_OBJECT_FIELDS) {
-    const value = record[field];
-    if (typeof value !== "object" || value === null) continue;
-
-    // No schema produces an array here, but a redactor has to fail safe on a
-    // shape it did not expect rather than wave it through — the cost of
-    // guessing wrong is a secret in a durable table.
-    replace(
-      field,
-      Array.isArray(value)
-        ? value.map(() => "[redacted]")
-        : redactValues(value as Record<string, unknown>),
-    );
+  for (const field of redactedObjectFieldsFor(action)) {
+    const value = redactObjectField(record[field]);
+    if (value !== undefined) replace(field, value);
   }
 
-  // A list of `{ key, value }` pairs rather than an object, so the header
-  // name survives and only what it carries is dropped.
   if (Array.isArray(record.extraHeaders)) {
-    replace(
-      "extraHeaders",
-      record.extraHeaders.map((header) =>
-        typeof header === "object" && header !== null && "value" in header
-          ? { ...header, value: "[redacted]" }
-          : header,
-      ),
-    );
+    replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
 
   return redacted ?? input;
@@ -684,7 +739,7 @@ const auditLogMutations = t.middleware(
       organizationId: (input as any)?.organizationId,
       projectId: (input as any)?.projectId,
       action: path,
-      args: redactAuditArgs(input),
+      args: redactAuditArgs({ input, action: path }),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,
