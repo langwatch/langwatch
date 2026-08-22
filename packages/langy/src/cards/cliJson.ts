@@ -15,6 +15,16 @@
 /** Give up scanning a huge stdout after this many `{`/`[` candidates. */
 const MAX_CANDIDATES = 32;
 
+/**
+ * A JSON scalar and the separator a document puts after it. Anchored, so it
+ * reads the token AT the position rather than searching the rest of stdout.
+ */
+const SCALAR_THEN_SEPARATOR =
+  /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(?:[,\]]|$)/;
+
+/** Room for the longest scalar worth reading, plus the separator after it. */
+const SCALAR_WINDOW = 40;
+
 function tryParse(candidate: string): { value: unknown } | null {
   try {
     return { value: JSON.parse(candidate) as unknown };
@@ -27,7 +37,13 @@ function tryParse(candidate: string): { value: unknown } | null {
  * Index of the bracket that closes the one at `start`, or -1. String-aware, so
  * a `}` inside a JSON string value does not close the document early.
  */
-function findBalancedEnd(text: string, start: number): number {
+function findBalancedEnd({
+  text,
+  start,
+}: {
+  text: string;
+  start: number;
+}): number {
   let depth = 0;
   let inString = false;
 
@@ -58,9 +74,16 @@ function findBalancedEnd(text: string, start: number): number {
  * before it. A spinner ends its frame with `\r` rather than `\n`, so both count
  * as the start of a line.
  */
-function startsAtDocumentBoundary(text: string, start: number): boolean {
-  const lineStart =
-    Math.max(text.lastIndexOf("\n", start - 1), text.lastIndexOf("\r", start - 1)) + 1;
+function startsAtDocumentBoundary({
+  text,
+  start,
+}: {
+  text: string;
+  start: number;
+}): boolean {
+  const newline = text.lastIndexOf("\n", start - 1);
+  const carriageReturn = text.lastIndexOf("\r", start - 1);
+  const lineStart = Math.max(newline, carriageReturn) + 1;
   return text.slice(lineStart, start).trim().length === 0;
 }
 
@@ -72,27 +95,42 @@ function startsAtDocumentBoundary(text: string, start: number): boolean {
  * bracket the rest of the output never closes is otherwise read as a truncated
  * document, which stops the scan. Reading its first token tells the two apart.
  */
-function opensJsonContent(text: string, start: number): boolean {
+function opensJsonContent({
+  text,
+  start,
+}: {
+  text: string;
+  start: number;
+}): boolean {
   const opensObject = text[start] === "{";
   const close = opensObject ? "}" : "]";
 
   for (let i = start + 1; i < text.length; i++) {
     const char = text[i]!;
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
+    if (char === " " || char === "\t" || char === "\n" || char === "\r") {
+      continue;
+    }
     if (char === close) return true;
+    // An object opens with a key, and with nothing else.
     if (opensObject) return char === '"';
-    return (
-      char === '"' ||
-      char === "{" ||
-      char === "[" ||
-      char === "-" ||
-      (char >= "0" && char <= "9") ||
-      char === "t" ||
-      char === "f" ||
-      char === "n"
-    );
+    return opensJsonValue({ text, at: i });
   }
   return false;
+}
+
+/**
+ * Whether a JSON value begins at `at`.
+ *
+ * A scalar counts only when what follows it is what a document would put
+ * there. The first character is not enough, and neither is the whole word: a
+ * log line reads `[notice] using the cache`, `[failed to reach the api` or
+ * `[true story, we retried]`, and all three open with the spelling of a JSON
+ * value. In a document a scalar is followed by a comma or the closing bracket.
+ */
+function opensJsonValue({ text, at }: { text: string; at: number }): boolean {
+  const char = text[at]!;
+  if (char === '"' || char === "{" || char === "[") return true;
+  return SCALAR_THEN_SEPARATOR.test(text.slice(at, at + SCALAR_WINDOW));
 }
 
 /**
@@ -123,10 +161,10 @@ export function parseCliJson(output: string): unknown | null {
     // reported it as a count. Every `--help` did the same. When nothing here is
     // a document, the command's own output is what stays (see the null
     // contract above).
-    if (!startsAtDocumentBoundary(output, i)) continue;
+    if (!startsAtDocumentBoundary({ text: output, start: i })) continue;
     if (++candidates > MAX_CANDIDATES) break;
 
-    const end = findBalancedEnd(output, i);
+    const end = findBalancedEnd({ text: output, start: i });
     if (end === -1) {
       // A JSON-looking document that opens a line but never closes is a
       // truncated OUTER result. Do not walk into it and promote a complete
@@ -136,7 +174,7 @@ export function parseCliJson(output: string): unknown | null {
       //
       // A log line that opens with a bracket and never closes it is not that
       // result, so it must not stop the scan before the document under it.
-      if (opensJsonContent(output, i)) return null;
+      if (opensJsonContent({ text: output, start: i })) return null;
       continue;
     }
     const parsed = tryParse(output.slice(i, end + 1));

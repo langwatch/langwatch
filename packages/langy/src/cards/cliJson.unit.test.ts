@@ -60,6 +60,39 @@ describe("parseCliJson", () => {
       expect(parseCliJson(output)).toEqual({ total: 2 });
     });
 
+    it("lifts the document under a log line that starts like a JSON literal", () => {
+      const lines = [
+        "[notice] using the cache",
+        "[failed to reach the api",
+        "[trying again",
+      ];
+
+      for (const line of lines) {
+        expect(parseCliJson(`${line}\n{"total": 2}\n`)).toEqual({ total: 2 });
+      }
+    });
+
+    it("lifts the document under a log line whose first word IS a JSON value", () => {
+      const lines = [
+        "[true retrying the request",
+        "[null pointer while reading the cache",
+        "[false start, reconnecting",
+        "[2026-08-22 fetching traces",
+      ];
+
+      for (const line of lines) {
+        expect(parseCliJson(`${line}\n{"total": 2}\n`)).toEqual({ total: 2 });
+      }
+    });
+
+    it("still reads an array of literals as the document", () => {
+      expect(parseCliJson("✔ Done\n[true, false, null]\n")).toEqual([
+        true,
+        false,
+        null,
+      ]);
+    });
+
     it("lifts a document a spinner frame left on the same line", () => {
       expect(parseCliJson('⠋ Searching traces...\r{"traces":[]}')).toEqual({
         traces: [],
@@ -112,6 +145,12 @@ describe("parseCliJson", () => {
         '{"traces":[{"trace_id":"trace_1","output":{"value":"unrelated nested answer"}},{"trace_id":"trace_2"';
 
       expect(parseCliJson(truncated)).toBeNull();
+    });
+
+    it("still stops on a truncated array of scalars", () => {
+      // `true` here is followed by a comma, which is what a document puts
+      // after it, so the array is cut short rather than a sentence.
+      expect(parseCliJson("reading…\n[true, false")).toBeNull();
     });
 
     it("still stops on a truncated array of results, log line or not", () => {
