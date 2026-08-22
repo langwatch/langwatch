@@ -848,6 +848,8 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
+  /** Absent while the Langy UI-action channel is flagged off. */
+  handleOptimizeTarget?: (target: TargetConfig, name: string) => void;
   handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;

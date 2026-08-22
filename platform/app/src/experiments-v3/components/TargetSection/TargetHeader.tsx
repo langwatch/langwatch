@@ -22,6 +22,7 @@ import {
   LuGlobe,
   LuPencil,
   LuPlay,
+  LuSparkles,
   LuSquare,
   LuTrash2,
   LuWorkflow,
@@ -59,6 +60,8 @@ const pulseAnimation = keyframes`
 
 type TargetHeaderProps = {
   target: TargetConfig;
+  /** Hands the prompt to Langy for the improvement loop. Prompt targets only. */
+  onOptimize?: (target: TargetConfig, name: string) => void;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
   onSwitch?: (target: TargetConfig) => void;
@@ -84,6 +87,7 @@ type TargetHeaderProps = {
  */
 export const TargetHeader = memo(function TargetHeader({
   target,
+  onOptimize,
   onEdit,
   onDuplicate,
   onSwitch,
@@ -528,6 +532,18 @@ export const TargetHeader = memo(function TargetHeader({
           </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
+          {onOptimize && target.type === "prompt" && (
+            <Menu.Item
+              value="optimize"
+              onClick={() => onOptimize(target, headerName)}
+              data-testid="target-optimize-menu-item"
+            >
+              <HStack gap={2}>
+                <LuSparkles size={14} />
+                <Text>Optimize this prompt</Text>
+              </HStack>
+            </Menu.Item>
+          )}
           <Menu.Item value="edit" onClick={() => onEdit?.(target)}>
             <HStack gap={2}>
               <LuPencil size={14} />

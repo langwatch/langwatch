@@ -45,6 +45,7 @@ import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenEvaluatorEditor } from "../hooks/useOpenEvaluatorEditor";
+import { useOptimizeWithLangy } from "../hooks/useOptimizeWithLangy";
 import {
   scrollToTargetColumn,
   useOpenTargetEditor,
@@ -822,6 +823,10 @@ export function EvaluationsV3Table({
     [duplicateTarget, openTargetEditor],
   );
 
+  // "Optimize this prompt": hand the column to Langy. Undefined while the
+  // UI-action channel is flagged off, which hides the menu item.
+  const handleOptimizeTarget = useOptimizeWithLangy();
+
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
   // effect register the exact same evaluatorEditor callbacks. onSave fetches the
   // freshly-created evaluator and adds it as a target column; onComparisonChange
@@ -1497,6 +1502,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
@@ -1527,6 +1533,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
