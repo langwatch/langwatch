@@ -15,12 +15,17 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { GatewayConfigMaterialiser } from "../../gateway/config.materialiser";
 import { VirtualKeyRepository } from "../../gateway/virtualKey.repository";
 import { ModelProviderService } from "../modelProvider.service";
+
+// The service authorizes every write through `getApp().permissions`, so the
+// App singleton has to hold a composed instance before the first call.
+wireDefaultTestApp();
 
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
