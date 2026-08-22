@@ -451,20 +451,23 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 // A turn's spawn at capacity evicts the least-recently-active IDLE worker
 // instead of failing: pre-warm fills the pool with workers that may never see
 // a message, and a real turn must never queue behind one of those (a two-slot
-// local pool wedged exactly that way). Warm spawns go through AcquireWarm,
-// which refuses at capacity rather than evicting — warm-evicting-warm would
-// only churn subprocesses.
+// local pool wedged exactly that way). Warm spawns go through AcquireWarm.
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
 	return p.acquire(ctx, conversationID, creds, true)
 }
 
-// AcquireWarm is Acquire for a pre-warm: best-effort, so at capacity it fails
-// with ErrMaxWorkers instead of evicting anyone.
+// AcquireWarm is Acquire for a pre-warm. At capacity it may evict an idle
+// worker that has NEVER served a turn — such a worker is a pure warm cache,
+// and the newest warm follows the user's attention, so it wins the slot. A
+// worker that HAS served a turn holds real session state and is never evicted
+// for a warm; when every slot holds one, the warm fails with ErrMaxWorkers.
+// Without this a small pool fills with stale warm caches, every later warm
+// silently no-ops, and the send it was meant to speed up pays a cold spawn.
 func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
 	return p.acquire(ctx, conversationID, creds, false)
 }
 
-func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, shouldEvictIdleAtCapacity bool) (app.Worker, error) {
+func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
@@ -529,16 +532,21 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 	// evicts idle workers (the reaper's own pick order) until a slot opens; the
 	// loop re-checks because a concurrent spawner can take the freed slot first.
 	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
-		victim, found := "", false
-		if shouldEvictIdleAtCapacity {
+		var victim string
+		var found bool
+		reason := "evicted: capacity needed for a turn's worker"
+		if forTurn {
 			victim, found = p.idleVictimLocked()
+		} else {
+			victim, found = p.neverServedIdleVictimLocked()
+			reason = "evicted: capacity needed for a newer warm worker"
 		}
 		if !found {
 			p.mu.Unlock()
 			return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
 		}
 		p.mu.Unlock()
-		p.kill(victim, "evicted: capacity needed for a turn's worker")
+		p.kill(victim, reason)
 		p.mu.Lock()
 	}
 	atomic.AddInt32(&p.pendingSpawns, 1)
@@ -572,6 +580,23 @@ func (p *Pool) idleVictimLocked() (conversationID string, found bool) {
 	for id, w := range p.workers {
 		idle, seen := w.idleSince()
 		if !idle {
+			continue
+		}
+		if !found || seen.Before(oldest) {
+			conversationID, oldest, found = id, seen, true
+		}
+	}
+	return conversationID, found
+}
+
+// neverServedIdleVictimLocked is idleVictimLocked restricted to workers that
+// have never completed a turn — the only workers a warm may evict (see
+// AcquireWarm). Caller holds p.mu; p.mu -> w.mu lock order matches reapIdle.
+func (p *Pool) neverServedIdleVictimLocked() (conversationID string, found bool) {
+	var oldest time.Time
+	for id, w := range p.workers {
+		idle, seen := w.idleSince()
+		if !idle || w.HasServedTurn() {
 			continue
 		}
 		if !found || seen.Before(oldest) {

@@ -112,11 +112,13 @@ Feature: Langy worker pre-warm on panel open
 
     # A pre-warm fills pool slots with workers that may never see a message. A
     # real turn's spawn takes priority: it evicts the least-recently-active
-    # IDLE worker rather than queueing behind one. Warms stay best-effort: at
-    # capacity they refuse rather than evict, because warm-evicting-warm only
-    # churns subprocesses. Seen live on a two-slot pool: one abandoned fresh
-    # warm plus one conversation wedged every later message into an outbox
-    # retry loop.
+    # IDLE worker rather than queueing behind one. A warm may only evict a
+    # worker that never served a turn — such a worker is a pure warm cache,
+    # and the newest warm follows the user's attention, so it wins the slot.
+    # A worker that has served a turn holds real session state; a warm never
+    # takes its slot. Seen live on a two-slot pool: stale warm caches filled
+    # the pool, every later panel-open warm silently no-oped, and the send it
+    # was meant to speed up paid a cold spawn.
     @unit
     Scenario: A real turn's spawn evicts an idle worker at capacity
       Given the pool is at its worker cap
@@ -134,9 +136,17 @@ Feature: Langy worker pre-warm on panel open
       And the outbox redelivers the turn when a slot frees
 
     @unit
-    Scenario: A warm never evicts anyone to make room for itself
+    Scenario: A warm at capacity evicts a stale warm worker that never served
       Given the pool is at its worker cap
-      And at least one worker has no turn in flight
+      And at least one idle worker has never served a turn
+      When a warm request needs a worker for a new conversation
+      Then that never-served idle worker is killed
+      And the new warm worker takes the freed slot
+
+    @unit
+    Scenario: A warm never evicts a worker that has served a turn
+      Given the pool is at its worker cap
+      And every worker has served a turn
       When a warm request needs a worker for a new conversation
       Then the pool refuses with the capacity error
       And every running worker is left alone

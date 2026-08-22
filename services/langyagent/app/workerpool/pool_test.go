@@ -297,21 +297,48 @@ func TestPool_Acquire_AtCapacityAllBusyReturnsErrMaxWorkers(t *testing.T) {
 	}
 }
 
-// @scenario "A warm never evicts anyone to make room for itself"
-func TestPool_AcquireWarm_AtCapacityRefusesWithoutEvicting(t *testing.T) {
+// @scenario "A warm at capacity evicts a stale warm worker that never served"
+func TestPool_AcquireWarm_AtCapacityEvictsNeverServedIdleWorker(t *testing.T) {
 	p := newTestPool(1)
-	p.workers["existing"] = &Worker{conversationID: "existing"}
+	// The slot holds a warm cache: an idle worker no message ever reached.
+	p.workers["stale-warm"] = &Worker{conversationID: "stale-warm"}
+	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	// The spawn itself fails in this environment (no sessions root); the
+	// contract under test is that capacity was NOT the refusal and the stale
+	// warm cache gave up its slot.
+	if herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("a warm must evict a never-served idle worker instead of refusing at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["stale-warm"]
+	p.mu.Unlock()
+	if stillThere {
+		t.Fatalf("the never-served idle worker should have been evicted for the newer warm")
+	}
+}
+
+// @scenario "A warm never evicts a worker that has served a turn"
+func TestPool_AcquireWarm_AtCapacityRefusesWhenEveryWorkerHasServed(t *testing.T) {
+	p := newTestPool(1)
+	served := &Worker{conversationID: "existing"}
+	if served.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	served.Release()
+	p.workers["existing"] = served
 	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
 	if !herr.IsCode(err, domain.ErrMaxWorkers) {
-		t.Fatalf("expected herr(ErrMaxWorkers) for a warm at capacity, got %v", err)
+		t.Fatalf("expected herr(ErrMaxWorkers) for a warm when every worker has served, got %v", err)
 	}
 	p.mu.Lock()
 	_, stillThere := p.workers["existing"]
 	p.mu.Unlock()
 	if !stillThere {
-		t.Fatalf("a warm must not evict the idle worker")
+		t.Fatalf("a warm must not evict a worker that holds real session state")
 	}
 }
 
