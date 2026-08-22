@@ -351,9 +351,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockGroup(input);
+      return ops.queues.unblockGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   unblockAll: protectedProcedure
@@ -363,9 +368,14 @@ export const opsRouter = createTRPCRouter({
         queueName: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockAll(input);
+      return ops.queues.unblockAll({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   drainGroup: protectedProcedure
@@ -376,9 +386,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainGroup(input);
+      return ops.queues.drainGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   pausePipeline: protectedProcedure
@@ -452,9 +467,14 @@ export const opsRouter = createTRPCRouter({
         groupIdContains: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainTenant(input);
+      return ops.queues.drainTenant({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   retryBlocked: protectedProcedure
@@ -941,9 +961,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveToDlq(input);
+      return ops.queues.moveToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   moveAllBlockedToDlq: protectedProcedure
@@ -955,9 +980,14 @@ export const opsRouter = createTRPCRouter({
         errorFilter: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveAllBlockedToDlq(input);
+      return ops.queues.moveAllBlockedToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   replayFromDlq: protectedProcedure
