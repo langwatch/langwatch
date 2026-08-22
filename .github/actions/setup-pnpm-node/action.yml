@@ -103,7 +103,11 @@ runs:
           # unquoted `for target in $INSTALL` would glob, and a filter carrying
           # a `*` would become however many paths happen to match in the
           # checkout, which is not what the caller asked to install.
-          read -ra targets <<< "$INSTALL"
+          # read stops at the first newline, and a YAML block scalar (`install: >`
+          # or `install: |`) is the natural way to write several targets, so
+          # fold newlines into spaces first or every target after the first is
+          # dropped without a word of warning.
+          read -ra targets <<< "${INSTALL//[$'\n\r']/ }"
           filters=()
           for target in "${targets[@]}"; do
             filters+=(--filter "$target")
