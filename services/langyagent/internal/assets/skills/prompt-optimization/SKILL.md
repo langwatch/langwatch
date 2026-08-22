@@ -86,6 +86,8 @@ If the scoring service errors on every cell, say so plainly, score the outputs a
 
 ## The report
 
+Write anything the user must keep after your last tool call of the turn. Text between tool calls is live narration: the user reads it while you work, and the turn's saved reply keeps only what you wrote after the last tool ran. A summary written before one more command disappears when the page reloads.
+
 Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% and cut cost per row by 12%. The baseline column is unchanged." Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
 
 Cards are ` ```langy-card ` fenced blocks in the reply text, never tool calls or echoed JSON:
