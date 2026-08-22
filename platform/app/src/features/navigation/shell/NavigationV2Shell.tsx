@@ -10,6 +10,7 @@ import {
 } from "~/features/langy/logic/langyPanelLayout";
 import Head from "~/utils/compat/next-head";
 import { ICON_RAIL_WIDTH, IconRail } from "./IconRail";
+import { MobileShell } from "./MobileShell";
 import { ProductSidebar } from "./ProductSidebar";
 import { ShellTopBar } from "./ShellTopBar";
 import { shellContentMaxWidth } from "./shellLayout";
@@ -56,6 +57,22 @@ export const NavigationV2Shell = ({
   if (state.status === "loading") return <LoadingScreen />;
 
   const isIconRail = mode === "icon-rail";
+
+  // A phone has room for the page or the chrome, not both: one compact
+  // bar and a full-screen menu replace the sidebar and the rail in both
+  // modes. Spec: specs/navigation/mobile-chrome.feature
+  if (state.isMobile) {
+    return (
+      <Box width="full" minHeight="100vh" background="bg.page">
+        <ShellHead pageTitle={pageTitle} state={state} />
+        <MobileShell state={state}>
+          <DashboardPageBody personalScope={personalScope} {...props}>
+            {children}
+          </DashboardPageBody>
+        </MobileShell>
+      </Box>
+    );
+  }
 
   return (
     <Box
