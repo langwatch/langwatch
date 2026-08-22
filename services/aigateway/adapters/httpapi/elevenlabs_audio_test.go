@@ -199,6 +199,88 @@ func TestElevenLabsNativeTranscription_MissingModelNamesTheFormFieldThisRouteRea
 	assert.Contains(t, body, "/v1/speech-to-text")
 }
 
+// The branch that decides 400 against 200 at the HTTP boundary: this vendor
+// fetches a cloud_storage_url itself, so an upload with no file part is a
+// complete request rather than a missing one.
+func TestElevenLabsNativeTranscription_AcceptsACloudStorageURLWithNoFile(t *testing.T) {
+	var captured domain.Request
+	router := nativeAudioRouter(&captured, elevenLabsCred())
+
+	form, contentType := multipartBody(t, map[string]string{
+		"model_id":          "scribe_v1",
+		"cloud_storage_url": "https://example.test/clip.mp3",
+	}, "", "", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/speech-to-text", form)
+	req.Header.Set("xi-api-key", "vk-lw-test")
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotNil(t, captured.Transcription)
+	assert.Empty(t, captured.Transcription.File)
+	assert.Equal(t, "https://example.test/clip.mp3",
+		captured.Transcription.Params["cloud_storage_url"])
+}
+
+// @scenario "Asynchronous transcription is refused rather than billed at zero"
+func TestElevenLabsNativeTranscription_AsyncWebhookIsRefused(t *testing.T) {
+	// Every spelling a form part uses for true, because the one that slips
+	// through is the one that bills nothing.
+	for _, value := range []string{"true", "TRUE", "1", "yes", " on "} {
+		t.Run(value, func(t *testing.T) {
+			dispatched := false
+			router := buildRouter(
+				app.WithAuth(audioAuth(elevenLabsCred())),
+				app.WithProviders(&mockProvider{
+					dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+						dispatched = true
+						return successResponse(), nil
+					},
+				}),
+				app.WithModels(modelresolver.New()),
+				app.WithLogger(zap.NewNop()),
+			)
+
+			form, contentType := multipartBody(t, map[string]string{
+				"model_id": "scribe_v1",
+				"webhook":  value,
+			}, "file", "clip.wav", []byte("RIFF-fake-wav"))
+			req := httptest.NewRequest(http.MethodPost, "/v1/speech-to-text", form)
+			req.Header.Set("xi-api-key", "vk-lw-test")
+			req.Header.Set("Content-Type", contentType)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Contains(t, rec.Body.String(), "webhook")
+			assert.False(t, dispatched,
+				"an async request carries no duration to bill, so it must not reach the vendor")
+		})
+	}
+}
+
+// A webhook part that is not asking for the async mode is just another form
+// field, and refusing it would break a caller that never opted in.
+func TestElevenLabsNativeTranscription_AFalseWebhookPartIsNotRefused(t *testing.T) {
+	var captured domain.Request
+	router := nativeAudioRouter(&captured, elevenLabsCred())
+
+	form, contentType := multipartBody(t, map[string]string{
+		"model_id": "scribe_v1",
+		"webhook":  "false",
+	}, "file", "clip.wav", []byte("RIFF-fake-wav"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/speech-to-text", form)
+	req.Header.Set("xi-api-key", "vk-lw-test")
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotNil(t, captured.Transcription)
+	assert.Equal(t, "false", captured.Transcription.Params["webhook"])
+}
+
 func TestElevenLabsNativeTranscription_NoAudioAtAllIsRefused(t *testing.T) {
 	router := nativeAudioRouter(nil, elevenLabsCred())
 

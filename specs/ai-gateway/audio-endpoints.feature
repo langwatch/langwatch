@@ -112,8 +112,9 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
   @unit
   Scenario: ElevenLabs' own synthesis path reaches the vendor unchanged
     When the gateway dispatches a native synthesis request
-    Then the caller's body, including voice settings, is forwarded byte for byte
-    And the resolved model is written into "model_id", the field this vendor reads
+    Then every field of the caller's body, including voice settings, is forwarded as written
+    And the one exception is "model_id", which carries the model resolution settled on
+    And no "model" field is invented, because no ElevenLabs endpoint reads one
     And the character count of the spoken text is the usage measure reported
     # The vendor's character-cost response header is credits under the
     # account's own plan, not characters, and it already carries the model's
@@ -123,9 +124,18 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
   Scenario: ElevenLabs' own transcription path reaches the vendor unchanged
     When the gateway dispatches a native transcription request
     Then every text form part the caller sent is carried through to the vendor
-    And the resolved model replaces whatever spelling the caller wrote
+    And the one exception is "model_id", which carries the model resolution settled on
     And the audio duration the vendor states is the usage measure reported
     And a request naming a cloud_storage_url instead of a file is accepted
+
+  @unit
+  Scenario: Asynchronous transcription is refused rather than billed at zero
+    When the client sends a "webhook" part asking the vendor to answer later
+    Then the gateway responds 400 naming the webhook part, and contacts no provider
+    # The vendor's early answer carries no duration and no word timings, so the
+    # spend record would confirm at zero seconds for audio the customer was
+    # charged for, and the gateway has no settlement path for the delivery that
+    # follows.
 
   @unit
   Scenario: A native ElevenLabs route refuses a key with no ElevenLabs credential

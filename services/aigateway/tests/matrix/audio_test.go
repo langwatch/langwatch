@@ -21,16 +21,20 @@ package matrix
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 const spokenLine = "The quick brown fox jumps over the lazy dog"
@@ -241,8 +245,9 @@ func TestAudio_ElevenLabs_Transcription(t *testing.T) {
 //	ELEVENLABS_VOICE_ID=EXAVITQu4vr4xnSDxMaL \
 //	  go test -tags=live_audio -run TestAudio_ElevenLabsNative ./services/aigateway/tests/matrix/... -v
 
-// speakNative fires the vendor's own synthesis path and returns the audio.
-func speakNative(t *testing.T, vk, voice, model string) []byte {
+// speakNative fires the vendor's own synthesis path and returns the audio
+// together with the trace id the call was billed under.
+func speakNative(t *testing.T, vk, voice, model string) ([]byte, string) {
 	t.Helper()
 	body := fmt.Sprintf(`{"text":%q,"model_id":%q}`, spokenLine, model)
 	url := fmt.Sprintf("%s/v1/text-to-speech/%s?output_format=mp3_44100_128", gatewayURL(), voice)
@@ -254,6 +259,7 @@ func speakNative(t *testing.T, vk, voice, model string) []byte {
 	// path: an ElevenLabs SDK changes its base URL and nothing else.
 	req.Header.Set("xi-api-key", vk)
 	req.Header.Set("Content-Type", "application/json")
+	traceID := newTraceParent(t, req)
 
 	resp, err := audioHTTPClient().Do(req)
 	if err != nil {
@@ -277,12 +283,12 @@ func speakNative(t *testing.T, vk, voice, model string) []byte {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "audio/") {
 		t.Fatalf("native speech Content-Type = %q, want audio/*", ct)
 	}
-	return audio
+	return audio, traceID
 }
 
 // transcribeNative fires the vendor's own transcription path and returns the
 // whole answer, which carries the duration the call is billed by.
-func transcribeNative(t *testing.T, vk, model, filename string, file []byte) (string, float64) {
+func transcribeNative(t *testing.T, vk, model, filename string, file []byte) (string, float64, string) {
 	t.Helper()
 	buf := &bytes.Buffer{}
 	w := multipart.NewWriter(buf)
@@ -306,6 +312,7 @@ func transcribeNative(t *testing.T, vk, model, filename string, file []byte) (st
 	}
 	req.Header.Set("xi-api-key", vk)
 	req.Header.Set("Content-Type", w.FormDataContentType())
+	traceID := newTraceParent(t, req)
 
 	resp, err := audioHTTPClient().Do(req)
 	if err != nil {
@@ -330,7 +337,101 @@ func transcribeNative(t *testing.T, vk, model, filename string, file []byte) (st
 	if parsed.Text == "" {
 		t.Fatalf("native transcription returned empty text: %s", truncate(body, 300))
 	}
-	return parsed.Text, parsed.Duration
+	return parsed.Text, parsed.Duration, traceID
+}
+
+// elevenLabsPublishedRates are the vendor's own API prices, which are what a
+// call through the gateway must be rated at. ElevenLabs publishes $0.05 per
+// 1,000 characters for Flash and Turbo, $0.10 for Multilingual v2, and $0.22
+// per hour for Scribe (https://elevenlabs.io/pricing/api, checked 2026-08-21).
+var elevenLabsPublishedRates = map[string]float64{
+	"eleven_flash_v2":        0.05 / 1000,
+	"eleven_flash_v2_5":      0.05 / 1000,
+	"eleven_turbo_v2_5":      0.05 / 1000,
+	"eleven_multilingual_v2": 0.10 / 1000,
+}
+
+const elevenLabsScribePerSecondUSD = 0.22 / 3600
+
+// ratedCostTolerance is 1%, and it is not slack for a wrong rate. The catalog
+// stores the published per-second price rounded to three significant figures,
+// the spend record rounds the duration to whole milliseconds, and the rated
+// cost is quantized to nano-USD. A rate that is actually wrong is wrong by a
+// factor, not by a fraction of a percent.
+const ratedCostTolerance = 0.01
+
+// newTraceParent stamps a fresh W3C traceparent on the request and returns its
+// trace id, so the call can be read back from the trace API afterwards. The
+// gateway carries the caller's own trace rather than inventing one, which is
+// what makes a billing assertion possible from outside the process.
+func newTraceParent(t *testing.T, req *http.Request) string {
+	t.Helper()
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		t.Fatalf("generate trace id: %v", err)
+	}
+	traceID := hex.EncodeToString(raw)
+	span := make([]byte, 8)
+	if _, err := rand.Read(span); err != nil {
+		t.Fatalf("generate span id: %v", err)
+	}
+	req.Header.Set("traceparent", "00-"+traceID+"-"+hex.EncodeToString(span)+"-01")
+	return traceID
+}
+
+// awaitAudioTraceCost polls the trace API until the call lands with a cost.
+//
+// It cannot reuse assertTraceCaptured: that helper also waits for a non-zero
+// token count, and an audio call priced by characters or seconds reports no
+// tokens at all, so it would time out on a perfectly billed request.
+func awaitAudioTraceCost(t *testing.T, traceID string) float64 {
+	t.Helper()
+	apiKey := requireEnv(t, "LW_PROJECT_API_KEY")
+
+	deadline := time.Now().Add(45 * time.Second)
+	backoff := 500 * time.Millisecond
+	url := lwBaseURL() + "/api/trace/" + traceID
+	for {
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("X-Auth-Token", apiKey)
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var parsed struct {
+					Metrics struct {
+						TotalCost float64 `json:"total_cost"`
+					} `json:"metrics"`
+				}
+				if json.Unmarshal(body, &parsed) == nil && parsed.Metrics.TotalCost > 0 {
+					return parsed.Metrics.TotalCost
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("trace %s did not land with a cost within 45s; an audio call that "+
+				"measures nothing is billed as free", traceID)
+		}
+		time.Sleep(backoff)
+		if backoff < 4*time.Second {
+			backoff *= 2
+		}
+	}
+}
+
+// assertRatedCost requires the cost the platform charged to match the vendor's
+// published price for the quantity the call actually used.
+func assertRatedCost(t *testing.T, label string, got, want float64) {
+	t.Helper()
+	if want == 0 {
+		t.Fatalf("%s: no published rate to compare against", label)
+	}
+	if diff := math.Abs(got-want) / want; diff > ratedCostTolerance {
+		t.Fatalf("%s: rated $%.9f, vendor price says $%.9f (%.2f%% off)",
+			label, got, want, diff*100)
+	}
+	t.Logf("%s: rated $%.9f against the vendor's published $%.9f", label, got, want)
 }
 
 // @scenario "A native ElevenLabs synthesis call bills the characters it spoke"
@@ -346,13 +447,22 @@ func TestAudio_ElevenLabsNative_SpeechToTranscriptionRoundTrip(t *testing.T) {
 		ttsModel = "eleven_flash_v2_5"
 	}
 
-	audio := speakNative(t, vk, voice, ttsModel)
+	audio, speechTrace := speakNative(t, vk, voice, ttsModel)
 	t.Logf("native TTS produced %d bytes of mp3 for %d characters", len(audio), len(spokenLine))
 
-	transcript, duration := transcribeNative(t, vk, "scribe_v1", "native.mp3", audio)
+	transcript, duration, transcribeTrace := transcribeNative(t, vk, "scribe_v1", "native.mp3", audio)
 	t.Logf("native STT transcript: %q over %.4f seconds", transcript, duration)
 	assertHeardTheFox(t, transcript)
 	if duration <= 0 {
 		t.Fatalf("the vendor stated no audio duration, so the call would bill nothing")
 	}
+
+	// The two billing scenarios this test binds. Without these the cells prove
+	// only that audio crossed both routes, and metering could be silently zero.
+	assertRatedCost(t, "synthesis",
+		awaitAudioTraceCost(t, speechTrace),
+		float64(utf8.RuneCountInString(spokenLine))*elevenLabsPublishedRates[ttsModel])
+	assertRatedCost(t, "transcription",
+		awaitAudioTraceCost(t, transcribeTrace),
+		duration*elevenLabsScribePerSecondUSD)
 }

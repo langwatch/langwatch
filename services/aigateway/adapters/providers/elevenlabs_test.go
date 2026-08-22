@@ -220,6 +220,45 @@ func TestElevenLabsTranscriptionAcceptsACloudStorageURLWithNoFile(t *testing.T) 
 	assert.InDelta(t, 12.5, resp.Usage.AudioSeconds, 1e-9)
 }
 
+// The redirect refusal is why this client exists rather than a shared one:
+// Go strips Authorization across hosts but not xi-api-key, so a followed
+// redirect from a customer-configured base URL would hand the customer's
+// ElevenLabs key to whatever host answered. Built through the real
+// constructor, because the injected test client in every case above bypasses
+// exactly the configuration under test here.
+func TestElevenLabsAudioClientDoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+
+	leaked := make(chan string, 1)
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		leaked <- r.Header.Get("xi-api-key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer elsewhere.Close()
+
+	vendor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+"/v1/text-to-speech/voice_1", http.StatusFound)
+	}))
+	defer vendor.Close()
+
+	client := newElevenLabsAudioClient(newCustomerEndpointPolicy(false, false, nil))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, vendor.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("xi-api-key", "xi-secret")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusFound, resp.StatusCode,
+		"the redirect must be returned to the caller, never followed")
+	select {
+	case key := <-leaked:
+		t.Fatalf("the redirect target received the provider key %q", key)
+	default:
+	}
+}
+
 func TestElevenLabsTranscribedSecondsFallsBackToWordTimings(t *testing.T) {
 	t.Parallel()
 

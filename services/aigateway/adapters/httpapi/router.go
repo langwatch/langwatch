@@ -624,6 +624,17 @@ func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
 // a payload worth forwarding by mistake.
 const maxElevenLabsSpeechBodyBytes = 1 << 20
 
+// maxElevenLabsUploadBytes caps a native transcription upload, at the same
+// 26 MB the OpenAI-wire transcription route uses so the two audio routes agree.
+//
+// It is its own constant rather than the gateway-wide request ceiling because
+// this upload is held in memory twice: once as the parsed file, and again in
+// the multipart body rebuilt for the vendor, for as long as the vendor call
+// runs. The vendor accepts far larger files, and a caller who has one sends a
+// cloud_storage_url part instead, which ElevenLabs fetches itself and which
+// costs this process nothing.
+const maxElevenLabsUploadBytes = maxTranscriptionBodyBytes
+
 // elevenLabsSpeechHandler terminates POST /v1/text-to-speech/{voice_id},
 // ElevenLabs' own synthesis path.
 //
@@ -721,7 +732,7 @@ func elevenLabsTranscriptionHandler(deps RouterDeps) http.HandlerFunc {
 // multi-gigabyte upload through this process is not something to hold in
 // memory.
 func parseElevenLabsUpload(deps RouterDeps, w http.ResponseWriter, r *http.Request) (*domain.TranscriptionUpload, bool) {
-	if err := readElevenLabsForm(deps, w, r); err != nil {
+	if err := readElevenLabsForm(w, r); err != nil {
 		writeError(deps.Logger, w, r.Context(), err)
 		return nil, false
 	}
@@ -734,11 +745,8 @@ func parseElevenLabsUpload(deps RouterDeps, w http.ResponseWriter, r *http.Reque
 }
 
 // readElevenLabsForm caps the body and parses the multipart envelope.
-func readElevenLabsForm(deps RouterDeps, w http.ResponseWriter, r *http.Request) error {
-	maxBytes := deps.MaxRequestBodyBytes
-	if maxBytes <= 0 {
-		maxBytes = config.DefaultMaxRequestBodyBytes
-	}
+func readElevenLabsForm(w http.ResponseWriter, r *http.Request) error {
+	maxBytes := int64(maxElevenLabsUploadBytes)
 	if err := prepareRequestBody(w, r, maxBytes); err != nil {
 		return err
 	}
@@ -749,7 +757,7 @@ func readElevenLabsForm(deps RouterDeps, w http.ResponseWriter, r *http.Request)
 		if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 			return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
 				"message": fmt.Sprintf(
-					"the audio upload exceeds this gateway's %d byte request limit; "+
+					"the audio upload exceeds this gateway's %d byte limit; "+
 						"send a cloud_storage_url part instead for a file this large", maxBytes),
 			})
 		}
@@ -762,16 +770,14 @@ func readElevenLabsForm(deps RouterDeps, w http.ResponseWriter, r *http.Request)
 
 // elevenLabsUploadFromForm lifts the parsed form into the shared upload shape.
 func elevenLabsUploadFromForm(r *http.Request) (*domain.TranscriptionUpload, error) {
-	upload := &domain.TranscriptionUpload{Params: map[string]string{}}
-	if r.MultipartForm != nil {
-		for name, values := range r.MultipartForm.Value {
-			if len(values) > 0 {
-				upload.Params[name] = values[0]
-			}
-		}
+	upload := &domain.TranscriptionUpload{Params: elevenLabsFormValues(r)}
+	if err := refuseElevenLabsAsyncTranscription(r, upload.Params); err != nil {
+		return nil, err
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		// No audio uploaded is a complete request when the caller named a
+		// cloud_storage_url, which this vendor fetches itself.
 		if upload.Params["cloud_storage_url"] != "" {
 			return upload, nil
 		}
@@ -790,6 +796,62 @@ func elevenLabsUploadFromForm(r *http.Request) (*domain.TranscriptionUpload, err
 	upload.File = data
 	upload.Filename = header.Filename
 	return upload, nil
+}
+
+// elevenLabsFormValues collects every text part the caller sent. They are all
+// carried through rather than filtered to a known list, because on a route
+// that mirrors a vendor's own path the caller's settings are the request, and
+// an allowlist goes stale the moment the vendor adds a parameter.
+func elevenLabsFormValues(r *http.Request) map[string]string {
+	values := map[string]string{}
+	if r.MultipartForm == nil {
+		return values
+	}
+	for name, part := range r.MultipartForm.Value {
+		if len(part) > 0 {
+			values[name] = part[0]
+		}
+	}
+	return values
+}
+
+// refuseElevenLabsAsyncTranscription rejects the vendor's own asynchronous
+// mode on this route.
+//
+// With a webhook part, ElevenLabs answers before it has transcribed anything
+// and delivers the result to a workspace webhook later. That first answer
+// carries no duration and no word timings, so the call would confirm its spend
+// record at zero seconds and bill nothing for audio the customer was charged
+// for. The gateway has no settlement path for those deliveries either: the
+// existing /v1/convai/webhook relay is for Conversational AI post-call
+// reports, which are a different payload keyed on a different id.
+//
+// Refusing says so, rather than billing zero and looking like it worked. The
+// synchronous request the caller can send instead is the one line of the fix.
+func refuseElevenLabsAsyncTranscription(r *http.Request, params map[string]string) error {
+	// The vendor names this parameter "webhook" and reports it back as
+	// `"param": "webhook"` on its own validation errors (measured against the
+	// live API, 2026-08-21). Any truthy spelling is refused, because the
+	// spelling that gets through is the one that bills nothing.
+	if value, ok := params["webhook"]; !ok || !isTruthyFormValue(value) {
+		return nil
+	}
+	return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+		"message": "webhook=true is not supported on this gateway route: the vendor answers " +
+			"before it has transcribed anything, so the call carries no duration to bill. " +
+			"Send the request without the webhook part and read the transcript from the response",
+		"fault": "customer",
+	})
+}
+
+// isTruthyFormValue reads a boolean the way a form part spells one.
+func isTruthyFormValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
