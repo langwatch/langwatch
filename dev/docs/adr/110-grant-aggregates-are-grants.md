@@ -11,7 +11,9 @@ registry, the fork — stands.
 **Builds on:** ADR-100 (the aggregate-scoped lane, which is where per-grant
 concurrency comes from), ADR-105 (an aggregate is one declaration).
 
-**Related:** ADR-103 (a run's totals are a query — the same instinct: stop
+**Related:** [ADR-113](113-a-pipeline-owns-a-set-of-aggregates.md) (the
+framework change that lets one pipeline carry both aggregates under their own
+types — until it lands, #7406 stamps both families `authz_grant`), ADR-103 (a run's totals are a query — the same instinct: stop
 maintaining what can be derived), ADR-057 (the share token is its own
 identity).
 
@@ -112,8 +114,12 @@ outright — the retry lands elsewhere, nothing collapses, and every pass adds
 another copy. A migrated fact therefore keeps the legacy row's own id, which is
 already a public handle (`DELETE /role-bindings/:id`); a fact the legacy schema
 only inferred derives its id from its content; a live write mints a KSUID,
-stable because its `commandId` is minted once and reused on retry. All three
-produce a `grant_`-prefixed KSUID and nothing downstream can tell them apart.
+stable because its `commandId` is minted once and reused on retry. Nothing
+downstream can tell them apart, and nothing may rely on their shape: a kept
+legacy id is an unprefixed `nanoid()`, a live binding is minted as
+`rolebinding_…`, and only a derived id reads `grant_…`. (An earlier draft
+claimed all three were `grant_`-prefixed; ADR-113 records why that would have
+mattered and why it is not true.)
 
 **The migration does not wait.** It cannot write the projection — it can only
 state events — so it states its facts and checks once. A check that finds the

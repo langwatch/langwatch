@@ -1,4 +1,8 @@
 # See dev/docs/adr/110-grant-aggregates-are-grants.md
+# The two aggregate types on one pipeline need ADR-113
+# (dev/docs/adr/113-a-pipeline-owns-a-set-of-aggregates.md); until it lands,
+# #7406 stamps role events with the pipeline's type and the scenario
+# "A role's aggregate is the role" is not satisfiable.
 # Rollout and migration behaviour lives in specs/migration/authz-grants-rollout.feature
 #
 # Scenarios tagged @unimplemented state designed behaviour no test enforces

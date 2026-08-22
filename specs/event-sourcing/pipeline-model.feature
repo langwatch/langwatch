@@ -14,6 +14,11 @@ Feature: Pipeline Model
     Then the pipeline definition is created with all components
     And the pipeline metadata is generated for introspection
 
+  # A pipeline may declare a set of aggregate types instead of one; that shape,
+  # and everything that follows from it, is specified in
+  # multi-aggregate-pipeline.feature (ADR-113). The single type above is the
+  # common case and is unchanged by it.
+
   Scenario: Registering a pipeline with the runtime
     Given a static pipeline definition "trace_processing"
     And an EventSourcing runtime with ClickHouse and Redis
