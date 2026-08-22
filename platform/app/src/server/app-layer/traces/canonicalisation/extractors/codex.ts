@@ -26,7 +26,8 @@
  * codex.user_prompt branch in extractIOFromLogRecord this class replaces).
  *
  * On the SPAN side, codex 0.137+ emits native spans under scope
- * `codex_cli_rs` to /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).
+ * `codex_cli_rs` (codex < 0.144) or `codex-app-server` (codex 0.144+) to
+ * /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).
  * The `session_task.turn` span carries the full per-turn metadata as
  * codex-namespaced attributes:
  *   - model
@@ -77,9 +78,19 @@ const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
  * that defers instead.
  */
 const CODEX_EXEC_SCOPE_NAME = "codex_exec";
+/**
+ * Codex 0.144+ renamed its instrumentation scope from `codex_cli_rs` to
+ * `codex-app-server` (the interactive TUI and the app server now share one
+ * scope name). Without this entry the CodexExtractor's scope gate bails
+ * before lifting `session_task.turn` attributes, so the model name, token
+ * counts, and reasoning effort never reach the canonical gen_ai.* keys
+ * and the trace summary shows no model.
+ */
+const CODEX_APP_SERVER_SCOPE_NAME = "codex-app-server";
 const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
   CODEX_RUST_SCOPE_NAME,
   CODEX_EXEC_SCOPE_NAME,
+  CODEX_APP_SERVER_SCOPE_NAME,
 ]);
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
@@ -135,7 +146,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // Path A codex traffic flows through the gateway as gen_ai.*
     // spans; GenAIExtractor handles that side and emits canonical
     // attributes. This branch covers Path B native spans from the
-    // Rust CLI (scope `codex_cli_rs`), where the per-turn
+    // Rust CLI (scope `codex_cli_rs` / `codex_exec` / `codex-app-server`
+    // — see CODEX_SCOPE_NAMES), where the per-turn
     // `session_task.turn` span carries codex-namespaced attributes
     // that won't match GenAIExtractor's gen_ai.* gates.
     //

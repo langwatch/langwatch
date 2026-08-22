@@ -157,6 +157,38 @@ describe("CodexExtractor.applyLog", () => {
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
     });
 
+    it("lifts codex.turn.token_usage.* + model + turn.id off the codex-app-server session_task.turn span (codex 0.144+)", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.6-luna",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "codex.turn.token_usage.output_tokens": "6",
+          "codex.turn.token_usage.cached_input_tokens": "10112",
+          "codex.turn.token_usage.total_tokens": "14371",
+          "codex.turn.reasoning_effort": "high",
+          "turn.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex-app-server", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({
+        "langwatch.span.type": "agent",
+        "gen_ai.request.model": "gpt-5.6-luna",
+        "gen_ai.response.model": "gpt-5.6-luna",
+        "gen_ai.usage.input_tokens": 14365,
+        "gen_ai.usage.output_tokens": 6,
+        "gen_ai.usage.cache_read.input_tokens": 10112,
+        "gen_ai.request.reasoning_effort": "high",
+        "gen_ai.conversation.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
+      });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+
     /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
     it("canonicalises codex.turn.reasoning_effort to gen_ai.request.reasoning_effort", () => {
       const ctx = createExtractorContext(
