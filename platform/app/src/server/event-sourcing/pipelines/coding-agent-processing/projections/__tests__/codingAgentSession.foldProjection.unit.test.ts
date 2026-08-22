@@ -187,6 +187,30 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.sessionId).toBe(SESSION_ID);
       expect(state.agent).toBe("claude_code");
     });
+
+    /** @scenario "an agent that states its own price keeps it" */
+    it("charges nothing for a call by an agent that reports its own cost", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-priced",
+          facts: {
+            model: "claude-sonnet-4-5",
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 900,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      // The cost comes from the api_request event, which states what the
+      // agent was billed. Estimating this span too would charge the turn
+      // twice, at two different rates.
+      expect(state.costUsd).toBe(0);
+    });
   });
 
   describe("when a tool span FAILED", () => {
@@ -1591,6 +1615,76 @@ describe("coding-agent session fold, codex", () => {
       // does not pretend to be model latency.
       expect(state.modelCallMs).toBe(0);
       expect(state.attempts).toBe(1);
+    });
+
+    /** @scenario "a codex session is priced from the tokens it reported" */
+    it("prices the turn from its tokens, since codex states no cost", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        initStateOf(projection),
+      );
+
+      // 2,936 non-cached input + 11,008 cache-read + 7 output at gpt-5.6-sol's
+      // registry rates. The figure is the registry's, not one written here, so
+      // the assertion is that a price was worked out at all.
+      expect(state.costUsd).toBeGreaterThan(0);
+      expect(state.costUsd).toBeLessThan(1);
+    });
+
+    /** @scenario "a codex session is priced from the tokens it reported" */
+    it("adds a second turn's price to the session's total", () => {
+      const projection = makeProjection();
+
+      const first = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced-1",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        initStateOf(projection),
+      );
+      const second = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced-2",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        first,
+      );
+
+      expect(first.costUsd).toBeGreaterThan(0);
+      expect(second.costUsd).toBeCloseTo(first.costUsd * 2, 10);
+    });
+
+    /** @scenario "a turn priced at an unknown model costs nothing rather than guessing" */
+    it("counts the tokens but charges nothing for a model in no price list", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-unpriced",
+          agent: "codex",
+          facts: {
+            ...codexTurnFacts,
+            "gen_ai.request.model": "a-model-no-registry-lists",
+            "gen_ai.response.model": "a-model-no-registry-lists",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.inputTokens).toBe(2_936);
+      expect(state.costUsd).toBe(0);
     });
 
     it("derives the non-cached input when codex's own count is absent", () => {

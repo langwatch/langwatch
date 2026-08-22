@@ -1,3 +1,4 @@
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
@@ -622,6 +623,29 @@ function foldModelCall(
 }
 
 /**
+ * What one turn cost, for an agent whose telemetry states no price of its own.
+ *
+ * Claude reports what it was billed on its API_REQUEST event, and that number
+ * is the session's cost. Codex reports a model and token counts and nothing
+ * else, so its sessions read as free while the SAME turn's trace states a
+ * figure — the trace pipeline prices the identical span against the model
+ * registry. This is that same call, so the two agree.
+ *
+ * The facts are the respelled ones, whose `input_tokens` is the disjoint
+ * non-cached bucket, and whose cache buckets keep codex's own spellings —
+ * which are the gen_ai keys {@link computeSpanCost} reads. An unpriced model
+ * comes back zero rather than an invented rate.
+ */
+function pricedFromTokens(facts: Record<string, unknown>): number {
+  return computeSpanCost({
+    attrs: facts,
+    model: str(facts.model) ?? undefined,
+    promptTokens: num(facts.input_tokens),
+    completionTokens: num(facts.output_tokens),
+  });
+}
+
+/**
  * Codex's turn tokens, respelled into the disjoint claude vocabulary
  * {@link foldModelCall} reads — one fold, one convention.
  *
@@ -701,13 +725,11 @@ export function applySpanToCodingAgentSession({
     // declined foreign spans reusing this bare name, and one that still
     // arrives labeled as another agent contributes identity only.
     if (agent !== "codex" || isLogsOnly) return withIdentity(state, attrs);
+    const facts = codexTurnTokenFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
-    return foldModelCall(
-      withIdentity(state, attrs),
-      codexTurnTokenFacts(attrs),
-      0,
-    );
+    const folded = foldModelCall(withIdentity(state, attrs), facts, 0);
+    return { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) };
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
