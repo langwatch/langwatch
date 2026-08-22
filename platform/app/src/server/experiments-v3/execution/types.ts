@@ -115,6 +115,11 @@ export const executionRequestSchema = z
       z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
       z.object({ type: z.literal("target"), targetId: z.string() }),
       z.object({
+        type: z.literal("target-rows"),
+        targetIds: z.array(z.string()),
+        rowIndices: z.array(z.number()).optional(),
+      }),
+      z.object({
         type: z.literal("cell"),
         targetId: z.string(),
         rowIndex: z.number(),
