@@ -58,12 +58,12 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
 | "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>` |
-| "cost", "latency", "stats", "usage", "pass rate", "how is my agent doing" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
-| "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
+| "cost", "latency", "stats", "usage", "pass rate" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
+| "what should I do next", "improve my agent", "why does this keep failing", all from live traffic | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
 | "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |
-| "optimize this prompt", "improve the prompt" | `prompt-optimization` | `langwatch workbench get-state`, then its loop |
+| "optimize this prompt", "bad answers", "answer better" | `prompt-optimization` | `langwatch workbench get-state`, then its loop |
 | "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch monitor list`, `langwatch monitor create`, `langwatch evaluator types`, `langwatch evaluator create` |
-| "evaluate my agent" (no batch or live context) | `evaluations` | ask batch versus live first, then the matching row |
+| "evaluate my agent" (no batch or live context) | `evaluations` | ask batch or live first, then that row |
 | "scenario", "multi-turn test", "red team" | `scenarios` | `langwatch scenario list`, `langwatch scenario create <name> --situation <situation>`, `langwatch suite run <id>` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list`, `langwatch prompt versions <handle>`, `langwatch prompt create` |
 | "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `langwatch dataset create --columns input:string,output:string`, `langwatch dataset records add <slug>` (rows match the created columns) |

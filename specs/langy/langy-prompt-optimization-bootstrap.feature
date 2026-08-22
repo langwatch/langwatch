@@ -62,3 +62,24 @@ Feature: Langy bootstraps a workbench that is missing pieces
   Scenario: The evaluator slug comes from evaluator types, never from memory
     When Langy adds any evaluator
     Then the type slug was read from the evaluator catalog in this conversation
+
+  Rule: Plain words are enough to start the loop
+
+    The customer this is for describes a quality problem, not a task. They say
+    the answers are bad. They name no experiment, use none of the product's
+    words, and have nothing set up. That sentence has to start the improvement
+    loop, not a tour of the product or a request to instrument their code.
+
+    @e2e
+    Scenario: A plain-language quality complaint starts the improvement loop
+      Given a user who says only that their bot answers badly
+      When Langy reads the request
+      Then it works toward measuring the answers and improving them
+      And it does not send the user away to add tracing or connect an SDK first
+
+    @e2e
+    Scenario: With nothing set up, Langy builds the experiment rather than asking the user to
+      Given no experiment, no dataset and no evaluator exist
+      When Langy starts the loop
+      Then it creates what the loop needs itself
+      And it explains the plan in the user's words

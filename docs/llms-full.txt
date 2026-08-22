@@ -53301,6 +53301,8 @@ So for anything in these skills that reads or writes a project: make sure `LANGW
 
 Improvements start from evidence, never from generic advice.
 
+**No traces in the project?** Then there is no production evidence to mine and this skill cannot start. Say so in one line and switch method: measure the answers against a dataset instead of against live traffic. In Langy, run the prompt improvement loop (`prompt-optimization`). In a coding agent, use the `experiments` skill. Come back here once real traffic exists.
+
 1. **Use an existing diagnosis when there is one.** Look for `agent-performance-report.html` (or ask if a recent diagnosis exists). If present, read it and extract the findings and their example trace IDs.
 2. **No diagnosis available?** Run a focused evidence sweep yourself:
 
