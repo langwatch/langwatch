@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/sdks/go/v0.3.0...sdks/go/v1.0.0) (2026-08-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-go:** the provider middlewares now capture input and output content by default (langwatch.DataCaptureAll), and the opt-in WithCaptureInput() / WithCaptureOutput() options are removed. An existing user who upgrades without passing WithDataCapture will begin exporting full prompts and completions, which routinely contain end-user PII. Opt out with WithDataCapture(langwatch.DataCaptureNone).
+
+### Features
+
+* **sdk-go:** native instrumentations, REST client, and gen_ai-first telemetry ([#4998](https://github.com/langwatch/langwatch/issues/4998)) ([893de7f](https://github.com/langwatch/langwatch/commit/893de7f740d56517ab835ece936b609bf6c81a11))
+
+
+### Bug Fixes
+
+* **traces:** reject pageOffset, and pin the updated-axis scroll to a snapshot ([#6812](https://github.com/langwatch/langwatch/issues/6812)) ([e490008](https://github.com/langwatch/langwatch/commit/e49000891dbd58fe0e033230dfc83c380e1b1615))
+
+
+### Miscellaneous
+
+* **deps:** bump the go_modules group across 12 directories with 3 updates ([#6830](https://github.com/langwatch/langwatch/issues/6830)) ([33287c4](https://github.com/langwatch/langwatch/commit/33287c44b91d07fb177eababc40ec5d6bae7debf))
+
+
+### Code Refactoring
+
+* **event-sourcing:** retire the reactor vocabulary — post-event work is subscribers and process managers (ADR-098) ([#6956](https://github.com/langwatch/langwatch/issues/6956)) ([8609798](https://github.com/langwatch/langwatch/commit/8609798ba36387596a62f8c513fd76660bd500dc))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.2.0...sdk-go@v0.3.0) (2026-05-13)
 
 
