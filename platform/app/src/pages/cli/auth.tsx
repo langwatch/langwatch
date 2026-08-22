@@ -63,7 +63,10 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../settings/api-keys/PermissionCategoryList";
-import { getUserPermissionsAcrossScopes } from "../settings/api-keys/utils";
+import {
+  clampSelectionsToAvailability,
+  getUserPermissionsAcrossScopes,
+} from "../settings/api-keys/utils";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
 import { defaultCliKeyScopes } from "./cliKeyScopeDefaults";
 import { FirstTraceRedirect } from "./FirstTraceRedirect";
@@ -470,17 +473,30 @@ export default function CliAuthPage() {
     );
   }, [cliKeyUserPermissions]);
 
+  // The customized rows, re-narrowed to the ceiling of whatever is selected
+  // NOW. Changing the scopes after customizing shrinks the ceiling, and a
+  // level chosen under the old one would otherwise stay checked and fail the
+  // approval with a scope violation.
+  const effectivePermissionSelections = useMemo(
+    () =>
+      clampSelectionsToAvailability({
+        selections: permissionSelections,
+        userPermissions: cliKeyUserPermissions,
+      }),
+    [permissionSelections, cliKeyUserPermissions],
+  );
+
   // The permission list the approve request carries. Untouched, the narrowed
   // default goes out; customized, it is exactly what the category selections
   // compute, itself bounded by the locked rows.
   const cliKeyPermissions = useMemo<string[]>(
     () =>
       arePermissionsCustomized
-        ? computePermissionsFromSelections(permissionSelections)
+        ? computePermissionsFromSelections(effectivePermissionSelections)
         : defaultCliKeyPermissionsHeld,
     [
       arePermissionsCustomized,
-      permissionSelections,
+      effectivePermissionSelections,
       defaultCliKeyPermissionsHeld,
     ],
   );
@@ -857,7 +873,7 @@ export default function CliAuthPage() {
                         <VStack align="stretch" gap={2}>
                           <PermissionCounter count={cliKeyPermissions.length} />
                           <PermissionCategoryList
-                            selections={permissionSelections}
+                            selections={effectivePermissionSelections}
                             userPermissions={cliKeyUserPermissions}
                             onChange={setPermissionSelections}
                           />

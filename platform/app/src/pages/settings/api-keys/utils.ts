@@ -1,7 +1,9 @@
 import { createListCollection } from "@chakra-ui/react";
 import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 import {
+  type AccessLevel,
   categorizablePermissions,
+  PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "../../../server/api-key/permission-categories";
 
@@ -459,4 +461,53 @@ export function getUserPermissionsAcrossScopes({
   return [...first].filter((permission) =>
     rest.every((held) => held.has(permission)),
   );
+}
+
+/**
+ * Narrows category selections to what the ceiling still allows.
+ *
+ * The ceiling moves while the form is open: selecting one more scope drops
+ * the intersection to what the caller holds everywhere, and a level picked
+ * under the wider ceiling would otherwise stay selected and leave the form
+ * looking valid until the save comes back `api_key_scope_violation`. Write
+ * falls back to read where read survives, and to none where neither does,
+ * so the rows the user reads are the permissions that actually go out.
+ *
+ * A category the ceiling no longer covers renders locked, which is the same
+ * `categoryAccessAvailability` answer the rows themselves use.
+ */
+export function clampSelectionsToAvailability({
+  selections,
+  userPermissions,
+}: {
+  selections: Record<string, AccessLevel | "none">;
+  userPermissions: string[];
+}): Record<string, AccessLevel | "none"> {
+  const clamped: Record<string, AccessLevel | "none"> = {};
+  for (const [key, level] of Object.entries(selections)) {
+    const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+    clamped[key] =
+      level === "none" || !category
+        ? "none"
+        : highestLevelStillGranted({
+            level,
+            ...categoryAccessAvailability({ category, userPermissions }),
+          });
+  }
+  return clamped;
+}
+
+/** Write where write survives, otherwise read, otherwise nothing. */
+function highestLevelStillGranted({
+  level,
+  canRead,
+  canWrite,
+}: {
+  level: AccessLevel;
+  canRead: boolean;
+  canWrite: boolean;
+}): AccessLevel | "none" {
+  if (level === "write" && canWrite) return "write";
+  if (canRead) return "read";
+  return "none";
 }

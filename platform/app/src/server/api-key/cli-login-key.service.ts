@@ -307,6 +307,7 @@ export class CliLoginKeyService {
         organizationId,
         deviceLabel,
         exceptApiKeyId: created.apiKey.id,
+        createdBefore: created.apiKey.createdAt,
       });
     } catch (err) {
       // The exchange is about to fail, so the replacement must not survive
@@ -325,18 +326,28 @@ export class CliLoginKeyService {
   /**
    * Revokes every non-revoked CLI login key this user holds for this device
    * label in this organization. Used after a re-login mint (which passes its
-   * fresh key as `exceptApiKeyId`) and by logout.
+   * fresh key as `exceptApiKeyId`) and by logout, which passes neither filter
+   * and so clears the device outright.
+   *
+   * `createdBefore` is what keeps two logins racing on the same device from
+   * revoking each other: each mint clears only keys OLDER than the one it
+   * just created, so the newer key always survives and the CLI is never
+   * handed a token that the other exchange revoked a moment later. Two keys
+   * created in the same millisecond both survive, which costs a stale key
+   * the next login clears rather than a dead credential.
    */
   async revokeLoginKeysForDevice({
     userId,
     organizationId,
     deviceLabel,
     exceptApiKeyId,
+    createdBefore,
   }: {
     userId: string;
     organizationId: string;
     deviceLabel: string;
     exceptApiKeyId?: string;
+    createdBefore?: Date;
   }): Promise<void> {
     const priorKeys = await this.prisma.apiKey.findMany({
       where: {
@@ -346,6 +357,7 @@ export class CliLoginKeyService {
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         revokedAt: null,
         ...(exceptApiKeyId ? { id: { not: exceptApiKeyId } } : {}),
+        ...(createdBefore ? { createdAt: { lt: createdBefore } } : {}),
       },
       select: { id: true },
     });

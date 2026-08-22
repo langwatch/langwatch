@@ -17,27 +17,60 @@ import {
 describe("PERMISSION_CATEGORIES", () => {
   /** @scenario Every registry permission belongs to a category */
   it("covers every registry permission except the platform tier", () => {
-    const covered = new Set<string>(
-      PERMISSION_CATEGORIES.flatMap((c) => [
-        ...c.readPermissions,
-        ...c.writePermissions,
-      ]),
-    );
+    // Which categories claim each permission, rather than whether any does:
+    // the categories partition the registry, so a permission owned by two of
+    // them is as wrong as one owned by none. A flat Set hides that, and the
+    // second owner is what silently widens a key — granting one category
+    // would hand over another category's resources. Read and write of the
+    // SAME category both naming a permission is the intended shape, since a
+    // write level always carries its own reads.
+    const owners = new Map<string, string[]>();
+    for (const category of PERMISSION_CATEGORIES) {
+      for (const permission of new Set([
+        ...category.readPermissions,
+        ...category.writePermissions,
+      ])) {
+        owners.set(permission, [
+          ...(owners.get(permission) ?? []),
+          category.key,
+        ]);
+      }
+    }
+
     const uncovered = categorizablePermissions().filter(
-      (permission) => !covered.has(permission),
+      (permission) => !owners.has(permission),
     );
     expect(
       uncovered,
       "Registry permissions missing from PERMISSION_CATEGORIES — add them to a category",
     ).toEqual([]);
 
+    const claimedTwice = [...owners.entries()]
+      .filter(([, categoryKeys]) => categoryKeys.length > 1)
+      .map(
+        ([permission, categoryKeys]) =>
+          `${permission}: ${categoryKeys.join(", ")}`,
+      );
+    expect(
+      claimedTwice,
+      "Permissions claimed by more than one category — granting one category would hand over the other's resources",
+    ).toEqual([]);
+
     // The only permissions outside the categories are the platform tier,
-    // which can never ride on an API key.
+    // which can never ride on an API key — so no category may name one.
     const categorizable = new Set<string>(categorizablePermissions());
     const platformOnly = ALL_PERMISSIONS.filter(
       (permission) => !categorizable.has(permission),
     );
     expect(platformOnly).toEqual(["ops:view", "ops:manage"]);
+
+    const platformInCategory = platformOnly.filter((permission) =>
+      owners.has(permission),
+    );
+    expect(
+      platformInCategory,
+      "Platform-tier permissions cannot ride on an API key — remove them from the categories",
+    ).toEqual([]);
   });
 
   it("only names permissions that exist in the registry", () => {

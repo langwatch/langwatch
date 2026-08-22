@@ -32,6 +32,7 @@ import {
   bindingsToScopes,
   bindingsToSelections,
   categoryAccessAvailability,
+  clampSelectionsToAvailability,
   deriveBindingRole,
   getUserPermissionsAcrossScopes,
   type PermissionMode,
@@ -161,11 +162,26 @@ export function EditApiKeyDrawer({
     }
   }, [apiKey, organizationId, currentTeamId, currentProjectId]);
 
+  // Re-narrowed to the ceiling of whatever is selected NOW: the key's stored
+  // level, or one picked before another scope was added, can sit above what
+  // the caller holds everywhere the key will be bound, and the save would
+  // come back `api_key_scope_violation` for a row that still looked granted.
+  const effectiveCategorySelections = useMemo(
+    () =>
+      clampSelectionsToAvailability({
+        selections: categorySelections,
+        userPermissions,
+      }) as Record<string, PermissionSelection>,
+    [categorySelections, userPermissions],
+  );
+
   const handlePermissionModeChange = (mode: "all" | "restricted") => {
     setPermissionMode(mode);
     if (
       mode === "restricted" &&
-      Object.values(categorySelections).every((v) => !v || v === "none")
+      Object.values(effectiveCategorySelections).every(
+        (v) => !v || v === "none",
+      )
     ) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
@@ -184,7 +200,7 @@ export function EditApiKeyDrawer({
 
     const permissions =
       permissionMode === "restricted"
-        ? computePermissionsFromSelections(categorySelections)
+        ? computePermissionsFromSelections(effectiveCategorySelections)
         : undefined;
 
     const bindings = selectedScopes.map((s) => ({
@@ -312,7 +328,7 @@ export function EditApiKeyDrawer({
                 {permissionMode === "restricted" && (
                   <PermissionCounter
                     count={
-                      Object.values(categorySelections).filter(
+                      Object.values(effectiveCategorySelections).filter(
                         (v) => v && v !== "none",
                       ).length
                     }
@@ -322,7 +338,7 @@ export function EditApiKeyDrawer({
 
               {permissionMode === "restricted" && (
                 <PermissionCategoryList
-                  selections={categorySelections}
+                  selections={effectiveCategorySelections}
                   userPermissions={userPermissions}
                   onChange={setCategorySelections}
                 />

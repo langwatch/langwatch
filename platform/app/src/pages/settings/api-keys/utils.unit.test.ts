@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   categorizablePermissions,
+  categoryPermissions,
   PERMISSION_CATEGORIES,
 } from "../../../server/api-key/permission-categories";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
   bindingsToSelections,
+  clampSelectionsToAvailability,
   computeBindings,
   getUserPermissionsAcrossScopes,
   getUserPermissionsAtScope,
@@ -753,6 +755,78 @@ describe("getUserPermissionsAcrossScopes()", () => {
           scopeId: "team-1",
         }),
       );
+    });
+  });
+});
+
+describe("clampSelectionsToAvailability()", () => {
+  const tracesRead = categoryPermissions({ key: "traces", level: "read" });
+  const tracesWrite = categoryPermissions({ key: "traces", level: "write" });
+
+  describe("when the ceiling still covers the chosen level", () => {
+    it("keeps the selection untouched", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { traces: "write" },
+        userPermissions: tracesWrite,
+      });
+      expect(result).toEqual({ traces: "write" });
+    });
+  });
+
+  describe("when the ceiling shrank to read only", () => {
+    /** @scenario Customized permissions follow the scopes that are selected */
+    it("falls back to read instead of sending a refused write", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { traces: "write" },
+        userPermissions: tracesRead,
+      });
+      expect(result).toEqual({ traces: "read" });
+    });
+  });
+
+  describe("when the ceiling no longer covers the category at all", () => {
+    it("drops the selection to none", () => {
+      expect(
+        clampSelectionsToAvailability({
+          selections: { traces: "write" },
+          userPermissions: [],
+        }),
+      ).toEqual({ traces: "none" });
+      expect(
+        clampSelectionsToAvailability({
+          selections: { traces: "read" },
+          userPermissions: [],
+        }),
+      ).toEqual({ traces: "none" });
+    });
+  });
+
+  describe("when a selection names a category that does not exist", () => {
+    it("drops it rather than passing it through", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { "not-a-category": "write" },
+        userPermissions: categorizablePermissions(),
+      });
+      expect(result).toEqual({ "not-a-category": "none" });
+    });
+  });
+
+  describe("when the caller holds everything", () => {
+    it("leaves every category at the level it was set to", () => {
+      const selections = Object.fromEntries(
+        PERMISSION_CATEGORIES.map((category) => [
+          category.key,
+          category.accessLevels.includes("write")
+            ? ("write" as const)
+            : ("read" as const),
+        ]),
+      );
+      expect(
+        clampSelectionsToAvailability({
+          selections,
+          userPermissions: categorizablePermissions(),
+        }),
+      ).toEqual(selections);
     });
   });
 });

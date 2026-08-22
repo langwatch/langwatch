@@ -31,6 +31,7 @@ import {
   CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
   defaultCliKeyPermissions,
 } from "~/server/api-key/cli-key-defaults";
+import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -631,6 +632,50 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
         },
       });
       expect(active).toBe(1);
+    });
+  });
+
+  describe("when two logins for one device label are exchanged at the same time", () => {
+    /** @scenario "two logins racing on one device leave the newer key alive" */
+    it("revokes only the keys older than each mint, so the newest survives", async () => {
+      const HOSTNAME = `race-${suffix}`;
+      const first = await runFlow({ as: memberUser, hostname: HOSTNAME });
+      const firstKey = await prisma.apiKey.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          userId: MEMBER_ID,
+          createdByDeviceLabel: HOSTNAME,
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, createdAt: true },
+      });
+      expect(firstKey).not.toBeNull();
+
+      const second = await runFlow({ as: memberUser, hostname: HOSTNAME });
+      expect(second.cli_api_key).not.toBe(first.cli_api_key);
+      const secondKey = await mintedKeyFor({
+        userId: MEMBER_ID,
+        deviceLabel: HOSTNAME,
+      });
+      expect(secondKey).not.toBeNull();
+
+      // The first exchange's revoke, arriving after the second mint already
+      // landed — the interleaving the race produces. Excluding only its own
+      // key is not enough; without the createdBefore bound it would revoke
+      // the key the second exchange just handed to the CLI.
+      await CliLoginKeyService.create(prisma).revokeLoginKeysForDevice({
+        userId: MEMBER_ID,
+        organizationId: ORG_ID,
+        deviceLabel: HOSTNAME,
+        exceptApiKeyId: firstKey!.id,
+        createdBefore: firstKey!.createdAt,
+      });
+
+      const secondAfter = await prisma.apiKey.findFirst({
+        where: { id: secondKey!.id, organizationId: ORG_ID },
+        select: { revokedAt: true },
+      });
+      expect(secondAfter!.revokedAt).toBeNull();
     });
   });
 

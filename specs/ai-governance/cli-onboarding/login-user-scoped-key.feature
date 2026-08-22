@@ -86,6 +86,14 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then only the permissions both teams grant are sent on approval
       And the write level is unavailable on a row only one of the teams grants
 
+    @unit
+    Scenario: Customized permissions follow the scopes that are selected
+      Given the user customized the permission rows under one set of scopes
+      When a scope is added that grants less than the rows already chosen
+      Then each row drops to the highest level the new selection still grants
+      And the approval carries what the rows show, so it is never refused for
+        a level the screen still displayed as chosen
+
     @integration
     Scenario: approval with zero scopes selected is refused
       Given the user deselects every scope on the authorize screen
@@ -156,6 +164,14 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       When the user logs in again from "my-laptop" and completes the exchange
       Then the previous CLI key for that device label is revoked
       And exactly one active CLI key remains for that user and device label
+
+    @integration
+    Scenario: two logins racing on one device leave the newer key alive
+      Given two logins from the same device label are exchanged at the same
+        time
+      When both mints complete
+      Then each mint revokes only the keys created before its own
+      And the key the last exchange handed to the CLI is still active
 
     @integration
     Scenario: logout revokes the CLI key
