@@ -85,6 +85,17 @@ describe("parseCliJson", () => {
       }
     });
 
+    it("lifts the document under a log line that pads its first word", () => {
+      // The check used to read a fixed window, so the end anchor matched the
+      // end of the WINDOW. A scalar padded that far from the prose after it
+      // then read as a result cut short, and the document below it was lost.
+      for (const padding of [1, 35, 36, 37, 200]) {
+        const line = `[true${" ".repeat(padding)}retrying`;
+
+        expect(parseCliJson(`${line}\n{"total": 2}\n`)).toEqual({ total: 2 });
+      }
+    });
+
     it("still reads an array of literals as the document", () => {
       expect(parseCliJson("✔ Done\n[true, false, null]\n")).toEqual([
         true,
@@ -151,6 +162,13 @@ describe("parseCliJson", () => {
       // `true` here is followed by a comma, which is what a document puts
       // after it, so the array is cut short rather than a sentence.
       expect(parseCliJson("reading…\n[true, false")).toBeNull();
+    });
+
+    it("still stops on a result cut off at its first scalar", () => {
+      // Nothing follows the scalar because the output ends there. This is what
+      // the end anchor is for, so it has to keep working from the real end.
+      expect(parseCliJson("reading…\n[true")).toBeNull();
+      expect(parseCliJson("reading…\n[true\n")).toBeNull();
     });
 
     it("still stops on a truncated array of results, log line or not", () => {

@@ -16,14 +16,16 @@
 const MAX_CANDIDATES = 32;
 
 /**
- * A JSON scalar and the separator a document puts after it. Anchored, so it
- * reads the token AT the position rather than searching the rest of stdout.
+ * A JSON scalar and the separator a document puts after it.
+ *
+ * Sticky rather than `^`-anchored: it reads the token AT `lastIndex` without
+ * copying the rest of stdout to get there, and `$` keeps meaning the end of
+ * the output. Reading a fixed window instead made `$` match the end of the
+ * WINDOW, so a scalar padded that far from its prose read as a truncated
+ * result. `^` cannot be used with `y`, since it would pin the match to index 0.
  */
 const SCALAR_THEN_SEPARATOR =
-  /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(?:[,\]]|$)/;
-
-/** Room for the longest scalar worth reading, plus the separator after it. */
-const SCALAR_WINDOW = 40;
+  /(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(?:[,\]]|$)/y;
 
 function tryParse(candidate: string): { value: unknown } | null {
   try {
@@ -130,7 +132,8 @@ function opensJsonContent({
 function opensJsonValue({ text, at }: { text: string; at: number }): boolean {
   const char = text[at]!;
   if (char === '"' || char === "{" || char === "[") return true;
-  return SCALAR_THEN_SEPARATOR.test(text.slice(at, at + SCALAR_WINDOW));
+  SCALAR_THEN_SEPARATOR.lastIndex = at;
+  return SCALAR_THEN_SEPARATOR.test(text);
 }
 
 /**
