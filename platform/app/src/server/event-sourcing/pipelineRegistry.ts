@@ -1647,12 +1647,19 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // ============================================================================
 
 import { getApp } from "../app-layer/app";
+import {
+  commandAggregateType,
+  componentKillSwitchAggregate,
+} from "./domain/aggregateScope";
 // StaticPipelineDefinition is already imported at the top of the file.
 
 export interface ProjectionMetadata {
   projectionName: string;
   pipelineName: string;
+  /** The first declared aggregate type — the label. */
   aggregateType: string;
+  /** Every aggregate type the pipeline owns (ADR-113). */
+  aggregateTypes: readonly string[];
   source: "pipeline" | "global";
   pauseKey: string;
   kind: "fold" | "map" | "state";
@@ -1661,14 +1668,20 @@ export interface ProjectionMetadata {
 export interface SubscriberMetadata {
   subscriberName: string;
   pipelineName: string;
+  /** The first declared aggregate type — the label. */
   aggregateType: string;
+  /** Every aggregate type the pipeline owns (ADR-113). */
+  aggregateTypes: readonly string[];
   afterProjection: string;
 }
 
 export interface EventSubscriberMetadata {
   subscriberName: string;
   pipelineName: string;
+  /** The first declared aggregate type — the label. */
   aggregateType: string;
+  /** Every aggregate type the pipeline owns (ADR-113). */
+  aggregateTypes: readonly string[];
   /** The event types this subscriber reacts to — its transition triggers. */
   eventTypes: readonly string[];
 }
@@ -1688,12 +1701,14 @@ function getDefinitions(): ReadonlyArray<
 
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
+    const aggregateTypes = aggregateScope.types;
     const folds = Array.from(def.foldProjections.values()).map(
       ({ definition }) => ({
         projectionName: definition.name,
         pipelineName,
         aggregateType,
+        aggregateTypes,
         source: "pipeline" as const,
         pauseKey: `${pipelineName}/projection/${definition.name}`,
         kind: "fold" as const,
@@ -1704,6 +1719,7 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         projectionName: definition.name,
         pipelineName,
         aggregateType,
+        aggregateTypes,
         source: "pipeline" as const,
         // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
         // entry must use the `handler` segment to match the dispatcher's Lua check.
@@ -1716,6 +1732,7 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         projectionName: name,
         pipelineName,
         aggregateType,
+        aggregateTypes,
         source: "pipeline" as const,
         // State projections enqueue with `__jobType=stateProjection`; the
         // dispatcher matches the pause key against that raw segment.
@@ -1729,12 +1746,14 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
 
 export function getSubscriberMetadata(): SubscriberMetadata[] {
   return getDefinitions().flatMap((def) => {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
+    const aggregateTypes = aggregateScope.types;
     return Array.from(def.foldSubscribers.values()).map(
       ({ projectionName, definition }) => ({
         subscriberName: definition.name,
         pipelineName,
         aggregateType,
+        aggregateTypes,
         afterProjection: projectionName,
       }),
     );
@@ -1750,11 +1769,13 @@ export function getSubscriberMetadata(): SubscriberMetadata[] {
  */
 export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
   return getDefinitions().flatMap((def) => {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
+    const aggregateTypes = aggregateScope.types;
     return Array.from(def.eventSubscribers.values()).map((definition) => ({
       subscriberName: definition.name,
       pipelineName,
       aggregateType,
+      aggregateTypes,
       eventTypes: definition.eventTypes,
     }));
   });
@@ -1763,7 +1784,10 @@ export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
 export interface ProcessManagerMetadata {
   processName: string;
   pipelineName: string;
+  /** The first declared aggregate type — the label. */
   aggregateType: string;
+  /** Every aggregate type the pipeline owns (ADR-113). */
+  aggregateTypes: readonly string[];
   /** Event types that drive the machine's transitions. */
   eventTypes: readonly string[];
   /**
@@ -1793,11 +1817,13 @@ export interface ProcessManagerMetadata {
  */
 export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
   return getDefinitions().flatMap((def) => {
-    const { name: pipelineName, aggregateType } = def.metadata;
+    const { name: pipelineName, aggregateType, aggregateScope } = def.metadata;
+    const aggregateTypes = aggregateScope.types;
     return Array.from(def.processManagers.values()).map(({ config }) => ({
       processName: config.name,
       pipelineName,
       aggregateType,
+      aggregateTypes,
       eventTypes: config.eventTypes,
       intentTypes: Object.keys(config.intents ?? {}),
       scheduled: Boolean(config.schedule),
@@ -1831,10 +1857,17 @@ function killSwitchDescriptorsOf(
   def: StaticPipelineDefinition<any, any, any>,
 ): KillSwitchDescriptor[] {
   const out: KillSwitchDescriptor[] = [];
-  const { name: pipelineName, aggregateType } = def.metadata;
+  const { name: pipelineName, aggregateScope } = def.metadata;
+  // The segment the router consults: the type on a single-type pipeline, the
+  // pipeline name on a multi-aggregate one (ADR-113). Commands carry the type
+  // they are bound to instead.
+  const aggregateType = componentKillSwitchAggregate({
+    scope: aggregateScope,
+    pipelineName,
+  });
   for (const { definition } of def.foldProjections.values()) {
     out.push({
-      key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
+      key: generateKillSwitchKey(aggregateType, "projection", definition.name),
       aggregateType,
       componentType: "projection",
       componentName: definition.name,
@@ -1843,7 +1876,11 @@ function killSwitchDescriptorsOf(
   }
   for (const { definition } of def.mapProjections.values()) {
     out.push({
-      key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
+      key: generateKillSwitchKey(
+        aggregateType,
+        "mapProjection",
+        definition.name,
+      ),
       aggregateType,
       componentType: "mapProjection",
       componentName: definition.name,
@@ -1866,9 +1903,14 @@ function killSwitchDescriptorsOf(
     });
   }
   for (const cmd of def.commands) {
+    const commandAggregate = commandAggregateType({
+      scope: aggregateScope,
+      commandName: cmd.name,
+      declared: cmd.options?.aggregateType,
+    });
     out.push({
-      key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
-      aggregateType,
+      key: generateKillSwitchKey(commandAggregate, "command", cmd.name),
+      aggregateType: commandAggregate,
       componentType: "command",
       componentName: cmd.name,
       pipelineName,

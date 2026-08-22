@@ -7,8 +7,16 @@ import type {
 
 vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
   getProjectionMetadata: vi.fn(() => [
-    { projectionName: "traceMetrics", aggregateType: "Trace" },
-    { projectionName: "experimentRun", aggregateType: "Experiment" },
+    {
+      projectionName: "traceMetrics",
+      aggregateType: "Trace",
+      aggregateTypes: ["Trace"],
+    },
+    {
+      projectionName: "experimentRun",
+      aggregateType: "Experiment",
+      aggregateTypes: ["Experiment"],
+    },
   ]),
   getDejaViewProjections: vi.fn(() => [
     {

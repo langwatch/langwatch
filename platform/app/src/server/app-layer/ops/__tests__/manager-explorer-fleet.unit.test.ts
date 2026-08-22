@@ -38,6 +38,7 @@ function serviceWithCounts(
         processName,
         pipelineName: `${processName}.pipeline`,
         aggregateType: "aggregate",
+        aggregateTypes: ["aggregate"],
         eventTypes: [],
         intentTypes: [],
         scheduled: false,

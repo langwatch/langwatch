@@ -432,8 +432,8 @@ export class ManagerExplorerService {
     projectId: string;
     aggregateId: string;
   }): Promise<AggregateProcessManager[]> {
-    const managers = getProcessManagerMetadata().filter(
-      (m) => m.aggregateType === params.aggregateType && !m.scheduled,
+    const managers = this.registry().filter(
+      (m) => m.aggregateTypes.includes(params.aggregateType) && !m.scheduled,
     );
 
     return Promise.all(

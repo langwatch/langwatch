@@ -36,7 +36,9 @@ export class EventExplorerService {
       return { projections: [] };
     }
 
-    const aggregateTypes = [...new Set(selected.map((p) => p.aggregateType))];
+    const aggregateTypes = [
+      ...new Set(selected.flatMap((p) => p.aggregateTypes)),
+    ];
     const sinceMs = new Date(params.since).getTime();
 
     const rows = await this.repo.findAggregates({
@@ -68,8 +70,9 @@ export class EventExplorerService {
     }> = [];
 
     for (const projection of selected) {
-      const tenantBreakdown =
-        byAggregateType.get(projection.aggregateType) ?? [];
+      const tenantBreakdown = projection.aggregateTypes.flatMap(
+        (aggregateType) => byAggregateType.get(aggregateType) ?? [],
+      );
       const aggregateCount = tenantBreakdown.reduce(
         (sum, t) => sum + t.aggregateCount,
         0,
