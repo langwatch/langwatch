@@ -1,4 +1,16 @@
-package cmd
+// Package engineexec adapts engine.Engine onto app.WorkflowExecutor.
+//
+// It sits in adapters/ rather than in cmd/ so the integration harness can
+// drive the same executor the binary composes. It previously lived in cmd/,
+// which forced every test that wanted an executor to hand-copy it, and the
+// copies drifted: one dropped UntilNodeID and the api-key context, another
+// dropped seven more request fields plus the cost and duration on the result.
+// A harness that mistranslates the request cannot fail on a translation bug,
+// so the copies are gone and this is the only translation.
+//
+// The dependency graph stays one-way: this package imports app and engine,
+// and neither imports it.
+package engineexec
 
 import (
 	"context"
@@ -21,19 +33,22 @@ func withWorkflowAPIKey(ctx context.Context, wf *dsl.Workflow) context.Context {
 	return context.WithValue(ctx, otelsetup.APIKeyContextKey{}, wf.APIKey)
 }
 
-// engineAdapter satisfies app.WorkflowExecutor by parsing the raw
+// New returns the app.WorkflowExecutor that runs workflows on eng.
+func New(eng *engine.Engine) app.WorkflowExecutor {
+	return adapter{eng: eng}
+}
+
+// adapter satisfies app.WorkflowExecutor by parsing the raw
 // workflow JSON, invoking engine.Engine, and converting the result
-// back into the app-layer shape. Lives here (cmd/) rather than in app/
-// or engine/ to keep the dependency graph one-way: cmd composes both,
-// neither package imports the other.
-type engineAdapter struct {
+// back into the app-layer shape.
+type adapter struct {
 	eng *engine.Engine
 }
 
 // ExecuteStream implements app.WorkflowExecutor's streaming method.
 // Bridges engine.StreamEvent → app.WorkflowStreamEvent so the handler
 // stays decoupled from the engine package's wire shape.
-func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
+func (a adapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
 	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
 	if err != nil {
 		ch := make(chan app.WorkflowStreamEvent, 1)
@@ -80,7 +95,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 }
 
 // Execute implements app.WorkflowExecutor.
-func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
+func (a adapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
 	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
 	if err != nil {
 		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
