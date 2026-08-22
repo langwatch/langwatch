@@ -1,0 +1,61 @@
+import { resolveCredentials } from "../../utils/apiKey";
+
+/**
+ * Dispatch one typed UI action to the page the user has open, and print the
+ * result (specs/langy/langy-ui-actions.feature).
+ *
+ * This command only works while an agent turn is running: the control plane
+ * publishes the action on that turn's live stream, the open page claims and
+ * executes it, and the result comes back in this same HTTP call. Run
+ * standalone in a terminal there is no turn and no page, and the server
+ * answers `langy_ui_turn_inactive`.
+ *
+ * The payload is opaque here on purpose — the server owns the action schemas
+ * (`langwatch ui actions` prints them) and refuses anything that does not
+ * parse, so this command never has to track them.
+ */
+export const uiCallCommand = async (
+  kind: string,
+  options: { payload?: string },
+): Promise<void> => {
+  const { apiKey, endpoint } = await resolveCredentials();
+
+  const conversationId = process.env.LANGY_CONVERSATION_ID;
+  if (!conversationId) {
+    process.stderr.write(
+      "ui call needs LANGY_CONVERSATION_ID in the environment. It is set for agent workers; outside one there is no page to drive.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  let payload: unknown = {};
+  if (options.payload) {
+    try {
+      payload = JSON.parse(options.payload);
+    } catch {
+      process.stderr.write("--payload is not valid JSON\n");
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": apiKey,
+    },
+    body: JSON.stringify({ conversationId, kind, payload }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    // The body is the canonical handled-error envelope — code, meta, tips.
+    // Print it whole so the agent can read the code and act on the tips.
+    process.stderr.write(`${text}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(text);
+};

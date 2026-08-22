@@ -679,6 +679,18 @@ export type EvaluationsV3Actions = {
    * the entity they reference.
    */
   duplicateTarget: (targetId: string, name?: string) => string | undefined;
+  /**
+   * Run one transform-backed workbench action from `actions/manifest.ts`
+   * against the live store — the browser leg of the agent's UI-action channel
+   * (specs/langy/langy-ui-actions.feature). Parses the payload with the
+   * action's own schema, applies its transform in ONE `set` (one undo entry),
+   * and returns the transform's result. THROWS on an unknown or non-transform
+   * kind, an invalid payload, or a transform refusal — unlike the silent
+   * no-op UI actions, the caller here is a machine that needs the reason.
+   * Typed loosely because `types.ts` cannot import the manifest (its schemas
+   * import this file).
+   */
+  applyWorkbenchAction: (args: { kind: string; payload: unknown }) => unknown;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
   /** Write a target's unsaved prompt draft, and the variables that came with it */

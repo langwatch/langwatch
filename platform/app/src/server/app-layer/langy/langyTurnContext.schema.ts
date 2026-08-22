@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LANGY_RESOURCE_KINDS } from "~/shared/langy/langyResourceKinds";
 import { LANGY_SKILLS } from "~/shared/langy/langySkills";
+import { CHIP_KIND_TO_MANIFEST } from "./ui-actions/pageManifests";
 
 /**
  * THE WIRE SHAPE for everything the composer attaches to a turn — and the one
@@ -255,6 +256,19 @@ export function renderLangyTurnContext(
         "",
         ...resources,
       ].join("\n"),
+    );
+  }
+
+  // One line, only when a chip's kind maps to a page with a UI-action
+  // manifest: the page the user is on can be driven live. The full catalog
+  // stays behind `langwatch ui actions` so this block never grows with it.
+  if (
+    (context.pageContext ?? []).some(
+      (chip) => CHIP_KIND_TO_MANIFEST[chip.kind] !== undefined,
+    )
+  ) {
+    blocks.push(
+      "This page accepts live UI actions: run `langwatch ui actions` to list them, and `langwatch ui call <kind> --payload '<json>'` to drive the page the user is watching.",
     );
   }
 

@@ -63,7 +63,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { api } from "~/utils/api";
+import { api, trpcClient } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
@@ -147,6 +147,8 @@ import {
   type LangyPanelMode,
   useLangyStore,
 } from "../stores/langyStore";
+import { executeUiAction } from "../uiActions/executeUiAction";
+import type { LangyUiActionHandlers } from "../uiActions/types";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
 import {
@@ -302,9 +304,13 @@ function onLangyProfilerRender(
 
 interface LangySidecarProps {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+  actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
 }
 
-export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
+export function LangySidecar({
+  proposalHandlersRef,
+  actionHandlersRef,
+}: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
   const openPanel = useLangyStore((s) => s.openPanel);
@@ -330,6 +336,7 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
       <LangyContextTargetLayer />
       <LangyPanel
         proposalHandlersRef={proposalHandlersRef}
+        actionHandlersRef={actionHandlersRef}
         peekEnabled={peekDock.enabled}
         onOpen={openPanel}
       />
@@ -448,10 +455,12 @@ function LangyLauncher({
 
 function LangyPanel({
   proposalHandlersRef,
+  actionHandlersRef,
   peekEnabled,
   onOpen,
 }: {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+  actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
   /**
    * Minimising slides this panel down to a sliver of its own header instead
    * of hiding it outright (`release_ui_langy_peek_dock_enabled`). Flag off,
@@ -701,6 +710,11 @@ function LangyPanel({
   // "a double-fire must not repeat the effect" shape.
   const navigatedInstructionsRef = useRef<Set<string>>(new Set());
 
+  // UI actions already claimed or dropped on this client, keyed by
+  // turnId+actionId (`uiActionDedupKey`) — the same replay problem, and the
+  // same per-turn reset, as the navigate dedup above.
+  const uiActionSeenRef = useRef<Set<string>>(new Set());
+
   // `router` (from react-router underneath) gets a new identity on every
   // route change; the transport below is memoised once (`[]`), so it reads
   // through a ref the render keeps fresh rather than closing over a router
@@ -728,6 +742,7 @@ function LangyPanel({
           useLangyStore.getState().beginTurn({ conversationId, turnId });
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
+          uiActionSeenRef.current = new Set();
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -745,6 +760,49 @@ function LangyPanel({
           // mounted, so the in-flight response keeps streaming right through
           // the move.
           void routerRef.current.push(entry.href);
+        },
+        onUiAction: (entry) => {
+          // The agent asking THIS page to carry out a typed action. All the
+          // decisions (dedup, claim, schema re-parse, handler run, completion)
+          // live in executeUiAction; this closure only supplies the live ids
+          // and the tRPC legs. Errors are swallowed here the way a dropped
+          // claim is: the dispatch side has its own timeout and reports to
+          // the agent, so a failed claim call must not crash the stream.
+          const store = useLangyStore.getState();
+          const projectId = turnContextRef.current?.projectId;
+          const conversationId = store.activeConversationId;
+          const turnId = store.activeTurnId;
+          if (!projectId || !conversationId || !turnId) return;
+          void executeUiAction({
+            entry,
+            turnId,
+            seen: uiActionSeenRef.current,
+            handlers: actionHandlersRef?.current ?? {},
+            claim: ({ actionId }) =>
+              trpcClient.langy.claimUiAction.mutate({
+                projectId,
+                conversationId,
+                turnId,
+                actionId,
+              }),
+            complete: ({ actionId, ok, result, errorCode }) =>
+              trpcClient.langy.completeUiAction.mutate({
+                projectId,
+                conversationId,
+                turnId,
+                actionId,
+                ok,
+                ...(result !== undefined ? { result } : {}),
+                ...(errorCode ? { errorCode } : {}),
+              }),
+            onHandlerError: ({ kind }) => {
+              toaster.create({
+                title: "Langy's change didn't apply",
+                description: `The page could not carry out ${kind}. Nothing else was affected.`,
+                type: "error",
+              });
+            },
+          }).catch(() => undefined);
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();

@@ -384,6 +384,37 @@ const registry = {
       "Wait for the current response to finish before sending another message",
     ],
   },
+  langy_ui_turn_inactive: {
+    tips: [
+      "UI actions only work while your own turn is running — this command must be run by the agent during a conversation, not standalone",
+    ],
+  },
+  langy_ui_action_unknown: {
+    tips: [
+      "Run `langwatch ui actions` to list the actions the current page accepts",
+    ],
+  },
+  langy_ui_payload_invalid: {
+    tips: [
+      "Read meta.issues — each entry names the offending payload field and what was expected",
+      "Run `langwatch ui actions` to see the action's payload schema",
+    ],
+  },
+  langy_ui_no_browser: {
+    tips: [
+      "The user has no page open that can run this action — tell them what you wanted to do, or use the equivalent API command instead",
+    ],
+  },
+  langy_ui_timeout: {
+    tips: [
+      "The page may have applied part of the action — read the current state (for example `langwatch workbench get-state`) before retrying",
+    ],
+  },
+  langy_ui_handler_failed: {
+    tips: [
+      "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
+    ],
+  },
   langy_rate_limited: {
     tips: ["Wait a few seconds before sending another message"],
   },

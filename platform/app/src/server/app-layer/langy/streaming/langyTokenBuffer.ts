@@ -79,6 +79,15 @@ export type LangyStreamEntry =
   // design: never a durable event, so reopening a past conversation (which
   // reads the durable fold, not this buffer) never replays a navigation.
   | { type: "navigate"; href: string }
+  // The agent asking the OPEN PAGE to carry out one typed action (duplicate a
+  // workbench column, edit a prompt draft, start a run). `kind` names an entry
+  // in a page's action manifest and `payload` has already passed that entry's
+  // schema server-side before it was appended — the browser re-parses with the
+  // same schema and never executes anything else. LIVE-ONLY like `navigate`:
+  // never a durable event, so reopening a past conversation can never replay
+  // an action. `actionId` is the server-minted claim/result key, which makes
+  // the whole round trip at-most-once.
+  | { type: "ui"; actionId: string; kind: string; payload: unknown }
   | { type: "end" }
   | { type: "error"; error: string };
 
@@ -442,6 +451,35 @@ export class LangyTokenBuffer {
     href: string;
   }): Promise<void> {
     await this.append(conversationId, turnId, { type: "navigate", href });
+  }
+
+  /**
+   * Push a live-only UI action for the attached page to claim and execute.
+   * The caller (the UI-action service) has already validated `kind` against
+   * the page manifest and `payload` against that kind's schema, and pinned the
+   * action to this conversation + turn in Redis; nothing agent-authored
+   * reaches the stream unvalidated. No durable event is ever written: like
+   * `navigate`, an action fires at most once, on the live edge.
+   */
+  async appendUiAction({
+    conversationId,
+    turnId,
+    actionId,
+    kind,
+    payload,
+  }: {
+    conversationId: string;
+    turnId: string;
+    actionId: string;
+    kind: string;
+    payload: unknown;
+  }): Promise<void> {
+    await this.append(conversationId, turnId, {
+      type: "ui",
+      actionId,
+      kind,
+      payload,
+    });
   }
 
   /**

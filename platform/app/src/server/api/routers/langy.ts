@@ -30,6 +30,10 @@ import {
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import {
+  LangyUiActionService,
+  type UiActionRedis,
+} from "~/server/app-layer/langy/ui-actions/ui-action.service";
 import type { Session } from "~/server/auth";
 import {
   checkLangyMessageRateLimit,
@@ -243,6 +247,16 @@ async function canWatchTurn({
     userId,
   });
   return !!conv;
+}
+
+/** The claim/complete side of the UI-action channel, on the shared app deps. */
+function createUiActionService(): LangyUiActionService {
+  const redis = getApp().redis as unknown as UiActionRedis;
+  return new LangyUiActionService({
+    redis,
+    conversations: getApp().langy.conversations,
+    buffer: createLangyTokenBuffer({ redis: getApp().redis }),
+  });
 }
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */
@@ -744,6 +758,76 @@ export const langyRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return { stopped: true };
+    }),
+
+  /**
+   * The page asking to execute a dispatched UI action
+   * (specs/langy/langy-ui-actions.feature). First successful claim wins across
+   * every tab and every stream replay; everyone else gets `claimed: false` and
+   * drops. `langy:view` on purpose: executing happens under the human's own
+   * session on their own page, and the dispatch already enforced the action's
+   * real permission against the agent's session key. The pending record the
+   * dispatch pinned in Redis is what this claim is verified against, so a
+   * claim can never attach to another project's or another turn's action.
+   */
+  claimUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        turnId: z.string(),
+        actionId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ claimed: boolean }> => {
+      const userId = ctx.session.user.id;
+      if (
+        !(await canWatchTurn({
+          projectId: input.projectId,
+          conversationId: input.conversationId,
+          turnId: input.turnId,
+          userId,
+        }))
+      ) {
+        return { claimed: false };
+      }
+      return await createUiActionService().claim({
+        projectId: input.projectId,
+        userId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        actionId: input.actionId,
+      });
+    }),
+
+  /**
+   * The page reporting a claimed action's outcome. Only the claiming user may
+   * complete; anything else is dropped as `accepted: false` — the dispatch has
+   * its own timeout, so a dropped completion cannot wedge the agent.
+   */
+  completeUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        turnId: z.string(),
+        actionId: z.string(),
+        ok: z.boolean(),
+        result: z.unknown().optional(),
+        errorCode: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ accepted: boolean }> => {
+      return await createUiActionService().complete({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        actionId: input.actionId,
+        completion: {
+          ok: input.ok,
+          ...(input.result !== undefined ? { result: input.result } : {}),
+          ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+        },
+      });
     }),
 
   /**

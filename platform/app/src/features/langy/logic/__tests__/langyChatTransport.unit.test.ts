@@ -451,6 +451,48 @@ describe("createLangyChatTransport", () => {
     });
   });
 
+  describe("when the live stream carries a UI action", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    it("forwards it to onUiAction as a bare passthrough, not a message chunk", async () => {
+      const onUiAction = vi.fn();
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onUiAction, onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      const entry = {
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      };
+      onData(entry);
+
+      expect(onUiAction).toHaveBeenCalledWith(entry);
+      expect(onSignal).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no onUiAction dep is wired", async () => {
+      const { transport } = makeTransport({ conversationId: null }, {});
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      expect(() =>
+        onData({ type: "ui", actionId: "a1", kind: "x", payload: {} }),
+      ).not.toThrow();
+    });
+  });
+
   describe("reconnectToStream", () => {
     it("returns null — resume is a panel-driven re-subscribe, not a transport reconnect", async () => {
       const { transport } = makeTransport();

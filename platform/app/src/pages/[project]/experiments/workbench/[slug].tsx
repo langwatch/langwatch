@@ -2,6 +2,11 @@ import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import {
+  WORKBENCH_ACTION_KINDS,
+  WORKBENCH_ACTIONS,
+} from "~/experiments-v3/actions/manifest";
+import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
@@ -17,7 +22,11 @@ import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
 import { HandledErrorAlert } from "~/features/errors";
 import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
-import { useRegisterLangyHandlers } from "~/features/langy/LangyContext";
+import {
+  useRegisterLangyActions,
+  useRegisterLangyHandlers,
+} from "~/features/langy/LangyContext";
+import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -279,6 +288,68 @@ export default function ExperimentsWorkbenchPage() {
   ]);
 
   useRegisterLangyHandlers(proposalHandlers, { experimentSlug: slug });
+
+  // The live UI actions this page executes for the agent
+  // (specs/langy/langy-ui-actions.feature). Transform-backed kinds run
+  // through the store's one shared code path (`applyWorkbenchAction`), so an
+  // agent edit and a user edit are the same mutation, one undo entry each.
+  // Reads project the LIVE store — unsaved prompt drafts, pending cells and
+  // in-memory results included, which the saved copy cannot show.
+  const uiActionHandlers = useMemo<LangyUiActionHandlers>(() => {
+    const handlers: LangyUiActionHandlers = {};
+    for (const kind of WORKBENCH_ACTION_KINDS) {
+      const definition = WORKBENCH_ACTIONS[kind];
+      if (definition.backend !== "transform") continue;
+      handlers[kind] = {
+        payloadSchema: definition.payloadSchema,
+        run: (payload: unknown) =>
+          useEvaluationsV3Store
+            .getState()
+            .applyWorkbenchAction({ kind, payload }),
+      };
+    }
+    handlers["workbench.getState"] = {
+      payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
+      run: (payload: { includeResults?: boolean }) => {
+        const state = useEvaluationsV3Store.getState();
+        return projectWorkbenchState({
+          state: {
+            name: state.name,
+            datasets: state.datasets,
+            activeDatasetId: state.activeDatasetId,
+            evaluators: state.evaluators,
+            targets: state.targets,
+            ...(state.experimentId ? { experimentId: state.experimentId } : {}),
+            ...(state.experimentSlug
+              ? { experimentSlug: state.experimentSlug }
+              : {}),
+          },
+          ...(payload.includeResults === false
+            ? {}
+            : { results: state.results }),
+        });
+      },
+    };
+    handlers["workbench.run"] = {
+      payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
+      run: (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
+        // Fire-and-forget like the run proposal: the run streams into the
+        // table the user is watching, and the agent polls the runs API for
+        // completion. Scope maps best-effort onto ExecutionScope — a target
+        // AND a row subset cannot be expressed together yet, rows win.
+        const scope = payload.rowIndices?.length
+          ? { type: "rows" as const, rowIndices: payload.rowIndices }
+          : payload.targetIds?.length === 1 && payload.targetIds[0]
+            ? { type: "target" as const, targetId: payload.targetIds[0] }
+            : { type: "full" as const };
+        void executeEvaluation(scope);
+        return { status: "running" as const };
+      },
+    };
+    return handlers;
+  }, [executeEvaluation]);
+
+  useRegisterLangyActions(uiActionHandlers);
 
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();

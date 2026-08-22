@@ -72,6 +72,12 @@ export interface LangyChatTransportDeps {
    * holds both the router and the active turn id the dedup key needs.
    */
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  /**
+   * Forward a live-only UI action for the page to claim and execute, bare
+   * passthrough like `onNavigate` — dedup, the claim race, and the handler
+   * lookup all live in the panel's orchestration (`executeUiAction`).
+   */
+  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
@@ -162,6 +168,7 @@ export function createLangyChatTransport(
         turnId,
         onSignal: deps.onSignal,
         ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
+        ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
         onSettled: deps.onTurnSettled,
         ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
@@ -187,6 +194,7 @@ function subscribeTurnStream({
   turnId,
   onSignal,
   onNavigate,
+  onUiAction,
   onSettled,
   onWireEntry,
   abortSignal,
@@ -196,6 +204,7 @@ function subscribeTurnStream({
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
@@ -273,6 +282,12 @@ function subscribeTurnStream({
             // Not a message part, not a signal the status line renders — a
             // one-shot action. Bare passthrough; the panel owns dedup + routing.
             onNavigate?.(entry);
+            return;
+          case "ui":
+            // Same contract as navigate: a one-shot instruction for the page,
+            // never a message part. The panel owns dedup, the claim, and the
+            // handler execution.
+            onUiAction?.(entry);
             return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });

@@ -3,6 +3,11 @@ import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
 import {
+  isWorkbenchActionKind,
+  WORKBENCH_ACTIONS,
+  type WorkbenchActionDefinition,
+} from "../actions/manifest";
+import {
   addColumn as addColumnTransform,
   attachEvaluator,
   attachTarget,
@@ -593,6 +598,29 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         }),
       ),
     );
+  },
+
+  applyWorkbenchAction: ({ kind, payload }) => {
+    // Widened to the definition type: the per-kind union makes `transform`
+    // inaccessible because the read/run kinds don't carry one.
+    const definition: WorkbenchActionDefinition | undefined =
+      isWorkbenchActionKind(kind) ? WORKBENCH_ACTIONS[kind] : undefined;
+    const transform = definition?.transform;
+    if (!definition || !transform) {
+      throw new Error(`No transform-backed workbench action "${kind}"`);
+    }
+    const parsed: unknown = definition.payloadSchema.parse(payload);
+    let result: unknown;
+    set((state) => {
+      const applied = runTransform({
+        state,
+        transform: transform as Transform<unknown, unknown>,
+        payload: parsed,
+      });
+      result = applied.result;
+      return applied.slice;
+    });
+    return result;
   },
 
   duplicateTarget: (targetId, name) => {

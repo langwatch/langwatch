@@ -3065,6 +3065,47 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await impl(resourceId);
     });
 
+  // Drive the page the user has open with typed UI actions. Agent plumbing
+  // like `navigate`: only works mid-turn, when the platform can reach the
+  // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.
+  const uiCmd = program
+    .command("ui")
+    .description("Drive the page the user has open with typed actions");
+
+  uiCmd
+    .command("call <kind>")
+    .description("Dispatch one UI action to the open page and print its result")
+    .option("--payload <json>", "The action's payload as JSON (default: {})")
+    .action(async (kind: string, options: { payload?: string }) => {
+      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+      await impl(kind, options);
+    });
+
+  uiCmd
+    .command("actions")
+    .description("List the UI actions pages accept, with their schemas")
+    .action(async () => {
+      const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
+      await impl();
+    });
+
+  const workbenchCmd = program
+    .command("workbench")
+    .description("Work with the evaluations workbench the user has open");
+
+  workbenchCmd
+    .command("get-state")
+    .description(
+      "Read the open workbench as the user sees it, unsaved edits included",
+    )
+    .option("--no-include-results", "Leave the results summary out")
+    .action(async (options: { includeResults?: boolean }) => {
+      const { workbenchGetStateCommand: impl } = await import(
+        "./commands/workbench/get-state.js"
+      );
+      await impl(options);
+    });
+
   // Add dataset command group
   const datasetCmd = program
     .command("dataset")
