@@ -43,7 +43,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
 
   async store(state: TData, context: ProjectionStoreContext): Promise<void> {
     const projection: Projection = {
-      id: context.aggregateId,
+      id: context.key ?? context.aggregateId,
       aggregateId: context.aggregateId,
       tenantId: context.tenantId,
       version: this.version,
@@ -72,7 +72,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
     // entry's tenant/retention (a multitenancy + retention correctness hazard).
     if (this.repo.storeProjectionBatch && this.isUniformContext(entries)) {
       const projections = entries.map((entry) => ({
-        id: entry.context.aggregateId,
+        id: entry.context.key ?? entry.context.aggregateId,
         aggregateId: entry.context.aggregateId,
         tenantId: entry.context.tenantId,
         version: this.version,

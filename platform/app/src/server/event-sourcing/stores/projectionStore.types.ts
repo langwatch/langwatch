@@ -120,6 +120,12 @@ export interface ProjectionStore<
    * **Race Condition Warning:** Multiple concurrent rebuilds of the same aggregate can
    * result in lost updates. Implementers should consider adding version checks.
    *
+   * **Row key:** `projection.id` is the key a later `getProjection(id)` reads
+   * back by. It equals `projection.aggregateId` on a single-type pipeline, and
+   * is `${aggregateType}:${aggregateId}` on a pipeline that owns several
+   * aggregate types (ADR-113), so a store must key by `id`, never by
+   * `aggregateId`.
+   *
    * @example
    * ```typescript
    * async storeProjection(projection: Projection, context: { tenantId: string }): Promise<void> {

@@ -26,6 +26,14 @@ import {
 import { toError } from "~/utils/posthogErrorCapture";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import {
+  type AggregateScope,
+  componentKillSwitchAggregate,
+  foldStateKey,
+  isMultiAggregate,
+  primaryAggregateType,
+  toAggregateScope,
+} from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
@@ -148,15 +156,32 @@ export class ProjectionRouter<
     EventSubscriberDefinition<EventType>
   >();
 
+  private readonly aggregateScope: AggregateScope;
+  /** The first declared type — a label for spans and errors, never a key. */
+  private readonly aggregateType: AggregateType;
+  /**
+   * The aggregate segment of this pipeline's projection and subscriber
+   * kill-switch keys: the type on a single-type pipeline, the pipeline name
+   * on a multi-aggregate one (ADR-113).
+   */
+  private readonly killSwitchAggregate: string;
+
   constructor(
-    private readonly aggregateType: AggregateType,
+    aggregateScope: AggregateType | AggregateScope,
     private readonly pipelineName: string,
     private readonly queueManager: QueueManager<EventType>,
     private readonly featureFlagService?: FeatureFlagServiceInterface,
     private readonly processRole?: ProcessRole,
     private readonly replayMarkerChecker?: ReplayMarkerChecker,
     private readonly retentionPolicyResolver?: RetentionPolicyResolver,
-  ) {}
+  ) {
+    this.aggregateScope = toAggregateScope(aggregateScope);
+    this.aggregateType = primaryAggregateType(this.aggregateScope);
+    this.killSwitchAggregate = componentKillSwitchAggregate({
+      scope: this.aggregateScope,
+      pipelineName,
+    });
+  }
 
   registerFoldProjection(
     projection: FoldProjectionDefinition<any, EventType>,
@@ -192,14 +217,20 @@ export class ProjectionRouter<
   ): void {
     if (projection.options?.trustAbsentMiss !== true) return;
     if (projection.options.readWindow === undefined) return;
-    if (TIME_LOCAL_AGGREGATE_TYPES.has(this.aggregateType)) return;
+    // Every aggregate the pipeline declares must be time-local: an absent read
+    // proves nothing for a long-lived aggregate sharing the fold.
+    const longLived = this.aggregateScope.types.filter(
+      (type) => !TIME_LOCAL_AGGREGATE_TYPES.has(type),
+    );
+    if (longLived.length === 0) return;
 
     throw new ConfigurationError(
       "ProjectionRouter",
-      `Fold projection "${projection.name}" trusts an absent windowed read but its aggregate type "${this.aggregateType}" is not time-local: rows of such an aggregate outlive any window width, so an absent read is not proof the state was never committed.`,
+      `Fold projection "${projection.name}" trusts an absent windowed read but its aggregate type "${longLived.join(", ")}" is not time-local: rows of such an aggregate outlive any window width, so an absent read is not proof the state was never committed.`,
       {
         projectionName: projection.name,
-        aggregateType: this.aggregateType,
+        aggregateType: longLived[0],
+        aggregateTypes: this.aggregateScope.types,
       },
     );
   }
@@ -1122,7 +1153,7 @@ export class ProjectionRouter<
         for (const event of events) {
           const disabled = await isComponentDisabled({
             featureFlagService: this.featureFlagService,
-            aggregateType: this.aggregateType,
+            aggregateType: this.killSwitchAggregate,
             componentType: "mapProjection",
             componentName: name,
             tenantId: event.tenantId,
@@ -1186,7 +1217,7 @@ export class ProjectionRouter<
 
           const disabled = await isComponentDisabled({
             featureFlagService: this.featureFlagService,
-            aggregateType: this.aggregateType,
+            aggregateType: this.killSwitchAggregate,
             componentType: "mapProjection",
             componentName: name,
             tenantId: event.tenantId,
@@ -1371,7 +1402,7 @@ export class ProjectionRouter<
         if (cached !== undefined) return cached;
         const disabled = await isComponentDisabled({
           featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
+          aggregateType: this.killSwitchAggregate,
           componentType: "subscriber",
           componentName: name,
           tenantId,
@@ -1590,7 +1621,7 @@ export class ProjectionRouter<
 
         const disabled = await isComponentDisabled({
           featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
+          aggregateType: this.killSwitchAggregate,
           componentType: "projection",
           componentName: projectionName,
           tenantId: first.tenantId,
@@ -1710,7 +1741,7 @@ export class ProjectionRouter<
         // Check kill switch
         const disabled = await isComponentDisabled({
           featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
+          aggregateType: this.killSwitchAggregate,
           componentType: "projection",
           componentName: projectionName,
           tenantId: event.tenantId,
@@ -1884,7 +1915,7 @@ export class ProjectionRouter<
         // Check kill switch (all events share the tenant)
         const disabled = await isComponentDisabled({
           featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
+          aggregateType: this.killSwitchAggregate,
           componentType: "projection",
           componentName: projectionName,
           tenantId: events[0]!.tenantId,
@@ -2306,9 +2337,22 @@ export class ProjectionRouter<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
+    options?: { key?: string; aggregateType?: AggregateType },
   ): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
+    // On a multi-aggregate pipeline the row is keyed by type and id, so the
+    // caller must say which aggregate it is reading.
+    if (
+      options?.key === undefined &&
+      options?.aggregateType === undefined &&
+      isMultiAggregate(this.aggregateScope)
+    ) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `getProjectionByName("${projectionName}") on a pipeline that declares ${this.aggregateScope.types.join(", ")} needs options.aggregateType to key the read`,
+        { projectionName, aggregateTypes: this.aggregateScope.types },
+      );
+    }
 
     const fold = this.foldProjections.get(projectionName);
     if (!fold) {
@@ -2320,10 +2364,19 @@ export class ProjectionRouter<
       );
     }
 
-    const lookupKey = options?.key ?? aggregateId;
+    const lookupKey =
+      options?.key ??
+      (options?.aggregateType !== undefined
+        ? foldStateKey(this.aggregateScope, {
+            aggregateType: options.aggregateType,
+            aggregateId,
+          })
+        : undefined) ??
+      aggregateId;
     const storeContext: ProjectionStoreContext = {
       aggregateId,
       tenantId: context.tenantId,
+      ...(lookupKey !== aggregateId ? { key: lookupKey } : {}),
     };
 
     const state = await fold.store.get(lookupKey, storeContext);
@@ -2416,10 +2469,11 @@ export class ProjectionRouter<
     isDeliveryContinuation?: boolean;
   }): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
+    const stateKey = key ?? foldStateKey(this.aggregateScope, event);
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,
-      ...(key !== undefined ? { key } : {}),
+      ...(stateKey !== undefined ? { key: stateKey } : {}),
       ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
       ...(isDeliveryContinuation !== undefined
         ? { isDeliveryContinuation }

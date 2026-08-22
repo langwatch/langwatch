@@ -109,7 +109,7 @@ function makeQueuedRouter(
   } as unknown as EventSourcedQueueProcessor<Record<string, unknown>>;
 
   const queueManager = new QueueManager<Event>({
-    aggregateType,
+    aggregateScope: aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     globalQueue,
     globalJobRegistry: new Map<string, JobRegistryEntry>(),
@@ -137,7 +137,7 @@ function makeInlineRouter(
     aggregateType,
     TEST_CONSTANTS.PIPELINE_NAME,
     new QueueManager<Event>({
-      aggregateType,
+      aggregateScope: aggregateType,
       pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     }),
   );

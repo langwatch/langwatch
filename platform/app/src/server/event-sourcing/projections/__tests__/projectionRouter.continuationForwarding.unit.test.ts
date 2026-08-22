@@ -40,7 +40,7 @@ describe("continuation forwarding", () => {
         }
       >();
       const queueManager = new QueueManager<Event>({
-        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        aggregateScope: TEST_CONSTANTS.AGGREGATE_TYPE,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         globalQueue: {} as never,
         globalJobRegistry: registry as never,

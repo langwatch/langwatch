@@ -15,14 +15,18 @@ export type KillSwitchComponentType =
 
 /**
  * Generates a feature flag key for a component kill switch.
- * Pattern: es-{aggregateType}-{componentType}-{componentName}-killswitch
+ * Pattern: es-{aggregate}-{componentType}-{componentName}-killswitch
+ *
+ * The aggregate segment is the pipeline's aggregate type, or — for a
+ * projection or subscriber on a pipeline that owns several aggregates
+ * (ADR-113) — the pipeline name, since such a component has no one type.
  *
  * Return type is the typed `EsKillSwitchKey` template literal so callers
  * passing the result to `featureFlagService.isEnabled` satisfy the
  * `FeatureFlagKey` constraint without a cast.
  */
 export function generateKillSwitchKey(
-  aggregateType: AggregateType,
+  aggregateType: AggregateType | string,
   componentType: KillSwitchComponentType,
   componentName: string,
 ): EsKillSwitchKey {
@@ -43,7 +47,7 @@ export async function isComponentDisabled({
   logger,
 }: {
   featureFlagService: FeatureFlagServiceInterface | undefined;
-  aggregateType: AggregateType;
+  aggregateType: AggregateType | string;
   componentType: KillSwitchComponentType;
   componentName: string;
   tenantId: string;

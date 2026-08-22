@@ -98,7 +98,7 @@ describe("state projection coalescing wiring", () => {
     it("puts the limit and a processBatch on the registry entry, and omits processBatch for the default of one", () => {
       const registry = new Map<string, JobRegistryEntry>();
       const queueManager = new QueueManager<Event>({
-        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        aggregateScope: TEST_CONSTANTS.AGGREGATE_TYPE,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         globalQueue: {} as never,
         globalJobRegistry: registry as never,

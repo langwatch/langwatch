@@ -44,7 +44,9 @@ export abstract class BaseMemoryProjectionStore<
     projection: T,
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
-    const key = this.getKey(context.tenantId, projection.aggregateId);
+    // `id` is the row key (it is the aggregate id on a single-type pipeline,
+    // and type-qualified on a multi-aggregate one); see ProjectionStore.
+    const key = this.getKey(context.tenantId, projection.id);
     this.store.set(key, projection);
   }
 }
