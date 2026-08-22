@@ -31,7 +31,10 @@ import {
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
-import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import {
+  checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
+} from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import {
   type LangyConversationDetailDto,
@@ -772,6 +775,26 @@ export const langyRouter = createTRPCRouter({
         ctx,
       }): Promise<{ conversationId: string | null; warmed: boolean }> => {
         try {
+          // The warm skips langyTurnProcedure so a panel open never spends the
+          // message budget, but each call can mint a conversation, mint a
+          // session key and ask for a worker, so it carries its own looser
+          // budget. Over it, the answer is the same silent one every other
+          // warm failure gives: no error to the panel, a cold start on the
+          // first message.
+          const rl = await checkLangyWarmRateLimit({
+            userId: ctx.session.user.id,
+            projectId: input.projectId,
+          });
+          if (!rl.allowed) {
+            logger.warn(
+              { projectId: input.projectId },
+              "langy warm rate limited, cold start on first message",
+            );
+            return {
+              conversationId: input.conversationId ?? null,
+              warmed: false,
+            };
+          }
           return await getApp().langy.turns.warmConversationWorker({
             projectId: input.projectId,
             session: ctx.session,

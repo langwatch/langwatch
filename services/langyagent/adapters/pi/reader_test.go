@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// startTestReader wires a reader over an in-process pipe and runs it.
 func startTestReader(t *testing.T) (*reader, io.WriteCloser) {
 	t.Helper()
 	pr, pw := io.Pipe()

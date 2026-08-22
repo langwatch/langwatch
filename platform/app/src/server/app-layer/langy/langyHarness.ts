@@ -39,12 +39,12 @@ export async function resolveLangyHarness({
   flags?: Pick<typeof featureFlagService, "isEnabled">;
 }): Promise<LangyHarness> {
   try {
-    const pi = await flags.isEnabled(LANGY_PI_HARNESS_FLAG, {
+    const isPiHarnessEnabled = await flags.isEnabled(LANGY_PI_HARNESS_FLAG, {
       distinctId: userId,
       projectId,
       organizationId,
     });
-    return pi ? "pi" : "opencode";
+    return isPiHarnessEnabled ? "pi" : "opencode";
   } catch (error) {
     // Fall back to the flag's own default (pi): after the cutover that is
     // what almost every project resolves to, so a flag-store blip changes

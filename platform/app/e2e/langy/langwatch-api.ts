@@ -18,7 +18,20 @@ const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
  * wait. Only timeouts and network errors retry — an HTTP error status is a
  * real answer and throws straight away.
  */
-async function lwFetch(path: string, init: RequestInit): Promise<any> {
+/**
+ * An HTTP error status. Its own type, not a message shape: the retry loop
+ * below decides on the class, so rewording the message can never turn a real
+ * answer back into something worth retrying.
+ */
+class LwHttpError extends Error {}
+
+async function lwFetch({
+  path,
+  init,
+}: {
+  path: string;
+  init: RequestInit;
+}): Promise<any> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -27,23 +40,28 @@ async function lwFetch(path: string, init: RequestInit): Promise<any> {
         signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
-        throw new Error(
+        throw new LwHttpError(
           `${init.method ?? "GET"} ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
         );
       }
       return res.json();
     } catch (error) {
-      if (error instanceof Error && error.message.includes(`${path} -> `)) {
-        throw error;
-      }
+      if (error instanceof LwHttpError) throw error;
       lastError = error;
+      // A stalled attempt is retried against the same loaded machine, so give
+      // it a moment rather than firing all three inside a few milliseconds.
+      if (attempt < 2) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * (attempt + 1)),
+        );
+      }
     }
   }
   throw lastError;
 }
 
 async function lwGet(path: string): Promise<any> {
-  return lwFetch(path, { headers: { "X-Auth-Token": LW_KEY } });
+  return lwFetch({ path, init: { headers: { "X-Auth-Token": LW_KEY } } });
 }
 
 async function lwPost({
@@ -53,10 +71,13 @@ async function lwPost({
   path: string;
   body: unknown;
 }): Promise<any> {
-  return lwFetch(path, {
-    method: "POST",
-    headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  return lwFetch({
+    path,
+    init: {
+      method: "POST",
+      headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
   });
 }
 

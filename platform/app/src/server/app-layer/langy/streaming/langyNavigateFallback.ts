@@ -153,9 +153,9 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
   },
 
   monitor_: async ({ projectId, resourceId }) => {
-    const monitor = await prisma.monitor.findFirst({
-      where: { id: resourceId, projectId },
-      select: { id: true },
+    const monitor = await getApp().monitors.getMonitorById({
+      projectId,
+      monitorId: resourceId,
     });
     if (!monitor) return null;
     return (projectSlug) =>
@@ -187,6 +187,31 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
   },
 };
 
+/**
+ * The page or resource this id names, as a builder that still needs the
+ * project slug. Page names are matched case-insensitively (they are words the
+ * agent types); id prefixes are matched on the raw string, because an id is
+ * case-sensitive and lowercasing one would resolve an id that does not exist.
+ */
+async function resolveUrlBuilder({
+  projectId,
+  resourceId,
+}: {
+  projectId: string;
+  resourceId: string;
+}): Promise<((projectSlug: string) => string) | null> {
+  const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
+  if (pagePath) {
+    return (projectSlug: string) =>
+      platformUrl({ projectSlug, path: pagePath });
+  }
+  const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
+    resourceId.startsWith(prefix),
+  )?.[1];
+  if (!resolver) return null;
+  return resolver({ projectId, resourceId }).catch(() => null);
+}
+
 export async function resolveNavigateFallbackUrl({
   projectId,
   resourceId,
@@ -194,16 +219,7 @@ export async function resolveNavigateFallbackUrl({
   projectId: string;
   resourceId: string;
 }): Promise<string | null> {
-  const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
-  const buildUrl = pagePath
-    ? (projectSlug: string) => platformUrl({ projectSlug, path: pagePath })
-    : await (async () => {
-        const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
-          resourceId.startsWith(prefix),
-        )?.[1];
-        if (!resolver) return null;
-        return resolver({ projectId, resourceId }).catch(() => null);
-      })();
+  const buildUrl = await resolveUrlBuilder({ projectId, resourceId });
   if (!buildUrl) return null;
 
   const project = await getApp()

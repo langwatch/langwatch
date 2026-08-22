@@ -58,17 +58,16 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     When the scenario runs against Langy
     Then Langy asks one short question distinguishing a batch experiment from an online evaluator
     And Langy creates nothing before the user answers
-
-  @e2e
-  Scenario: A "take me to" request lands a navigate instruction on the turn stream
-    Given a Langy dogfood scenario where the user asks to be taken to their prompts
-    When the scenario runs against Langy
-    Then a navigate instruction lands on the live turn stream
-    And its address is the platform's own prompts page for the project
-    And the judge confirms the reply names where the user was taken
     And after the answer, Langy creates the matching resource and the create succeeds
     And the judge confirms that a create rejected over a type slug is corrected from the
       error's accepted values and retried once, never turned into a question
+
+  @e2e
+  Scenario: A "take me to" request opens the page the user asked for
+    Given a Langy dogfood scenario where the user asks to be taken to their prompts
+    When the scenario runs against Langy
+    Then the user is taken to this project's prompts page
+    And the judge confirms the reply names where the user was taken
 
   # ---------------------------------------------------------------------------
   # Delivering a request to a destination the conversation named is refused on

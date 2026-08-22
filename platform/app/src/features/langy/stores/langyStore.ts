@@ -750,6 +750,10 @@ export const useLangyStore = create<LangyState>()(
         set((state) => ({
           activeConversationId: null,
           historyLoadConversationId: null,
+          // A new chat is a new conversation: any id still held from an earlier
+          // warm belongs to the chat being left behind. The panel's re-armed
+          // warm mints a fresh one.
+          pendingConversationId: null,
           // A new chat starts on a BLANK composer. Without this, the half-typed
           // text abandoned in the last conversation is still sitting there,
           // primed to be sent into the new one. (`resetForScope` already
@@ -946,6 +950,11 @@ export const useLangyStore = create<LangyState>()(
           turnReasoning: null,
           turnPlan: null,
           interruptedConversationId: null,
+          // The warmed id is spent: this turn either adopted it or the server
+          // minted its own. Keeping it would let the NEXT new chat send its
+          // first message into this conversation, because the create path
+          // reads the pending id whenever no conversation is active.
+          pendingConversationId: null,
         })),
       unconfirmedConversations: {},
       confirmConversation: (id) =>

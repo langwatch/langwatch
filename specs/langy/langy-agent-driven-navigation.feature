@@ -174,17 +174,16 @@ Feature: Langy opens the resource it surfaced in the browser
 
     @unit
     Scenario: A chained lookup-and-open compound resolves through the platform fallback
-      Given the model chained its lookup and the open into one compound command
-      And the conversation never remembered a link for the resource
-      When the navigate instruction names a resource in this project
-      Then the platform looks the id up with the project's own access
-      And the browser navigates to the platform's own address for it
+      Given Langy found the resource and opened it in one step
+      And the conversation never showed the user a link for it
+      When Langy asks to open a resource in this project
+      Then the user is taken to that resource, resolved with the project's own access
 
     @unit
     Scenario: The platform fallback resolves every resource surface Langy opens
-      When the agent asks to open a prompt, dataset, workflow, experiment, monitor, evaluator or agent the project can see
-      Then the platform computes that resource's own address
-      And the address is the one the platform's public API or its own UI produces for it
+      When Langy asks to open a prompt, dataset, workflow, experiment, monitor, evaluator or agent the project can see
+      Then the user is taken to that resource
+      And they land on the same page the product's own links open
 
     @unit
     Scenario: An id the project cannot resolve drops silently

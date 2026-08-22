@@ -60,16 +60,25 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
   });
 
   afterEach(async () => {
-    const projectIds = [project.id, otherProject.id];
-    await prisma.llmPromptConfigVersion.deleteMany({
-      where: { projectId: { in: projectIds } },
-    });
-    await prisma.llmPromptConfig.deleteMany({
-      where: { projectId: { in: projectIds } },
-    });
-    await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
-    await prisma.team.delete({ where: { id: team.id } });
-    await prisma.organization.delete({ where: { id: organization.id } });
+    // Guarded on what setup actually created: a create that threw part-way
+    // leaves the later rows undefined, and deleting by an undefined id throws
+    // an error that hides the real setup failure.
+    const projectIds = [project?.id, otherProject?.id].filter(
+      (id): id is string => typeof id === "string",
+    );
+    if (projectIds.length > 0) {
+      await prisma.llmPromptConfigVersion.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+      await prisma.llmPromptConfig.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+      await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
+    }
+    if (team?.id) await prisma.team.deleteMany({ where: { id: team.id } });
+    if (organization?.id) {
+      await prisma.organization.deleteMany({ where: { id: organization.id } });
+    }
   });
 
   describe("when the agent asks to open a prompt the project can see", () => {

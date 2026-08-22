@@ -78,7 +78,7 @@ describe("createLangyChatTransport", () => {
     subscription.mockClear();
   });
 
-  describe("given no conversation id yet (a fresh conversation)", () => {
+  describe("when no conversation id yet (a fresh conversation)", () => {
     it("starts the turn via langy.createConversation and adopts the minted ids", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
       await transport.sendMessages(options());
@@ -139,7 +139,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given an active conversation id", () => {
+  describe("when an active conversation id", () => {
     it("continues via langy.continueConversation carrying that conversation id", async () => {
       const { transport } = makeTransport({ conversationId: "conv-active" });
       await transport.sendMessages(options());
@@ -162,7 +162,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given a pending conversation id from a panel-open warm", () => {
+  describe("when a pending conversation id from a panel-open warm", () => {
     /** @scenario The first message adopts the warmed conversation */
     it("creates the conversation under the warmed id so the turn reuses the warm worker", async () => {
       const { transport } = makeTransport({
@@ -177,7 +177,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given per-send context (model override + composer chips)", () => {
+  describe("when per-send context (model override + composer chips)", () => {
     it("threads only the present fields onto the turn input", async () => {
       const { transport } = makeTransport({
         conversationId: null,
@@ -198,7 +198,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the turn-start mutation rejects", () => {
+  describe("when the turn-start mutation rejects", () => {
     it("propagates the error to useChat and never subscribes to a stream", async () => {
       mutation.mockRejectedValue(new Error("boom"));
       const { transport, onIds } = makeTransport({ conversationId: null });
@@ -209,7 +209,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given a full send round-trip", () => {
+  describe("when a full send round-trip", () => {
     it("resolves the send, adopts the ids and opens the live stream", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
 
@@ -224,7 +224,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries plan and sub-status entries", () => {
+  describe("when the live stream carries plan and sub-status entries", () => {
     /** Grab the onData callback the transport handed the subscription. */
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
@@ -290,7 +290,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream terminates", () => {
+  describe("when the live stream terminates", () => {
     function handlers() {
       return subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;
@@ -347,7 +347,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries a navigate instruction", () => {
+  describe("when the live stream carries a navigate instruction", () => {
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;

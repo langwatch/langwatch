@@ -574,7 +574,7 @@ export class LangyTurnService {
       conversationId: null,
     };
     try {
-      return await this.resolveAndWarm(args, progress);
+      return await this.resolveAndWarm({ ...args, progress });
     } catch (error) {
       const { projectId } = args;
       const conversationId = progress.conversationId;
@@ -599,20 +599,23 @@ export class LangyTurnService {
    * The warm happy path, throws freely; `warmConversationWorker` is the one
    * catch that turns every failure into a silent cold start.
    */
-  private async resolveAndWarm(
-    {
-      projectId,
-      session,
-      requestedConversationId,
-      modelOverride,
-    }: {
-      projectId: string;
-      session: Session;
-      requestedConversationId: string | null;
-      modelOverride?: string;
-    },
-    progress: { conversationId: string | null },
-  ): Promise<{ conversationId: string | null; warmed: boolean }> {
+  private async resolveAndWarm({
+    projectId,
+    session,
+    requestedConversationId,
+    modelOverride,
+    progress,
+  }: {
+    projectId: string;
+    session: Session;
+    requestedConversationId: string | null;
+    modelOverride?: string;
+    /**
+     * Written as soon as the conversation id exists, so a later failure still
+     * hands the caller the id the first message could adopt.
+     */
+    progress: { conversationId: string | null };
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
     const { worker } = this.deps;
     const userId = session.user.id;
     const { speculativeConversation, credentials, resolvedModel } =
@@ -668,15 +671,26 @@ export class LangyTurnService {
     credentials.langwatchApiKey = minted.token;
     credentials.langwatchApiKeyId = minted.apiKeyId;
 
-    // Fire-and-forget: the port never throws and the panel is not waiting on
-    // the boot, only on the id above.
-    void worker.warm({
-      projectId,
-      actorUserId: userId,
-      conversationId,
-      credentials,
-      modelOverride: warmModel,
-    });
+    // Fire-and-forget: the panel is not waiting on the boot, only on the id
+    // above. Nothing awaits this promise, so the outer catch cannot see a
+    // rejection: it would leave the process on Node's unhandled-rejection
+    // path, on the one code path whose entire contract is that a warm failure
+    // is a cold start. The dispatch call in this same file catches for the
+    // same reason.
+    void worker
+      .warm({
+        projectId,
+        actorUserId: userId,
+        conversationId,
+        credentials,
+        modelOverride: warmModel,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { error, projectId, conversationId },
+          "langy warm dispatch failed, the first message cold-starts the worker",
+        );
+      });
     return { conversationId, warmed: true };
   }
 

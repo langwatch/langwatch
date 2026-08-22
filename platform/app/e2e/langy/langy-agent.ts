@@ -389,10 +389,16 @@ async function streamTurnText({
           // install prompt as a product card from the error's tips. Mirror
           // that shape: a langy-card block is the rubric's marker for the
           // product's own UI, not Langy's prose.
-          assistantText += `\`\`\`langy-card\n${
+          const installCard = `\`\`\`langy-card\n${
             parsed.tips[0] ??
             "The LangWatch GitHub App is not installed for this project."
           }\n\`\`\``;
+          // Both buffers: the fold below returns textAfterLastTool whenever a
+          // tool ran and that buffer is non-empty, so a card appended to
+          // assistantText alone is dropped whenever any delta arrived after
+          // the last tool frame.
+          assistantText += installCard;
+          textAfterLastTool += installCard;
         } else {
           streamError =
             typeof entry.errorText === "string"

@@ -195,23 +195,28 @@ linters:
       # trees: InsecureSkipVerify (G402) against a self-signed test listener,
       # no ReadHeaderTimeout (G112) on a short-lived httptest-style server, and
       # 0755 fixture dirs/scripts (G301/G306, a fake worker script needs the
-      # exec bit). None of it ships.
+      # exec bit). None of it ships. Named by diagnostic id, so a new insecure
+      # pattern in a test still reports.
       - path: services/langyagent/.*_test\.go
         linters:
           - gosec
+        text: "G(112|301|306|402)"
 
       # langyagent carries a pre-linting baseline: the streaming/provisioning
       # state machines (opencode + pi Stream, Provision, the pool spawn path)
       # are event loops whose length and complexity are inherent to the
       # protocol they drive, and the argument-limit hits are
       # interface-mandated signatures (app ports, frames, telemetry) shared by
-      # both harness adapters. Scoped here so the rest of the repo keeps these
-      # rules at full strength.
-      - path: services/langyagent/
+      # both harness adapters.
+      #
+      # The waiver names the exact files that carry it rather than the whole
+      # service, so a NEW file under services/langyagent keeps these rules at
+      # full strength. Drop a path from the list once its functions are split.
+      - path: services/langyagent/(adapters/controlplane/finalizer\.go|adapters/controlplane/relay\.go|adapters/controlplane/revoker\.go|adapters/egress/adapter\.go|adapters/egress/policy\.go|adapters/egress/sni\.go|adapters/egress/throttle\.go|adapters/opencode/agent\.go|adapters/opencode/authproxy\.go|adapters/opencode/opencode\.go|adapters/opencode/provision\.go|adapters/otelrelay/genai\.go|adapters/otelrelay/llmproxy\.go|adapters/otelrelay/llmproxy_stream\.go|adapters/otelrelay/otelrelay\.go|adapters/otelrelay/reparent\.go|adapters/pi/agent\.go|adapters/pi/reader\.go|adapters/pi/spawn\.go|app/app\.go|app/workerpool/pool\.go|app/workerpool/worker\.go|config\.go|domain/credentials\.go|internal/frames/frames\.go|internal/telemetry/telemetry\.go|internal/toolmap/toolmap\.go|otel/angelinajolie\.go|serve\.go)$
         linters:
           - gocognit
           - funlen
-      - path: services/langyagent/
+      - path: services/langyagent/(adapters/controlplane/finalizer\.go|adapters/controlplane/relay\.go|adapters/controlplane/revoker\.go|adapters/egress/adapter\.go|adapters/egress/policy\.go|adapters/egress/sni\.go|adapters/egress/throttle\.go|adapters/opencode/agent\.go|adapters/opencode/authproxy\.go|adapters/opencode/opencode\.go|adapters/opencode/provision\.go|adapters/otelrelay/genai\.go|adapters/otelrelay/llmproxy\.go|adapters/otelrelay/llmproxy_stream\.go|adapters/otelrelay/otelrelay\.go|adapters/otelrelay/reparent\.go|adapters/pi/agent\.go|adapters/pi/reader\.go|adapters/pi/spawn\.go|app/app\.go|app/workerpool/pool\.go|app/workerpool/worker\.go|config\.go|domain/credentials\.go|internal/frames/frames\.go|internal/telemetry/telemetry\.go|internal/toolmap/toolmap\.go|otel/angelinajolie\.go|serve\.go)$
         linters:
           - revive
         text: "argument-limit:"

@@ -150,10 +150,14 @@ async function seedNavigablePrompt(): Promise<void> {
   // front of the app for longer than any sane single-attempt budget while
   // probes from a fresh process answered instantly, so a short per-attempt
   // timeout with retries beats one long wait.
+  // Only timeouts and network errors retry: an HTTP error status is a real
+  // answer, so it throws from outside the retried block rather than burning
+  // the two remaining attempts on the same rejection.
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
+    let res: Response;
     try {
-      const res = await fetch(`${LW_BASE_URL}/api/prompts`, {
+      res = await fetch(`${LW_BASE_URL}/api/prompts`, {
         method: "POST",
         headers: {
           "X-Auth-Token": LANGWATCH_API_KEY,
@@ -165,13 +169,14 @@ async function seedNavigablePrompt(): Promise<void> {
         }),
         signal: AbortSignal.timeout(20_000),
       });
-      if (res.ok || res.status === 409) return;
-      throw new Error(
-        `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
-      );
     } catch (error) {
       lastError = error;
+      continue;
     }
+    if (res.ok || res.status === 409) return;
+    throw new Error(
+      `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
+    );
   }
   throw lastError;
 }
@@ -600,7 +605,7 @@ describe("Langy dogfood: named flows", () => {
   });
 
   describe("when the user asks to be taken to their prompts", () => {
-    /** @scenario A "take me to" request lands a navigate instruction on the turn stream */
+    /** @scenario A "take me to" request opens the page the user asked for */
     it("lands a navigate instruction for the prompts page on the turn stream", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({

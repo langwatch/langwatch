@@ -150,7 +150,7 @@ Feature: Langy worker pre-warm on panel open
       Given the panel warmed a fresh chat and a conversation then took over
       When the user starts a new chat while the panel stays open
       Then the panel warms the fresh chat again
-      And the new warm's minted id becomes the pending conversation id
+      And the first message of that new chat reaches the freshly warmed worker
 
   Rule: An unused warm worker is reaped and its key dies with it
 

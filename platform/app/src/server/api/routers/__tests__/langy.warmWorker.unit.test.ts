@@ -12,12 +12,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
   startConversationTurn,
   warmConversationWorker,
   auditLog,
   getDecision,
 } = vi.hoisted(() => ({
   checkLangyMessageRateLimit: vi.fn(),
+  checkLangyWarmRateLimit: vi.fn(),
   startConversationTurn: vi.fn(),
   warmConversationWorker: vi.fn(),
   auditLog: vi.fn(),
@@ -31,7 +33,9 @@ const {
 
 vi.mock("~/server/middleware/rate-limit-langy", () => ({
   checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
   LANGY_MESSAGES_PER_MINUTE: 30,
+  LANGY_WARMS_PER_MINUTE: 60,
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -89,6 +93,7 @@ describe("langy.warmWorker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     checkLangyMessageRateLimit.mockResolvedValue({ allowed: true });
+    checkLangyWarmRateLimit.mockResolvedValue({ allowed: true, remaining: 60 });
     warmConversationWorker.mockResolvedValue({
       conversationId: "conv-warm",
       warmed: true,
@@ -131,6 +136,26 @@ describe("langy.warmWorker", () => {
       caller().warmWorker({ projectId: "p1", conversationId: "bad id!" }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(warmConversationWorker).not.toHaveBeenCalled();
+  });
+
+  it("degrades to a cold start once the warm budget is spent", async () => {
+    checkLangyWarmRateLimit.mockResolvedValue({ allowed: false, remaining: 0 });
+
+    const result = await caller().warmWorker({ projectId: "p1" });
+
+    // Silent by contract: the panel gets no error, only a cold first message.
+    expect(result).toEqual({ conversationId: null, warmed: false });
+    expect(warmConversationWorker).not.toHaveBeenCalled();
+  });
+
+  it("keeps the warm budget separate from the message budget", async () => {
+    await caller().warmWorker({ projectId: "p1" });
+
+    expect(checkLangyWarmRateLimit).toHaveBeenCalledWith({
+      userId: "user_1",
+      projectId: "p1",
+    });
+    expect(checkLangyMessageRateLimit).not.toHaveBeenCalled();
   });
 
   it("never throws past the mutation when the service does", async () => {
