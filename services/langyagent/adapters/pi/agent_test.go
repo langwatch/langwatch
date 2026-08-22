@@ -388,3 +388,83 @@ func TestCommandWireShape(t *testing.T) {
 		t.Errorf("ping command = %s", body)
 	}
 }
+
+// A turn abandoned between Post and Stream leaves its handle in the handoff
+// channel. The NEXT turn's Stream must attach to its OWN mailbox, never to that
+// leftover: app.go starts the Stream goroutine BEFORE PostMessage, so a Stream
+// that wins the race against the next Post would otherwise pick up the dead
+// turn's mailbox, receive nothing, and leave the live turn's mailbox filling
+// until the reader blocked on it.
+//
+// The worker calls TurnEnded from Release at the turn boundary, which is what
+// clears the orphan while no Stream is waiting.
+//
+// @scenario "An abandoned pi turn cannot capture the next turn's stream"
+func TestAgent_AbandonedTurn_DoesNotCaptureTheNextStream(t *testing.T) {
+	agent := spawnFake(t, "happy", 20*time.Second)
+	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+
+	// Turn one is posted and then abandoned: its Stream never attaches, exactly
+	// as when the customer's request context dies between the two calls.
+	postCtx, cancelPost := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelPost()
+	if err := agent.Post(postCtx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-abandoned", Prompt: "hi"}); err != nil {
+		t.Fatalf("Post(abandoned): %v", err)
+	}
+
+	// The turn boundary the worker drives from Release.
+	agent.TurnEnded()
+
+	// Turn two runs the production ordering: Stream first, then Post.
+	sink, err := runTurn(t, agent, "turn-live")
+	if err != nil {
+		t.Fatalf("Stream(live) = %v, want nil", err)
+	}
+	if !strings.Contains(sink.joined(), `"text":"Hello"`) {
+		t.Errorf("the live turn streamed nothing; got:\n%s", sink.joined())
+	}
+
+	// Which mailbox the live Stream attached to is the actual claim, and the
+	// frames alone cannot show it: the abandoned turn ran to completion inside
+	// the wrapper, so ITS mailbox holds the same frames and a content check
+	// passes either way. Stream unregisters the mailbox it attached to, so a
+	// still-registered turn-live is the leak: the live turn's events would pile
+	// up in a box no one is reading.
+	r := agent.currentReader()
+	r.mu.Lock()
+	_, liveLeaked := r.boxes["turn-live"]
+	_, abandonedLeaked := r.boxes["turn-abandoned"]
+	r.mu.Unlock()
+	if liveLeaked {
+		t.Error("the live turn's stream attached to the abandoned turn's mailbox, leaving its own registered and filling")
+	}
+	if abandonedLeaked {
+		t.Error("the abandoned turn's mailbox outlived the turn boundary")
+	}
+}
+
+// TurnEnded is called on every turn boundary, including the ordinary one where
+// the handle was consumed. It must be a no-op there rather than blocking on an
+// empty channel.
+func TestAgent_TurnEnded_IsANoOpWhenNothingWasOrphaned(t *testing.T) {
+	agent := spawnFake(t, "happy", 20*time.Second)
+	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	if _, err := runTurn(t, agent, "turn-clean"); err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		agent.TurnEnded()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("TurnEnded blocked on an empty handoff channel")
+	}
+}

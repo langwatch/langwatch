@@ -57,7 +57,25 @@ function catalogEntryFor(model: LangyWorkerModelConfig): CatalogModelEntry | und
 }
 
 function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown> {
-  const { baseUrlEnv: _baseUrlEnv, apiKeyEnv: _apiKeyEnv, ...configEntry } = model;
+  const {
+    baseUrlEnv: _baseUrlEnv,
+    apiKeyEnv: _apiKeyEnv,
+    // The model config passes unknown keys through (config.ts) so a new compat
+    // finding needs no wrapper change. Routing and credential keys are the
+    // exception and are dropped: a model-level baseUrl or provider would send
+    // pi straight at the provider instead of through the mediated gateway, and
+    // a literal apiKey would put the secret in models.json when the provider
+    // block references it by env name. The catalog is already stripped of the
+    // same three below; the config gets the same treatment.
+    baseUrl: _configBaseUrl,
+    provider: _configProvider,
+    apiKey: _configApiKey,
+    ...configEntry
+  } = model as LangyWorkerModelConfig & {
+    baseUrl?: unknown;
+    provider?: unknown;
+    apiKey?: unknown;
+  };
   const catalog = catalogEntryFor(model);
   if (!catalog) return configEntry;
   const {

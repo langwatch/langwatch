@@ -190,6 +190,12 @@ func (w *Worker) Release() {
 	// after completion; a turn longer than the timeout can be killed mid-stream.
 	w.lastSeen = time.Now()
 	w.mu.Unlock()
+
+	// Outside w.mu: the agent takes its own locks, and the turn is already
+	// recorded as finished above. See app.TurnBoundary for what this clears.
+	if boundary, ok := w.agent.(app.TurnBoundary); ok {
+		boundary.TurnEnded()
+	}
 }
 
 // rememberHandled records a completed turnId in the bounded FIFO set. Caller holds

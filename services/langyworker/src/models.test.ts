@@ -142,4 +142,41 @@ describe("buildModelsJson", () => {
       }
     });
   });
+
+  describe("when the config carries routing or credential keys", () => {
+    // The model config passes unknown keys through on purpose, so a new compat
+    // flag needs no wrapper change. Routing and credential keys must not ride
+    // that path: a model-level baseUrl or provider sends pi straight at the
+    // provider instead of through the mediated gateway, and a literal apiKey
+    // would write the secret into models.json when the provider block
+    // deliberately references it by env NAME.
+    /** @scenario A model entry cannot carry its own endpoint or credential */
+    it("drops baseUrl, provider and apiKey while keeping the gateway's own", () => {
+      const generated = buildModelsJson({
+        model: {
+          ...model,
+          baseUrl: "https://api.openai.com/v1",
+          provider: "openai",
+          apiKey: "sk-leaked",
+        } as typeof model,
+        env: {
+          OPENAI_BASE_URL: "http://127.0.0.1:41234/v1",
+          OPENAI_API_KEY: "sk-secret",
+        },
+      });
+      const provider = generated.providers[PROVIDER_ID] as {
+        baseUrl: string;
+        apiKey: string;
+        models: Record<string, unknown>[];
+      };
+
+      expect(provider.baseUrl).toBe("http://127.0.0.1:41234/v1");
+      expect(provider.apiKey).toBe("$OPENAI_API_KEY");
+      expect(provider.models[0]).not.toHaveProperty("baseUrl");
+      expect(provider.models[0]).not.toHaveProperty("provider");
+      expect(provider.models[0]).not.toHaveProperty("apiKey");
+      expect(JSON.stringify(generated)).not.toContain("sk-leaked");
+      expect(JSON.stringify(generated)).not.toContain("sk-secret");
+    });
+  });
 });

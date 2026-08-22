@@ -124,8 +124,14 @@ func (s *llmStreamSniffer) buffer(part []byte) {
 }
 
 var (
-	sseDataLinePrefix  = []byte("data: ")
-	errorEventTypeMark = []byte(`"type":"error"`)
+	sseDataLinePrefix = []byte("data: ")
+	// A cheap gate in front of the gjson parse, which would otherwise run on
+	// every chunk of every healthy stream. It matches the quoted VALUE alone,
+	// not `"type":"error"`, because a provider is free to emit
+	// `{"type": "error"}` with the space and the byte-exact form would then
+	// drop a real terminal error on the floor. gjson below is the
+	// discriminator; this only decides what is worth parsing.
+	errorEventTypeMark = []byte(`"error"`)
 )
 
 func (s *llmStreamSniffer) inspectLine(line []byte) {

@@ -75,7 +75,14 @@ type Deps struct {
 }
 
 // New builds an Orchestrator from its injected dependencies.
+//
+// Log is optional and defaults to a no-op: the orchestrator logs from paths a
+// caller cannot predict (a Redis database collision, a janitor sweep), so a
+// Deps built without one would panic there instead of at construction.
 func New(d Deps) *Orchestrator {
+	if d.Log == nil {
+		d.Log = zap.NewNop()
+	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,

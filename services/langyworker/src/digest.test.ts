@@ -91,5 +91,35 @@ describe("buildHandoffDigest", () => {
     it("skips them instead of throwing", () => {
       expect(buildHandoffDigest({ messages: [null, 42, {}, { role: "user", content: "ok" }] })).toBe("user: ok");
     });
+
+    // A message whose content ARRAY holds a null is the harder case: the entry
+    // itself is well formed, so it reaches the block loop. Reading .type off
+    // null threw, runner.ts caught it, and the resumed worker was seeded with an
+    // empty digest, losing the whole conversation without a word.
+    it("skips invalid content blocks and keeps the rest of the conversation", () => {
+      const digest = buildHandoffDigest({
+        messages: [
+          { role: "user", content: [null] },
+          { role: "assistant", content: ["a string, not a block", 7] },
+          { role: "user", content: [{ type: "text", text: "survives" }] },
+        ],
+      });
+      expect(digest).toBe("user: survives");
+    });
+  });
+
+  describe("when the budget is smaller than the truncation header", () => {
+    // maxBytes is a hard bound. Prepending the header regardless returned more
+    // bytes than the caller allowed, on the one path meant to enforce the cap.
+    it("returns nothing rather than a header that breaks the bound", () => {
+      const messages = Array.from({ length: 10 }, (_, i) => ({
+        role: "user",
+        content: `message ${i}`,
+      }));
+      expect(buildHandoffDigest({ messages, maxBytes: 1 })).toBe("");
+      expect(
+        Buffer.byteLength(buildHandoffDigest({ messages, maxBytes: 4 }), "utf8"),
+      ).toBeLessThanOrEqual(4);
+    });
   });
 });

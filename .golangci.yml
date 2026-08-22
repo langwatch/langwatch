@@ -212,11 +212,14 @@ linters:
       # The waiver names the exact files that carry it rather than the whole
       # service, so a NEW file under services/langyagent keeps these rules at
       # full strength. Drop a path from the list once its functions are split.
-      - path: services/langyagent/(adapters/controlplane/finalizer\.go|adapters/controlplane/relay\.go|adapters/controlplane/revoker\.go|adapters/egress/adapter\.go|adapters/egress/policy\.go|adapters/egress/sni\.go|adapters/egress/throttle\.go|adapters/opencode/agent\.go|adapters/opencode/authproxy\.go|adapters/opencode/opencode\.go|adapters/opencode/provision\.go|adapters/otelrelay/genai\.go|adapters/otelrelay/llmproxy\.go|adapters/otelrelay/llmproxy_stream\.go|adapters/otelrelay/otelrelay\.go|adapters/otelrelay/reparent\.go|adapters/pi/agent\.go|adapters/pi/reader\.go|adapters/pi/spawn\.go|app/app\.go|app/workerpool/pool\.go|app/workerpool/worker\.go|config\.go|domain/credentials\.go|internal/frames/frames\.go|internal/telemetry/telemetry\.go|internal/toolmap/toolmap\.go|otel/angelinajolie\.go|serve\.go)$
+      # The two rules below waive the same file list, so it is written once and
+      # aliased: two hand-maintained copies of a 29-file regex drift the moment
+      # one of them is edited alone.
+      - path: &langyagentBaseline services/langyagent/(adapters/controlplane/finalizer\.go|adapters/controlplane/relay\.go|adapters/controlplane/revoker\.go|adapters/egress/adapter\.go|adapters/egress/policy\.go|adapters/egress/sni\.go|adapters/egress/throttle\.go|adapters/opencode/agent\.go|adapters/opencode/authproxy\.go|adapters/opencode/opencode\.go|adapters/opencode/provision\.go|adapters/otelrelay/genai\.go|adapters/otelrelay/llmproxy\.go|adapters/otelrelay/llmproxy_stream\.go|adapters/otelrelay/otelrelay\.go|adapters/otelrelay/reparent\.go|adapters/pi/agent\.go|adapters/pi/reader\.go|adapters/pi/spawn\.go|app/app\.go|app/workerpool/pool\.go|app/workerpool/worker\.go|config\.go|domain/credentials\.go|internal/frames/frames\.go|internal/telemetry/telemetry\.go|internal/toolmap/toolmap\.go|otel/angelinajolie\.go|serve\.go)$
         linters:
           - gocognit
           - funlen
-      - path: services/langyagent/(adapters/controlplane/finalizer\.go|adapters/controlplane/relay\.go|adapters/controlplane/revoker\.go|adapters/egress/adapter\.go|adapters/egress/policy\.go|adapters/egress/sni\.go|adapters/egress/throttle\.go|adapters/opencode/agent\.go|adapters/opencode/authproxy\.go|adapters/opencode/opencode\.go|adapters/opencode/provision\.go|adapters/otelrelay/genai\.go|adapters/otelrelay/llmproxy\.go|adapters/otelrelay/llmproxy_stream\.go|adapters/otelrelay/otelrelay\.go|adapters/otelrelay/reparent\.go|adapters/pi/agent\.go|adapters/pi/reader\.go|adapters/pi/spawn\.go|app/app\.go|app/workerpool/pool\.go|app/workerpool/worker\.go|config\.go|domain/credentials\.go|internal/frames/frames\.go|internal/telemetry/telemetry\.go|internal/toolmap/toolmap\.go|otel/angelinajolie\.go|serve\.go)$
+      - path: *langyagentBaseline
         linters:
           - revive
         text: "argument-limit:"

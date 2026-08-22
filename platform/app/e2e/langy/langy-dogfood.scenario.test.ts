@@ -386,9 +386,12 @@ describe("Langy dogfood: named flows", () => {
       // gate judged reached the stream before the gate canceled it (the sink
       // pushes, then observes). An install prompt with no command card behind
       // it is the regression this guards.
+      // Word boundaries cover both edges: a hand-rolled class needed a leading
+      // space injected into every command, and still missed `cd repo && git`,
+      // where the tool name is the last token.
       expect(
         langy.state.toolCommands.some((command) =>
-          /[\s(;&|](gh|git)\s/.test(" " + command),
+          /\b(gh|git)\b/.test(command),
         ),
       ).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);

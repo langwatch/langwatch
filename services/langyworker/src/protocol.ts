@@ -160,7 +160,12 @@ export function boundJsonValue({
   try {
     serialized = JSON.stringify(value) ?? "null";
   } catch {
-    return `[unserializable value]${TRUNCATION_MARKER}`;
+    // The fallback prose is still subject to maxBytes: a cyclic value must not
+    // be the one input that walks past the cap the caller asked for.
+    return boundText({
+      text: `[unserializable value]${TRUNCATION_MARKER}`,
+      maxBytes,
+    });
   }
   if (Buffer.byteLength(serialized, "utf8") <= maxBytes) return value;
   const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8");

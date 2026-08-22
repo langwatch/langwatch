@@ -102,9 +102,7 @@ export function currentTurnAssistant(
   messages: ThinkingMessage[],
 ): ThinkingMessage | undefined {
   const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
-  return messages
-    .slice(lastUserIndex + 1)
-    .find((m) => m.role === "assistant");
+  return messages.slice(lastUserIndex + 1).find((m) => m.role === "assistant");
 }
 
 /** Has any earlier turn of this conversation already been answered? */

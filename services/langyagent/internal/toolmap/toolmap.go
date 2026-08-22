@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -293,9 +294,29 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 		}
 		return out
 	case map[string]any:
-		out := make(map[string]any, len(value))
-		for k, item := range value {
-			out[k] = reduceJSONValue(item, maxString, maxItems)
+		// Width is capped like an array's length. Without this a document that
+		// is one flat object of thousands of keys (a result keyed by id) can
+		// never shrink under the budget however hard the loop tightens, so
+		// reduceJSONOutput gives up and the caller severs the document with the
+		// byte cut — the exact outcome this function exists to prevent.
+		keys := make([]string, 0, len(value))
+		for k := range value {
+			keys = append(keys, k)
+		}
+		// Sorted so the SAME document always reduces to the same keys; Go's map
+		// order would otherwise make the card's contents a coin toss.
+		sort.Strings(keys)
+		dropped := 0
+		if len(keys) > maxItems {
+			dropped = len(keys) - maxItems
+			keys = keys[:maxItems]
+		}
+		out := make(map[string]any, len(keys)+1)
+		for _, k := range keys {
+			out[k] = reduceJSONValue(value[k], maxString, maxItems)
+		}
+		if dropped > 0 {
+			out["…"] = fmt.Sprintf("%d more keys truncated", dropped)
 		}
 		return out
 	default:
@@ -367,6 +388,11 @@ func (t *ToolCallTracker) EndIfNew(id, toolName string) bool {
 	return true
 }
 
+// The separator must be a SPACED dash. AGENTS.md teaches the model exactly one
+// example of this format, so that example and this pattern are one contract:
+// change either and progress silently stops being drawn, because a todo line
+// that does not match is simply carried as prose. A colon is the near miss to
+// watch for; it produces no measured frame at all.
 var measuredProgressPattern = regexp.MustCompile(`^\s*(.+?)\s+[-–—]\s+([0-9][0-9,]*)\s*/\s*([0-9][0-9,]*)\s*$`)
 
 // MeasuredProgressFromPlan recognizes the exact X/Y todo protocol documented in

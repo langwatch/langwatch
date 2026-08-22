@@ -200,6 +200,7 @@ RUN set -eux; \
       arm64) bun_target=bun-linux-arm64 ;; \
       *) echo "unsupported TARGETARCH for the langy-worker binary: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
+    mkdir -p /out; \
     bun run scripts/build-binary.ts --target="${bun_target}" --outfile=/out/langy-worker; \
     chmod 0755 /out/langy-worker
 

@@ -32,6 +32,10 @@ function renderContent(content: string | ContentBlock[] | undefined): string {
   if (!Array.isArray(content)) return "";
   const parts: string[] = [];
   for (const block of content) {
+    // A persisted message can carry a null or scalar member. Reading .type off
+    // one throws, and runner.ts turns the throw into an EMPTY handoff seed —
+    // the resumed worker silently loses the whole conversation.
+    if (block === null || typeof block !== "object") continue;
     if (block.type === "text" && typeof block.text === "string") {
       parts.push(block.text);
     } else if (block.type === "toolCall") {
@@ -92,6 +96,12 @@ export function buildHandoffDigest({
   }
 
   kept.reverse();
-  if (truncated) kept.unshift(DIGEST_TRUNCATION_HEADER);
+  // maxBytes is a HARD bound, so the header only goes on when it fits. Below
+  // its own size there is nothing truthful left to return: a budget that
+  // cannot hold the "older messages omitted" line cannot hold a digest either.
+  if (truncated) {
+    if (headerBytes > maxBytes) return "";
+    kept.unshift(DIGEST_TRUNCATION_HEADER);
+  }
   return kept.join("\n");
 }

@@ -57,6 +57,20 @@ describe("listSkills", () => {
     });
   });
 
+  describe("when frontmatter declares an empty name", () => {
+    // An empty name is a missing name. Kept verbatim it listed a blank entry,
+    // and the execute path reads an empty name argument as "list everything",
+    // so the skill existed in the inventory and could never be loaded.
+    it("falls back to the directory name", () => {
+      mkdirSync(join(skillsDir, "gamma"));
+      writeFileSync(join(skillsDir, "gamma", "SKILL.md"), '---\nname: ""\ndescription: G\n---\n');
+      mkdirSync(join(skillsDir, "delta"));
+      writeFileSync(join(skillsDir, "delta", "SKILL.md"), "---\nname: '   '\ndescription: D\n---\n");
+
+      expect(listSkills(skillsDir).map((s) => s.name)).toEqual(["delta", "gamma"]);
+    });
+  });
+
   describe("when no skills directory", () => {
     it("returns an empty list", () => {
       expect(listSkills(undefined)).toEqual([]);

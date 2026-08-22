@@ -118,6 +118,36 @@ describe("createLangyChatTransport", () => {
       );
     });
 
+    it("sends only THIS message, not the previous conversation's questions", async () => {
+      // Dropping the assistant turns is not enough. The state that survives a
+      // mid-stream new chat holds the old USER messages too, and sending those
+      // seeds the new conversation, and the title generated from it, with
+      // questions the user did not just ask.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "user",
+              parts: [{ type: "text", text: "the previous question" }],
+            },
+            {
+              id: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ id: string }> }).messages).toEqual([
+        { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ]);
+    });
+
     it("mints a fresh idempotency key for each logical send", async () => {
       const { transport } = makeTransport({ conversationId: null });
 

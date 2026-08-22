@@ -95,6 +95,18 @@ describe("boundJsonValue", () => {
     cyclic.self = cyclic;
     expect(typeof boundJsonValue({ value: cyclic })).toBe("string");
   });
+
+  // The cap applies to the fallback prose too. It was returned raw, so a cyclic
+  // value was the one input that walked straight past the budget the caller
+  // asked for, on a function whose whole contract is the cap.
+  it("keeps the unserializable fallback inside the requested budget", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    for (const maxBytes of [1, 8, 32]) {
+      const bounded = boundJsonValue({ value: cyclic, maxBytes });
+      expect(Buffer.byteLength(bounded as string, "utf8")).toBeLessThanOrEqual(maxBytes);
+    }
+  });
 });
 
 describe("truncateToBytes", () => {

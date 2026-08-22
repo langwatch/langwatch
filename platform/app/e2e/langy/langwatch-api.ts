@@ -12,19 +12,19 @@ const LW_KEY = LANGWATCH_API_KEY;
 const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
 
 /**
- * Retried fetch for the verification helpers: on a loaded machine a single
- * request has stalled in front of the app past any sane one-shot budget while
- * a fresh attempt answered instantly, so three short attempts beat one long
- * wait. Only timeouts and network errors retry — an HTTP error status is a
- * real answer and throws straight away.
- */
-/**
  * An HTTP error status. Its own type, not a message shape: the retry loop
  * below decides on the class, so rewording the message can never turn a real
  * answer back into something worth retrying.
  */
 class LwHttpError extends Error {}
 
+/**
+ * Retried fetch for the verification helpers: on a loaded machine a single
+ * request has stalled in front of the app past any sane one-shot budget while
+ * a fresh attempt answered instantly, so three short attempts beat one long
+ * wait. Only timeouts and network errors retry — an HTTP error status is a
+ * real answer and throws straight away.
+ */
 async function lwFetch({
   path,
   init,
@@ -109,7 +109,7 @@ export async function listAgents(): Promise<
 }
 
 export async function listEvaluators(): Promise<
-  Array<{ id: string; name: string }>
+  Array<{ id: string; name: string; config?: { evaluatorType?: string } }>
 > {
   return toArray(await lwGet("/api/evaluators"));
 }
@@ -129,7 +129,16 @@ export async function ensureEvaluator({
   const existing = (await listEvaluators()).find(
     (evaluator) => evaluator.name === name,
   );
-  if (existing) return;
+  // The name alone does not make it the right fixture. A retained evaluator of
+  // a DIFFERENT type leaves the scenario asserting against the wrong resource
+  // while the premise reads as satisfied, so the type is checked too, and a
+  // mismatch is replaced rather than reused. The type is what the API keeps
+  // under config.evaluatorType; the top-level `type` is the record kind
+  // ("evaluator" for everything created here) and cannot tell them apart.
+  if (existing) {
+    if (existing.config?.evaluatorType === evaluatorType) return;
+    await deleteEvaluator(existing.id);
+  }
   await lwPost({
     path: "/api/evaluators",
     body: { name, config: { evaluatorType } },
@@ -165,14 +174,29 @@ const SEEDED_EVALUATOR_NAMES = new Set(["e2e-offtopic"]);
  * spends real money until someone notices.
  */
 export async function resetEvaluationResources(): Promise<void> {
+  // allSettled, not all: every deletion must be ATTEMPTED even when an earlier
+  // one fails. Under Promise.all the first rejected monitor delete skipped the
+  // evaluator sweep entirely, which is the leak this function exists to stop.
+  // The failures are collected and raised once every attempt is in.
   const monitors = await listMonitors();
-  await Promise.all(monitors.map((monitor) => deleteMonitor(monitor.id)));
+  const monitorResults = await Promise.allSettled(
+    monitors.map((monitor) => deleteMonitor(monitor.id)),
+  );
   const evaluators = await listEvaluators();
-  await Promise.all(
+  const evaluatorResults = await Promise.allSettled(
     evaluators
       .filter((evaluator) => !SEEDED_EVALUATOR_NAMES.has(evaluator.name))
       .map((evaluator) => deleteEvaluator(evaluator.id)),
   );
+  const failures = [...monitorResults, ...evaluatorResults]
+    .filter((result) => result.status === "rejected")
+    .map((result) => (result as PromiseRejectedResult).reason);
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `resetEvaluationResources: ${failures.length} deletion(s) failed`,
+    );
+  }
 }
 
 export async function listScenarios(): Promise<

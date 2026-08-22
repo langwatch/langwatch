@@ -633,7 +633,8 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     // folds `seed + prompt` into a fresh session's first message, so the
     // label lands between the transcript and the user's words exactly when
     // the fold happens — and a resumed session's follow-up stays a bare ask.
-    expect(historySeed.trimEnd().endsWith("THE USER'S MESSAGE:")).toBe(true);
+    expect(historySeed).toBeDefined();
+    expect(historySeed?.trimEnd().endsWith("THE USER'S MESSAGE:")).toBe(true);
     expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.

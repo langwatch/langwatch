@@ -57,8 +57,12 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
       if (!statSync(baseDir).isDirectory()) continue;
       const markdown = readFileSync(filePath, "utf8");
       const frontmatter = parseSkillFrontmatter(markdown);
+      // An empty frontmatter name is a MISSING name, not a name: the tool would
+      // list a blank entry, and the execute path reads an empty name argument
+      // as "list every skill", so the skill could never be loaded.
+      const frontmatterName = frontmatter.name?.trim();
       skills.push({
-        name: frontmatter.name ?? dirName,
+        name: frontmatterName ? frontmatterName : dirName,
         description: frontmatter.description ?? "",
         filePath,
         baseDir,

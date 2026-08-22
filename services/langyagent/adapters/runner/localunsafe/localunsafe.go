@@ -48,8 +48,9 @@ func New(environment string) (Runner, error) {
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "local-unsafe" }
 
-// CommandContext builds the worker exec.Cmd with no isolation wrapper: the
-// binary runs directly on the host.
+// CommandContext runs the worker with NO isolation wrapper, which is safe only
+// because New refuses this runner outside local development: on a shared
+// machine the worker would execute agent-driven commands against the host.
 func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, binary, args...)
 }

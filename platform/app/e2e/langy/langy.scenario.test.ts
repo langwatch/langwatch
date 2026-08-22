@@ -854,14 +854,26 @@ describe("Langy via HTTP wrapper", () => {
         // a branch their criteria do not describe). The model usually creates
         // an evaluator to back the monitor, so sweep both by before-diff. The
         // suite key holds the manage grain Langy's own key lacks.
+        // allSettled and log, never throw: this is a finally block, so a throw
+        // here REPLACES the assertion failure the test was about to report,
+        // and one failed delete must not stop the rest of the sweep.
         const leftover = (await listMonitors()).filter(
           (m) => !beforeIds.has(m.id),
         );
-        await Promise.all(leftover.map((m) => deleteMonitor(m.id)));
+        const monitorResults = await Promise.allSettled(
+          leftover.map((m) => deleteMonitor(m.id)),
+        );
         const leftoverEvaluators = (await listEvaluators()).filter(
           (e) => !beforeEvaluatorIds.has(e.id),
         );
-        await Promise.all(leftoverEvaluators.map((e) => deleteEvaluator(e.id)));
+        const evaluatorResults = await Promise.allSettled(
+          leftoverEvaluators.map((e) => deleteEvaluator(e.id)),
+        );
+        for (const result of [...monitorResults, ...evaluatorResults]) {
+          if (result.status === "rejected") {
+            console.error("cleanup delete failed:", result.reason);
+          }
+        }
       }
     });
 

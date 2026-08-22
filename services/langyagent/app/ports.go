@@ -83,6 +83,24 @@ type TurnAborter interface {
 	AbortTurn(ctx context.Context, ep Endpoint, sessionID, turnID string) error
 }
 
+// TurnBoundary is the OPTIONAL capability a CodingAgent implements when it
+// carries per-turn state that must not survive into the next turn. The worker
+// calls TurnEnded from Release, which runs after Post and Stream have both
+// finished, so the agent gets a point where no turn is in flight.
+//
+// It exists because Post and Stream are NOT ordered against each other: app.go
+// starts the Stream goroutine before PostMessage. An agent that hands the turn
+// from Post to Stream can therefore be left holding a handle nobody consumed
+// (a turn abandoned between the two), and the NEXT turn's Stream could pick
+// that stale handle up instead of its own. Clearing at the boundary is what
+// makes the handoff unambiguous: turns are serialized by ClaimTurn, so nothing
+// left behind can reach the turn after it. An agent without the capability
+// (opencode, which drives turns over HTTP and keeps no such handle) is a
+// silent no-op.
+type TurnBoundary interface {
+	TurnEnded()
+}
+
 // ClaimOutcome is the result of Worker.ClaimTurn — a turnId-idempotent claim.
 type ClaimOutcome int
 

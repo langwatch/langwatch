@@ -5,19 +5,19 @@ import { attachJsonlReader } from "./stdin.js";
 function makeSource() {
   const emitter = new EventEmitter();
   const lines: string[] = [];
-  let ended = false;
+  let hasEnded = false;
   attachJsonlReader({
     stream: emitter as never,
     onLine: (line) => lines.push(line),
     onEnd: () => {
-      ended = true;
+      hasEnded = true;
     },
   });
   return {
     push: (chunk: string | Buffer) => emitter.emit("data", chunk),
     end: () => emitter.emit("end"),
     lines,
-    isEnded: () => ended,
+    isEnded: () => hasEnded,
   };
 }
 

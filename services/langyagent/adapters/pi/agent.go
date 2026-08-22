@@ -50,11 +50,16 @@ type Agent struct {
 	pipesMu sync.Mutex
 	stdin   io.WriteCloser
 	reader  *reader
+	// stdinBroken latches once a command write fails part-way: the wrapper's
+	// stdin then carries a partial JSONL line and no later command can be
+	// parsed, so writing more would only add garbage. See writeCommand.
+	stdinBroken bool
 
 	// posted hands the just-posted turn to its Stream goroutine. Capacity 1:
 	// turns are serialized per worker (ClaimTurn), so at most one handle is
-	// ever in flight; Post drains a stale handle (a turn whose Stream was
-	// canceled before attaching) before offering its own.
+	// ever in flight. A handle nobody consumed (a turn abandoned between Post
+	// and Stream) is dropped by TurnEnded at the turn boundary, never by the
+	// next Post, which would race that turn's own Stream.
 	posted chan *postedTurn
 }
 
@@ -75,8 +80,9 @@ type postedTurn struct {
 // Compile-time proof Agent satisfies the app ports, including the optional
 // abort capability the worker type-asserts at cancel time.
 var (
-	_ app.CodingAgent = (*Agent)(nil)
-	_ app.TurnAborter = (*Agent)(nil)
+	_ app.CodingAgent  = (*Agent)(nil)
+	_ app.TurnAborter  = (*Agent)(nil)
+	_ app.TurnBoundary = (*Agent)(nil)
 )
 
 // NewAgent returns a pi CodingAgent. readinessTimeout bounds WaitReady, the
@@ -144,7 +150,7 @@ func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, er
 // turn line is written: app.go launches the Stream goroutine before
 // PostMessage with no ordering guarantee, and the wrapper can emit
 // turn_started the instant the line lands, so routing must exist first.
-func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *Agent) Post(ctx context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: Post before Spawn")
@@ -157,7 +163,7 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 		turnID = "t-" + randomID()
 	}
 	mb := r.register(turnID)
-	if err := a.writeCommand(command{
+	if err := a.writeCommand(ctx, command{
 		Type:        "turn",
 		TurnID:      turnID,
 		Prompt:      turn.Prompt,
@@ -167,20 +173,35 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 		r.unregister(turnID, mb)
 		return err
 	}
-	// Hand the turn to its Stream. A stale handle can only be a prior turn
-	// whose Stream was canceled before attaching (its post failed or its turn
-	// was abandoned); turns are serialized, so no live Stream is waiting on it.
-	for {
-		select {
-		case stale := <-a.posted:
-			r.unregister(stale.turnID, stale.mb)
-			continue
-		default:
-		}
-		break
-	}
+	// Hand the turn to its Stream. TurnEnded emptied the channel at the previous
+	// turn's boundary, so the handle offered here is the only one this turn's
+	// Stream can take. Draining HERE instead would not be enough: app.go starts
+	// the Stream goroutine before PostMessage, so a Stream that ran first could
+	// take a leftover handle before the drain ever executed, attach to the dead
+	// turn's mailbox, and leave this turn's mailbox filling until the reader
+	// blocked on it.
 	a.posted <- &postedTurn{turnID: turnID, mb: mb}
 	return nil
+}
+
+// TurnEnded is the app.TurnBoundary capability. The worker calls it from
+// Release, once Post and Stream have both returned, so it is the one moment
+// where a handle still sitting in the channel is provably unclaimed: its turn
+// is over and no Stream is waiting for it. Dropping it here is what keeps the
+// NEXT turn's Stream from attaching to it.
+func (a *Agent) TurnEnded() {
+	r := a.currentReader()
+	for {
+		select {
+		case orphan := <-a.posted:
+			if r != nil {
+				r.unregister(orphan.turnID, orphan.mb)
+			}
+			continue
+		default:
+			return
+		}
+	}
 }
 
 // Stream attaches to the posted turn's mailbox and maps its wire events onto
@@ -481,34 +502,69 @@ func (s *streamState) applyPlan(ev wireEvent) bool {
 // NotifyShutdownImminent (ADR-048) tells the wrapper the manager will kill the
 // process by deadline; an in-flight turn then terminates with a handoff event
 // carrying the conversation digest.
-func (a *Agent) NotifyShutdownImminent(_ context.Context, _ app.Endpoint, _ string, deadline time.Time) error {
-	return a.writeCommand(command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
+func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ app.Endpoint, _ string, deadline time.Time) error {
+	return a.writeCommand(ctx, command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
 }
 
 // AbortTurn is the optional app.TurnAborter capability: it writes abort for
 // exactly the named turn. The wrapper double-checks the id against its running
 // turn, so a stale cancel can never halt the wrong generation. The aborted
 // turn still terminates with turn_done aborted, which Stream settles clean.
-func (a *Agent) AbortTurn(_ context.Context, _ app.Endpoint, _ string, turnID string) error {
+func (a *Agent) AbortTurn(ctx context.Context, _ app.Endpoint, _ string, turnID string) error {
 	if turnID == "" {
 		return errors.New("pi agent: abort needs a turn id")
 	}
-	return a.writeCommand(command{Type: "abort", TurnID: turnID})
+	return a.writeCommand(ctx, command{Type: "abort", TurnID: turnID})
+}
+
+// commandWriteTimeout bounds one command write when the caller's context sets
+// no earlier deadline. A worker that has stopped reading its stdin fills the
+// pipe buffer, and an unbounded write there holds pipesMu forever: Post,
+// AbortTurn, NotifyShutdownImminent and currentReader all take that lock, so
+// one wedged worker would wedge the cancel path for its whole conversation.
+const commandWriteTimeout = 5 * time.Second
+
+// deadlineWriter is the write end of the wrapper's stdin pipe. os.Pipe files
+// are runtime-poller backed, so a write deadline actually interrupts a write
+// blocked on a full pipe.
+type deadlineWriter interface {
+	SetWriteDeadline(t time.Time) error
 }
 
 // writeCommand writes one JSONL command line to the wrapper's stdin, whole
-// lines under the stdin mutex so concurrent writers never interleave.
-func (a *Agent) writeCommand(cmd command) error {
+// lines under the stdin mutex so concurrent writers never interleave. The write
+// is deadline-bounded (see commandWriteTimeout).
+//
+// A write that fails part-way has put a partial line on the wire, and the
+// wrapper's reader splits on newlines: the next command would concatenate onto
+// that fragment and both would be unparseable. So a failed write POISONS the
+// pipe — every later command is refused with the same error, and the pool
+// recycles the worker on the turn failure that follows.
+func (a *Agent) writeCommand(ctx context.Context, cmd command) error {
 	body, err := json.Marshal(cmd)
 	if err != nil {
 		return fmt.Errorf("pi agent: marshal %s command: %w", cmd.Type, err)
 	}
+	deadline := time.Now().Add(commandWriteTimeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+
 	a.pipesMu.Lock()
 	defer a.pipesMu.Unlock()
 	if a.stdin == nil {
 		return errors.New("pi agent: worker stdin not open")
 	}
+	if a.stdinBroken {
+		return errors.New("pi agent: worker stdin is broken, an earlier command did not write whole")
+	}
+	if pipe, ok := any(a.stdin).(deadlineWriter); ok {
+		if err := pipe.SetWriteDeadline(deadline); err == nil {
+			defer func() { _ = pipe.SetWriteDeadline(time.Time{}) }()
+		}
+	}
 	if _, err := a.stdin.Write(append(body, '\n')); err != nil {
+		a.stdinBroken = true
 		return fmt.Errorf("pi agent: write %s command: %w", cmd.Type, err)
 	}
 	return nil
