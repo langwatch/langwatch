@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useRef } from "react";
 
 import { Dialog } from "~/components/ui/dialog";
@@ -46,29 +46,22 @@ export function LangyMakeDefaultDialog({
       initialFocusEl={() => declineRef.current}
     >
       {shown ? (
-        <Dialog.Content bg="bg" maxWidth="420px" errorScope="Langy default ask">
-          <Dialog.Header>
-            <Dialog.Title>Make this the Langy default?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack align="stretch" gap={2}>
-              <Text
-                data-testid="langy-make-default-model"
-                fontSize="md"
-                fontWeight="700"
-                lineHeight="1.3"
-                wordBreak="break-all"
-              >
+        <Dialog.Content bg="bg" maxWidth="480px" errorScope="Langy default ask">
+          <Dialog.Header paddingBottom={0}>
+            {/* The question is the whole dialog, so it is also its name. */}
+            <Dialog.Title
+              fontSize="sm"
+              fontWeight="normal"
+              lineHeight="1.5"
+              wordBreak="break-word"
+            >
+              Make{" "}
+              <Text as="span" data-testid="langy-make-default-model">
                 {modelLabel}
-              </Text>
-              <Dialog.Description fontSize="sm" color="fg.muted">
-                The Langy default model is set for this {shown.scopeLabel}.
-                Making {modelLabel} the default changes what Langy answers with
-                for everyone under it, from the next conversation on. Your pick
-                already applies to this conversation either way.
-              </Dialog.Description>
-            </VStack>
-          </Dialog.Body>
+              </Text>{" "}
+              the default model for Langy for the {shown.scopeLabel}?
+            </Dialog.Title>
+          </Dialog.Header>
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
