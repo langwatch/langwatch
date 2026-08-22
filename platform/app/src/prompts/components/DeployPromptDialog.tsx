@@ -43,6 +43,19 @@ interface DeployPromptDialogProps {
   variables?: PromptSnippetVariable[];
 }
 
+/**
+ * What the tag field says when creating a tag fails. A name collision is the
+ * one failure the reader can act on, so it is named for the tag they typed
+ * rather than echoed back as the server's own sentence.
+ */
+function addTagErrorMessage({ error, name }: { error: unknown; name: string }) {
+  const message =
+    error instanceof Error ? error.message : "Failed to create tag";
+  return message.toLowerCase().includes("already exists")
+    ? `${name} already exists`
+    : message;
+}
+
 export function DeployPromptDialog({
   isOpen,
   onClose,
@@ -206,13 +219,7 @@ export function DeployPromptDialog({
       setIsAddingTag(false);
       setNewTagName("");
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create tag";
-      if (message.toLowerCase().includes("already exists")) {
-        setAddTagError(`${name} already exists`);
-      } else {
-        setAddTagError(message);
-      }
+      setAddTagError(addTagErrorMessage({ error, name }));
     } finally {
       setIsSubmittingTag(false);
     }

@@ -21,6 +21,42 @@ export interface ChatSendButtonProps {
   onStop?: () => void;
 }
 
+/**
+ * The button's three looks: stopping a run, nothing to send, and ready. Kept
+ * apart from the markup so the button itself reads as one control rather than
+ * as a stack of conditional style props.
+ */
+function sendButtonAppearance({
+  stopping,
+  inactive,
+}: {
+  stopping: boolean;
+  inactive: boolean;
+}) {
+  if (stopping) {
+    return {
+      background: "red.solid",
+      color: "white",
+      cursor: "pointer",
+      _hover: { filter: "brightness(1.08)" },
+    } as const;
+  }
+  if (inactive) {
+    return {
+      background: "bg.muted",
+      color: "fg.muted",
+      cursor: "default",
+      _hover: undefined,
+    } as const;
+  }
+  return {
+    background: "orange.solid",
+    color: "white",
+    cursor: "pointer",
+    _hover: { filter: "brightness(1.08)" },
+  } as const;
+}
+
 export function ChatSendButton({
   inProgress = false,
   disabled = false,
@@ -43,13 +79,8 @@ export function ChatSendButton({
       flexShrink={0}
       display="grid"
       placeItems="center"
-      background={
-        stopping ? "red.solid" : inactive ? "bg.muted" : "orange.solid"
-      }
-      color={stopping || !inactive ? "white" : "fg.muted"}
-      cursor={inactive ? "default" : "pointer"}
+      {...sendButtonAppearance({ stopping, inactive })}
       transition="background 150ms ease"
-      _hover={inactive ? undefined : { filter: "brightness(1.08)" }}
     >
       {/* The paper-plane's ink sits low-left of its own box, so centring the
           glyph geometrically leaves it looking low and left. The nudge is

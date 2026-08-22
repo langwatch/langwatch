@@ -273,10 +273,22 @@ describe("groupIntoTurns", () => {
     ]);
   });
 
-  it("leaves untraced parts unnumbered", () => {
+  /** @scenario "An untraced part leading a traced one joins that turn" */
+  it("folds a leading untraced part into the turn that answers it", () => {
     const turns = groupIntoTurns([part("a"), part("b", "trace-1")]);
 
-    expect(turns[0]?.turnNumber).toBeUndefined();
-    expect(turns[1]?.turnNumber).toBe(1);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.turnNumber).toBe(1);
+    expect(turns[0]?.parts.map((p) => p.content)).toEqual(["a", "b"]);
+  });
+
+  /** @scenario "An untraced part with nothing after it is left unnumbered" */
+  it("leaves a trailing untraced part unnumbered", () => {
+    const turns = groupIntoTurns([part("a", "trace-1"), part("b")]);
+
+    expect(turns).toHaveLength(2);
+    expect(turns[0]?.turnNumber).toBe(1);
+    expect(turns[1]?.turnNumber).toBeUndefined();
+    expect(turns[1]?.parts.map((p) => p.content)).toEqual(["b"]);
   });
 });

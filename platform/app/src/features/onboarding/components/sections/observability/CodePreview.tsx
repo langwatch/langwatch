@@ -74,6 +74,27 @@ interface CodePreviewProps {
   maxHeight?: string;
 }
 
+/**
+ * A capped block scrolls its own body, so it becomes a column and the header
+ * stays put at the top of it. Without a cap the block grows to its content and
+ * none of this applies.
+ */
+function boundedHeightProps(maxHeight: string | number | undefined) {
+  if (!maxHeight) return {};
+  return { maxHeight, display: "flex", flexDirection: "column" } as const;
+}
+
+function stickyHeaderProps(maxHeight: string | number | undefined) {
+  if (!maxHeight) return {};
+  return {
+    flexShrink: 0,
+    position: "sticky",
+    top: 0,
+    zIndex: 1,
+    background: "bg.subtle",
+  } as const;
+}
+
 export function CodePreview({
   code,
   filename,
@@ -176,19 +197,13 @@ export function CodePreview({
             backdropFilter="blur(20px) saturate(1.3)"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             overflow="hidden"
-            maxHeight={maxHeight}
-            display={maxHeight ? "flex" : undefined}
-            flexDirection={maxHeight ? "column" : undefined}
+            {...boundedHeightProps(maxHeight)}
           >
             <CodeBlock.Header
               display="flex"
               justifyContent="space-between"
               borderColor="gray.200"
-              flexShrink={maxHeight ? 0 : undefined}
-              position={maxHeight ? "sticky" : undefined}
-              top={maxHeight ? 0 : undefined}
-              zIndex={maxHeight ? 1 : undefined}
-              background={maxHeight ? "bg.subtle" : undefined}
+              {...stickyHeaderProps(maxHeight)}
             >
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
