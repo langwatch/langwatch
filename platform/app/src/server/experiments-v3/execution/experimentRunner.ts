@@ -94,12 +94,18 @@ const persistRunResults = async ({
   draft: RunResultsDraft;
   isRetry?: boolean;
 }): Promise<void> => {
-  if (runResultsAreEmpty(draft)) return;
+  if (runResultsAreEmpty(draft)) {
+    logger.info(
+      { runId, experimentId },
+      "Run produced no cells to write into the workbench state",
+    );
+    return;
+  }
 
   const plan = planRunMerge(scope);
 
   try {
-    await persistence.experiments.applyWorkbenchTransform({
+    const saved = await persistence.experiments.applyWorkbenchTransform({
       projectId,
       id: experimentId,
       actor: persistence.actor,
@@ -109,6 +115,15 @@ const persistRunResults = async ({
         results: mergeRunResults({ existing: state.results, draft, plan }),
       }),
     });
+    logger.info(
+      {
+        runId,
+        experimentId,
+        version: saved.version,
+        targets: Object.keys(draft.targetOutputs).length,
+      },
+      "Wrote the run results into the workbench state",
+    );
   } catch (error) {
     if (error instanceof StaleWorkbenchStateError && !isRetry) {
       logger.info(
@@ -168,6 +183,10 @@ const runExecution = async ({
   const finishRun = async (summary: ExecutionSummary) => {
     // The cells go in before the run reports completed, so a caller that polls
     // until it does and then reads the workbench finds them there.
+    logger.info(
+      { runId, persists: Boolean(persistResults) },
+      "Run finished, deciding whether to write its cells back",
+    );
     if (persistResults) {
       await persistRunResults({
         persistence: persistResults,

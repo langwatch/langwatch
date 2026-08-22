@@ -125,6 +125,24 @@ Feature: Versioned workbench saves
       When a backend run completes
       Then the run still reports completed
 
+    # The engine reports a cell that failed as its own event rather than as a
+    # result with an error on it. A run where every cell fails still has to
+    # reach the table: a workbench that reads "No output yet" after a failed
+    # run tells the user nothing happened, when in fact everything did and
+    # everything broke.
+    @regression @unit
+    Scenario: A run whose cells all fail writes those failures into the cells
+      Given a backend run whose every cell fails
+      When the run completes
+      Then each failing cell carries its failure in the saved state
+      And an evaluator that failed carries its own failure on its cell
+
+    @regression @unit
+    Scenario: A failure that names no cell leaves the cells alone
+      Given a backend run that fails before any cell runs
+      When the run completes
+      Then no cell is marked, because the run's own status carries the failure
+
   Rule: The same seam is reachable over REST
 
     An agent or a CI job builds an experiment without a browser. It creates

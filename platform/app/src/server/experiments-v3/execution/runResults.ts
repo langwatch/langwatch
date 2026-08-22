@@ -109,9 +109,55 @@ export const applyRunEvent = ({
       return;
     }
 
+    case "error":
+      applyCellError({ draft, event });
+      return;
+
     default:
       return;
   }
+};
+
+/**
+ * A cell that failed rather than answered. The engine reports it as its own
+ * event instead of a result, and the cell still has to show the failure: a run
+ * where everything failed writes those failures back, the same as the browser
+ * does, rather than leaving the table reading "No output yet".
+ *
+ * An error naming no cell is the whole run failing. There is no cell to mark,
+ * and the run's own status already carries it.
+ */
+const applyCellError = ({
+  draft,
+  event,
+}: {
+  draft: RunResultsDraft;
+  event: Extract<EvaluationV3Event, { type: "error" }>;
+}): void => {
+  const { rowIndex, targetId } = event;
+  if (rowIndex === undefined || !targetId) return;
+
+  draft.startedCells.add(cellKey({ rowIndex, targetId }));
+
+  if (event.evaluatorId) {
+    const byEvaluator = draft.evaluatorResults[targetId] ?? {};
+    draft.evaluatorResults[targetId] = byEvaluator;
+    rowsOf(byEvaluator, event.evaluatorId)[rowIndex] = {
+      status: "error",
+      error_type: "EvaluatorError",
+      details: event.message,
+      traceback: [],
+      ...(event.domainError ? { domainError: event.domainError } : {}),
+    };
+    return;
+  }
+
+  rowsOf(draft.errors, targetId)[rowIndex] = event.message;
+  const metadata = rowsOf(draft.targetMetadata, targetId);
+  metadata[rowIndex] = {
+    ...(metadata[rowIndex] ?? {}),
+    ...(event.domainError ? { domainError: event.domainError } : {}),
+  };
 };
 
 const applyTargetResult = ({
