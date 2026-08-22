@@ -4,6 +4,7 @@ import type {
   AuthzMigrationRepository,
   ExistingTeamBinding,
   ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
@@ -18,7 +19,8 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import { queryCutoverOnEngine } from "../cutover-gate";
+
+import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**
  * How many guarded budget raises are in flight at once while seeding an
@@ -151,6 +153,42 @@ export class PrismaAuthzMigrationRepository
     return rows.map((row) => row.id);
   }
 
+  /** Every non-resource Grant head row, revoked included — the ADR-110
+   *  proof needs both directions: a live row to compare and a revoked one to
+   *  recognize as already denied. Resource rows have their own read
+   *  (`findResourceGrantRows`), which carries the tier's extra columns. */
+  async findGrantHeadRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GrantHeadRow[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, scopeType: { not: "RESOURCE" } },
+      select: {
+        id: true,
+        principalType: true,
+        principalId: true,
+        roleKey: true,
+        legacyRole: true,
+        source: true,
+        scopeType: true,
+        scopeId: true,
+        revokedAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      principalType: row.principalType,
+      principalId: row.principalId,
+      roleKey: row.roleKey,
+      legacyRole: row.legacyRole,
+      source: row.source,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      revoked: row.revokedAt !== null,
+    }));
+  }
+
   async findRoleHeads({
     organizationId,
   }: {
@@ -193,6 +231,20 @@ export class PrismaAuthzMigrationRepository
       customRoleId: row.assignedRoleId,
       createdAtMs: row.createdAt.getTime(),
     }));
+  }
+
+  /** Every (userId, groupId) membership in the organization — what lets the
+   *  migration mirror the legacy fallback's suppression predicate, which
+   *  counts bindings held THROUGH a group as bindings the user holds. */
+  async findGroupMemberships({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Array<{ userId: string; groupId: string }>> {
+    return this.prisma.groupMembership.findMany({
+      where: { group: { organizationId } },
+      select: { userId: true, groupId: true },
+    });
   }
 
   async findExistingTeamBindings({
@@ -265,7 +317,7 @@ export class PrismaAuthzMigrationRepository
       select: { migrationName: true, status: true },
     });
     // `status` is a plain Prisma string column (no DB enum) - wider than the
-    // union the port is pinned to, same reasoning as ledger-write-gate.ts's
+    // union the port is pinned to, same reasoning as engine-gate.ts's
     // own read of this table. The cast is on this map's values, not on the
     // port's declared type, so a rename of the union still catches every
     // caller.
@@ -448,9 +500,12 @@ export class PrismaAuthzMigrationRepository
     organizationId: string;
   }): Promise<ResourceGrantRow[]> {
     const rows = await this.prisma.grant.findMany({
-      where: { organizationId, scopeType: "RESOURCE" },
+      // Live rows only: this read serves the ADR-110 proof, and a revoked
+      // link is a deny already applied, not an extra to reconcile.
+      where: { organizationId, scopeType: "RESOURCE", revokedAt: null },
       select: {
         id: true,
+        source: true,
         token: true,
         resourceKind: true,
         scopeId: true,
@@ -474,6 +529,7 @@ export class PrismaAuthzMigrationRepository
     );
     return rows.map((row) => ({
       grantId: row.id,
+      source: row.source,
       token: row.token,
       resourceKind: row.resourceKind,
       resourceId: row.scopeId,
@@ -519,7 +575,7 @@ export class PrismaAuthzMigrationRepository
   }
 
   /** The same query the request-path gate's own cache miss runs
-   *  (cutover-gate.ts's `queryCutoverOnEngine`) - one predicate, so the
+   *  (engine-gate.ts's `queryOrganizationOnAuthzEngine`) - one predicate, so the
    *  migration awaiting its own flip and the gate serving it can never
    *  drift onto different answers. */
   async findCutoverOnEngine({
@@ -527,6 +583,9 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    return queryCutoverOnEngine({ prisma: this.prisma, organizationId });
+    return queryOrganizationOnAuthzEngine({
+      prisma: this.prisma,
+      organizationId,
+    });
   }
 }

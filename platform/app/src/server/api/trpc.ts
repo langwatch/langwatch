@@ -37,7 +37,16 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
-import type { AuthzPermission } from "@langwatch/authz";
+import type {
+  AuthzPermission,
+  DeclarationError,
+  DeclaredAuthzMiddleware,
+  NoPermissionOptions,
+  ScopeTierField,
+  ValidatePermissionForInput,
+  ViaFieldFor,
+} from "@langwatch/authz";
+import { authzDeclarationOf } from "@langwatch/authz";
 import {
   HandledError,
   isZodLikeError,
@@ -47,6 +56,7 @@ import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { type App, getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -56,7 +66,13 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
-import { checkPermissionV2 } from "../app-layer/authz/trpc-middleware";
+import { scopeLineageGuard } from "../app-layer/authz/scope-lineage-guard";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "../app-layer/authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -73,6 +89,13 @@ interface CreateContextOptions {
   req?: NextApiRequest;
   res?: NextApiResponse;
   session: Session | null;
+  /**
+   * The composed App this request decides through. The request path passes
+   * `getApp()`; a test can inject a fake here instead of mocking the App
+   * module. Left unset, App-reading middleware falls back to the process
+   * singleton.
+   */
+  app?: App;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
@@ -103,6 +126,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     req: opts.req,
     res: opts.res,
     prisma,
+    app: opts.app,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
@@ -127,6 +151,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     session,
+    app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
   });
@@ -1198,8 +1223,16 @@ interface PendingPermissionProcedureBuilder<
     TOutputOut,
     TCaller
   >;
+  /**
+   * The custom-check escape hatch, and it only takes middleware that says
+   * what it is: `declareAuthzMiddleware(...)` is the sole way to produce the
+   * brand, so a hand-rolled function that flips `ctx.permissionChecked`
+   * without declaring its policy is a compile error here rather than a CI
+   * sweep finding. Non-authz middleware (plan gates, error handlers) belongs
+   * AFTER the declaration, on the plain builder this returns.
+   */
   use: (
-    middleware: PermissionMiddleware<TInputOut>,
+    middleware: DeclaredAuthzMiddleware<PermissionMiddleware<TInputOut>>,
   ) => ProcedureBuilder<
     TContext,
     TMeta,
@@ -1211,13 +1244,92 @@ interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * ADR-092 §5 sugar: declare the required permission and let the engine
-   * extract the scope (projectId / teamId / organizationId) from the
-   * validated input. New procedures prefer this over `.use(checkXxx…)`.
+   * ADR-092 delivery-plan decision 25: declare the required permission,
+   * typed against the validated input the check reads its scope id from.
+   * The permission's registry tiers decide which of `projectId` / `teamId` /
+   * `organizationId` the input must carry — a missing id, or an id from a
+   * tier the permission cannot be granted at, is a compile error naming the
+   * problem. The most specific allowed tier present decides the check scope.
    */
-  permission: (
-    permission: AuthzPermission,
-  ) => ProcedureBuilder<
+  permission<P extends AuthzPermission>(
+    permission: P & ValidateDeclaredPermission<P, TInputOut>,
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * The derivation form, for a permission whose tier the input does not name
+   * directly: `.permission("organization:manage", { via: "teamId" })` checks
+   * the organization the input's team belongs to. `via` must name a required
+   * input field whose tier can derive one the permission is grantable at —
+   * the derivation is written at the call site, never inferred.
+   */
+  permission<P extends AuthzPermission>(
+    permission: P,
+    options: { via: ViaFieldFor<P, TInputOut> },
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * Any one of the permissions is enough, checked at the input's project
+   * scope. List the primary surface's permission first — the denial names
+   * it, so granting it resolves the refusal whichever feature the caller
+   * came through.
+   */
+  permissionAny<Ps extends readonly [AuthzPermission, ...AuthzPermission[]]>(
+    ...permissions: PermissionAnyArgs<Ps, TInputOut>
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * Authenticated, deliberately unchecked — for procedures that read no
+   * organization-, team-, or project-scoped data. Requires a written reason,
+   * and every scope id the input carries must be individually allowed with
+   * one: the legacy `skipPermissionCheck` runtime guard, moved to compile
+   * time.
+   */
+  noPermission(
+    options: DeclaredNoPermissionOptions<TInputOut>,
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * The scope is data the handler loads at runtime (a row's own scope set),
+   * so the SERVICE performs the real authorization. The declaration records
+   * why, and which permissions the service enforces — this only moves WHERE
+   * the check happens, never whether one does.
+   */
+  authorizeInService(options: {
+    reason: string;
+    permissions: readonly AuthzPermission[];
+  }): ProcedureBuilder<
     TContext,
     TMeta,
     TContextOverrides,
@@ -1228,6 +1340,39 @@ interface PendingPermissionProcedureBuilder<
     TCaller
   >;
 }
+
+/**
+ * `.permission()` reads its scope id from the validated input, so an input
+ * must be declared first — `UnsetMarker` is tRPC's "no .input() yet".
+ */
+type ValidateDeclaredPermission<
+  P extends AuthzPermission,
+  I,
+> = UnsetMarker extends I
+  ? DeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
+  : ValidatePermissionForInput<P, I>;
+
+type PermissionAnyArgs<
+  Ps extends readonly [AuthzPermission, ...AuthzPermission[]],
+  I,
+> = UnsetMarker extends I
+  ? [
+      AuthzPermission &
+        DeclarationError<"declare .input() before .permissionAny() — the check reads its projectId from the validated input">,
+    ]
+  : I extends { projectId: string }
+    ? {
+        [K in keyof Ps]: Ps[K] &
+          ValidatePermissionForInput<Ps[K] & AuthzPermission, I>;
+      }
+    : [
+        AuthzPermission &
+          DeclarationError<".permissionAny() checks at the project scope and needs a required 'projectId' in the input">,
+      ];
+
+type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
+  ? { reason: string; allow?: undefined }
+  : NoPermissionOptions<I>;
 
 const permissionProcedureBuilder = <
   TContext,
@@ -1259,6 +1404,19 @@ const permissionProcedureBuilder = <
   TOutputOut,
   TCaller
 > => {
+  /** The builder this call returns, named once rather than spelled out at
+   *  every cast below — the instantiation is identical in all of them. */
+  type Pending = PendingPermissionProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+
   /**
    * The one chain both entry points build: the surrounding middlewares are
    * identical and only the permission check in the middle differs, so
@@ -1271,6 +1429,11 @@ const permissionProcedureBuilder = <
       .use(tracerMiddleware as any)
       .use(loggerMiddleware as any)
       .use(handledErrorMiddleware as any)
+      // Ahead of the check on purpose: a request mixing scope ids across
+      // organizations is refused before ANY declaration kind — declared,
+      // custom, or opted-out — can pass on one id while the handler acts on
+      // another. See scope-lineage-guard.ts.
+      .use(scopeLineageGuard(authzDeclarationOf(check)) as any)
       .use(check as any)
       .use(enforcePermissionCheck as any)
       .use(auditLogMutations as any) as any;
@@ -1278,19 +1441,28 @@ const permissionProcedureBuilder = <
   return {
     input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
-    }) as PendingPermissionProcedureBuilder<
-      TContext,
-      TMeta,
-      TContextOverrides,
-      TInputIn,
-      TInputOut,
-      TOutputIn,
-      TOutputOut,
-      TCaller
-    >["input"],
+    }) as Pending["input"],
     use: (middleware) => withPermissionCheck(middleware),
-    permission: (permission) =>
-      withPermissionCheck(checkPermissionV2(permission)),
+    permission: ((
+      permission: AuthzPermission,
+      options?: { via?: ScopeTierField },
+    ) =>
+      withPermissionCheck(
+        checkDeclaredPermission({ permission, via: options?.via }),
+      )) as Pending["permission"],
+    permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
+      withPermissionCheck(
+        checkDeclaredPermissionAny(permissions),
+      )) as Pending["permissionAny"],
+    noPermission: ((options: {
+      reason: string;
+      allow?: Record<string, string>;
+    }) =>
+      withPermissionCheck(
+        declaredNoPermission(options),
+      )) as Pending["noPermission"],
+    authorizeInService: (options) =>
+      withPermissionCheck(declaredServiceAuthorization(options)),
   };
 };
 

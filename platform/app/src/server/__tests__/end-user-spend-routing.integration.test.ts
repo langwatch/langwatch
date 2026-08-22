@@ -33,28 +33,39 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  // Built per call rather than once: the routes now take their ClickHouse
-  // repositories from the App, and `chClient` is only assigned once the test
-  // containers are up - after this factory runs.
-  getApp: () => ({
-    planProvider: {
-      getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
-    },
-    gateway: {
-      budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
-      virtualKeySpend: new GatewayVirtualKeySpendRepository(
-        async () => chClient,
-      ),
-      spendEvents: new GatewaySpendEventsRepository(async () => chClient),
-      webhookEvents: new WebhookEventsClickHouseRepository(
-        async () => chClient,
-      ),
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  // The REST org-auth middleware decides through
+  // appFromContext(c).permissions (ADR-092); the fake carries the real
+  // composition over the real test database so requests reach the routes.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const permissions = permissionsServiceFor(dbForPermissions);
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    // Built per call rather than once: the routes now take their ClickHouse
+    // repositories from the App, and `chClient` is only assigned once the test
+    // containers are up - after this factory runs.
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
+      },
+      gateway: {
+        budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
+        virtualKeySpend: new GatewayVirtualKeySpendRepository(
+          async () => chClient,
+        ),
+        spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          async () => chClient,
+        ),
+      },
+    }),
+  };
+});
 let chClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =

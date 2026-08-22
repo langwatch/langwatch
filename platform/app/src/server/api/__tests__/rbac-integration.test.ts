@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { declaredNoPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
   checkOrganizationPermission,
@@ -14,13 +15,11 @@ import {
   type Permission,
   resolveProjectPermission,
   resolveTeamPermission,
-  skipPermissionCheck,
-  skipPermissionCheckProjectCreation,
 } from "../rbac";
 
 // Mock Prisma client
 const mockPrisma = {
-  authzCutoverProjection: {
+  systemMigrationTenantState: {
     findUnique: vi.fn(),
   },
   project: {
@@ -65,10 +64,8 @@ describe("RBAC Integration Tests", () => {
     // A cold, explicit "not on the engine" answer, so the resolvers stay on
     // the legacy path these tests pin instead of the gate caching a failed
     // read of a missing delegate.
-    resetCutoverGateForTesting();
-    mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
-      onEngine: false,
-    });
+    resetAuthzEngineGateForTesting();
+    mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     // Default: the caller IS a current member of the owning org — scoped
     // resolution fails closed on membership, so every test that exercises a
     // binding/group path needs one. Tests about non-members override this with
@@ -761,41 +758,28 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("skipPermissionCheck", () => {
+    describe("declaredNoPermission (skipPermissionCheck's successor)", () => {
       it("calls next and set permissionChecked to true", async () => {
-        const result = await skipPermissionCheck({
+        const result = await declaredNoPermission({ reason: "test opt-out" })({
           ctx: mockCtx,
           input: {},
           next: mockNext,
-        });
+        } as never);
 
         expect(result).toBe("success");
         expect(mockCtx.permissionChecked).toBe(true);
       });
 
-      it("throws error when sensitive keys are present", () => {
-        expect(() =>
-          skipPermissionCheck({
+      it("throws error when sensitive keys are present", async () => {
+        await expect(
+          declaredNoPermission({ reason: "test opt-out" })({
             ctx: mockCtx,
             input: { projectId: "project-123" },
             next: mockNext,
-          }),
-        ).toThrow(
+          } as never),
+        ).rejects.toThrow(
           "projectId is not allowed to be used without permission check",
         );
-      });
-    });
-
-    describe("skipPermissionCheckProjectCreation", () => {
-      it("calls next and set permissionChecked to true", async () => {
-        const result = await skipPermissionCheckProjectCreation({
-          ctx: mockCtx,
-          input: {},
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
       });
     });
   });

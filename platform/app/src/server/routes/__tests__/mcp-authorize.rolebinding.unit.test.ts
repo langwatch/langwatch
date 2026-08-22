@@ -96,12 +96,22 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // connection the handler writes the auth code to.
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma } = await import("~/server/db");
   // misc.ts reads its connection through tryGetApp; getApp is overridden too
-  // so both accessors agree on the fake.
+  // so both accessors agree on the fake. The permission check runs the REAL
+  // walk over this file's prisma fixtures, exactly as it did before the App
+  // owned the service.
+  const app = {
+    redis: mockRedis,
+    permissions: permissionsServiceFor(prisma),
+  };
   return {
     ...actual,
-    getApp: () => ({ redis: mockRedis }),
-    tryGetApp: () => ({ redis: mockRedis }),
+    getApp: () => app,
+    tryGetApp: () => app,
   };
 });
 vi.mock("~/utils/encryption", () => ({

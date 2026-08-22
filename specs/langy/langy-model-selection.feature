@@ -75,3 +75,43 @@ Feature: Langy runs on the model the project chose
     When the user switches the composer to a model from another provider and sends a follow-up
     Then the turn carries what was already said in this conversation
     And the new model can answer from it
+
+  @unit
+  Scenario: The composer follows a default-model change made in settings
+    Given the composer's model was seeded from the resolved default
+    When the default model configuration is saved or removed while the panel is open
+    Then the composer's picker snaps to the newly resolved default without a reload
+    And a model the user picked on purpose is never replaced
+
+  @unit
+  Scenario: Picking a model offers to make it the default at the scope that holds it
+    Given the Langy default is configured at a scope the user can manage
+    When the user picks a different model in the composer
+    Then a dialog offers to make that model the Langy default going forward
+    And confirming writes the default at the same scope and kind that held it
+    And declining keeps the pick for this conversation only
+
+  @unit
+  Scenario: No default offer without the right to change it
+    Given the Langy default is configured at a scope the user cannot manage
+    When the user picks a different model in the composer
+    Then no dialog appears and the pick stays with the conversation
+    And picking the default itself, or having no configured default, asks nothing
+
+  # A pick lives with its conversation. The durable record keeps the model of
+  # the latest accepted turn, so reopening the conversation — another tab,
+  # another device, after a reload — restores the model it last ran on
+  # instead of snapping back to the default.
+  @unit
+  Scenario: Reopening a conversation restores the model it last ran on
+    Given a conversation whose last turn ran on a model the user picked
+    When the conversation is opened again and its history loads
+    Then the composer's picker shows that model, not the resolved default
+    And a model the user picked since opening it is never replaced
+    And a model the allowlist refuses is not restored
+
+  @unit
+  Scenario: A new conversation starts on the resolved default again
+    Given the user picked a model for one conversation
+    When the user starts a new conversation or switches to another
+    Then the pick does not follow to the other conversation

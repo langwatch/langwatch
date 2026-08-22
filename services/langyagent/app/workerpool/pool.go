@@ -844,7 +844,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	readySpan.End()
 	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
 
-	sessionID, err := agent.OpenSession(ctx, endpoint)
+	sessionID, resumedSession, err := agent.OpenSession(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -868,6 +868,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		zap.Int("port", externalPort),
 		zap.Int("internalPort", internalPort),
 		zap.String("session", sessionID),
+		zap.Bool("resumedSession", resumedSession),
 		zap.Uint32("uid", uid),
 	)
 
@@ -880,6 +881,10 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		otelRelay:         p.otelRelay,
 		otelToken:         otelToken,
 		openCodeSessionID: sessionID,
+		// A resumed session already carries the conversation — folding the
+		// history seed into its next message would tell it its own story twice
+		// and break the byte-stable prefix provider caching reads.
+		promptDelivered:   resumedSession,
 		cmd:               cmd,
 		uid:               uid,
 		credSig:           sig,

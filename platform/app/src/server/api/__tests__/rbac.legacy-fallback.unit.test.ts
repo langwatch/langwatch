@@ -1,25 +1,22 @@
 /**
- * The legacy TeamUser fallback at the resolver seam
- * (specs/rbac/in-place-authz-migration.feature): the fallback participates
- * for EVERY organization - pending, migrated, parked, or finalized - until
- * the contract change deletes the rows themselves. Stage B's finalization
- * proves the promoted bindings answer identically at the scopes they
- * replace; it does NOT switch the rows off. A per-organization switch used
- * to live here and did exactly that, which made the legacy resolver
- * disagree with the engine (whose readers keep inferring from the same
- * rows on both heads, the dormant-fact principle) the moment an
- * organization finalized.
+ * The legacy TeamUser fallback at the resolver seam.
+ *
+ * An organization that has not finished its migration is answered by the
+ * legacy walk, and the TeamUser rows are part of that walk for as long as it
+ * is the one answering. Nothing switches them off per-organization: a
+ * per-organization switch used to live here and did exactly that, which made
+ * the legacy resolver disagree with the engine the moment an organization
+ * finalized.
  *
  * A unit test, and named one: every Prisma delegate below is a stub, so it
  * opens no socket and needs no datastore.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {
-  authzCutoverProjection: { findUnique: vi.fn() },
   team: { findUnique: vi.fn() },
   organizationUser: { findFirst: vi.fn() },
   teamUser: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -27,6 +24,9 @@ const mockPrisma = {
   groupMembership: { findMany: vi.fn() },
   roleBinding: { findMany: vi.fn() },
   systemMigrationTenantState: { findUnique: vi.fn() },
+  // The engine's own head, for the one case where the migration finished.
+  grant: { findMany: vi.fn().mockResolvedValue([]) },
+  role: { findMany: vi.fn().mockResolvedValue([]) },
 } as any;
 
 const mockSession = {
@@ -39,10 +39,8 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     // A cold, explicit "not on the engine" answer: the gate cache is reset so
     // no other test's cached read leaks in, and the projection stub is what
     // keeps this suite on the legacy resolver path it exists to pin.
-    resetCutoverGateForTesting();
-    mockPrisma.authzCutoverProjection.findUnique.mockResolvedValue({
-      onEngine: false,
-    });
+    resetAuthzEngineGateForTesting();
+    mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     mockPrisma.team.findUnique.mockResolvedValue({
       id: "team-1",
       organizationId: "org-1",
@@ -64,14 +62,16 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
 
   describe.each([
     "pending",
-    "migrated",
     "parked",
-    "finalized",
-  ] as const)("when the organization's backfill is %s", (state) => {
-    /** @scenario "The legacy team rows keep answering until contract deletes them" */
-    it("keeps the legacy fallback participating exactly as today", async () => {
+    // Held: the work landed but the proof found the projection behind or
+    // disagreeing. The ops page promises such an organization behaves
+    // exactly as before, so it reads legacy like the others.
+    "migrated",
+  ] as const)("when the organization's migration is %s", (status) => {
+    /** @scenario "An organization that has not finalized reads from legacy" */
+    it("answers from the legacy row, whatever the migration is doing", async () => {
       mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(
-        state === "pending" ? null : { status: state },
+        status === "pending" ? null : { status },
       );
 
       const result = await resolveTeamPermission(
@@ -82,11 +82,26 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
 
       expect(result.permitted).toBe(true);
       expect(mockPrisma.teamUser.findFirst).toHaveBeenCalled();
-      // No migration-state read stands between a permission check and the
-      // rows: the fallback is unconditional until contract.
-      expect(
-        mockPrisma.systemMigrationTenantState.findUnique,
-      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the migration has finalized", () => {
+    // Finishing IS the switch (ADR-110), so the engine answers and the legacy
+    // rows are not consulted at all. Only `finalized` finishes: `migrated`
+    // is the held state and reads legacy above.
+    /** @scenario "A cut-over organization is decided by the engine" */
+    it("stops consulting the legacy row", async () => {
+      mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue({
+        status: "finalized",
+      });
+
+      await resolveTeamPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "team-1",
+        "team:manage" as Permission,
+      );
+
+      expect(mockPrisma.teamUser.findFirst).not.toHaveBeenCalled();
     });
   });
 });

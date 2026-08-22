@@ -25,13 +25,15 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
+
+wireDefaultTestApp();
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),

@@ -390,7 +390,7 @@ describe("SystemMigrationRunnerService", () => {
   });
 
   describe("when an operator pins a tenant rolled_back while its migration is still running", () => {
-    /** @scenario "A pass already in flight cannot overwrite an operator's rollback" */
+    /** @scenario "A pass in flight cannot overwrite an operator's rollback" */
     it("discards the pass's outcome instead of overwriting the pin", async () => {
       // The interleaving: the pass reads "migrated", starts the (slow)
       // migration, and the operator pins the row before the outcome write.
@@ -430,7 +430,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(summary?.skipped).toBe(1);
     });
 
-    /** @scenario "A pass already in flight cannot overwrite an operator's rollback" */
+    /** @scenario "A pass in flight cannot overwrite an operator's rollback" */
     it("never parks over the pin when the migration then throws", async () => {
       await state.upsertRecord({
         migrationName: "m1",

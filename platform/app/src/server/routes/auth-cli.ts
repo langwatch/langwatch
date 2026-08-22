@@ -54,12 +54,12 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-} from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
@@ -379,11 +379,10 @@ async function refuseProjectKeyHandout(
       400,
     );
   }
-  const canWriteProject = await hasProjectPermission(
+  const canWriteProject = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: userId } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "project:update",
   );
@@ -1661,8 +1660,8 @@ async function ensureGovernancePermissionOr403(
   tokenRecord: { user_id: string; organization_id: string },
   permission: Permission,
 ): Promise<Response | null> {
-  const allowed = await hasOrganizationPermission(
-    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+  const allowed = await probeOrganizationPermission(
+    { session: { user: { id: tokenRecord.user_id } } } as any,
     tokenRecord.organization_id,
     permission,
   );
@@ -2065,11 +2064,10 @@ async function mintProjectIngestionKey(
     );
   }
 
-  const allowed = await hasProjectPermission(
+  const allowed = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: tokenRecord.user_id } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "traces:create",
   );
@@ -2487,7 +2485,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     // Resolve the picked project: it must live in the chosen org and not be
     // archived. Authorization is NOT decided by this lookup. The
-    // `hasProjectPermission(..., "project:update")` check below is the source
+    // `probeProjectPermission(..., "project:update")` check below is the source
     // of truth, and it re-derives the org from the project id and inspects
     // project-, team- and org-scoped role bindings plus the org role. So an
     // org-level admin (or an org/team-scoped role-binding admin) who sees the

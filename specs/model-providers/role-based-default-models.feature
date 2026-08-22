@@ -172,6 +172,16 @@ Feature: Role-based default models with per-scope overrides
     # while the row disappears reads as data loss.
 
   @integration
+  Scenario: A cache refresh that fails after the write still reads as saved
+    Given the drawer saved a config
+    When the follow-up cache refresh fails
+    Then the toast still says the config was saved
+    And no error is shown for a write that landed
+    # Saving also refreshes the default-model caches and re-points Langy's
+    # model pill. That refresh runs after the write; a failure there is a
+    # stale open panel, never a failed save.
+
+  @integration
   Scenario: Adding a config for a scope that already has one says it will replace it
     Given the organization already has a config
     When I open the drawer for a new config and pick the organization scope

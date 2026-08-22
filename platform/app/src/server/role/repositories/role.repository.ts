@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -398,11 +398,14 @@ export class RoleRepository {
     apiKeyId,
     organizationId,
     actor,
+    awaitProjection = true,
   }: {
     roleIds: string[];
     apiKeyId: string;
     organizationId: string;
     actor: LedgerActor;
+    /** Same contract as `GrantsLedgerWriter.deleteRole`'s parameter of this name. */
+    awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;
     // Revoke this api key's CUSTOM grants on these roles FIRST. The
@@ -436,7 +439,12 @@ export class RoleRepository {
         this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
       ]);
       if (holders > 0 || assignedUsers > 0) continue;
-      await this.writer.deleteRole({ organizationId, roleId, actor });
+      await this.writer.deleteRole({
+        organizationId,
+        roleId,
+        actor,
+        awaitProjection,
+      });
     }
   }
 

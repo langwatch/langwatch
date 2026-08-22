@@ -1451,6 +1451,8 @@ model LangyConversationProjection {
   /// The turn in flight, or null when idle (busy guard reads this).
   CurrentTurnId        String?                    @map("currentTurnId")
   LastError            String?                    @map("lastError")
+  /// The model the latest accepted turn ran on; reopening seeds the picker from it.
+  LastModel            String?                    @map("lastModel")
   /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
   PendingHandoffToken  String?                    @map("pendingHandoffToken")
   PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")
@@ -2462,6 +2464,8 @@ model Grant {
   // of that resource's identity itself: resourceKind says what the id names
   // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
   // lives. createdByUserId is whoever minted the link.
+  // Unique GLOBALLY, revoked or not: a reissued token is an old share link
+  // that works again, which is the one thing revoking it was for.
   token           String?   @unique
   permission      String?
   resourceKind    String?
@@ -2473,6 +2477,13 @@ model Grant {
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+
+  // A revoke MARKS the row rather than deleting it. Deleting made the
+  // projection order-dependent - a redelivered `attached` after a `revoked`
+  // had no row left to lose to - and it threw away the answer to when a
+  // grant ended and why. Every read of live access fences on this being null.
+  revokedAt     DateTime?
+  revokedReason String?
 
   // The collector's principal scan is served by
   // "Grant_organizationId_principalType_principalId_idx", a PARTIAL index
@@ -2528,44 +2539,17 @@ model Role {
   name           String
   description    String?
   permissions    Json // registry permission strings only; empty grants nothing
-  kind           String   @default("custom") // "custom" | "system_api_key"
+  kind           String    @default("custom") // "custom" | "system_api_key"
   occurredAt     DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  // A delete marks the row. The name stays taken: identity is the id, and
+  // reusing a deleted role's name would make two different roles read as one
+  // in every audit trail that recorded the name.
+  deletedAt      DateTime?
 
   @@unique([organizationId, name])
   @@index([organizationId])
-}
-
-// One row per organization: how far the authz_grants fold has applied.
-// Advanced by the projection writer itself - the write IS the version bump,
-// so no write path can skip it. Replaces the hand-bumped epoch at contract.
-model AuthzProjectionCursor {
-  organizationId    String   @id
-  lastEventId       String
-  acceptedAt        DateTime
-  occurredAt        DateTime
-  projectionVersion String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
-}
-
-// Projected from the ledger's cutover_* process events. What the per-org
-// permission fork and the legacy-fallback gate read.
-model AuthzCutoverProjection {
-  organizationId          String    @id
-  onEngine                Boolean   @default(false)
-  provedAt                DateTime?
-  parityDiffs             Json?
-  // Why the newest cutover_completed fact did NOT put this organization on
-  // the engine, or null when none was refused. The fold is a pure reducer
-  // and cannot log, so a refusal is state - and this column is what carries
-  // it to the operator surface. "parity_unproven" | "parity_diffs_outstanding".
-  completionRefusedReason String?
-  // Business time of the newest cutover fact folded here - the reducer's
-  // monotonic guard, persisted so a reload does not reset it.
-  changedAt               DateTime?
-  updatedAt               DateTime  @default(now()) @updatedAt
 }
 
 model ApiKey {
@@ -4270,7 +4254,7 @@ model GatewayRealtimeSession {
 // Organization id as a plain column ref (no FK) - the runner is generic
 // over tenants and survives organization deletion trivially. First rider:
 // the ADR-092 stage-B TeamUser backfill (@langwatch/authz-server). Spec:
-// specs/rbac/in-place-authz-migration.feature.
+// specs/migration/authz-grants-rollout.feature.
 model SystemMigrationTenantState {
   migrationName String
   tenantId      String

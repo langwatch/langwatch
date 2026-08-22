@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/web",
-  "version": "3.15.0",
+  "version": "3.16.0",
   "private": true,
   "engines": {
     "node": "24.x || 25.x || 26.x",
@@ -96,6 +96,7 @@
     "@hono/node-server": "^2.0.6",
     "@hono/standard-validator": "^0.2.3",
     "@langwatch/api": "workspace:*",
+    "@langwatch/actor": "workspace:*",
     "@langwatch/authz": "workspace:*",
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automations": "workspace:*",

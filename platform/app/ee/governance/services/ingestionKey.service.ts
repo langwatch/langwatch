@@ -111,6 +111,13 @@ export class IngestionKeyService {
         callerUserId,
         callerIsAdmin: true,
         organizationId,
+        // The prior key is dead the moment its row is revoked, and its
+        // private role is named after that key id, so the mint below never
+        // waits for the name. Holding here for the role deletion to project
+        // only added a fold pickup cycle to a rotation that already waits
+        // for the new key's own writes: the CLI's first `langwatch claude`
+        // after a logout sat well over twenty seconds on this one request.
+        awaitProjection: false,
       });
     }
 

@@ -201,16 +201,6 @@ interface LangyState extends TurnPhaseState {
   closePanel: () => void;
   togglePanel: () => void;
 
-  /**
-   * The one-time "you can hand me things off the page" hint has been retired.
-   *
-   * Persisted per browser, and set two ways: the user dismisses it, or they do
-   * the thing it teaches (see `absorbContextTarget`). Teaching a gesture is
-   * worth exactly one showing — a hint that comes back is an ad.
-   */
-  contextHintDismissed: boolean;
-  dismissContextHint: () => void;
-
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
   // (never persisted) — it exists only for the hop between the bar and the panel.
@@ -322,6 +312,23 @@ interface LangyState extends TurnPhaseState {
   modelOverride: string;
   setModelOverride: (model: string) => void;
   /**
+   * Which conversation the picker was last seeded for from the durable
+   * record — so a poll of the same history does not re-apply a model the
+   * user has since picked away from. Session-only, never persisted.
+   */
+  modelSeededForConversationId: string | null;
+  /**
+   * A conversation remembers the model its last turn ran on; opening it
+   * brings that model back to the picker. Applies once per selection, only
+   * while the pick is still the seeded default (an explicit pick since the
+   * conversation was opened is never replaced).
+   */
+  followConversationModel: (args: {
+    conversationId: string;
+    model: string;
+    resolvedDefault: string | null;
+  }) => void;
+  /**
    * The project's coding default changed server-side (a codex connect flow
    * wrote the LANGY role default). Follow it with the composer's pill ONLY
    * when the pill is still on the default it replaced: an empty override, or
@@ -423,6 +430,13 @@ interface LangyState extends TurnPhaseState {
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
   /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
   requestStop: () => void;
+  /**
+   * The conversation whose last turn THIS browser stopped (ADR-078). What lets
+   * an empty stopped reply read "Interrupted" instead of "No content". Session
+   * truth only: set when the stop dispatches, cleared by the next send and by
+   * the scope reset — a reloaded page falls back to the plain empty state.
+   */
+  interruptedConversationId: string | null;
   /**
    * The stop request never reached the backend: `stopping` → `active`. The
    * spinner is a promise that a stop is on its way, so it may not outlive a
@@ -577,11 +591,10 @@ const emptyConversationState = () => ({
  * forgotten INTO the reset, which is the harmless direction.
  *
  * Each entry earns its place:
- *   isOpen, panelMode, panelEffect, devMode, contextHintDismissed
+ *   isOpen, panelMode, panelEffect, devMode
  *     — browser-level preferences. They describe how this person likes the panel,
- *       not what they were looking at. Closing the panel or forgetting that the
- *       gesture hint was already retired, every time somebody changes project,
- *       would be a bug of its own.
+ *       not what they were looking at. Closing the panel every time somebody
+ *       changes project would be a bug of its own.
  *   dockShellClaims, dockShifted
  *     — not preferences and not data: a live count of what is mounted RIGHT NOW.
  *       Zeroing them would tell the app shell the dock is free while it is still
@@ -596,7 +609,6 @@ const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "panelMode",
   "panelEffect",
   "devMode",
-  "contextHintDismissed",
   "dockShellClaims",
   "dockShifted",
 ]);
@@ -635,11 +647,6 @@ export const useLangyStore = create<LangyState>()(
       openPanel: () => set({ isOpen: true }),
       closePanel: () => set({ isOpen: false }),
 
-      contextHintDismissed: false,
-      dismissContextHint: () =>
-        set((state) =>
-          state.contextHintDismissed ? state : { contextHintDismissed: true },
-        ),
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
 
       pendingPrompt: null,
@@ -711,6 +718,11 @@ export const useLangyStore = create<LangyState>()(
         set({
           activeConversationId: id,
           historyLoadConversationId: id,
+          // The pick belongs to the conversation being left behind; the one
+          // being opened seeds its own from the durable record (or the
+          // default) once its history lands.
+          modelOverride: "",
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
       adoptConversation: (id) => set({ activeConversationId: id }),
@@ -723,6 +735,11 @@ export const useLangyStore = create<LangyState>()(
           // primed to be sent into the new one. (`resetForScope` already
           // cleared the draft — it was simply missed here.)
           draft: "",
+          // A model pick lives with its conversation ("Just this
+          // conversation" is the dialog's promise) — a new chat starts on
+          // the resolved default again.
+          modelOverride: "",
+          modelSeededForConversationId: null,
           chosenChipIds: new Set<string>(),
           // The targets the user pointed at were gathered for the conversation
           // being left behind; the epoch is what tells the target store to let
@@ -736,6 +753,25 @@ export const useLangyStore = create<LangyState>()(
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
       setModelOverride: (modelOverride) => set({ modelOverride }),
+      modelSeededForConversationId: null,
+      followConversationModel: ({ conversationId, model, resolvedDefault }) =>
+        set((state) => {
+          if (state.activeConversationId !== conversationId) return state;
+          if (state.modelSeededForConversationId === conversationId)
+            return state;
+          // An empty override, or one equal to the resolved default the panel
+          // seeds on open, both mean the user never picked since opening this
+          // conversation — only then may the record's model take the pill.
+          const isUntouched =
+            state.modelOverride === "" ||
+            state.modelOverride === resolvedDefault;
+          return isUntouched
+            ? {
+                modelOverride: model,
+                modelSeededForConversationId: conversationId,
+              }
+            : { modelSeededForConversationId: conversationId };
+        }),
       followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
         set((state) =>
           state.modelOverride === "" || state.modelOverride === previousDefault
@@ -889,6 +925,7 @@ export const useLangyStore = create<LangyState>()(
           turnProgressSample: null,
           turnReasoning: null,
           turnPlan: null,
+          interruptedConversationId: null,
         })),
       unconfirmedConversations: {},
       confirmConversation: (id) =>
@@ -897,8 +934,23 @@ export const useLangyStore = create<LangyState>()(
           const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
           return { unconfirmedConversations: rest };
         }),
-      requestStop: () => set((s) => reduceRequestStop(s)),
-      abandonStop: () => set((s) => reduceAbandonStop(s)),
+      interruptedConversationId: null,
+      requestStop: () =>
+        set((s) => ({
+          ...reduceRequestStop(s),
+          // Only a stop that actually moved the machine counts as an
+          // interruption — requestStop is a no-op outside `active`.
+          interruptedConversationId:
+            s.turnPhase === "active"
+              ? s.activeConversationId
+              : s.interruptedConversationId,
+        })),
+      abandonStop: () =>
+        set((s) => ({
+          ...reduceAbandonStop(s),
+          // The stop never went out, so nothing was interrupted.
+          interruptedConversationId: null,
+        })),
       observeBackendTurn: (inFlight) =>
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
@@ -1095,7 +1147,6 @@ export const useLangyStore = create<LangyState>()(
       partialize: (state) => ({
         isOpen: state.isOpen,
         devMode: state.devMode,
-        contextHintDismissed: state.contextHintDismissed,
         panelMode: state.panelMode,
         panelEffect: state.panelEffect,
         activeConversationId: state.activeConversationId,

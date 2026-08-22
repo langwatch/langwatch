@@ -151,6 +151,13 @@ export type ActivityGroup = {
   calls: ToolCall[];
   /** @see Sequenced */
   order: number;
+  /**
+   * The part index of the group's LATEST call. `order` anchors the group where
+   * its first call ran; this says how recently it was active — which is what
+   * decides whether it is the turn's freshest settled work (see the held card
+   * in {@link LangyActivityParts}).
+   */
+  lastOrder: number;
 };
 
 export type FailedToolCall = {
@@ -601,6 +608,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
       existing.done = existing.done && done;
       existing.detail = described.detail ?? existing.detail;
       existing.calls.push(call);
+      existing.lastOrder = index;
     } else {
       order.push(key);
       byKey.set(key, {
@@ -610,6 +618,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
         done,
         calls: [call],
         order: index,
+        lastOrder: index,
       });
     }
   });
@@ -651,10 +660,11 @@ export function LangyActivityParts({
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
+  const turnPhase = useLangyStore((state) => state.turnPhase);
   const view: PartsView = { parts };
   const groups = toActivityGroups(view);
   const runningGroups = groups.filter((group) => !group.done);
-  const completedGroups = groups.filter((group) => group.done);
+  const allCompletedGroups = groups.filter((group) => group.done);
   const capabilityCalls = toCapabilityCalls(view);
   const capabilityBatches = batchCapabilityCalls(capabilityCalls);
   const pending = toPendingCapabilities(view);
@@ -667,6 +677,30 @@ export function LangyActivityParts({
   ) {
     return null;
   }
+
+  // While the turn is streaming, the action that finished LAST holds its
+  // ground as a settled card instead of folding into the receipt the instant
+  // its output lands — the reader is watching the model think about what that
+  // call returned. It folds when anything takes its place: the next call
+  // starting (running or pending below), answer text streaming in after it, a
+  // failure or capability card landing after it, or the turn settling.
+  const heldGroup = (() => {
+    if (turnPhase === "idle") return null;
+    if (runningGroups.length > 0 || pending.length > 0) return null;
+    if (allCompletedGroups.length === 0) return null;
+    const latest = allCompletedGroups.reduce((left, right) =>
+      right.lastOrder > left.lastOrder ? right : left,
+    );
+    const supersededAt = Math.max(
+      lastAnswerTextIndex(view),
+      ...capabilityCalls.map((entry) => entry.order),
+      ...failures.map((failure) => failure.order),
+    );
+    return latest.lastOrder > supersededAt ? latest : null;
+  })();
+  const completedGroups = heldGroup
+    ? allCompletedGroups.filter((group) => group !== heldGroup)
+    : allCompletedGroups;
 
   // One ordered transcript, not four stacked piles keyed by kind. Every block
   // knows the part it came from, so the render is a stable sort on that: a
@@ -712,6 +746,22 @@ export function LangyActivityParts({
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
+            ),
+          },
+        ]
+      : []),
+    ...(heldGroup
+      ? [
+          {
+            key: `held:${heldGroup.key}`,
+            order: heldGroup.lastOrder,
+            node: (
+              <VStack align="stretch" gap={2} role="list">
+                <LatestSettledActivityCard
+                  group={heldGroup}
+                  devMode={devMode}
+                />
+              </VStack>
             ),
           },
         ]
@@ -904,52 +954,80 @@ function CompletedActivityRow({
   devMode: boolean;
 }) {
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  // The receipt names what ran; the result is what the model actually read,
+  // and "why did it conclude that?" is unanswerable without it. Only rows
+  // with a recorded result open — an empty disclosure would promise
+  // something the record does not hold.
+  const callsWithResult = group.calls.filter(
+    (call) => toolResultText(call) !== null,
+  );
+  const canOpenResult = callsWithResult.length > 0;
+
+  // Spans, not the default paragraph: the disclosure below wraps these in a
+  // native <button>, which may hold phrasing content only.
+  const label = (
+    <Text
+      as="span"
+      display="block"
+      textStyle="xs"
+      color="fg"
+      fontWeight="520"
+      flex={1}
+      // Without this the label wraps to a second line and the row grows,
+      // while the detail beside it truncates — the two halves of one row
+      // disagreeing about how to run out of space.
+      minWidth={0}
+      truncate
+    >
+      {completedActivityLabel(group.label)}
+    </Text>
+  );
+  const detail = group.detail ? (
+    <Text
+      as="span"
+      display="block"
+      textStyle="2xs"
+      color="fg.subtle"
+      fontFamily="mono"
+      maxWidth="52%"
+      truncate
+    >
+      {group.detail}
+    </Text>
+  ) : null;
 
   return (
     <VStack align="stretch" gap={1} role="listitem">
       <HStack gap={2} paddingY={1.5}>
-        <Text
-          textStyle="xs"
-          color="fg"
-          fontWeight="520"
-          flex={1}
-          // Without this the label wraps to a second line and the row grows,
-          // while the detail beside it truncates — the two halves of one row
-          // disagreeing about how to run out of space.
-          minWidth={0}
-          truncate
-        >
-          {completedActivityLabel(group.label)}
-        </Text>
-        {group.detail ? (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            maxWidth="52%"
-            truncate
+        {canOpenResult ? (
+          <ResultDisclosureButton
+            isExpanded={resultOpen}
+            onToggle={() => setResultOpen((value) => !value)}
           >
-            {group.detail}
-          </Text>
-        ) : null}
+            {label}
+            {detail}
+          </ResultDisclosureButton>
+        ) : (
+          <>
+            {label}
+            {detail}
+          </>
+        )}
         {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((value) => !value)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
         ) : null}
       </HStack>
+      {resultOpen ? (
+        <VStack align="stretch" gap={1} paddingBottom={1.5}>
+          {callsWithResult.map((call, index) => (
+            <ToolResultBlock key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
+      ) : null}
       {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1} paddingBottom={1.5}>
           {group.calls.map((call, index) => (
@@ -958,6 +1036,122 @@ function CompletedActivityRow({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/**
+ * The label half of a finished row, made to open. The devMode raw-JSON toggle
+ * sits beside it as its own button, so the disclosure covers only this half —
+ * a button inside a button is not a thing.
+ */
+function ResultDisclosureButton({
+  isExpanded,
+  onToggle,
+  children,
+}: {
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={2}
+      flex={1}
+      minWidth={0}
+      textAlign="left"
+      cursor="pointer"
+      aria-expanded={isExpanded}
+      onClick={onToggle}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.solid",
+        outlineOffset: "2px",
+        borderRadius: "4px",
+      }}
+    >
+      {children}
+      <Box
+        as="span"
+        color="fg.subtle"
+        transition="transform 0.18s ease"
+        transform={isExpanded ? "rotate(90deg)" : undefined}
+        flexShrink={0}
+        display="flex"
+      >
+        <ChevronRight size={12} />
+      </Box>
+    </chakra.button>
+  );
+}
+
+/** Dev mode's raw-payload toggle for one finished row. */
+function RawDataToggle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const label = isOpen ? "Hide raw data" : "Show raw data";
+  return (
+    <Tooltip content={label} showArrow>
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        color={isOpen ? "orange.solid" : "fg.subtle"}
+        aria-label={label}
+        aria-expanded={isOpen}
+        onClick={onToggle}
+      >
+        <Braces size={12} />
+      </IconButton>
+    </Tooltip>
+  );
+}
+
+/**
+ * What one finished call returned, as the model read it. A failed call's
+ * result IS its error text. Null when the record kept no result at all —
+ * the caller uses that to withhold the disclosure, not to render "nothing".
+ */
+function toolResultText(call: ToolCall): string | null {
+  if (call.errorText) return call.errorText;
+  if (call.output === undefined || call.output === null) return null;
+  if (typeof call.output === "string") {
+    return call.output.trim().length > 0 ? call.output : null;
+  }
+  try {
+    return JSON.stringify(call.output, null, 2);
+  } catch {
+    return String(call.output);
+  }
+}
+
+function ToolResultBlock({ call }: { call: ToolCall }) {
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.muted"
+      background="bg.muted"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="sm"
+      padding={2}
+      margin={0}
+      maxHeight="240px"
+      overflowY="auto"
+      overflowX="auto"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+    >
+      {toolResultText(call)}
+    </Box>
   );
 }
 
@@ -1266,6 +1460,164 @@ function groupCategory(group: ActivityGroup): string {
  * for a normal user, whichever tool it is. An unmapped tool is not a licence to
  * dump JSON in someone's chat; its name and its input are the honest answer.
  */
+/**
+ * The part index of the last streamed answer text — a settled action older than
+ * the answer's own words has been read past, so it has no claim to stay out of
+ * the receipt. Reasoning parts deliberately do NOT count: thinking after a call
+ * is exactly the window the held card exists for.
+ */
+function lastAnswerTextIndex(view: PartsView): number {
+  let last = -1;
+  view.parts.forEach((part, index) => {
+    const candidate = part as { type?: string; text?: string };
+    if (
+      candidate?.type === "text" &&
+      typeof candidate.text === "string" &&
+      candidate.text.trim().length > 0
+    ) {
+      last = index;
+    }
+  });
+  return last;
+}
+
+/**
+ * The action that just finished, still on the table.
+ *
+ * Rendered for the turn's latest settled activity group while the turn is live
+ * and nothing has taken its place — the reader is watching the model think
+ * about what this call returned, so the card holds its ground instead of
+ * folding into the receipt the instant the output lands. Same geometry as
+ * {@link RunningActivityCard}: a green check for the pulse, the past-tense
+ * label for the shimmer.
+ */
+function LatestSettledActivityCard({
+  group,
+  devMode,
+}: {
+  group: ActivityGroup;
+  devMode: boolean;
+}) {
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const detail = group.detail;
+  // The same disclosure the receipt row carries: the reader is watching the
+  // model think about what this call returned, so what it returned has to be
+  // readable here too, not only after the card folds into the receipt.
+  const callsWithResult = group.calls.filter(
+    (call) => toolResultText(call) !== null,
+  );
+
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      role="listitem"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="langyCard"
+      background="bg.subtle"
+      boxShadow="langyCard"
+      paddingX="15px"
+      paddingY="12px"
+    >
+      <HStack gap={1.5} align="center">
+        <Box color="green.fg" display="flex" flexShrink={0}>
+          <Check size={11} />
+        </Box>
+        <Text
+          textStyle="2xs"
+          fontWeight="500"
+          letterSpacing="0.03em"
+          textTransform="uppercase"
+          color="fg.subtle"
+          truncate
+          flex={1}
+          minWidth={0}
+        >
+          {groupCategory(group)}
+        </Text>
+        {devMode ? (
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
+        ) : null}
+      </HStack>
+
+      {callsWithResult.length > 0 ? (
+        <ResultDisclosureButton
+          isExpanded={resultOpen}
+          onToggle={() => setResultOpen((value) => !value)}
+        >
+          <SettledActivityLabel label={group.label} detail={detail} />
+        </ResultDisclosureButton>
+      ) : (
+        <SettledActivityLabel label={group.label} detail={detail} />
+      )}
+
+      {resultOpen ? (
+        <VStack align="stretch" gap={1}>
+          {callsWithResult.map((call, index) => (
+            <ToolResultBlock key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
+      ) : null}
+
+      {devMode && jsonOpen ? (
+        <VStack align="stretch" gap={1}>
+          {group.calls.map((call, index) => (
+            <RawCallJson key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * The held card's headline and its mono detail line, as one block.
+ *
+ * Spans throughout, because the disclosure wraps this in a native `<button>`,
+ * which may hold phrasing content only.
+ */
+function SettledActivityLabel({
+  label,
+  detail,
+}: {
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <Box
+      as="span"
+      display="flex"
+      flexDirection="column"
+      alignItems="stretch"
+      gap={2}
+      flex={1}
+      minWidth={0}
+    >
+      <Box as="span" textStyle="sm" fontWeight="640" lineHeight="1.3">
+        {completedActivityLabel(label)}
+      </Box>
+      {detail ? (
+        <Text
+          as="span"
+          display="block"
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          truncate
+        >
+          {detail}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
 function RunningActivityCard({
   group,
   devMode,

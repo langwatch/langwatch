@@ -32,7 +32,6 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -67,7 +66,7 @@ const logger = createLogger("langwatch:langy:router");
 /**
  * Builds a Langy procedure gated on one `langy:*` permission, with three
  * gates in order:
- *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *  1. `.permission(permission)` — may the caller do THIS to the
  *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
  *     because it provisions credentials, spawns a worker and spends the
  *     project's model budget — not something a read grant should buy.
@@ -78,15 +77,17 @@ const logger = createLogger("langwatch:langy:router");
  *     the `langyEgress` router uses. Last, so membership is always proven
  *     before the flag is read.
  *
- * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * The permission declaration comes before any `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyProcedure = (permission: Permission) =>
+const langyProcedure = (
+  permission: "langy:view" | "langy:create" | "langy:update" | "langy:delete",
+) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
@@ -502,6 +503,13 @@ export const langyRouter = createTRPCRouter({
         eventCursor: { acceptedAt: number; eventId: string } | null;
         /** The turn in flight, or null — what a refresh reattaches to. */
         currentTurnId: string | null;
+        /**
+         * The model the latest accepted turn ran on, or null before any turn
+         * recorded one. Opening a conversation seeds the composer's picker
+         * from it, so a conversation keeps the model it was last used with
+         * across tabs and reloads.
+         */
+        lastModel: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -549,6 +557,7 @@ export const langyRouter = createTRPCRouter({
           shouldAskFeedback,
           eventCursor: conversation.eventCursor,
           currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+          lastModel: conversation.lastModel,
         };
       },
     ),

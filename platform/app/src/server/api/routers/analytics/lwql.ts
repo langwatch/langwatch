@@ -30,7 +30,6 @@ import {
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 
-import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
@@ -85,7 +84,7 @@ export interface LangWatchQLAvailability {
  */
 const availability = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .query(async ({ ctx, input }): Promise<LangWatchQLAvailability> => {
     const enabled = await lwqlEnabled({
       prisma: ctx.prisma,
@@ -102,7 +101,7 @@ const availability = protectedProcedure
 /** The LangWatchQL datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return getLangWatchQLService().describeSchema({
@@ -131,7 +130,7 @@ const query = protectedProcedure
       timeWindow: lwqlTimeWindowSchema.optional(),
     }),
   )
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     // The project's LangWatchQL secret is hashed into the tenant capability

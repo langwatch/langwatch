@@ -61,11 +61,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-import {
-  cutoverEnrollmentCohort,
-  migrationPassCohort,
-  runSystemMigrationPass,
-} from "../runtime";
+import { migrationPassCohort, runSystemMigrationPass } from "../runtime";
 
 describe("migrationPassCohort on cloud", () => {
   beforeEach(() => {
@@ -116,7 +112,6 @@ describe("migrationPassCohort on cloud", () => {
           migrationName: "authz-team-user-backfill",
         },
       ]);
-      stubs.enrollmentFindUnique.mockResolvedValueOnce(null);
 
       const cohort = await migrationPassCohort();
       expect(
@@ -131,25 +126,6 @@ describe("migrationPassCohort on cloud", () => {
           migrationName: "authz-grants-cutover",
         }),
       ).toBe(false);
-      await expect(cutoverEnrollmentCohort("org_acme")).resolves.toBe(false);
-
-      expect(stubs.enrollmentFindUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            organizationId_migrationName: {
-              organizationId: "org_acme",
-              migrationName: "authz-grants-cutover",
-            },
-          },
-        }),
-      );
-    });
-
-    it("admits the cutover once it is enrolled itself", async () => {
-      stubs.enrollmentFindUnique.mockResolvedValueOnce({
-        organizationId: "org_acme",
-      });
-      await expect(cutoverEnrollmentCohort("org_acme")).resolves.toBe(true);
     });
   });
 

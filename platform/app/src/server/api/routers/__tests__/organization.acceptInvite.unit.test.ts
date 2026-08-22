@@ -83,18 +83,10 @@ vi.mock("../../rbac", async (importOriginal) => {
       ctx.permissionChecked = true;
       return next();
     },
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    resolveTeamPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 

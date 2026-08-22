@@ -59,6 +59,7 @@ export const APP_ERROR_CODES = [
   "clickhouse_overloaded",
   "clickhouse_unavailable",
   "codex_auth_failed",
+  "contested_credentials",
   "credential_class_mismatch",
   "custom_role_id_required",
   "custom_role_in_use",

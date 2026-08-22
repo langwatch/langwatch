@@ -17,6 +17,7 @@ function toRow(row: Row): LangyConversationRow {
     status: row.Status,
     currentTurnId: row.CurrentTurnId,
     lastError: row.LastError,
+    lastModel: row.LastModel,
     messageCount: row.MessageCount,
     lastActivityAtMs: row.LastActivityAt ?? 0,
     cursorActivityAtMs: row.LastActivityAt,

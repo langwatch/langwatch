@@ -93,8 +93,8 @@ const handler = async () => ({ id: "1" });
  */
 export function rpcRegistrationsTheCompilerJudges(): void {
   createService({ name: "things" }).version("2026-08-07", (v) => {
-    v.rpc("/things.create", { output }, handler);
-    v.rpc("/things.nested.get", { output }, handler);
+    v.rpc("/things.create", { noPermission: { reason: "framework test endpoint" }, output }, handler);
+    v.rpc("/things.nested.get", { noPermission: { reason: "framework test endpoint" }, output }, handler);
 
     v.rpc(
       // @ts-expect-error a name with no dot is a REST path, not an RPC
@@ -161,7 +161,7 @@ type UntypedRpc = {
 
 function registerThroughUntypedCaller(path: string): void {
   createService({ name: "things" }).version("2026-08-07", (v) => {
-    (v as unknown as UntypedRpc).rpc(path, { output }, handler);
+    (v as unknown as UntypedRpc).rpc(path, { noPermission: { reason: "framework test endpoint" }, output }, handler);
   });
 }
 
