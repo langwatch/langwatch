@@ -131,6 +131,12 @@ import {
   SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
+import {
+  currentTurnAssistant,
+  hasTokens,
+  runningTool,
+  settledTool,
+} from "../logic/langyThinkingLine";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
@@ -740,8 +746,10 @@ function LangyPanel({
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();
-          if (signal.type === "status") store.setTurnStatus(signal.status);
-          else if (signal.type === "progress") {
+          if (signal.type === "status") {
+            if (signal.readiness) store.setTurnReadinessStatus(signal.status);
+            else store.setTurnStatus(signal.status);
+          } else if (signal.type === "progress") {
             if (signal.message?.trim()) {
               store.setTurnStatus(signal.message);
             }
@@ -2062,6 +2070,7 @@ function LangyPanel({
     ? {
         ...turnSignals,
         status: timeTravel.signals.status,
+        statusIsReadiness: false,
         progress: timeTravel.signals.progress,
         progressSample: null,
         reasoning: timeTravel.signals.reasoning,
@@ -2069,10 +2078,6 @@ function LangyPanel({
         segment: null,
       }
     : turnSignals;
-  const hasTurnDetail =
-    !!displaySignals.status ||
-    displaySignals.progress !== null ||
-    (displaySignals.metrics?.length ?? 0) > 0;
 
   const latestAssistantMessage = [...messages]
     .reverse()
@@ -2102,10 +2107,30 @@ function LangyPanel({
   // conversation right now — the trigger for the seam's fibre glitter. Mirrors
   // exactly what makes StreamingStatusLine render its status orb, so the seam
   // shimmers in sympathy with that orb.
+  // A readiness status is a placeholder for silence, and it may NEVER render
+  // under an answer that is already on screen: a stream replay (reconnect,
+  // resumed turn) re-delivers it after text has streamed, and "Thinking…"
+  // below the visible reply reads as a contradiction. Suppress it the moment
+  // the current turn has provable output; statuses the agent reports mid-turn
+  // are untouched.
+  const currentTurnMessage = currentTurnAssistant(displayMessages);
+  const turnHasVisibleOutput =
+    !!runningTool(currentTurnMessage) ||
+    hasTokens(currentTurnMessage) ||
+    settledTool(currentTurnMessage) ||
+    !!displaySignals.reasoning;
+  const statusForDisplay =
+    displaySignals.statusIsReadiness && turnHasVisibleOutput
+      ? null
+      : displaySignals.status;
+  const hasTurnDetail =
+    !!statusForDisplay ||
+    displaySignals.progress !== null ||
+    (displaySignals.metrics?.length ?? 0) > 0;
   const activityOwnership = resolveLangyActivityOwnership({
     hasInlineProgressOwner,
     turnInFlight,
-    status: displaySignals.status,
+    status: statusForDisplay,
     progress: displaySignals.progress,
     progressSample: displaySignals.progressSample,
     metricsCount: displaySignals.metrics?.length ?? 0,

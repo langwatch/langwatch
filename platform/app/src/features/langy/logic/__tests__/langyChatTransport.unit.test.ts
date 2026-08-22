@@ -262,6 +262,35 @@ describe("createLangyChatTransport", () => {
       expect(cleared).toHaveLength(1);
     });
 
+    it("marks a pre-output status as readiness and a post-output status as real", async () => {
+      // A replayed stream re-delivers the readiness placeholder after the
+      // answer is already on screen; the flag is what lets the panel suppress
+      // it there instead of rendering "Thinking…" under the visible reply.
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({ type: "status", status: "Thinking…" });
+      onData({ type: "delta", text: "Sure —" });
+      onData({ type: "status", status: "Analysing 1,204 traces…" });
+
+      const statuses = onSignal.mock.calls
+        .map(([s]) => s)
+        .filter((s) => s.type === "status" && s.status !== "");
+      expect(statuses).toEqual([
+        { type: "status", status: "Thinking…", readiness: true },
+        {
+          type: "status",
+          status: "Analysing 1,204 traces…",
+          readiness: false,
+        },
+      ]);
+    });
+
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
       const onSignal = vi.fn();
       const { transport } = makeTransport(
@@ -282,10 +311,12 @@ describe("createLangyChatTransport", () => {
       expect(onSignal).toHaveBeenNthCalledWith(1, {
         type: "status",
         status: "Searching traces…",
+        readiness: false,
       });
       expect(onSignal).toHaveBeenNthCalledWith(2, {
         type: "status",
         status: "",
+        readiness: false,
       });
     });
   });

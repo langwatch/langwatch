@@ -487,6 +487,15 @@ interface LangyState extends TurnPhaseState {
   applyTurnEvents: (events: readonly LangyConversationTurnWireEvent[]) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
+  /**
+   * The current turnStatus is the manager's pre-first-frame readiness line
+   * ("Starting Langy…", "Thinking…") — a placeholder for silence. The panel
+   * must never render it under an answer that is already visible: a stream
+   * replay can re-deliver it after text is on screen, and "Thinking…" below
+   * the reply reads as a contradiction. Statuses the agent reports mid-turn
+   * keep rendering regardless.
+   */
+  turnStatusIsReadiness: boolean;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
   turnProgress: number | null;
   /** Latest measured X/Y sample used for smooth, rate-aware interpolation. */
@@ -505,6 +514,8 @@ interface LangyState extends TurnPhaseState {
    */
   turnPlan: Array<{ content: string; status: string }> | null;
   setTurnStatus: (status: string | null) => void;
+  /** Set the manager's readiness placeholder status (see turnStatusIsReadiness). */
+  setTurnReadinessStatus: (status: string | null) => void;
   setTurnProgress: (progress: number | null) => void;
   setTurnProgressSample: (sample: LangyProgressSample | null) => void;
   /** Append a run of streamed reasoning tokens to the live thinking. */
@@ -583,6 +594,7 @@ const emptyConversationState = () => ({
   ...initialTurnPhaseState,
   turnProjection: initialLangyTurnProjection,
   turnStatus: null as string | null,
+  turnStatusIsReadiness: false as boolean,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
   turnReasoning: null as string | null,
@@ -941,6 +953,7 @@ export const useLangyStore = create<LangyState>()(
               ? s.unconfirmedConversations
               : { ...s.unconfirmedConversations, [conversationId]: true },
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
@@ -1060,11 +1073,15 @@ export const useLangyStore = create<LangyState>()(
           return { turnProjection };
         }),
       turnStatus: null,
+      turnStatusIsReadiness: false,
       turnProgress: null,
       turnProgressSample: null,
       turnReasoning: null,
       turnPlan: null,
-      setTurnStatus: (turnStatus) => set({ turnStatus }),
+      setTurnStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: false }),
+      setTurnReadinessStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: true }),
       setTurnProgress: (turnProgress) => set({ turnProgress }),
       setTurnProgressSample: (turnProgressSample) =>
         set({ turnProgressSample }),
@@ -1074,6 +1091,7 @@ export const useLangyStore = create<LangyState>()(
       resetTurnSignals: () =>
         set({
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,

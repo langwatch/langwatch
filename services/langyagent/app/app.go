@@ -24,21 +24,24 @@ import (
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
 // Pre-first-frame status lines. Plain and factual: the cold line names a boot
-// that is really happening, the warm line names a round-trip, and the resume
-// line names a checkpointed turn being picked back up (ADR-048). The cold line
-// pairs with the panel's own pre-relay ladder ("Preparing Langy's workspace…",
-// langyThinkingLine.ts): the panel covers the spawn window before any frame
-// exists, this status takes over once the worker is up, and the two read as
-// one startup progressing.
+// that is really happening, and the resume line names a checkpointed turn
+// being picked back up (ADR-048). The cold line pairs with the panel's own
+// pre-relay ladder ("Preparing Langy's workspace…", langyThinkingLine.ts): the
+// panel covers the spawn window before any frame exists, this status takes
+// over once the worker is up, and the two read as one startup progressing.
+// A warm worker gets "Thinking…": its dispatch is a millisecond round-trip,
+// so the whole window this status fills is the model working — a
+// connection-flavored line there read as a lost connection on every
+// follow-up message.
 const (
 	statusStartingUp = "Starting Langy…"
-	statusConnecting = "Connecting…"
+	statusThinking   = "Thinking…"
 	statusResuming   = "Picking up where it left off…"
 )
 
 // readyStatusFor words the pre-first-frame status by the transition actually
 // happening: resuming a checkpointed turn, booting a worker that has never
-// answered, or reaching one that has.
+// answered, or a live worker already working on the answer.
 func readyStatusFor(req ChatRequest, worker Worker) string {
 	if req.ResumeToken != "" {
 		return statusResuming
@@ -46,7 +49,7 @@ func readyStatusFor(req ChatRequest, worker Worker) string {
 	if !worker.HasServedTurn() {
 		return statusStartingUp
 	}
-	return statusConnecting
+	return statusThinking
 }
 
 // App is the langyagent application. It composes the worker pool and the
@@ -157,8 +160,9 @@ type ChatRequest struct {
 // warming only once its credentials are final.
 //
 // At capacity is not an error worth surfacing: the turn itself will report it.
-// AcquireWarm rather than Acquire, because a warm must never evict a worker to
-// make room for itself — only a real turn's spawn earns that.
+// AcquireWarm rather than Acquire: a warm may only evict an idle worker that
+// never served a turn (a stale warm cache); a worker holding real session
+// state is evicted only by a real turn's spawn.
 func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Credentials) error {
 	worker, err := a.pool.AcquireWarm(ctx, conversationID, creds)
 	if err != nil {

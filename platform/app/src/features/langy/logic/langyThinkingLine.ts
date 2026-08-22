@@ -90,6 +90,31 @@ export const THINKING_STILL_STARTING_MS = 12_000;
 export const THINKING_SLOW_MS = 35_000;
 export const THINKING_STUCK_MS = 75_000;
 
+/**
+ * The assistant message of the CURRENT turn: the one after the last user
+ * message, or nothing while the reply has not started arriving. The wire-truth
+ * checks below must read THIS message, never the last assistant overall — on a
+ * follow-up send the last assistant overall is the PREVIOUS completed reply,
+ * whose settled text made the line claim "Writing…" for a turn that had
+ * produced nothing.
+ */
+export function currentTurnAssistant(
+  messages: ThinkingMessage[],
+): ThinkingMessage | undefined {
+  const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
+  return messages
+    .slice(lastUserIndex + 1)
+    .find((m) => m.role === "assistant");
+}
+
+/** Has any earlier turn of this conversation already been answered? */
+export function hasPriorReply(messages: ThinkingMessage[]): boolean {
+  const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
+  return messages
+    .slice(0, Math.max(lastUserIndex, 0))
+    .some((m) => m.role === "assistant");
+}
+
 /** The last tool call that has NOT settled — the one actually running now. */
 export function runningTool(
   message: ThinkingMessage | undefined,
@@ -144,7 +169,7 @@ export function langyThinkingLine({
    */
   hasLiveReasoning?: boolean;
 }): LangyThinkingLine {
-  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  const last = currentTurnAssistant(messages);
 
   // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
   //    with its command in the input. Say the true thing.
@@ -185,7 +210,31 @@ export function langyThinkingLine({
     return { text: "Thinking…", tone: "working", allowWhimsy: true };
   }
 
-  // 5. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
+  // 5. A FOLLOW-UP IS WAITING. The conversation has answered before, so its
+  //    worker is (almost always) alive and the wait is the model working —
+  //    the manager's own "Thinking…" status lands moments later and takes
+  //    over either way. The startup ladder here would claim a boot that is
+  //    not happening; a connection-flavoured line read as a lost connection.
+  //    Long silence still escalates, because a follow-up can genuinely wedge.
+  if (hasPriorReply(messages)) {
+    if (elapsedMs >= THINKING_STUCK_MS) {
+      return {
+        text: "Langy still hasn't answered — it may be stuck.",
+        tone: "stuck",
+        allowWhimsy: false,
+      };
+    }
+    if (elapsedMs >= THINKING_SLOW_MS) {
+      return {
+        text: "This is taking longer than usual…",
+        tone: "waiting",
+        allowWhimsy: false,
+      };
+    }
+    return { text: "Thinking…", tone: "waiting", allowWhimsy: false };
+  }
+
+  // 6. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
   //    a worker that has not started, and we must not pretend otherwise.
   //    Escalate with time: silence is normal for a moment, then it isn't, then
   //    it's a fault.

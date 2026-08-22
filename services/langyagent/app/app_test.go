@@ -552,15 +552,16 @@ func TestApp_Turn_NeverServedWorkerEmitsStartingUpStatus(t *testing.T) {
 	}
 }
 
-// A warm worker gets the connecting line — never the starting-up line, which
-// would claim a boot that isn't happening.
-func TestApp_Turn_WarmWorkerEmitsConnectingStatus(t *testing.T) {
+// A warm worker gets the thinking line — never the starting-up line, which
+// would claim a boot that isn't happening. Its dispatch is a millisecond
+// round-trip, so the window this status fills is the model working.
+func TestApp_Turn_WarmWorkerEmitsThinkingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true, servedTurn: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	if got := statusOf(relay.stream.emitted); got != statusConnecting {
-		t.Errorf("warm readiness status = %q, want %q", got, statusConnecting)
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("warm readiness status = %q, want %q", got, statusThinking)
 	}
 }
 

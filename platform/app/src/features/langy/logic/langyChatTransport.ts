@@ -35,10 +35,21 @@ export interface LangyTurnRequestContext {
  * manager's typed plan snapshot into the store, which the plan card prefers over
  * parsing the raw `todowrite` tool part.
  */
-export type LangyTurnSignalEntry = Extract<
-  LangyStreamEntry,
-  { type: "status" | "progress" | "milestone" | "reasoning" | "plan" }
->;
+export type LangyTurnSignalEntry =
+  | (Extract<LangyStreamEntry, { type: "status" }> & {
+      /**
+       * The status arrived BEFORE this stream produced any output — the
+       * manager's readiness placeholder for silence ("Starting Langy…",
+       * "Thinking…"). The panel suppresses a readiness status once the answer
+       * is visible: a replayed stream re-delivers it after text is already on
+       * screen, and a placeholder under the reply reads as a contradiction.
+       */
+      readiness?: boolean;
+    })
+  | Extract<
+      LangyStreamEntry,
+      { type: "progress" | "milestone" | "reasoning" | "plan" }
+    >;
 
 /**
  * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
@@ -105,6 +116,15 @@ export function createLangyChatTransport(
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
+      // A create carries THIS send and nothing else. The useChat state can still
+      // hold the previous conversation when the user starts a new chat
+      // mid-stream, and anything else in it seeds the new conversation, and the
+      // title generated from it, with the old exchange. Every user message was
+      // the same failure with the answers stripped out: the old questions still
+      // went through.
+      const lastUserMessage = options.messages.findLast(
+        (message) => message.role === "user",
+      );
       const turnInput = {
         // One logical send, one identity: minted fresh on every sendMessages
         // call (each composer submit / regenerate re-arms with a new key), so
@@ -127,13 +147,7 @@ export function createLangyChatTransport(
           })
         : await trpcClient.langy.createConversation.mutate({
             ...turnInput,
-            // A create carries only the user's own messages. The useChat state
-            // can still hold the PREVIOUS conversation's assistant reply when
-            // the user starts a new chat mid-stream, and sending it would seed
-            // the new conversation (and its title) with the old answer.
-            messages: options.messages.filter(
-              (message) => message.role === "user",
-            ),
+            messages: lastUserMessage ? [lastUserMessage] : [],
             // Adopt the warmed conversation when the panel holds one, so the
             // first turn reuses the worker the panel open already booted.
             ...(ctx.pendingConversationId
@@ -249,6 +263,8 @@ function subscribeTurnStream({
             onSignal(entry);
             return;
           case "status":
+            onSignal({ ...entry, readiness: !sawOutput });
+            return;
           case "progress":
           case "milestone":
             onSignal(entry);

@@ -63,10 +63,10 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then it emits the status "Starting Langy…" before the first agent frame
 
   @unit
-  Scenario: A warm worker says it is connecting
+  Scenario: A warm worker goes straight to thinking
     Given a turn is dispatched to a worker that has already served a turn
     When the manager opens the turn
-    Then it emits the status "Connecting…" and never the starting-up line
+    Then it emits the status "Thinking…" and never the starting-up line
 
   @unit
   Scenario: A resumed turn says it is picking up where it left off

@@ -42,6 +42,57 @@ describe("langyThinkingLine", () => {
       expect(line.allowWhimsy).toBe(false);
     });
 
+    it("says thinking on a follow-up, never the startup ladder", () => {
+      // The conversation has answered before, so its worker is alive and the
+      // wait is the model working. "Preparing Langy's workspace…" here would
+      // claim a boot that is not happening.
+      const line = langyThinkingLine({
+        messages: [
+          user,
+          assistant([{ type: "text", text: "Yes, how can I help?" }]),
+          user,
+        ],
+        elapsedMs: 3_000,
+      });
+      expect(line.text).toBe("Thinking…");
+      expect(line.tone).toBe("waiting");
+      expect(line.allowWhimsy).toBe(false);
+    });
+
+    it("never reads the previous reply as the current turn's output", () => {
+      // The last assistant overall is the PREVIOUS completed reply. Its text
+      // used to make the line claim "Writing…" for a turn that had produced
+      // nothing.
+      const line = langyThinkingLine({
+        messages: [
+          user,
+          assistant([{ type: "text", text: "Done, anything else?" }]),
+          user,
+        ],
+        elapsedMs: 1_000,
+      });
+      expect(line.text).not.toBe("Writing…");
+      expect(line.tone).toBe("waiting");
+    });
+
+    it("still escalates a follow-up that stays silent too long", () => {
+      const messages = [
+        user,
+        assistant([{ type: "text", text: "Sure." }]),
+        user,
+      ];
+      const slow = langyThinkingLine({
+        messages,
+        elapsedMs: THINKING_SLOW_MS,
+      });
+      expect(slow.text).toBe("This is taking longer than usual…");
+      const stuck = langyThinkingLine({
+        messages,
+        elapsedMs: THINKING_STUCK_MS,
+      });
+      expect(stuck.tone).toBe("stuck");
+    });
+
     it("moves to starting Langy once the workspace phase should be over", () => {
       const line = langyThinkingLine({
         messages: [user, assistant([])],
