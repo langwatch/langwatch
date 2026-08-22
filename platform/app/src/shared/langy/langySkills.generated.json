@@ -46,6 +46,12 @@
 		"category": "recipe"
 	},
 	{
+		"id": "drive-the-ui",
+		"label": "Drive the ui",
+		"description": "Drive the page the user has open through live UI actions. List the actions a page accepts, call them with typed payloads, and read the live state including unsaved edits. Use when the user is looking at a page you can operate, such as the evaluations workbench, and a change should happen in front of them rather than behind their back.",
+		"category": "skill"
+	},
+	{
 		"id": "eval-triage",
 		"label": "Eval triage",
 		"description": "Investigate failing experiments and evaluations with LangWatch. Triage a failing experiment run to the exact rows and evaluator scores that regressed, then to a root cause. Use when an experiment fails, scores drop, or evaluations regress.",
@@ -96,6 +102,12 @@
 		"description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
 		"category": "skill",
 		"userPrompt": "Set up online evaluations for my agent"
+	},
+	{
+		"id": "prompt-optimization",
+		"label": "Prompt optimization",
+		"description": "Improve a prompt on the evaluations workbench through a measured loop. Duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
+		"category": "skill"
 	},
 	{
 		"id": "prompts",
