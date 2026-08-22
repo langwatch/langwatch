@@ -798,27 +798,28 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBe(0);
     });
 
-    // A monitor is not an inert definition: it evaluates every ingested trace
-    // from the moment it exists, so `POST /api/monitors` asks for
-    // `evaluations:manage` — the delete-implying grain Langy never holds.
-    it("states the monitor-creation boundary and writes nothing (Layer 2: no monitor)", async () => {
+    // Creating a monitor is operating the project: `POST /api/monitors` asks
+    // for `evaluations:create`, the same grain the product's own create button
+    // uses, and Langy's key holds it. The destructive line is unchanged —
+    // deletion keeps `evaluations:manage`, which Langy never holds (the
+    // boundary suite covers the decline).
+    it("creates a monitor (Layer 2: appears in API)", async () => {
       const langy = makeLangyAdapter();
       const monitorName = `langy-test-monitor-${Date.now()}`;
       const before = await listMonitors();
       const beforeIds = new Set(before.map((m) => m.id));
 
       const result = await runScenarioAndLog({
-        name: "monitor creation permission boundary",
-        description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace — an administration action Langy's credentials deliberately cannot take.`,
+        name: "create monitor",
+        description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace.`,
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
           scenario.judgeAgent({
             model,
             criteria: [
-              "Langy says plainly that it cannot create the monitor with its current permissions and gives the user a real path forward; it never claims the monitor was created.",
+              "Langy reports the monitor was created, naming it; it never claims a permission problem.",
               "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
-              "Langy carries the request as far as it can: the evaluator the monitor would run is created, or Langy says what the user needs to do first.",
             ],
           }),
         ],
@@ -834,11 +835,11 @@ describe("Langy via HTTP wrapper", () => {
       expect(result.success).toBe(true);
 
       const after = await listMonitors();
-      const newOnes = after.filter((m) => !beforeIds.has(m.id));
+      const created = after.filter((m) => !beforeIds.has(m.id));
       console.log(
-        `Layer 2 monitor guard: ${newOnes.length ? `LEAKED ${newOnes.map((m) => m.name).join(", ")}` : "nothing created"}`,
+        `Layer 2 monitor: ${created.length ? `created ${created.map((m) => m.name).join(", ")}` : "NOTHING CREATED"}`,
       );
-      expect(newOnes.length).toBe(0);
+      expect(created.some((m) => m.name === monitorName)).toBe(true);
     });
 
     it("creates a prompt (Layer 2: appears in API)", async () => {
