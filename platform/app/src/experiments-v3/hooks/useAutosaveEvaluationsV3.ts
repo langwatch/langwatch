@@ -262,6 +262,45 @@ export const useAutosaveEvaluationsV3 = () => {
     }, 2000);
   }, [setAutosaveStatus]);
 
+  /**
+   * What a refused autosave leaves behind.
+   *
+   * A refusal for a newer server version is not a failure to report: nothing
+   * was lost, so autosave stands down and the banner offers the reload.
+   * Everything else is a real error and is reported as one.
+   */
+  const handleAutosaveFailure = (error: unknown) => {
+    const handled = readHandledError(error);
+    if (handled?.code === "experiment_stale_workbench_state") {
+      // Someone else (another tab, Langy, the API) wrote a newer version. The
+      // current server version rides in the error's meta when available.
+      const serverVersion =
+        typeof handled.meta?.currentVersion === "number"
+          ? handled.meta.currentVersion
+          : (workbenchVersion ?? 0) + 1;
+      setStaleWorkbench({ serverVersion });
+      setAutosaveStatus("evaluation", "error", "Out of date");
+      return;
+    }
+    console.error("Failed to autosave evaluations v3:", error);
+    setAutosaveStatus(
+      "evaluation",
+      "error",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    toaster.create({
+      title: "Failed to autosave evaluation",
+      type: "error",
+    });
+    captureException(toError(error), {
+      extra: {
+        context: "Failed to autosave evaluations v3",
+        projectId: project?.id,
+        persistedState,
+      },
+    });
+  };
+
   // Autosave effect with debounce
   useEffect(() => {
     // The pass that runs in the same commit as a load still sees the
@@ -329,37 +368,7 @@ export const useAutosaveEvaluationsV3 = () => {
           }
           markSaved();
         } catch (error) {
-          const handled = readHandledError(error);
-          if (handled?.code === "experiment_stale_workbench_state") {
-            // Someone else (another tab, Langy, the API) wrote a newer
-            // version. Refuse-before-write means nothing was lost; autosave
-            // stands down and the banner offers the reload. The current
-            // server version rides in the error's meta when available.
-            const serverVersion =
-              typeof handled.meta?.currentVersion === "number"
-                ? handled.meta.currentVersion
-                : (workbenchVersion ?? 0) + 1;
-            setStaleWorkbench({ serverVersion });
-            setAutosaveStatus("evaluation", "error", "Out of date");
-            return;
-          }
-          console.error("Failed to autosave evaluations v3:", error);
-          setAutosaveStatus(
-            "evaluation",
-            "error",
-            error instanceof Error ? error.message : "Unknown error",
-          );
-          toaster.create({
-            title: "Failed to autosave evaluation",
-            type: "error",
-          });
-          captureException(toError(error), {
-            extra: {
-              context: "Failed to autosave evaluations v3",
-              projectId: project.id,
-              persistedState,
-            },
-          });
+          handleAutosaveFailure(error);
         }
       })();
     }, AUTOSAVE_DEBOUNCE_MS);

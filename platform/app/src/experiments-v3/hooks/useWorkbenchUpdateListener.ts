@@ -6,43 +6,31 @@ import {
   experimentUpdateSignalSchema,
 } from "~/server/api/routers/experiments.schemas";
 import { api } from "~/utils/api";
+import type { EvaluationsV3Actions } from "../types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 /** Tab switches within this window share one staleness probe. */
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;
 
-/**
- * Keeps an open workbench current with the server (specs/langy/
- * langy-ui-actions-fallback.feature).
- *
- * Two signals feed the same rule: the `experiment_updated` broadcast (a save
- * landed, whoever wrote it) and a version probe when the tab becomes visible
- * again. The rule: a CLEAN workbench reloads silently; a DIRTY one gets the
- * stale banner and the user decides: a reload clears their edits, so it is
- * never automatic.
- */
-export function useWorkbenchUpdateListener({
-  projectId,
-  experimentSlug,
-  isDirty,
-  reloadFromServer,
-  enabled = true,
-}: {
-  projectId: string;
-  experimentSlug: string | undefined;
-  isDirty: boolean;
-  reloadFromServer: () => Promise<void>;
-  enabled?: boolean;
-}) {
-  const { workbenchVersion, staleWorkbench, setStaleWorkbench } =
-    useEvaluationsV3Store(
-      useShallow((state) => ({
-        workbenchVersion: state.workbenchVersion,
-        staleWorkbench: state.staleWorkbench,
-        setStaleWorkbench: state.setStaleWorkbench,
-      })),
-    );
+/** Applies a server version to the open workbench, and reloads it on demand. */
+type ApplyServerVersion = (serverVersion: number, actorLabel?: string) => void;
 
+/**
+ * The one rule both signals run: a newer server version reloads a CLEAN
+ * workbench silently, and banners a DIRTY one so the user decides, because a
+ * reload clears their edits.
+ */
+const useApplyServerVersion = ({
+  isDirty,
+  workbenchVersion,
+  reloadFromServer,
+  setStaleWorkbench,
+}: {
+  isDirty: boolean;
+  workbenchVersion: number | undefined;
+  reloadFromServer: () => Promise<void>;
+  setStaleWorkbench: EvaluationsV3Actions["setStaleWorkbench"];
+}): { applyServerVersion: ApplyServerVersion; reload: () => Promise<void> } => {
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
   const versionRef = useRef(workbenchVersion);
@@ -51,8 +39,8 @@ export function useWorkbenchUpdateListener({
   reloadRef.current = reloadFromServer;
   const reloadingRef = useRef(false);
 
-  const applyServerVersion = useCallback(
-    (serverVersion: number, actorLabel?: string) => {
+  const applyServerVersion = useCallback<ApplyServerVersion>(
+    (serverVersion, actorLabel) => {
       const known = versionRef.current;
       if (known === undefined || serverVersion <= known) return;
       // A save in flight is usually the very write this signal announces; the
@@ -77,6 +65,25 @@ export function useWorkbenchUpdateListener({
     [setStaleWorkbench],
   );
 
+  const reload = useCallback(async () => {
+    await reloadRef.current();
+  }, []);
+
+  return { applyServerVersion, reload };
+};
+
+/** The `experiment_updated` broadcast: a save landed, whoever wrote it. */
+const useExperimentUpdateSignal = ({
+  enabled,
+  projectId,
+  experimentSlug,
+  applyServerVersion,
+}: {
+  enabled: boolean;
+  projectId: string;
+  experimentSlug: string | undefined;
+  applyServerVersion: ApplyServerVersion;
+}) => {
   useSSESubscription<
     { event?: unknown; timestamp?: number },
     { projectId: string }
@@ -105,10 +112,23 @@ export function useWorkbenchUpdateListener({
       },
     },
   );
+};
 
-  // A returning tab probes the version once, cheaply, and runs the same rule.
+/** A returning tab probes the version once, cheaply, and runs the same rule. */
+const useVisibilityVersionProbe = ({
+  enabled,
+  projectId,
+  experimentSlug,
+  applyServerVersion,
+}: {
+  enabled: boolean;
+  projectId: string;
+  experimentSlug: string | undefined;
+  applyServerVersion: ApplyServerVersion;
+}) => {
   const trpcUtils = api.useUtils();
   const lastProbeAtRef = useRef(0);
+
   useEffect(() => {
     if (!enabled || !projectId || !experimentSlug) return;
     const probe = () => {
@@ -130,11 +150,57 @@ export function useWorkbenchUpdateListener({
       window.removeEventListener("focus", probe);
     };
   }, [enabled, projectId, experimentSlug, trpcUtils, applyServerVersion]);
+};
 
-  return {
-    stale: staleWorkbench ?? null,
-    reload: useCallback(async () => {
-      await reloadRef.current();
-    }, []),
-  };
+/**
+ * Keeps an open workbench current with the server (specs/langy/
+ * langy-ui-actions-fallback.feature).
+ *
+ * Two signals feed the same rule: the `experiment_updated` broadcast (a save
+ * landed, whoever wrote it) and a version probe when the tab becomes visible
+ * again.
+ */
+export function useWorkbenchUpdateListener({
+  projectId,
+  experimentSlug,
+  isDirty,
+  reloadFromServer,
+  enabled = true,
+}: {
+  projectId: string;
+  experimentSlug: string | undefined;
+  isDirty: boolean;
+  reloadFromServer: () => Promise<void>;
+  enabled?: boolean;
+}) {
+  const { workbenchVersion, staleWorkbench, setStaleWorkbench } =
+    useEvaluationsV3Store(
+      useShallow((state) => ({
+        workbenchVersion: state.workbenchVersion,
+        staleWorkbench: state.staleWorkbench,
+        setStaleWorkbench: state.setStaleWorkbench,
+      })),
+    );
+
+  const { applyServerVersion, reload } = useApplyServerVersion({
+    isDirty,
+    workbenchVersion,
+    reloadFromServer,
+    setStaleWorkbench,
+  });
+
+  useExperimentUpdateSignal({
+    enabled,
+    projectId,
+    experimentSlug,
+    applyServerVersion,
+  });
+  useVisibilityVersionProbe({
+    enabled,
+    projectId,
+    experimentSlug,
+    applyServerVersion,
+  });
+
+  return { stale: staleWorkbench ?? null, reload };
 }

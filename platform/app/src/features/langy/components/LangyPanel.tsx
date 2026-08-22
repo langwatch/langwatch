@@ -302,6 +302,63 @@ function onLangyProfilerRender(
   }
 }
 
+/**
+ * Carry out one typed UI action the agent asked THIS page for.
+ *
+ * Every decision (dedup, claim, schema re-parse, handler run, completion)
+ * lives in `executeUiAction`; this supplies the live ids and the tRPC legs.
+ * A failure is swallowed the way a dropped claim is: the dispatch side has its
+ * own timeout and reports to the agent, so a failed claim call must not crash
+ * the stream.
+ */
+function dispatchUiActionToPage({
+  entry,
+  projectId,
+  seen,
+  handlers,
+}: {
+  entry: { actionId: string; kind: string; payload: unknown };
+  projectId: string | undefined;
+  seen: Set<string>;
+  handlers: LangyUiActionHandlers;
+}): void {
+  const store = useLangyStore.getState();
+  const conversationId = store.activeConversationId;
+  const turnId = store.activeTurnId;
+  if (!projectId || !conversationId || !turnId) return;
+
+  void executeUiAction({
+    entry,
+    turnId,
+    seen,
+    handlers,
+    claim: ({ actionId }) =>
+      trpcClient.langy.claimUiAction.mutate({
+        projectId,
+        conversationId,
+        turnId,
+        actionId,
+      }),
+    complete: ({ actionId, ok, result, errorCode }) =>
+      trpcClient.langy.completeUiAction.mutate({
+        projectId,
+        conversationId,
+        turnId,
+        actionId,
+        ok,
+        ...(result !== undefined ? { result } : {}),
+        ...(errorCode ? { errorCode } : {}),
+      }),
+    onHandlerError: ({ kind }) => {
+      toaster.create({
+        title: "Langy's change didn't apply",
+        description: `The page could not carry out ${kind}. Nothing else was affected.`,
+        type: "error",
+      });
+    },
+  }).catch(() => undefined);
+}
+
 interface LangySidecarProps {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
   actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
@@ -762,47 +819,12 @@ function LangyPanel({
           void routerRef.current.push(entry.href);
         },
         onUiAction: (entry) => {
-          // The agent asking THIS page to carry out a typed action. All the
-          // decisions (dedup, claim, schema re-parse, handler run, completion)
-          // live in executeUiAction; this closure only supplies the live ids
-          // and the tRPC legs. Errors are swallowed here the way a dropped
-          // claim is: the dispatch side has its own timeout and reports to
-          // the agent, so a failed claim call must not crash the stream.
-          const store = useLangyStore.getState();
-          const projectId = turnContextRef.current?.projectId;
-          const conversationId = store.activeConversationId;
-          const turnId = store.activeTurnId;
-          if (!projectId || !conversationId || !turnId) return;
-          void executeUiAction({
+          dispatchUiActionToPage({
             entry,
-            turnId,
+            projectId: turnContextRef.current?.projectId,
             seen: uiActionSeenRef.current,
             handlers: actionHandlersRef?.current ?? {},
-            claim: ({ actionId }) =>
-              trpcClient.langy.claimUiAction.mutate({
-                projectId,
-                conversationId,
-                turnId,
-                actionId,
-              }),
-            complete: ({ actionId, ok, result, errorCode }) =>
-              trpcClient.langy.completeUiAction.mutate({
-                projectId,
-                conversationId,
-                turnId,
-                actionId,
-                ok,
-                ...(result !== undefined ? { result } : {}),
-                ...(errorCode ? { errorCode } : {}),
-              }),
-            onHandlerError: ({ kind }) => {
-              toaster.create({
-                title: "Langy's change didn't apply",
-                description: `The page could not carry out ${kind}. Nothing else was affected.`,
-                type: "error",
-              });
-            },
-          }).catch(() => undefined);
+          });
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();

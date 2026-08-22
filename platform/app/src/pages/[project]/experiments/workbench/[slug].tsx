@@ -39,6 +39,42 @@ import { useRouter } from "~/utils/compat/next-router";
 import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
 
 /**
+ * The workbench as the agent should read it: the LIVE store, so unsaved prompt
+ * drafts, pending cells and in-memory results are included, which the saved
+ * copy cannot show. `source` mirrors the backend fallback's marker, so the
+ * agent always knows whether it read the live page or the saved document.
+ */
+function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
+  const state = useEvaluationsV3Store.getState();
+
+  const identity: { experimentId?: string; experimentSlug?: string } = {};
+  if (state.experimentId) identity.experimentId = state.experimentId;
+  if (state.experimentSlug) identity.experimentSlug = state.experimentSlug;
+
+  const withResults: { results?: typeof state.results } = {};
+  if (includeResults !== false) withResults.results = state.results;
+
+  const projection = projectWorkbenchState({
+    state: {
+      name: state.name,
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      evaluators: state.evaluators,
+      targets: state.targets,
+      ...identity,
+    },
+    ...withResults,
+  });
+
+  const version: { version?: number } = {};
+  if (state.workbenchVersion !== undefined) {
+    version.version = state.workbenchVersion;
+  }
+
+  return { source: "live", ...version, ...projection };
+}
+
+/**
  * Experiments Workbench Page
  *
  * Main page for the spreadsheet-like experiment experience.
@@ -330,34 +366,8 @@ export default function ExperimentsWorkbenchPage() {
     }
     handlers["workbench.getState"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
-      run: (payload: { includeResults?: boolean }) => {
-        const state = useEvaluationsV3Store.getState();
-        const projection = projectWorkbenchState({
-          state: {
-            name: state.name,
-            datasets: state.datasets,
-            activeDatasetId: state.activeDatasetId,
-            evaluators: state.evaluators,
-            targets: state.targets,
-            ...(state.experimentId ? { experimentId: state.experimentId } : {}),
-            ...(state.experimentSlug
-              ? { experimentSlug: state.experimentSlug }
-              : {}),
-          },
-          ...(payload.includeResults === false
-            ? {}
-            : { results: state.results }),
-        });
-        // `source` mirrors the backend fallback's marker, so the agent always
-        // knows whether it read the live page or the saved document.
-        return {
-          source: "live",
-          ...(state.workbenchVersion !== undefined
-            ? { version: state.workbenchVersion }
-            : {}),
-          ...projection,
-        };
-      },
+      run: (payload: { includeResults?: boolean }) =>
+        readLiveWorkbench(payload),
     };
     handlers["workbench.run"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,

@@ -34,16 +34,25 @@ const authorOf = (entry: VersionEntry): string => {
   return entry.authorName ?? "You";
 };
 
-export function VersionHistoryDrawer({
+/**
+ * Restore a saved version and leave the open workbench holding it.
+ *
+ * The restore is finished only once the page's own query has answered again
+ * and the store holds what it returned, so this refetches the same query the
+ * page loads by rather than keeping a second copy of the mapping.
+ */
+const useVersionRestore = ({
   experimentId,
   experimentSlug,
+  onRestored,
+  onSettled,
 }: {
   experimentId: string;
   experimentSlug: string;
-}) {
-  const { closeDrawer } = useDrawer();
+  onRestored: () => void;
+  onSettled: () => void;
+}) => {
   const { project } = useOrganizationTeamProject();
-  const { can } = useCan();
   const utils = api.useUtils();
   const loadState = useEvaluationsV3Store((state) => state.loadState);
   const setWorkbenchVersion = useEvaluationsV3Store(
@@ -52,24 +61,10 @@ export function VersionHistoryDrawer({
   const setStaleWorkbench = useEvaluationsV3Store(
     (state) => state.setStaleWorkbench,
   );
-  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
-    null,
-  );
+  const restoreVersion = api.experiments.restoreWorkbenchVersion.useMutation();
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
 
-  const canRestore = can("experiments:update");
-
-  const versionsQuery = api.experiments.listWorkbenchVersions.useQuery(
-    { projectId: project?.id ?? "", experimentId },
-    { enabled: !!project?.id && !!experimentId },
-  );
-
-  const restoreVersion = api.experiments.restoreWorkbenchVersion.useMutation();
-
-  const versions = (versionsQuery.data?.versions ?? []) as VersionEntry[];
-  const currentVersion = versions[0]?.version;
-
-  const handleRestore = async (version: number) => {
+  const restore = async (version: number) => {
     if (!project) return;
     setRestoringVersion(version);
     try {
@@ -79,10 +74,6 @@ export function VersionHistoryDrawer({
         version,
       });
 
-      // The workbench reads its state through `getEvaluationsV3BySlug`, so the
-      // restore is finished only once that query has answered again and the
-      // store holds what it returned. Invalidate, refetch, load: the same path
-      // the page itself loads by, rather than a second copy of the mapping.
       await utils.experiments.getEvaluationsV3BySlug.invalidate({
         projectId: project.id,
         experimentSlug,
@@ -103,21 +94,185 @@ export function VersionHistoryDrawer({
         experimentId,
       });
 
-      toaster.create({
-        title: `Restored version ${version}`,
-        type: "success",
-      });
-      closeDrawer();
+      toaster.create({ title: `Restored version ${version}`, type: "success" });
+      onRestored();
     } catch (error) {
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't restore this version",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't restore this version" });
     } finally {
       setRestoringVersion(null);
-      setConfirmingVersion(null);
+      onSettled();
     }
   };
+
+  return { restore, restoringVersion };
+};
+
+/** One saved version: who wrote it, when, and the restore affordance. */
+function VersionRow({
+  entry,
+  isCurrent,
+  isConfirming,
+  isRestoring,
+  canRestore,
+  onAskRestore,
+  onConfirmRestore,
+  onCancelRestore,
+}: {
+  entry: VersionEntry;
+  isCurrent: boolean;
+  isConfirming: boolean;
+  isRestoring: boolean;
+  canRestore: boolean;
+  onAskRestore: () => void;
+  onConfirmRestore: () => void;
+  onCancelRestore: () => void;
+}) {
+  return (
+    <HStack
+      align="start"
+      justify="space-between"
+      gap={3}
+      paddingY={3}
+      borderBottom="1px solid"
+      borderColor="border.muted"
+    >
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <HStack gap={2}>
+          <Text fontWeight="medium" fontSize="sm">
+            v{entry.version}
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            · {authorOf(entry)}
+          </Text>
+          {isCurrent && (
+            <Badge size="sm" colorPalette="green">
+              Current
+            </Badge>
+          )}
+        </HStack>
+        <Text color="fg.muted" fontSize="xs" lineClamp={2}>
+          {entry.commitMessage ? `${entry.commitMessage} · ` : ""}
+          {formatTimeAgo(new Date(entry.createdAt).getTime())}
+        </Text>
+      </VStack>
+
+      {canRestore && !isCurrent && (
+        <HStack gap={1} flexShrink={0}>
+          {isConfirming ? (
+            <>
+              <Button
+                size="xs"
+                colorPalette="orange"
+                loading={isRestoring}
+                onClick={onConfirmRestore}
+              >
+                Confirm restore
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={isRestoring}
+                onClick={onCancelRestore}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button size="xs" variant="outline" onClick={onAskRestore}>
+              Restore
+            </Button>
+          )}
+        </HStack>
+      )}
+    </HStack>
+  );
+}
+
+/** The list itself, with its loading, failed and empty states. */
+function VersionList({
+  experimentId,
+  experimentSlug,
+  onRestored,
+}: {
+  experimentId: string;
+  experimentSlug: string;
+  onRestored: () => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const { can } = useCan();
+  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
+    null,
+  );
+  const { restore, restoringVersion } = useVersionRestore({
+    experimentId,
+    experimentSlug,
+    onRestored,
+    onSettled: () => setConfirmingVersion(null),
+  });
+
+  const versionsQuery = api.experiments.listWorkbenchVersions.useQuery(
+    { projectId: project?.id ?? "", experimentId },
+    { enabled: !!project?.id && !!experimentId },
+  );
+
+  const versions = (versionsQuery.data?.versions ?? []) as VersionEntry[];
+  const currentVersion = versions[0]?.version;
+
+  if (versionsQuery.isLoading) {
+    return (
+      <HStack justify="center" paddingY={8}>
+        <Spinner />
+      </HStack>
+    );
+  }
+  if (versionsQuery.isError) {
+    return (
+      <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
+        Failed to load the version history.
+      </Text>
+    );
+  }
+  if (versions.length === 0) {
+    return (
+      <Text color="fg.muted" textAlign="center" paddingY={8}>
+        No versions saved yet.
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      <VStack gap={0} align="stretch">
+        {versions.map((entry) => (
+          <VersionRow
+            key={entry.version}
+            entry={entry}
+            isCurrent={entry.version === currentVersion}
+            isConfirming={confirmingVersion === entry.version}
+            isRestoring={restoringVersion === entry.version}
+            canRestore={can("experiments:update")}
+            onAskRestore={() => setConfirmingVersion(entry.version)}
+            onConfirmRestore={() => void restore(entry.version)}
+            onCancelRestore={() => setConfirmingVersion(null)}
+          />
+        ))}
+      </VStack>
+      <Text color="fg.muted" fontSize="xs" paddingTop={4}>
+        A restore writes the old setup forward as a new version, so nothing in
+        this list is lost.
+      </Text>
+    </>
+  );
+}
+
+export function VersionHistoryDrawer({
+  experimentId,
+  experimentSlug,
+}: {
+  experimentId: string;
+  experimentSlug: string;
+}) {
+  const { closeDrawer } = useDrawer();
 
   return (
     <Drawer.Root
@@ -134,104 +289,11 @@ export function VersionHistoryDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {versionsQuery.isLoading && (
-            <HStack justify="center" paddingY={8}>
-              <Spinner />
-            </HStack>
-          )}
-          {versionsQuery.isError && (
-            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
-              Failed to load the version history.
-            </Text>
-          )}
-          {!versionsQuery.isLoading &&
-            !versionsQuery.isError &&
-            versions.length === 0 && (
-              <Text color="fg.muted" textAlign="center" paddingY={8}>
-                No versions saved yet.
-              </Text>
-            )}
-          {versions.length > 0 && (
-            <VStack gap={0} align="stretch">
-              {versions.map((entry) => {
-                const isCurrent = entry.version === currentVersion;
-                const isConfirming = confirmingVersion === entry.version;
-                const isRestoring = restoringVersion === entry.version;
-
-                return (
-                  <HStack
-                    key={entry.version}
-                    align="start"
-                    justify="space-between"
-                    gap={3}
-                    paddingY={3}
-                    borderBottom="1px solid"
-                    borderColor="border.muted"
-                  >
-                    <VStack align="start" gap={0} flex={1} minWidth={0}>
-                      <HStack gap={2}>
-                        <Text fontWeight="medium" fontSize="sm">
-                          v{entry.version}
-                        </Text>
-                        <Text color="fg.muted" fontSize="sm">
-                          · {authorOf(entry)}
-                        </Text>
-                        {isCurrent && (
-                          <Badge size="sm" colorPalette="green">
-                            Current
-                          </Badge>
-                        )}
-                      </HStack>
-                      <Text color="fg.muted" fontSize="xs" lineClamp={2}>
-                        {entry.commitMessage ? `${entry.commitMessage} · ` : ""}
-                        {formatTimeAgo(new Date(entry.createdAt).getTime())}
-                      </Text>
-                    </VStack>
-
-                    {canRestore && !isCurrent && (
-                      <HStack gap={1} flexShrink={0}>
-                        {isConfirming ? (
-                          <>
-                            <Button
-                              size="xs"
-                              colorPalette="orange"
-                              loading={isRestoring}
-                              onClick={() => void handleRestore(entry.version)}
-                            >
-                              Confirm restore
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              disabled={isRestoring}
-                              onClick={() => setConfirmingVersion(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => setConfirmingVersion(entry.version)}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </HStack>
-                    )}
-                  </HStack>
-                );
-              })}
-            </VStack>
-          )}
-
-          {versions.length > 0 && (
-            <Text color="fg.muted" fontSize="xs" paddingTop={4}>
-              A restore writes the old setup forward as a new version, so
-              nothing in this list is lost.
-            </Text>
-          )}
+          <VersionList
+            experimentId={experimentId}
+            experimentSlug={experimentSlug}
+            onRestored={closeDrawer}
+          />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>

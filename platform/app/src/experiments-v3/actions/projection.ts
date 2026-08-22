@@ -136,6 +136,109 @@ const countEvaluatorMappings = (
 const serializedSize = (projection: ProjectedWorkbenchState): number =>
   JSON.stringify(projection).length;
 
+const projectDataset = (dataset: DatasetReference): ProjectedDataset => ({
+  id: dataset.id,
+  name: dataset.name,
+  type: dataset.type,
+  columns: dataset.columns.map((column) => ({
+    id: column.id,
+    name: column.name,
+    type: column.type,
+  })),
+  rowCount: datasetRowCount(dataset),
+  sampleRows: sampleRowsOf(dataset),
+});
+
+const projectTarget = (
+  target: WorkbenchState["targets"][number],
+): ProjectedTarget => ({
+  id: target.id,
+  type: target.type,
+  promptId: target.promptId,
+  promptVersionNumber: target.promptVersionNumber,
+  hasDraft: !!target.localPromptConfig,
+  model: target.localPromptConfig?.llm.model,
+  inputs: (target.inputs ?? []).map((input) => input.identifier),
+  outputs: (target.outputs ?? []).map((output) => output.identifier),
+  mappings: target.mappings,
+});
+
+const projectEvaluator = (
+  evaluator: WorkbenchState["evaluators"][number],
+): ProjectedEvaluator => ({
+  id: evaluator.id,
+  evaluatorType: evaluator.evaluatorType,
+  dbEvaluatorId: evaluator.dbEvaluatorId,
+  inputs: evaluator.inputs.map((input) => input.identifier),
+  mappings: evaluator.mappings,
+});
+
+const projectResults = ({
+  state,
+  results,
+  activeRowCount,
+}: {
+  state: WorkbenchState;
+  results: EvaluationResults;
+  activeRowCount: number;
+}): ProjectedResults => ({
+  runId: results.runId,
+  status: results.status,
+  targets: state.targets.map((target) => {
+    const aggregate = computeTargetAggregates(
+      target.id,
+      results,
+      state.evaluators,
+      activeRowCount,
+    );
+    return {
+      targetId: target.id,
+      completedRows: aggregate.completedRows,
+      errorRows: aggregate.errorRows,
+      overallPassRate: aggregate.overallPassRate,
+      overallAverageScore: aggregate.overallAverageScore,
+      averageCost: aggregate.averageCost,
+      totalCost: aggregate.totalCost,
+      averageLatency: aggregate.averageLatency,
+    };
+  }),
+});
+
+/**
+ * Drop detail until the projection fits the budget, in order of what an agent
+ * can most easily ask for again. Mutates and returns the same object.
+ */
+const fitToBudget = (
+  projection: ProjectedWorkbenchState,
+): ProjectedWorkbenchState => {
+  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
+    return projection;
+  }
+
+  // Sample rows are the first to go: they are the only free-text payload here,
+  // and an agent can always read a dataset row by row when it needs one.
+  projection.truncated = true;
+  for (const dataset of projection.datasets) {
+    dataset.sampleRows = undefined;
+  }
+  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
+    return projection;
+  }
+
+  // Then mappings collapse to counts. What survives is "this target is wired,
+  // and how much of it", enough to decide whether to ask for the detail.
+  for (const target of projection.targets) {
+    target.mappingCount = countTargetMappings(target.mappings ?? {});
+    target.mappings = undefined;
+  }
+  for (const evaluator of projection.evaluators) {
+    evaluator.mappingCount = countEvaluatorMappings(evaluator.mappings ?? {});
+    evaluator.mappings = undefined;
+  }
+
+  return projection;
+};
+
 /**
  * Project the workbench for an agent.
  *
@@ -159,87 +262,14 @@ export const projectWorkbenchState = ({
   const projection: ProjectedWorkbenchState = {
     name: state.name,
     activeDatasetId: state.activeDatasetId,
-    datasets: state.datasets.map((dataset) => ({
-      id: dataset.id,
-      name: dataset.name,
-      type: dataset.type,
-      columns: dataset.columns.map((column) => ({
-        id: column.id,
-        name: column.name,
-        type: column.type,
-      })),
-      rowCount: datasetRowCount(dataset),
-      sampleRows: sampleRowsOf(dataset),
-    })),
-    targets: state.targets.map((target) => ({
-      id: target.id,
-      type: target.type,
-      promptId: target.promptId,
-      promptVersionNumber: target.promptVersionNumber,
-      hasDraft: !!target.localPromptConfig,
-      model: target.localPromptConfig?.llm.model,
-      inputs: (target.inputs ?? []).map((input) => input.identifier),
-      outputs: (target.outputs ?? []).map((output) => output.identifier),
-      mappings: target.mappings,
-    })),
-    evaluators: state.evaluators.map((evaluator) => ({
-      id: evaluator.id,
-      evaluatorType: evaluator.evaluatorType,
-      dbEvaluatorId: evaluator.dbEvaluatorId,
-      inputs: evaluator.inputs.map((input) => input.identifier),
-      mappings: evaluator.mappings,
-    })),
+    datasets: state.datasets.map(projectDataset),
+    targets: state.targets.map(projectTarget),
+    evaluators: state.evaluators.map(projectEvaluator),
   };
 
   if (results) {
-    projection.results = {
-      runId: results.runId,
-      status: results.status,
-      targets: state.targets.map((target) => {
-        const aggregate = computeTargetAggregates(
-          target.id,
-          results,
-          state.evaluators,
-          activeRowCount,
-        );
-        return {
-          targetId: target.id,
-          completedRows: aggregate.completedRows,
-          errorRows: aggregate.errorRows,
-          overallPassRate: aggregate.overallPassRate,
-          overallAverageScore: aggregate.overallAverageScore,
-          averageCost: aggregate.averageCost,
-          totalCost: aggregate.totalCost,
-          averageLatency: aggregate.averageLatency,
-        };
-      }),
-    };
+    projection.results = projectResults({ state, results, activeRowCount });
   }
 
-  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
-    return projection;
-  }
-
-  // Sample rows are the first to go: they are the only free-text payload here,
-  // and an agent can always read a dataset row by row when it needs one.
-  projection.truncated = true;
-  for (const dataset of projection.datasets) {
-    dataset.sampleRows = undefined;
-  }
-  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
-    return projection;
-  }
-
-  // Then mappings collapse to counts. What survives is "this target is wired,
-  // and how much of it" — enough to decide whether to ask for the detail.
-  for (const target of projection.targets) {
-    target.mappingCount = countTargetMappings(target.mappings ?? {});
-    target.mappings = undefined;
-  }
-  for (const evaluator of projection.evaluators) {
-    evaluator.mappingCount = countEvaluatorMappings(evaluator.mappings ?? {});
-    evaluator.mappings = undefined;
-  }
-
-  return projection;
+  return fitToBudget(projection);
 };

@@ -78,14 +78,26 @@ describe("the experiments workbench REST surface", () => {
     });
   };
 
+  /**
+   * Fixture, not a test: a create that fails here is a broken arrangement, so
+   * it throws with the status AND the body rather than asserting. That reads
+   * better than "expected 500 to be 200" in a test whose subject is something
+   * else, and every test that cares about the create asserts on the result it
+   * gets back.
+   */
   const createExperiment = async (body: unknown = {}) => {
     const res = await request({ path: "", method: "POST", body });
-    const created = (await res.json()) as {
+    const text = await res.text();
+    if (res.status !== 200) {
+      throw new Error(
+        `Arranging an experiment answered ${res.status}: ${text}`,
+      );
+    }
+    const created = JSON.parse(text) as {
       id: string;
       slug: string;
       version: number;
     };
-    expect(res.status).toBe(200);
     createdIds.push(created.id);
     return created;
   };
