@@ -1606,7 +1606,7 @@ The response is the standard JSON transcript with `text`, plus whatever the prov
 
 ## ElevenLabs' own audio paths
 
-The two routes above take OpenAI's request shape. If your code already uses the ElevenLabs SDK, you do not have to rewrite it: the gateway also serves that vendor's own paths, so changing the base URL is the whole change.
+The two routes above take OpenAI's request shape. If your code already uses the ElevenLabs SDK, you do not have to rewrite it: the gateway also serves that vendor's own paths, so two settings are the whole change. Point the SDK's base URL at the gateway, and give it a LangWatch virtual key in place of your ElevenLabs key. Your ElevenLabs key stays where it belongs, configured once in **Settings → Model Providers**; an SDK still holding it will be rejected, because the gateway reads that header as a virtual key.
 
 ```
 POST /v1/text-to-speech/{voice_id}
@@ -1614,7 +1614,7 @@ POST /v1/speech-to-text
 xi-api-key: vk-lw-<ULID>
 ```
 
-The virtual key goes in the `xi-api-key` header the SDK already sends. Bodies, form parts and query parameters reach ElevenLabs as you wrote them, so voice settings, `output_format`, diarization, timestamp granularity and the rest keep working. The one field the gateway changes is `model_id`: it is replaced with whatever the virtual key's aliases and allowlist resolve the name to, so `elevenlabs/eleven_flash_v2_5` and a key alias both reach the vendor as the bare model it knows. A synthesis request that names no `model_id` bills and gates under `eleven_multilingual_v2`, which is what the vendor would have used.
+The virtual key goes in the `xi-api-key` header the SDK already sends, so no code changes. Bodies, form parts and query parameters reach ElevenLabs as you wrote them, so voice settings, `output_format`, diarization, timestamp granularity and the rest keep working. The one field the gateway changes is `model_id`: it is replaced with whatever the virtual key's aliases and allowlist resolve the name to, so `elevenlabs/eleven_flash_v2_5` and a key alias both reach the vendor as the bare model it knows. A synthesis request that names no `model_id` bills and gates under `eleven_multilingual_v2`, which is what the vendor would have used.
 
 ```python
 from elevenlabs import ElevenLabs
