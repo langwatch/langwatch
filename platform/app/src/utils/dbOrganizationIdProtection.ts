@@ -389,6 +389,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause, action }) =>
       action === "findMany" && isBranchRecheckSweep(clause),
   },
+  // ADR-094: provider-login → person links and the discovered-bot inventory.
+  // Every access path carries organizationId by construction — the link
+  // package's storage layer takes it as a required argument on every call —
+  // so the base bounds (organizationId / row id / composite-org key) cover
+  // them with no extra hatch.
+  ProviderIdentityLink: {},
+  DiscoveredAgent: {},
 };
 
 /**
