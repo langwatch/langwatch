@@ -718,6 +718,8 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return { api_key: pick("OPENAI_API_KEY") };
     case "deepseek":
       return { api_key: pick("DEEPSEEK_API_KEY") };
+    case "orcarouter":
+      return { api_key: pick("ORCAROUTER_API_KEY") };
     case "xai":
       return { api_key: pick("XAI_API_KEY") };
     case "cerebras":

@@ -42,8 +42,11 @@ const overlayModels = (
  *
  * Codex bills the user's ChatGPT plan. Every `openrouter/` id is a router
  * rather than a model: the price comes from whichever model it picks.
+ * OrcaRouter is the same shape — an OpenAI-compatible gateway that routes
+ * each call to one of 200+ models, so its alias ids price by the model
+ * the router picks rather than by a fixed rate.
  */
-const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
+const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//, /^orcarouter\//];
 
 /**
  * Models known to have no usable rate, each with the reason.

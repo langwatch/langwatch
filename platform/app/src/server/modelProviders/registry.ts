@@ -560,6 +560,18 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  orcarouter: {
+    name: "OrcaRouter",
+    type: "llm",
+    apiKey: "ORCAROUTER_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      ORCAROUTER_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-08-21"),
+    blurb:
+      "One endpoint, every model. OrcaRouter routes to 200+ frontier and open-weight models through a single OpenAI-compatible API — and runs gateway-level, zero-trust security for AI agents on the same endpoint, screening every prompt/response and governing every tool call on a default-deny basis.",
+  },
   xai: {
     name: "xAI",
     type: "llm",

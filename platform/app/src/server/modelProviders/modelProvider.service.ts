@@ -823,6 +823,7 @@ export class ModelProviderService {
       bedrock: "Bedrock",
       vertex_ai: "Vertex AI",
       deepseek: "DeepSeek",
+      orcarouter: "OrcaRouter",
       xai: "xAI",
       cerebras: "Cerebras",
       groq: "Groq",

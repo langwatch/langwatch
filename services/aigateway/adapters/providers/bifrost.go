@@ -1184,11 +1184,19 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// may legitimately be empty (unauthenticated self-hosted server).
 		k.Value = envVar(cred.APIKey)
 		url := credBaseURL(cred)
-		if url == "" && cred.ProviderID == domain.ProviderDeepSeek {
+		switch {
+		case url != "":
+			// customer-configured base URL wins
+		case cred.ProviderID == domain.ProviderDeepSeek:
 			// DeepSeek rides the openai-compat path (no Bifrost-native
 			// provider) but is a hosted API, not a customer endpoint —
 			// customers configure only an API key, so default the URL.
 			url = deepseekBaseURL
+		case cred.ProviderID == domain.ProviderOrcaRouter:
+			// OrcaRouter is the same shape as DeepSeek: a hosted
+			// OpenAI-compatible gateway (no Bifrost-native provider) whose
+			// public endpoint is the default when no base URL is set.
+			url = orcarouterBaseURL
 		}
 		k.VLLMKeyConfig = &bfschemas.VLLMKeyConfig{
 			URL: envVar(normalizeOpenAICompatBaseURL(url)),
@@ -1258,6 +1266,12 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 		// base URL defaults to DeepSeek's public endpoint in
 		// credentialToBifrostKey.
 		return bfschemas.VLLM
+	case domain.ProviderOrcaRouter:
+		// OrcaRouter is a hosted OpenAI-compatible gateway, not in
+		// Bifrost's ModelProvider enum. Same treatment as DeepSeek: route
+		// through the vLLM (openai-compat) adapter with OrcaRouter's
+		// public endpoint as the default base URL.
+		return bfschemas.VLLM
 	case domain.ProviderCustom:
 		// Customer-hosted OpenAI-compatible endpoint. Bifrost's vLLM
 		// provider is its generic OpenAI-compat adapter with a per-key
@@ -1283,6 +1297,10 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 // deepseekBaseURL is DeepSeek's public OpenAI-compatible endpoint, used
 // when a DeepSeek credential arrives without an explicit base URL.
 const deepseekBaseURL = "https://api.deepseek.com"
+
+// orcarouterBaseURL is OrcaRouter's public OpenAI-compatible endpoint,
+// used when an OrcaRouter credential arrives without an explicit base URL.
+const orcarouterBaseURL = "https://api.orcarouter.ai/v1"
 
 // credBaseURL returns the customer-configured endpoint override for
 // OpenAI-compatible credentials. The control-plane wire names it
