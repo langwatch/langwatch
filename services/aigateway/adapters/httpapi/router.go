@@ -1498,11 +1498,11 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 // Pre-allocated SSE framing bytes — three w.Write calls instead of one
 // fmt.Fprintf avoids allocating a format buffer per chunk.
 var (
-	sseDataPrefix  = []byte("data: ")
-	sseDoubleNL    = []byte("\n\n")
-	sseErrorPrefix = []byte("event: error\ndata: ")
-	sseWarnPrefix  = []byte("event: warning\ndata: ")
-	sseDone        = []byte("data: [DONE]\n\n")
+	sseDataPrefix    = []byte("data: ")
+	sseDoubleNL      = []byte("\n\n")
+	sseErrorPrefix   = []byte("event: error\ndata: ")
+	sseCommentPrefix = []byte(": ")
+	sseDone          = []byte("data: [DONE]\n\n")
 )
 
 // streamErrorFrame builds the data payload for a terminal `event: error`.
@@ -1598,8 +1598,14 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if !raw && iter.Usage().TotalTokens == 0 {
+		// Emit the missing-usage notice as an SSE comment line, never as a
+		// data: frame. SDK clients (OpenAI Responses, Vercel AI SDK) schema-
+		// validate every data payload against {choices}|{error}; a bare
+		// warning object there crashes strict clients mid-stream (see
+		// issue #7421). Comment lines are ignored by spec-compliant
+		// parsers but stay visible to curl-style debugging.
 		warnJSON, _ := sonic.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
-		_, _ = w.Write(sseWarnPrefix)
+		_, _ = w.Write(sseCommentPrefix)
 		_, _ = w.Write(warnJSON)
 		_, _ = w.Write(sseDoubleNL)
 	}

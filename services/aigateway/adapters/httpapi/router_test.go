@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -924,4 +925,61 @@ func TestRouter_ModelsEndpoint_KeepsTheFamilyInOwnedBy(t *testing.T) {
 	require.Len(t, parsed.Data, 1)
 	assert.Equal(t, "eu/claude-sonnet-5", parsed.Data[0].ID)
 	assert.Equal(t, "anthropic", parsed.Data[0].OwnedBy)
+}
+
+// Regression for issue #7421: the missing-usage notice used to be emitted
+// as its own data: frame carrying a bare {"warning": ...} object. Strict
+// OpenAI-compatible SDK clients (Vercel AI SDK / @ai-sdk/opencompatible)
+// schema-validate every data payload against a {choices}|{error} union and
+// hard-crash mid-stream on anything else. The notice must ride as an SSE
+// comment line, which spec-compliant parsers ignore.
+type zeroUsageIter struct {
+	chunks [][]byte
+	i      int
+}
+
+func (it *zeroUsageIter) Next(_ context.Context) bool {
+	if it.i >= len(it.chunks) {
+		return false
+	}
+	it.i++
+	return true
+}
+
+func (it *zeroUsageIter) Chunk() []byte       { return it.chunks[it.i-1] }
+func (it *zeroUsageIter) Usage() domain.Usage { return domain.Usage{} }
+func (it *zeroUsageIter) Err() error          { return nil }
+func (it *zeroUsageIter) Close() error        { return nil }
+
+func TestWriteSSE_MissingUsageNotice_IsCommentNotDataFrame(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeSSE(context.Background(), rec, &zeroUsageIter{
+		chunks: [][]byte{
+			[]byte(`{"id":"1","choices":[{"delta":{"content":"hi"}}]}`),
+			[]byte(`{"id":"1","choices":[],"usage":{"prompt_tokens":89,"completion_tokens":45,"total_tokens":134}}`),
+		},
+	})
+	body := rec.Body.String()
+
+	require.Contains(t, body, "provider_did_not_report_usage_on_stream",
+		"notice should still be emitted for curl-style debugging")
+	require.NotContains(t, body, "data: {\"warning\"",
+		"the notice must never be its own data: frame")
+
+	// Every data payload the client sees must satisfy the strict
+	// {choices}|{error} union (or be the [DONE] sentinel).
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		payload := strings.TrimPrefix(line, "data: ")
+		if payload == "[DONE]" {
+			continue
+		}
+		var probe map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal([]byte(payload), &probe),
+			"data payload is not a JSON object: %q", line)
+		require.True(t, probe["choices"] != nil || probe["error"] != nil,
+			"data payload without choices/error crashes strict spec-validating clients: %q", line)
+	}
 }
