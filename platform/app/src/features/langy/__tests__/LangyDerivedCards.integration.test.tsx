@@ -556,3 +556,64 @@ describe("given a card renderer that throws", () => {
     consoleError.mockRestore();
   });
 });
+
+/**
+ * @see specs/langy/langy-derived-stats-presentation.feature
+ */
+describe("given a stats card comparing readings on one scale", () => {
+  const comparison = {
+    type: "langy-card",
+    blockId: "cmp",
+    kind: "stats",
+    provenance: "derived",
+    card: {
+      kind: "stats",
+      blockId: "cmp",
+      title: "Baseline vs candidate",
+      items: [
+        { label: "Baseline pass rate", value: 35, unit: "percent" },
+        { label: "Candidate pass rate", value: 45, unit: "percent" },
+      ],
+    },
+  };
+
+  /** @scenario "The bar comparison marks the leading reading" */
+  it("draws a bar per reading and marks the leading one", () => {
+    renderMessage(assistantMessage([comparison]));
+
+    const bars = screen.getAllByTestId("derived-stat-bar");
+    expect(bars).toHaveLength(2);
+    expect(bars.filter((bar) => bar.dataset.best === "true")).toHaveLength(1);
+    expect(bars[1]!.dataset.best).toBe("true");
+  });
+
+  /** @scenario "A unit word is drawn as the symbol a reader expects" */
+  it("draws each unit as its symbol", () => {
+    renderMessage(assistantMessage([comparison]));
+
+    expect(screen.getByText("35%")).toBeDefined();
+    expect(screen.getByText("45%")).toBeDefined();
+  });
+
+  /** @scenario "The figure row wraps rather than leaving the panel" */
+  it("keeps every reading in the card rather than dropping any", () => {
+    renderMessage(
+      assistantMessage([
+        {
+          ...comparison,
+          card: {
+            ...comparison.card,
+            items: [
+              ...comparison.card.items,
+              { label: "Policy-sheet rows", value: 83, unit: "percent" },
+              { label: "Shipping-window rows", value: 60, unit: "percent" },
+            ],
+          },
+        },
+      ]),
+    );
+
+    expect(screen.getAllByTestId("derived-stat-bar")).toHaveLength(4);
+    expect(screen.getByText("Shipping-window rows")).toBeDefined();
+  });
+});
