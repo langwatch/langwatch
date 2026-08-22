@@ -99,7 +99,7 @@ audio = client.text_to_speech.convert(
 )
 ```
 
-These routes need an ElevenLabs key on the virtual key. They carry that vendor's own request shape, so the gateway will not fall back to another provider for them.
+These routes need the virtual key to reach an ElevenLabs provider. The vendor key itself lives on the organization's ElevenLabs provider row, never on the virtual key, so what matters is that the key's provider access still includes ElevenLabs. They carry that vendor's own request shape, so the gateway will not fall back to another provider for them: a key that cannot reach ElevenLabs is refused rather than served by whichever provider it does hold.
 
 Transcription accepts a `file` part, or a `cloud_storage_url` part for ElevenLabs to fetch the audio itself. Uploads are capped at 25 MB of audio, the same limit as `/v1/audio/transcriptions`; larger uploads get a `413` before any provider is contacted. Send a `cloud_storage_url` for a bigger file: ElevenLabs fetches it directly and the gateway never holds it.
 
