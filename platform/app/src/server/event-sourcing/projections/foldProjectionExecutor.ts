@@ -465,6 +465,7 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        aggregateType: event.aggregateType,
         occurredAtMs: eventOccurredAt,
       });
 
@@ -636,6 +637,7 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        aggregateType: fresh[0]!.aggregateType,
         occurredAtMs: earliestOccurredAt,
       });
       logger.info(

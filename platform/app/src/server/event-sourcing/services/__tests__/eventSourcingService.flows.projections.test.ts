@@ -38,7 +38,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -63,7 +63,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
@@ -81,7 +81,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -109,7 +109,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -134,7 +134,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -152,7 +152,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
@@ -170,7 +170,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -189,7 +189,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [
           createMockFoldProjectionDefinition("projection1"),
@@ -222,7 +222,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -249,7 +249,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef1, foldDef2],
       });
@@ -275,7 +275,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });

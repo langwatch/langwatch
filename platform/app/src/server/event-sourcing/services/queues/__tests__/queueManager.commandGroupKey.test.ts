@@ -100,7 +100,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -143,7 +143,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -182,7 +182,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -243,7 +243,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
   function buildManager() {
     const globalJobRegistry = new Map<string, JobRegistryEntry>();
     const manager = new QueueManager({
-      aggregateType,
+      aggregateScope: aggregateType,
       pipelineName: "test-pipeline",
       globalQueue: createMockSharedQueue(),
       globalJobRegistry,
@@ -597,7 +597,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -643,7 +643,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,

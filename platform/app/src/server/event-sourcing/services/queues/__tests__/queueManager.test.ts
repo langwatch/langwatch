@@ -158,7 +158,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -201,7 +201,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -222,7 +222,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -265,7 +265,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -296,7 +296,7 @@ describe("QueueManager", () => {
       const handleEventCallback = vi.fn().mockResolvedValue(void 0);
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -331,7 +331,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -365,7 +365,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -386,7 +386,7 @@ describe("QueueManager", () => {
   describe("initializeHandlerQueues", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
       });
 
@@ -405,7 +405,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -435,7 +435,7 @@ describe("QueueManager", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -467,7 +467,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -501,7 +501,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -539,7 +539,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -574,7 +574,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -615,7 +615,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -643,7 +643,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -686,7 +686,7 @@ describe("QueueManager", () => {
   describe("initializeProjectionQueues", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
       });
 
@@ -708,7 +708,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -742,7 +742,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -776,7 +776,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -807,7 +807,7 @@ describe("QueueManager", () => {
   describe("initializeCommandQueues", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
       });
 
@@ -833,7 +833,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -881,7 +881,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -924,7 +924,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -964,7 +964,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1000,7 +1000,7 @@ describe("QueueManager", () => {
   describe("initializeProjectionSubscriberQueues", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
       });
 
@@ -1017,7 +1017,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1047,7 +1047,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1085,7 +1085,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1126,7 +1126,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1158,7 +1158,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1194,7 +1194,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -1231,7 +1231,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,

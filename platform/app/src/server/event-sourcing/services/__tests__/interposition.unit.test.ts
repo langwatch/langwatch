@@ -74,7 +74,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const mapDef = createMockMapProjectionDefinition("lean-dispatch");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -113,7 +113,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       // mapDef.eventTypes must include the test event type to trigger dispatch
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [{ ...mapDef, eventTypes: [] }],
       });
@@ -156,7 +156,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const mapDef = createMockMapProjectionDefinition("lean-throw");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -206,7 +206,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [{ ...mapDef, eventTypes: [] }],
       });

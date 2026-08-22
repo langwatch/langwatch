@@ -55,7 +55,7 @@ function createMockCommandHandlerClass(): CommandHandlerClass<
 
 function createManager(globalJobRegistry: Map<string, JobRegistryEntry>) {
   return new QueueManager({
-    aggregateType: createTestAggregateType(),
+    aggregateScope: createTestAggregateType(),
     pipelineName: "test-pipeline",
     globalQueue: createMockSharedQueue(),
     globalJobRegistry,

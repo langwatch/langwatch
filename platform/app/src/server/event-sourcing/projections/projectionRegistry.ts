@@ -146,7 +146,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 
     const aggregateType: AggregateType = "global";
     this.queueManager = new QueueManager<EventType>({
-      aggregateType,
+      aggregateScope: aggregateType,
       pipelineName: "global",
       globalQueue,
       globalJobRegistry,

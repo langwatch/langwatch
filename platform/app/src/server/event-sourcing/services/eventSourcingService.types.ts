@@ -3,6 +3,7 @@ import type { ProcessRole } from "../../app-layer/config";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
+import type { AggregateScope } from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
@@ -40,9 +41,10 @@ export interface EventSourcingServiceOptions<
    */
   pipelineName: string;
   /**
-   * The aggregate type this service manages (e.g., "trace", "user").
+   * The aggregate types this service manages and their event ownership
+   * (ADR-113). One type is the common case.
    */
-  aggregateType: AggregateType;
+  aggregateScope: AggregateType | AggregateScope;
   /**
    * Event store for persisting and retrieving events.
    */

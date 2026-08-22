@@ -33,7 +33,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -84,7 +84,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -144,7 +144,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -191,7 +191,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -230,7 +230,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });

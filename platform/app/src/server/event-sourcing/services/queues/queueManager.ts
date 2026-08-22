@@ -4,6 +4,12 @@ import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { Command, CommandHandler } from "../../commands/command";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { CommandSchema } from "../../commands/commandSchema";
+import {
+  type AggregateScope,
+  commandAggregateType,
+  primaryAggregateType,
+  toAggregateScope,
+} from "../../domain/aggregateScope";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { CommandType } from "../../domain/commandType";
 import type { Event } from "../../domain/types";
@@ -132,6 +138,8 @@ interface QueuedEventConsumerDefinition<E extends Event> {
  * and shared across all pipelines.
  */
 export class QueueManager<EventType extends Event = Event> {
+  private readonly aggregateScope: AggregateScope;
+  /** The first declared type — a label, never a key (ADR-113). */
   private readonly aggregateType: AggregateType;
   private readonly pipelineName: string;
   private readonly logger = createLogger(
@@ -150,19 +158,20 @@ export class QueueManager<EventType extends Event = Event> {
   private projectionSubscriberCount = 0;
 
   constructor({
-    aggregateType,
+    aggregateScope,
     pipelineName,
     globalQueue,
     globalJobRegistry,
     featureFlagService,
   }: {
-    aggregateType: AggregateType;
+    aggregateScope: AggregateType | AggregateScope;
     pipelineName: string;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
-    this.aggregateType = aggregateType;
+    this.aggregateScope = toAggregateScope(aggregateScope);
+    this.aggregateType = primaryAggregateType(this.aggregateScope);
     this.pipelineName = pipelineName;
     this.globalQueue = globalQueue;
     this.globalJobRegistry = globalJobRegistry;
@@ -614,6 +623,14 @@ export class QueueManager<EventType extends Event = Event> {
 
     // Step 2: Register each command in the global queue and create facades
     for (const [cmdName, cmdEntry] of commandRegistry) {
+      // The aggregate this command writes: named at registration, or the
+      // pipeline's one type. Every key below carries it, so a multi-aggregate
+      // pipeline keeps one command's jobs apart from another aggregate's.
+      const boundAggregateType = commandAggregateType({
+        scope: this.aggregateScope,
+        commandName: cmdName,
+        declared: cmdEntry.options.aggregateType,
+      });
       const rawDedup = resolveDeduplicationStrategy(
         cmdEntry.options.deduplication as
           | DeduplicationStrategy<any>
@@ -622,7 +639,7 @@ export class QueueManager<EventType extends Event = Event> {
           const key = cmdEntry.getGroupKey
             ? cmdEntry.getGroupKey(payload)
             : cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
+          return `${String(payload.tenantId)}:${boundAggregateType}:${String(key)}`;
         },
       );
 
@@ -637,7 +654,7 @@ export class QueueManager<EventType extends Event = Event> {
             : cmdEntry.getGroupKey
               ? cmdEntry.getGroupKey(payload)
               : cmdEntry.getAggregateId(payload);
-          return `${this.aggregateType}:${String(key)}`;
+          return `${boundAggregateType}:${String(key)}`;
         },
       });
       const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
@@ -672,7 +689,7 @@ export class QueueManager<EventType extends Event = Event> {
         handler: cmdEntry.handler,
         getAggregateId: cmdEntry.getAggregateId,
         storeEventsFn: storeEvents,
-        aggregateType: this.aggregateType,
+        aggregateType: boundAggregateType,
         commandName: cmdEntry.commandName,
         pipelineName: this.pipelineName,
         featureFlagService: this.featureFlagService,

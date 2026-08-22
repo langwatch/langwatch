@@ -44,7 +44,7 @@ function makeQueueManager() {
   // so the router runs the subscriber inline — the seam still applies the
   // enqueue filter, and the handler sees the staged payload.
   return new QueueManager<Event>({
-    aggregateType,
+    aggregateScope: aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
   });
 }
@@ -338,7 +338,7 @@ describe("subscriber enqueue-time contract", () => {
         const handle = vi.fn().mockResolvedValue(void 0);
         const service = new EventSourcingService<Event>({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-          aggregateType,
+          aggregateScope: aggregateType,
           eventStore,
           subscribers: [
             {

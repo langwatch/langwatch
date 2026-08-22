@@ -112,7 +112,7 @@ describe("evaluation processing live FIFO", () => {
     const registry = new Map<string, JobRegistryEntry>();
     new EventSourcingService<EvaluationProcessingEvent>({
       pipelineName: "evaluation_processing",
-      aggregateType: "evaluation",
+      aggregateScope: "evaluation",
       eventStore: new EventStoreMemory(new EventRepositoryMemory()),
       foldProjections: [
         new EvaluationRunFoldProjection({
@@ -168,7 +168,7 @@ describe("evaluation processing live FIFO", () => {
   it("serializes different lifecycle commands for one evaluation while leaving other evaluations independent", () => {
     const registry = new Map<string, JobRegistryEntry>();
     const manager = new QueueManager<EvaluationProcessingEvent>({
-      aggregateType: "evaluation",
+      aggregateScope: "evaluation",
       pipelineName: "evaluation_processing",
       globalQueue: sharedQueue(),
       globalJobRegistry: registry,

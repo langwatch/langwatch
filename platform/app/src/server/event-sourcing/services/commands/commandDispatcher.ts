@@ -483,6 +483,8 @@ export async function processCommandBatch<EventType extends Event>(
  */
 export interface CommandHandlerOptions<Payload>
   extends CommandSerializationOptions<Payload> {
+  /** The aggregate this command writes; required on a multi-aggregate pipeline (ADR-113). */
+  aggregateType?: AggregateType;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;

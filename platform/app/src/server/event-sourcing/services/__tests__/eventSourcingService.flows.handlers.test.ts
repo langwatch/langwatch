@@ -45,7 +45,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
         logger: logger as any,
@@ -78,7 +78,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef1, mapDef2],
       });
@@ -113,7 +113,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
         globalQueue,

@@ -140,7 +140,7 @@ describe("event-subscriber runtime boundary", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         subscribers: [subscriber],
         globalQueue,
@@ -210,7 +210,7 @@ describe("event-subscriber runtime boundary", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [fold],
         subscribers: [subscriber],
@@ -302,7 +302,7 @@ describe("event-subscriber runtime boundary", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         subscribers: [subscriber],
         globalQueue,

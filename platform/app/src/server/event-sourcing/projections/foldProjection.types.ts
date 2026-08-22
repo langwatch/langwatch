@@ -1,3 +1,4 @@
+import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
@@ -79,10 +80,23 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   eventLoader?: (context: {
     tenantId: string;
     aggregateId: string;
+    /**
+     * Aggregate type of the event that triggered the re-fold. On a pipeline
+     * that owns several aggregates (ADR-113) this is the only way to read the
+     * right history; a loader on a single-type pipeline may ignore it.
+     */
+    aggregateType: AggregateType;
     /** occurredAt (ms) of the event that triggered the re-fold, used to
      * lower-bound the event_log rehydration scan for time-local aggregates. */
     occurredAtMs?: number;
   }) => Promise<Event[]>;
+
+  /**
+   * Set by a custom `eventLoader` that reads `context.aggregateType`. A
+   * multi-aggregate pipeline refuses a custom loader without it; the
+   * auto-wired loaders set it themselves.
+   */
+  eventLoaderIsAggregateTypeAware?: boolean;
 
   /**
    * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log order

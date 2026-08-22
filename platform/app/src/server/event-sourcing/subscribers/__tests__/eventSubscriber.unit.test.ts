@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { singleAggregateScope } from "../../domain/aggregateScope";
 import type { Event } from "../../domain/types";
 import {
   createMockEventStore,
@@ -38,7 +39,7 @@ describe("event subscribers", () => {
         };
         const service = new EventSourcingService({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-          aggregateType,
+          aggregateScope: aggregateType,
           eventStore,
           subscribers: [subscriber],
         });
@@ -53,7 +54,7 @@ describe("event subscribers", () => {
         expect(eventStore.storeEvents).toHaveBeenCalledWith(
           [event],
           context,
-          aggregateType,
+          singleAggregateScope(aggregateType),
         );
         expect(eventStore.getEvents).not.toHaveBeenCalled();
         expect(eventStore.getEventsUpTo).not.toHaveBeenCalled();
@@ -77,7 +78,7 @@ describe("event subscribers", () => {
         };
         const service = new EventSourcingService({
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-          aggregateType,
+          aggregateScope: aggregateType,
           eventStore,
           subscribers: [subscriber],
         });

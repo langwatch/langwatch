@@ -40,7 +40,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -80,7 +80,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -120,7 +120,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -169,7 +169,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,

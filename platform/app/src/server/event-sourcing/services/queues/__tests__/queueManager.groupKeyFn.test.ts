@@ -36,7 +36,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -85,7 +85,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
@@ -128,7 +128,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
-        aggregateType,
+        aggregateScope: aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,

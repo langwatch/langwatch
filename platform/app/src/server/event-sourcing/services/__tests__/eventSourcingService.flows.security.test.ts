@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { singleAggregateScope } from "../../domain/aggregateScope";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
@@ -34,7 +35,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -58,7 +59,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -82,7 +83,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -100,13 +101,13 @@ describe("EventSourcingService - Security Flows", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events,
         context1,
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
       // Verify tenantId is passed to store
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         expect.any(Array),
         expect.objectContaining({ tenantId: tenantId1 }),
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
     });
 
@@ -120,7 +121,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -146,7 +147,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -167,7 +168,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -205,7 +206,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -232,7 +233,7 @@ describe("EventSourcingService - Security Flows", () => {
       const customAggregateType = "trace" as const;
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType: customAggregateType,
+        aggregateScope: customAggregateType,
         eventStore,
       });
 
@@ -250,7 +251,7 @@ describe("EventSourcingService - Security Flows", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events,
         context,
-        customAggregateType,
+        singleAggregateScope(customAggregateType),
       );
     });
 
@@ -261,13 +262,13 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service1 = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType: aggregateType1,
+        aggregateScope: aggregateType1,
         eventStore,
       });
 
       const service2 = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType: aggregateType2,
+        aggregateScope: aggregateType2,
         eventStore,
       });
 
@@ -286,12 +287,12 @@ describe("EventSourcingService - Security Flows", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events,
         context,
-        aggregateType1,
+        singleAggregateScope(aggregateType1),
       );
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events,
         context,
-        aggregateType2,
+        singleAggregateScope(aggregateType2),
       );
     });
   });
@@ -301,7 +302,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
       });
 
@@ -329,12 +330,12 @@ describe("EventSourcingService - Security Flows", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events1,
         expect.objectContaining({ tenantId: tenantId1 }),
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         events2,
         expect.objectContaining({ tenantId: tenantId2 }),
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
     });
 
@@ -345,7 +346,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -376,7 +377,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         foldProjections: [foldDef],
       });
@@ -411,7 +412,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
+        aggregateScope: aggregateType,
         eventStore,
         mapProjections: [mapDef],
       });
@@ -439,13 +440,13 @@ describe("EventSourcingService - Security Flows", () => {
         1,
         events1,
         context1,
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
       expect(eventStore.storeEvents).toHaveBeenNthCalledWith(
         2,
         events2,
         context2,
-        aggregateType,
+        singleAggregateScope(aggregateType),
       );
     });
   });
