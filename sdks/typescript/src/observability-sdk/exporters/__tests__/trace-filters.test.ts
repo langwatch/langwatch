@@ -282,6 +282,19 @@ describe("trace-filters", () => {
       expect(isHttpRequestSpan(createMockSpan("GETAWAY", "http"))).toBe(false);
       expect(isHttpRequestSpan(createMockSpan("GETTING", "http"))).toBe(false);
     });
+
+    it("requires whitespace or end-of-string after the verb, not any word boundary", () => {
+      // Hyphen, dot, slash etc. are word boundaries but not OTel HTTP span shapes.
+      expect(isHttpRequestSpan(createMockSpan("post-process", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("get-user-profile", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("delete-account", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("patch-config", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("head-request-handler", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("options-resolver", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("put-record.v2", "custom"))).toBe(false);
+      // Bare verb at end-of-string is still a valid OTel shape.
+      expect(isHttpRequestSpan(createMockSpan("POST", "http"))).toBe(true);
+    });
   });
 
   describe("applyPreset", () => {
@@ -456,4 +469,3 @@ describe("trace-filters", () => {
     });
   });
 });
-
