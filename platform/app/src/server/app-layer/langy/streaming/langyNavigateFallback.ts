@@ -25,6 +25,7 @@ import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
 import { AgentService } from "~/server/agents/agent.service";
 import { getApp } from "~/server/app-layer/app";
+import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { DatasetService } from "~/server/datasets/dataset.service";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
@@ -153,7 +154,7 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
   },
 
   monitor_: async ({ projectId, resourceId }) => {
-    const monitor = await getApp().monitors.getMonitorById({
+    const monitor = await MonitorService.create(prisma).getMonitorById({
       projectId,
       monitorId: resourceId,
     });

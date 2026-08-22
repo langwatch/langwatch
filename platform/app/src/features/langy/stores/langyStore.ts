@@ -750,10 +750,6 @@ export const useLangyStore = create<LangyState>()(
         set((state) => ({
           activeConversationId: null,
           historyLoadConversationId: null,
-          // A new chat is a new conversation: any id still held from an earlier
-          // warm belongs to the chat being left behind. The panel's re-armed
-          // warm mints a fresh one.
-          pendingConversationId: null,
           // A new chat starts on a BLANK composer. Without this, the half-typed
           // text abandoned in the last conversation is still sitting there,
           // primed to be sent into the new one. (`resetForScope` already

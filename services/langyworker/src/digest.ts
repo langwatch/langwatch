@@ -10,6 +10,7 @@ import { truncateToBytes } from "./protocol.js";
 export const DIGEST_MAX_BYTES = 64 * 1024;
 export const DIGEST_MESSAGE_MAX_BYTES = 8 * 1024;
 export const DIGEST_TRUNCATION_HEADER = "[digest truncated: older messages omitted]";
+const MESSAGE_TRUNCATION_MARKER = "\n[message truncated]";
 
 type ContentBlock = {
   type?: string;
@@ -58,7 +59,11 @@ export function renderMessageLine(message: DigestibleMessage): string | undefine
       : role;
   const line = `${label}: ${body}`;
   if (Buffer.byteLength(line, "utf8") <= DIGEST_MESSAGE_MAX_BYTES) return line;
-  return `${truncateToBytes({ text: line, maxBytes: DIGEST_MESSAGE_MAX_BYTES })}\n[message truncated]`;
+  // The marker is part of the per-message budget, not an addition to it: the
+  // per-message cap is what buildHandoffDigest counts against the whole digest.
+  const budget =
+    DIGEST_MESSAGE_MAX_BYTES - Buffer.byteLength(MESSAGE_TRUNCATION_MARKER, "utf8");
+  return `${truncateToBytes({ text: line, maxBytes: budget })}${MESSAGE_TRUNCATION_MARKER}`;
 }
 
 export function buildHandoffDigest({

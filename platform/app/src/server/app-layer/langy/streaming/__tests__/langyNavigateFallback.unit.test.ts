@@ -22,7 +22,7 @@ const {
   getEvaluatorById,
   getAgentByIdOrThrow,
   workflowFindFirst,
-  monitorFindFirst,
+  getMonitorById,
 } = vi.hoisted(() => ({
   getScenarioRunData: vi.fn(),
   getProjectById: vi.fn(),
@@ -32,7 +32,7 @@ const {
   getEvaluatorById: vi.fn(),
   getAgentByIdOrThrow: vi.fn(),
   workflowFindFirst: vi.fn(),
-  monitorFindFirst: vi.fn(),
+  getMonitorById: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -48,7 +48,6 @@ vi.mock("~/server/app-layer/app", () => ({
 vi.mock("~/server/db", () => ({
   prisma: {
     workflow: { findFirst: workflowFindFirst },
-    monitor: { findFirst: monitorFindFirst },
   },
 }));
 
@@ -60,6 +59,10 @@ vi.mock("~/server/prompt-config/prompt.service", () => ({
 
 vi.mock("~/server/datasets/dataset.service", () => ({
   DatasetService: { create: () => ({ getBySlugOrId: getDatasetBySlugOrId }) },
+}));
+
+vi.mock("~/server/app-layer/monitors/monitor.service", () => ({
+  MonitorService: { create: () => ({ getMonitorById }) },
 }));
 
 vi.mock("~/server/evaluators/evaluator.service", () => ({
@@ -199,19 +202,19 @@ describe("resolveNavigateFallbackUrl", () => {
 
   describe("given a monitor id the project can see", () => {
     it("resolves the online-evaluations page with that monitor's drawer open", async () => {
-      monitorFindFirst.mockResolvedValue({ id: "monitor_1" });
+      getMonitorById.mockResolvedValue({ id: "monitor_1" });
 
       expect(await resolve("monitor_1")).toBe(
         "https://app.langwatch.ai/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1",
       );
-      expect(monitorFindFirst).toHaveBeenCalledWith({
-        where: { id: "monitor_1", projectId: "proj_1" },
-        select: { id: true },
+      expect(getMonitorById).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        monitorId: "monitor_1",
       });
     });
 
     it("returns null when the monitor does not resolve in this project", async () => {
-      monitorFindFirst.mockResolvedValue(null);
+      getMonitorById.mockResolvedValue(null);
 
       expect(await resolve("monitor_gone")).toBeNull();
     });

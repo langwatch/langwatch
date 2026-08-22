@@ -37,11 +37,13 @@ describe("renderMessageLine", () => {
     expect(renderMessageLine({ role: "bashExecution", content: "x" })).toBeUndefined();
   });
 
-  it("caps one message at the per-message budget", () => {
+  it("caps one message at the per-message budget, marker included", () => {
     const line = renderMessageLine({ role: "user", content: "x".repeat(DIGEST_MESSAGE_MAX_BYTES * 2) });
     expect(line).toBeDefined();
+    // The marker rides INSIDE the budget: a line that overshot it by the
+    // marker's own length would break the cap buildHandoffDigest counts on.
     expect(Buffer.byteLength(line as string, "utf8")).toBeLessThanOrEqual(
-      DIGEST_MESSAGE_MAX_BYTES + "\n[message truncated]".length,
+      DIGEST_MESSAGE_MAX_BYTES,
     );
     expect(line).toContain("[message truncated]");
   });
