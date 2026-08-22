@@ -8,7 +8,14 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "pytest>=8.1.2",
     "fastapi>=0.115.11",
-    "arize-phoenix>=4.9.0",
+    # Capped below 19.18.0: from that release phoenix declares a dataclass with
+    # a mappingproxy default, which Python 3.11 rejects at import
+    # ("mutable default <class 'mappingproxy'> ... use default_factory"). Its
+    # metadata still claims >=3.10, and this project is on 3.11 per
+    # .python-version, so the bad versions resolve happily and then break
+    # collection for the whole suite via phoenix's pytest plugin. Lift the cap
+    # once phoenix fixes that or langevals moves to 3.12.
+    "arize-phoenix>=4.9.0,<19.18.0",
     "openinference-instrumentation-dspy>=0.1.9",
     "opentelemetry-exporter-otlp>=1.25.0",
     "hypercorn>=0.16.0",
