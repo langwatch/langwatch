@@ -80,6 +80,12 @@ vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
   useLambdaWarmup: () => undefined,
 }));
 
+// The optimize handoff reads a feature flag over tRPC; this layout test has
+// no api.featureFlag surface, so stub the hook (flag off hides the menu item).
+vi.mock("~/experiments-v3/hooks/useOptimizeWithLangy", () => ({
+  useOptimizeWithLangy: () => undefined,
+}));
+
 // The page registers Langy action handlers via useRegisterLangyHandlers, which
 // calls useLangy() and requires a <LangyProvider>. We don't render the panel
 // here, so stub the hook to a no-op.

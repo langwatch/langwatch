@@ -49,7 +49,6 @@ import {
   scrollToTargetColumn,
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
-import { useOptimizeWithLangy } from "../hooks/useOptimizeWithLangy";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useSyncWorkflowTargetFields } from "../hooks/useSyncWorkflowTargetFields";
 import type {
@@ -196,12 +195,18 @@ type EvaluationsV3TableProps = {
   isLoadingDatasets?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /**
+   * "Optimize this prompt": hand the column to Langy. The page owns the
+   * hook (it is the Langy integration point); undefined hides the menu item.
+   */
+  onOptimizeTarget?: (target: TargetConfig, name: string) => void;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
   disableVirtualization = false,
+  onOptimizeTarget,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
   // Serializable drawer URL params (evaluatorType, evaluatorId, …). Read here so
@@ -822,10 +827,6 @@ export function EvaluationsV3Table({
     },
     [duplicateTarget, openTargetEditor],
   );
-
-  // "Optimize this prompt": hand the column to Langy. Undefined while the
-  // UI-action channel is flagged off, which hides the menu item.
-  const handleOptimizeTarget = useOptimizeWithLangy();
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
   // effect register the exact same evaluatorEditor callbacks. onSave fetches the
@@ -1502,7 +1503,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
-      handleOptimizeTarget,
+      handleOptimizeTarget: onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
@@ -1533,7 +1534,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
-      handleOptimizeTarget,
+      onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,

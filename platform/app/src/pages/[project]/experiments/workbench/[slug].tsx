@@ -22,6 +22,7 @@ import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEval
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "~/experiments-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
+import { useOptimizeWithLangy } from "~/experiments-v3/hooks/useOptimizeWithLangy";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
 import { useWorkbenchUpdateListener } from "~/experiments-v3/hooks/useWorkbenchUpdateListener";
 import { HandledErrorAlert } from "~/features/errors";
@@ -75,6 +76,9 @@ export default function ExperimentsWorkbenchPage() {
   const utils = api.useUtils();
   const { execute: executeEvaluation } = useExecuteEvaluation();
   const { openDrawer } = useDrawer();
+  // "Optimize this prompt": hand the column to Langy. The page is the Langy
+  // integration point; undefined while flagged off, which hides the menu item.
+  const optimizeTarget = useOptimizeWithLangy();
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -479,6 +483,7 @@ export default function ExperimentsWorkbenchPage() {
             <EvaluationsV3Table
               isLoadingExperiment={isLoadingExperiment}
               isLoadingDatasets={isLoadingDatasets}
+              onOptimizeTarget={optimizeTarget}
             />
           </Box>
         </Box>
