@@ -96,7 +96,7 @@ For a **Custom (OpenAI-compatible)** provider, a self-hosted vLLM, a LiteLLM pro
 
 A key with only one provider does not need this: with one provider there is nothing to choose between, so any model name is forwarded to it.
 
-`GET /v1/models` also lists models discovered by asking the provider's own endpoint. A discovered model that you have not declared is listed, but on a key with several providers it is not routable by its bare name, because nothing says which provider owns it. Declare it, or name the provider in the request.
+`GET /v1/models` also lists models discovered by asking the provider's own endpoint. Discovery lists a model, but it does not declare it, so it does not tell the gateway which provider owns the bare name. The name can still reach the provider through the later steps of the resolution order, for example when that provider declares no models at all, or when the key has only one provider. On a key with several providers it is not certain: another provider that declares the name takes it first. Declare the model, or name the provider in the request.
 
 ## Errors
 

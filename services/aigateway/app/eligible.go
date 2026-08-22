@@ -477,10 +477,6 @@ func modelNotRecognized(ctx context.Context, model string, options reachable) er
 // error they stop reading.
 const maxReachableOptions = 10
 
-// reachableOptions renders the prefixes this key accepts: the provider
-// families its credentials belong to, plus the routing handles its providers
-// carry. Rendered as a quoted, comma-separated list, capped, with the overflow
-// stated rather than silently dropped.
 // reachable is the prefixes a key accepts, both as the list itself and as the
 // sentence fragment a message embeds. Both come from one place so a client
 // composing its own copy and a caller reading ours never disagree.
@@ -489,16 +485,28 @@ type reachable struct {
 	rendered string
 }
 
+// reachableOptions renders the prefixes this key accepts: the provider
+// families its credentials belong to, plus the routing handles its providers
+// carry. Rendered as a quoted, comma-separated list, capped, with the overflow
+// stated rather than silently dropped.
+//
+// The cap falls on the families. A family is interchangeable in the message,
+// because every family the key holds appears and the caller only needs one of
+// them. A handle names one instance and cannot be guessed, so dropping it
+// leaves the refusal telling a caller to use a spelling it does not list.
 func reachableOptions(creds []domain.Credential, cfg domain.BundleConfig) reachable {
-	options := reachableSpellings(creds, cfg)
-	if len(options) == 0 {
+	families, handles := reachableSpellings(creds, cfg)
+	if len(families)+len(handles) == 0 {
 		return reachable{rendered: "no provider"}
 	}
 	overflow := 0
-	if len(options) > maxReachableOptions {
-		overflow = len(options) - maxReachableOptions
-		options = options[:maxReachableOptions]
+	if room := maxReachableOptions - len(handles); len(families) > room {
+		overflow = len(families) - max(room, 0)
+		families = families[:max(room, 0)]
 	}
+	options := make([]string, 0, len(families)+len(handles))
+	options = append(options, families...)
+	options = append(options, handles...)
 	quoted := make([]string, len(options))
 	for i, name := range options {
 		quoted[i] = fmt.Sprintf("%q", name)
@@ -511,15 +519,15 @@ func reachableOptions(creds []domain.Credential, cfg domain.BundleConfig) reacha
 }
 
 // reachableSpellings lists every prefix this key accepts: the provider
-// families its credentials belong to, sorted, then the routing handles its
-// providers carry. Families first because they are the spelling most callers
-// already use.
-func reachableSpellings(creds []domain.Credential, cfg domain.BundleConfig) []string {
+// families its credentials belong to, sorted, and the routing handles its
+// providers carry. Returned apart so the caller's cap can drop families and
+// keep handles; rendered families first, because that is the spelling most
+// callers already use.
+func reachableSpellings(creds []domain.Credential, cfg domain.BundleConfig) (families, handles []string) {
 	if len(creds) == 0 {
 		creds = cfg.Credentials
 	}
 	seen := make(map[string]bool)
-	var families []string
 	for _, c := range creds {
 		name := string(c.ProviderID)
 		if name == "" || seen[name] {
@@ -532,10 +540,10 @@ func reachableSpellings(creds []domain.Credential, cfg domain.BundleConfig) []st
 	for _, c := range creds {
 		if c.Handle != "" && !seen[c.Handle] {
 			seen[c.Handle] = true
-			families = append(families, c.Handle)
+			handles = append(handles, c.Handle)
 		}
 	}
-	return families
+	return families, handles
 }
 
 // inferProviderFromModel maps a bare model name to the provider that

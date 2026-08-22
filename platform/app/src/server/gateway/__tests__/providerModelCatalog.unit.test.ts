@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { declaredModelsForProvider } from "../providerModelCatalog";
 
 describe("declaredModelsForProvider", () => {
-  describe("given a custom provider with declared models", () => {
+  describe("when a custom provider declares models", () => {
     it("declares the customer's own model ids", () => {
       const declared = declaredModelsForProvider({
         provider: "custom",
@@ -35,7 +35,7 @@ describe("declaredModelsForProvider", () => {
     });
   });
 
-  describe("given a hosted family", () => {
+  describe("when the provider is a hosted family", () => {
     it("declares the shipped catalog with the family prefix removed", () => {
       const declared = declaredModelsForProvider({
         provider: "openai",
@@ -76,7 +76,7 @@ describe("declaredModelsForProvider", () => {
     });
   });
 
-  describe("given a provider that declares nothing", () => {
+  describe("when a provider declares nothing", () => {
     it("declares nothing at all rather than an empty list", () => {
       // Silence is not a denial: the gateway reads an absent catalog as "this
       // provider said nothing" and keeps it a candidate for a model no other

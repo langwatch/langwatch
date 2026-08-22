@@ -3,7 +3,6 @@ package modelresolver
 
 import (
 	"context"
-	"strings"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -124,7 +123,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		// it left whole is read here, where the key's handles are known.
 		resolved := domain.ResolvedModel{ModelID: alias.Model, ProviderID: alias.ProviderID}
 		if alias.ProviderID == "" {
-			resolved = readSpelling(config, alias.Model)
+			resolved = config.ReadSpelling(alias.Model)
 		}
 		if !config.AllowsResolvedModel(resolved.ProviderID, resolved.ModelID) {
 			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
@@ -139,7 +138,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	// 2. Read the spelling: a routing handle pins one instance, a known
 	// provider family selects a kind, and anything else is a whole model id
 	// that credential selection matches against the providers' own catalogs.
-	resolved := readSpelling(config, rawModel)
+	resolved := config.ReadSpelling(rawModel)
 
 	// Echo the spelling the caller sent when a qualifier was read. Naming the
 	// bare model reads as a different refusal than the one they asked for,
@@ -156,51 +155,4 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	}
 
 	return &resolved, nil
-}
-
-// readSpelling turns a model string into the provider it names and the model
-// id that reaches the provider.
-//
-// The first segment is a qualifier only when it names something real: a
-// routing handle on one of the key's provider rows, or a provider family the
-// gateway knows. Everything else is a model id in full, slashes and all,
-// because self-hosted servers and proxies serve models whose own ids contain
-// one ("stealth/ox-alpha", "meta-llama/Llama-3-70B").
-//
-// A handle belonging to a row the key's routing policy or provider access
-// dropped is recognized too, and returns that row's id. Credential selection
-// then finds no dispatchable credential for it and reports which setting
-// removed the provider, which is a far better answer than treating the
-// operator's own handle as an unknown prefix.
-func readSpelling(config domain.BundleConfig, spelling string) domain.ResolvedModel {
-	qualifier, remainder, found := strings.Cut(spelling, "/")
-	if !found || qualifier == "" || remainder == "" {
-		return domain.ResolvedModel{ModelID: spelling, Source: domain.ModelSourceImplicit}
-	}
-
-	if cred, ok := config.CredentialByHandle(qualifier); ok {
-		return domain.ResolvedModel{
-			ModelID:      remainder,
-			ProviderID:   cred.ProviderID,
-			CredentialID: cred.ID,
-			Source:       domain.ModelSourceExplicit,
-		}
-	}
-	if excluded, ok := config.ExcludedByHandle(qualifier); ok {
-		return domain.ResolvedModel{
-			ModelID:      remainder,
-			ProviderID:   excluded.ProviderID,
-			CredentialID: excluded.ID,
-			Source:       domain.ModelSourceExplicit,
-		}
-	}
-	if domain.KnownProviderFamily(qualifier) {
-		return domain.ResolvedModel{
-			ModelID:    remainder,
-			ProviderID: domain.NormalizeProviderID(strings.ToLower(qualifier)),
-			Source:     domain.ModelSourceExplicit,
-		}
-	}
-
-	return domain.ResolvedModel{ModelID: spelling, Source: domain.ModelSourceImplicit}
 }

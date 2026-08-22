@@ -348,11 +348,8 @@ func failsClosed(g guardrailWire) bool {
 // tell the two apart. Splitting those here produced an alias pointing at a
 // provider nobody holds, so no request for it could ever be served.
 func buildModelAlias(target string) domain.ModelAlias {
-	provider, model, found := strings.Cut(target, "/")
-	if !found || provider == "" || model == "" || !domain.KnownProviderFamily(provider) {
-		return domain.ModelAlias{Model: target}
-	}
-	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(strings.ToLower(provider)), Model: model}
+	providerID, model, _ := domain.SplitModelSpelling(target)
+	return domain.ModelAlias{ProviderID: providerID, Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -132,17 +131,6 @@ var knownProviderFamilies = map[string]struct{}{
 func KnownProviderFamily(segment string) bool {
 	_, ok := knownProviderFamilies[strings.ToLower(segment)]
 	return ok
-}
-
-// KnownProviderFamilies returns the recognized family spellings, sorted, for
-// an error message that has to tell a caller what a prefix may be.
-func KnownProviderFamilies() []string {
-	out := make([]string, 0, len(knownProviderFamilies))
-	for name := range knownProviderFamilies {
-		out = append(out, name)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // CodexTokenRefresher exchanges a codex provider row's stored refresh token

@@ -212,6 +212,48 @@ func TestTheRefusalIsBounded(t *testing.T) {
 	}
 }
 
+// A handle is the only spelling that reaches one specific instance, and a
+// caller cannot guess it, so the cap has to fall on the families instead. A
+// wide key used to lose every handle to the truncation, leaving the refusal
+// telling the caller to use a prefix it did not list.
+// @scenario "The refusal lists a bounded number of options"
+func TestTheRefusalKeepsHandlesWhenItTruncates(t *testing.T) {
+	t.Parallel()
+
+	var creds []domain.Credential
+	for _, family := range []domain.ProviderID{
+		domain.ProviderAnthropic, domain.ProviderOpenAI, domain.ProviderGemini,
+		domain.ProviderVertex, domain.ProviderAzure, domain.ProviderBedrock,
+		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
+		domain.ProviderDeepSeek, domain.ProviderVoyage, domain.ProviderCustom,
+	} {
+		creds = append(creds, domain.Credential{
+			ID:         string(family) + "_1",
+			ProviderID: family,
+			Models:     []string{string(family) + "-only-model"},
+		})
+	}
+	creds = append(creds, domain.Credential{
+		ID:         "anthropic_eu",
+		ProviderID: domain.ProviderAnthropic,
+		Handle:     "eu",
+		Models:     []string{"claude-sonnet-5"},
+	})
+	cfg := domain.BundleConfig{Credentials: creds}
+
+	_, err := pick(t, cfg, bare("private-build"))
+	if !herr.IsCode(err, domain.ErrModelNotRecognized) {
+		t.Fatalf("got %v, want model_not_recognized", err)
+	}
+	text := errMessage(err)
+	if !strings.Contains(text, `"eu"`) {
+		t.Errorf("the refusal dropped the handle it must offer: %s", text)
+	}
+	if !strings.Contains(text, "more") {
+		t.Errorf("the refusal must say more options exist: %s", text)
+	}
+}
+
 // @scenario "A handle prefix reaches its own instance"
 // @scenario "A routing handle overrides the chain order"
 func TestAHandlePinsOneInstance(t *testing.T) {

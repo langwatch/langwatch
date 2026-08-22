@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,8 +16,38 @@ import {
 const check = (input: string | null | undefined) =>
   routingHandleProblem(normalizeRoutingHandle(input));
 
+/**
+ * The provider family spellings the gateway reads as a model prefix, taken
+ * from the Go source that defines them.
+ *
+ * A second hand-written copy of this list is exactly what the parity check
+ * has to catch, so the test reads the real one. The map is a plain literal of
+ * quoted keys, so a parse this small is enough, and the length assertion in
+ * the test fails loudly if the shape ever stops matching.
+ */
+function gatewayProviderFamilies(): string[] {
+  const repoRoot = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../../../..",
+  );
+  const source = readFileSync(
+    resolve(repoRoot, "services/aigateway/domain/provider.go"),
+    "utf8",
+  );
+  const block =
+    /var knownProviderFamilies = map\[string\]struct\{\}\{\n([\s\S]*?)\n\}/.exec(
+      source,
+    )?.[1];
+  if (!block) {
+    throw new Error(
+      "knownProviderFamilies not found in services/aigateway/domain/provider.go",
+    );
+  }
+  return [...block.matchAll(/"([^"]+)":/g)].map((match) => match[1]!);
+}
+
 describe("routing handle", () => {
-  describe("given a handle an operator typed", () => {
+  describe("when an operator typed a handle", () => {
     /** @scenario "A handle is stored lowercased" */
     it("stores it lowercased and trimmed", () => {
       expect(normalizeRoutingHandle("  MyRouter ")).toBe("myrouter");
@@ -88,12 +121,18 @@ describe("routing handle", () => {
       expect(check("mp")).toBe("reserved");
     });
 
-    it("covers every provider family the registry knows", () => {
-      // The gateway reads a handle BEFORE a provider family, so a family key
-      // missing from this set would be shadowed for a whole organization.
-      for (const key of ["openai", "anthropic", "gemini", "azure", "voyage"]) {
-        expect(RESERVED_ROUTING_HANDLES.has(key)).toBe(true);
-      }
+    it("covers every provider family the gateway reads as a prefix", () => {
+      // The gateway reads a handle BEFORE a provider family, so a family
+      // spelling missing from this set would be shadowed for a whole
+      // organization. The gateway owns that vocabulary in Go, so the check
+      // reads its list rather than a copy that can drift from it.
+      const families = gatewayProviderFamilies();
+      expect(families.length).toBeGreaterThan(10);
+
+      const unreserved = families.filter(
+        (family) => !RESERVED_ROUTING_HANDLES.has(family),
+      );
+      expect(unreserved).toEqual([]);
     });
   });
 

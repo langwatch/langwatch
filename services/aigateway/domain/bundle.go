@@ -190,8 +190,61 @@ func (c BundleConfig) ExcludedByHandle(handle string) (ExcludedModelProvider, bo
 	return ExcludedModelProvider{}, false
 }
 
-// RoutingHandles lists every handle this key can address, dispatchable first,
-// sorted inside each group so an error message reads the same twice.
+// ReadSpelling turns a model string into the provider it names and the model
+// id that reaches the provider.
+//
+// The first segment is a qualifier only when it names something real: a
+// routing handle on one of the key's provider rows, or a provider family the
+// gateway knows. Everything else is a model id in full, slashes and all,
+// because self-hosted servers and proxies serve models whose own ids contain
+// one ("stealth/ox-alpha", "meta-llama/Llama-3-70B").
+//
+// A handle belonging to a row the key's routing policy or provider access
+// dropped is recognized too, and returns that row's id. Credential selection
+// then finds no dispatchable credential for it and reports which setting
+// removed the provider, which is a far better answer than treating the
+// operator's own handle as an unknown prefix.
+//
+// It hangs off the config because only the key's own config can tell a handle
+// from a model id that happens to contain a slash. Dispatch and the model
+// listing both read spellings, and a second copy of this rule would let the
+// list offer a name dispatch refuses.
+func (c BundleConfig) ReadSpelling(spelling string) ResolvedModel {
+	qualifier, remainder, found := strings.Cut(spelling, "/")
+	if !found || qualifier == "" || remainder == "" {
+		return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+	}
+
+	if cred, ok := c.CredentialByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   cred.ProviderID,
+			CredentialID: cred.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if excluded, ok := c.ExcludedByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   excluded.ProviderID,
+			CredentialID: excluded.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if KnownProviderFamily(qualifier) {
+		return ResolvedModel{
+			ModelID:    remainder,
+			ProviderID: NormalizeProviderID(strings.ToLower(qualifier)),
+			Source:     ModelSourceExplicit,
+		}
+	}
+
+	return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+}
+
+// RoutingHandles lists the handles of the key's dispatchable credentials,
+// sorted so an error message reads the same twice. Handles of excluded rows
+// are deliberately absent: a refusal must not offer a row the key cannot use.
 func (c BundleConfig) RoutingHandles() []string {
 	seen := make(map[string]bool)
 	var out []string

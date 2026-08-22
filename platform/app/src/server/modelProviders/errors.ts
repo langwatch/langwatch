@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
+import { ROUTING_HANDLE_RULE } from "./routingHandle";
+
 /**
  * The model provider a read or write named does not exist, or is not visible
  * to the caller's scopes.
@@ -314,7 +316,7 @@ export class ModelProviderRoutingHandleInvalidError extends HandledError {
       "model_provider_routing_handle_invalid",
       problem === "reserved"
         ? "That routing handle already names a provider type, so requests using it would be ambiguous. Choose a different name."
-        : "That routing handle is not a valid name. A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to 32 characters.",
+        : `That routing handle is not a valid name. ${ROUTING_HANDLE_RULE}`,
       {
         meta: { handle, problem },
         httpStatus: 400,
@@ -329,9 +331,10 @@ export class ModelProviderRoutingHandleInvalidError extends HandledError {
  * Another provider in this organization already uses the routing handle.
  *
  * A handle has to resolve to exactly one provider or it cannot pin anything, so
- * the organization owns the name space. Enforced by a partial unique index as
- * well, which is what makes two simultaneous saves safe; this error is the one
- * a person reads.
+ * the organization owns the name space. Enforced by a unique index over
+ * (organizationId, routingHandle) as well, which is what makes two simultaneous
+ * saves safe; this error is the one a person reads. Postgres treats NULLs as
+ * distinct, so the providers that set no handle all still fit.
  */
 export class ModelProviderRoutingHandleTakenError extends HandledError {
   declare readonly code: "model_provider_routing_handle_taken";

@@ -215,8 +215,19 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		})
 	}
 
+	// A routing handle is read against the key's own credential chain, which
+	// travels on either side of the bundle depending on the caller.
+	spellingCfg := cfg
+	if len(spellingCfg.Credentials) == 0 {
+		spellingCfg.Credentials = bundle.Credentials
+	}
+
 	for name, alias := range cfg.ModelAliases {
-		add(name, domain.Model{ID: alias.Model, ProviderID: alias.ProviderID})
+		target, routable := aliasTarget(spellingCfg, alias)
+		if !routable {
+			continue
+		}
+		add(name, target)
 	}
 
 	if len(cfg.AllowedModels) > 0 {
@@ -302,6 +313,42 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 // key at all, so singling out its provider-qualified names would not make the
 // list truer, only empty, and a key still being wired up keeps a model list
 // that shows what it is configured to reach.
+// aliasTarget reads an alias target the way dispatch reads it, and reports
+// whether a request for the alias could be served at all.
+//
+// The config wire leaves a target whole when its first segment is not a
+// provider family, because only the key's own config tells a routing handle
+// from a model id that contains a slash. Dispatch has that config and splits
+// the target; listing has it too, so it splits here rather than judging the
+// raw string. Judging "eu/gpt-5-mini" whole asked models_allowed, the policy
+// rules and reachability about a model no provider serves, so the endpoint
+// listed aliases dispatch refuses and dropped aliases dispatch serves.
+//
+// A handle names ONE row. When that row is one the key cannot dispatch to,
+// the alias reaches nothing, so it is left out entirely rather than borrowed
+// against another row of the same family.
+func aliasTarget(cfg domain.BundleConfig, alias domain.ModelAlias) (domain.Model, bool) {
+	if alias.ProviderID != "" {
+		return domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}, true
+	}
+
+	resolved := cfg.ReadSpelling(alias.Model)
+	if resolved.CredentialID == "" {
+		return domain.Model{ID: resolved.ModelID, ProviderID: resolved.ProviderID}, true
+	}
+
+	for _, cred := range cfg.Credentials {
+		if cred.ID == resolved.CredentialID {
+			return domain.Model{
+				ID:         resolved.ModelID,
+				ProviderID: resolved.ProviderID,
+				Handle:     cred.Handle,
+			}, true
+		}
+	}
+	return domain.Model{}, false
+}
+
 func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	creds := bundle.Credentials
 	if len(creds) == 0 {

@@ -324,3 +324,61 @@ func TestListModels_QualifiesAHandledInstanceByItsHandle(t *testing.T) {
 		assert.Equal(t, domain.ProviderAnthropic, m.ProviderID, "model %q must keep its family", m.ID)
 	}
 }
+
+// A handle-qualified alias target reaches the instance the handle names, so
+// the listing has to judge that instance. The wire leaves "eu/claude-haiku-4-5"
+// whole, because only the key's config tells a handle from a model id with a
+// slash in it, and judging the whole string asked models_allowed about a model
+// no provider serves. The alias then vanished from the list while dispatch
+// served it.
+// Spec: specs/ai-gateway/instance-routing-handle.feature
+func TestListModels_ReadsAnAliasTargetingARoutingHandle(t *testing.T) {
+	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+			{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+		},
+		Config: domain.BundleConfig{
+			ModelAliases: map[string]domain.ModelAlias{
+				"fast": {Model: "eu/claude-haiku-4-5"},
+			},
+			AllowedModels: []string{"claude-haiku-4-5"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, modelIDs(models), "fast")
+
+	for _, m := range models {
+		if m.ID == "fast" {
+			assert.Equal(t, domain.ProviderAnthropic, m.ProviderID,
+				"the alias is owned by the family behind its handle")
+			assert.Equal(t, "eu", m.Handle, "the alias reaches the handled instance")
+		}
+	}
+}
+
+// An alias pinned to a handle on a row the key cannot dispatch to reaches
+// nothing. Listing it would offer a name that is refused on use, and the
+// surviving row of the same family must not answer for it.
+// Spec: specs/ai-gateway/instance-routing-handle.feature
+func TestListModels_DropsAnAliasPinnedToAnExcludedInstance(t *testing.T) {
+	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+		},
+		Config: domain.BundleConfig{
+			ModelAliases: map[string]domain.ModelAlias{
+				"fast": {Model: "eu/claude-haiku-4-5"},
+			},
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, modelIDs(models), "fast")
+}

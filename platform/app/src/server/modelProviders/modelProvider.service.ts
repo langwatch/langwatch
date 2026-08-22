@@ -748,18 +748,20 @@ export class ModelProviderService {
       throw new ModelProviderScopesRequiredError();
     }
 
-    return await this.withRoutingHandleConflict(normalizedHandle, () =>
-      this.writeModelProvider({
-        existingProvider,
-        createScopes,
-        isHandleProvided,
-        normalizedHandle,
-        input,
-        validatedKeys,
-        customKeysProvided,
-        scopes,
-      }),
-    );
+    return await this.withRoutingHandleConflict({
+      handle: normalizedHandle,
+      write: () =>
+        this.writeModelProvider({
+          existingProvider,
+          createScopes,
+          isHandleProvided,
+          normalizedHandle,
+          input,
+          validatedKeys,
+          customKeysProvided,
+          scopes,
+        }),
+    });
   }
 
   /**
@@ -768,10 +770,13 @@ export class ModelProviderService {
    * racing each other both pass any read-then-write check; this is only the
    * translation.
    */
-  private async withRoutingHandleConflict<T>(
-    handle: string | null,
-    write: () => Promise<T>,
-  ): Promise<T> {
+  private async withRoutingHandleConflict<T>({
+    handle,
+    write,
+  }: {
+    handle: string | null;
+    write: () => Promise<T>;
+  }): Promise<T> {
     try {
       return await write();
     } catch (error) {
@@ -785,17 +790,25 @@ export class ModelProviderService {
   private async writeModelProvider(write: ModelProviderWrite) {
     return await this.prisma.$transaction(async (tx) =>
       write.existingProvider
-        ? await this.applyUpdate(write, write.existingProvider, tx)
-        : await this.applyCreate(write, tx),
+        ? await this.applyUpdate({
+            write,
+            existingProvider: write.existingProvider,
+            tx,
+          })
+        : await this.applyCreate({ write, tx }),
     );
   }
 
   /** Updates a stored row and evicts the gateway config in the same write. */
-  private async applyUpdate(
-    write: ModelProviderWrite,
-    existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
-  ) {
+  private async applyUpdate({
+    write,
+    existingProvider,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
     const { input, isHandleProvided, normalizedHandle, scopes } = write;
     const result = await this.updateExisting(
       existingProvider,
@@ -833,10 +846,13 @@ export class ModelProviderService {
   }
 
   /** Creates a new row and seeds the role defaults it can fulfill. */
-  private async applyCreate(
-    write: ModelProviderWrite,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
-  ) {
+  private async applyCreate({
+    write,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
     const { input, isHandleProvided, normalizedHandle } = write;
     const createScopes = write.createScopes!;
     const result = await this.createNew(
