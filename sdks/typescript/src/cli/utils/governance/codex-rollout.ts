@@ -85,9 +85,10 @@ export interface CodexRolloutMeta {
 	gitBranch: string | null;
 	gitRepositoryUrl: string | null;
 	/**
-	 * The first thing the user typed, from the `user_message` event — the typed
-	 * prompt itself, apart from the context codex injects as user-role messages.
-	 * What names the session, since codex generates no title of its own.
+	 * The first thing the user typed, apart from the context codex injects as
+	 * user-role messages. What names the session, since codex generates no title
+	 * of its own. Read from the `user_message` event, and from the conversation
+	 * itself when there is none, which is every `codex exec` session.
 	 */
 	firstUserMessage: string | null;
 }
@@ -97,6 +98,13 @@ export interface ParsedCodexRollout {
 	turns: CodexTurnIO[];
 	meta: CodexRolloutMeta | null;
 }
+
+/**
+ * A user-role message codex wrote to itself rather than one a person typed.
+ * Codex opens each injected block with a tag naming it, and the typed prompt
+ * never opens with one.
+ */
+const INJECTED_CONTEXT_BLOCK = /^<[A-Za-z_][\w-]*>/;
 
 function truncate(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max)}…[truncated]` : text;
@@ -247,7 +255,7 @@ class CodexTurnAccumulator {
 	} | null = null;
 	/** Latest assistant text not yet committed to history (the final-answer candidate). */
 	private pendingAssistant: string | null = null;
-	/** The first typed prompt of the thread, from its user_message event. */
+	/** The first typed prompt of the thread. */
 	private firstUserMessage: string | null = null;
 	/** Authoritative final answer from the agent_message(final_answer) event. */
 	private agentFinal: string | null = null;
@@ -331,6 +339,26 @@ class CodexTurnAccumulator {
 		}
 	}
 
+	/**
+	 * The typed prompt as it appears in the conversation itself, which is the
+	 * only place `codex exec` records it: an exec session emits no `user_message`
+	 * event at all, so without this it reaches the sessions screen unnamed.
+	 * A session that does emit the event keeps it, since the event precedes the
+	 * turn and this never overwrites a prompt already found.
+	 *
+	 * Codex also speaks to itself in this role, injecting its context as
+	 * user-role messages, each wrapped in a tag of its own
+	 * (`<environment_context>`, `<recommended_plugins>`, ...). Only what the
+	 * person typed arrives untagged, and a 10k-character plugin catalogue makes
+	 * a poor session title.
+	 */
+	private rememberTypedPrompt(text: string): void {
+		if (this.firstUserMessage !== null) return;
+		const trimmed = text.trim();
+		if (!trimmed || INJECTED_CONTEXT_BLOCK.test(trimmed)) return;
+		this.firstUserMessage = trimmed;
+	}
+
 	private onTaskStarted(payload: Record<string, unknown>): void {
 		this.closeTurn();
 		const traceId =
@@ -391,6 +419,7 @@ class CodexTurnAccumulator {
 		} else if (role === "user") {
 			this.flushPendingAssistant();
 			this.history.push({ role: "user", content: text });
+			this.rememberTypedPrompt(text);
 		} else if (role === "assistant") {
 			// Hold: this may be a mid-turn preamble (committed to history when the
 			// next item arrives) or the turn's final answer (consumed by closeTurn).

@@ -484,6 +484,39 @@ describe("parseCodexRollout", () => {
       });
     });
   });
+
+  describe("given an exec session, which emits no user_message event at all", () => {
+    describe("when the rollout is parsed", () => {
+      /** @scenario "A session that emits no user_message event is still named" */
+      it("names it by the prompt in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-2222", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "Context codex injects as a user message never names the session" */
+      it("skips the context codex writes to itself", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-3333", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("<recommended_plugins>\nAirtable\nAlpaca\n"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+    });
+  });
 });
 
 describe("buildCodexIOExportRequest", () => {
