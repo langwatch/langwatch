@@ -258,6 +258,13 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Then that block is skipped and the typed prompt after it names the session
 
     @unit
+    Scenario: The event names the session even when the conversation also carries a prompt
+      Given a session that emits a user_message event and also holds user messages in its conversation
+      When the rollout is parsed
+      Then the prompt from the event names the session
+      And no later user message in the conversation renames it
+
+    @unit
     Scenario: A machine-injected first prompt does not name the session
       Given a rollout whose first user_message is injected context in a tag
       When the completed turn is harvested

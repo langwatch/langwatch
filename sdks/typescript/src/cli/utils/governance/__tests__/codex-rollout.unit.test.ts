@@ -517,6 +517,29 @@ describe("parseCodexRollout", () => {
       });
     });
   });
+
+  describe("given a session that records the prompt in both places", () => {
+    const typedEvent = (message: string) =>
+      ({ type: "event_msg", payload: { type: "user_message", message } });
+
+    describe("when the rollout is parsed", () => {
+      /** @scenario "The event names the session even when the conversation also carries a prompt" */
+      it("keeps the event's prompt over anything in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-4444", cwd: "/w" } },
+            typedEvent("review the diff on this branch"),
+            taskStarted("abc123", "t1"),
+            userMsg("<environment_context>\ncwd: /w\n"),
+            userMsg("a later user turn, which must not rename the session"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+    });
+  });
 });
 
 describe("buildCodexIOExportRequest", () => {
