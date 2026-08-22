@@ -1532,7 +1532,7 @@ For additional help, contact us at [support@langwatch.ai](mailto:support@langwat
 
 ---
 title: POST /v1/audio/*
-description: OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+description: Speech synthesis and transcription through the LangWatch AI Gateway, on OpenAI's wire and on ElevenLabs' own.
 sidebarTitle: Audio (TTS + STT)
 ---
 
@@ -1603,6 +1603,43 @@ print(transcript.text)
 ```
 
 The response is the standard JSON transcript with `text`, plus whatever the provider reports (duration, segments, token usage).
+
+## ElevenLabs' own audio paths
+
+The two routes above take OpenAI's request shape. If your code already uses the ElevenLabs SDK, you do not have to rewrite it: the gateway also serves that vendor's own paths, so two settings are the whole change. Point the SDK's base URL at the gateway, and give it a LangWatch virtual key in place of your ElevenLabs key. Your ElevenLabs key stays where it belongs, configured once in **Settings → Model Providers**; an SDK still holding it will be rejected, because the gateway reads that header as a virtual key.
+
+```
+POST /v1/text-to-speech/{voice_id}
+POST /v1/speech-to-text
+xi-api-key: vk-lw-<ULID>
+```
+
+The virtual key goes in the `xi-api-key` header the SDK already sends, so no code changes. Bodies, form parts and query parameters reach ElevenLabs as you wrote them, so voice settings, `output_format`, diarization, timestamp granularity and the rest keep working. The one field the gateway changes is `model_id`: it is replaced with whatever the virtual key's aliases and allowlist resolve the name to, so `elevenlabs/eleven_flash_v2_5` and a key alias both reach the vendor as the bare model it knows. A synthesis request that names no `model_id` bills and gates under `eleven_multilingual_v2`, which is what the vendor would have used.
+
+```python
+from elevenlabs import ElevenLabs
+
+client = ElevenLabs(
+    base_url="https://gateway.langwatch.ai",
+    api_key="vk-lw-...",
+)
+audio = client.text_to_speech.convert(
+    voice_id="EXAVITQu4vr4xnSDxMaL",
+    text="Hello from the gateway.",
+    model_id="eleven_flash_v2_5",
+    output_format="mp3_44100_128",
+)
+```
+
+These routes need the virtual key to reach an ElevenLabs provider. The vendor key itself lives on the organization's ElevenLabs provider row, never on the virtual key, so what matters is that the key's provider access still includes ElevenLabs. They carry that vendor's own request shape, so the gateway will not fall back to another provider for them: a key that cannot reach ElevenLabs is refused rather than served by whichever provider it does hold.
+
+Transcription accepts a `file` part, or a `cloud_storage_url` part for ElevenLabs to fetch the audio itself. Uploads are capped at 25 MB of audio, the same limit as `/v1/audio/transcriptions`; larger uploads get a `413` before any provider is contacted. Send a `cloud_storage_url` for a bigger file: ElevenLabs fetches it directly and the gateway never holds it.
+
+The gateway refuses asynchronous transcription. A truthy `webhook` part gets a `400` from the gateway itself, before ElevenLabs is contacted at all, so no call is made and nothing is billed. The reason for the refusal is that the mode makes the vendor answer before it has transcribed anything: were the request forwarded, the reply would carry no duration and the transcription would meter as free.
+
+Metering is the same as on the OpenAI-shaped routes: synthesis is billed by the Unicode characters of `text`, counted as characters rather than bytes so an accented or non-Latin script costs what it reads; transcription is billed by the audio duration ElevenLabs reports on its own answer. A call costs the same whichever of the two wires it arrives on.
+
+Streaming (`/v1/text-to-speech/{voice_id}/stream`) is not served yet.
 
 ## Observability and cost measures
 

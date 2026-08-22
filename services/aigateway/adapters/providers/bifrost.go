@@ -75,6 +75,11 @@ type BifrostRouter struct {
 	// the customer's provider key in a header Go does not strip across
 	// hosts.
 	realtimeClient *http.Client
+	// elevenLabsClient serves the two ElevenLabs-native audio routes, which
+	// Bifrost cannot forward. Its own client for the same reasons as the mint
+	// above, with the gateway-wide provider timeout because synthesis and
+	// transcription are real work rather than a mint.
+	elevenLabsClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -150,6 +155,8 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
 		realtimeClient:  newRealtimeClient(endpointPolicy),
+
+		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
 	}, nil
 }
 
@@ -207,6 +214,17 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// provider mapping because the route already named the vendor.
 	if req.Type == domain.RequestTypeRealtimeSession {
 		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
+	// ElevenLabs' own audio paths carry that vendor's wire, which Bifrost's
+	// ElevenLabs provider answers with an unsupported-operation error, so the
+	// gateway calls the vendor itself. The route pinned the provider, so the
+	// credential here is already an ElevenLabs one.
+	if elevenLabsNativeRoute(req) {
+		if req.Type == domain.RequestTypeTranscription {
+			return r.dispatchElevenLabsTranscription(ctx, req, cred)
+		}
+		return r.dispatchElevenLabsSpeech(ctx, req, cred)
 	}
 
 	model := req.Model

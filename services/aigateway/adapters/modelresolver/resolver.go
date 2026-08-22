@@ -53,10 +53,29 @@ const fallbackMissingModelMessage = `this request names no model. Supply one the
 	`expects: a top-level "model" field in the JSON body on the completion endpoints, a "model" form ` +
 	`part on /v1/audio/transcriptions, or the model in the URL path on the Gemini surface`
 
+// missingModelSurfaceMessages says where a route that mirrors a vendor's own
+// path names the model, for the routes whose request type is shared with a
+// translated route and so cannot be told apart by type alone. ElevenLabs'
+// transcription path takes the same multipart shape as /v1/audio/transcriptions
+// but reads a different form part, and naming the wrong one sends the caller
+// to fix a field the endpoint does not read.
+var missingModelSurfaceMessages = map[string]string{
+	domain.ElevenLabsTranscriptionSurface().Name: `POST /v1/speech-to-text sends a multipart/form-data body ` +
+		`and takes the model from a "` + domain.ElevenLabsModelField + `" form field, not from JSON. Add one ` +
+		`naming the model or the virtual key's alias for it, for example "scribe_v1", alongside the audio`,
+}
+
 // missingModelMessage returns the rejection wording for the surface the
-// request arrived on.
-func missingModelMessage(requestType domain.RequestType) string {
-	if message, ok := missingModelMessages[requestType]; ok {
+// request arrived on. A route carrying a vendor's own wire answers first,
+// because its request type is shared with the translated route it mirrors.
+func missingModelMessage(req *domain.Request) string {
+	if req == nil {
+		return fallbackMissingModelMessage
+	}
+	if message, ok := missingModelSurfaceMessages[req.InboundSurface().Name]; ok {
+		return message
+	}
+	if message, ok := missingModelMessages[req.Type]; ok {
 		return message
 	}
 	return fallbackMissingModelMessage
@@ -83,7 +102,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		// errProviderNotAllowed states it: a malformed body is the caller's
 		// to fix, and an unannotated rejection reads as a platform problem.
 		return nil, herr.New(ctx, domain.ErrMissingModel, herr.M{
-			"message":      missingModelMessage(requestType),
+			"message":      missingModelMessage(req),
 			"fault":        "customer",
 			"request_type": string(requestType),
 		})

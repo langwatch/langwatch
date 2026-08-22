@@ -590,8 +590,12 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 	case domain.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
-		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		// Two field names because two wires reach this shape: the OpenAI one
+		// calls it input, and ElevenLabs' own route calls it text.
+		for _, field := range []string{"input", "text"} {
+			if in := gjson.GetBytes(body, field); in.Exists() && in.String() != "" {
+				return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+			}
 		}
 		return ""
 	default:

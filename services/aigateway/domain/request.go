@@ -39,6 +39,14 @@ type Request struct {
 	// RequestTypeRealtimeSession. Nil otherwise.
 	RealtimeSession *RealtimeSessionRequest
 
+	// ElevenLabs carries the URL-level parameters of an ElevenLabs-native
+	// audio route and, by being set at all, says the request arrived on one.
+	// Those routes carry that vendor's own wire, so they dispatch straight to
+	// it rather than through a translation layer. Nil on every other route,
+	// including the OpenAI-wire audio routes that reach ElevenLabs by model
+	// name.
+	ElevenLabs *ElevenLabsAudioRequest
+
 	// Surface is the route this request arrived on, stated by the handler
 	// registered there, when that route can only be served by named
 	// providers. Zero on the routes the gateway translates, which any
@@ -58,10 +66,17 @@ func (r *Request) InboundSurface() Surface {
 }
 
 // ModelBodyPath is where the model id sits in this request's JSON body, in
-// sjson path syntax. The realtime mint nests it under the session object the
-// vendor reads; every other shape uses the top-level field.
+// sjson path syntax. A route that carries a vendor's own wire uses the field
+// that vendor reads; the realtime mint nests it under the session object;
+// every other shape uses the top-level field.
 func (r *Request) ModelBodyPath() string {
-	if r != nil && r.Type == RequestTypeRealtimeSession {
+	if r == nil {
+		return "model"
+	}
+	if r.ElevenLabs != nil {
+		return ElevenLabsModelField
+	}
+	if r.Type == RequestTypeRealtimeSession {
 		return "session.model"
 	}
 	return "model"
