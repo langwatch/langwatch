@@ -30,6 +30,16 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the span carries the reasoning tokens under the canonical usage key
     And the trace summary reasoning token total includes them
 
+  @unit
+  Scenario: A codex turn's cached input is priced once, not twice
+    Given a codex turn span whose reported input includes its cached tokens
+    When the span is canonicalised
+    Then the span's input tokens are the part that was not cached
+    And the cached tokens stay on their own keys, at their own rates
+    # Codex reports the whole input, cache included. Lifting that straight
+    # across charged the cached tokens at the full input rate and again at
+    # the cache rate, which priced such a turn about four times over.
+
   # --- Which conversation a codex turn belongs to ---------------------------
 
   # A codex turn span names two ids: the session it belongs to, and the turn

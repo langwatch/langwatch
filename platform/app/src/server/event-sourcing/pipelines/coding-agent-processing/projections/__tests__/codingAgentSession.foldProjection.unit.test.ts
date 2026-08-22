@@ -1574,11 +1574,16 @@ describe("coding-agent session fold, per-agent gating", () => {
 });
 
 describe("coding-agent session fold, codex", () => {
-  /** A live turn span's facts, verbatim spellings from codex-rs 0.147. */
+  /**
+   * A live turn span from codex-rs 0.147, as the fold receives it: after
+   * canonicalisation, where the input has already been made the disjoint
+   * non-cached bucket (2936 of the 13944 codex reported, the other 11008
+   * being the cache read).
+   */
   const codexTurnFacts = {
     "gen_ai.request.model": "gpt-5.6-sol",
     "gen_ai.response.model": "gpt-5.6-sol",
-    "gen_ai.usage.input_tokens": "13944",
+    "gen_ai.usage.input_tokens": "2936",
     "gen_ai.usage.output_tokens": "7",
     "gen_ai.usage.cache_read.input_tokens": "11008",
     "gen_ai.usage.cache_creation.input_tokens": "0",
@@ -1687,7 +1692,7 @@ describe("coding-agent session fold, codex", () => {
       expect(state.costUsd).toBe(0);
     });
 
-    it("derives the non-cached input when codex's own count is absent", () => {
+    it("reads the input the canonicalisation settled on, without deriving it again", () => {
       const projection = makeProjection();
       const {
         "codex.turn.token_usage.non_cached_input_tokens": _omit,
@@ -1704,7 +1709,9 @@ describe("coding-agent session fold, codex", () => {
         initStateOf(projection),
       );
 
-      expect(state.inputTokens).toBe(13_944 - 11_008);
+      // Taking the cache off a second time would leave nothing here, which
+      // is what a session whose turns all read zero input looked like.
+      expect(state.inputTokens).toBe(2_936);
       expect(state.cacheReadTokens).toBe(11_008);
     });
 

@@ -148,13 +148,56 @@ describe("CodexExtractor.applyLog", () => {
         "langwatch.span.type": "agent",
         "gen_ai.request.model": "gpt-5.5",
         "gen_ai.response.model": "gpt-5.5",
-        "gen_ai.usage.input_tokens": 14365,
+        // Codex reports the WHOLE input; the canonical key is the disjoint
+        // non-cached bucket, so the cache read comes off it.
+        "gen_ai.usage.input_tokens": 14365 - 10112,
         "gen_ai.usage.output_tokens": 6,
         "gen_ai.usage.cache_read.input_tokens": 10112,
         "gen_ai.request.reasoning_effort": "high",
         "gen_ai.conversation.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
       });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+
+    /** @scenario "A codex turn's cached input is priced once, not twice" */
+    it("prefers codex's own non-cached count over the subtraction", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.6-sol",
+          "codex.turn.token_usage.input_tokens": "43001",
+          "codex.turn.token_usage.cached_input_tokens": "36096",
+          "codex.turn.token_usage.non_cached_input_tokens": "6905",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(6905);
+      expect(ctx.out["gen_ai.usage.cache_read.input_tokens"]).toBe(36096);
+    });
+
+    /** @scenario "A codex turn's cached input is priced once, not twice" */
+    it("takes the cache write off the input as well", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.6-sol",
+          "codex.turn.token_usage.input_tokens": "1000",
+          "codex.turn.token_usage.cached_input_tokens": "600",
+          "codex.turn.token_usage.cache_write_input_tokens": "300",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(100);
     });
 
     /** @scenario "A codex turn is filed under its session, not under itself" */

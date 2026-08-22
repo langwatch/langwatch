@@ -125,11 +125,49 @@ type CanonicalLift = readonly [string, string | number | null];
  * `thread.id` is one of those.
  */
 function conversationIdOf(attrs: {
+  get: (key: string) => unknown;
   take: (key: string) => unknown;
 }): string | null {
-  const sessionId = asString(attrs.take("thread.id"));
+  // Read, not taken: the coding-agent pipeline keys a codex session off this
+  // same attribute.
+  const sessionId = asString(attrs.get("thread.id"));
   const turnId = asString(attrs.take("turn.id"));
   return sessionId?.includes("-") ? sessionId : turnId;
+}
+
+/**
+ * The input tokens the turn actually paid full price for.
+ *
+ * The canonical key is the DISJOINT non-cached bucket: the cache buckets are
+ * reported beside it and priced at their own rates, so they add on top rather
+ * than overlap. Codex's `input_tokens` is the WHOLE input, cache included
+ * (43001 = 36096 cache-read + 6905 non-cached on a live turn), so lifting it
+ * straight across charged the cached tokens twice, once at the full input
+ * rate and again at the cache rate, and priced such a turn about four times
+ * over.
+ *
+ * Codex's own non-cached count is preferred; when a build omits it, the
+ * subtraction recovers it. The same re-derivation the session fold does, so a
+ * codex turn's trace and its session state one figure.
+ */
+function nonCachedInput({
+  attrs,
+  cacheRead,
+  cacheCreation,
+}: {
+  attrs: { get: (key: string) => unknown; take: (key: string) => unknown };
+  cacheRead: number | null;
+  cacheCreation: number | null;
+}): number | null {
+  // Read, not taken: the coding-agent session fold reads codex's own count
+  // off the same span.
+  const own = asNumber(
+    attrs.get("codex.turn.token_usage.non_cached_input_tokens"),
+  );
+  const whole = asNumber(attrs.take("codex.turn.token_usage.input_tokens"));
+  if (own !== null) return own;
+  if (whole === null) return null;
+  return Math.max(0, whole - (cacheRead ?? 0) - (cacheCreation ?? 0));
 }
 
 /**
@@ -205,6 +243,12 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
+    const cacheRead = asNumber(
+      attrs.take("codex.turn.token_usage.cached_input_tokens"),
+    );
+    const cacheCreation = asNumber(
+      attrs.take("codex.turn.token_usage.cache_write_input_tokens"),
+    );
     // codex spells cache creation "cache_write"; the canonical keys follow the
     // Anthropic-derived semconv names.
     const lifts: CanonicalLift[] = [
@@ -212,20 +256,14 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
       [
         ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.input_tokens")),
+        nonCachedInput({ attrs, cacheRead, cacheCreation }),
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
         asNumber(attrs.take("codex.turn.token_usage.output_tokens")),
       ],
-      [
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens")),
-      ],
-      [
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.cache_write_input_tokens")),
-      ],
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead],
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheCreation],
       [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
         asNumber(attrs.take("codex.turn.token_usage.reasoning_output_tokens")),
