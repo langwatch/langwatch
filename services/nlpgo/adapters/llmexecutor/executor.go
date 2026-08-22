@@ -143,25 +143,47 @@ func (e *GatewayHTTPError) Error() string {
 // LiteLLM-wrapped "litellm.RateLimitError: ..." string. Returns "" when
 // the body isn't recognizable JSON — caller falls back to the bare
 // status-code message.
+//
+// Aggregator envelopes (OpenRouter and compatible relays) wrap the real
+// upstream failure: `error.message` is a generic "Provider returned
+// error" while `error.metadata.raw` carries the upstream's own error
+// text and `error.metadata.provider_name` says which upstream failed.
+// Without the metadata the surfaced message gives the user zero signal,
+// so it is appended when present.
 func extractProviderErrorMessage(body []byte) string {
 	if len(body) == 0 {
 		return ""
 	}
 	var envelope struct {
 		Error struct {
-			Message string `json:"message"`
-			Type    string `json:"type"`
-			Code    any    `json:"code"`
+			Message  string `json:"message"`
+			Type     string `json:"type"`
+			Code     any    `json:"code"`
+			Metadata struct {
+				Raw          string `json:"raw"`
+				ProviderName string `json:"provider_name"`
+			} `json:"metadata"`
 		} `json:"error"`
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return ""
 	}
-	if envelope.Error.Message != "" {
-		return envelope.Error.Message
+	message := envelope.Error.Message
+	if message == "" {
+		message = envelope.Message
 	}
-	return envelope.Message
+	if message == "" {
+		return ""
+	}
+	if raw := strings.TrimSpace(envelope.Error.Metadata.Raw); raw != "" {
+		detail := raw
+		if name := strings.TrimSpace(envelope.Error.Metadata.ProviderName); name != "" {
+			detail = name + ": " + raw
+		}
+		message = message + " (" + detail + ")"
+	}
+	return message
 }
 
 // buildGatewayRequest performs all the shape mapping in one place so the

@@ -1083,6 +1083,21 @@ func TestGatewayHTTPError_HandlesAlternativeShapes(t *testing.T) {
 			want: "gateway returned non-2xx status 400",
 		},
 		{
+			// OpenRouter wraps upstream failures in a generic message and
+			// puts the upstream's own text in error.metadata.raw — without
+			// it "Provider returned error" says nothing actionable.
+			name: "aggregator_metadata_raw_appended",
+			body: []byte(`{"error":{"message":"Provider returned error","code":502,"metadata":{"raw":"maximum output tokens exceeded","provider_name":"Stealth"}}}`),
+			code: 502,
+			want: "Provider returned error (Stealth: maximum output tokens exceeded)",
+		},
+		{
+			name: "aggregator_metadata_raw_without_provider_name",
+			body: []byte(`{"error":{"message":"Provider returned error","code":502,"metadata":{"raw":"upstream timeout"}}}`),
+			code: 502,
+			want: "Provider returned error (upstream timeout)",
+		},
+		{
 			name: "openai_invalid_api_key",
 			body: []byte(`{"error":{"message":"Incorrect API key provided: sk-***. You can find your API key at https://platform.openai.com/account/api-keys.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}`),
 			code: 401,
