@@ -64,6 +64,7 @@ import { projectRouter } from "./routers/project";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
+import { setupSkillsRouter } from "./routers/setupSkills";
 import { roleRouter } from "./routers/role";
 import { roleBindingRouter } from "./routers/roleBinding";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
@@ -126,6 +127,7 @@ const coreRouters = {
   bugReports: bugReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
+  setupSkills: setupSkillsRouter,
   share: shareRouter,
   sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,

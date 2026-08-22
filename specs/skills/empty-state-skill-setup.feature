@@ -27,10 +27,21 @@ Feature: Set up with AI from every empty page
       | prompts            | prompts            |
       | datasets           | datasets           |
 
-  Scenario: Langy is offered first where the reader can ask
+  Scenario: The coding-agent prompt is offered first
     Given I can ask Langy on this project
     When I open the set-up-with-AI menu
-    Then the first item hands the surface's setup prompt to Langy
+    Then the first item copies the prompt for my own coding agent
+    And the second item hands the surface's setup prompt to Langy
+
+  Scenario: The copied prompt carries the skill's own instructions
+    When I choose the copy-a-prompt item
+    Then the copied text holds the whole skill, not a line telling the agent to fetch it
+
+  Scenario: The copied prompt leads with the project's keys
+    Given the surface minted an access token for me
+    When I choose the copy-a-prompt item
+    Then the copied text opens with the API key and project id
+    And the skill follows under them
 
   Scenario: Langy stays out of the menu where the reader cannot ask
     Given I cannot ask Langy on this project

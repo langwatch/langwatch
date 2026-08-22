@@ -62,7 +62,7 @@ export function OnboardAgentPill({
       () =>
         toaster.create({
           type: "success",
-          title: "Prompt copied — paste it to your coding agent",
+          title: "Prompt copied. Paste it to your coding agent",
         }),
       () =>
         toaster.create({
