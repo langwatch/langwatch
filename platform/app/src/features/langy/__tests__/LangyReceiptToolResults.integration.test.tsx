@@ -104,6 +104,111 @@ describe("the completed receipt's tool results", () => {
     });
   });
 
+  describe("when the call came through the CLI envelope", () => {
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
+    it("shows the payload, indented, without the transport around it", () => {
+      renderMessage(
+        assistantMessage([
+          {
+            type: "tool-langwatch.trace.search",
+            toolCallId: "call-1",
+            state: "output-available",
+            input: { command: 'langwatch trace search --start "now-1d"' },
+            output: JSON.stringify({
+              kind: "json",
+              payload: { count: 6, window: "1d" },
+            }),
+          },
+          { type: "text", text: "Six traces.", role: "assistant" },
+        ]),
+      );
+
+      const row = screen.getAllByRole("listitem")[0]!;
+      fireEvent.click(within(row).getAllByRole("button")[0]!);
+
+      const shown = row.textContent ?? "";
+      expect(shown).toContain('"count": 6');
+      expect(shown).not.toContain("kind");
+      expect(shown).not.toContain("payload");
+    });
+
+    /** @scenario An opened result names the command that produced it */
+    it("names the command of every call the row grouped", () => {
+      renderMessage(
+        assistantMessage([
+          {
+            type: "tool-langwatch.trace.search",
+            toolCallId: "call-1",
+            state: "output-available",
+            input: { command: 'langwatch trace search --start "now-1d"' },
+            output: JSON.stringify({ kind: "json", payload: [] }),
+          },
+          {
+            type: "tool-langwatch.trace.search",
+            toolCallId: "call-2",
+            state: "output-available",
+            input: { command: "langwatch trace search" },
+            output: JSON.stringify({ kind: "json", payload: [{ id: "t_1" }] }),
+          },
+          { type: "text", text: "Six traces.", role: "assistant" },
+        ]),
+      );
+
+      const row = screen.getAllByRole("listitem")[0]!;
+      fireEvent.click(within(row).getAllByRole("button")[0]!);
+
+      expect(
+        screen.getByText('$ langwatch trace search --start "now-1d"'),
+      ).toBeDefined();
+      expect(screen.getByText("$ langwatch trace search")).toBeDefined();
+    });
+  });
+
+  describe("when the call is a plain shell command", () => {
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
+    it("keeps stdout exactly as the model read it", () => {
+      const stdout = "zsh:1: command not found: langwatch\n";
+      renderMessage(
+        assistantMessage([
+          {
+            type: "tool-bash",
+            toolCallId: "call-1",
+            state: "output-available",
+            input: { command: "langwatch --help" },
+            output: stdout,
+          },
+          { type: "text", text: "Not installed.", role: "assistant" },
+        ]),
+      );
+
+      const row = screen.getAllByRole("listitem")[0]!;
+      fireEvent.click(within(row).getAllByRole("button")[0]!);
+      expect(screen.getByText(stdout.trim())).toBeDefined();
+    });
+
+    /** @scenario An opened row shows the data a tool returned, formatted to read */
+    it("keeps a log line that came before the JSON", () => {
+      const stdout = 'connecting…\n{"total":2}\n';
+      renderMessage(
+        assistantMessage([
+          {
+            type: "tool-bash",
+            toolCallId: "call-1",
+            state: "output-available",
+            input: { command: "./report.sh" },
+            output: stdout,
+          },
+          { type: "text", text: "Two.", role: "assistant" },
+        ]),
+      );
+
+      const row = screen.getAllByRole("listitem")[0]!;
+      fireEvent.click(within(row).getAllByRole("button")[0]!);
+      expect(row.textContent).toContain("connecting…");
+      expect(row.textContent).toContain('{"total":2}');
+    });
+  });
+
   describe("when a row's calls recorded no result", () => {
     it("offers nothing to open", () => {
       renderMessage(
