@@ -100,6 +100,28 @@ export class LangyUiTimeoutError extends HandledError {
   }
 }
 
+/**
+ * The action must run on the backend (no page answered) and the dispatch named
+ * no experiment to run it against (HTTP 400). The browser path never needs
+ * this: the open page IS the experiment. The CLI passes `--experiment <slug>`.
+ */
+export class LangyUiExperimentRequiredError extends HandledError {
+  declare readonly code: "langy_ui_experiment_required";
+  constructor(kind: string) {
+    super(
+      "langy_ui_experiment_required",
+      `No open page answered, and running "${kind}" on the backend needs the experiment named.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { kind },
+        ...remediation("langy_ui_experiment_required"),
+      },
+    );
+    this.name = "LangyUiExperimentRequiredError";
+  }
+}
+
 /** The page executed the action and it failed there (HTTP 502). */
 export class LangyUiHandlerFailedError extends HandledError {
   declare readonly code: "langy_ui_handler_failed";

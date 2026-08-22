@@ -19,8 +19,6 @@ import {
   createInitialUIState,
   type EvaluationsV3State,
 } from "~/experiments-v3/types";
-import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
-import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -37,7 +35,6 @@ import { prisma } from "~/server/db";
 import {
   ExperimentNotFoundError,
   ExperimentVersionNotFoundError,
-  InvalidExperimentConfigurationError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
 import {
@@ -46,6 +43,7 @@ import {
 } from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
+import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import {
   requestAbort,
@@ -264,28 +262,6 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   if (value === undefined) return undefined;
   const parsed = parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-};
-
-const buildState = (
-  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
-): EvaluationsV3State => {
-  const dataset = workbenchState.datasets[0]!;
-  return {
-    name: workbenchState.name,
-    datasets: workbenchState.datasets as EvaluationsV3State["datasets"],
-    activeDatasetId: dataset.id ?? "dataset-1",
-    targets: workbenchState.targets as EvaluationsV3State["targets"],
-    evaluators: workbenchState.evaluators as EvaluationsV3State["evaluators"],
-    results: {
-      status: "running",
-      targetOutputs: {},
-      targetMetadata: {},
-      evaluatorResults: {},
-      errors: {},
-    },
-    pendingSavedChanges: {},
-    ui: createInitialUIState(),
-  };
 };
 
 // ── POST /execute ────────────────────────────────────────────────────
@@ -613,38 +589,6 @@ secured.access(apiKeyAuthRun).post(
     }
     const { project, markUsed } = authResult;
 
-    const experiment = await ExperimentService.create(prisma).findBySlugAndType(
-      {
-        projectId: project.id,
-        slug,
-        type: ExperimentType.EVALUATIONS_V3,
-      },
-    );
-
-    if (!experiment) {
-      throw new ExperimentNotFoundError(slug);
-    }
-
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-      experiment.workbenchState,
-    );
-    if (!parseResult.success) {
-      logger.error(
-        { slug, errors: parseResult.error.errors },
-        "Invalid workbenchState",
-      );
-      // The stored workbench state no longer matches its schema. The customer
-      // did not type this and cannot repair it from the API, so it is ours:
-      // `fault: "platform"` keeps it out of the customer-error noise.
-      throw new InvalidExperimentConfigurationError(slug);
-    }
-
-    const workbenchState = parseResult.data;
-    const dataset = workbenchState.datasets[0];
-    if (!dataset) {
-      return c.json({ error: "No dataset configured" }, { status: 400 });
-    }
-
     // An empty body is allowed (a full run); malformed JSON must 400 rather than
     // silently default to {} and start a full run on invalid input.
     const bodyText = await c.req.text();
@@ -667,35 +611,32 @@ secured.access(apiKeyAuthRun).post(
     }
     const runInputs = inputsParse.data;
 
-    const dataResult = await loadExecutionData(
-      project.id,
-      dataset,
-      workbenchState.targets,
-      workbenchState.evaluators,
-      {
+    const prepared = await prepareSavedStateExecution({
+      projectId: project.id,
+      slug,
+      runInputs: {
         data: runInputs.data,
         datasetId: runInputs.dataset_id,
         parameters: runInputs.parameters,
       },
-    );
-
-    if ("error" in dataResult) {
+    });
+    if ("error" in prepared) {
       return c.json(
-        { error: dataResult.error },
-        { status: dataResult.status as 400 | 404 },
+        { error: prepared.error },
+        { status: prepared.status as 400 | 404 },
       );
     }
 
     const {
+      experiment,
+      state,
       datasetRows,
       datasetColumns,
       loadedPrompts,
       loadedAgents,
       loadedEvaluators,
       loadedWorkflows,
-    } = dataResult;
-
-    const state = buildState(workbenchState);
+    } = prepared;
 
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }

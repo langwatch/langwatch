@@ -1913,6 +1913,11 @@ const presentations = {
     describe: () =>
       "The change didn't match what the page expects, so nothing was applied. Ask Langy to try again.",
   },
+  langy_ui_experiment_required: {
+    title: "Langy needs to know which evaluation to change",
+    describe: () =>
+      "No page was open, and Langy didn't name the evaluation to apply the change to. Ask again with the evaluation named, or open it first.",
+  },
   langy_ui_no_browser: {
     title: "No page was open to make the change",
     describe: () =>

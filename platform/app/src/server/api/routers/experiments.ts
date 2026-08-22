@@ -1,3 +1,4 @@
+import { on } from "events";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { JsonValue } from "@prisma/client/runtime/client";
@@ -304,6 +305,57 @@ export const experimentsRouter = createTRPCRouter({
         workbenchState: workbench.state,
         version: workbench.version,
       };
+    }),
+
+  /**
+   * The cheap staleness probe: the version and nothing else. A returning tab
+   * compares it with the version it loaded and only refetches the whole state
+   * when it is behind, so tab switching costs one point read, not one blob.
+   */
+  getWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentSlug: z.string(),
+      }),
+    )
+    .permission("experiments:view")
+    .query(async ({ input }) => {
+      const workbench = await experimentService()
+        .getWorkbenchState({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
+      return {
+        experimentId: workbench.experimentId,
+        version: workbench.version,
+        updatedAt: workbench.updatedAt,
+      };
+    }),
+
+  /**
+   * SSE subscription pushing `experiment_updated` signals when a workbench
+   * save lands, whoever wrote it: the editor's own autosave, a Langy backend
+   * write, or the REST API. Signal-then-refetch like `langy.onConversationUpdate`;
+   * the payload never carries state.
+   */
+  onExperimentUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("experiments:view")
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      try {
+        for await (const eventArgs of on(emitter, "experiment_updated", {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- input-bearing subscriptions leave opts.signal untyped (same as langy/traces routers)
+          signal: (opts as { signal?: AbortSignal }).signal,
+        })) {
+          yield eventArgs[0] as { event?: unknown; timestamp?: number };
+        }
+      } finally {
+        getApp().broadcast.cleanupTenantEmitter(projectId);
+      }
     }),
 
   listWorkbenchVersions: protectedProcedure

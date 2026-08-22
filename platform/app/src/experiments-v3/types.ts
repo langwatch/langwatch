@@ -587,6 +587,18 @@ export type EvaluationsV3State = {
   // Metadata
   experimentId?: string;
   experimentSlug?: string;
+  /**
+   * The saved version this store loaded, echoed on every autosave so a
+   * concurrent writer turns the save into a 409 instead of a silent clobber.
+   * Not part of the persisted blob: it identifies the blob's revision.
+   */
+  workbenchVersion?: number;
+  /**
+   * Set when the server holds a newer version than this store and the
+   * workbench has unsaved edits, so reloading is the user's call. A clean
+   * workbench reloads silently and never sets this.
+   */
+  staleWorkbench?: { serverVersion: number; actorLabel?: string };
   name: string;
 
   // Multiple datasets with active selection
@@ -621,6 +633,10 @@ export type EvaluationsV3Actions = {
   setName: (name: string) => void;
   setExperimentId: (id: string) => void;
   setExperimentSlug: (slug: string) => void;
+  setWorkbenchVersion: (version: number | undefined) => void;
+  setStaleWorkbench: (
+    stale: { serverVersion: number; actorLabel?: string } | undefined,
+  ) => void;
 
   // Dataset management actions
   addDataset: (dataset: DatasetReference) => void;

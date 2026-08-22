@@ -69,10 +69,27 @@ export interface UiActionCompletion {
 /** The dispatch answer the CLI prints for the agent. */
 export interface UiActionOutcome {
   status: "done";
-  executedVia: "browser";
+  executedVia: "browser" | "backend";
   actionId: string;
   kind: string;
   result: unknown;
+}
+
+/**
+ * The away-fallback executor: the same action applied to the SAVED state.
+ * Injected so the service stays testable and free of the execution pipeline.
+ */
+export type UiActionBackendRunner = (args: {
+  kind: string;
+  definition: NonNullable<ReturnType<typeof findPageAction>>;
+  payload: unknown;
+  experimentSlug?: string;
+}) => Promise<unknown>;
+
+/** The one presence read dispatch uses: is any of this project's tabs alive? */
+export interface UiActionPresence {
+  isEnabledForProject(projectId: string): Promise<boolean>;
+  getByProject(projectId: string): Promise<unknown[]>;
 }
 
 /** The minimal Redis surface the service needs (ioredis satisfies it). */
@@ -110,15 +127,21 @@ export class LangyUiActionService {
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
   private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  private readonly presence?: UiActionPresence;
+  private readonly backendRunner?: UiActionBackendRunner;
 
   constructor(deps: {
     redis: UiActionRedis;
     conversations: UiActionConversations;
     buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+    presence?: UiActionPresence;
+    backendRunner?: UiActionBackendRunner;
   }) {
     this.redis = deps.redis;
     this.conversations = deps.conversations;
     this.buffer = deps.buffer;
+    this.presence = deps.presence;
+    this.backendRunner = deps.backendRunner;
   }
 
   /**
@@ -137,6 +160,7 @@ export class LangyUiActionService {
     conversationId,
     kind,
     payload,
+    experimentSlug,
     notFound,
   }: {
     projectId: string;
@@ -144,6 +168,7 @@ export class LangyUiActionService {
     conversationId: string;
     kind: string;
     payload: unknown;
+    experimentSlug?: string;
     notFound: () => Error;
   }): Promise<UiActionOutcome> {
     const conversation = await this.conversations.findByIdVisible({
@@ -162,6 +187,20 @@ export class LangyUiActionService {
     const parsed = definition.payloadSchema.safeParse(payload);
     if (!parsed.success) {
       throw new LangyUiPayloadInvalidError(kind, parsed.error.issues);
+    }
+
+    // Nobody's home? Skip the publish entirely and apply the action to the
+    // saved state. Presence is a pre-check only: unavailable or disabled
+    // presence means "unknown", and the claim window below decides instead.
+    if (await this.projectHasNoLiveTab(projectId)) {
+      const actionId = nanoid();
+      return await this.runOnBackend({
+        actionId,
+        kind,
+        definition,
+        payload: parsed.data,
+        experimentSlug,
+      });
     }
 
     const actionId = nanoid();
@@ -186,7 +225,58 @@ export class LangyUiActionService {
       payload: parsed.data,
     });
 
-    return await this.awaitResult({ actionId, kind, definition });
+    return await this.awaitResult({
+      actionId,
+      kind,
+      definition,
+      payload: parsed.data,
+      experimentSlug,
+    });
+  }
+
+  /**
+   * True only when presence is available, enabled for the project, and
+   * reports zero live sessions. Any uncertainty answers false, so the claim
+   * window stays the deciding signal.
+   */
+  private async projectHasNoLiveTab(projectId: string): Promise<boolean> {
+    if (!this.presence || !this.backendRunner) return false;
+    try {
+      if (!(await this.presence.isEnabledForProject(projectId))) return false;
+      const sessions = await this.presence.getByProject(projectId);
+      return sessions.length === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async runOnBackend({
+    actionId,
+    kind,
+    definition,
+    payload,
+    experimentSlug,
+  }: {
+    actionId: string;
+    kind: string;
+    definition: NonNullable<ReturnType<typeof findPageAction>>;
+    payload: unknown;
+    experimentSlug?: string;
+  }): Promise<UiActionOutcome> {
+    if (!this.backendRunner) throw new LangyUiNoBrowserError(kind);
+    const result = await this.backendRunner({
+      kind,
+      definition,
+      payload,
+      experimentSlug,
+    });
+    return {
+      status: "done",
+      executedVia: "backend",
+      actionId,
+      kind,
+      result: result ?? null,
+    };
   }
 
   /**
@@ -202,10 +292,14 @@ export class LangyUiActionService {
     actionId,
     kind,
     definition,
+    payload,
+    experimentSlug,
   }: {
     actionId: string;
     kind: string;
     definition: NonNullable<ReturnType<typeof findPageAction>>;
+    payload: unknown;
+    experimentSlug?: string;
   }): Promise<UiActionOutcome> {
     const blocking = this.redis.duplicate();
     try {
@@ -220,11 +314,16 @@ export class LangyUiActionService {
       if (!claimed) {
         // Nothing is listening. Delete the pending record before deciding, so
         // a tab that wakes up later cannot claim and execute an action whose
-        // dispatch already answered.
+        // dispatch already answered — the backend execution below must stay
+        // the only execution.
         await this.redis.del(uiActionKeys.pending(actionId));
-        // Phase 3 executes `definition.backend` transparently here; until
-        // then every unclaimed dispatch is this refusal.
-        throw new LangyUiNoBrowserError(kind);
+        return await this.runOnBackend({
+          actionId,
+          kind,
+          definition,
+          payload,
+          experimentSlug,
+        });
       }
 
       const budgetMs = Math.min(

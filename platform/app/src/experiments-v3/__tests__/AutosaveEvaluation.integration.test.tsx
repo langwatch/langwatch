@@ -293,4 +293,59 @@ describe("Autosave evaluation state", () => {
 
     expect(mockMutateAsync).toHaveBeenCalled();
   });
+
+  describe("when the save is refused as stale", () => {
+    /** @scenario Autosave hitting a stale version pauses and offers reload */
+    it("stands down instead of clobbering, and saves nothing further", async () => {
+      // The tRPC envelope for experiment_stale_workbench_state, as
+      // readHandledError expects it: payload under data.error.
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: { currentVersion: 9 },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedVersion: 4 }),
+      );
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+        serverVersion: 9,
+      });
+      expect(
+        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+      ).toBe("error");
+
+      // Standing down: further edits do not save while stale.
+      mockMutateAsync.mockClear();
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "another edit");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -3139,10 +3139,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("call <kind>")
     .description("Dispatch one UI action to the open page and print its result")
     .option("--payload <json>", "The action's payload as JSON (default: {})")
-    .action(async (kind: string, options: { payload?: string }) => {
-      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
-      await impl(kind, options);
-    });
+    .option(
+      "--experiment <slug>",
+      "Experiment for the backend fallback to apply the action to when no page answers",
+    )
+    .action(
+      async (kind: string, options: { payload?: string; experiment?: string }) => {
+        const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+        await impl(kind, options);
+      },
+    );
 
   uiCmd
     .command("actions")
@@ -3157,17 +3163,22 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Work with the evaluations workbench the user has open");
 
   workbenchCmd
-    .command("get-state")
+    .command("get-state [experiment]")
     .description(
-      "Read the open workbench as the user sees it, unsaved edits included",
+      "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
     )
     .option("--no-include-results", "Leave the results summary out")
-    .action(async (options: { includeResults?: boolean }) => {
-      const { workbenchGetStateCommand: impl } = await import(
-        "./commands/workbench/get-state.js"
-      );
-      await impl(options);
-    });
+    .action(
+      async (
+        experiment: string | undefined,
+        options: { includeResults?: boolean },
+      ) => {
+        const { workbenchGetStateCommand: impl } = await import(
+          "./commands/workbench/get-state.js"
+        );
+        await impl(experiment, options);
+      },
+    );
 
   // Add dataset command group
   const datasetCmd = program

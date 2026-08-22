@@ -16,7 +16,7 @@ import { resolveCredentials } from "../../utils/apiKey";
  */
 export const uiCallCommand = async (
   kind: string,
-  options: { payload?: string },
+  options: { payload?: string; experiment?: string },
 ): Promise<void> => {
   const { apiKey, endpoint } = await resolveCredentials();
 
@@ -46,7 +46,14 @@ export const uiCallCommand = async (
       "Content-Type": "application/json",
       "X-Auth-Token": apiKey,
     },
-    body: JSON.stringify({ conversationId, kind, payload }),
+    body: JSON.stringify({
+      conversationId,
+      kind,
+      payload,
+      // Names the experiment a backend fallback applies the action to when no
+      // page answers. The open page never needs it.
+      ...(options.experiment ? { experimentSlug: options.experiment } : {}),
+    }),
   });
 
   const text = await response.text();

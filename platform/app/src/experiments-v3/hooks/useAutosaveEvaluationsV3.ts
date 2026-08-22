@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { useRouter } from "~/utils/compat/next-router";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -37,6 +38,8 @@ export const useAutosaveEvaluationsV3 = () => {
   const {
     experimentId,
     experimentSlug,
+    workbenchVersion,
+    staleWorkbench,
     name,
     datasets,
     activeDatasetId,
@@ -47,6 +50,8 @@ export const useAutosaveEvaluationsV3 = () => {
     concurrency,
     setExperimentId,
     setExperimentSlug,
+    setWorkbenchVersion,
+    setStaleWorkbench,
     setName,
     setAutosaveStatus,
     loadState,
@@ -54,6 +59,8 @@ export const useAutosaveEvaluationsV3 = () => {
     useShallow((state) => ({
       experimentId: state.experimentId,
       experimentSlug: state.experimentSlug,
+      workbenchVersion: state.workbenchVersion,
+      staleWorkbench: state.staleWorkbench,
       name: state.name,
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
@@ -64,6 +71,8 @@ export const useAutosaveEvaluationsV3 = () => {
       concurrency: state.ui.concurrency,
       setExperimentId: state.setExperimentId,
       setExperimentSlug: state.setExperimentSlug,
+      setWorkbenchVersion: state.setWorkbenchVersion,
+      setStaleWorkbench: state.setStaleWorkbench,
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
       loadState: state.loadState,
@@ -139,6 +148,12 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
 
+  // What the server last acknowledged, as the exact string this hook would
+  // send. `stringifiedState !== lastSavedRef.current` is the ONE definition of
+  // a dirty workbench; the update listener reads it through `isDirty` below.
+  const lastSavedRef = useRef<string | null>(null);
+  const justLoadedRef = useRef(false);
+
   // Load existing experiment data into store
   useEffect(() => {
     if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
@@ -148,17 +163,23 @@ export const useAutosaveEvaluationsV3 = () => {
       // Set experiment ID and slug first
       setExperimentId(existingExperiment.data.id);
       setExperimentSlug(existingExperiment.data.slug);
+      setWorkbenchVersion(existingExperiment.data.version);
+      setStaleWorkbench(undefined);
 
       // Load the full wizard state if available
       if (existingExperiment.data.workbenchState && loadState) {
         loadState(existingExperiment.data.workbenchState);
       }
+      // The state the next render derives from this load IS the saved state.
+      justLoadedRef.current = true;
     }
   }, [
     existingExperiment.data,
     routerSlug,
     setExperimentId,
     setExperimentSlug,
+    setWorkbenchVersion,
+    setStaleWorkbench,
     loadState,
   ]);
 
@@ -206,6 +227,12 @@ export const useAutosaveEvaluationsV3 = () => {
 
   // Autosave effect with debounce
   useEffect(() => {
+    // The first state derived after a load is the saved state, not an edit.
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      lastSavedRef.current = stringifiedState;
+      return;
+    }
     if (!project) return;
     // Don't save while we're loading an existing experiment
     if (existingExperiment.isLoading) return;
@@ -215,9 +242,16 @@ export const useAutosaveEvaluationsV3 = () => {
     // Don't save if we don't have an experiment ID yet (experiment must exist first)
     if (!experimentId) return;
     if (!name) return;
+    // Out of date against the server: saving now would clobber the newer
+    // version, so autosave stands down until the user reloads.
+    if (staleWorkbench) return;
 
     // Only save if there are actual changes from initial state
     if (stringifiedState === stringifiedInitialState) {
+      return;
+    }
+    // Nothing changed since the last acknowledged save.
+    if (stringifiedState === lastSavedRef.current) {
       return;
     }
 
@@ -235,6 +269,7 @@ export const useAutosaveEvaluationsV3 = () => {
           const updatedExperiment = await saveExperiment.mutateAsync({
             projectId: project.id,
             experimentId: experimentId,
+            expectedVersion: workbenchVersion,
             // Cast to any since the actual types are more complex than the schema
             // The schema is designed to be lenient for storage
             state: persistedState as Parameters<
@@ -244,11 +279,27 @@ export const useAutosaveEvaluationsV3 = () => {
 
           setExperimentId(updatedExperiment.id);
           setExperimentSlug(updatedExperiment.slug);
+          setWorkbenchVersion(updatedExperiment.version);
+          lastSavedRef.current = stringifiedState;
           if (updatedExperiment.name && updatedExperiment.name !== name) {
             setName(updatedExperiment.name);
           }
           markSaved();
         } catch (error) {
+          const handled = readHandledError(error);
+          if (handled?.code === "experiment_stale_workbench_state") {
+            // Someone else (another tab, Langy, the API) wrote a newer
+            // version. Refuse-before-write means nothing was lost; autosave
+            // stands down and the banner offers the reload. The current
+            // server version rides in the error's meta when available.
+            const serverVersion =
+              typeof handled.meta?.currentVersion === "number"
+                ? handled.meta.currentVersion
+                : (workbenchVersion ?? 0) + 1;
+            setStaleWorkbench({ serverVersion });
+            setAutosaveStatus("evaluation", "error", "Out of date");
+            return;
+          }
           console.error("Failed to autosave evaluations v3:", error);
           setAutosaveStatus(
             "evaluation",
@@ -283,6 +334,8 @@ export const useAutosaveEvaluationsV3 = () => {
     shouldLoadExisting,
     experimentId,
     existingExperiment.isLoading,
+    staleWorkbench,
+    workbenchVersion,
   ]);
 
   // Determine if experiment was truly not found
@@ -305,6 +358,39 @@ export const useAutosaveEvaluationsV3 = () => {
     });
   }, [project?.id, routerSlug, trpcUtils]);
 
+  /**
+   * Pull the server's current state into the store, discarding local edits.
+   * The reconciliation path: the update listener calls it silently on a clean
+   * workbench, and the stale banner's Reload button calls it on a dirty one.
+   * Clearing `staleWorkbench` is what resumes autosave.
+   */
+  const reloadFromServer = useCallback(async () => {
+    if (!project || !routerSlug) return;
+    const fresh = await trpcUtils.experiments.getEvaluationsV3BySlug.fetch({
+      projectId: project.id,
+      experimentSlug: routerSlug,
+    });
+    setExperimentId(fresh.id);
+    setExperimentSlug(fresh.slug);
+    setWorkbenchVersion(fresh.version);
+    if (fresh.workbenchState) {
+      loadState(fresh.workbenchState);
+    }
+    setStaleWorkbench(undefined);
+    setAutosaveStatus("evaluation", "idle");
+    justLoadedRef.current = true;
+  }, [
+    project,
+    routerSlug,
+    trpcUtils,
+    setExperimentId,
+    setExperimentSlug,
+    setWorkbenchVersion,
+    setStaleWorkbench,
+    setAutosaveStatus,
+    loadState,
+  ]);
+
   return {
     isLoading: existingExperiment.isLoading,
     isSaving: saveExperiment.isPending,
@@ -314,5 +400,10 @@ export const useAutosaveEvaluationsV3 = () => {
     isError: existingExperiment.isError && !isNotFoundError,
     error: existingExperiment.error,
     reset: reset,
+    /** True when the store differs from the last state the server acknowledged. */
+    isDirty:
+      lastSavedRef.current !== null &&
+      stringifiedState !== lastSavedRef.current,
+    reloadFromServer,
   };
 };

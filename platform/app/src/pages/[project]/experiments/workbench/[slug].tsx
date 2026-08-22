@@ -11,16 +11,18 @@ import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
-import { VersionHistoryButton } from "~/experiments-v3/components/VersionHistoryButton";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
+import { VersionHistoryButton } from "~/experiments-v3/components/VersionHistoryButton";
+import { WorkbenchStaleBanner } from "~/experiments-v3/components/WorkbenchStaleBanner";
 import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "~/experiments-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
+import { useWorkbenchUpdateListener } from "~/experiments-v3/hooks/useWorkbenchUpdateListener";
 import { HandledErrorAlert } from "~/features/errors";
 import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
 import {
@@ -80,7 +82,19 @@ export default function ExperimentsWorkbenchPage() {
     isError,
     error,
     reset: resetAutosave,
+    isDirty,
+    reloadFromServer,
   } = useAutosaveEvaluationsV3();
+
+  // A save that lands elsewhere (Langy's backend fallback, the API, another
+  // tab) reloads a clean workbench silently and banners a dirty one.
+  const { stale: staleWorkbench, reload: reloadStaleWorkbench } =
+    useWorkbenchUpdateListener({
+      projectId: project?.id ?? "",
+      experimentSlug: typeof slug === "string" ? slug : undefined,
+      isDirty,
+      reloadFromServer,
+    });
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
@@ -313,7 +327,7 @@ export default function ExperimentsWorkbenchPage() {
       payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
       run: (payload: { includeResults?: boolean }) => {
         const state = useEvaluationsV3Store.getState();
-        return projectWorkbenchState({
+        const projection = projectWorkbenchState({
           state: {
             name: state.name,
             datasets: state.datasets,
@@ -329,6 +343,15 @@ export default function ExperimentsWorkbenchPage() {
             ? {}
             : { results: state.results }),
         });
+        // `source` mirrors the backend fallback's marker, so the agent always
+        // knows whether it read the live page or the saved document.
+        return {
+          source: "live",
+          ...(state.workbenchVersion !== undefined
+            ? { version: state.workbenchVersion }
+            : {}),
+          ...projection,
+        };
       },
     };
     handlers["workbench.run"] = {
@@ -436,6 +459,13 @@ export default function ExperimentsWorkbenchPage() {
             />
           </HStack>
         </HStack>
+
+        {staleWorkbench && (
+          <WorkbenchStaleBanner
+            actorLabel={staleWorkbench.actorLabel}
+            onReload={reloadStaleWorkbench}
+          />
+        )}
 
         {/* Main content - table container with config panel */}
         <Box

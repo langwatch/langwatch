@@ -26,7 +26,10 @@ const IDS = {
   turnId: "turn-ui",
 };
 
-function makeService(appended: Array<{ actionId: string }>) {
+function makeService(
+  appended: Array<{ actionId: string }>,
+  backendRunner?: (args: { kind: string }) => Promise<unknown>,
+) {
   return new LangyUiActionService({
     redis: redis as unknown as UiActionRedis,
     conversations: {
@@ -37,6 +40,7 @@ function makeService(appended: Array<{ actionId: string }>) {
         appended.push({ actionId });
       },
     },
+    ...(backendRunner ? { backendRunner } : {}),
   });
 }
 
@@ -133,4 +137,33 @@ describe("LangyUiActionService against real Redis", () => {
     const outcome = await dispatch;
     expect(outcome).toMatchObject({ executedVia: "browser" });
   });
+
+  /** @scenario With no browser attached the same verb executes on the backend transparently */
+  it("falls back to the backend when the real claim window lapses unclaimed", async () => {
+    const appended: Array<{ actionId: string }> = [];
+    let pendingAtRunnerTime: string | null = "unread";
+    const service = makeService(appended, async ({ kind }) => {
+      // The pending record must be gone BEFORE the backend runs, so a zombie
+      // tab waking later finds nothing to claim.
+      const actionId = appended[0]!.actionId;
+      pendingAtRunnerTime = await redis.get(uiActionKeys.pending(actionId));
+      return { via: "backend", kind };
+    });
+
+    const outcome = await service.dispatch({
+      ...IDS,
+      kind: "workbench.duplicateTarget",
+      payload: { targetId: "t1" },
+      experimentSlug: "my-exp",
+      notFound: () => new Error("not-found"),
+    });
+
+    expect(outcome).toMatchObject({
+      status: "done",
+      executedVia: "backend",
+      result: { via: "backend", kind: "workbench.duplicateTarget" },
+    });
+    expect(appended).toHaveLength(1);
+    expect(pendingAtRunnerTime).toBeNull();
+  }, 15_000);
 });

@@ -405,6 +405,11 @@ const registry = {
       "The user has no page open that can run this action — tell them what you wanted to do, or use the equivalent API command instead",
     ],
   },
+  langy_ui_experiment_required: {
+    tips: [
+      "Pass --experiment <slug> so the backend knows which experiment to apply the action to; the slug is on the experiment context chip and in `langwatch experiment list`",
+    ],
+  },
   langy_ui_timeout: {
     tips: [
       "The page may have applied part of the action — read the current state (for example `langwatch workbench get-state`) before retrying",

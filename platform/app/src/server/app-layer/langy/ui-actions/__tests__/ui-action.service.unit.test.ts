@@ -74,11 +74,19 @@ function makeService({
   currentTurnId = "turn-1",
   conversationExists = true,
   appended = [],
+  presenceSessions,
+  backendRunner,
 }: {
   redis: UiActionRedis;
   currentTurnId?: string | null;
   conversationExists?: boolean;
   appended?: Array<{ actionId: string; kind: string; payload: unknown }>;
+  presenceSessions?: unknown[];
+  backendRunner?: (args: {
+    kind: string;
+    payload: unknown;
+    experimentSlug?: string;
+  }) => Promise<unknown>;
 }) {
   return new LangyUiActionService({
     redis,
@@ -91,6 +99,20 @@ function makeService({
         appended.push({ actionId, kind, payload });
       },
     },
+    ...(presenceSessions
+      ? {
+          presence: {
+            isEnabledForProject: async () => true,
+            getByProject: async () => presenceSessions,
+          },
+        }
+      : {}),
+    ...(backendRunner
+      ? {
+          backendRunner: ({ kind, payload, experimentSlug }) =>
+            backendRunner({ kind, payload, experimentSlug }),
+        }
+      : {}),
   });
 }
 
@@ -411,6 +433,115 @@ describe("LangyUiActionService", () => {
         ok: false,
         errorCode: "result_too_large",
       });
+    });
+  });
+
+  describe("when no live tab is present for the project", () => {
+    /** @scenario With no browser attached the same verb executes on the backend transparently */
+    it("skips the publish entirely and answers from the backend", async () => {
+      const { redis } = makeRedis();
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      const runnerCalls: Array<{ kind: string; experimentSlug?: string }> = [];
+      const service = makeService({
+        redis,
+        appended,
+        presenceSessions: [],
+        backendRunner: async ({ kind, experimentSlug }) => {
+          runnerCalls.push({ kind, experimentSlug });
+          return { targetId: "t2" };
+        },
+      });
+
+      const outcome = await service.dispatch({
+        ...DISPATCH,
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+        experimentSlug: "my-exp",
+      });
+
+      expect(outcome.executedVia).toBe("backend");
+      expect(outcome.result).toEqual({ targetId: "t2" });
+      expect(appended).toHaveLength(0);
+      expect(runnerCalls).toEqual([
+        { kind: "workbench.duplicateTarget", experimentSlug: "my-exp" },
+      ]);
+    });
+  });
+
+  describe("when the published action goes unclaimed", () => {
+    /** @scenario An unclaimed action falls back to the backend after the claim window */
+    it("deletes the pending record first, then executes on the backend", async () => {
+      const { redis, store } = makeRedis(["wait-empty"]);
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      let pendingAtRunnerTime: boolean | null = null;
+      const service = makeService({
+        redis,
+        appended,
+        // A live tab exists, so the publish happens; it just never claims.
+        presenceSessions: [{}],
+        backendRunner: async () => {
+          pendingAtRunnerTime = [...store.kv.keys()].some((key) =>
+            key.startsWith("langy:ui:pending:"),
+          );
+          return { ok: true };
+        },
+      });
+
+      const outcome = await service.dispatch({
+        ...DISPATCH,
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+        experimentSlug: "my-exp",
+      });
+
+      expect(outcome.executedVia).toBe("backend");
+      expect(appended).toHaveLength(1);
+      // A zombie tab claiming late must find nothing to claim.
+      expect(pendingAtRunnerTime).toBe(false);
+    });
+  });
+
+  describe("when a page claimed the action and went silent", () => {
+    /** @scenario A claimed but silent action times out and never double-executes */
+    it("times out without running the backend", async () => {
+      // The first scripted wait plants the claim before it lapses: the page
+      // took the action and never completed. The second wait times out too.
+      let plantClaim: (() => void) | undefined;
+      const { redis, store } = makeRedis([() => plantClaim?.(), "wait-empty"]);
+      plantClaim = () => {
+        const pendingKey = [...store.kv.keys()].find((key) =>
+          key.startsWith("langy:ui:pending:"),
+        );
+        if (!pendingKey) return;
+        const actionId = pendingKey.replace("langy:ui:pending:", "");
+        store.kv.set(uiActionKeys.claim(actionId), "user-1");
+      };
+      let runnerCalled = false;
+      const service = makeService({
+        redis,
+        presenceSessions: [{}],
+        backendRunner: async () => {
+          runnerCalled = true;
+          return {};
+        },
+      });
+
+      await expect(
+        service.dispatch({
+          ...DISPATCH,
+          kind: "workbench.duplicateTarget",
+          payload: { targetId: "t1" },
+        }),
+      ).rejects.toThrow(/did not finish inside the action's time budget/);
+      expect(runnerCalled).toBe(false);
     });
   });
 });

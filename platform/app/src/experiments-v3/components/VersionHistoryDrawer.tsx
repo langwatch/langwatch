@@ -46,6 +46,12 @@ export function VersionHistoryDrawer({
   const { can } = useCan();
   const utils = api.useUtils();
   const loadState = useEvaluationsV3Store((state) => state.loadState);
+  const setWorkbenchVersion = useEvaluationsV3Store(
+    (state) => state.setWorkbenchVersion,
+  );
+  const setStaleWorkbench = useEvaluationsV3Store(
+    (state) => state.setStaleWorkbench,
+  );
   const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
     null,
   );
@@ -88,6 +94,10 @@ export function VersionHistoryDrawer({
       if (fresh.workbenchState) {
         loadState(fresh.workbenchState);
       }
+      // The restore is a new version; echoing it keeps the next autosave's
+      // compare-and-set honest, and the workbench is current again.
+      setWorkbenchVersion(fresh.version);
+      setStaleWorkbench(undefined);
       await utils.experiments.listWorkbenchVersions.invalidate({
         projectId: project.id,
         experimentId,

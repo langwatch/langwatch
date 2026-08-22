@@ -47,6 +47,7 @@ import {
   LangyUiActionService,
   type UiActionRedis,
 } from "~/server/app-layer/langy/ui-actions/ui-action.service";
+import { executeBackendAction } from "~/server/app-layer/langy/ui-actions/uiActionBackendExecutor";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
@@ -74,6 +75,12 @@ const dispatchBodySchema = z.object({
   conversationId: z.string().min(1),
   kind: z.string().min(1),
   payload: z.unknown().optional(),
+  /**
+   * Which experiment a backend fallback applies the action to. The browser
+   * path ignores it (the open page IS the experiment); without it a fallback
+   * for a workbench action refuses with `langy_ui_experiment_required`.
+   */
+  experimentSlug: z.string().min(1).optional(),
 });
 
 /**
@@ -119,12 +126,25 @@ async function authorizeUiRequest(c: Context) {
   };
 }
 
-function createService(): LangyUiActionService {
+function createService(context: {
+  projectId: string;
+  projectSlug: string;
+  userId: string;
+}): LangyUiActionService {
   const redis = getApp().redis as unknown as UiActionRedis;
   return new LangyUiActionService({
     redis,
     conversations: getApp().langy.conversations,
     buffer: createLangyTokenBuffer({ redis: getApp().redis }),
+    presence: getApp().presence,
+    backendRunner: ({ kind, definition, payload, experimentSlug }) =>
+      executeBackendAction({
+        experiments: getApp().experiments,
+        context: { ...context, experimentSlug },
+        kind,
+        definition,
+        payload,
+      }),
   });
 }
 
@@ -143,7 +163,7 @@ secured
       if (!parsed.success) {
         throw new LangyApiRequestInvalidError(parsed.error.issues);
       }
-      const { conversationId, kind, payload } = parsed.data;
+      const { conversationId, kind, payload, experimentSlug } = parsed.data;
 
       // The action's own permission is the key's ceiling for this dispatch.
       // Unknown kinds refuse before the ceiling so the error names the real
@@ -155,12 +175,17 @@ secured
         permission: definition.requiredPermission,
       });
 
-      const outcome = await createService().dispatch({
+      const outcome = await createService({
+        projectId: auth.projectId,
+        projectSlug: auth.resolved.project.slug,
+        userId: auth.userId,
+      }).dispatch({
         projectId: auth.projectId,
         userId: auth.userId,
         conversationId,
         kind,
         payload: payload ?? {},
+        experimentSlug,
         notFound: () => new LangyConversationNotFoundError(conversationId),
       });
       return c.json(outcome, 200);

@@ -160,6 +160,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set({ experimentSlug });
   },
 
+  setWorkbenchVersion: (workbenchVersion) => {
+    set({ workbenchVersion });
+  },
+
+  setStaleWorkbench: (staleWorkbench) => {
+    set({ staleWorkbench });
+  },
+
   // -------------------------------------------------------------------------
   // Dataset management actions
   // -------------------------------------------------------------------------
@@ -1216,6 +1224,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       ...createInitialState(),
       experimentId: undefined,
       experimentSlug: undefined,
+      workbenchVersion: undefined,
+      staleWorkbench: undefined,
     });
   },
 
