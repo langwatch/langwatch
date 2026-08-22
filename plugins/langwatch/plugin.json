@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "langwatch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Records which repository and branch each coding-agent session worked in, and teaches the agent to read its own traces back from LangWatch.",
   "author": {
     "name": "LangWatch",
