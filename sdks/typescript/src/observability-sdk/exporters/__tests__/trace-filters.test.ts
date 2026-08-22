@@ -264,10 +264,32 @@ describe("trace-filters", () => {
       expect(isHttpRequestSpan(createMockSpan("HEAD /check", "http"))).toBe(true);
     });
 
-    it("is case-insensitive for HTTP verbs", () => {
-      expect(isHttpRequestSpan(createMockSpan("get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("Get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GeT /api", "http"))).toBe(true);
+    it("matches bare uppercase verb names emitted without a route", () => {
+      expect(isHttpRequestSpan(createMockSpan("GET", "http"))).toBe(true);
+      expect(isHttpRequestSpan(createMockSpan("POST", "http"))).toBe(true);
+    });
+
+    it("rejects lowercase verbs so user span names survive", () => {
+      // OpenTelemetry HTTP instrumentation emits uppercase verbs; lowercase
+      // names are user spans (issue #7413: they were silently dropped before).
+      expect(isHttpRequestSpan(createMockSpan("get /api", "custom"))).toBe(false);
+      expect(isHttpRequestSpan(createMockSpan("Get /api", "custom"))).toBe(false);
+    });
+
+    it("keeps user spans whose name starts with a verb word plus punctuation", () => {
+      for (const name of [
+        "POST-process",
+        "post-process",
+        "post-publish-smoke",
+        "get-user-profile",
+        "delete-account",
+        "put-record",
+        "patch-config",
+        "head-request-handler",
+        "options-resolver",
+      ]) {
+        expect(isHttpRequestSpan(createMockSpan(name, "custom"))).toBe(false);
+      }
     });
 
     it("returns false for non-HTTP patterns", () => {
@@ -275,12 +297,6 @@ describe("trace-filters", () => {
       expect(isHttpRequestSpan(createMockSpan("database query", "db"))).toBe(false);
       expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(false);
       expect(isHttpRequestSpan(createMockSpan("", ""))).toBe(false);
-    });
-
-    it("requires word boundary after verb", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "http"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETTING", "http"))).toBe(false);
     });
   });
 

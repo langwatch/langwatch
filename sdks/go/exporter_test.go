@@ -76,6 +76,56 @@ func TestFilteringExporter_AllFiltered(t *testing.T) {
 	assert.Len(t, mock.GetSpans(), 0)
 }
 
+// Regression test for #7413: the filter used to match case-insensitively with
+// a word boundary, so user spans named "post-process", "get-user-profile", ...
+// were silently dropped alongside real HTTP request spans.
+func TestExcludeHTTPRequests_KeepsUserSpansWithVerbPrefixedNames(t *testing.T) {
+	mock := testutil.NewMockExporter()
+	exporter := NewFilteringExporter(mock, ExcludeHTTPRequests())
+
+	userSpans := []string{
+		"POST-process",
+		"post-process",
+		"post-publish-smoke",
+		"get-user-profile",
+		"delete-account",
+		"put-record",
+		"patch-config",
+		"head-request-handler",
+		"options-resolver",
+		"get /lowercase-verb-route",
+	}
+
+	spans := make([]sdktrace.ReadOnlySpan, 0, len(userSpans))
+	for _, name := range userSpans {
+		spans = append(spans, testutil.CreateMockSpan(name, "custom"))
+	}
+
+	err := exporter.ExportSpans(context.Background(), spans)
+	require.NoError(t, err)
+
+	result := mock.GetSpans()
+	assert.Len(t, result, len(userSpans))
+	for i, name := range userSpans {
+		assert.Equal(t, name, result[i].Name())
+	}
+}
+
+func TestExcludeHTTPRequests_DropsRealHTTPShapes(t *testing.T) {
+	mock := testutil.NewMockExporter()
+	exporter := NewFilteringExporter(mock, ExcludeHTTPRequests())
+
+	spans := []sdktrace.ReadOnlySpan{
+		testutil.CreateMockSpan("GET", "net/http"),
+		testutil.CreateMockSpan("POST /v1/traces", "net/http"),
+	}
+
+	err := exporter.ExportSpans(context.Background(), spans)
+	require.NoError(t, err)
+
+	assert.Len(t, mock.GetSpans(), 0)
+}
+
 func TestFilteringExporter_Shutdown(t *testing.T) {
 	mock := testutil.NewMockExporter()
 	exporter := NewFilteringExporter(mock)
