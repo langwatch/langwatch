@@ -1,4 +1,5 @@
 import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 
 /**
  * Dispatch one typed UI action to the page the user has open, and print the
@@ -17,7 +18,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 export const uiCallCommand = async (
   kind: string,
   options: { payload?: string; experiment?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();
 
   const conversationId = process.env.LANGY_CONVERSATION_ID;
@@ -58,11 +59,36 @@ export const uiCallCommand = async (
 
   const text = await response.text();
   if (!response.ok) {
-    // The body is the canonical handled-error envelope — code, meta, tips.
+    // The body is the canonical handled-error envelope: code, meta, tips.
     // Print it whole so the agent can read the code and act on the tips.
     process.stderr.write(`${text}\n`);
     process.exitCode = 1;
     return;
   }
-  console.log(text);
+  return asCommandResult(text);
+};
+
+/**
+ * Hand the server's answer to the output contract without reshaping it.
+ *
+ * The action result is the server's document, so `data` is the parsed body and
+ * `-o json|yaml|agents`, `--json` and `--jq` all project from it. The human
+ * form stays the exact bytes the server sent, which is what an agent reading
+ * the default output already expects.
+ */
+export const asCommandResult = (text: string): CommandResult | void => {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    process.stderr.write(`The server answered a body that is not JSON:\n${text}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  return {
+    data,
+    table: () => {
+      console.log(text);
+    },
+  };
 };

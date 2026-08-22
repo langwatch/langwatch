@@ -1,4 +1,5 @@
 import { uiCallCommand } from "../ui/call";
+import type { CommandResult } from "../../utils/output";
 
 /**
  * Read the evaluations workbench as the user sees it right now — unsaved
@@ -11,8 +12,8 @@ export const workbenchGetStateCommand = async (
   options: {
     includeResults?: boolean;
   },
-): Promise<void> => {
-  await uiCallCommand("workbench.getState", {
+): Promise<CommandResult | void> => {
+  return uiCallCommand("workbench.getState", {
     payload: JSON.stringify({
       includeResults: options.includeResults !== false,
     }),

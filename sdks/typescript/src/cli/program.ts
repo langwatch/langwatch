@@ -3135,50 +3135,52 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("ui")
     .description("Drive the page the user has open with typed actions");
 
-  uiCmd
-    .command("call <kind>")
-    .description("Dispatch one UI action to the open page and print its result")
-    .option("--payload <json>", "The action's payload as JSON (default: {})")
-    .option(
-      "--experiment <slug>",
-      "Experiment for the backend fallback to apply the action to when no page answers",
-    )
-    .action(
-      async (kind: string, options: { payload?: string; experiment?: string }) => {
-        const { uiCallCommand: impl } = await import("./commands/ui/call.js");
-        await impl(kind, options);
-      },
-    );
+  emitsResult(
+    uiCmd
+      .command("call <kind>")
+      .description("Dispatch one UI action to the open page and print its result")
+      .option("--payload <json>", "The action's payload as JSON (default: {})")
+      .option(
+        "--experiment <slug>",
+        "Experiment for the backend fallback to apply the action to when no page answers",
+      ),
+    async (kind: string, options: { payload?: string; experiment?: string }) => {
+      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+      return impl(kind, options);
+    },
+  );
 
-  uiCmd
-    .command("actions")
-    .description("List the UI actions pages accept, with their schemas")
-    .action(async () => {
+  emitsResult(
+    uiCmd
+      .command("actions")
+      .description("List the UI actions pages accept, with their schemas"),
+    async () => {
       const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
-      await impl();
-    });
+      return impl();
+    },
+  );
 
   const workbenchCmd = program
     .command("workbench")
     .description("Work with the evaluations workbench the user has open");
 
-  workbenchCmd
-    .command("get-state [experiment]")
-    .description(
-      "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
-    )
-    .option("--no-include-results", "Leave the results summary out")
-    .action(
-      async (
-        experiment: string | undefined,
-        options: { includeResults?: boolean },
-      ) => {
-        const { workbenchGetStateCommand: impl } = await import(
-          "./commands/workbench/get-state.js"
-        );
-        await impl(experiment, options);
-      },
-    );
+  emitsResult(
+    workbenchCmd
+      .command("get-state [experiment]")
+      .description(
+        "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
+      )
+      .option("--no-include-results", "Leave the results summary out"),
+    async (
+      experiment: string | undefined,
+      options: { includeResults?: boolean },
+    ) => {
+      const { workbenchGetStateCommand: impl } = await import(
+        "./commands/workbench/get-state.js"
+      );
+      return impl(experiment, options);
+    },
+  );
 
   // Add dataset command group
   const datasetCmd = program
