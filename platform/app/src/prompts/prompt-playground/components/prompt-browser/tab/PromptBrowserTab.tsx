@@ -1,6 +1,7 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuX } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import { withController } from "~/utils/withControllerHOC";
@@ -12,6 +13,8 @@ interface PromptBrowserTabProps extends StackProps {
   isActive?: boolean;
   /** The strip has run out of room, so every tab sits at its narrow floor. */
   isCrowded?: boolean;
+  /** A single tab puts its close action at the opposite end of the card. */
+  hideCloseButton?: boolean;
 }
 
 type PromptBrowserTabControllerProps = ReturnType<
@@ -29,6 +32,7 @@ function PromptBrowserTabView({
   dimmed,
   isActive,
   isCrowded,
+  hideCloseButton,
   handleClose,
   versionNumber,
   latestVersion,
@@ -49,7 +53,8 @@ function PromptBrowserTabView({
   // The name is what tells two tabs apart, so it wins until the pointer
   // arrives. The active tab is the one most likely to be closed, and it is
   // never in doubt about which prompt it is.
-  const showsCloseButton = !isCrowded || isActive || isHovered;
+  const showsCloseButton =
+    !hideCloseButton && (!isCrowded || isActive || isHovered);
 
   return (
     // `minWidth={0}` on every flex ancestor of the title, or the title's
@@ -79,9 +84,15 @@ function PromptBrowserTabView({
           {name}
         </Text>
         {hasUnsavedChanges && (
-          <Box flexShrink={0}>
-            <Circle size="10px" bg="orange.solid" />
-          </Box>
+          <Tooltip content="This prompt has unsaved changes">
+            <Box
+              flexShrink={0}
+              aria-label="This prompt has unsaved changes"
+              tabIndex={0}
+            >
+              <Circle size="10px" bg="orange.solid" />
+            </Box>
+          </Tooltip>
         )}
         {showVersionBadge && versionNumber != null && (
           <Box flexShrink={0}>

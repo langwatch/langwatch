@@ -12,6 +12,7 @@ import {
   useFormContext,
   useWatch,
 } from "react-hook-form";
+import { MODEL_ICON_SIZE_SM } from "~/components/llmPromptConfigs/constants";
 import {
   LLMConfigPopover,
   type Output,
@@ -96,7 +97,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
     // placeholder instead of falling through to the empty-state callout
     // (which would flash "No models configured" for a frame before the
     // data resolves).
-    return <Skeleton width="180px" height="32px" borderRadius="md" />;
+    return <Skeleton width="150px" height="32px" borderRadius="md" />;
   }
 
   if (isEmpty) {
@@ -139,21 +140,36 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >
             <ChakraPopover.Anchor asChild>
+              {/*
+                Sized to its label and no bigger (the composer's model pill
+                does the same): a `space-between` chip stretched to whatever
+                room the header had, which made the model read as the loudest
+                thing in the editor. `minHeight` keeps it on the same baseline
+                as the action buttons beside it.
+              */}
               <HStack
-                paddingY={2}
-                paddingX={3}
+                gap={1.5}
+                minHeight="24px"
+                paddingY={0.5}
+                paddingX={2}
                 borderRadius="md"
                 border="1px solid"
-                borderColor="border"
+                borderColor="border.muted"
                 cursor="pointer"
-                _hover={{ bg: "bg.subtle" }}
-                transition="background 0.15s"
-                justify="space-between"
+                maxWidth="260px"
+                minWidth={0}
+                _hover={{ bg: "bg.subtle", borderColor: "border.emphasized" }}
+                transition="background 0.15s, border-color 0.15s"
                 onClick={() => setPopoverOpen((prev) => !prev)}
               >
-                <LLMModelDisplay model={field.value?.model ?? ""} />
-                <Box color="fg.muted">
-                  <ChevronDown size={16} />
+                <LLMModelDisplay
+                  model={field.value?.model ?? ""}
+                  fontSize="13px"
+                  iconSize={MODEL_ICON_SIZE_SM}
+                  minWidth={0}
+                />
+                <Box color="fg.subtle" flexShrink={0} display="flex">
+                  <ChevronDown size={14} />
                 </Box>
               </HStack>
             </ChakraPopover.Anchor>

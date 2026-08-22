@@ -29,6 +29,7 @@ import {
 } from "./liquidTokenizer";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
+  BORDERLESS_LINE_HEIGHT,
   findJustCompletedVariable,
   findUnclosedBraces,
   findUnclosedPercentBraces,
@@ -529,7 +530,7 @@ export const PromptTextAreaWithVariables = ({
               ? undefined
               : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             fontSize: borderless ? "14px" : "13px",
-            lineHeight: borderless ? "28px" : "1.5",
+            lineHeight: borderless ? `${BORDERLESS_LINE_HEIGHT}px` : "1.5",
             padding: borderless ? "0 0 0 24px" : "8px 10px",
             ...(reservedBottomPadding !== null
               ? { paddingBottom: `${reservedBottomPadding}px` }

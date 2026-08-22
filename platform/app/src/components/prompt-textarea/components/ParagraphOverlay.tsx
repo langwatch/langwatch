@@ -50,7 +50,10 @@ export function LineHighlights({
           left={0}
           right={0}
           height={`${positions[draggedParagraph]?.height ?? 0}px`}
-          background="blue.50"
+          // Semantic, so the dragged line reads as a tint of the surface it is
+          // over in either theme. `blue.50` is a light-mode shade and lit the
+          // row up white against a dark editor.
+          background="blue.subtle"
           opacity={0.5}
           pointerEvents="none"
           borderRadius="md"

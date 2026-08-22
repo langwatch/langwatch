@@ -30,14 +30,14 @@ vi.mock("~/components/variables", () => ({
 
 /**
  * Helper to open the editing mode menu and click an option.
- * The menu is triggered by clicking the title (Prompt/Messages).
+ * The menu is triggered by clicking the mode button (Instructions/Messages).
  */
 const switchEditingMode = async (
   user: ReturnType<typeof userEvent.setup>,
   targetMode: "prompt" | "messages",
 ) => {
   // Find and click the menu trigger (the title text)
-  const titles = screen.queryAllByText(/^(Prompt|Messages)$/);
+  const titles = screen.queryAllByText(/^(Instructions|Messages)$/);
   const menuTrigger = titles[0]; // The first one is the title/trigger
   if (menuTrigger) {
     await user.click(menuTrigger);
@@ -181,8 +181,8 @@ describe("PromptMessagesField", () => {
     it("defaults to Prompt mode for system + user with {{input}}", () => {
       renderComponent();
 
-      // The title should show "Prompt" (default messages are system + user with {{input}})
-      expect(screen.getByText("Prompt")).toBeInTheDocument();
+      // The title should show "Instructions" (default messages are system + user with {{input}})
+      expect(screen.getByText("Instructions")).toBeInTheDocument();
     });
 
     it("defaults to Messages mode when user message is not {{input}}", () => {
@@ -205,8 +205,8 @@ describe("PromptMessagesField", () => {
         ],
       });
 
-      // Title should be "Prompt" because user message is empty
-      expect(screen.getByText("Prompt")).toBeInTheDocument();
+      // Title should be "Instructions" because user message is empty
+      expect(screen.getByText("Instructions")).toBeInTheDocument();
     });
 
     it("defaults to Messages mode when there are multiple non-system messages", () => {
@@ -227,7 +227,7 @@ describe("PromptMessagesField", () => {
       renderComponent();
 
       // Click the title to open the menu
-      await user.click(screen.getByText("Prompt"));
+      await user.click(screen.getByText("Instructions"));
 
       // Menu items should appear
       expect(screen.getByTestId("editing-mode-prompt")).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("Prompt mode", () => {
+  describe("Instructions mode", () => {
     it("shows only the system message textarea", () => {
       renderComponent();
 
@@ -288,13 +288,41 @@ describe("PromptMessagesField", () => {
       expect(screen.queryByText("USER")).not.toBeInTheDocument();
     });
 
-    it("does not show add message button in Prompt mode", () => {
+    it("does not show the role picker for adding a message", () => {
       renderComponent();
 
-      // Count the buttons - should only have the title trigger (which is a button-like element)
+      // The mode button and the add-user-message button, and nothing else:
+      // no per-message add/remove controls in this mode.
       const buttons = screen.getAllByRole("button");
-      // Should be exactly 1: the menu trigger
-      expect(buttons).toHaveLength(1);
+      expect(buttons).toHaveLength(2);
+    });
+
+    /** @scenario Adding a user message from Instructions mode */
+    it("reveals the hidden user message when adding a user message", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await user.click(screen.getByTestId("add-user-message-button"));
+
+      // Switched to the mode that shows messages, and the {{input}} message
+      // that was already there is what got revealed - not a second, empty one.
+      expect(screen.getByText("Messages")).toBeInTheDocument();
+      expect(screen.getAllByTestId("prompt-textarea")).toHaveLength(2);
+      expect(screen.getByText("User")).toBeInTheDocument();
+    });
+
+    /** @scenario Adding a user message when the prompt has none */
+    it("creates a user message when adding one to an instructions-only prompt", async () => {
+      const user = userEvent.setup();
+      renderComponent({
+        defaultMessages: [{ role: "system", content: "System prompt" }],
+      });
+
+      await user.click(screen.getByTestId("add-user-message-button"));
+
+      expect(screen.getByText("Messages")).toBeInTheDocument();
+      expect(screen.getAllByTestId("prompt-textarea")).toHaveLength(2);
+      expect(screen.getByText("User")).toBeInTheDocument();
     });
   });
 
@@ -437,8 +465,8 @@ describe("PromptMessagesField", () => {
         />,
       );
 
-      // Initially should show "Prompt" (default messages are system + user with {{input}})
-      expect(screen.getByText("Prompt")).toBeInTheDocument();
+      // Initially should show "Instructions" (default messages are system + user with {{input}})
+      expect(screen.getByText("Instructions")).toBeInTheDocument();
 
       // After form reset, should switch to "Messages" mode
       await waitFor(
@@ -459,14 +487,14 @@ describe("PromptMessagesField", () => {
         />,
       );
 
-      // Should show "Prompt" mode
-      expect(screen.getByText("Prompt")).toBeInTheDocument();
+      // Should show "Instructions" mode
+      expect(screen.getByText("Instructions")).toBeInTheDocument();
 
-      // After form reset, should still be in "Prompt" mode
+      // After form reset, should still be in "Instructions" mode
       await waitFor(
         () => {
-          // Check that we still have Prompt and don't have Messages
-          expect(screen.getByText("Prompt")).toBeInTheDocument();
+          // Check that we still have Instructions and do not have Messages
+          expect(screen.getByText("Instructions")).toBeInTheDocument();
         },
         { timeout: 500 },
       );
@@ -483,8 +511,8 @@ describe("PromptMessagesField", () => {
         />,
       );
 
-      // Initially "Prompt"
-      expect(screen.getByText("Prompt")).toBeInTheDocument();
+      // Initially "Instructions"
+      expect(screen.getByText("Instructions")).toBeInTheDocument();
 
       // After reset with assistant message, should be "Messages"
       await waitFor(

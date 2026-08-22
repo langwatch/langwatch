@@ -89,7 +89,7 @@ export function useHandleSavePrompt() {
       });
 
       toaster.create({
-        title: "Prompt saved",
+        title: "Saved changes",
         description: `Prompt ${prompt.handle} is now at version ${prompt.version}`,
         type: "success",
       });

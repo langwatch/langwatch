@@ -1396,6 +1396,13 @@ const presentations = {
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
   },
+  cross_origin_refused: {
+    // Seen by a developer poking the endpoint from elsewhere, never by the
+    // victim of the cross-site request it exists to stop.
+    title: "This endpoint only accepts requests from the LangWatch app",
+    describe: () =>
+      "Browser-session endpoints refuse requests from other origins. Use the API with an API key instead.",
+  },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
     // Both lists are our own names, not free text: the run dialog needs to

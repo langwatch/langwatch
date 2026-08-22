@@ -24,6 +24,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
+import {
+  CARD_BORDER_COLOR,
+  CARD_BORDER_WIDTH,
+  CARD_RADIUS,
+} from "./cardSurface";
 import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
@@ -238,6 +243,12 @@ function DraggableTabsWindow({
   return (
     <TabWindowContext.Provider value={windowContextValue}>
       <VStack height="full" gap={0} align="stretch" width="full">
+        {/* Browser tabs: the strip stands on the page ground and the card below
+            it holds the prompt. The frame lives on `DraggableTabsBrowser.Panel`
+            rather than here, because the strip has to be OUTSIDE it — the
+            active tab takes the card's own surface and overlaps its top border,
+            so tab and content read as one continuous shape with no rule between
+            them. The root keeps only the flex column. */}
         <Tabs.Root
           value={activeTabId}
           onValueChange={(change) =>
@@ -250,6 +261,7 @@ function DraggableTabsWindow({
           height="full"
           display="flex"
           flexDirection="column"
+          minHeight={0}
           variant="enclosed"
           lazyMount
           unmountOnExit
@@ -284,7 +296,24 @@ function DraggableTabsTabBar({
   ...props
 }: DraggableTabsTabBarProps) {
   return (
-    <HStack gap={0} width="full" flexWrap="nowrap" minWidth={0} {...props}>
+    // The strip stands on the page ground, not on the card: it carries no
+    // surface of its own, and the tabs sitting on it are what the eye reads. It
+    // overlaps the card below by exactly the card's border width, so the active
+    // tab — which paints the card's surface — covers the card's top border for
+    // its own width and the two join into one shape. `zIndex` puts the strip
+    // above the card so that overlap paints over the border, not under it.
+    <HStack
+      gap={0}
+      width="full"
+      flexWrap="nowrap"
+      minWidth={0}
+      flexShrink={0}
+      alignItems="stretch"
+      position="relative"
+      zIndex={1}
+      marginBottom={`-${CARD_BORDER_WIDTH}`}
+      {...props}
+    >
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}
@@ -299,7 +328,9 @@ function DraggableTabsTabBar({
           // this the switcher wraps onto a line of its own once the tabs fill
           // the width, and the tab bar grows a second row.
           flexWrap="nowrap"
-          alignItems="center"
+          // Stretch, so a tab reaches the bottom of the strip and can meet the
+          // card. Anything in the strip that is not a tab centres itself.
+          alignItems="stretch"
           minWidth={0}
         >
           {children}
@@ -317,6 +348,8 @@ function DraggableTabsTabBar({
 interface DraggableTabTriggerProps extends BoxProps {
   children: React.ReactNode;
   id: string;
+  /** A lone tab grows into the space before its joined action cluster. */
+  fillAvailableWidth?: boolean;
 }
 
 /**
@@ -337,9 +370,12 @@ export const TAB_MAX_WIDTH = "180px";
 function DraggableBrowserTabTrigger({
   value,
   children,
+  joinedTrailingActions = false,
 }: {
   value: string;
   children: React.ReactNode;
+  /** The action cluster beside this trigger continues the same tab surface. */
+  joinedTrailingActions?: boolean;
 }) {
   return (
     <Tabs.Trigger
@@ -348,9 +384,40 @@ function DraggableBrowserTabTrigger({
       // trigger to its content and stop the tab from ever shrinking.
       minWidth={0}
       width="full"
+      height="calc(100% - 1px)"
       overflow="hidden"
       cursor="pointer"
-      transition="all 0.15s ease-in-out"
+      transition="background 0.15s ease-in-out, color 0.15s ease-in-out"
+      // Rounded at the top only, square at the bottom where it runs into the
+      // card. A tab rounded on all four corners is a pill sitting near the card
+      // rather than the top edge of it.
+      borderTopRadius={CARD_RADIUS}
+      borderTopRightRadius={joinedTrailingActions ? 0 : CARD_RADIUS}
+      borderBottomRadius={0}
+      background="transparent"
+      color="fg.muted"
+      // Reserved on every tab and transparent while unselected: a border that
+      // only existed on the selected tab would shift its label by a pixel every
+      // time the selection moved.
+      borderWidth={CARD_BORDER_WIDTH}
+      borderBottomWidth={0}
+      borderRightWidth={joinedTrailingActions ? 0 : CARD_BORDER_WIDTH}
+      borderColor="transparent"
+      // The `enclosed` variant lifts the selected trigger with a drop shadow,
+      // which reads as a raised control — a combo box — rather than as a tab.
+      boxShadow="none"
+      _hover={{ background: "bg.muted", color: "fg" }}
+      // The selected tab IS the card: same surface, same border, same radius,
+      // and the strip's negative bottom margin pulls it down over the card's
+      // top border so no rule runs between the tab and its own content.
+      _selected={{
+        background: "bg.panel",
+        color: "fg",
+        borderColor: CARD_BORDER_COLOR,
+        boxShadow: "none",
+        height: "full",
+        _hover: { background: "bg.panel" },
+      }}
     >
       {children}
     </Tabs.Trigger>
@@ -364,7 +431,12 @@ function DraggableBrowserTabTrigger({
  * @param children - Tab content/trigger
  * @param rest - Additional box props
  */
-function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
+function DraggableTab({
+  id,
+  children,
+  fillAvailableWidth = false,
+  ...rest
+}: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
 
   const {
@@ -396,14 +468,16 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       // Not `data-tab-id`: that already marks a tab's chat textarea
       // (SyncedChatInput), which PromptPlaygroundChat queries to focus.
       data-tab-strip-id={id}
-      // Tabs share the strip rather than each claiming its natural width, so
-      // more of them stay visible as the count grows: they shrink from
-      // TAB_MAX_WIDTH down to TAB_MIN_WIDTH, and only then does the strip
-      // scroll. They are never hidden — a hidden element has a zero-size rect,
-      // which would corrupt @dnd-kit's drop-index math for these sortables.
-      flex="1 1 0"
+      // A tab is as wide as its own title, capped at TAB_MAX_WIDTH, and shrinks
+      // from there down to TAB_MIN_WIDTH as the strip fills; only then does the
+      // strip scroll. Sizing every tab to an equal share instead stretched a
+      // lone tab to its cap and stranded the close button an inch from the name
+      // it belongs to. They are never hidden — a hidden element has a zero-size
+      // rect, which would corrupt @dnd-kit's drop-index math for these
+      // sortables.
+      flex={fillAvailableWidth ? "1 1 0" : "0 1 auto"}
       minWidth={TAB_MIN_WIDTH}
-      maxWidth={TAB_MAX_WIDTH}
+      maxWidth={fillAvailableWidth ? "none" : TAB_MAX_WIDTH}
       alignItems="stretch"
       cursor={isDragging ? "grabbing" : "grab"}
       transform={CSS.Transform.toString(transform)}
@@ -411,6 +485,38 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       opacity={isDragging || isOver ? 0.5 : 1}
       {...attributes}
       {...listeners}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/**
+ * DraggableTabsPanel
+ *
+ * Single Responsibility: draws the card that holds the open tab's content.
+ *
+ * The frame — surface, border, radius — is here rather than around the whole
+ * window so that the tab strip stays outside it and the active tab can overlap
+ * its top border. `overflow: hidden` is what makes the radius survive: the
+ * panes inside paint their own opaque backgrounds and would otherwise square
+ * off the corners they cover.
+ */
+function DraggableTabsPanel({ children, ...props }: BoxProps) {
+  return (
+    <Box
+      data-testid="prompt-card"
+      flex={1}
+      minHeight={0}
+      width="full"
+      display="flex"
+      flexDirection="column"
+      background="bg.panel"
+      borderWidth={CARD_BORDER_WIDTH}
+      borderColor={CARD_BORDER_COLOR}
+      borderRadius={CARD_RADIUS}
+      overflow="hidden"
+      {...props}
     >
       {children}
     </Box>
@@ -432,7 +538,9 @@ const DraggableTabsContent = Tabs.Content;
  *         <DraggableTabsBrowser.Trigger value="tab1">Tab 1</DraggableTabsBrowser.Trigger>
  *       </DraggableTabsBrowser.Tab>
  *     </DraggableTabsBrowser.TabBar>
- *     <DraggableTabsBrowser.Content value="tab1">Content</DraggableTabsBrowser.Content>
+ *     <DraggableTabsBrowser.Panel>
+ *       <DraggableTabsBrowser.Content value="tab1">Content</DraggableTabsBrowser.Content>
+ *     </DraggableTabsBrowser.Panel>
  *   </DraggableTabsBrowser.Window>
  * </DraggableTabsBrowser.Root>
  * ```
@@ -443,5 +551,6 @@ export const DraggableTabsBrowser = {
   TabBar: DraggableTabsTabBar,
   Trigger: DraggableBrowserTabTrigger,
   Tab: DraggableTab,
+  Panel: DraggableTabsPanel,
   Content: DraggableTabsContent,
 };

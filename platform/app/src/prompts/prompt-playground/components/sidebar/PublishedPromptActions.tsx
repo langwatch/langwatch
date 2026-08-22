@@ -5,7 +5,7 @@ import {
   LuClock,
   LuCopyPlus,
   LuEllipsisVertical,
-  LuPencil,
+  LuFolderInput,
   LuTrash2,
 } from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -218,14 +218,14 @@ export function PublishedPromptActions({
               showArrow
             >
               <Menu.Item
-                value="rename"
+                value="move-or-rename"
                 onClick={canRename ? renameHandle : undefined}
                 disabled={!canRename}
                 opacity={canRename ? 1 : 0.5}
                 cursor={canRename ? "pointer" : "not-allowed"}
               >
-                <LuPencil size={16} />
-                <Text as="span">Rename handle</Text>
+                <LuFolderInput size={16} />
+                <Text as="span">Move or rename</Text>
               </Menu.Item>
             </Tooltip>
             <Tooltip

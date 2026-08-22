@@ -202,7 +202,11 @@ export const TemplateLogicMenu = ({
                     gap={2}
                     cursor="pointer"
                     borderRadius="4px"
-                    background={isHighlighted ? "blue.50" : undefined}
+                    // Semantic pair, not a fixed light tint: `blue.50` has no
+                    // dark counterpart, so in dark mode the highlighted row
+                    // painted itself near-white and the text on it disappeared.
+                    background={isHighlighted ? "blue.subtle" : undefined}
+                    color={isHighlighted ? "blue.fg" : undefined}
                     onMouseMove={() => {
                       if (isKeyboardNav || highlightedIndex !== index) {
                         setIsKeyboardNav(false);
@@ -220,7 +224,10 @@ export const TemplateLogicMenu = ({
                     >
                       {construct.keyword}
                     </Text>
-                    <Text fontSize="xs" color="fg.muted">
+                    <Text
+                      fontSize="xs"
+                      color={isHighlighted ? "inherit" : "fg.muted"}
+                    >
                       {construct.description}
                     </Text>
                   </HStack>
@@ -246,7 +253,7 @@ export const TemplateLogicMenu = ({
             display="flex"
             alignItems="center"
             gap={1}
-            _hover={{ color: "blue.500" }}
+            _hover={{ color: "blue.fg" }}
           >
             Learn template syntax
             <ExternalLink size={10} />

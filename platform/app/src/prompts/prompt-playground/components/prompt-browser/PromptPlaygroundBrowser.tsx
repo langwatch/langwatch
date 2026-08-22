@@ -1,19 +1,65 @@
-import { HStack } from "@chakra-ui/react";
-import { LuColumns2 } from "react-icons/lu";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { HStack, IconButton } from "@chakra-ui/react";
+import { LuColumns2, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptTabStrip } from "./PromptTabStrip";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
+import { usePromptBrowserTabController } from "./tab/usePromptBrowserTabController";
+import {
+  CARD_BORDER_COLOR,
+  CARD_BORDER_WIDTH,
+  CARD_RADIUS,
+  TAB_STRIP_TOP_PADDING,
+} from "./ui/cardSurface";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
+
+function SingleTabCloseButton() {
+  const { title, handleClose } = usePromptBrowserTabController();
+  const name = getDisplayHandle(title);
+
+  return (
+    <Tooltip content={`Close ${name}`}>
+      <IconButton
+        aria-label={`Close ${name}`}
+        size="xs"
+        variant="ghost"
+        onClick={handleClose}
+      >
+        <LuX size={14} />
+      </IconButton>
+    </Tooltip>
+  );
+}
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
  * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
+/**
+ * The strip chrome's layout. A lone tab lets the chrome join the card below
+ * it, so the row borrows the card's own surface, border and top-right corner
+ * and stretches to meet it; with several tabs the row is just a row and
+ * centres itself instead.
+ */
+function stripChromeLayout(isSingleTab: boolean) {
+  return {
+    flexShrink: 0,
+    gap: 1,
+    borderColor: CARD_BORDER_COLOR,
+    paddingRight: isSingleTab ? 2 : 3,
+    marginRight: isSingleTab ? 3 : 0,
+    marginTop: isSingleTab ? TAB_STRIP_TOP_PADDING : 0,
+    background: isSingleTab ? "bg.panel" : "transparent",
+    borderTopWidth: isSingleTab ? CARD_BORDER_WIDTH : 0,
+    borderRightWidth: isSingleTab ? CARD_BORDER_WIDTH : 0,
+    borderTopRightRadius: isSingleTab ? CARD_RADIUS : 0,
+    alignSelf: isSingleTab ? "stretch" : "center",
+  } as const;
+}
+
 export function PromptPlaygroundBrowser() {
   const {
     windows,
@@ -95,63 +141,71 @@ export function PromptPlaygroundBrowser() {
               onSelectTab={(tabId) =>
                 handleTabChange({ windowId: tabbedWindow.id, tabId })
               }
+              joinTrailingActions={tabbedWindow.tabs.length === 1}
             />
-            {tabbedWindow.id === activeWindowId && (
-              <>
-                <HStack
-                  flexShrink={0}
-                  paddingLeft={1}
-                  position="relative"
-                  _before={{
-                    content: '""',
-                    position: "absolute",
-                    left: "-10px",
-                    top: 0,
-                    bottom: 0,
-                    width: "10px",
-                    height: "50px",
-                    background:
-                      "linear-gradient(to right, transparent, var(--chakra-colors-bg-panel))",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                  }}
+            {/* Strip chrome, not a toolbar: these are secondary to the tabs
+                they sit beside, so they run at the strip's own button scale
+                rather than the editor toolbar's. Both act on what is already
+                open, and only the one that leaves the playground keeps a word
+                on it. Adding a prompt is not among them: that action belongs to
+                the rail that lists the prompts, which is where it lives.
+
+                Every pane carries the same set. Showing them on the active pane
+                only made two panes that are otherwise identical disagree about
+                what they can do, and left the user hunting for the controls
+                after clicking into the other one. Pointer-down claims the pane
+                before the button's own click runs, so a button acts on the
+                strip the user actually reached for. */}
+            <HStack
+              {...stripChromeLayout(tabbedWindow.tabs.length === 1)}
+              onPointerDownCapture={() =>
+                setActiveWindow({ windowId: tabbedWindow.id })
+              }
+            >
+              <Tooltip content="Compare prompts side by side">
+                <IconButton
+                  aria-label="Compare prompts side by side"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    tabbedWindow.activeTabId &&
+                    handleSplit(tabbedWindow.activeTabId)
+                  }
+                  disabled={!tabbedWindow.activeTabId}
                 >
-                  <ExperimentFromPlaygroundButton
-                    iconOnly={windows.length > 1}
-                  />
-                  <Tooltip content="Compare" disabled={windows.length <= 1}>
-                    <PageLayout.HeaderButton
-                      onClick={() =>
-                        tabbedWindow.activeTabId &&
-                        handleSplit(tabbedWindow.activeTabId)
-                      }
-                      disabled={!tabbedWindow.activeTabId}
-                      title="Split tab to compare prompts side by side"
-                    >
-                      <LuColumns2 size="18px" />
-                      {windows.length <= 1 && "Compare"}
-                    </PageLayout.HeaderButton>
-                  </Tooltip>
-                  <AddPromptButton iconOnly={windows.length > 1} />
-                </HStack>
-              </>
-            )}
+                  <LuColumns2 size={14} />
+                </IconButton>
+              </Tooltip>
+              <ExperimentFromPlaygroundButton
+                iconOnly={windows.length > 1}
+                size="xs"
+                variant="outline"
+              />
+              {tabbedWindow.tabs.length === 1 && tabbedWindow.activeTabId && (
+                <TabIdProvider tabId={tabbedWindow.activeTabId}>
+                  <SingleTabCloseButton />
+                </TabIdProvider>
+              )}
+            </HStack>
           </DraggableTabsBrowser.TabBar>
-          {tabbedWindow.tabs.map((tab) => (
-            <TabIdProvider key={tab.id} tabId={tab.id}>
-              <DraggableTabsBrowser.Content
-                value={tab.id}
-                height="full"
-                borderRadius="lg"
-                boxShadow="md"
-                background="bg.panel"
-                padding={0}
-                minHeight="0"
-              >
-                <PromptBrowserWindowContent />
-              </DraggableTabsBrowser.Content>
-            </TabIdProvider>
-          ))}
+          {/* The card. The strip above stands on the page ground and only the
+              active tab joins this frame, so the content claims the room inside
+              it and nothing else. */}
+          <DraggableTabsBrowser.Panel>
+            {tabbedWindow.tabs.map((tab) => (
+              <TabIdProvider key={tab.id} tabId={tab.id}>
+                <DraggableTabsBrowser.Content
+                  value={tab.id}
+                  height="full"
+                  padding={0}
+                  minHeight="0"
+                  overflow="hidden"
+                >
+                  <PromptBrowserWindowContent />
+                </DraggableTabsBrowser.Content>
+              </TabIdProvider>
+            ))}
+          </DraggableTabsBrowser.Panel>
         </DraggableTabsBrowser.Window>
       ))}
     </DraggableTabsBrowser.Root>

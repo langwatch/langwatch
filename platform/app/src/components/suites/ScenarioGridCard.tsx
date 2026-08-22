@@ -3,8 +3,7 @@
  *
  * Wraps SimulationCard to display a scenario run result as a card
  * with status overlay and a "Target: Scenario (#N)" title.
- * Uses MessagePreview for a lightweight conversation preview that
- * doesn't require the CopilotKit runtime.
+ * Uses MessagePreview for a lightweight conversation preview.
  */
 
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";

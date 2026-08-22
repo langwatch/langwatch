@@ -5,6 +5,7 @@ import {
   HStack,
   IconButton,
   Input,
+  Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -29,6 +30,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { usePromptTags } from "~/prompts/hooks/usePromptTags";
+import type { PromptSnippetVariable } from "~/prompts/utils/snippets/getGetPromptSnippets";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -37,6 +39,21 @@ interface DeployPromptDialogProps {
   configId: string;
   handle: string;
   projectId: string;
+  /** The variables the prompt declares, shown in each tag's code snippet. */
+  variables?: PromptSnippetVariable[];
+}
+
+/**
+ * What the tag field says when creating a tag fails. A name collision is the
+ * one failure the reader can act on, so it is named for the tag they typed
+ * rather than echoed back as the server's own sentence.
+ */
+function addTagErrorMessage({ error, name }: { error: unknown; name: string }) {
+  const message =
+    error instanceof Error ? error.message : "Failed to create tag";
+  return message.toLowerCase().includes("already exists")
+    ? `${name} already exists`
+    : message;
 }
 
 export function DeployPromptDialog({
@@ -45,6 +62,7 @@ export function DeployPromptDialog({
   configId,
   handle,
   projectId,
+  variables,
 }: DeployPromptDialogProps) {
   const { project } = useOrganizationTeamProject();
 
@@ -201,13 +219,7 @@ export function DeployPromptDialog({
       setIsAddingTag(false);
       setNewTagName("");
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create tag";
-      if (message.toLowerCase().includes("already exists")) {
-        setAddTagError(`${name} already exists`);
-      } else {
-        setAddTagError(message);
-      }
+      setAddTagError(addTagErrorMessage({ error, name }));
     } finally {
       setIsSubmittingTag(false);
     }
@@ -231,6 +243,12 @@ export function DeployPromptDialog({
   );
 
   const nonLatestTags = allTags.filter((t) => t.name !== "latest");
+  const hasPendingTagChanges = nonLatestTags.some((tagDef) => {
+    const currentTag = tagDef.id
+      ? (tagsQuery.data ?? []).find((tag) => tag.tagId === tagDef.id)
+      : undefined;
+    return (tagSelections[tagDef.name] ?? "") !== (currentTag?.versionId ?? "");
+  });
 
   return (
     <DialogRoot
@@ -238,47 +256,61 @@ export function DeployPromptDialog({
       onOpenChange={(e) => !e.open && onClose()}
       size="md"
     >
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent
+        width={{ base: "calc(100vw - 24px)", md: "calc(100vw - 48px)" }}
+        maxWidth="640px"
+        maxHeight="calc(100dvh - 48px)"
+        overflow="hidden"
+      >
+        <DialogHeader paddingX={5} paddingTop={5} paddingBottom={2}>
           <DialogTitle>Deploy prompt</DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
-        <DialogBody>
+        <DialogBody paddingX={5} paddingTop={1} overflowY="auto" minHeight={0}>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt versions via the SDK and API.
-              Prompt versions with the production tag are returned by default.
+              Tags let SDK and API callers select a prompt version. The
+              production tag is used when no tag is specified.
             </Text>
 
-            <HStack gap={2}>
-              <Box
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="full"
-                paddingX={3}
-                paddingY={1}
+            <VStack align="stretch" gap={1}>
+              <Text
+                fontSize="xs"
+                fontWeight="medium"
+                color="fg.muted"
+                textTransform="uppercase"
               >
-                <HStack gap={2}>
-                  <Text fontSize="sm" color="fg.muted">
-                    Slug:
-                  </Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {handle}
-                  </Text>
+                Prompt slug
+              </Text>
+              <HStack
+                justify="space-between"
+                gap={3}
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="md"
+                background="bg.subtle"
+                paddingX={3}
+                minHeight="40px"
+              >
+                <Text fontSize="sm" fontFamily="mono" truncate>
+                  {handle}
+                </Text>
+                <Box flexShrink={0}>
                   <CopyButton value={handle} label="Prompt slug" />
-                </HStack>
-              </Box>
-            </HStack>
+                </Box>
+              </HStack>
+            </VStack>
 
             {/* Tag rows */}
             <VStack align="stretch" gap={3}>
               {/* latest row — auto-managed, not editable */}
               <Box
                 borderWidth="1px"
-                borderColor="border"
-                borderRadius="lg"
-                paddingX={4}
-                paddingY={3}
+                borderColor="border.muted"
+                borderRadius="md"
+                background="bg.subtle"
+                paddingX={3}
+                paddingY={2.5}
               >
                 <HStack justify="space-between">
                   <HStack gap={3}>
@@ -286,7 +318,7 @@ export function DeployPromptDialog({
                       width="10px"
                       height="10px"
                       borderRadius="full"
-                      bg="green.400"
+                      bg={latestVersion ? "green.400" : "fg.subtle"}
                       flexShrink={0}
                     />
                     <Text fontWeight="medium" fontSize="sm">
@@ -294,15 +326,27 @@ export function DeployPromptDialog({
                     </Text>
                   </HStack>
                   <HStack gap={2}>
-                    <Text
-                      fontSize="sm"
-                      color="fg.muted"
-                      data-testid="latest-version"
-                    >
-                      {latestVersion ? `v${latestVersion.version}` : "--"}
-                    </Text>
+                    {versionsQuery.isLoading ? (
+                      <Skeleton width="36px" height="16px" />
+                    ) : (
+                      <Text
+                        fontSize="sm"
+                        color="fg.muted"
+                        data-testid="latest-version"
+                      >
+                        {latestVersion
+                          ? `v${latestVersion.version}`
+                          : "No versions yet"}
+                      </Text>
+                    )}
                     <Tooltip content="Automatically points to the latest version number.">
-                      <Box color="fg.muted" cursor="help">
+                      <Box
+                        as="span"
+                        color="fg.muted"
+                        cursor="help"
+                        tabIndex={0}
+                        aria-label="Latest always points to the newest prompt version"
+                      >
                         <Info size={14} />
                       </Box>
                     </Tooltip>
@@ -317,10 +361,10 @@ export function DeployPromptDialog({
                   <Box
                     key={tagDef.name}
                     borderWidth="1px"
-                    borderColor="border"
-                    borderRadius="lg"
-                    paddingX={4}
-                    paddingY={3}
+                    borderColor="border.muted"
+                    borderRadius="md"
+                    paddingX={3}
+                    paddingY={2.5}
                   >
                     <HStack justify="space-between" gap={3}>
                       <HStack gap={3} flexShrink={0}>
@@ -429,6 +473,7 @@ export function DeployPromptDialog({
                           promptHandle={handle}
                           apiKey={project?.apiKey}
                           label={tagDef.name}
+                          variables={variables}
                         >
                           <GeneratePromptApiSnippetDialog.Trigger>
                             <IconButton
@@ -485,7 +530,7 @@ export function DeployPromptDialog({
                   />
                   <Button
                     size="sm"
-                    colorPalette="orange"
+                    colorPalette="blue"
                     onClick={() => void handleAddTagConfirm()}
                     loading={isSubmittingTag}
                   >
@@ -505,7 +550,7 @@ export function DeployPromptDialog({
                 </HStack>
               ) : (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   alignSelf="flex-start"
                   onClick={() => setIsAddingTag(true)}
@@ -515,25 +560,33 @@ export function DeployPromptDialog({
               )}
 
               {addTagError && (
-                <Text fontSize="sm" color="red.500">
+                <Text fontSize="sm" color="fg.error">
                   {addTagError}
                 </Text>
               )}
             </VStack>
           </VStack>
         </DialogBody>
-        <DialogFooter>
+        <DialogFooter
+          paddingX={5}
+          paddingTop={3}
+          paddingBottom={5}
+          borderTopWidth="1px"
+          borderColor="border.muted"
+        >
           <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
+            {hasPendingTagChanges && (
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+            )}
             <Button
               colorPalette="blue"
               size="sm"
               onClick={() => void handleSave()}
               loading={isSaving}
             >
-              Save
+              {hasPendingTagChanges ? "Save changes" : "Done"}
             </Button>
           </HStack>
         </DialogFooter>

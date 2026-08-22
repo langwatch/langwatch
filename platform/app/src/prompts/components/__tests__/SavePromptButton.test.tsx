@@ -55,7 +55,8 @@ function TestWrapper({
 
 describe("SavePromptButton", () => {
   describe("when at latest version with no changes", () => {
-    it("shows 'Saved' and is disabled", () => {
+    /** @scenario "The save button is quiet when there is nothing to save" */
+    it("says there are no changes to save and is disabled", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 5,
         latestVersion: 5,
@@ -79,13 +80,39 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Saved");
+      expect(button).toHaveTextContent("No changes to save");
       expect(button).toBeDisabled();
     });
   });
 
+  describe("when the prompt has no versions yet", () => {
+    /** @scenario "A prompt with no versions yet is simply saved" */
+    it("names the action as a plain save", () => {
+      // Nothing to be the latest of, so there is no version to bump and no
+      // older version to republish: the only action is the first save.
+      mockUseLatestPromptVersion.mockReturnValue({
+        currentVersion: undefined,
+        latestVersion: undefined,
+        nextVersion: undefined,
+        isOutdated: false,
+        isLoading: false,
+      });
+
+      render(
+        <TestWrapper formValues={{ configId: undefined }}>
+          <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={true} />
+        </TestWrapper>,
+      );
+
+      const button = screen.getByTestId("save-prompt-button");
+      expect(button).toHaveTextContent("Save");
+      expect(button).toBeEnabled();
+    });
+  });
+
   describe("when at latest version with changes", () => {
-    it("shows 'Update to vX' and is enabled", () => {
+    /** @scenario "The save button names saving, not the version number" */
+    it("names the action as saving the changes", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 5,
         latestVersion: 5,
@@ -109,13 +136,14 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Save changes");
       expect(button).not.toBeDisabled();
     });
   });
 
   describe("when NOT at latest version with no changes", () => {
-    it("shows 'Update to vX' and is enabled (allows rollback)", () => {
+    /** @scenario "The save button names rollback when an older version is loaded" */
+    it("offers to make the loaded version the latest one", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 3,
         latestVersion: 5,
@@ -139,13 +167,13 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Make this the latest version");
       expect(button).not.toBeDisabled();
     });
   });
 
   describe("when NOT at latest version with changes", () => {
-    it("shows 'Update to vX' and is enabled", () => {
+    it("names the action as saving the changes", () => {
       mockUseLatestPromptVersion.mockReturnValue({
         currentVersion: 3,
         latestVersion: 5,
@@ -169,7 +197,7 @@ describe("SavePromptButton", () => {
       );
 
       const button = screen.getByTestId("save-prompt-button");
-      expect(button).toHaveTextContent("Update to v6");
+      expect(button).toHaveTextContent("Save changes");
       expect(button).not.toBeDisabled();
     });
   });

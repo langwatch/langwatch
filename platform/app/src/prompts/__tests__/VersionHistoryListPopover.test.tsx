@@ -10,6 +10,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
@@ -27,7 +28,10 @@ const mockVersions = [
     handle: "test-prompt",
     version: 3,
     commitMessage: "Latest version",
+    versionCreatedAt: new Date("2026-08-20T09:00:00.000Z"),
     author: { name: "User 1" },
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "system", content: "You are a terse assistant." }],
   },
   {
     id: "config-1",
@@ -35,7 +39,10 @@ const mockVersions = [
     handle: "test-prompt",
     version: 2,
     commitMessage: "Second version",
+    versionCreatedAt: new Date("2026-08-19T09:00:00.000Z"),
     author: { name: "User 1" },
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "system", content: "You are a helpful assistant." }],
   },
   {
     id: "config-1",
@@ -43,7 +50,10 @@ const mockVersions = [
     handle: "test-prompt",
     version: 1,
     commitMessage: "Initial version",
+    versionCreatedAt: new Date("2026-08-18T09:00:00.000Z"),
     author: { name: "User 1" },
+    model: "openai/gpt-4.1",
+    messages: [{ role: "system", content: "You are a helpful assistant." }],
   },
 ] as unknown as VersionedPrompt[];
 
@@ -77,6 +87,22 @@ const renderWithChakra = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 };
 
+const openPopover = async () => {
+  const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+  fireEvent.click(historyButton);
+  await waitFor(() => {
+    expect(screen.getByText("Version history")).toBeInTheDocument();
+  });
+};
+
+/** The one action a version row offers lives behind its overflow menu. */
+const chooseLoadVersion = async (version: number) => {
+  const user = userEvent.setup();
+  await user.click(screen.getByTestId(`version-actions-button-${version}`));
+  const item = await screen.findByTestId(`restore-version-button-${version}`);
+  await user.click(item);
+};
+
 describe("VersionHistoryListPopover", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +117,7 @@ describe("VersionHistoryListPopover", () => {
   });
 
   describe("when loading a previous version", () => {
+    /** @scenario "Loading another version is one deliberate choice" */
     it("calls onRestoreSuccess with version data without making backend API call", async () => {
       const onRestoreSuccess = vi.fn().mockResolvedValue(undefined);
 
@@ -101,20 +128,8 @@ describe("VersionHistoryListPopover", () => {
         />,
       );
 
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
-
-      // Wait for popover to open and find the restore button for v2
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("restore-version-button-2"),
-        ).toBeInTheDocument();
-      });
-
-      // Click restore for version 2
-      const restoreButton = screen.getByTestId("restore-version-button-2");
-      fireEvent.click(restoreButton);
+      await openPopover();
+      await chooseLoadVersion(2);
 
       // Should call onRestoreSuccess with the version 2 data
       await waitFor(() => {
@@ -135,7 +150,7 @@ describe("VersionHistoryListPopover", () => {
       );
     });
 
-    it("does not call onRestoreSuccess for current version", async () => {
+    it("does not offer to load the version already open", async () => {
       const onRestoreSuccess = vi.fn();
 
       renderWithChakra(
@@ -145,18 +160,11 @@ describe("VersionHistoryListPopover", () => {
         />,
       );
 
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
+      await openPopover();
 
-      // Wait for popover to open
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-
-      // Current version (v3) should not have a restore button
+      // Current version (v3) offers no actions of its own
       expect(
-        screen.queryByTestId("restore-version-button-3"),
+        screen.queryByTestId("version-actions-button-3"),
       ).not.toBeInTheDocument();
       expect(onRestoreSuccess).not.toHaveBeenCalled();
     });
@@ -171,29 +179,22 @@ describe("VersionHistoryListPopover", () => {
         />,
       );
 
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
+      await openPopover();
 
-      // Wait for popover to open
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-
-      // V3 (latest) should be marked as current - no restore button
+      // V3 (latest) should be marked as current - no actions
       expect(
-        screen.queryByTestId("restore-version-button-3"),
+        screen.queryByTestId("version-actions-button-3"),
       ).not.toBeInTheDocument();
-      // V2 should have restore button (not current)
+      // V2 and V1 can be loaded
       expect(
-        screen.getByTestId("restore-version-button-2"),
+        screen.getByTestId("version-actions-button-2"),
       ).toBeInTheDocument();
-      // V1 should have restore button (not current)
       expect(
-        screen.getByTestId("restore-version-button-1"),
+        screen.getByTestId("version-actions-button-1"),
       ).toBeInTheDocument();
     });
 
+    /** @scenario "The version the editor is on is marked as current" */
     it("marks specified version as current when currentVersionId is provided", async () => {
       renderWithChakra(
         <VersionHistoryListPopover
@@ -202,27 +203,18 @@ describe("VersionHistoryListPopover", () => {
         />,
       );
 
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
+      await openPopover();
 
-      // Wait for popover to open
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-
-      // V3 should have restore button (not current when editing v2)
       expect(
-        screen.getByTestId("restore-version-button-3"),
+        screen.getByTestId("version-actions-button-3"),
       ).toBeInTheDocument();
-      // V2 should be marked as current - no restore button
       expect(
-        screen.queryByTestId("restore-version-button-2"),
+        screen.queryByTestId("version-actions-button-2"),
       ).not.toBeInTheDocument();
-      // V1 should have restore button (not current)
       expect(
-        screen.getByTestId("restore-version-button-1"),
+        screen.getByTestId("version-actions-button-1"),
       ).toBeInTheDocument();
+      expect(screen.getAllByText("Current")).toHaveLength(1);
     });
 
     it("marks oldest version as current when editing v1", async () => {
@@ -233,49 +225,17 @@ describe("VersionHistoryListPopover", () => {
         />,
       );
 
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
+      await openPopover();
 
-      // Wait for popover to open
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-
-      // V3 should have restore button (not current)
       expect(
-        screen.getByTestId("restore-version-button-3"),
+        screen.getByTestId("version-actions-button-3"),
       ).toBeInTheDocument();
-      // V2 should have restore button (not current)
       expect(
-        screen.getByTestId("restore-version-button-2"),
+        screen.getByTestId("version-actions-button-2"),
       ).toBeInTheDocument();
-      // V1 should be marked as current - no restore button
       expect(
-        screen.queryByTestId("restore-version-button-1"),
+        screen.queryByTestId("version-actions-button-1"),
       ).not.toBeInTheDocument();
-    });
-
-    it("shows 'current' tag on the version being edited", async () => {
-      renderWithChakra(
-        <VersionHistoryListPopover
-          configId="config-1"
-          currentVersionId="version-2" // User is editing v2
-        />,
-      );
-
-      // Open the popover
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
-
-      // Wait for popover to open
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-
-      // Should show "current" tag - only one should exist (for v2)
-      const currentTags = screen.getAllByText("current");
-      expect(currentTags).toHaveLength(1);
     });
   });
 
@@ -306,15 +266,146 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("commit message of a version", () => {
-    const openPopover = async () => {
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+  describe("when a version was saved", () => {
+    /** @scenario "Each version says when it was saved" */
+    it("shows how long ago each version was saved", async () => {
+      const savedAt = new Date(Date.now() - 1000 * 60 * 60 * 3);
+      mockUseQuery.mockReturnValue({
+        data: [
+          {
+            id: "config-1",
+            versionId: "version-1",
+            version: 1,
+            commitMessage: "Initial version",
+            versionCreatedAt: savedAt,
+            author: { name: "User 1" },
+          },
+        ] as unknown as VersionedPrompt[],
+        isLoading: false,
       });
-    };
 
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+      await openPopover();
+
+      const relative = screen.getByText(/hours ago/);
+      // The exact moment stays reachable without cluttering the row.
+      expect(relative).toHaveAttribute(
+        "aria-label",
+        `Saved ${savedAt.toLocaleString()}`,
+      );
+    });
+
+    it("omits the time when the version carries none", async () => {
+      mockUseQuery.mockReturnValue({
+        data: [
+          {
+            id: "config-1",
+            versionId: "version-1",
+            version: 1,
+            commitMessage: "Initial version",
+            author: { name: "User 1" },
+          },
+        ] as unknown as VersionedPrompt[],
+        isLoading: false,
+      });
+
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+      await openPopover();
+
+      expect(screen.getByText("Initial version")).toBeInTheDocument();
+      expect(screen.queryByText(/ago/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("unsaved changes", () => {
+    /** @scenario "Discarding unsaved edits is offered above the list, not beside a version" */
+    it("offers to discard them once, above the list", async () => {
+      const onRestoreSuccess = vi.fn().mockResolvedValue(undefined);
+
+      renderWithChakra(
+        <VersionHistoryListPopover
+          configId="config-1"
+          hasUnsavedChanges={true}
+          onRestoreSuccess={onRestoreSuccess}
+        />,
+      );
+
+      await openPopover();
+
+      expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
+      const discardButtons = screen.getAllByTestId(
+        "discard-local-changes-button",
+      );
+      expect(discardButtons).toHaveLength(1);
+
+      fireEvent.click(discardButtons[0]!);
+
+      // Discarding reloads the version the editor is based on.
+      await waitFor(() => {
+        expect(onRestoreSuccess).toHaveBeenCalledWith(
+          expect.objectContaining({ versionId: "version-3" }),
+        );
+      });
+      expect(toaster.info).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Discarded changes" }),
+      );
+    });
+
+    /** @scenario "The panel is quiet when there is nothing unsaved" */
+    it("says nothing about discarding when there are none", async () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+
+      await openPopover();
+
+      expect(
+        screen.queryByTestId("discard-local-changes-button"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("what a version changed", () => {
+    /** @scenario "A version shows what it changed from the version before it" */
+    it("shows the words removed and the words added", async () => {
+      const user = userEvent.setup();
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+      await openPopover();
+
+      await user.click(screen.getByTestId("version-changes-toggle-3"));
+
+      const changes = await screen.findByTestId("version-changes-3");
+      expect(changes).toHaveTextContent("System prompt");
+      expect(changes).toHaveTextContent("helpful");
+      expect(changes).toHaveTextContent("terse");
+    });
+
+    it("reports a changed model as a setting", async () => {
+      const user = userEvent.setup();
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+      await openPopover();
+
+      await user.click(screen.getByTestId("version-changes-toggle-2"));
+
+      const changes = await screen.findByTestId("version-changes-2");
+      expect(changes).toHaveTextContent("Model");
+      expect(changes).toHaveTextContent("openai/gpt-4.1");
+      expect(changes).toHaveTextContent("openai/gpt-5-mini");
+    });
+
+    /** @scenario "The oldest version offers no comparison" */
+    it("offers no comparison on the oldest version", async () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+      await openPopover();
+
+      expect(
+        screen.getByTestId("version-changes-toggle-3"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("version-changes-toggle-1"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("commit message of a version", () => {
     describe("given the commit message is long", () => {
       describe("when displaying the version history", () => {
         /** @scenario "A long commit message is shown in full" */
@@ -353,14 +444,6 @@ describe("VersionHistoryListPopover", () => {
   });
 
   describe("author of a version", () => {
-    const openPopover = async () => {
-      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
-      fireEvent.click(historyButton);
-      await waitFor(() => {
-        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
-      });
-    };
-
     const renderWithAuthor = (author: unknown) => {
       mockUseQuery.mockReturnValue({
         data: [

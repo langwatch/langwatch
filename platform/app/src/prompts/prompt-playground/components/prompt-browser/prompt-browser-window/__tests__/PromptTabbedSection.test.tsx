@@ -407,22 +407,10 @@ vi.mock("../../ui/TabContext", () => ({
   useTabId: () => tabIdRef.current,
 }));
 
-// Mock CopilotKit
-vi.mock("@copilotkit/react-core", () => ({
-  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useCopilotChat: () => ({
-    visibleMessages: [],
-    appendMessage: vi.fn(),
-    setMessages: vi.fn(),
-    isLoading: false,
-  }),
-  useCopilotContext: () => ({
-    chatComponentsCache: { current: {} },
-  }),
-}));
-
-vi.mock("@copilotkit/react-ui", () => ({
-  CopilotChat: () => <div data-testid="copilot-chat">CopilotChat</div>,
+// The chat mounts the shared conversation renderer, which reaches tRPC for
+// each turn's trace. This suite is about the tab section around it.
+vi.mock("../../../chat/PromptPlaygroundChat", () => ({
+  PromptPlaygroundChat: () => <div data-testid="playground-chat" />,
 }));
 
 /**
@@ -499,12 +487,31 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
     });
 
-    it("does not show border-bottom on tabs in vertical mode", () => {
-      renderPromptTabbedSection({ layoutMode: "vertical" });
+    /** @scenario The drag divider sits above the sub-tab bar when the panes are stacked */
+    it("puts the divider before the tab bar in document order", () => {
+      const { container } = renderPromptTabbedSection({
+        layoutMode: "vertical",
+      });
 
-      // Tabs should not have explicit border-bottom (divider handles it)
-      const tabsList = screen.getByRole("tablist");
-      expect(tabsList).not.toHaveStyle({ borderBottom: "1px solid" });
+      const divider = screen.getByTestId("resizable-divider");
+      const tabsList = container.querySelector('[role="tablist"]');
+      expect(tabsList).toBeInTheDocument();
+      // The handle resizes the prompt above it, so it belongs between that and
+      // the tabs — not overlapping the tab bar's own bottom edge.
+      expect(
+        divider.compareDocumentPosition(tabsList!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario The sub-tab bar closes with a hairline in both layouts */
+    it("shows border-bottom on tabs in vertical mode", () => {
+      const { container } = renderPromptTabbedSection({
+        layoutMode: "vertical",
+      });
+
+      const tabsList = container.querySelector('[role="tablist"]');
+      expect(tabsList).toHaveStyle({ borderBottomStyle: "solid" });
     });
   });
 
@@ -515,6 +522,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(screen.queryByTestId("resizable-divider")).not.toBeInTheDocument();
     });
 
+    /** @scenario The sub-tab bar closes with a hairline in both layouts */
     it("shows border-bottom on tabs in horizontal mode", () => {
       const { container } = renderPromptTabbedSection({
         layoutMode: "horizontal",

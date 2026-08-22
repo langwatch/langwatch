@@ -1,45 +1,95 @@
-import { Button, type ButtonProps, Icon } from "@chakra-ui/react";
-import { LuSend } from "react-icons/lu";
+import { chakra } from "@chakra-ui/react";
+import { LuSend, LuSquare } from "react-icons/lu";
 
 /**
- * Send button for chat input with disabled state handling.
- * Single Responsibility: Renders a clickable send button with visual feedback.
+ * The composer's one action: send, or stop the run that is already going.
+ *
+ * A run in flight takes the button rather than sitting beside it — there is no
+ * queue, so "send" has nothing to mean while a reply is arriving, and the
+ * playground had no way to stop a run at all: the handler existed and the
+ * composer dropped it on the floor.
+ *
+ * Round and fixed-size, matching Langy's composer, so the two controls read as
+ * the same thing in two places.
  */
-export interface ChatSendButtonProps extends Omit<ButtonProps, "onClick"> {
-  /** Whether the button is disabled (in progress or empty input) */
+export interface ChatSendButtonProps {
+  /** A run is in flight: the button stops it instead of sending. */
+  inProgress?: boolean;
+  /** Nothing to send — an empty field. Ignored while a run is in flight. */
   disabled?: boolean;
-  /** Click handler for send action */
   onSend: () => void;
+  onStop?: () => void;
 }
 
 /**
- * Send button for chat input with disabled state handling.
+ * The button's three looks: stopping a run, nothing to send, and ready. Kept
+ * apart from the markup so the button itself reads as one control rather than
+ * as a stack of conditional style props.
  */
+function sendButtonAppearance({
+  stopping,
+  inactive,
+}: {
+  stopping: boolean;
+  inactive: boolean;
+}) {
+  if (stopping) {
+    return {
+      background: "red.solid",
+      color: "white",
+      cursor: "pointer",
+      _hover: { filter: "brightness(1.08)" },
+    } as const;
+  }
+  if (inactive) {
+    return {
+      background: "bg.muted",
+      color: "fg.muted",
+      cursor: "default",
+      _hover: undefined,
+    } as const;
+  }
+  return {
+    background: "orange.solid",
+    color: "white",
+    cursor: "pointer",
+    _hover: { filter: "brightness(1.08)" },
+  } as const;
+}
+
 export function ChatSendButton({
+  inProgress = false,
   disabled = false,
   onSend,
-  ...buttonProps
+  onStop,
 }: ChatSendButtonProps) {
+  const stopping = inProgress && !!onStop;
+  const inactive = stopping ? false : disabled || inProgress;
+
   return (
-    <Button
+    <chakra.button
       type="button"
-      unstyled
-      cursor={disabled ? "not-allowed" : "pointer"}
-      onClick={() => onSend()}
-      disabled={disabled}
-      bg={disabled ? "bg.emphasized" : "orange.solid"}
-      color="white"
-      borderRadius="md"
-      padding={2}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      opacity={disabled ? 0.5 : 1}
-      _hover={disabled ? undefined : { bg: "orange.emphasized" }}
-      transition="all 0.2s"
-      {...buttonProps}
+      aria-label={stopping ? "Stop generating" : "Send message"}
+      onClick={() => (stopping ? onStop?.() : onSend())}
+      disabled={inactive}
+      width="34px"
+      height="34px"
+      borderRadius="full"
+      borderWidth={0}
+      flexShrink={0}
+      display="grid"
+      placeItems="center"
+      {...sendButtonAppearance({ stopping, inactive })}
+      transition="background 150ms ease"
     >
-      <Icon as={LuSend} boxSize="16px" />
-    </Button>
+      {/* The paper-plane's ink sits low-left of its own box, so centring the
+          glyph geometrically leaves it looking low and left. The nudge is
+          optical, and the square needs none of it. */}
+      {stopping ? (
+        <LuSquare size={12} />
+      ) : (
+        <LuSend size={14} style={{ transform: "translate(-1px, 1px)" }} />
+      )}
+    </chakra.button>
   );
 }

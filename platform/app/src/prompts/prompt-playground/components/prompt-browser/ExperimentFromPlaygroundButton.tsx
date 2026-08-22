@@ -1,4 +1,4 @@
-import { Button, Spinner, Text } from "@chakra-ui/react";
+import { Button, type ButtonProps, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
@@ -178,7 +178,7 @@ const convertTabToTarget = (
   };
 };
 
-interface ExperimentFromPlaygroundButtonProps {
+interface ExperimentFromPlaygroundButtonProps extends ButtonProps {
   iconOnly?: boolean;
 }
 
@@ -190,6 +190,7 @@ interface ExperimentFromPlaygroundButtonProps {
  */
 export function ExperimentFromPlaygroundButton({
   iconOnly,
+  ...buttonProps
 }: ExperimentFromPlaygroundButtonProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
@@ -324,8 +325,10 @@ export function ExperimentFromPlaygroundButton({
           title={
             isDisabled ? "Open a prompt to create an experiment" : undefined
           }
+          aria-label="Experiment"
+          {...buttonProps}
         >
-          <FlaskConical size="18px" />
+          <FlaskConical size={14} />
           {!iconOnly && "Experiment"}
         </PageLayout.HeaderButton>
       </Tooltip>

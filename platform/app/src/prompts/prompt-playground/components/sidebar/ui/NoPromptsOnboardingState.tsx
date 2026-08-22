@@ -17,10 +17,10 @@ export function NoPromptsOnboardingState() {
           <EmptyState.Indicator>
             <LuSparkles />
           </EmptyState.Indicator>
-          <EmptyState.Title>Create Your First Prompt</EmptyState.Title>
+          <EmptyState.Title>Create your first prompt</EmptyState.Title>
           <EmptyState.Description>
-            Get started on the prompt playground to design, test, and optimize
-            your AI prompts in one place.
+            Write the instructions, try a real conversation and save a version
+            when it is ready to use.
           </EmptyState.Description>
           <HStack gap={2}>
             <Button
@@ -28,7 +28,7 @@ export function NoPromptsOnboardingState() {
               size="sm"
               onClick={() => void createDraftPrompt()}
             >
-              Create First Prompt
+              Create first prompt
             </Button>
             <SetupWithAgentButton surface="prompts" />
           </HStack>

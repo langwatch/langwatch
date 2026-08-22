@@ -74,6 +74,7 @@ export function ProviderIconGlyph({
       icon={icon}
       monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)}
       size={size}
+      testId={`provider-icon-${provider}`}
     />
   );
 }
