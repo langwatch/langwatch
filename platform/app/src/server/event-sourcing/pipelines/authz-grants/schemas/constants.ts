@@ -2,10 +2,11 @@
 // The organization is the tenant of every event and the aggregate of nothing.
 // Rollout state is not here: the migration's status is the read fork.
 
+// One pipeline carries both aggregate types (ADR-113): the pipeline keeps
+// the name `authz_grant`, which is also what its projection kill-switch and
+// pause keys are spelled with, and each family stamps its own type.
 export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 export const AUTHZ_GRANT_AGGREGATE_TYPE = "authz_grant" as const;
-
-export const AUTHZ_ROLE_PIPELINE_NAME = "authz_role" as const;
 export const AUTHZ_ROLE_AGGREGATE_TYPE = "authz_role" as const;
 
 // Each command names one grant; a command may not straddle aggregates.

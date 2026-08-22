@@ -11,6 +11,9 @@
  * emitted event's shape would have passed throughout.
  */
 import { describe, expect, it } from "vitest";
+import { eventAggregateMismatch } from "../../../domain/aggregateScope";
+import type { Event } from "../../../domain/types";
+import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -19,10 +22,18 @@ import {
   DeleteRoleCommand,
   RevokeGrantCommand,
 } from "../commands/grantsLedgerCommands";
+import { createAuthzGrantsPipeline } from "../pipeline";
 import {
   AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_ROLE_AGGREGATE_TYPE,
 } from "../schemas/constants";
+
+// The pipeline's own declared scope, so a command and its pipeline cannot
+// drift apart: a stamp the store would refuse fails here.
+const { aggregateScope } = createAuthzGrantsPipeline({
+  authzGrantsWriteStore: {} as never,
+  authzAuditTrailStore: {} as never,
+}).metadata;
 
 const ORG = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;
@@ -52,12 +63,7 @@ async function emit(
   handler: { handle: (c: never) => Promise<unknown[]> },
   data: unknown,
 ) {
-  return (await handler.handle({ tenantId: ORG, data } as never)) as {
-    aggregateType: string;
-    aggregateId: string;
-    idempotencyKey: string;
-    occurredAt: number;
-  }[];
+  return (await handler.handle({ tenantId: ORG, data } as never)) as Event[];
 }
 
 describe("authz command aggregate identity", () => {
@@ -93,6 +99,10 @@ describe("authz command aggregate identity", () => {
       expect(event?.aggregateId).toBe("grant_1");
       expect(event?.aggregateId).not.toBe(ORG);
       expect(event?.aggregateType).toBe(AUTHZ_GRANT_AGGREGATE_TYPE);
+      expect(eventAggregateMismatch(aggregateScope, event!)).toBeUndefined();
+      expect(() =>
+        validateEventAggregateType(event!, aggregateScope, 0),
+      ).not.toThrow();
     });
   });
 
@@ -126,6 +136,10 @@ describe("authz command aggregate identity", () => {
       expect(event?.aggregateId).toBe("role_1");
       expect(event?.aggregateId).not.toBe(ORG);
       expect(event?.aggregateType).toBe(AUTHZ_ROLE_AGGREGATE_TYPE);
+      expect(eventAggregateMismatch(aggregateScope, event!)).toBeUndefined();
+      expect(() =>
+        validateEventAggregateType(event!, aggregateScope, 0),
+      ).not.toThrow();
     });
   });
 
