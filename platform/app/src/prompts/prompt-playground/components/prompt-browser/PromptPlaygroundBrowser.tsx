@@ -38,6 +38,28 @@ function SingleTabCloseButton() {
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
  * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
+/**
+ * The strip chrome's layout. A lone tab lets the chrome join the card below
+ * it, so the row borrows the card's own surface, border and top-right corner
+ * and stretches to meet it; with several tabs the row is just a row and
+ * centres itself instead.
+ */
+function stripChromeLayout(isSingleTab: boolean) {
+  return {
+    flexShrink: 0,
+    gap: 1,
+    borderColor: CARD_BORDER_COLOR,
+    paddingRight: isSingleTab ? 2 : 3,
+    marginRight: isSingleTab ? 3 : 0,
+    marginTop: isSingleTab ? TAB_STRIP_TOP_PADDING : 0,
+    background: isSingleTab ? "bg.panel" : "transparent",
+    borderTopWidth: isSingleTab ? CARD_BORDER_WIDTH : 0,
+    borderRightWidth: isSingleTab ? CARD_BORDER_WIDTH : 0,
+    borderTopRightRadius: isSingleTab ? CARD_RADIUS : 0,
+    alignSelf: isSingleTab ? "stretch" : "center",
+  } as const;
+}
+
 export function PromptPlaygroundBrowser() {
   const {
     windows,
@@ -135,30 +157,7 @@ export function PromptPlaygroundBrowser() {
                 before the button's own click runs, so a button acts on the
                 strip the user actually reached for. */}
             <HStack
-              flexShrink={0}
-              gap={1}
-              paddingRight={tabbedWindow.tabs.length === 1 ? 2 : 3}
-              marginRight={tabbedWindow.tabs.length === 1 ? 3 : 0}
-              marginTop={
-                tabbedWindow.tabs.length === 1 ? TAB_STRIP_TOP_PADDING : 0
-              }
-              background={
-                tabbedWindow.tabs.length === 1 ? "bg.panel" : "transparent"
-              }
-              borderTopWidth={
-                tabbedWindow.tabs.length === 1 ? CARD_BORDER_WIDTH : 0
-              }
-              borderRightWidth={
-                tabbedWindow.tabs.length === 1 ? CARD_BORDER_WIDTH : 0
-              }
-              borderColor={CARD_BORDER_COLOR}
-              borderTopRightRadius={
-                tabbedWindow.tabs.length === 1 ? CARD_RADIUS : 0
-              }
-              // The strip stretches its children so a tab can reach the card
-              // below; this row is not a tab, so it centres itself in the row
-              // rather than growing into the card's top edge.
-              alignSelf={tabbedWindow.tabs.length === 1 ? "stretch" : "center"}
+              {...stripChromeLayout(tabbedWindow.tabs.length === 1)}
               onPointerDownCapture={() =>
                 setActiveWindow({ windowId: tabbedWindow.id })
               }

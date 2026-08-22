@@ -139,6 +139,63 @@ function ConversationPart({
   }
 }
 
+/**
+ * Sequential audio playback for a thread's parts: one clip finishing starts
+ * the next. The ordered ids are filtered to audio so a sibling video or
+ * attachment cannot offset the hook's idea of "next", and the returned
+ * accessor answers `undefined` for any part that is not audio, so the caller
+ * hands it every part without re-testing the kind.
+ */
+function useConversationAudio(parts: DisplayPart[]) {
+  const orderedAudioIds = useMemo(
+    () => parts.filter(isAudioPart).map((part) => part.id),
+    [parts],
+  );
+
+  const { getAudioProps } = useSequentialAudioPlayback({
+    orderedIds: orderedAudioIds,
+  });
+
+  return (part: DisplayPart): AudioPlaybackProps | undefined =>
+    isAudioPart(part) ? getAudioProps(part.id) : undefined;
+}
+
+function isAudioPart(
+  part: DisplayPart,
+): part is Extract<DisplayPart, { kind: "media" }> {
+  return part.kind === "media" && part.part.type === "audio";
+}
+
+/**
+ * The thread column's own layout. The drawer's section already pads; the grid
+ * cell does not. A panel pads itself, so neither the first message nor the
+ * avatars beside the messages sit flush against its edges — the horizontal
+ * room matches what a bubble sets inside itself. A panel's height comes from
+ * its content inside the scroll box; a section fills the box it was handed
+ * and scrolls inside it.
+ */
+function threadBodyLayout({
+  compact,
+  panel,
+}: {
+  compact: boolean;
+  panel: ConversationThreadProps["panel"];
+}) {
+  return {
+    align: "stretch",
+    width: "100%",
+    gap: compact ? 2 : 4,
+    padding: compact ? 2 : 0,
+    fontSize: compact ? "xs" : "sm",
+    paddingX: panel ? 4 : undefined,
+    paddingY: panel ? 6 : undefined,
+    maxWidth: panel?.contentMaxWidth,
+    marginX: panel ? "auto" : undefined,
+    height: panel ? undefined : "100%",
+    overflowY: panel ? undefined : "auto",
+  } as const;
+}
+
 export function ConversationThread({
   parts,
   variant = "regular",
@@ -172,23 +229,7 @@ export function ConversationThread({
     // part of the reply does.
   }, [parts, pendingReply, autoScroll]);
 
-  // Ordered audio ids drive sequential playback: one clip finishing starts the
-  // next. Filtered to audio so a sibling video or attachment cannot offset the
-  // hook's idea of "next".
-  const orderedAudioIds = useMemo(
-    () =>
-      parts
-        .filter(
-          (part): part is Extract<DisplayPart, { kind: "media" }> =>
-            part.kind === "media" && part.part.type === "audio",
-        )
-        .map((part) => part.id),
-    [parts],
-  );
-
-  const { getAudioProps } = useSequentialAudioPlayback({
-    orderedIds: orderedAudioIds,
-  });
+  const audioPropsFor = useConversationAudio(parts);
 
   const renderPart = (part: DisplayPart) => (
     <ConversationPart
@@ -200,33 +241,13 @@ export function ConversationThread({
       projectId={projectId}
       structuredOutput={structuredOutput}
       actions={renderPartActions?.(part)}
-      audioPlayback={
-        part.kind === "media" && part.part.type === "audio"
-          ? getAudioProps(part.id)
-          : undefined
-      }
+      audioPlayback={audioPropsFor(part)}
     />
   );
 
   const body = (
     <VStack
-      align="stretch"
-      gap={compact ? 2 : 4}
-      // The drawer's section already pads; the grid cell does not. A panel
-      // pads itself, so neither the first message nor the avatars beside the
-      // messages sit flush against its edges — the horizontal room matches
-      // what a bubble sets inside itself.
-      padding={compact ? 2 : 0}
-      paddingX={panel ? 4 : undefined}
-      paddingY={panel ? 6 : undefined}
-      fontSize={compact ? "xs" : "sm"}
-      width="100%"
-      maxWidth={panel?.contentMaxWidth}
-      marginX={panel ? "auto" : undefined}
-      // A panel's height comes from its content inside the scroll box; a
-      // section fills the box it was handed and scrolls inside it.
-      height={panel ? undefined : "100%"}
-      overflowY={panel ? undefined : "auto"}
+      {...threadBodyLayout({ compact, panel })}
       ref={panel ? undefined : scrollRef}
     >
       {compact

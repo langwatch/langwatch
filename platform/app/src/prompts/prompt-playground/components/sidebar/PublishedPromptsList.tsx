@@ -59,6 +59,80 @@ function PromptRailSkeleton() {
 }
 
 /**
+ * How a folder shows that a dragged row would land in it. Kept apart from the
+ * group's markup so the three props move together and read as one state.
+ */
+function dropTargetStyle(isDropTarget: boolean) {
+  return isDropTarget
+    ? {
+        background: "blue.subtle",
+        outline: "1px solid",
+        outlineColor: "blue.muted",
+      }
+    : { background: "transparent" };
+}
+
+/**
+ * One prompt in the rail. Split out from the folder group so the group reads
+ * as the drop target it is, rather than as a drop target wrapped around a
+ * whole row's worth of drag plumbing.
+ */
+function PromptRailRow({
+  prompt,
+  active,
+  moving,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onOpen,
+}: {
+  prompt: VersionedPrompt;
+  active: boolean;
+  moving: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <LangyContextTarget
+      target={promptContextChip({
+        promptId: prompt.id,
+        handle: prompt.handle,
+      })}
+    >
+      <Sidebar.Item
+        active={active}
+        icon={
+          <ProviderIconGlyph
+            provider={
+              prompt.model?.split("/")[0] as keyof typeof modelProviders
+            }
+            size="16px"
+          />
+        }
+        draggable
+        opacity={moving ? 0.45 : 1}
+        cursor={dragging ? "grabbing" : "grab"}
+        onDragStart={(event: DragEvent<HTMLDivElement>) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData(DRAGGED_PROMPT_TYPE, prompt.id);
+          onDragStart();
+        }}
+        onDragEnd={onDragEnd}
+        onClick={onOpen}
+      >
+        <PublishedPromptContent
+          promptId={prompt.id}
+          promptHandle={prompt.handle}
+          prompt={prompt}
+        />
+      </Sidebar.Item>
+    </LangyContextTarget>
+  );
+}
+
+/**
  * The project's prompt catalogue. Folder membership is the handle prefix, so
  * dropping a row onto a folder uses the existing handle update API and does
  * not introduce a second, drifting folder model.
@@ -176,14 +250,14 @@ export function PublishedPromptsList() {
         </VStack>
       ) : (
         groups.map(({ folder, prompts: groupPrompts }) => {
-          const isDropTarget = dropFolder === folder && draggedPromptId;
+          const isDropTarget = Boolean(
+            dropFolder === folder && draggedPromptId,
+          );
           return (
             <Box
               key={folder ?? "unfiled"}
               borderRadius="md"
-              background={isDropTarget ? "blue.subtle" : "transparent"}
-              outline={isDropTarget ? "1px solid" : undefined}
-              outlineColor={isDropTarget ? "blue.muted" : undefined}
+              {...dropTargetStyle(isDropTarget)}
               transition="background 0.15s ease"
               onDragOver={(event) => {
                 event.preventDefault();
@@ -210,51 +284,19 @@ export function PublishedPromptsList() {
                 }
               >
                 {groupPrompts.map((prompt) => (
-                  <LangyContextTarget
+                  <PromptRailRow
                     key={prompt.id}
-                    target={promptContextChip({
-                      promptId: prompt.id,
-                      handle: prompt.handle,
-                    })}
-                  >
-                    <Sidebar.Item
-                      active={prompt.id === selectedPromptId}
-                      icon={
-                        <ProviderIconGlyph
-                          provider={
-                            prompt.model?.split(
-                              "/",
-                            )[0] as keyof typeof modelProviders
-                          }
-                          size="16px"
-                        />
-                      }
-                      draggable
-                      opacity={movingPromptId === prompt.id ? 0.45 : 1}
-                      cursor={
-                        draggedPromptId === prompt.id ? "grabbing" : "grab"
-                      }
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData(
-                          DRAGGED_PROMPT_TYPE,
-                          prompt.id,
-                        );
-                        setDraggedPromptId(prompt.id);
-                      }}
-                      onDragEnd={() => {
-                        setDraggedPromptId(undefined);
-                        setDropFolder(null);
-                      }}
-                      onClick={() => openPrompt(prompt)}
-                    >
-                      <PublishedPromptContent
-                        promptId={prompt.id}
-                        promptHandle={prompt.handle}
-                        prompt={prompt}
-                      />
-                    </Sidebar.Item>
-                  </LangyContextTarget>
+                    prompt={prompt}
+                    active={prompt.id === selectedPromptId}
+                    moving={movingPromptId === prompt.id}
+                    dragging={draggedPromptId === prompt.id}
+                    onDragStart={() => setDraggedPromptId(prompt.id)}
+                    onDragEnd={() => {
+                      setDraggedPromptId(undefined);
+                      setDropFolder(null);
+                    }}
+                    onOpen={() => openPrompt(prompt)}
+                  />
                 ))}
               </Sidebar.List>
             </Box>

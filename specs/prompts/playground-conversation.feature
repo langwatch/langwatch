@@ -204,6 +204,22 @@ Feature: Prompt Playground conversation
     When the parts are grouped into turns
     Then two turns are produced, numbered in order
 
+  # An untraced part is the start of something rather than the end of it: it
+  # either leads the traced turn that answers it, or the conversation ends
+  # there and it is live content still waiting for its answer.
+
+  @unit
+  Scenario: An untraced part leading a traced one joins that turn
+    Given an untraced part followed by a part carrying a trace
+    When the parts are grouped into turns
+    Then one turn is produced holding both parts
+
+  @unit
+  Scenario: An untraced part with nothing after it is left unnumbered
+    Given a part carrying a trace followed by an untraced part
+    When the parts are grouped into turns
+    Then the trailing untraced part is its own turn with no number
+
   # -- Binding the live turn to the input placeholder -------------------
   #
   # Three production regressions live in these rules. They were covered against
