@@ -53,6 +53,41 @@ describe("parseCliJson", () => {
         { id: "ds_1" },
       ]);
     });
+
+    it("lifts a document a spinner frame left on the same line", () => {
+      expect(parseCliJson('⠋ Searching traces...\r{"traces":[]}')).toEqual({
+        traces: [],
+      });
+    });
+  });
+
+  describe("given stdout that is the command's own usage text", () => {
+    /** @scenario A rejected command is never read as an empty result */
+    it("returns null for help that documents a jq path", () => {
+      const help = [
+        "Usage: langwatch trace search [options]",
+        "",
+        "Options:",
+        "  --limit <n>            Max results to return (default: 25)",
+        "  --jq <expr>            Filter output with a path expression (e.g.",
+        "                         .traces[].traceId)",
+      ].join("\n");
+
+      expect(parseCliJson(help)).toBeNull();
+    });
+
+    /** @scenario A rejected command is never read as an empty result */
+    it("returns null for a rejected flag and the usage under it", () => {
+      const rejected = [
+        "error: unknown option '--start'",
+        "",
+        "Usage: langwatch trace search [options]",
+        "  --jq <expr>  Filter output with a path expression (e.g.",
+        "               .traces[].traceId)",
+      ].join("\n");
+
+      expect(parseCliJson(rejected)).toBeNull();
+    });
   });
 
   describe("given stdout that holds no JSON", () => {

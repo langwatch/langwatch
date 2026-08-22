@@ -53,8 +53,14 @@ function findBalancedEnd(text: string, start: number): number {
   return -1;
 }
 
+/**
+ * Whether the bracket at `start` opens its own line, with nothing but whitespace
+ * before it. A spinner ends its frame with `\r` rather than `\n`, so both count
+ * as the start of a line.
+ */
 function startsAtDocumentBoundary(text: string, start: number): boolean {
-  const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+  const lineStart =
+    Math.max(text.lastIndexOf("\n", start - 1), text.lastIndexOf("\r", start - 1)) + 1;
   return text.slice(lineStart, start).trim().length === 0;
 }
 
@@ -75,18 +81,28 @@ export function parseCliJson(output: string): unknown | null {
   for (let i = 0; i < output.length; i++) {
     const char = output[i]!;
     if (char !== "{" && char !== "[") continue;
+    // A DOCUMENT OPENS ITS OWN LINE. A BRACKET INSIDE PROSE IS PROSE.
+    //
+    // Without this the scan reached into sentences. `langwatch trace search
+    // --start now-1d` names a flag the command does not have, so the CLI
+    // printed `error: unknown option '--start'` followed by its usage, and that
+    // usage documents `--jq` with the example `.traces[].traceId`. The `[]` in
+    // it parses as an empty array, so a REJECTED command became the JSON
+    // document `[]`. The agent read that as "no traces in the last day" and
+    // reported it as a count. Every `--help` did the same. When nothing here is
+    // a document, the command's own output is what stays (see the null
+    // contract above).
+    if (!startsAtDocumentBoundary(output, i)) continue;
     if (++candidates > MAX_CANDIDATES) break;
 
     const end = findBalancedEnd(output, i);
     if (end === -1) {
-      // A JSON-looking document that starts at the beginning of a line but
-      // never closes is a truncated OUTER result. Do not continue walking into
-      // it and accidentally promote a complete nested object (for example one
-      // trace's {"output":{"value":"…"}}) into the result for the whole
-      // command. That was how an oversized trace search rendered an unrelated
-      // sentence as its card.
-      if (startsAtDocumentBoundary(output, i)) return null;
-      continue;
+      // A JSON-looking document that opens a line but never closes is a
+      // truncated OUTER result. Do not walk into it and promote a complete
+      // nested object (for example one trace's {"output":{"value":"…"}}) into
+      // the result for the whole command. That was how an oversized trace
+      // search rendered an unrelated sentence as its card.
+      return null;
     }
     const parsed = tryParse(output.slice(i, end + 1));
     if (parsed) return parsed.value;
