@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0](https://github.com/langwatch/langwatch/compare/skills@v1.2.0...skills@v1.3.0) (2026-08-22)
+
+
+### Features
+
+* **langy:** minimal harness, own system prompt, scoped tools, outcome-based judge, overfit-resistant skills ([#7266](https://github.com/langwatch/langwatch/issues/7266)) ([084324f](https://github.com/langwatch/langwatch/commit/084324f9db077cdaea0cc822ff505485b593d278))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
+* **deps:** bump chalk from 5.6.2 to 6.0.0 ([#6803](https://github.com/langwatch/langwatch/issues/6803)) ([82c62ea](https://github.com/langwatch/langwatch/commit/82c62eacb15d9a9ae33e5f4a14da82feaf1de033))
+
+
+### Documentation
+
+* **agent-simulations:** use the skill card on the connect-your-agent page ([#7155](https://github.com/langwatch/langwatch/issues/7155)) ([65307a1](https://github.com/langwatch/langwatch/commit/65307a16eebdc9c7dfbc97a0fd2f8de8d1683048))
+
 ## [1.2.0](https://github.com/langwatch/langwatch/compare/skills@v1.1.0...skills@v1.2.0) (2026-08-18)
 
 

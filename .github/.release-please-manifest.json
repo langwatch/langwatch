@@ -6,6 +6,6 @@
   "mcp/typescript": "2.0.0",
   "services/langevals": "3.0.0",
   ".": "3.16.0",
-  "skills": "1.2.0",
+  "skills": "1.3.0",
   "plugins/langwatch": "1.0.0"
 }
