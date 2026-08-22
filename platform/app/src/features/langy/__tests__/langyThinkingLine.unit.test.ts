@@ -36,10 +36,10 @@ describe("langyThinkingLine", () => {
         messages: [user, assistant([])],
         elapsedMs: 3_000,
       });
-      expect(line.text).toBe("Preparing Langy's workspace…");
-      expect(line.tone).toBe("waiting");
+      expect(line?.text).toBe("Preparing Langy's workspace…");
+      expect(line?.tone).toBe("waiting");
       // And CRUCIALLY: no cycling. Cycling reads as progress.
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("says thinking on a follow-up, never the startup ladder", () => {
@@ -54,9 +54,9 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 3_000,
       });
-      expect(line.text).toBe("Thinking…");
-      expect(line.tone).toBe("waiting");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.text).toBe("Thinking…");
+      expect(line?.tone).toBe("waiting");
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("never reads the previous reply as the current turn's output", () => {
@@ -71,8 +71,8 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 1_000,
       });
-      expect(line.text).not.toBe("Writing…");
-      expect(line.tone).toBe("waiting");
+      expect(line?.text).not.toBe("Writing…");
+      expect(line?.tone).toBe("waiting");
     });
 
     it("still escalates a follow-up that stays silent too long", () => {
@@ -98,9 +98,9 @@ describe("langyThinkingLine", () => {
         messages: [user, assistant([])],
         elapsedMs: 7_000,
       });
-      expect(line.text).toBe("Starting Langy…");
-      expect(line.tone).toBe("waiting");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.text).toBe("Starting Langy…");
+      expect(line?.tone).toBe("waiting");
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("admits it is still starting once the silence stops being normal", () => {
@@ -108,8 +108,8 @@ describe("langyThinkingLine", () => {
         messages: [user],
         elapsedMs: THINKING_STILL_STARTING_MS,
       });
-      expect(line.text).toBe("Still starting up…");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.text).toBe("Still starting up…");
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("says it is slow when it is slow", () => {
@@ -117,17 +117,17 @@ describe("langyThinkingLine", () => {
         messages: [user],
         elapsedMs: THINKING_SLOW_MS,
       });
-      expect(line.text).toContain("longer than usual");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.text).toContain("longer than usual");
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("eventually LOOKS STUCK, because it is", () => {
       // The line that would have saved a session: at 97s, with nothing on the
       // wire, the honest word is "stuck" — not "Reading the whole file".
       const line = langyThinkingLine({ messages: [user], elapsedMs: 97_000 });
-      expect(line.tone).toBe("stuck");
-      expect(line.text).toContain("stuck");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.tone).toBe("stuck");
+      expect(line?.text).toContain("stuck");
+      expect(line?.allowWhimsy).toBe(false);
       expect(THINKING_STUCK_MS).toBeLessThan(97_000);
     });
 
@@ -138,7 +138,7 @@ describe("langyThinkingLine", () => {
         THINKING_SLOW_MS,
         THINKING_STUCK_MS,
       ].map(
-        (elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs }).tone,
+        (elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs })?.tone,
       );
       expect(tones).toEqual(["waiting", "waiting", "waiting", "stuck"]);
     });
@@ -159,10 +159,10 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 5_000,
       });
-      expect(line.tone).toBe("working");
+      expect(line?.tone).toBe("working");
       // The real command, not a guess about it.
-      expect(line.text.toLowerCase()).toContain("trace");
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.text.toLowerCase()).toContain("trace");
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("ignores a tool that has already settled — that is not what is running", () => {
@@ -180,7 +180,7 @@ describe("langyThinkingLine", () => {
         elapsedMs: 5_000,
       });
       // The settled call must not be narrated as though it were still running.
-      expect(line.text.toLowerCase()).not.toContain("trace");
+      expect(line?.text.toLowerCase()).not.toContain("trace");
     });
 
     it("never claims the turn is starting up once a tool has settled", () => {
@@ -201,16 +201,18 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 5_000,
       });
-      expect(line.text).not.toContain("Starting");
-      expect(line.text).not.toContain("Preparing");
-      expect(line.tone).toBe("working");
+      expect(line?.text).not.toContain("Starting");
+      expect(line?.text).not.toContain("Preparing");
+      expect(line?.tone).toBe("working");
     });
   });
 
   describe("given the model is genuinely generating", () => {
-    it("says so, and only THEN allows whimsy", () => {
-      // A joke about Langy's character claims nothing about the work, and here
-      // the work is real: tokens are arriving.
+    /** @scenario The streaming answer replaces the thinking line */
+    it("renders no line at all, the streaming answer speaks for itself", () => {
+      // The prose is on screen right above where this line would sit, so a
+      // second row under it read as the panel still waiting for the reply
+      // that was visibly arriving.
       const line = langyThinkingLine({
         messages: [
           user,
@@ -218,8 +220,7 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 5_000,
       });
-      expect(line.tone).toBe("working");
-      expect(line.allowWhimsy).toBe(true);
+      expect(line).toBeNull();
     });
 
     it("does not go stuck while tokens are still arriving", () => {
@@ -227,7 +228,7 @@ describe("langyThinkingLine", () => {
         messages: [user, assistant([{ type: "text", text: "still writing" }])],
         elapsedMs: 200_000,
       });
-      expect(line.tone).toBe("working");
+      expect(line).toBeNull();
     });
   });
 
@@ -240,10 +241,10 @@ describe("langyThinkingLine", () => {
         elapsedMs: 3_000,
         hasLiveReasoning: true,
       });
-      expect(line.text).toBe("Thinking…");
-      expect(line.tone).toBe("working");
+      expect(line?.text).toBe("Thinking…");
+      expect(line?.tone).toBe("working");
       // The reasoning stream itself is the show — no whimsy cycling on top.
-      expect(line.allowWhimsy).toBe(false);
+      expect(line?.allowWhimsy).toBe(false);
     });
 
     it("does not escalate to stuck while reasoning keeps arriving", () => {
@@ -252,7 +253,7 @@ describe("langyThinkingLine", () => {
         elapsedMs: 200_000,
         hasLiveReasoning: true,
       });
-      expect(line.tone).toBe("working");
+      expect(line?.tone).toBe("working");
     });
 
     it("lets a running tool win — the tool line is more specific than Thinking…", () => {
@@ -270,7 +271,7 @@ describe("langyThinkingLine", () => {
         elapsedMs: 5_000,
         hasLiveReasoning: true,
       });
-      expect(line.text.toLowerCase()).toContain("trace");
+      expect(line?.text.toLowerCase()).toContain("trace");
     });
   });
 

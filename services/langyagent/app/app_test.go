@@ -67,8 +67,10 @@ type fakeWorker struct {
 	// LLM call failed with, riding the agent_error frame as a reason.
 	llmErr   herr.E
 	llmErrOK bool
-	// servedTurn stubs HasServedTurn — drives the ready-status wording.
+	// servedTurn / prewarmed stub HasServedTurn and Prewarmed — they drive the
+	// ready-status wording.
 	servedTurn bool
+	prewarmed  bool
 	// forwardedFailure / forwardedTurnSpans record the deferred customer
 	// turn-span forward: the failure it carried (nil on success) and that the
 	// forward happened at all.
@@ -89,6 +91,7 @@ func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
 func (w *fakeWorker) Release()            { w.released++ }
 func (w *fakeWorker) Touch()              { w.touched++ }
 func (w *fakeWorker) HasServedTurn() bool { return w.servedTurn }
+func (w *fakeWorker) Prewarmed() bool     { return w.prewarmed }
 func (w *fakeWorker) ForwardTurnSpan(_ trace.SpanContext, _, _ time.Time, failure *domain.TurnFailure) {
 	w.forwardedFailure = failure
 	w.forwardedTurnSpans++
@@ -562,6 +565,34 @@ func TestApp_Turn_WarmWorkerEmitsThinkingStatus(t *testing.T) {
 
 	if got := statusOf(relay.stream.emitted); got != statusThinking {
 		t.Errorf("warm readiness status = %q, want %q", got, statusThinking)
+	}
+}
+
+// A pre-warmed worker's first turn thinks: its boot happened while the panel
+// sat open, so "Starting Langy…" would name a startup the user never waited
+// on.
+func TestApp_Turn_PrewarmedWorkerEmitsThinkingStatus(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true, prewarmed: true}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("prewarmed readiness status = %q, want %q", got, statusThinking)
+	}
+}
+
+// A follow-up whose worker was reaped respawns on the persisted session — the
+// conversation already has replies (the dispatch carries a history seed), and
+// "Starting Langy…" there reads as the workspace having vanished mid-chat.
+func TestApp_Turn_FollowUpRespawnEmitsThinkingStatus(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	relay := &fakeRelay{}
+	r := req()
+	r.HistorySeed = "THE CONVERSATION SO FAR: earlier exchange"
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), r)
+
+	if got := statusOf(relay.stream.emitted); got != statusThinking {
+		t.Errorf("follow-up respawn readiness status = %q, want %q", got, statusThinking)
 	}
 }
 

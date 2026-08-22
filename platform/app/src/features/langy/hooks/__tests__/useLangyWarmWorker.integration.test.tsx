@@ -46,6 +46,7 @@ const props = (over: Partial<HookProps> = {}): HookProps => ({
   isOpen: true,
   conversationId: null,
   pendingConversationId: null,
+  turnInFlight: false,
   model: "openai/gpt-5-mini",
   ...over,
 });
@@ -105,6 +106,45 @@ describe("useLangyWarmWorker", () => {
       });
 
       expect(useLangyStore.getState().pendingConversationId).toBeNull();
+    });
+  });
+
+  describe("when a turn is streaming", () => {
+    /** @scenario No warm fires while a turn is streaming */
+    it("holds every warm until the turn settles, then fires it", () => {
+      // A mid-stream model switch re-arms a warm carrying the NEW picker
+      // model; fired live it asked the manager for a worker the running turn
+      // did not match, and the manager used to kill the turn's worker.
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props({
+          conversationId: "conv-live",
+          turnInFlight: true,
+        }),
+      });
+      expect(mutate).not.toHaveBeenCalled();
+
+      rerender(
+        props({
+          conversationId: "conv-live",
+          turnInFlight: true,
+          model: "gemini/gemini-3.7-flash",
+        }),
+      );
+      expect(mutate).not.toHaveBeenCalled();
+
+      rerender(
+        props({
+          conversationId: "conv-live",
+          turnInFlight: false,
+          model: "gemini/gemini-3.7-flash",
+        }),
+      );
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate.mock.calls[0]![0]).toEqual({
+        projectId: "proj-1",
+        conversationId: "conv-live",
+        modelOverride: "gemini/gemini-3.7-flash",
+      });
     });
   });
 

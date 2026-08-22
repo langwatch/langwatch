@@ -112,13 +112,19 @@ Feature: Langy worker pre-warm on panel open
 
     # A pre-warm fills pool slots with workers that may never see a message. A
     # real turn's spawn takes priority: it evicts the least-recently-active
-    # IDLE worker rather than queueing behind one. A warm may only evict a
-    # worker that never served a turn — such a worker is a pure warm cache,
-    # and the newest warm follows the user's attention, so it wins the slot.
-    # A worker that has served a turn holds real session state; a warm never
-    # takes its slot. Seen live on a two-slot pool: stale warm caches filled
-    # the pool, every later panel-open warm silently no-oped, and the send it
-    # was meant to speed up paid a cold spawn.
+    # IDLE worker rather than queueing behind one. A warm evicts by the same
+    # pick order — the newest warm follows the user's attention, and an
+    # evicted worker's conversation survives in the persistent session store,
+    # so its next turn resumes cheaply with the provider's prompt cache
+    # intact. Only a pool where every worker is running a turn refuses a
+    # warm. Seen live on a two-slot pool: two served-but-idle workers held
+    # every slot, every panel-open warm silently no-oped, and the send it was
+    # meant to speed up paid a cold spawn in front of the user.
+    #
+    # A warm is a hint, never an order: whatever credentials it carries, it
+    # must not tear down live work. Seen live: a background warm resolved a
+    # slightly different credential signature than the running turn and the
+    # manager killed the worker MID-REPLY.
     @unit
     Scenario: A real turn's spawn evicts an idle worker at capacity
       Given the pool is at its worker cap
@@ -136,20 +142,38 @@ Feature: Langy worker pre-warm on panel open
       And the outbox redelivers the turn when a slot frees
 
     @unit
-    Scenario: A warm at capacity evicts a stale warm worker that never served
+    Scenario: A warm at capacity evicts the least-recently-active idle worker
       Given the pool is at its worker cap
-      And at least one idle worker has never served a turn
+      And at least one worker has no turn in flight
       When a warm request needs a worker for a new conversation
-      Then that never-served idle worker is killed
+      Then the least-recently-active idle worker is killed
       And the new warm worker takes the freed slot
 
     @unit
-    Scenario: A warm never evicts a worker that has served a turn
+    Scenario: A warm never disturbs a busy worker
       Given the pool is at its worker cap
-      And every worker has served a turn
+      And every worker has a turn in flight
       When a warm request needs a worker for a new conversation
       Then the pool refuses with the capacity error
       And every running worker is left alone
+
+    @unit
+    Scenario: A warm never replaces the conversation's live worker
+      Given a conversation's worker is running a turn
+      When a warm arrives for that conversation carrying different credentials
+      Then the live worker is returned untouched
+      And nothing is killed or respawned
+
+    # The panel half of the same guard: while a turn streams, the worker is
+    # provably alive, and a mid-stream model switch re-arms a warm with the
+    # NEW picker model — fired live it names a worker the running turn does
+    # not match.
+    @unit
+    Scenario: No warm fires while a turn is streaming
+      Given the panel has a turn in flight
+      When the picker model changes or the conversation comes on screen
+      Then no warm is sent
+      And the pending warm fires once the turn settles
 
     # The panel half of the same rule: one fresh-chat warm per open used to be
     # the cap, so the new-chat button after a first warm sent no warm at all,

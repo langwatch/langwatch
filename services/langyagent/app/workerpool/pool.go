@@ -456,13 +456,16 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 	return p.acquire(ctx, conversationID, creds, true)
 }
 
-// AcquireWarm is Acquire for a pre-warm. At capacity it may evict an idle
-// worker that has NEVER served a turn — such a worker is a pure warm cache,
-// and the newest warm follows the user's attention, so it wins the slot. A
-// worker that HAS served a turn holds real session state and is never evicted
-// for a warm; when every slot holds one, the warm fails with ErrMaxWorkers.
-// Without this a small pool fills with stale warm caches, every later warm
-// silently no-ops, and the send it was meant to speed up pays a cold spawn.
+// AcquireWarm is Acquire for a pre-warm, with two softenings that keep a
+// speculative warm from ever costing the user anything. At capacity it evicts
+// the least-recently-active IDLE worker — served or not — because the newest
+// warm follows the user's attention and an evicted worker's conversation
+// survives in the persistent session store, so its next turn resumes cheaply
+// with the provider's prompt cache intact. Only a pool where every worker is
+// BUSY refuses with ErrMaxWorkers. And a warm whose credentials mismatch the
+// conversation's live worker returns that worker untouched instead of
+// replacing it (see acquire): a warm must never kill a worker, least of all
+// one running a turn.
 func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
 	return p.acquire(ctx, conversationID, creds, false)
 }
@@ -476,9 +479,19 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 			p.mu.Unlock()
 			return w, nil
 		}
-		// Capability mismatch: kill the existing worker, then fall through to
-		// the regular spawn path. We release the lock around kill so the exit
-		// goroutine can land its cleanup without contending.
+		// A warm is a speculative hint, so a signature mismatch returns the
+		// live worker untouched: killing here would tear down a worker that
+		// may be MID-TURN just because a background warm resolved slightly
+		// different credentials, and the user watches their reply die. The
+		// next real turn carries the authoritative credentials and does the
+		// replacement below.
+		if !forTurn {
+			p.mu.Unlock()
+			return w, nil
+		}
+		// Capability mismatch on a turn: kill the existing worker, then fall
+		// through to the regular spawn path. We release the lock around kill
+		// so the exit goroutine can land its cleanup without contending.
 		p.mu.Unlock()
 		p.kill(conversationID, "credential capability changed")
 		p.mu.Lock()
@@ -532,15 +545,11 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 	// evicts idle workers (the reaper's own pick order) until a slot opens; the
 	// loop re-checks because a concurrent spawner can take the freed slot first.
 	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
-		var victim string
-		var found bool
 		reason := "evicted: capacity needed for a turn's worker"
-		if forTurn {
-			victim, found = p.idleVictimLocked()
-		} else {
-			victim, found = p.neverServedIdleVictimLocked()
+		if !forTurn {
 			reason = "evicted: capacity needed for a newer warm worker"
 		}
+		victim, found := p.idleVictimLocked()
 		if !found {
 			p.mu.Unlock()
 			return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
@@ -566,6 +575,9 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 	if err != nil {
 		return nil, err
 	}
+	// Stamped before publication (immutable after): the status copy for this
+	// worker's first turn depends on who booted it.
+	w.prewarmed = !forTurn
 	p.mu.Lock()
 	p.workers[conversationID] = w
 	p.mu.Unlock()
@@ -580,23 +592,6 @@ func (p *Pool) idleVictimLocked() (conversationID string, found bool) {
 	for id, w := range p.workers {
 		idle, seen := w.idleSince()
 		if !idle {
-			continue
-		}
-		if !found || seen.Before(oldest) {
-			conversationID, oldest, found = id, seen, true
-		}
-	}
-	return conversationID, found
-}
-
-// neverServedIdleVictimLocked is idleVictimLocked restricted to workers that
-// have never completed a turn — the only workers a warm may evict (see
-// AcquireWarm). Caller holds p.mu; p.mu -> w.mu lock order matches reapIdle.
-func (p *Pool) neverServedIdleVictimLocked() (conversationID string, found bool) {
-	var oldest time.Time
-	for id, w := range p.workers {
-		idle, seen := w.idleSince()
-		if !idle || w.HasServedTurn() {
 			continue
 		}
 		if !found || seen.Before(oldest) {

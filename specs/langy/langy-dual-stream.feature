@@ -58,7 +58,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
 
   @unit
   Scenario: A worker that has not served a turn yet says it is starting up
-    Given a turn is dispatched to a worker that has not served a turn yet
+    Given a brand-new conversation's turn spawned a worker that has not served a turn
     When the manager opens the turn
     Then it emits the status "Starting Langy…" before the first agent frame
 
@@ -66,6 +66,22 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   Scenario: A warm worker goes straight to thinking
     Given a turn is dispatched to a worker that has already served a turn
     When the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  # The startup line is reserved for the one wait the user really has: a
+  # first-ever boot. A pre-warmed worker booted while the panel sat open, and
+  # a reaped follow-up worker respawns fast on the persisted session; either
+  # saying "starting" reads as the workspace having vanished.
+  @unit
+  Scenario: A pre-warmed worker's first turn goes straight to thinking
+    Given a turn is dispatched to a worker a pre-warm already booted
+    When the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  @unit
+  Scenario: A follow-up on a respawned worker goes straight to thinking
+    Given a conversation with earlier replies whose worker was reaped
+    When the next turn respawns the worker and the manager opens the turn
     Then it emits the status "Thinking…" and never the starting-up line
 
   @unit

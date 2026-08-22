@@ -80,6 +80,12 @@ type Worker struct {
 	projectID         string
 	langwatchEndpoint string
 
+	// prewarmed records that a pre-warm, not a turn, spawned this worker. Set
+	// once before the worker is published to the registry, immutable after, so
+	// it is read without the lock. The manager's pre-first-frame status reads
+	// it: a pre-warmed worker's first turn already has its boot behind it.
+	prewarmed bool
+
 	mu sync.Mutex
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
@@ -174,6 +180,11 @@ func (w *Worker) HasServedTurn() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return len(w.handled) > 0
+}
+
+// Prewarmed reports whether a pre-warm spawned this worker (see the field).
+func (w *Worker) Prewarmed() bool {
+	return w.prewarmed
 }
 
 // Release marks the worker idle again and records the turn as recently-handled so

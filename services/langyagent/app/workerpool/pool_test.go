@@ -297,31 +297,12 @@ func TestPool_Acquire_AtCapacityAllBusyReturnsErrMaxWorkers(t *testing.T) {
 	}
 }
 
-// @scenario "A warm at capacity evicts a stale warm worker that never served"
-func TestPool_AcquireWarm_AtCapacityEvictsNeverServedIdleWorker(t *testing.T) {
+// @scenario "A warm at capacity evicts the least-recently-active idle worker"
+func TestPool_AcquireWarm_AtCapacityEvictsIdleWorker(t *testing.T) {
 	p := newTestPool(1)
-	// The slot holds a warm cache: an idle worker no message ever reached.
-	p.workers["stale-warm"] = &Worker{conversationID: "stale-warm"}
-	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
-		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
-	})
-	// The spawn itself fails in this environment (no sessions root); the
-	// contract under test is that capacity was NOT the refusal and the stale
-	// warm cache gave up its slot.
-	if herr.IsCode(err, domain.ErrMaxWorkers) {
-		t.Fatalf("a warm must evict a never-served idle worker instead of refusing at capacity, got %v", err)
-	}
-	p.mu.Lock()
-	_, stillThere := p.workers["stale-warm"]
-	p.mu.Unlock()
-	if stillThere {
-		t.Fatalf("the never-served idle worker should have been evicted for the newer warm")
-	}
-}
-
-// @scenario "A warm never evicts a worker that has served a turn"
-func TestPool_AcquireWarm_AtCapacityRefusesWhenEveryWorkerHasServed(t *testing.T) {
-	p := newTestPool(1)
+	// The slot holds an idle worker that HAS served a turn. Its conversation
+	// survives in the persistent session store, so evicting it costs only a
+	// cheap resume later — the newest warm follows the user's attention.
 	served := &Worker{conversationID: "existing"}
 	if served.ClaimTurn("t1") != app.ClaimGranted {
 		t.Fatalf("claiming the seeded worker's turn should be granted")
@@ -331,14 +312,72 @@ func TestPool_AcquireWarm_AtCapacityRefusesWhenEveryWorkerHasServed(t *testing.T
 	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
+	// The spawn itself fails in this environment (no sessions root); the
+	// contract under test is that capacity was NOT the refusal and the idle
+	// worker gave up its slot.
+	if herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("a warm must evict an idle worker instead of refusing at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if stillThere {
+		t.Fatalf("the idle worker should have been evicted for the newer warm")
+	}
+}
+
+// @scenario "A warm never disturbs a busy worker"
+func TestPool_AcquireWarm_AtCapacityAllBusyRefuses(t *testing.T) {
+	p := newTestPool(1)
+	busy := &Worker{conversationID: "existing"}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["existing"] = busy
+	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
 	if !herr.IsCode(err, domain.ErrMaxWorkers) {
-		t.Fatalf("expected herr(ErrMaxWorkers) for a warm when every worker has served, got %v", err)
+		t.Fatalf("expected herr(ErrMaxWorkers) for a warm when every worker is busy, got %v", err)
 	}
 	p.mu.Lock()
 	_, stillThere := p.workers["existing"]
 	p.mu.Unlock()
 	if !stillThere {
-		t.Fatalf("a warm must not evict a worker that holds real session state")
+		t.Fatalf("a warm must never evict a worker that is running a turn")
+	}
+}
+
+// @scenario "A warm never replaces the conversation's live worker"
+func TestPool_AcquireWarm_CredentialMismatchReturnsLiveWorkerUntouched(t *testing.T) {
+	p := newTestPool(4)
+	creds := domain.Credentials{
+		Model: "openai/gpt-5-mini", LangwatchAPIKey: "k", LLMVirtualKey: "vk",
+		GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	}
+	// The conversation's worker is MID-TURN when a background warm arrives
+	// carrying a different model. Killing it here killed real replies in the
+	// field ("pi worker process exited mid-turn"); the warm must yield.
+	busy := &Worker{conversationID: "c", credSig: sigOf(creds)}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["c"] = busy
+
+	warmCreds := creds
+	warmCreds.Model = "gemini/gemini-3.7-flash"
+	got, err := p.AcquireWarm(context.Background(), "c", warmCreds)
+	if err != nil {
+		t.Fatalf("a mismatched warm should return the live worker, got error %v", err)
+	}
+	if got.(*Worker) != busy {
+		t.Fatalf("a mismatched warm must return the conversation's live worker untouched")
+	}
+	p.mu.Lock()
+	still := p.workers["c"]
+	p.mu.Unlock()
+	if still != busy {
+		t.Fatalf("the live worker must not be killed or replaced by a warm")
 	}
 }
 

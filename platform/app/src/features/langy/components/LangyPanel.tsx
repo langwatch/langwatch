@@ -979,24 +979,6 @@ function LangyPanel({
     setMakeDefaultPlan(null);
   };
 
-  // Pre-warm the worker on panel open and on conversation change, so the first
-  // message finds it booted (specs/langy/langy-worker-prewarm.feature). The
-  // model is passed only after both model queries settle, the picker's value
-  // is what the turn will carry, and warming before the allowlist could snap
-  // it away would boot a worker the turn cannot reuse. Fire-and-forget: the
-  // hook surfaces nothing.
-  const modelQueriesSettled =
-    !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
-  useLangyWarmWorker({
-    projectId,
-    isOpen,
-    conversationId: activeConversationId,
-    pendingConversationId,
-    model: modelQueriesSettled
-      ? modelOverride || langyDefaultModel || null
-      : null,
-  });
-
   const {
     messages,
     sendMessage,
@@ -1008,6 +990,27 @@ function LangyPanel({
     resetEngine,
     clearError,
   } = useLangyChatEngine({ transport });
+
+  // Pre-warm the worker on panel open and on conversation change, so the first
+  // message finds it booted (specs/langy/langy-worker-prewarm.feature). The
+  // model is passed only after both model queries settle, the picker's value
+  // is what the turn will carry, and warming before the allowlist could snap
+  // it away would boot a worker the turn cannot reuse. Held while a turn is
+  // streaming: the worker is provably alive then, and a warm racing the turn
+  // (a mid-stream model switch re-arms one) has nothing to add. Fire-and-
+  // forget: the hook surfaces nothing.
+  const modelQueriesSettled =
+    !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
+  useLangyWarmWorker({
+    projectId,
+    isOpen,
+    conversationId: activeConversationId,
+    pendingConversationId,
+    turnInFlight: status === "submitted" || status === "streaming",
+    model: modelQueriesSettled
+      ? modelOverride || langyDefaultModel || null
+      : null,
+  });
 
   // ── Server state (React Query, via the langy tRPC router) ─────────────────
   const {

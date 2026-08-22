@@ -84,6 +84,66 @@ function holdPendingConversation({
 }
 
 /**
+ * Send one claimed warm. Bumps the generation so only THIS warm's answer may
+ * hold the pending id: two warms can be in flight at once (a model switch
+ * fires a second while the first is still going), and answers can land out of
+ * order, so without the generation check an older fresh-chat mint could
+ * overwrite a newer one.
+ */
+function fireWarm({
+  mutate,
+  fired,
+  generationRef,
+  latestProjectIdRef,
+  projectId,
+  model,
+  targetConversationId,
+}: {
+  mutate: ReturnType<typeof api.langy.warmWorker.useMutation>["mutate"];
+  fired: Set<string>;
+  generationRef: { current: number };
+  latestProjectIdRef: { current: string | undefined };
+  projectId: string;
+  model: string;
+  targetConversationId: string | null;
+}): void {
+  generationRef.current += 1;
+  const generation = generationRef.current;
+  mutate(
+    {
+      projectId,
+      ...(targetConversationId ? { conversationId: targetConversationId } : {}),
+      modelOverride: model,
+    },
+    {
+      onSuccess: (result) => {
+        // Only a mint (a fresh warm with no target) has an id worth holding,
+        // and only when no newer warm has been fired since.
+        if (generationRef.current !== generation) return;
+        if (targetConversationId || !result.conversationId) return;
+        // The held id becomes the next render's warm target; remember it as
+        // already warmed so holding it does not immediately re-fire.
+        fired.add(
+          warmKey({
+            projectId,
+            conversationId: result.conversationId,
+            model,
+          }),
+        );
+        holdPendingConversation({
+          conversationId: result.conversationId,
+          projectId,
+          latestProjectId: latestProjectIdRef.current,
+        });
+      },
+      onError: () => {
+        // Fire-and-forget by contract: a warm failure is a cold start.
+      },
+    },
+  );
+}
+
+/**
  * Pre-warm the Langy worker when the panel is the strongest signal a message
  * is coming (specs/langy/langy-worker-prewarm.feature): on the panel-open
  * rising edge, and again whenever the panel points at a different conversation
@@ -112,6 +172,7 @@ export function useLangyWarmWorker({
   isOpen,
   conversationId,
   pendingConversationId,
+  turnInFlight,
   model,
 }: {
   projectId: string | undefined;
@@ -128,6 +189,14 @@ export function useLangyWarmWorker({
    * key and a new worker filling the pool.
    */
   pendingConversationId: string | null;
+  /**
+   * True while a turn is running on this panel. No warm fires then: the
+   * worker is provably alive, and a warm racing a live turn (a mid-stream
+   * model switch re-arms one with the NEW picker model) asks the manager for
+   * a worker the running turn does not match. When the turn settles the
+   * effect re-runs and any pending warm fires against a quiet pool.
+   */
+  turnInFlight: boolean;
   /**
    * The model the composer's picker shows, passed as the warm's override so
    * the warmed worker's signature matches the turn the user is about to send.
@@ -173,6 +242,10 @@ export function useLangyWarmWorker({
       generationRef.current += 1;
       return;
     }
+    // A running turn owns the worker; any warm this render would fire waits
+    // for the effect re-run when the turn settles. Nothing is claimed, so the
+    // wait loses nothing.
+    if (turnInFlight) return;
     // A fresh chat re-warms the id an earlier warm already minted, so the
     // server probes its running worker instead of minting a sibling.
     const targetConversationId = conversationId ?? pendingConversationId;
@@ -184,43 +257,21 @@ export function useLangyWarmWorker({
     });
     if (!claimed) return;
 
-    generationRef.current += 1;
-    const generation = generationRef.current;
-    const forProjectId = projectId;
-    const forModel = model;
-    mutateRef.current(
-      {
-        projectId: forProjectId,
-        ...(targetConversationId
-          ? { conversationId: targetConversationId }
-          : {}),
-        modelOverride: model,
-      },
-      {
-        onSuccess: (result) => {
-          // Only a mint (a fresh warm with no target) has an id worth
-          // holding, and only when no newer warm has been fired since.
-          if (generationRef.current !== generation) return;
-          if (targetConversationId || !result.conversationId) return;
-          // The held id becomes the next render's warm target; remember it as
-          // already warmed so holding it does not immediately re-fire.
-          firedRef.current.add(
-            warmKey({
-              projectId: forProjectId,
-              conversationId: result.conversationId,
-              model: forModel,
-            }),
-          );
-          holdPendingConversation({
-            conversationId: result.conversationId,
-            projectId: forProjectId,
-            latestProjectId: latestProjectIdRef.current,
-          });
-        },
-        onError: () => {
-          // Fire-and-forget by contract: a warm failure is a cold start.
-        },
-      },
-    );
-  }, [isOpen, projectId, conversationId, pendingConversationId, model]);
+    fireWarm({
+      mutate: mutateRef.current,
+      fired: firedRef.current,
+      generationRef,
+      latestProjectIdRef,
+      projectId,
+      model,
+      targetConversationId,
+    });
+  }, [
+    isOpen,
+    projectId,
+    conversationId,
+    pendingConversationId,
+    turnInFlight,
+    model,
+  ]);
 }

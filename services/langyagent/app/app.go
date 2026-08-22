@@ -40,16 +40,24 @@ const (
 )
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn, booting a worker that has never
-// answered, or a live worker already working on the answer.
+// happening. "Starting Langy…" is reserved for the one case where the user
+// really is waiting on a first-ever boot: a brand-new conversation whose
+// worker a turn had to spawn. Everything else thinks:
+//   - a resume from a shutdown handoff names the pick-up (ADR-048);
+//   - a worker that has answered before is a round-trip;
+//   - a pre-warmed worker booted while the panel sat open, so its first turn
+//     has no startup the user should hear about;
+//   - a follow-up whose worker was reaped (non-empty history seed) respawns
+//     fast on the persisted session — the user just spoke to this
+//     conversation, and "starting" reads as the workspace having vanished.
 func readyStatusFor(req ChatRequest, worker Worker) string {
 	if req.ResumeToken != "" {
 		return statusResuming
 	}
-	if !worker.HasServedTurn() {
-		return statusStartingUp
+	if worker.HasServedTurn() || worker.Prewarmed() || req.HistorySeed != "" {
+		return statusThinking
 	}
-	return statusThinking
+	return statusStartingUp
 }
 
 // App is the langyagent application. It composes the worker pool and the

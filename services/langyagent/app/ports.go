@@ -130,8 +130,13 @@ type Worker interface {
 	// Always paired with a granted ClaimTurn.
 	Release()
 	// HasServedTurn reports whether this worker has completed at least one turn —
-	// the honest cold/warm signal behind the pre-first-frame status copy.
+	// the cold/warm signal behind the pre-first-frame status copy.
 	HasServedTurn() bool
+	// Prewarmed reports whether this worker was spawned by a pre-warm rather
+	// than by a turn. A pre-warmed worker's first turn is not a startup the
+	// user should hear about: the boot already happened while the panel sat
+	// open, so its status reads as thinking, not starting.
+	Prewarmed() bool
 	// Touch resets the idle timer.
 	Touch()
 	// PostMessage queues the turn on the worker's opencode session. historySeed

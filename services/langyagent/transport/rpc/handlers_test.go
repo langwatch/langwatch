@@ -33,6 +33,7 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 func (w *stubWorker) Release()            {}
 func (w *stubWorker) Touch()              {}
 func (w *stubWorker) HasServedTurn() bool { return false }
+func (w *stubWorker) Prewarmed() bool     { return false }
 func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time, *domain.TurnFailure) {
 }
 

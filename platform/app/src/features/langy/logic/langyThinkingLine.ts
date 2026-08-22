@@ -21,7 +21,9 @@ import { describeToolCall, effectiveToolName } from "./langyToolLabel";
  * The line may only say things that are TRUE at the moment it says them.
  *
  *   1. A tool is running    → say what it is. We know: it is on the tool stream.
- *   2. Tokens are arriving  → "Writing…". The model really is generating.
+ *   2. Tokens are arriving  → say NOTHING. The streaming answer is on screen
+ *                              and speaks for itself; a line under it reads
+ *                              as still waiting for the visible reply.
  *   3. Reasoning is arriving → "Thinking…". The model IS working — live
  *                              reasoning deltas are on the wire — so it must
  *                              never read as a startup wait.
@@ -95,7 +97,7 @@ export const THINKING_STUCK_MS = 75_000;
  * message, or nothing while the reply has not started arriving. The wire-truth
  * checks below must read THIS message, never the last assistant overall — on a
  * follow-up send the last assistant overall is the PREVIOUS completed reply,
- * whose settled text made the line claim "Writing…" for a turn that had
+ * whose settled text would read as this turn already generating when it has
  * produced nothing.
  */
 export function currentTurnAssistant(
@@ -224,7 +226,8 @@ function waitingLine({
 }
 
 /**
- * The honest line for the current state of a turn.
+ * The line for the current state of a turn, or null when no line should
+ * render at all (the streaming answer is on screen and speaks for itself).
  *
  * Pure: the caller measures `elapsedMs` (time since the turn was sent) and owns
  * the clock. Everything here is derived from what is provably on the wire.
@@ -244,7 +247,7 @@ export function langyThinkingLine({
    * claim: the model is provably working.
    */
   hasLiveReasoning?: boolean;
-}): LangyThinkingLine {
+}): LangyThinkingLine | null {
   const last = currentTurnAssistant(messages);
 
   // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
@@ -263,10 +266,12 @@ export function langyThinkingLine({
     };
   }
 
-  // 2. TOKENS ARE ARRIVING. The model really is generating, so a whimsical verb
-  //    here claims nothing that isn't happening — it IS thinking.
+  // 2. TOKENS ARE ARRIVING. The streaming prose is on screen right above this
+  //    line, so the answer itself is the status — a second line under it
+  //    ("Writing…", or any status orb) reads as the panel still waiting for
+  //    the reply that is visibly arriving. Render nothing.
   if (hasTokens(last)) {
-    return { text: "Writing…", tone: "working", allowWhimsy: true };
+    return null;
   }
 
   // 3. REASONING IS ARRIVING. No prose yet, but the model is provably working —
