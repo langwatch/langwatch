@@ -266,9 +266,12 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 				if mErr != nil {
 					continue
 				}
-				if !emitFrame(hb) {
-					return
-				}
+				// A failed beat is never a reason to stop beating. The sink
+				// absorbs a broken push and reconnects on a later frame, so
+				// giving up here would leave the rest of the turn with no
+				// liveness at all, and the control plane ends a turn whose
+				// heartbeat goes stale. Only the turn ending stops the ticker.
+				emitFrame(hb)
 			}
 		}
 	}()
