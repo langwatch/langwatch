@@ -63,7 +63,11 @@ function makeFakeSession() {
   };
 }
 
-function makeRunner(session: SessionLike, appliedSystemPrompts: string[] = []) {
+function makeRunner(
+  session: SessionLike,
+  appliedSystemPrompts: string[] = [],
+  options: { sessionResumed?: boolean } = {},
+) {
   const { writer, events } = makeWriter();
   const runner = new TurnRunner({
     session,
@@ -71,6 +75,7 @@ function makeRunner(session: SessionLike, appliedSystemPrompts: string[] = []) {
     composeSystem: (turnSystem?: string) => `PERSONA\n\nAGENTS${turnSystem ? `\n\n${turnSystem}` : ""}`,
     applySystemPrompt: (composed) => appliedSystemPrompts.push(composed),
     warn: () => undefined,
+    ...options,
   });
   return { runner, events, writer };
 }
@@ -116,6 +121,24 @@ describe("TurnRunner", () => {
       expect(fake.promptCalls[0]?.prompt).toContain("[Resumed conversation");
       expect(fake.promptCalls[0]?.prompt).toContain("user: earlier");
       expect(fake.promptCalls[0]?.prompt.endsWith("continue")).toBe(true);
+    });
+  });
+
+  describe("when the session was resumed from the home's own transcript", () => {
+    /** @scenario A resumed session ignores the handoff digest it no longer needs */
+    it("does not prepend the resumeToken seed", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner(fake.session, [], { sessionResumed: true });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "continue",
+        resumeToken: "user: earlier",
+      });
+      await until(() => fake.promptCalls.length === 1);
+      fake.finish();
+      await done;
+      expect(fake.promptCalls[0]?.prompt).toBe("continue");
     });
   });
 

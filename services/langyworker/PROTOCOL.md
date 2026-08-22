@@ -10,9 +10,13 @@ U+2028/U+2029). stdout carries protocol lines ONLY. All logging goes to stderr.
 - The manager sets `HOME` to the worker home and writes `$HOME/.langy-worker.json`
   (see Config below) and `$HOME/AGENTS.md` before spawn. Secrets travel only in
   environment variables; the config file references env var NAMES.
-- The wrapper emits `{"type":"ready","protocol":1}` exactly once, after the pi
-  session is constructed. Commands received before `ready` are valid and are
-  processed in order.
+- The wrapper emits `{"type":"ready","protocol":1,"resumed":<bool>}` exactly
+  once, after the pi session is constructed. `resumed` is true when the wrapper
+  continued a persisted session its home still held (the home outlives the
+  process on an idle reap or a crash); the manager then skips the transcript
+  seed, since the session's own history is the single copy of the conversation.
+  A resumed wrapper also ignores a turn's `resumeToken` for the same reason.
+  Commands received before `ready` are valid and are processed in order.
 - The wrapper never writes anything to stdout that is not a protocol line, and
   never exits between a turn's start and its terminal line: the terminal line is
   flushed to the pipe before anything else can happen.
@@ -55,7 +59,7 @@ U+2028/U+2029). stdout carries protocol lines ONLY. All logging goes to stderr.
 Lifecycle:
 
 ```json
-{"type":"ready","protocol":1}
+{"type":"ready","protocol":1,"resumed":false}
 {"type":"pong"}
 ```
 

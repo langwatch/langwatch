@@ -55,8 +55,11 @@ type reader struct {
 
 	ready     chan struct{}
 	readyOnce sync.Once
-	dead      chan struct{}
-	deadOnce  sync.Once
+	// resumed records the ready event's session-resume announcement; written
+	// once before ready closes, read only after it (WaitReady orders both).
+	resumed  bool
+	dead     chan struct{}
+	deadOnce sync.Once
 }
 
 func newReader(src io.ReadCloser) *reader {
@@ -158,7 +161,10 @@ func (r *reader) handleLine(ctx context.Context, raw []byte) {
 			clog.Get(ctx).Warn("pi worker announced an unexpected protocol version",
 				zap.Int("got", ev.Protocol), zap.Int("want", protocolVersion))
 		}
-		r.readyOnce.Do(func() { close(r.ready) })
+		r.readyOnce.Do(func() {
+			r.resumed = ev.Resumed
+			close(r.ready)
+		})
 	case eventPong:
 		// Liveness is driven by the manager-side heartbeat ticker; nothing to do.
 	case "":

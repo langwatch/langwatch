@@ -35,7 +35,11 @@ type planItem struct {
 type wireEvent struct {
 	Type     string `json:"type"`
 	Protocol int    `json:"protocol"`
-	TurnID   string `json:"turnId"`
+	// ready: whether the wrapper continued a persisted session its home still
+	// held. Absent (an older wrapper) decodes false, which keeps the
+	// transcript-seed path.
+	Resumed bool   `json:"resumed"`
+	TurnID  string `json:"turnId"`
 	// delta / reasoning
 	Text string `json:"text"`
 	// tool lifecycle. IDs are opaque strings: the responses lane emits

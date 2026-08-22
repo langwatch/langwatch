@@ -108,8 +108,15 @@ func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
 // OpenSession is local: the wrapper owns its one pi session, so there is no
 // remote call to make and nothing that can fail. The returned id is a synthetic
 // handle for logs and route parity; the wire protocol never carries it.
-func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, error) {
-	return "pi-" + randomID(), nil
+// Resumed relays the wrapper's own ready-handshake announcement: the wrapper
+// continues the newest persisted session when its home still holds one (the
+// home outlives the process on an idle reap or a crash), and a resumed
+// session must not be re-seeded the transcript it already carries. The reader
+// records the flag before closing ready, and the pool calls OpenSession only
+// after WaitReady, so the read is ordered.
+func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, error) {
+	resumed := a.reader != nil && a.reader.resumed
+	return "pi-" + randomID(), resumed, nil
 }
 
 // Post queues one turn on the wrapper. The mailbox is registered BEFORE the

@@ -76,6 +76,34 @@ func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 	}
 }
 
+// The ready handshake's resumed announcement reaches OpenSession, which is
+// how the pool learns to skip the transcript seed for a worker that resumed
+// the session its home still held. A wrapper that says nothing (or an older
+// binary that never emits the field) reads as false and keeps the seed path.
+//
+// @scenario "A respawned pi worker resumes the session its home still holds"
+func TestAgent_OpenSession_RelaysWrapperSessionResume(t *testing.T) {
+	for _, tc := range []struct {
+		mode string
+		want bool
+	}{
+		{mode: "resumed", want: true},
+		{mode: "happy", want: false},
+	} {
+		agent := spawnFake(t, tc.mode, 20*time.Second)
+		if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+			t.Fatalf("WaitReady(%s): %v", tc.mode, err)
+		}
+		_, resumed, err := agent.OpenSession(context.Background(), app.Endpoint{})
+		if err != nil {
+			t.Fatalf("OpenSession(%s): %v", tc.mode, err)
+		}
+		if resumed != tc.want {
+			t.Errorf("OpenSession(%s) resumed = %v, want %v", tc.mode, resumed, tc.want)
+		}
+	}
+}
+
 // The full happy path over a real subprocess: ready handshake, delta,
 // reasoning, the tool lifecycle (with the composite opaque id the responses
 // lane produces), the plan snapshot + measured progress, and a clean nil

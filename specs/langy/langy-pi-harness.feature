@@ -72,3 +72,30 @@ Feature: Langy can run a conversation on the pi harness
     When a cancel arrives naming a different turn, or a conversation with no worker
     Then nothing is aborted
     And the running turn continues untouched
+
+  # The worker home outlives the process on an idle reap or a crash. A
+  # respawn that started a fresh session used to be re-seeded the whole
+  # transcript, which changed every turn and broke the provider prompt cache;
+  # resuming the persisted session keeps the conversation's own context as
+  # the single copy. The transcript seed remains the fallback for a home that
+  # is genuinely gone (fleet roll, model switch).
+  @unit
+  Scenario: A respawned pi worker resumes the session its home still holds
+    Given a worker home holding the previous session with at least one completed turn
+    When the worker respawns in that home
+    Then it continues that session instead of starting fresh
+    And it announces the resume on its ready handshake, so the manager skips the transcript seed
+
+  @unit
+  Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn
+    Given the home's persisted session file cannot be read
+    When the worker respawns in that home
+    Then it starts a fresh session and reports no resume
+    And the spawn itself never fails over the corrupt file
+
+  @unit
+  Scenario: A resumed session ignores the handoff digest it no longer needs
+    Given a worker resumed the session its home still held
+    When a turn arrives carrying a shutdown-handoff digest
+    Then the digest is not folded into the prompt
+    And the session's own history remains the single copy of the conversation

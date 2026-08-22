@@ -59,7 +59,11 @@ func fakeWrapperMain(mode string) {
 			time.Sleep(time.Hour)
 		}
 	}
-	fakeEmit(map[string]any{"type": "ready", "protocol": 1})
+	if mode == "resumed" {
+		fakeEmit(map[string]any{"type": "ready", "protocol": 1, "resumed": true})
+	} else {
+		fakeEmit(map[string]any{"type": "ready", "protocol": 1})
+	}
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	currentTurn := ""

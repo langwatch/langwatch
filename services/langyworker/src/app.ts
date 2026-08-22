@@ -45,7 +45,7 @@ export async function runApp(): Promise<void> {
   const writer = new ProtocolWriter((chunk, callback) => rawStdoutWrite(chunk, callback));
 
   const systemPrompt = { current: composeSystem() };
-  const session = await createLangySession({ config, home, systemPrompt });
+  const { session, resumed } = await createLangySession({ config, home, systemPrompt });
 
   const runner = new TurnRunner({
     session,
@@ -55,10 +55,13 @@ export async function runApp(): Promise<void> {
       systemPrompt.current = composed;
     },
     warn,
+    // A resumed session already carries the conversation, so the handoff
+    // digest a turn may still bring along would tell it its own story twice.
+    sessionResumed: resumed,
   });
   session.subscribe(runner.onSessionEvent);
 
-  await writer.emit({ type: "ready", protocol: PROTOCOL_VERSION });
+  await writer.emit({ type: "ready", protocol: PROTOCOL_VERSION, resumed });
 
   return new Promise<void>((resolve) => {
     attachJsonlReader(

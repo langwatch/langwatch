@@ -57,6 +57,13 @@ export type TurnRunnerOptions = {
    */
   applySystemPrompt: (systemPrompt: string) => void;
   warn?: (message: string) => void;
+  /**
+   * True when the session continued a persisted transcript at boot. A turn's
+   * `resumeToken` (the shutdown-handoff digest) is then skipped: the session's
+   * own history is the single copy of the conversation, and prepending a
+   * digest of it would re-tell the story and break the byte-stable prefix.
+   */
+  sessionResumed?: boolean;
 };
 
 export class TurnRunner {
@@ -172,9 +179,10 @@ export class TurnRunner {
 
       await writer.emit({ type: "turn_started", turnId: command.turnId });
 
-      const prompt = command.resumeToken
-        ? prependResumeSeed(command.prompt, command.resumeToken)
-        : command.prompt;
+      const prompt =
+        command.resumeToken && !this.options.sessionResumed
+          ? prependResumeSeed(command.prompt, command.resumeToken)
+          : command.prompt;
 
       let thrown: unknown;
       try {

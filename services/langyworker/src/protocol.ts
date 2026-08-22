@@ -68,7 +68,13 @@ export function parseCommand(line: string): ManagerCommand | undefined {
 
 // ---- wrapper -> manager -------------------------------------------------
 
-export type ReadyEvent = { type: "ready"; protocol: number };
+/**
+ * `resumed` reports whether the worker continued a persisted session its home
+ * already held (see session.ts). The manager reads it to skip the transcript
+ * seed for a resumed conversation; an absent field reads as false, so an
+ * older worker binary keeps the seed path.
+ */
+export type ReadyEvent = { type: "ready"; protocol: number; resumed: boolean };
 export type PongEvent = { type: "pong" };
 export type TurnStartedEvent = { type: "turn_started"; turnId: string };
 export type DeltaEvent = { type: "delta"; turnId: string; text: string };

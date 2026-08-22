@@ -66,11 +66,47 @@ export type CreateLangySessionOptions = {
   systemPrompt: SystemPromptHolder;
 };
 
+export type LangySessionHandle = {
+  session: AgentSession;
+  /**
+   * Whether the session continues a persisted transcript this home already
+   * held. The worker home outlives the process on an idle reap or a crash, so
+   * a respawn finds the previous session file and resumes it: the session's
+   * own history is then the single copy of the conversation, the manager
+   * skips the transcript seed, and the prompt prefix stays byte-stable for
+   * provider caching. False means a genuinely fresh session (new
+   * conversation, or the home was lost) and the seed path applies.
+   */
+  resumed: boolean;
+};
+
+/**
+ * Resume the newest persisted session when the home still holds one, so a
+ * respawned worker keeps the conversation's own context instead of being
+ * re-seeded a transcript (which would also break the byte-stable prompt
+ * prefix provider caching reads). A failed listing or a corrupt file degrades
+ * to a fresh session rather than failing the spawn.
+ */
+export function openSessionManager({
+  home,
+  sessionDir,
+}: {
+  home: string;
+  sessionDir: string;
+}): { sessionManager: SessionManager; resumed: boolean } {
+  try {
+    const sessionManager = SessionManager.continueRecent(home, sessionDir);
+    return { sessionManager, resumed: sessionManager.getEntries().length > 0 };
+  } catch {
+    return { sessionManager: SessionManager.create(home, sessionDir), resumed: false };
+  }
+}
+
 export async function createLangySession({
   config,
   home,
   systemPrompt,
-}: CreateLangySessionOptions): Promise<AgentSession> {
+}: CreateLangySessionOptions): Promise<LangySessionHandle> {
   const agentDir = join(home, ".langy-pi");
   const generated = writeModelsJson({ agentDir, model: config.model, env: process.env });
 
@@ -87,6 +123,11 @@ export async function createLangySession({
   }
 
   mkdirSync(config.sessionDir, { recursive: true, mode: 0o700 });
+
+  const { sessionManager, resumed } = openSessionManager({
+    home,
+    sessionDir: config.sessionDir,
+  });
 
   const settingsManager = SettingsManager.inMemory({
     compaction: { enabled: true },
@@ -115,10 +156,10 @@ export async function createLangySession({
     thinkingLevel: config.thinkingLevel ?? (config.model.reasoning ? "medium" : "off"),
     modelRuntime,
     resourceLoader,
-    sessionManager: SessionManager.create(home, config.sessionDir),
+    sessionManager,
     settingsManager,
     tools: [...ENABLED_TOOLS],
   });
 
-  return session;
+  return { session, resumed };
 }
