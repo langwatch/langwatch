@@ -211,14 +211,18 @@ interface LangyState extends TurnPhaseState {
   consumePendingPrompt: () => void;
 
   /**
-   * An `askLangy` handoff also asks the panel's composer to take focus: the
-   * reader just handed a question over and expects to keep typing, not to
-   * click the field first. A flag rather than an imperative call because the
-   * composer may not be mounted yet when the handoff fires — it honors the
-   * request on mount or on change, then consumes it so focus is taken exactly
-   * once. Ephemeral, like `pendingPrompt`.
+   * The panel's composer is asked to take focus. Three producers: an
+   * `askLangy` handoff (the reader just handed a question over and expects to
+   * keep typing), a new chat (the one gesture whose whole point is to write
+   * the next message), and a dialog that took the cursor away and gives it
+   * back on close. A flag rather than an imperative call because the composer
+   * may not be mounted yet when the request fires — it honors the request on
+   * mount or on change, then consumes it so focus is taken exactly once.
+   * Ephemeral, like `pendingPrompt`.
    */
   composerFocusRequested: boolean;
+  /** Ask the composer to take focus. */
+  requestComposerFocus: () => void;
   /** The composer has taken the requested focus — clear it so it fires once. */
   consumeComposerFocus: () => void;
 
@@ -273,6 +277,30 @@ interface LangyState extends TurnPhaseState {
 
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
+  /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). NOT the active conversation,
+   * nothing durable exists under it yet; the first send adopts it (the
+   * transport passes it to `createConversation`) so the turn lands on the
+   * worker the warm already booted. Cleared whenever the panel points at a
+   * different chat (new conversation, ask handoff, selection, scope change).
+   */
+  pendingConversationId: string | null;
+  /** The warm hook stores the id its mutation returned; null clears it. */
+  setPendingConversationId: (id: string | null) => void;
+  /**
+   * The conversation whose worker the last warm PROVED alive (`warmed: true`
+   * from `langy.warmWorker`). The thinking line reads it: a first message to a
+   * warmed worker skips the cold-boot ladder and says "Thinking…" from the
+   * first frame, because the workspace it would claim to be preparing already
+   * exists. Only ever compared against the ids on screen, so a stale value is
+   * inert; if the worker was reaped since, the manager's own readiness status
+   * corrects the line moments later, exactly as it does on a follow-up.
+   * Session-only, never persisted.
+   */
+  warmedConversationId: string | null;
+  /** A warm answered `warmed: true` for this conversation's worker. */
+  markConversationWarmed: (id: string) => void;
   /**
    * The conversation whose durable server history should hydrate the chat
    * engine. Set only when the USER selects a conversation; cleared once the
@@ -476,6 +504,15 @@ interface LangyState extends TurnPhaseState {
   applyTurnEvents: (events: readonly LangyConversationTurnWireEvent[]) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
+  /**
+   * The current turnStatus is the manager's pre-first-frame readiness line
+   * ("Starting Langy…", "Thinking…") — a placeholder for silence. The panel
+   * must never render it under an answer that is already visible: a stream
+   * replay can re-deliver it after text is on screen, and "Thinking…" below
+   * the reply reads as a contradiction. Statuses the agent reports mid-turn
+   * keep rendering regardless.
+   */
+  turnStatusIsReadiness: boolean;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
   turnProgress: number | null;
   /** Latest measured X/Y sample used for smooth, rate-aware interpolation. */
@@ -494,6 +531,8 @@ interface LangyState extends TurnPhaseState {
    */
   turnPlan: Array<{ content: string; status: string }> | null;
   setTurnStatus: (status: string | null) => void;
+  /** Set the manager's readiness placeholder status (see turnStatusIsReadiness). */
+  setTurnReadinessStatus: (status: string | null) => void;
   setTurnProgress: (progress: number | null) => void;
   setTurnProgressSample: (sample: LangyProgressSample | null) => void;
   /** Append a run of streamed reasoning tokens to the live thinking. */
@@ -572,12 +611,17 @@ const emptyConversationState = () => ({
   ...initialTurnPhaseState,
   turnProjection: initialLangyTurnProjection,
   turnStatus: null as string | null,
+  turnStatusIsReadiness: false as boolean,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
   turnReasoning: null as string | null,
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  // A conversation change also drops the id a panel-open warm minted: the
+  // pending id belongs to the fresh chat the warm was fired for, and the warm
+  // hook re-warms (and re-mints) for whatever the panel points at next.
+  pendingConversationId: null as string | null,
 });
 
 /**
@@ -677,6 +721,7 @@ export const useLangyStore = create<LangyState>()(
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
       composerFocusRequested: false,
+      requestComposerFocus: () => set({ composerFocusRequested: true }),
       consumeComposerFocus: () => set({ composerFocusRequested: false }),
 
       // Sidebar by default: docked inside the app shell as a second content
@@ -714,6 +759,10 @@ export const useLangyStore = create<LangyState>()(
       scopeAnnounced: false,
       conversationEpoch: 0,
       historyLoadConversationId: null,
+      pendingConversationId: null,
+      setPendingConversationId: (id) => set({ pendingConversationId: id }),
+      warmedConversationId: null,
+      markConversationWarmed: (id) => set({ warmedConversationId: id }),
       selectConversation: (id) =>
         set({
           activeConversationId: id,
@@ -725,7 +774,10 @@ export const useLangyStore = create<LangyState>()(
           modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
-      adoptConversation: (id) => set({ activeConversationId: id }),
+      // The pending id is retired either way: adopted (the send used it and it
+      // just became the active id) or superseded (the server minted its own).
+      adoptConversation: (id) =>
+        set({ activeConversationId: id, pendingConversationId: null }),
       startNewConversation: () =>
         set((state) => ({
           activeConversationId: null,
@@ -746,6 +798,9 @@ export const useLangyStore = create<LangyState>()(
           // them go (see its subscription).
           conversationEpoch: state.conversationEpoch + 1,
           ...emptyConversationState(),
+          // A new chat exists to be written in, so it opens with the cursor
+          // already in the composer.
+          composerFocusRequested: true,
         })),
       consumeHistoryLoad: () => set({ historyLoadConversationId: null }),
 
@@ -921,11 +976,17 @@ export const useLangyStore = create<LangyState>()(
               ? s.unconfirmedConversations
               : { ...s.unconfirmedConversations, [conversationId]: true },
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
           turnPlan: null,
           interruptedConversationId: null,
+          // The warmed id is spent: this turn either adopted it or the server
+          // minted its own. Keeping it would let the NEXT new chat send its
+          // first message into this conversation, because the create path
+          // reads the pending id whenever no conversation is active.
+          pendingConversationId: null,
         })),
       unconfirmedConversations: {},
       confirmConversation: (id) =>
@@ -1035,11 +1096,15 @@ export const useLangyStore = create<LangyState>()(
           return { turnProjection };
         }),
       turnStatus: null,
+      turnStatusIsReadiness: false,
       turnProgress: null,
       turnProgressSample: null,
       turnReasoning: null,
       turnPlan: null,
-      setTurnStatus: (turnStatus) => set({ turnStatus }),
+      setTurnStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: false }),
+      setTurnReadinessStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: true }),
       setTurnProgress: (turnProgress) => set({ turnProgress }),
       setTurnProgressSample: (turnProgressSample) =>
         set({ turnProgressSample }),
@@ -1049,6 +1114,7 @@ export const useLangyStore = create<LangyState>()(
       resetTurnSignals: () =>
         set({
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,

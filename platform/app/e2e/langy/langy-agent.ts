@@ -28,6 +28,14 @@ interface TurnMessage {
 }
 interface LangySessionState {
   conversationId: string | null;
+  /** Every navigate instruction observed on this session's turn streams, in
+   * order. Navigation scenarios assert on these: the href is the hard fact
+   * that the agent-driven navigate actually landed on the stream. */
+  navigateHrefs: string[];
+  /** Every settled bash command observed on this session's turn streams, in
+   * order. The github-gate scenario asserts on these: the command card that
+   * tripped the gate must reach the stream before the gate cancels it. */
+  toolCommands: string[];
 }
 
 let cachedCookie: Promise<string> | null = null;
@@ -42,12 +50,26 @@ let cachedCookie: Promise<string> | null = null;
 function getSessionCookie(): Promise<string> {
   cachedCookie ??= (async () => {
     try {
-      const res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_BASE },
-        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-        signal: AbortSignal.timeout(15_000),
-      });
+      let res: Response;
+      for (let attempt = 1; ; attempt++) {
+        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: APP_BASE },
+          body: JSON.stringify({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        // Every vitest run signs in once, so a burst of runs (a suite driven
+        // in chunks) can land on the auth rate limiter. That is the runner
+        // being throttled, not a scenario failing: wait out the window.
+        if (res.status !== 429 || attempt >= 6) break;
+        console.log(
+          `[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20_000));
+      }
       if (!res.ok) {
         throw new Error(
           `Langy test sign-in failed: ${res.status} ${await res.text()}`,
@@ -108,7 +130,13 @@ async function trpcMutate<T>({
       Origin: APP_BASE,
     },
     body: JSON.stringify({ json: input }),
-    signal: AbortSignal.timeout(60_000),
+    // Generous on purpose: under a queue backlog the turn mutation has been
+    // measured completing server-side at 135s, and a full failure-analysis
+    // turn on the opencode harness has been measured working past 180s.
+    // Aborting a still-working turn destroys the run (the judge grades a
+    // one-token reply), and retrying is worse — the retry races the accepted
+    // first attempt into langy_turn_in_progress.
+    signal: AbortSignal.timeout(300_000),
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.error) {
@@ -185,12 +213,22 @@ async function trpcMutateWithTurnLockRetry<T>({
  * A property rather than a message match. The two markers used to be found by
  * substring on `String(error)`, which reads a code out of prose and breaks the
  * moment the wording moves.
+ *
+ * Walks the cause chain: the scenario library rethrows adapter errors as
+ * `new Error(..., { cause: error })`, so the marker arrives one level down.
  */
 export function isTransientInfrastructureError(error: unknown): boolean {
-  return (
-    (error as { transientInfrastructure?: boolean } | null)
-      ?.transientInfrastructure === true
-  );
+  let current: unknown = error;
+  for (let hops = 0; current && hops < 8; hops++) {
+    if (
+      (current as { transientInfrastructure?: boolean })
+        .transientInfrastructure === true
+    ) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function transientInfrastructureError(message: string): Error {
@@ -233,13 +271,47 @@ function parseHandledStreamError(entry: {
   };
 }
 
+/**
+ * The judge grades from these frames while the AGENT read the full payload,
+ * so any cut between the two must be stated or the judge reads a missing item
+ * as a nonexistent one and fails a genuinely grounded reply as fabrication
+ * (it did, twice: real seeded trace ids cited from an elided array tail, and
+ * a result count that sat past this adapter's own byte cap). Two cuts exist:
+ * the manager's structural reduction for the panel (toolmap.TruncateToolOutput
+ * elides array tails behind an "… N more items truncated" marker), and the
+ * byte cap this adapter applies when building the judge's tool message. The
+ * note states that a cut happened; it adds no evidence.
+ */
+function boundOutputForJudge(output: string): string {
+  const capped = output.slice(0, 8192);
+  const cut =
+    output.length > capped.length || capped.includes("more items truncated");
+  if (!cut) return capped;
+  return `${capped}\n\n[Display note: this tool output was reduced for display. The agent read the full payload, so data beyond what is shown here existed. A reply citing an item or a count that is not visible here is citing the reduced part, not fabricating.]`;
+}
+
+/** One settled tool call observed on the turn stream, as the panel showed it. */
+export interface SettledToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+  output: string;
+  isError: boolean;
+}
+
 /** Reads the onTurnStream SSE frames until the server closes the response. */
 async function streamTurnText({
   cookie,
   params,
+  onNavigate,
+  onSettledTool,
 }: {
   cookie: string;
   params: { projectId: string; conversationId: string; turnId: string };
+  /** Called for each navigate entry on the stream (live-only, never durable). */
+  onNavigate?: (href: string) => void;
+  /** Called for each settled tool card on the stream, in order. */
+  onSettledTool?: (call: SettledToolCall) => void;
 }): Promise<string> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
   const res = await fetch(
@@ -263,6 +335,7 @@ async function streamTurnText({
   // the judge grades the reply the user actually receives, not the raw stream.
   let textAfterLastTool = "";
   let sawTool = false;
+  let toolSeq = 0;
   let streamError: string | null = null;
   let streamErrorCode: string | null = null;
   let sawTerminal = false;
@@ -286,6 +359,19 @@ async function streamTurnText({
       } else if (entry.type === "tool") {
         textAfterLastTool = "";
         sawTool = true;
+        if (entry.phase === "end") {
+          toolSeq += 1;
+          onSettledTool?.({
+            id:
+              typeof entry.id === "string" && entry.id
+                ? entry.id
+                : `tool-${toolSeq}`,
+            name: typeof entry.name === "string" ? entry.name : "tool",
+            input: entry.input ?? {},
+            output: typeof entry.output === "string" ? entry.output : "",
+            isError: entry.isError === true,
+          });
+        }
       } else if (entry.type === "error") {
         // The server emits errorText (see langyChatTransport.ts's onEntry
         // "error" case), not message — checking the wrong field silently
@@ -298,9 +384,21 @@ async function streamTurnText({
         // this is the product's expected answer to any PR request.
         const parsed = parseHandledStreamError(entry);
         if (parsed?.code === "langy_github_not_connected") {
-          assistantText +=
+          // The gate stops the turn after the tripping command card (already
+          // captured above as a tool result); the panel then renders the
+          // install prompt as a product card from the error's tips. Mirror
+          // that shape: a langy-card block is the rubric's marker for the
+          // product's own UI, not Langy's prose.
+          const installCard = `\`\`\`langy-card\n${
             parsed.tips[0] ??
-            "The LangWatch GitHub App is not installed for this project.";
+            "The LangWatch GitHub App is not installed for this project."
+          }\n\`\`\``;
+          // Both buffers: the fold below returns textAfterLastTool whenever a
+          // tool ran and that buffer is non-empty, so a card appended to
+          // assistantText alone is dropped whenever any delta arrived after
+          // the last tool frame.
+          assistantText += installCard;
+          textAfterLastTool += installCard;
         } else {
           streamError =
             typeof entry.errorText === "string"
@@ -308,6 +406,9 @@ async function streamTurnText({
               : `Langy stream error (raw: ${JSON.stringify(entry)})`;
           streamErrorCode = parsed?.code ?? null;
         }
+      }
+      if (entry.type === "navigate" && typeof entry.href === "string") {
+        onNavigate?.(entry.href);
       }
       if (entry.type === "end") sawTerminal = true;
       // "complete" (SSE stream finished) / "connected" / "status" carry no
@@ -339,7 +440,8 @@ async function streamTurnText({
   }
   // Same fold as turnfold.go: when tools ran and real text followed the last
   // tool, the product shows only that trailing text (the cards carry the rest),
-  // so the judge must grade what the user actually reads.
+  // so the judge must grade what the user actually reads. The cards themselves
+  // ride as tool messages (see makeLangyAdapter), never inside this text.
   if (sawTool && textAfterLastTool.trim() !== "") {
     return textAfterLastTool.replace(/^[\s]+/, "");
   }
@@ -373,12 +475,22 @@ async function streamTurnText({
 export function makeLangyAdapter(): AgentAdapter & {
   state: LangySessionState;
 } {
-  const state: LangySessionState = { conversationId: null };
+  const state: LangySessionState = {
+    conversationId: null,
+    navigateHrefs: [],
+    toolCommands: [],
+  };
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
       const cookie = await getSessionCookie();
-      const messages = input.messages.map((m: any) => toTurnMessage(m));
+      // Tool traffic from earlier turns stays out of the product payload: the
+      // panel transport sends only the text history, and a role:"tool" message
+      // would otherwise reach the API as an empty user message.
+      const messages = input.messages
+        .filter((m: any) => m.role !== "tool")
+        .map((m: any) => toTurnMessage(m))
+        .filter((m) => m.parts.length > 0 || m.role === "user");
       const turnInput = {
         requestId: crypto.randomUUID(),
         messages,
@@ -397,11 +509,55 @@ export function makeLangyAdapter(): AgentAdapter & {
       }>({ cookie, path, input: body });
       state.conversationId = conversationId;
 
+      const settledTools: SettledToolCall[] = [];
       const text = await streamTurnText({
         cookie,
         params: { projectId: PROJECT_ID, conversationId, turnId },
+        onNavigate: (href) => state.navigateHrefs.push(href),
+        onSettledTool: (call) => {
+          settledTools.push(call);
+          const command = (call.input as { command?: unknown } | null)?.command;
+          if (typeof command === "string" && command) {
+            state.toolCommands.push(command);
+          }
+        },
       });
-      return { role: "assistant", content: text };
+      if (settledTools.length === 0) {
+        return { role: "assistant", content: text };
+      }
+      // The product's tool cards ride as real tool traffic: the judge sees a
+      // native tool-call/tool-result exchange (the retrieval that grounds the
+      // reply's claims), the user simulator sees the framework's compact
+      // summaries of it, and the reply text stays exactly the prose the panel
+      // renders.
+      return [
+        {
+          role: "assistant",
+          content: settledTools.map((call) => ({
+            type: "tool-call" as const,
+            toolCallId: call.id,
+            toolName: call.name,
+            input: call.input,
+          })),
+        },
+        {
+          role: "tool",
+          content: settledTools.map((call) => ({
+            type: "tool-result" as const,
+            toolCallId: call.id,
+            toolName: call.name,
+            // The server already bounds tool output (8KB canonical reduction);
+            // mirror that bound rather than cutting deeper, and state the cut
+            // when one happens — a silent slice has cost a judge the very
+            // count a reply was grounded on.
+            output: {
+              type: call.isError ? ("error-text" as const) : ("text" as const),
+              value: boundOutputForJudge(call.output),
+            },
+          })),
+        },
+        { role: "assistant", content: text },
+      ];
     },
   };
   return Object.assign(adapter, { state });

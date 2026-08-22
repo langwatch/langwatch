@@ -23,10 +23,14 @@ type frameSink struct {
 	firstFrame   sync.Once
 	onFirstFrame func()
 
-	// onFrame, when set, observes EVERY emitted frame (after the accumulate,
-	// before the push). Inspect-only: it cannot veto or fail the emit. driveTurn
-	// wires the GitHub gate here so it can watch the tool stream for the agent
-	// reaching for a capability the turn doesn't carry (see githubgate.go).
+	// onFrame, when set, observes EVERY emitted frame, after the accumulate
+	// AND after the push. Inspect-only: it cannot veto or fail the emit.
+	// driveTurn wires the GitHub gate here so it can watch the tool stream for
+	// the agent reaching for a capability the turn doesn't carry (see
+	// githubgate.go). Observing after the push matters: the gate's trip
+	// cancels the stream context, and observing first canceled the push of
+	// the very tool card that tripped it, so the user saw the gate's verdict
+	// with no trace of the command it judged.
 	onFrame func(frames.Frame)
 }
 
@@ -42,13 +46,14 @@ func (s *frameSink) Emit(f frames.Frame) error {
 		s.firstFrame.Do(s.onFirstFrame)
 	}
 	s.acc.Observe(f)
+	var pushErr error
+	if s.stream != nil {
+		pushErr = s.stream.Emit(f)
+	}
 	if s.onFrame != nil {
 		s.onFrame(f)
 	}
-	if s.stream == nil {
-		return nil
-	}
-	return s.stream.Emit(f)
+	return pushErr
 }
 
 // result snapshots the accumulated final, mapping the frame-shaped tool calls

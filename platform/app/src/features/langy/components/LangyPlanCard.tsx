@@ -86,7 +86,7 @@ export function LangyPlanCard({
       {cardOpen ? (
         <>
           {plan.preamble.length > 0 ? (
-            <LangyActivityParts parts={plan.preamble} />
+            <LangyActivityParts parts={plan.preamble} live={isStreaming} />
           ) : null}
           <VStack align="stretch" gap={1.5} role="list">
             {plan.items.map((item, index) => (
@@ -356,7 +356,7 @@ function PlanStep({
       )}
       {showNested ? (
         <Box paddingLeft="20px" paddingTop={2}>
-          <LangyActivityParts parts={nestedParts} />
+          <LangyActivityParts parts={nestedParts} live={isStreaming} />
         </Box>
       ) : null}
     </Box>

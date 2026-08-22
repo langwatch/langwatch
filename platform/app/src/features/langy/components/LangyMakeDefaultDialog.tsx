@@ -13,13 +13,16 @@ import type { MakeDefaultWritePlan } from "../logic/langyMakeDefaultOffer";
  */
 export function LangyMakeDefaultDialog({
   plan,
-  isBusy,
   onDecline,
   onConfirm,
 }: {
   /** The write a yes would perform; null when nothing is being asked. */
   plan: MakeDefaultWritePlan | null;
-  isBusy: boolean;
+  /**
+   * Both handlers close the dialog at once — a yes runs its write in the
+   * background and reports a failure as a toast. Holding the dialog open on a
+   * spinner made answering a yes/no question feel like submitting a form.
+   */
   onDecline: () => void;
   onConfirm: () => void;
 }) {
@@ -40,6 +43,7 @@ export function LangyMakeDefaultDialog({
   return (
     <Dialog.Root
       open={!!plan}
+      placement="center"
       onOpenChange={(details) => {
         if (!details.open) onDecline();
       }}
@@ -47,37 +51,32 @@ export function LangyMakeDefaultDialog({
     >
       {shown ? (
         <Dialog.Content bg="bg" maxWidth="480px" errorScope="Langy default ask">
-          <Dialog.Header paddingBottom={0}>
-            {/* The question is the whole dialog, so it is also its name. */}
-            <Dialog.Title
-              fontSize="sm"
-              fontWeight="normal"
-              lineHeight="1.5"
-              wordBreak="break-word"
-            >
+          <Dialog.Header>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Set model as default?
+            </Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body paddingTop={0}>
+            <Text fontSize="sm" color="fg.muted" wordBreak="break-word">
               Make{" "}
-              <Text as="span" data-testid="langy-make-default-model">
+              <Text
+                as="span"
+                fontWeight="semibold"
+                color="fg"
+                data-testid="langy-make-default-model"
+              >
                 {modelLabel}
               </Text>{" "}
               the default model for Langy for the {shown.scopeLabel}?
-            </Dialog.Title>
-          </Dialog.Header>
+            </Text>
+          </Dialog.Body>
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
-              <Button
-                ref={declineRef}
-                variant="ghost"
-                onClick={onDecline}
-                disabled={isBusy}
-              >
+              <Button ref={declineRef} variant="ghost" onClick={onDecline}>
                 Just this conversation
               </Button>
-              <Button
-                colorPalette="orange"
-                onClick={onConfirm}
-                loading={isBusy}
-              >
+              <Button colorPalette="orange" onClick={onConfirm}>
                 Make it the default
               </Button>
             </HStack>

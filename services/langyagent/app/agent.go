@@ -59,7 +59,15 @@ type Endpoint struct {
 
 // Turn is one message queued on a coding-agent session. ResumeToken (ADR-048)
 // carries an opaque prior-turn checkpoint to resume from; empty on a cold start.
+//
+// TurnID is the control plane's turn id (the one the worker Claimed). The
+// opencode adapter ignores it; the pi adapter tags the wrapper's `turn` command
+// with it, so a later `abort` naming the same id (TurnAborter) reaches exactly
+// this turn on the wire. Empty for an older control plane that threads none,
+// the pi adapter then mints a private id, and an abort (which requires a name)
+// cannot arrive for it anyway.
 type Turn struct {
+	TurnID      string
 	System      string
 	Prompt      string
 	ResumeToken string

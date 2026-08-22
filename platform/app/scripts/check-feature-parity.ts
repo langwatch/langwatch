@@ -72,6 +72,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // behavior. Without this root those specs could only be @unimplemented.
   "platform/app/e2e",
   "packages",
+  // Langy's pi-harness wrapper: the process that turns the manager's config
+  // into pi's model registry and speaks the stdio protocol. Scenarios about
+  // what the wrapper generates can only bind from its own vitest suite.
+  "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
@@ -309,7 +313,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",

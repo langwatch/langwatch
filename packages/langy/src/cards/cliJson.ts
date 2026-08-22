@@ -72,9 +72,13 @@ function findBalancedEnd({
 }
 
 /**
- * Whether the bracket at `start` opens its own line, with nothing but whitespace
- * before it. A spinner ends its frame with `\r` rather than `\n`, so both count
- * as the start of a line.
+ * Whether the bracket at `start` opens its own line, with nothing at all
+ * before it. A spinner ends its frame with `\r` rather than `\n`, so both
+ * count as the start of a line. Indentation disqualifies: the CLI prints the
+ * outer document unindented, so a bracket behind whitespace is a nested value
+ * of a pretty-printed document — a TAIL-truncated output (pi's bash tool keeps
+ * the last lines of a big result) can leave such an item fully balanced, and a
+ * nested value must never be promoted to the whole command's result.
  */
 function startsAtDocumentBoundary({
   text,
@@ -83,10 +87,9 @@ function startsAtDocumentBoundary({
   text: string;
   start: number;
 }): boolean {
-  const newline = text.lastIndexOf("\n", start - 1);
-  const carriageReturn = text.lastIndexOf("\r", start - 1);
-  const lineStart = Math.max(newline, carriageReturn) + 1;
-  return text.slice(lineStart, start).trim().length === 0;
+  if (start === 0) return true;
+  const previous = text[start - 1];
+  return previous === "\n" || previous === "\r";
 }
 
 /**

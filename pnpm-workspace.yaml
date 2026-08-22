@@ -16,6 +16,7 @@ packages:
   - "mcp/typescript"
   - "plugins/*"
   - "sdks/typescript"
+  - "services/langyworker"
   - "skills"
   - "tests/agentic-e2e"
 
@@ -53,6 +54,13 @@ minimumReleaseAgeExclude:
   # fails the whole install. Drop this once it ages out (2026-08-24).
   - dayjs@1.11.23
   - es-toolkit@1.51.0
+  # The Langy pi harness pins the pi SDK exactly (services/langyworker); the
+  # release sits right at the age-gate boundary, so name it explicitly rather
+  # than letting the install flap around the 7-day mark. pi-ai is the SDK's
+  # model layer, a direct dependency too (the wrapper reads its model catalog),
+  # pinned to the same release. Drop both once they age out (2026-08-28).
+  - "@earendil-works/pi-coding-agent@0.84.2"
+  - "@earendil-works/pi-ai@0.84.2"
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these

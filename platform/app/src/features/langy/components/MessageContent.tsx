@@ -349,6 +349,10 @@ function MessageContentImpl({
             <LangyToolActivity
               message={message}
               reasoningTitles={reasoningFold.titles}
+              // A call is only ever closed by its own output, so a stopped or
+              // dead turn leaves its open calls looking like they still run.
+              // Off the streaming turn, an open call is an interrupted one.
+              live={isStreaming}
             />
           </LangyCardBoundary>
         )}
@@ -454,6 +458,23 @@ function MessageContentImpl({
             a bare one-word ack. `isFeedbackPinned` (a pin) keeps a shown card
             mounted across the refetch that follows the shown-mark, and powers
             /feedback. Never renders mid-stream. */}
+        {/* The reply the user cut short says so, whatever it managed to say
+            first. Without this line a stopped turn that had already run a tool
+            or written a paragraph looked exactly like a finished one, so the
+            reader had to remember they pressed Stop to read the answer
+            correctly. The empty-reply branch above owns the case where there is
+            nothing else at all. */}
+        {interrupted && !isStreaming ? (
+          <Text
+            fontSize="langyAnswer"
+            lineHeight="1.5"
+            paddingX="2px"
+            fontStyle="italic"
+            color="fg.muted"
+          >
+            Interrupted
+          </Text>
+        ) : null}
         {showFeedback &&
         !isStreaming &&
         displayText &&

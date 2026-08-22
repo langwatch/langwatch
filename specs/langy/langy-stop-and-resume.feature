@@ -57,6 +57,26 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the empty reply row says "Interrupted"
     And it does not say "No content", because the emptiness was my own doing
 
+  # A reply with a card or a paragraph in it used to look exactly like a finished
+  # one, so the reader had to remember pressing Stop to read the answer correctly.
+  @unit
+  Scenario: A stopped reply says so, whatever it managed to say first
+    Given Langy had written a paragraph or drawn a card before I stopped the turn
+    Then the reply keeps everything that arrived
+    And it ends with a quiet "Interrupted" line
+
+  # A tool call is only ever closed by its own output, so a call the stop caught
+  # mid-flight stays open for good. It used to keep the running card: a pulsing
+  # dot and "Searching traces…" for the rest of the conversation, for work that
+  # nothing was doing.
+  @unit
+  Scenario: A call left open by a stopped turn reads as interrupted
+    Given a tool call was still running when the turn ended
+    When the reply is drawn again
+    Then its card keeps the rows and the command it had already shown
+    And the card says it was interrupted before it finished
+    And it no longer pulses, shimmers, or claims to be running
+
   # The distinguishing act of THIS spec versus langy-turn-recovery: a stop is
   # neither a success nor a failure. It is its own terminal outcome, carried on the
   # same "the agent responded" event that carries a completed answer (it has an
@@ -98,6 +118,18 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When I stop the turn
     Then the worker is signalled to cancel the in-flight generation
     And a late result from that worker cannot resurrect or duplicate the stopped turn
+
+  # The manager's half of the signal above: the cancel names the conversation
+  # and the turn, and the manager hands it to the worker actually running that
+  # turn. Fire-and-forget on purpose: the stop is already truthful on the
+  # durable record, so a cancel that finds nothing to halt answers success and
+  # halts nothing.
+  @unit
+  Scenario: A stop makes the manager abort the in-flight generation
+    Given the manager is driving the turn the user stopped
+    When the stop's cancel arrives at the manager
+    Then the manager tells the turn's worker to abort it
+    And the caller is never handed an error for a cancel that had nothing left to do
 
   # Stop must be honest about latency: the click cannot claim success before the
   # backend has confirmed. The button reflects a "stopping…" state until the

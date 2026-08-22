@@ -192,6 +192,42 @@ describe("parseCliJson", () => {
       expect(parseCliJson(truncated)).toBeNull();
     });
 
+    it("does not promote a nested value out of a TAIL-truncated result", () => {
+      // pi's bash tool keeps the LAST lines of a big output, so the fragment
+      // opens mid-document; its first balanced bracket is a nested
+      // `"stacktrace": []`, which must not become the whole command's result.
+      const tail = [
+        '            "message": "Evaluator cannot be reached",',
+        '            "stacktrace": []',
+        "          },",
+        '          "trace_id": "trace_44"',
+        "        }",
+        "      ],",
+        '      "pagination": { "totalHits": 44 }',
+        "    }",
+      ].join("\n");
+
+      expect(parseCliJson(tail)).toBeNull();
+    });
+
+    it("does not promote a complete pretty-printed array item out of a tail fragment", () => {
+      // Pretty-printed items open their own line behind indentation; a tail
+      // cut can leave one fully balanced. It is still not the document.
+      const tail = [
+        '          "value"',
+        "        },",
+        "        {",
+        '          "trace_id": "trace_43",',
+        '          "error": null',
+        "        }",
+        "      ],",
+        '      "pagination": { "totalHits": 44 }',
+        "    }",
+      ].join("\n");
+
+      expect(parseCliJson(tail)).toBeNull();
+    });
+
     it("returns null for an empty output", () => {
       expect(parseCliJson("")).toBeNull();
     });

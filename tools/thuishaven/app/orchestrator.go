@@ -75,7 +75,14 @@ type Deps struct {
 }
 
 // New builds an Orchestrator from its injected dependencies.
+//
+// Log is optional and defaults to a no-op: the orchestrator logs from paths a
+// caller cannot predict (a Redis database collision, a janitor sweep), so a
+// Deps built without one would panic there instead of at construction.
 func New(d Deps) *Orchestrator {
+	if d.Log == nil {
+		d.Log = zap.NewNop()
+	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
@@ -746,14 +753,43 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 // Reusing the registered value is what makes the assignment stable across
 // restarts: the slug's hash is only a starting point, so a stack that had to
 // probe away from it once must not drift back on the next `up`.
+//
+// An explicit LANGWATCH_HAVEN_REDIS_DB wins over both, for the neighbor the
+// allocator cannot see: it only knows haven-managed stacks, so a plain-`pnpm
+// dev` neighbor holding a database is invisible to it, and the operator's pin
+// is the way around that neighbor. A pin onto a database another MANAGED stack
+// already holds is refused instead: that collision is one haven can see, and
+// two stacks on one database share the job queue, which is the failure the pin
+// exists to avoid.
 func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
+	isPinned := o.cfg.RedisDBOverride != nil
+	pinned := 0
+	if isPinned {
+		pinned = *o.cfg.RedisDBOverride
+	}
+
 	taken := map[int]bool{}
+	var registered = -1
 	stacks := o.store.Stacks()
 	for i := range stacks {
 		if stacks[i].Slug == slug {
-			return stacks[i].RedisDB, true
+			registered = stacks[i].RedisDB
+			continue
 		}
 		taken[stacks[i].RedisDB] = true
+	}
+
+	if isPinned {
+		if !taken[pinned] {
+			return pinned, true
+		}
+		o.log.Warn("LANGWATCH_HAVEN_REDIS_DB names a database another haven stack holds; allocating a free one instead",
+			zap.String("slug", slug),
+			zap.Int("pinned", pinned),
+		)
+	}
+	if registered >= 0 && !taken[registered] {
+		return registered, true
 	}
 	return domain.AllocateRedisDB(slug, taken)
 }

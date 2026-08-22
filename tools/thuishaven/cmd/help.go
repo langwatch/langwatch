@@ -161,6 +161,9 @@ var envHelpText = `Environment variables.
                                  is always reused as-is instead).
     HAVEN_PG_PORT=5432           Port to expect/start Postgres on.
     LANGWATCH_HAVEN_REDIS=0      Do not manage Redis (use .env REDIS_URL).
+    LANGWATCH_HAVEN_REDIS_DB=N   Pin this worktree's Redis DB index (0-15). Use when a
+                                 non-haven process from another worktree holds a DB the
+                                 allocator cannot see, to avoid sharing its job queue.
     HAVEN_REDIS_FORMULA=redis    brew formula to start if none is running.
     HAVEN_REDIS_PORT=6379        Port to expect/start Redis on.
     HAVEN_REDIS_MAXMEMORY_MB=512 maxmemory ceiling applied to the managed Redis

@@ -62,11 +62,23 @@ const emptyAssistantMessage = {
   parts: [],
 } as unknown as UIMessage;
 
-function renderMessage({ interrupted }: { interrupted: boolean }) {
+const partialAssistantMessage = {
+  id: "m-assistant-partial",
+  role: "assistant",
+  parts: [{ type: "text", text: "The slowest traces are" }],
+} as unknown as UIMessage;
+
+function renderMessage({
+  interrupted,
+  message = emptyAssistantMessage,
+}: {
+  interrupted: boolean;
+  message?: UIMessage;
+}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <MessageContent
-        message={emptyAssistantMessage}
+        message={message}
         appliedOutcomes={{}}
         discardedProposals={new Set()}
         applyingProposals={new Set()}
@@ -94,6 +106,26 @@ describe("given a settled assistant reply with nothing visible", () => {
       renderMessage({ interrupted: false });
 
       expect(screen.getByText("No content")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a settled assistant reply that had started to answer", () => {
+  describe("when this browser stopped the turn", () => {
+    /** @scenario A stopped reply says so, whatever it managed to say first */
+    it("keeps what arrived and marks the reply interrupted", () => {
+      renderMessage({ interrupted: true, message: partialAssistantMessage });
+
+      expect(screen.getByText(/The slowest traces are/)).toBeInTheDocument();
+      expect(screen.getByText("Interrupted")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reply finished on its own", () => {
+    it("marks nothing", () => {
+      renderMessage({ interrupted: false, message: partialAssistantMessage });
+
+      expect(screen.queryByText("Interrupted")).toBeNull();
     });
   });
 });

@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/otelrelay"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/pi"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -45,6 +46,10 @@ type Options struct {
 	SessionsRoot       string
 	WorkspaceRoot      string
 	OpenCodeBinaryPath string
+	// PiBinaryPath is the langy-worker executable the pi harness spawns
+	// (resolved via PATH when bare). Selected per conversation by
+	// credentials.harness; the opencode path is untouched by it.
+	PiBinaryPath string
 	// Runner is the isolation substrate for worker subprocesses — the ADR-033
 	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/localunsafe),
 	// chosen once at the composition root. nil defaults to the sandboxed (secure)
@@ -67,6 +72,31 @@ type Options struct {
 	// env). nil ⇒ unmediated fallback wiring — tests and partial wiring boot
 	// unchanged.
 	OTelRelay *otelrelay.Relay
+}
+
+// agentCloser is the optional capability an agent implements when it owns a
+// resource cmd.Wait does not release. The pi agent holds the parent's write end
+// of the worker's stdin pipe; the opencode agent holds nothing and does not
+// implement it.
+type agentCloser interface {
+	Close()
+}
+
+// closeAgent releases an agent's own pipes, if it holds any. Idempotent, so
+// the failed-spawn rollback, the kill path and the exit watcher can all call
+// it.
+func closeAgent(agent app.CodingAgent) {
+	if closer, ok := agent.(agentCloser); ok {
+		closer.Close()
+	}
+}
+
+// closeAgentOf is closeAgent for a registered worker.
+func closeAgentOf(w *Worker) {
+	if w == nil {
+		return
+	}
+	closeAgent(w.agent)
 }
 
 // CredentialRevoker revokes the session key a dead worker was carrying.
@@ -102,6 +132,7 @@ type Pool struct {
 	sessionsRoot       string
 	workspaceRoot      string
 	openCodeBinaryPath string
+	piBinaryPath       string
 	runner             app.Runner
 	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
 	// spawn only does the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll and never a
@@ -114,7 +145,7 @@ type Pool struct {
 	revoker   CredentialRevoker
 	otelRelay *otelrelay.Relay
 
-	// baseCtx is the pool-lifetime context (carries the logger; cancelled on
+	// baseCtx is the pool-lifetime context (carries the logger; canceled on
 	// Shutdown). Worker subprocesses bind to it via spawnOpenCode so a pool
 	// shutdown / deadline propagates to them — the flat manager used
 	// context.Background here and dropped that propagation.
@@ -168,7 +199,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	if tel == nil {
 		tel = telemetry.New()
 	}
-	var guard egress.Guard = opts.Egress
+	var guard = opts.Egress
 	if guard == nil {
 		guard = egress.NewPassThrough()
 	}
@@ -187,6 +218,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		sessionsRoot:       opts.SessionsRoot,
 		workspaceRoot:      opts.WorkspaceRoot,
 		openCodeBinaryPath: opts.OpenCodeBinaryPath,
+		piBinaryPath:       opts.PiBinaryPath,
 		runner:             runner,
 		agentsTemplate:     agentsTemplate,
 		telemetry:          tel,
@@ -341,13 +373,6 @@ func (p *Pool) countInFlight(workers []*Worker) int {
 	return n
 }
 
-// Acquire returns the worker for conversationID, spawning one if needed. Two
-// concurrent callers for the same conversationID share the same spawn promise —
-// only one subprocess is ever created.
-//
-// If an existing worker's CredentialSignature differs from the caller's (model
-// changed, GitHub token added/removed) the existing worker is killed and a
-// fresh one is spawned with the new capability set.
 // HasLiveWorker reports whether a worker is already running for this
 // conversation whose capabilities match `sig`.
 //
@@ -373,7 +398,7 @@ func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignatu
 //
 // Fire-and-forget on the pool's base context, NOT the caller's: the caller is
 // usually kill(), which may be running under a request that is about to return,
-// and a revocation must not be cancelled just because the turn finished. It must
+// and a revocation must not be canceled just because the turn finished. It must
 // also never block a kill — a dead worker's cleanup cannot wait on an HTTP call
 // to a control plane that might be down.
 //
@@ -415,8 +440,38 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin, creds.GithubRepoScope)}
 }
 
+// Acquire returns the worker for conversationID, spawning one if needed. Two
+// concurrent callers for the same conversationID share the same spawn promise,
+// only one subprocess is ever created.
+//
+// If an existing worker's CredentialSignature differs from the caller's (model
+// changed, GitHub token added/removed) the existing worker is killed and a
+// fresh one is spawned with the new capability set.
+//
+// A turn's spawn at capacity evicts the least-recently-active IDLE worker
+// instead of failing: pre-warm fills the pool with workers that may never see
+// a message, and a real turn must never queue behind one of those (a two-slot
+// local pool wedged exactly that way). Warm spawns go through AcquireWarm.
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
+	return p.acquire(ctx, conversationID, creds, true)
+}
+
+// AcquireWarm is Acquire for a pre-warm, with two softenings that keep a
+// speculative warm from ever costing the user anything. At capacity it evicts
+// the least-recently-active IDLE worker — served or not — because the newest
+// warm follows the user's attention and an evicted worker's conversation
+// survives in the persistent session store, so its next turn resumes cheaply
+// with the provider's prompt cache intact. Only a pool where every worker is
+// BUSY refuses with ErrMaxWorkers. And a warm whose credentials mismatch the
+// conversation's live worker returns that worker untouched instead of
+// replacing it (see acquire): a warm must never kill a worker, least of all
+// one running a turn.
+func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, creds, false)
+}
+
+func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -424,9 +479,19 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 			p.mu.Unlock()
 			return w, nil
 		}
-		// Capability mismatch: kill the existing worker, then fall through to
-		// the regular spawn path. We release the lock around kill so the exit
-		// goroutine can land its cleanup without contending.
+		// A warm is a speculative hint, so a signature mismatch returns the
+		// live worker untouched: killing here would tear down a worker that
+		// may be MID-TURN just because a background warm resolved slightly
+		// different credentials, and the user watches their reply die. The
+		// next real turn carries the authoritative credentials and does the
+		// replacement below.
+		if !forTurn {
+			p.mu.Unlock()
+			return w, nil
+		}
+		// Capability mismatch on a turn: kill the existing worker, then fall
+		// through to the regular spawn path. We release the lock around kill
+		// so the exit goroutine can land its cleanup without contending.
 		p.mu.Unlock()
 		p.kill(conversationID, "credential capability changed")
 		p.mu.Lock()
@@ -476,10 +541,22 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 
 	// Atomic capacity reservation. Increment BEFORE releasing the registry lock
 	// so concurrent first-turns for N distinct conversations can't observe
-	// len(workers)==0 and all pass the cap check.
-	if len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
+	// len(workers)==0 and all pass the cap check. At capacity, a turn's spawn
+	// evicts idle workers (the reaper's own pick order) until a slot opens; the
+	// loop re-checks because a concurrent spawner can take the freed slot first.
+	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
+		reason := "evicted: capacity needed for a turn's worker"
+		if !forTurn {
+			reason = "evicted: capacity needed for a newer warm worker"
+		}
+		victim, found := p.idleVictimLocked()
+		if !found {
+			p.mu.Unlock()
+			return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
+		}
 		p.mu.Unlock()
-		return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
+		p.kill(victim, reason)
+		p.mu.Lock()
 	}
 	atomic.AddInt32(&p.pendingSpawns, 1)
 	ch := make(chan struct{})
@@ -498,14 +575,34 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 	if err != nil {
 		return nil, err
 	}
+	// Stamped before publication (immutable after): the status copy for this
+	// worker's first turn depends on who booted it.
+	w.prewarmed = !forTurn
 	p.mu.Lock()
 	p.workers[conversationID] = w
 	p.mu.Unlock()
 	return w, nil
 }
 
+// idleVictimLocked picks the least-recently-active idle worker, the same one
+// the reaper would take first. Caller holds p.mu; the p.mu -> w.mu lock order
+// matches reapIdle.
+func (p *Pool) idleVictimLocked() (conversationID string, found bool) {
+	var oldest time.Time
+	for id, w := range p.workers {
+		idle, seen := w.idleSince()
+		if !idle {
+			continue
+		}
+		if !found || seen.Before(oldest) {
+			conversationID, oldest, found = id, seen, true
+		}
+	}
+	return conversationID, found
+}
+
 // Status returns a live worker count and the configured cap (used by /health).
-func (p *Pool) Status() (active, max int) {
+func (p *Pool) Status() (active, capacity int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return len(p.workers), p.maxWorkers
@@ -515,6 +612,23 @@ func (p *Pool) Status() (active, max int) {
 // longer exists — recycle so the next turn spawns fresh.
 func (p *Pool) KillSessionVanished(conversationID string) {
 	p.kill(conversationID, "opencode session vanished")
+}
+
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (the token-burn half of the user's Stop, ADR-078). A registry LOOKUP
+// only, never Acquire: Acquire can spawn, and a cancel for a conversation
+// with no worker must find nothing, not boot one. Every miss (no worker, a
+// different turn in flight, an agent that cannot abort) is a silent no-op: the
+// durable stopped terminal is already recorded upstream, so there is nothing
+// to report and nothing to retry.
+func (p *Pool) CancelTurn(conversationID, turnID string) {
+	p.mu.Lock()
+	w := p.workers[conversationID]
+	p.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.AbortTurn(p.baseCtx, turnID)
 }
 
 // reserveUIDLocked finds a free UID for conversationID. Must be called with
@@ -677,6 +791,11 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 			MirrorTier:           creds.MirrorTier,
 			SourceOrganizationID: creds.OrganizationID,
 			SourceProjectID:      creds.ProjectID,
+			// The harness gates the relay's LLM-call span synthesis: a pi
+			// worker exports no OTLP of its own, so the relay retells its
+			// mediated LLM calls as gen_ai spans; opencode workers keep
+			// exporting their own.
+			Harness: domain.NormalizeHarness(creds.Harness),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("register worker telemetry relay: %w", err)
@@ -692,130 +811,199 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}
 
-	// The coding agent (adapters/opencode) provisions its own home, spawns its own
-	// process, and is driven through the endpoint below — the pool orchestrates
-	// but never speaks opencode's wire protocol. Constructed here so Provision and
-	// Spawn share the one instance the Worker later keeps for the drive methods.
-	agent := opencode.NewAgent(p.readinessTimeout)
-	if err := agent.Provision(opencode.ProvisionInput{
-		Home:                workerHome,
-		WorkspaceRoot:       p.workspaceRoot,
-		Creds:               creds,
-		UID:                 uid,
-		AgentsTemplate:      p.agentsTemplate,
-		Runner:              p.runner,
-		EnableOpenTelemetry: mediation.OTLPEndpoint != "",
-	}); err != nil {
-		provSpan.RecordError(err)
-		provSpan.SetStatus(codes.Error, "provision worker home")
-		provSpan.End()
-		return nil, err
-	}
-	provSpan.End()
+	// The coding agent provisions its own home, spawns its own process, and is
+	// driven through the app.CodingAgent port: the pool orchestrates but never
+	// speaks either agent's wire protocol. Which adapter runs is the credential
+	// envelope's harness: pi is the langy-worker wrapper driven over stdio
+	// pipes, the default is opencode driven over its loopback HTTP API. The
+	// agent instance is shared between Provision/Spawn here and the Worker's
+	// drive methods.
+	var agent app.CodingAgent
+	var endpoint app.Endpoint
+	var proxy *opencode.AuthProxy
+	var cmd *exec.Cmd
 
-	// Two ports per worker:
-	//   - externalPort: the authProxy listens here, requires Bearer auth.
-	//     handlers always dial this one (worker.port).
-	//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
-	//     Never exposed to callers; the proxy is the only consumer.
-	externalPort, err := opencode.GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-	// Any free port works: sibling isolation is enforced by opencode's own
-	// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
-	// into an iptables-locked range. opencode.GetFreePort closes its listener before
-	// returning, so two independent calls can (rarely) hand back the SAME
-	// ephemeral port — which would make the proxy bind externalPort first and
-	// opencode then fail to listen, burning the whole readiness timeout. Re-roll
-	// until the internal port differs from the external one.
-	var internalPort int
-	for attempt := 0; attempt < 8; attempt++ {
-		internalPort, err = opencode.GetFreePort()
+	switch domain.NormalizeHarness(creds.Harness) {
+	case domain.HarnessPi:
+		piAgent := pi.NewAgent(p.readinessTimeout)
+		if err := piAgent.Provision(pi.ProvisionInput{
+			Home:           workerHome,
+			WorkspaceRoot:  p.workspaceRoot,
+			SessionDir:     p.piSessionDir(conversationID),
+			Creds:          creds,
+			UID:            uid,
+			AgentsTemplate: p.agentsTemplate,
+			Runner:         p.runner,
+		}); err != nil {
+			provSpan.RecordError(err)
+			provSpan.SetStatus(codes.Error, "provision worker home")
+			provSpan.End()
+			return nil, err
+		}
+		provSpan.End()
+
+		// A pi worker has no listener and no authproxy: the stdio pipes are
+		// its only control surface, so the zero Endpoint is correct and proxy
+		// stays nil (every touch point is nil-guarded). Its LLM traffic still
+		// routes through the relay's mediated loopback URL when the relay runs.
+		llmBaseURL := ""
+		if p.otelRelay != nil {
+			llmBaseURL = p.otelRelay.LLMBaseURLFor(otelToken)
+		}
+		// baseCtx (not ctx) binds the subprocess, which outlives the request;
+		// the span hangs off the spawn span so the fork shows up in the
+		// waterfall, tagged with the isolation substrate.
+		_, piSpan := p.telemetry.StartPhase(ctx, "langy.pi.spawn")
+		piSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
+		piCmd, err := piAgent.Spawn(p.baseCtx, pi.SpawnInput{
+			BinaryPath:     p.piBinaryPath,
+			ConversationID: conversationID,
+			Home:           workerHome,
+			UID:            uid,
+			Creds:          creds,
+			EgressPort:     we.ProxyPort,
+			Runner:         p.runner,
+			LLMBaseURL:     llmBaseURL,
+			// The turn's capabilities fold their own env into the worker: the
+			// SAME set that produced this worker's credential signature.
+			Capabilities: capabilitiesFor(creds),
+		})
+		if err != nil {
+			piSpan.RecordError(err)
+			piSpan.SetStatus(codes.Error, "spawn langy-worker")
+			piSpan.End()
+			return nil, err
+		}
+		piSpan.End()
+		agent, cmd = piAgent, piCmd
+
+	default:
+		ocAgent := opencode.NewAgent(p.readinessTimeout)
+		if err := ocAgent.Provision(opencode.ProvisionInput{
+			Home:                workerHome,
+			WorkspaceRoot:       p.workspaceRoot,
+			Creds:               creds,
+			UID:                 uid,
+			AgentsTemplate:      p.agentsTemplate,
+			Runner:              p.runner,
+			EnableOpenTelemetry: mediation.OTLPEndpoint != "",
+		}); err != nil {
+			provSpan.RecordError(err)
+			provSpan.SetStatus(codes.Error, "provision worker home")
+			provSpan.End()
+			return nil, err
+		}
+		provSpan.End()
+
+		// Two ports per worker:
+		//   - externalPort: the authProxy listens here, requires Bearer auth.
+		//     handlers always dial this one (worker.port).
+		//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
+		//     Never exposed to callers; the proxy is the only consumer.
+		externalPort, err := opencode.GetFreePort()
 		if err != nil {
 			return nil, err
 		}
-		if internalPort != externalPort {
-			break
+		// Any free port works: sibling isolation is enforced by opencode's own
+		// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
+		// into an iptables-locked range. opencode.GetFreePort closes its listener before
+		// returning, so two independent calls can (rarely) hand back the SAME
+		// ephemeral port, which would make the proxy bind externalPort first and
+		// opencode then fail to listen, burning the whole readiness timeout. Re-roll
+		// until the internal port differs from the external one.
+		var internalPort int
+		for attempt := 0; attempt < 8; attempt++ {
+			internalPort, err = opencode.GetFreePort()
+			if err != nil {
+				return nil, err
+			}
+			if internalPort != externalPort {
+				break
+			}
 		}
-	}
-	if internalPort == externalPort {
-		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
-	}
-
-	bearerToken, err := opencode.GenerateBearerToken()
-	if err != nil {
-		return nil, err
-	}
-
-	// Distinct per-worker secret opencode itself enforces (ADR-033 Fix A′) —
-	// deliberately generated separately from bearerToken above: bearerToken
-	// gates the external port (caller <-> authProxy), openCodePassword gates the
-	// internal port (authProxy <-> opencode). Reusing one secret for both would
-	// mean any caller holding the external bearer token could also derive the
-	// internal credential.
-	openCodePassword, err := opencode.GenerateBearerToken()
-	if err != nil {
-		return nil, err
-	}
-
-	// The endpoint the sandbox exposes for this worker's coding-agent process:
-	// the authproxy-fronted external port callers dial, opencode's own internal
-	// control port (checked directly by the readiness probe, never exposed), and
-	// the per-worker bearer. agent (adapters/opencode) drives readiness, session,
-	// and every turn through it — the pool never speaks the agent's wire protocol.
-	endpoint := app.Endpoint{
-		BaseURL:      "http://127.0.0.1:" + strconv.Itoa(externalPort),
-		ExternalPort: externalPort,
-		InternalPort: internalPort,
-		BearerToken:  bearerToken,
-	}
-
-	// authProxy binds the pool-lifetime context so its serve goroutine logs and
-	// lifetime follow the pool, not a single request.
-	proxy, err := opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
-	if err != nil {
-		return nil, fmt.Errorf("start authproxy: %w", err)
-	}
-	defer func() {
-		if !success {
-			proxy.Shutdown()
+		if internalPort == externalPort {
+			return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 		}
-	}()
 
-	// The worker subprocess is bound to the POOL-lifetime context — the
-	// per-request context controls a single chat turn, but the worker stays
-	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
-	// (rather than context.Background, as the flat manager did) means a pool
-	// Shutdown / deadline propagates to the subprocess.
-	// The opencode fork itself. baseCtx (not ctx) binds the subprocess — it outlives
-	// the request — but the span hangs off the spawn span so the fork shows up in the
-	// waterfall, tagged with the isolation substrate (sandboxed vs local) that set
-	// its SysProcAttr.
-	_, ocSpan := p.telemetry.StartPhase(ctx, "langy.opencode.spawn")
-	ocSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
-	cmd, err := agent.Spawn(p.baseCtx, opencode.SpawnInput{
-		BinaryPath:       p.openCodeBinaryPath,
-		ConversationID:   conversationID,
-		Home:             workerHome,
-		UID:              uid,
-		Port:             internalPort,
-		Creds:            creds,
-		OpenCodePassword: openCodePassword,
-		EgressPort:       we.ProxyPort,
-		Runner:           p.runner,
-		Mediation:        mediation,
-		// The turn's capabilities fold their own env into the worker — the SAME set
-		// that produced this worker's credential signature (see capabilitiesFor).
-		Capabilities: capabilitiesFor(creds),
-	})
-	if err != nil {
-		ocSpan.RecordError(err)
-		ocSpan.SetStatus(codes.Error, "spawn opencode")
+		bearerToken, err := opencode.GenerateBearerToken()
+		if err != nil {
+			return nil, err
+		}
+
+		// Distinct per-worker secret opencode itself enforces (ADR-033 Fix A′),
+		// deliberately generated separately from bearerToken above: bearerToken
+		// gates the external port (caller <-> authProxy), openCodePassword gates the
+		// internal port (authProxy <-> opencode). Reusing one secret for both would
+		// mean any caller holding the external bearer token could also derive the
+		// internal credential.
+		openCodePassword, err := opencode.GenerateBearerToken()
+		if err != nil {
+			return nil, err
+		}
+
+		// The endpoint the sandbox exposes for this worker's coding-agent process:
+		// the authproxy-fronted external port callers dial, opencode's own internal
+		// control port (checked directly by the readiness probe, never exposed), and
+		// the per-worker bearer. agent (adapters/opencode) drives readiness, session,
+		// and every turn through it, the pool never speaks the agent's wire protocol.
+		endpoint = app.Endpoint{
+			BaseURL:      "http://127.0.0.1:" + strconv.Itoa(externalPort),
+			ExternalPort: externalPort,
+			InternalPort: internalPort,
+			BearerToken:  bearerToken,
+		}
+
+		// authProxy binds the pool-lifetime context so its serve goroutine logs and
+		// lifetime follow the pool, not a single request.
+		proxy, err = opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
+		if err != nil {
+			return nil, fmt.Errorf("start authproxy: %w", err)
+		}
+		// The rollback registers the moment the proxy is live: a spawn failure
+		// below returns from this function, and a defer added after the switch
+		// would not exist yet, so the proxy would keep its port for the pool's
+		// whole lifetime.
+		defer func() {
+			if !success {
+				proxy.Shutdown()
+			}
+		}()
+
+		// The worker subprocess is bound to the POOL-lifetime context, the
+		// per-request context controls a single chat turn, but the worker stays
+		// alive across turns and only dies on idle/shutdown. Binding to baseCtx
+		// (rather than context.Background, as the flat manager did) means a pool
+		// Shutdown / deadline propagates to the subprocess.
+		// The opencode fork itself. baseCtx (not ctx) binds the subprocess, it outlives
+		// the request, but the span hangs off the spawn span so the fork shows up in the
+		// waterfall, tagged with the isolation substrate (sandboxed vs local) that set
+		// its SysProcAttr.
+		_, ocSpan := p.telemetry.StartPhase(ctx, "langy.opencode.spawn")
+		ocSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
+		ocCmd, err := ocAgent.Spawn(p.baseCtx, opencode.SpawnInput{
+			BinaryPath:       p.openCodeBinaryPath,
+			ConversationID:   conversationID,
+			Home:             workerHome,
+			UID:              uid,
+			Port:             internalPort,
+			Creds:            creds,
+			OpenCodePassword: openCodePassword,
+			EgressPort:       we.ProxyPort,
+			Runner:           p.runner,
+			Mediation:        mediation,
+			// The turn's capabilities fold their own env into the worker, the SAME set
+			// that produced this worker's credential signature (see capabilitiesFor).
+			Capabilities: capabilitiesFor(creds),
+		})
+		if err != nil {
+			ocSpan.RecordError(err)
+			ocSpan.SetStatus(codes.Error, "spawn opencode")
+			ocSpan.End()
+			return nil, err
+		}
 		ocSpan.End()
-		return nil, err
+		agent, cmd = ocAgent, ocCmd
 	}
-	ocSpan.End()
 	// The exit watcher goroutine is NOT started until success below, so this undo
 	// owns cmd.Wait() without a race: on a readiness/session failure it kills the
 	// process and drains its exit, and the rollbacks above shut the proxy, wipe
@@ -825,6 +1013,11 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		if !success {
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
+			// The agent's own pipes go with the process. This worker never
+			// reached the registry, so neither kill() nor onWorkerExit will
+			// ever see it, and a readiness or session failure would otherwise
+			// leave the pi agent's stdin pipe held for the manager's life.
+			closeAgent(agent)
 		}
 	}()
 
@@ -865,8 +1058,10 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 
 	log.Info("worker ready",
 		zap.String("conversation", conversationID),
-		zap.Int("port", externalPort),
-		zap.Int("internalPort", internalPort),
+		zap.String("harness", domain.NormalizeHarness(creds.Harness)),
+		// Ports are zero on the pi harness (stdio, no listener).
+		zap.Int("port", endpoint.ExternalPort),
+		zap.Int("internalPort", endpoint.InternalPort),
 		zap.String("session", sessionID),
 		zap.Bool("resumedSession", resumedSession),
 		zap.Uint32("uid", uid),
@@ -973,6 +1168,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	// so the key is now pure liability: nothing can use it, and it would otherwise
 	// stay valid for hours.
 	if deletedOwnEntry {
+		closeAgentOf(exitedWorker)
 		p.revokeKeyOf(exitedWorker, "worker exited")
 		// Revoke the telemetry-relay routing token too: a dead worker's token must
 		// stop attributing spans / spending the virtual key, and the relay's
@@ -1019,6 +1215,7 @@ func (p *Pool) kill(conversationID, reason string) {
 		return
 	}
 	p.telemetry.WorkerKilled(p.baseCtx, reason)
+	closeAgentOf(w)
 	// The key's lifetime is the worker's. kill() is the funnel for EVERY
 	// deliberate death — capability change, idle reap, shutdown — so revoking here
 	// covers all three at once. Self-exit and crash are the other path, handled in
@@ -1079,5 +1276,78 @@ func (p *Pool) reapIdle() {
 	p.mu.Unlock()
 	for _, id := range candidates {
 		p.kill(id, "idle timeout")
+	}
+	p.sweepSessionStashes()
+}
+
+// piSessionStashDirName holds every conversation's persistent pi session
+// storage, one subdirectory per conversation, as a SIBLING of the worker homes
+// under sessionsRoot. The home is wiped on every worker death; the session
+// files here survive it, so a respawned worker resumes the conversation's pi
+// session — same messages, same provider prompt-cache prefix — instead of
+// re-reading the whole conversation from a folded transcript. The leading dot
+// keeps the name outside the validated conversation-id charset, so a home and
+// the stash can never collide. Boot still wipes sessionsRoot whole, same
+// hygiene as before.
+const piSessionStashDirName = ".pi-sessions"
+
+// sessionStashTTL bounds how long a conversation's session files may sit with
+// no live worker: conversation content must not linger on the manager's disk
+// indefinitely after the user moved on. Well past the 1h provider cache tier
+// it exists to serve; a conversation resumed later than this re-seeds from the
+// durable transcript exactly as before.
+const sessionStashTTL = 24 * time.Hour
+
+func (p *Pool) piSessionDir(conversationID string) string {
+	return filepath.Join(p.sessionsRoot, piSessionStashDirName, conversationID)
+}
+
+// stashLastWrite is the newest mtime of the stash directory or anything in it.
+func stashLastWrite(dir string) time.Time {
+	newest := time.Time{}
+	if info, err := os.Stat(dir); err == nil {
+		newest = info.ModTime()
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return newest
+	}
+	for _, entry := range entries {
+		if info, err := entry.Info(); err == nil && info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	return newest
+}
+
+// sweepSessionStashes removes session storage whose conversation has gone
+// quiet: no live worker and nothing written for sessionStashTTL. Runs on the
+// reaper's clock, off the pool lock except for the live-worker check.
+func (p *Pool) sweepSessionStashes() {
+	stashRoot := filepath.Join(p.sessionsRoot, piSessionStashDirName)
+	entries, err := os.ReadDir(stashRoot)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for _, entry := range entries {
+		p.mu.Lock()
+		_, live := p.workers[entry.Name()]
+		p.mu.Unlock()
+		if live {
+			continue
+		}
+		// Freshness is the newest mtime INSIDE the stash: appending to a
+		// session file updates the file, not its directory, so the directory
+		// mtime alone would sweep a conversation that wrote minutes ago.
+		if now.Sub(stashLastWrite(filepath.Join(stashRoot, entry.Name()))) < sessionStashTTL {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(stashRoot, entry.Name())); err != nil {
+			clog.Get(p.baseCtx).Warn("remove stale session stash failed",
+				zap.String("conversation", entry.Name()),
+				zap.Error(err),
+			)
+		}
 	}
 }

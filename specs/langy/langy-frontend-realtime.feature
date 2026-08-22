@@ -224,7 +224,16 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     And opened page context (an experiment or trace) rides as a removable chip inside the composer
 
   # The thinking line may only say true things (see langyThinkingLine.ts). Live
-  # reasoning IS the model working, so it must never read as "Starting up…".
+  # reasoning IS the model working, so it must never read as a startup wait.
+  # And once the answer's prose is streaming on screen, the answer itself is
+  # the status: a working line under it reads as the panel still waiting for
+  # the reply that is visibly arriving.
+  @unit
+  Scenario: The streaming answer replaces the thinking line
+    Given a turn is in flight and the reply's text is streaming on screen
+    Then no thinking line renders under the answer
+    And no status placeholder renders under the answer
+
   @unit
   Scenario: Live reasoning reads as thinking, not as starting up
     Given a turn is in flight with no prose and no tool call yet

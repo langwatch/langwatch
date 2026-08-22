@@ -164,6 +164,47 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the browser navigates to that link
       And asking to open the batch the lookup named navigates to the same link
 
+  Rule: An id the conversation never surfaced still resolves through the platform
+
+    # The link store is an optimization, not the source of truth. The model
+    # often chains its lookup and the open into ONE compound command, and
+    # compound stdout never seeds the store (stdout provenance), so the
+    # platform's own verified lookup must resolve the id, for every resource
+    # surface Langy opens, not only scenario runs.
+
+    @unit
+    Scenario: A chained lookup-and-open compound resolves through the platform fallback
+      Given Langy found the resource and opened it in one step
+      And the conversation never showed the user a link for it
+      When Langy asks to open a resource in this project
+      Then the user is taken to that resource, resolved with the project's own access
+
+    @unit
+    Scenario: The platform fallback resolves every resource surface Langy opens
+      When Langy asks to open a prompt, dataset, workflow, experiment, monitor, evaluator or agent the project can see
+      Then the user is taken to that resource
+      And they land on the same page the product's own links open
+
+    @unit
+    Scenario: An id the project cannot resolve drops silently
+      When a navigate instruction names an id that does not resolve in this project
+      Then no navigation happens
+      And the turn continues unaffected
+
+    # "Take me to my prompts" names a page, not a resource: there is no id to
+    # look up, so the platform resolves a closed set of page names to its own
+    # project-scoped addresses. A name outside that set is not a destination.
+
+    @unit
+    Scenario: A page name navigates to the project's own page
+      When the navigate instruction names a page such as "prompts"
+      Then the browser navigates to that page under the project's own address
+
+    @unit
+    Scenario: A name outside the page set is not a destination
+      When the navigate instruction names a word that is neither a page nor a resolvable id
+      Then no navigation happens
+
   Rule: Navigation is a live-edge instruction, fired at most once
 
     @integration
