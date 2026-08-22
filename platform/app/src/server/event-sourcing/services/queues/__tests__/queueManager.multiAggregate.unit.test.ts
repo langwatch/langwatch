@@ -16,6 +16,14 @@ import {
   createMockSharedQueue,
 } from "./commandHandlerFixtures";
 
+/** The dedup id a registered command computes for a payload. */
+function dedupKeyOf(
+  entry: JobRegistryEntry | undefined,
+  payload: Record<string, unknown>,
+): string | undefined {
+  return entry?.deduplication?.makeId(payload);
+}
+
 const scope = declaredAggregateScope({
   authz_grant: ["lw.authz.grant.attached"],
   authz_role: ["lw.authz.role.defined"],
@@ -40,7 +48,7 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
       const manager = new QueueManager({
         aggregateScope: scope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         globalQueue: createMockSharedQueue(),
         globalJobRegistry,
       });
@@ -50,21 +58,26 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
           {
             name: "defineRole",
             handlerClass: createMockCommandHandlerClass("defineRole"),
-            options: { aggregateType: "authz_role" },
+            options: {
+              aggregateType: "authz_role",
+              deduplication: "aggregate",
+            },
           },
         ],
         vi.fn(),
-        "authz_grant",
+        "authz",
       );
 
-      const entry = globalJobRegistry.get("authz_grant:command:defineRole");
-      const groupKey = entry?.groupKeyFn({
+      const entry = globalJobRegistry.get("authz:command:defineRole");
+      const payload = {
         tenantId: String(tenantId),
         aggregateId: "r1",
         occurredAt: 1000,
-      });
+      };
+      const groupKey = entry?.groupKeyFn(payload);
 
       expect(groupKey).toBe("org_1/command/defineRole/authz_role:r1");
+      expect(dedupKeyOf(entry, payload)).toBe("org_1:authz_role:r1");
     });
 
     /** @scenario "A command's queue group key and kill-switch key use its bound aggregate" */
@@ -76,7 +89,7 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
       const manager = new QueueManager({
         aggregateScope: scope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         globalQueue: createMockSharedQueue(),
         globalJobRegistry,
         featureFlagService,
@@ -91,10 +104,10 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
           },
         ],
         vi.fn(),
-        "authz_grant",
+        "authz",
       );
 
-      await globalJobRegistry.get("authz_grant:command:defineRole")?.process({
+      await globalJobRegistry.get("authz:command:defineRole")?.process({
         tenantId: String(tenantId),
         aggregateId: "r1",
         occurredAt: 1000,
@@ -112,7 +125,7 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
     it("refuses to register it", () => {
       const manager = new QueueManager({
         aggregateScope: scope,
-        pipelineName: "authz_grant",
+        pipelineName: "authz",
         globalQueue: createMockSharedQueue(),
         globalJobRegistry: new Map(),
       });
@@ -148,21 +161,26 @@ describe("QueueManager on a multi-aggregate pipeline", () => {
           {
             name: "recordSpan",
             handlerClass: createMockCommandHandlerClass("recordSpan"),
+            options: { deduplication: "aggregate" },
           },
         ],
         vi.fn(),
         "trace_processing",
       );
 
-      const groupKey = globalJobRegistry
-        .get("trace_processing:command:recordSpan")
-        ?.groupKeyFn({
-          tenantId: String(tenantId),
-          aggregateId: "t1",
-          occurredAt: 1000,
-        });
+      const entry = globalJobRegistry.get(
+        "trace_processing:command:recordSpan",
+      );
+      const payload = {
+        tenantId: String(tenantId),
+        aggregateId: "t1",
+        occurredAt: 1000,
+      };
 
-      expect(groupKey).toBe("org_1/command/recordSpan/trace:t1");
+      expect(entry?.groupKeyFn(payload)).toBe(
+        "org_1/command/recordSpan/trace:t1",
+      );
+      expect(dedupKeyOf(entry, payload)).toBe("org_1:trace:t1");
     });
   });
 });

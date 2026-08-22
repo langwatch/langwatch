@@ -121,7 +121,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         expect(eventLoader).toHaveBeenCalledWith({
           tenantId,
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType: expect.any(String),
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           occurredAtMs: 1_000,
         });
         // Replayed from init(), so the stored count of 99 is discarded entirely.

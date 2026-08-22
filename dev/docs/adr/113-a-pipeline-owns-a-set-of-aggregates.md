@@ -95,7 +95,7 @@ assertion, and they are the whole cost of the change:
 | Site | What it does with the type |
 |---|---|
 | `EventSourcingService` fold/map event loaders | closes over it (`capturedAggregateType`) to call `getEvents` / `getEventsUpTo` / `getEventsUpToPaged` for a re-fold |
-| `QueueManager` command registration | `${tenantId}:${aggregateType}:${aggregateId}` is the command queue group key and the dedup key |
+| `QueueManager` command registration | `${aggregateType}:${aggregateId}` is the domain segment of the command queue group key (`<tenant>/command/<name>/<type>:<id>`) and `${tenantId}:${aggregateType}:${id}` is the dedup key |
 | `utils/killSwitch.ts` | `es-<aggregateType>-<component>-<name>-killswitch` for every command, fold, map and subscriber; checked in `commandDispatcher` and six sites in `projectionRouter` |
 | `ProjectionRouter` time-local gate | `TIME_LOCAL_AGGREGATE_TYPES.has(this.aggregateType)` permits a fold to trust an absent windowed read |
 | `PipelineMetadata`, spans, metrics, `ops/event-explorer.service.ts`, `ops/manager-explorer.service.ts` | a single label; the explorers resolve a pipeline *from* a type |
@@ -170,15 +170,25 @@ loader's context gains `aggregateType`, supplied by the executor from the
 delivered event. No loader closes over a pipeline-level type.
 
 **Fold state on a multi-aggregate pipeline is keyed by
-`${aggregateType}:${aggregateId}`.** `ProjectionStoreContext` already has a
-`key` that "defaults to `aggregateId` when not set"; on a multi-aggregate
-pipeline the router sets it to the qualified form for every fold, state and
-map store call, and the same qualified key is what replay and the fold drain
-already use for their group ids. No column, table or existing row changes:
-the value in the existing key column gains a prefix, and only on pipelines
-that do not exist yet. A single-aggregate pipeline keeps the bare id. The
-price is on the read side — application code that reads a fold row by id must
-qualify it — and it is named under Consequences.
+`${aggregateType}:${aggregateId}`, a custom projection key included.**
+`ProjectionStoreContext` already has a `key` that "defaults to `aggregateId`
+when not set". One function, `projectionStateKey`, produces the key for live
+dispatch, for reads and for replay's accumulators, so a rebuilt row lands
+where the live row did; a projection's own `key(event)` is qualified the same
+way, or two families would still fold into one row. No column, table or
+existing row changes: the value in the existing key column gains a prefix,
+and only on pipelines that do not exist yet. A single-aggregate pipeline
+keeps the bare id.
+
+The key reaches a row only through a store that writes `context.key` and
+reads by it. `RepositoryFoldStore` (and a Redis cache in front of one) does;
+the per-pipeline ClickHouse repositories derive their row key from the state
+itself and do not. So a store declares `honoursContextKey`, and the builder
+refuses a fold on a multi-aggregate pipeline whose store does not declare
+it. Widening that to every store is its own change; nothing in this ADR
+needs it, since the authorization pipeline has no fold projection. The price
+on the read side — `getProjectionByName` must be told which aggregate it is
+reading — is named under Consequences.
 
 **Kill-switch keys for projections and subscribers on a multi-aggregate
 pipeline use the pipeline name in the aggregate segment.** A fold that folds
@@ -197,9 +207,10 @@ the code match it.
 **Ops scope stays per pipeline and projection.** Pause keys
 (`<pipeline>/projection/<name>`), replay selection and retention are
 unchanged. An operator pausing the ledger fold pauses it for grants and roles
-alike, which is what "one projection" means. `PipelineMetadata.aggregateType`
-becomes `aggregateTypes`; the two explorers list them and resolve a pipeline
-from any of them.
+alike, which is what "one projection" means. The ops metadata rows list
+`aggregateTypes`; the event explorer discovers aggregates across all of them
+and the manager explorer resolves a pipeline's process managers from any of
+them.
 
 ### Under the extraction
 
@@ -261,10 +272,15 @@ concurrently exactly as two grants do.
   specify. The comment #7406 added to `constants.ts` is replaced and the
   `AUTHZ_ROLE_AGGREGATE_TYPE` constant it deleted returns; its
   `aggregateIdentity` test asserts against the pipeline's declared **set**.
-- The ledger fold's rows for the authorization pipeline are keyed
-  `authz_grant:<grantId>` / `authz_role:<roleId>`. The ledger read path
-  (`grantsLedger`, the permission projection loader) qualifies the id. No
-  rows exist to migrate: the store refused every write until now.
+- The authorization pipeline has one map projection and one subscriber and
+  no fold, so no fold row changes shape for it. A fold added to it later is
+  keyed `authz_grant:<grantId>` / `authz_role:<roleId>` and read with
+  `getProjectionByName(name, id, ctx, { aggregateType })`.
+- `FoldProjectionStore.honoursContextKey` is a new marker; `RepositoryFoldStore`
+  sets it and `RedisCachedFoldStore` forwards its inner store's. A
+  multi-aggregate pipeline refuses a fold store without it at build.
+- Replay's fold and state accumulators take the pipeline's scope and key
+  rebuilt rows exactly as live dispatch does.
 - `withCommand` gains an optional `aggregateType`; mandatory only on a
   multi-aggregate pipeline.
 - The `occurredAt` re-fold loader's context gains `aggregateType`. A custom
@@ -272,8 +288,11 @@ concurrently exactly as two grants do.
   and is wrong on a multi-aggregate one; the builder refuses a
   multi-aggregate pipeline that registers a fold with a custom loader unless
   the loader declares itself type-aware.
-- `PipelineMetadata.aggregateType` → `aggregateTypes`; `RegisteredPipeline.
-  aggregateType` is kept as the first declared type until nothing reads it.
+- `PipelineMetadata` keeps `aggregateType` (the first declared type, a
+  label) and gains `aggregateScope`; the ops metadata rows (`ProjectionMetadata`,
+  `SubscriberMetadata`, `EventSubscriberMetadata`, `ProcessManagerMetadata`)
+  gain `aggregateTypes`. `RegisteredPipeline.aggregateType` stays the first
+  declared type until nothing reads it.
 - Kill-switch keys gain one rule (pipeline name for projections on a
   multi-aggregate pipeline) and rename nothing.
 - No event row, queue key, pause key or existing fold row changes. The

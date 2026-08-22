@@ -13,7 +13,7 @@ concurrency comes from), ADR-105 (an aggregate is one declaration).
 
 **Related:** [ADR-113](113-a-pipeline-owns-a-set-of-aggregates.md) (the
 framework change that lets one pipeline carry both aggregates under their own
-types — until it lands, #7406 stamps both families `authz_grant`), ADR-103 (a run's totals are a query — the same instinct: stop
+types; #7406's interim fix stamped both families `authz_grant`), ADR-103 (a run's totals are a query — the same instinct: stop
 maintaining what can be derived), ADR-057 (the share token is its own
 identity).
 

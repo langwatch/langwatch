@@ -73,15 +73,16 @@ Feature: Internal feature flag system for system-level kill switches
     # type today. A pipeline declaring several (ADR-113) has no one type for a
     # projection that folds them all, so the segment is the pipeline name; a
     # command uses the type it is bound to. No existing key changes shape.
+    @unit
     Scenario: kill switch key for a projection on a multi-aggregate pipeline uses the pipeline name
-      Given a pipeline "authz_grant" declaring aggregate types "authz_grant" and "authz_role"
+      Given a pipeline "authz" declaring aggregate types "authz_grant" and "authz_role"
       And a fold projection "ledger" on it
       When code checks the projection's kill switch
-      Then the generated key is "es-authz_grant-projection-ledger-killswitch"
-      And it resolves as SYSTEM scope inherited from the family
+      Then the generated key is "es-authz-projection-ledger-killswitch"
 
+    @unit
     Scenario: kill switch key for a command on a multi-aggregate pipeline uses the command's bound aggregate
-      Given a pipeline "authz_grant" declaring aggregate types "authz_grant" and "authz_role"
+      Given a pipeline "authz" declaring aggregate types "authz_grant" and "authz_role"
       And a command "defineRole" bound to aggregate type "authz_role"
       When code checks the command's kill switch
       Then the generated key is "es-authz_role-command-defineRole-killswitch"

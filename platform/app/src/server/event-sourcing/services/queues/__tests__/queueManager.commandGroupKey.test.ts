@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import type { Command, CommandHandler } from "../../../commands/command";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass";
 import { defineCommandSchema } from "../../../commands/commandSchema";
@@ -13,36 +12,11 @@ import {
 } from "../../__tests__/testHelpers";
 import type { JobRegistryEntry } from "../queueManager";
 import { QueueManager } from "../queueManager";
-
-const payloadSchema = z.object({
-  tenantId: z.string(),
-  aggregateId: z.string(),
-  experimentId: z.string().optional(),
-  runId: z.string().optional(),
-  index: z.number().optional(),
-  occurredAt: z.number(),
-});
-
-function createMockCommandHandlerClass(
-  name: string,
-): CommandHandlerClass<any, CommandType, Event> {
-  class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
-    static readonly schema = defineCommandSchema(
-      `test.command.${name}` as CommandType,
-      payloadSchema,
-    );
-
-    static getAggregateId(payload: any): string {
-      return payload.aggregateId;
-    }
-
-    async handle(_command: Command<any, any>): Promise<Event[]> {
-      return [];
-    }
-  }
-
-  return MockCommandHandler as any;
-}
+import {
+  commandPayloadSchema,
+  createMockCommandHandlerClass,
+  createMockSharedQueue,
+} from "./commandHandlerFixtures";
 
 function createMockCommandHandlerClassWithGroupKey(
   name: string,
@@ -52,7 +26,7 @@ function createMockCommandHandlerClassWithGroupKey(
   {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
-      payloadSchema,
+      commandPayloadSchema,
     );
 
     static getAggregateId(payload: any): string {
@@ -69,15 +43,6 @@ function createMockCommandHandlerClassWithGroupKey(
   }
 
   return MockCommandHandlerWithGroupKey as any;
-}
-
-function createMockSharedQueue(): EventSourcedQueueProcessor<any> {
-  return {
-    send: vi.fn().mockResolvedValue(void 0),
-    sendBatch: vi.fn().mockResolvedValue(void 0),
-    close: vi.fn().mockResolvedValue(void 0),
-    waitUntilReady: vi.fn().mockResolvedValue(void 0),
-  };
 }
 
 describe("QueueManager.initializeCommandQueues with getGroupKey", () => {

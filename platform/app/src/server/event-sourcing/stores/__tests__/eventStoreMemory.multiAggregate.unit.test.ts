@@ -32,12 +32,6 @@ describe("EventStoreMemory.storeEvents on a multi-aggregate pipeline", () => {
   const tenantId = createTestTenantId("org_1");
   const context = createTestEventStoreReadContext<Event>(tenantId);
 
-  async function storeOne(event: Event) {
-    const store = new EventStoreMemory<Event>();
-    await store.storeEvents([event], context, scope);
-    return store;
-  }
-
   describe("given an event of each aggregate", () => {
     /** @scenario "Appending an event of each aggregate to the shared pipeline" */
     it("stores both, each under the type it was stamped with", async () => {
@@ -71,6 +65,7 @@ describe("EventStoreMemory.storeEvents on a multi-aggregate pipeline", () => {
         /owned by aggregate 'authz_role' but the event is stamped 'authz_grant'/,
       );
       expect(await store.getEvents("r1", context, GRANT)).toHaveLength(0);
+      expect(await store.getEvents("r1", context, ROLE)).toHaveLength(0);
     });
   });
 
@@ -79,7 +74,9 @@ describe("EventStoreMemory.storeEvents on a multi-aggregate pipeline", () => {
     it("rejects the append naming the aggregateType field", async () => {
       const stray = createTestEvent("t1", "trace", tenantId, SPAN_RECEIVED);
 
-      const failure = await storeOne(stray).catch((error: unknown) => error);
+      const failure = await new EventStoreMemory<Event>()
+        .storeEvents([stray], context, scope)
+        .catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(ValidationError);
       expect((failure as ValidationError).field).toBe("aggregateType");
