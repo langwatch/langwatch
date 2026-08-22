@@ -145,29 +145,33 @@ describe("authz command aggregate identity", () => {
   describe("when the store validates a command's events on append", () => {
     /** @scenario "A role's aggregate is the role" */
     it.each([
-      ["attach", new AttachGrantCommand(), { ...identity, grant: GRANT }],
-      [
-        "define role",
-        new DefineRoleCommand(),
-        { ...identity, role: ROLE, actor: ACTOR },
-      ],
-      [
-        "change permissions",
-        new ChangeRolePermissionsCommand(),
-        {
+      {
+        label: "attach",
+        handler: new AttachGrantCommand(),
+        data: { ...identity, grant: GRANT },
+      },
+      {
+        label: "define role",
+        handler: new DefineRoleCommand(),
+        data: { ...identity, role: ROLE, actor: ACTOR },
+      },
+      {
+        label: "change permissions",
+        handler: new ChangeRolePermissionsCommand(),
+        data: {
           ...identity,
           roleId: "role_1",
           permissions: ["traces:view"],
           actor: ACTOR,
           occurredAtMs: AT,
         },
-      ],
-      [
-        "delete role",
-        new DeleteRoleCommand(),
-        { ...identity, roleId: "role_1", actor: ACTOR, occurredAtMs: AT },
-      ],
-    ])("accepts every event %s emits", async (_, handler, data) => {
+      },
+      {
+        label: "delete role",
+        handler: new DeleteRoleCommand(),
+        data: { ...identity, roleId: "role_1", actor: ACTOR, occurredAtMs: AT },
+      },
+    ])("accepts every event $label emits", async ({ handler, data }) => {
       const declared = createAuthzGrantsPipeline({
         authzGrantsWriteStore: {} as never,
         authzAuditTrailStore: {} as never,
