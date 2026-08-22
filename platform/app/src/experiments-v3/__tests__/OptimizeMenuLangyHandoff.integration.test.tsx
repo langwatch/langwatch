@@ -50,6 +50,8 @@ const promptTarget: TargetConfig = {
   id: "target-baseline",
   type: "prompt",
   promptId: "prompt_1",
+  inputs: [],
+  outputs: [],
   mappings: {},
 };
 
@@ -88,6 +90,8 @@ describe("given a prompt column on the workbench", () => {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: "eval_1",
+          inputs: [],
+          outputs: [],
           mappings: {},
         },
         vi.fn(),

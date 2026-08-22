@@ -166,7 +166,8 @@ describe("LangyUiActionService", () => {
     /** @scenario A payload failing its schema is refused with langy_ui_payload_invalid */
     it("refuses before anything reaches the stream", async () => {
       const { redis } = makeRedis();
-      const appended: Array<{ actionId: string }> = [];
+      const appended: Array<{ actionId: string; kind: string; payload: unknown }> =
+        [];
       const service = makeService({ redis, appended });
 
       await expect(
@@ -184,7 +185,8 @@ describe("LangyUiActionService", () => {
     /** @scenario Agent invokes a workbench action and the attached browser applies it live */
     /** @scenario The action's result returns to the agent within the same CLI call */
     it("returns the page's result as a browser execution", async () => {
-      const appended: Array<{ actionId: string; kind: string }> = [];
+      const appended: Array<{ actionId: string; kind: string; payload: unknown }> =
+        [];
       // The first blocking wait finds the result: the fake claims + completes
       // mid-wait, the way a fast page beats the claim window.
       const { redis, store } = makeRedis([
@@ -216,7 +218,8 @@ describe("LangyUiActionService", () => {
   describe("when nothing claims the action inside the claim window", () => {
     /** @scenario An unclaimed action deletes its pending record before answering */
     it("deletes the pending record and refuses with langy_ui_no_browser", async () => {
-      const appended: Array<{ actionId: string }> = [];
+      const appended: Array<{ actionId: string; kind: string; payload: unknown }> =
+        [];
       const { redis, store } = makeRedis(["wait-empty"]);
       const service = makeService({ redis, appended });
 
@@ -245,7 +248,8 @@ describe("LangyUiActionService", () => {
   describe("when the page claims and then goes silent", () => {
     /** @scenario A claimed action that never completes times out without re-dispatching */
     it("refuses with langy_ui_timeout after the execute budget", async () => {
-      const appended: Array<{ actionId: string }> = [];
+      const appended: Array<{ actionId: string; kind: string; payload: unknown }> =
+        [];
       const { redis, store, blpopCalls } = makeRedis([
         // Claim window lapses with no result, but a claim key appeared.
         () => {
@@ -271,7 +275,8 @@ describe("LangyUiActionService", () => {
   describe("when the page reports a failure", () => {
     /** @scenario A browser handler failure reaches the agent as langy_ui_handler_failed and the user as a toast */
     it("carries the page's error code to the agent", async () => {
-      const appended: Array<{ actionId: string }> = [];
+      const appended: Array<{ actionId: string; kind: string; payload: unknown }> =
+        [];
       const { redis, store } = makeRedis([
         () => {
           const actionId = appended[0]!.actionId;
