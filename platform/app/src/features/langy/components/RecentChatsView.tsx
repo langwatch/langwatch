@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import {
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -67,7 +68,39 @@ const UNTITLED = "Untitled chat";
 /** Below this, a search field is more chrome than help. */
 const SEARCH_FROM = 7;
 const VIRTUALIZE_FROM = 50;
-const CHAT_ROW_ESTIMATE = 58;
+const CHAT_ROW_ESTIMATE = 60;
+
+/** The day buckets the list groups under, newest first. */
+type ChatGroup = "Today" | "Yesterday" | "This week" | "Older";
+
+const DAY_MS = 24 * 60 * 60 * 1_000;
+
+/**
+ * The day bucket a conversation's last activity falls in. Same start-of-day
+ * arithmetic as `formatLangyConversationDate`, coarser buckets: rows sort
+ * newest-first, so equal buckets are always contiguous and each one can carry
+ * a single header.
+ */
+function chatGroupFor(timestampMs: number, nowMs = Date.now()): ChatGroup {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) return "Older";
+  const date = new Date(timestampMs);
+  const now = new Date(nowMs);
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const startOfDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
+  const dayDifference = Math.round((startOfToday - startOfDate) / DAY_MS);
+  if (dayDifference <= 0) return "Today";
+  if (dayDifference === 1) return "Yesterday";
+  if (dayDifference < 7) return "This week";
+  return "Older";
+}
 
 interface ChatItem {
   value: string;
@@ -77,6 +110,7 @@ interface ChatItem {
   searchText: string;
   lastActivityAtMs: number;
   dateLabel: string;
+  group: ChatGroup;
   messageCount: number;
 }
 
@@ -155,6 +189,7 @@ export function RecentChatsView({
           searchText: title.toLowerCase(),
           lastActivityAtMs: conversation.lastActivityAtMs,
           dateLabel: formatLangyConversationDate(conversation.lastActivityAtMs),
+          group: chatGroupFor(conversation.lastActivityAtMs),
           messageCount: conversation.messageCount,
         };
       }),
@@ -234,11 +269,11 @@ export function RecentChatsView({
       </HStack>
 
       {searchable ? (
-        <Box paddingX={pad} paddingBottom={2}>
+        <Box paddingX={pad} paddingBottom={3}>
           <HStack
             gap={2}
             paddingX={2.5}
-            paddingY={1}
+            paddingY={1.5}
             borderWidth="1px"
             borderStyle="solid"
             borderColor="border.emphasized"
@@ -310,10 +345,11 @@ export function RecentChatsView({
       <ChatRows
         items={items}
         paddingX={pad}
-        renderItem={(item) => (
+        renderItem={(item, showDate) => (
           <ChatRow
             key={item.value}
             item={item}
+            showDate={showDate}
             isActive={item.value === activeConversationId}
             onSelect={selectChat}
             onDelete={deleteChat}
@@ -367,6 +403,12 @@ export function RecentChatsView({
  * Recents are keyset-paginated, but a person can deliberately load many pages.
  * Once that happens, keep the actual DOM bounded while preserving the same rows
  * and row actions for everything on screen.
+ *
+ * The non-virtual path (the common case) groups rows under quiet day headers;
+ * rows in Today/Yesterday drop their own date, since the header already says
+ * it. The virtual path stays a flat list — absolute-positioned rows cannot
+ * interleave headers without measuring them too — so there every row keeps its
+ * date, which is what `showDate` tells the row.
  */
 function ChatRows({
   items,
@@ -375,7 +417,7 @@ function ChatRows({
 }: {
   items: ChatItem[];
   paddingX: string;
-  renderItem: (item: ChatItem) => React.ReactNode;
+  renderItem: (item: ChatItem, showDate: boolean) => React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -417,13 +459,40 @@ function ChatRows({
                 width="full"
                 transform={`translateY(${virtualItem.start}px)`}
               >
-                {renderItem(item)}
+                {renderItem(item, true)}
               </Box>
             );
           })}
         </Box>
       ) : (
-        items.map(renderItem)
+        items.map((item, index) => {
+          const startsGroup = item.group !== items[index - 1]?.group;
+          const headerHidesDate =
+            item.group === "Today" || item.group === "Yesterday";
+          return (
+            <Fragment key={item.value}>
+              {startsGroup ? (
+                // The header is presentation: every row already carries its
+                // date in its own accessible name, so screen readers keep an
+                // uninterrupted list of items.
+                <Text
+                  aria-hidden="true"
+                  textStyle="2xs"
+                  fontWeight="600"
+                  color="fg.subtle"
+                  textTransform="uppercase"
+                  letterSpacing="0.06em"
+                  paddingX={2}
+                  paddingTop={index === 0 ? 1 : 4}
+                  paddingBottom={1.5}
+                >
+                  {item.group}
+                </Text>
+              ) : null}
+              {renderItem(item, !headerHidesDate)}
+            </Fragment>
+          );
+        })
       )}
     </Box>
   );
@@ -435,6 +504,7 @@ function ChatRows({
 // so a row only re-renders when its own item, active flag or edit state moves.
 const ChatRow = memo(function ChatRow({
   item,
+  showDate,
   isActive,
   onSelect,
   onDelete,
@@ -447,6 +517,8 @@ const ChatRow = memo(function ChatRow({
   onCancelRename,
 }: {
   item: ChatItem;
+  /** False when a group header above the row already names the day. */
+  showDate: boolean;
   isActive: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -475,7 +547,7 @@ const ChatRow = memo(function ChatRow({
       {...(isActive ? { background: "bg.subtle" } : {})}
     >
       {editing ? (
-        <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.25}>
+        <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.5}>
           <Input
             size="xs"
             autoFocus
@@ -518,14 +590,14 @@ const ChatRow = memo(function ChatRow({
           type="button"
           onClick={() => onSelect(item.value)}
           // Named EXPLICITLY: the label is what a screen reader announces and
-          // what a test can find the row by, and it carries the date the
-          // visible row splits into a second line.
+          // what a test can find the row by. It always carries the date, even
+          // when the visible row leaves it to the group header above.
           aria-label={`${item.title}, ${item.dateLabel}`}
           flex={1}
           minWidth={0}
           textAlign="left"
           paddingX={2}
-          paddingY={1.25}
+          paddingY={1.5}
           borderRadius="md"
           borderWidth={0}
           background="transparent"
@@ -548,6 +620,7 @@ const ChatRow = memo(function ChatRow({
               display="block"
               fontSize="13px"
               lineHeight="1.25"
+              fontWeight={isActive ? "600" : undefined}
               color={item.untitled ? "fg.muted" : "fg"}
               fontStyle={item.untitled ? "italic" : undefined}
               whiteSpace="nowrap"
@@ -557,24 +630,29 @@ const ChatRow = memo(function ChatRow({
             >
               {item.title}
             </Box>
-            <HStack gap={1} color="fg.subtle" minWidth={0}>
-              <chakra.time
-                dateTime={
-                  item.lastActivityAtMs > 0
-                    ? new Date(item.lastActivityAtMs).toISOString()
-                    : undefined
-                }
-                textStyle="2xs"
-                whiteSpace="nowrap"
-              >
-                {item.dateLabel}
-              </chakra.time>
-              {item.messageCount > 0 ? (
-                <Text textStyle="2xs" truncate>
-                  · {item.messageCount.toLocaleString()} messages
-                </Text>
-              ) : null}
-            </HStack>
+            {showDate || item.messageCount > 0 ? (
+              <HStack gap={1.5} color="fg.subtle" minWidth={0}>
+                {showDate ? (
+                  <chakra.time
+                    dateTime={
+                      item.lastActivityAtMs > 0
+                        ? new Date(item.lastActivityAtMs).toISOString()
+                        : undefined
+                    }
+                    textStyle="2xs"
+                    whiteSpace="nowrap"
+                  >
+                    {item.dateLabel}
+                  </chakra.time>
+                ) : null}
+                {item.messageCount > 0 ? (
+                  <Text textStyle="2xs" truncate>
+                    {showDate ? "· " : ""}
+                    {item.messageCount.toLocaleString()} messages
+                  </Text>
+                ) : null}
+              </HStack>
+            ) : null}
           </VStack>
         </chakra.button>
       )}

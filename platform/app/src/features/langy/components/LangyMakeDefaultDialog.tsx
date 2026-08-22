@@ -40,6 +40,7 @@ export function LangyMakeDefaultDialog({
   return (
     <Dialog.Root
       open={!!plan}
+      placement="center"
       onOpenChange={(details) => {
         if (!details.open) onDecline();
       }}
@@ -47,21 +48,25 @@ export function LangyMakeDefaultDialog({
     >
       {shown ? (
         <Dialog.Content bg="bg" maxWidth="480px" errorScope="Langy default ask">
-          <Dialog.Header paddingBottom={0}>
-            {/* The question is the whole dialog, so it is also its name. */}
-            <Dialog.Title
-              fontSize="sm"
-              fontWeight="normal"
-              lineHeight="1.5"
-              wordBreak="break-word"
-            >
+          <Dialog.Header>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Set default model?
+            </Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body paddingTop={0}>
+            <Text fontSize="sm" color="fg.muted" wordBreak="break-word">
               Make{" "}
-              <Text as="span" data-testid="langy-make-default-model">
+              <Text
+                as="span"
+                fontWeight="semibold"
+                color="fg"
+                data-testid="langy-make-default-model"
+              >
                 {modelLabel}
               </Text>{" "}
               the default model for Langy for the {shown.scopeLabel}?
-            </Dialog.Title>
-          </Dialog.Header>
+            </Text>
+          </Dialog.Body>
           <Dialog.Footer>
             <HStack width="full">
               <Spacer />
