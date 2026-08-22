@@ -101,11 +101,11 @@ audio = client.text_to_speech.convert(
 
 These routes need an ElevenLabs key on the virtual key. They carry that vendor's own request shape, so the gateway will not fall back to another provider for them.
 
-Transcription accepts a `file` part, or a `cloud_storage_url` part for ElevenLabs to fetch the audio itself. Uploads through the gateway are capped at 26 MB, the same limit as `/v1/audio/transcriptions`; use `cloud_storage_url` for anything larger.
+Transcription accepts a `file` part, or a `cloud_storage_url` part for ElevenLabs to fetch the audio itself. Uploads are capped at 25 MB of audio, the same limit as `/v1/audio/transcriptions`; larger uploads get a `413` before any provider is contacted. Send a `cloud_storage_url` for a bigger file: ElevenLabs fetches it directly and the gateway never holds it.
 
-Asynchronous transcription (`webhook=true`) returns `400`. The vendor answers that request before it has transcribed anything, so the call carries no duration and would bill nothing.
+The gateway refuses asynchronous transcription. A truthy `webhook` part gets a `400` from the gateway itself, before ElevenLabs is contacted at all. That mode makes the vendor answer before it has transcribed anything, so the reply carries no duration and the call would be billed as free.
 
-Metering is the same as on the OpenAI-shaped routes: synthesis is billed by the characters of `text`, transcription by the duration the vendor reports. A call costs the same whichever of the two wires it arrives on.
+Metering is the same as on the OpenAI-shaped routes: synthesis is billed by the Unicode characters of `text`, counted as characters rather than bytes so an accented or non-Latin script costs what it reads; transcription is billed by the audio duration ElevenLabs reports on its own answer. A call costs the same whichever of the two wires it arrives on.
 
 Streaming (`/v1/text-to-speech/{voice_id}/stream`) is not served yet.
 
