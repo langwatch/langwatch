@@ -727,6 +727,79 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
     });
   });
 
+  describe("when a re-login from the same device fails at the mint", () => {
+    /** @scenario "a failed re-login leaves the previous key working" */
+    it("leaves the key already in the user's CLI config active", async () => {
+      const HOSTNAME = `failed-relogin-${suffix}`;
+      await runFlow({ as: memberUser, hostname: HOSTNAME });
+      const firstKey = await mintedKeyFor({
+        userId: MEMBER_ID,
+        deviceLabel: HOSTNAME,
+      });
+      expect(firstKey).not.toBeNull();
+
+      identity.current = memberUser;
+      const dc = await mintDeviceCode();
+      const approved = await approve({
+        userCode: dc.user_code,
+        keySelection: {
+          bindings: [{ scope_type: "TEAM", scope_id: TEAM_SHARED_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+      expect(approved.status).toBe(200);
+
+      // Same window the access_denied case uses: the approval is valid and
+      // the mint is not, which is the only way to fail a mint from outside.
+      const removedBindings = await prisma.roleBinding.findMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      const removedMemberships = await prisma.organizationUser.findMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+
+      try {
+        const exchanged = await exchange({
+          deviceCode: dc.device_code,
+          hostname: HOSTNAME,
+        });
+        expect(exchanged.status).toBe(410);
+
+        const firstAfter = await prisma.apiKey.findFirst({
+          where: { id: firstKey!.id, organizationId: ORG_ID },
+          select: { revokedAt: true },
+        });
+        expect(firstAfter!.revokedAt).toBeNull();
+
+        // And no half-minted replacement outlives the failed exchange.
+        const active = await prisma.apiKey.count({
+          where: {
+            organizationId: ORG_ID,
+            userId: MEMBER_ID,
+            createdByDeviceLabel: HOSTNAME,
+            revokedAt: null,
+          },
+        });
+        expect(active).toBe(1);
+      } finally {
+        await prisma.organizationUser.createMany({
+          data: removedMemberships,
+          skipDuplicates: true,
+        });
+        await prisma.roleBinding.createMany({
+          data: removedBindings,
+          skipDuplicates: true,
+        });
+      }
+    });
+  });
+
   describe("when the owner is demoted after the key was minted", () => {
     /** @scenario "the key can never exceed the owner's live permissions" */
     it("refuses a trace search on a project the owner can no longer view", async () => {

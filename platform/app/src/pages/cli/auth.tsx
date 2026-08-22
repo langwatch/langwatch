@@ -63,7 +63,7 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../settings/api-keys/PermissionCategoryList";
-import { getUserPermissionsAtScope } from "../settings/api-keys/utils";
+import { getUserPermissionsAcrossScopes } from "../settings/api-keys/utils";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
 import { defaultCliKeyScopes } from "./cliKeyScopeDefaults";
 import { FirstTraceRedirect } from "./FirstTraceRedirect";
@@ -431,36 +431,32 @@ export default function CliAuthPage() {
   // on another would make approve fail with api_key_scope_violation.
   const cliKeyUserPermissions = useMemo(() => {
     if (selectedScopes.length === 0 || !selectedOrgId) return [];
-    const orgProjects = offeredProjects.map((p) => ({
-      id: p.id,
-      teamId: p.teamId,
-    }));
-    const perScope = selectedScopes.map(
-      (scope) =>
-        new Set(
-          getUserPermissionsAtScope({
-            myBindings: myBindings.data,
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-            organizationId: selectedOrgId,
-            orgProjects,
-            isServiceKey: false,
-            getTeamRolePermissions: (role) =>
-              getTeamRolePermissions(role as TeamUserRole),
-          }),
-        ),
-    );
-    const [first, ...rest] = perScope;
-    if (!first) return [];
-    return [...first].filter((permission) =>
-      rest.every((held) => held.has(permission)),
-    );
+    return getUserPermissionsAcrossScopes({
+      myBindings: myBindings.data,
+      scopes: selectedScopes,
+      organizationId: selectedOrgId,
+      orgProjects: offeredProjects.map((p) => ({ id: p.id, teamId: p.teamId })),
+      isServiceKey: false,
+      getTeamRolePermissions: (role) =>
+        getTeamRolePermissions(role as TeamUserRole),
+    });
   }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
 
-  // Whether the picker has anything at all to offer, which separates "you
-  // deselected everything" from "there is nothing here for you".
-  const hasAnyScopeToOffer =
-    sharedTeams.length > 0 || offeredProjects.length > 0;
+  // Whether the picker has anything to offer THIS user, which separates "you
+  // deselected everything" from "there is nothing here for you". Read from
+  // the same defaults the screen preselects, because a team listed in the
+  // organization the user holds no binding on is not a scope they can bind.
+  const hasAnyScopeToOffer = useMemo(() => {
+    if (!selectedOrgId || !myBindings.data) return false;
+    return (
+      defaultCliKeyScopes({
+        organizationId: selectedOrgId,
+        bindings: myBindings.data,
+        sharedTeamIds: sharedTeams.map((team) => team.id),
+        personalProjectId: personalProject?.id ?? null,
+      }).length > 0
+    );
+  }, [selectedOrgId, myBindings.data, sharedTeams, personalProject]);
 
   // The default list, narrowed to what the user actually holds everywhere the
   // key will be bound. The rule the key lives by is "never more than your own

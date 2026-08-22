@@ -33,7 +33,7 @@ import {
   bindingsToSelections,
   categoryAccessAvailability,
   deriveBindingRole,
-  getUserPermissionsAtScope,
+  getUserPermissionsAcrossScopes,
   type PermissionMode,
 } from "./utils";
 
@@ -98,20 +98,30 @@ export function EditApiKeyDrawer({
 
   const isServiceKey = apiKey ? !apiKey.userId : false;
 
-  const primaryScope = selectedScopes[0] ?? {
-    scopeType: "PROJECT" as const,
-    scopeId: currentProjectId ?? "",
-  };
+  const ceilingScopes = useMemo(
+    () =>
+      selectedScopes.length > 0
+        ? selectedScopes
+        : [
+            {
+              scopeType: "PROJECT" as const,
+              scopeId: currentProjectId ?? "",
+            },
+          ],
+    [selectedScopes, currentProjectId],
+  );
+  const primaryScope = ceilingScopes[0]!;
 
   // Same ceiling the create drawer shows: the team-role bags carry no
   // organization, gateway, governance or playground permissions, so reading
   // them directly would lock rows a service key or an organization admin can
-  // in fact grant.
+  // in fact grant. Across every selected scope, not only the first: one
+  // permission list serves every binding, so a row the second scope refuses
+  // would fail the save with a scope violation.
   const userPermissions = useMemo(() => {
-    return getUserPermissionsAtScope({
+    return getUserPermissionsAcrossScopes({
       myBindings: myBindings.data,
-      scopeType: primaryScope.scopeType,
-      scopeId: primaryScope.scopeId,
+      scopes: ceilingScopes,
       organizationId,
       orgProjects,
       isServiceKey,
@@ -120,8 +130,7 @@ export function EditApiKeyDrawer({
     });
   }, [
     myBindings.data,
-    primaryScope.scopeType,
-    primaryScope.scopeId,
+    ceilingScopes,
     organizationId,
     orgProjects,
     isServiceKey,

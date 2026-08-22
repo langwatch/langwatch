@@ -263,8 +263,6 @@ describe("/cli/auth key selection, given an organization admin", () => {
     for (const excluded of [
       "organization:manage",
       "organization:delete",
-      "project:create",
-      "project:delete",
       "team:manage",
       "ops:view",
       "ops:manage",
@@ -364,6 +362,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
     ];
   });
 
+  /** @scenario "the offered permissions are the intersection of every selected scope" */
   it("sends only the permissions every selected team grants", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -389,6 +388,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
     }
   });
 
+  /** @scenario "the offered permissions are the intersection of every selected scope" */
   it("locks the write level on rows only one team grants", async () => {
     const user = userEvent.setup();
     renderPage();

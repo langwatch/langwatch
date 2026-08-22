@@ -412,3 +412,51 @@ export function getUserPermissionsAtScope({
   }
   return getRolePerms(binding.role);
 }
+
+/**
+ * The ceiling for a key bound to several scopes at once: the intersection of
+ * what the caller holds at each of them.
+ *
+ * One permission list serves every binding on a key, so a permission held on
+ * one team but not on another cannot go out — `assertSelectionWithinCeiling`
+ * walks every binding at save time and refuses the whole selection. Offering
+ * such a permission would turn a valid-looking form into a scope violation.
+ */
+export function getUserPermissionsAcrossScopes({
+  myBindings,
+  scopes,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+  getTeamRolePermissions: getRolePerms,
+}: {
+  myBindings:
+    | Array<{ scopeType: string; scopeId: string; role: string }>
+    | undefined;
+  scopes: Array<{ scopeType: string; scopeId: string }>;
+  organizationId: string;
+  orgProjects: Array<{ id: string; teamId: string }>;
+  isServiceKey: boolean;
+  getTeamRolePermissions: (role: string) => string[];
+}): string[] {
+  const perScope = scopes.map(
+    (scope) =>
+      new Set(
+        getUserPermissionsAtScope({
+          myBindings,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+          organizationId,
+          orgProjects,
+          isServiceKey,
+          getTeamRolePermissions: getRolePerms,
+        }),
+      ),
+  );
+
+  const [first, ...rest] = perScope;
+  if (!first) return [];
+  return [...first].filter((permission) =>
+    rest.every((held) => held.has(permission)),
+  );
+}

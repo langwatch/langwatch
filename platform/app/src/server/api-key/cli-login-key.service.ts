@@ -286,12 +286,6 @@ export class CliLoginKeyService {
       bindings: selection.bindings,
     });
 
-    await this.revokeLoginKeysForDevice({
-      userId,
-      organizationId,
-      deviceLabel,
-    });
-
     const created = await this.apiKeyService.create({
       name: `${CLI_LOGIN_KEY_NAME_PREFIX}${deviceLabel}`,
       userId,
@@ -303,21 +297,46 @@ export class CliLoginKeyService {
       createdByDeviceLabel: deviceLabel,
     });
 
+    // The predecessor stays usable until its replacement exists. A mint has
+    // several fallible steps, and the key this call replaces is the one in
+    // the user's CLI config right now: revoking it first would leave a
+    // failed re-login with no working key at all.
+    try {
+      await this.revokeLoginKeysForDevice({
+        userId,
+        organizationId,
+        deviceLabel,
+        exceptApiKeyId: created.apiKey.id,
+      });
+    } catch (err) {
+      // The exchange is about to fail, so the replacement must not survive
+      // it: the CLI never receives this token and nothing else can revoke it.
+      await this.revokeQuietly({
+        apiKeyId: created.apiKey.id,
+        userId,
+        organizationId,
+      });
+      throw err;
+    }
+
     return { token: created.token, apiKeyId: created.apiKey.id, scope };
   }
 
   /**
    * Revokes every non-revoked CLI login key this user holds for this device
-   * label in this organization. Used before a re-login mint and by logout.
+   * label in this organization. Used after a re-login mint (which passes its
+   * fresh key as `exceptApiKeyId`) and by logout.
    */
   async revokeLoginKeysForDevice({
     userId,
     organizationId,
     deviceLabel,
+    exceptApiKeyId,
   }: {
     userId: string;
     organizationId: string;
     deviceLabel: string;
+    exceptApiKeyId?: string;
   }): Promise<void> {
     const priorKeys = await this.prisma.apiKey.findMany({
       where: {
@@ -326,6 +345,7 @@ export class CliLoginKeyService {
         createdByDeviceLabel: deviceLabel,
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         revokedAt: null,
+        ...(exceptApiKeyId ? { id: { not: exceptApiKeyId } } : {}),
       },
       select: { id: true },
     });

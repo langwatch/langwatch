@@ -84,7 +84,9 @@ The browser shows an "Approve" or "Send API key" button (depending on the chosen
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
 
 - **Scopes**: an organization admin gets the whole organization by default; other members get their teams plus their personal workspace. You can narrow the selection to specific teams or projects.
-- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Organization management stays off by default: the key cannot create or delete projects, manage members and roles, or manage the organization unless you turn those on under **Customize**.
+- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Organization management stays off by default: the key cannot manage members and roles, or manage the organization, unless you turn those on under **Customize**.
+
+Project administration is the one thing that rides along. Model providers and project settings are gated by the project management permission, and that same permission answers a project create or delete request, so a key that can configure model providers can also create and delete projects in the scopes it covers. To withhold it, set **Project** to **Read** under **Customize**, which turns model provider writes off with it.
 
 Every request the key makes is checked against your live permissions, so the key can never do more than you can, and it shrinks with you if your role changes. A new login from the same machine replaces the previous login key, and `langwatch logout` revokes it.
 

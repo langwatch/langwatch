@@ -185,22 +185,17 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("team"),
   },
   {
-    key: "projectSettings",
-    label: "Project settings",
+    // One category, because the role model gives no way to split it:
+    // `project:manage` is the umbrella grant for the project resource, and
+    // `hasPermissionWithHierarchy` answers a `project:create` or
+    // `project:delete` check with it. A category that offered project
+    // settings without project creation would describe a separation the
+    // request path does not make.
+    key: "project",
+    label: "Project",
     accessLevels: ["read", "write"],
     readPermissions: viewsOf("project"),
-    writePermissions: ["project:view", "project:update", "project:manage"],
-  },
-  {
-    // Write-only on purpose: creating and deleting projects is an
-    // administrative act with no read counterpart, split from Project
-    // settings so a key can manage a project without being able to add or
-    // remove projects.
-    key: "projectAdministration",
-    label: "Project administration",
-    accessLevels: ["write"],
-    readPermissions: [],
-    writePermissions: ["project:create", "project:delete"],
+    writePermissions: allActionsOf("project"),
   },
   {
     key: "organization",
@@ -275,10 +270,9 @@ export function selectionsFromPermissions(
 
   // Hierarchy-aware so a stored list carrying `datasets:manage` still
   // satisfies `datasets:create` (keys stored before the write lists were
-  // expanded keep reading as "write") — but the implication only rides on a
-  // manage grant the category ITSELF carries. `project:manage` belongs to
-  // Project settings, so it must never make Project administration
-  // (`project:create`/`project:delete`) read as granted.
+  // expanded keep reading as "write"). The implication rides only on a manage
+  // grant the category itself carries, so one category's manage can never
+  // mark another category granted.
   const heldWithinCategory = (
     category: PermissionCategory,
     permission: Permission,

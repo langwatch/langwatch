@@ -8,6 +8,7 @@ import {
   bindingsToScopes,
   bindingsToSelections,
   computeBindings,
+  getUserPermissionsAcrossScopes,
   getUserPermissionsAtScope,
   permissionLabelToRole,
   permissionsSummary,
@@ -676,6 +677,82 @@ describe("getUserPermissionsAtScope()", () => {
         getTeamRolePermissions: mockGetPerms,
       });
       expect(result).toEqual(["project:view", "project:update"]);
+    });
+  });
+});
+
+describe("getUserPermissionsAcrossScopes()", () => {
+  const mockGetPerms = (role: string) => {
+    if (role === "ADMIN") return ["project:manage", "project:view"];
+    if (role === "MEMBER") return ["project:view", "project:update"];
+    return ["project:view"];
+  };
+
+  const orgProjects = [
+    { id: "proj-1", teamId: "team-1" },
+    { id: "proj-2", teamId: "team-2" },
+  ];
+
+  describe("when the caller holds different roles on the selected scopes", () => {
+    it("offers only what every scope grants", () => {
+      const result = getUserPermissionsAcrossScopes({
+        myBindings: [
+          { scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" },
+          { scopeType: "TEAM", scopeId: "team-2", role: "VIEWER" },
+        ],
+        scopes: [
+          { scopeType: "TEAM", scopeId: "team-1" },
+          { scopeType: "TEAM", scopeId: "team-2" },
+        ],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      // One permission list serves every binding, and the VIEWER team would
+      // refuse project:manage at save time.
+      expect(result).toEqual(["project:view"]);
+    });
+  });
+
+  describe("when a selected scope carries nothing", () => {
+    it("offers nothing at all", () => {
+      const result = getUserPermissionsAcrossScopes({
+        myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" }],
+        scopes: [
+          { scopeType: "TEAM", scopeId: "team-1" },
+          { scopeType: "TEAM", scopeId: "team-unbound" },
+        ],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when a single scope is selected", () => {
+    it("matches the single-scope ceiling", () => {
+      const args = {
+        myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" }],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      };
+      expect(
+        getUserPermissionsAcrossScopes({
+          ...args,
+          scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
+        }),
+      ).toEqual(
+        getUserPermissionsAtScope({
+          ...args,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+        }),
+      );
     });
   });
 });

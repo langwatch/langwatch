@@ -50,14 +50,23 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
     @integration
     Scenario: the organization-management permissions are off by default
       When the user opens the authorize screen for the device code
-      Then "organization:manage", "organization:delete", "project:create",
-        "project:delete" and "team:manage" are not part of the default
-        permission list
-      And a key holding "project:manage" still cannot create or delete a
-        project, so the exclusion holds in effect and not only in the list
+      Then "organization:manage", "organization:delete" and "team:manage" are
+        not part of the default permission list
+      And none of them is reachable through the manage hierarchy either, so
+        the exclusion holds in effect and not only in the list
       And gateway permissions (virtual keys, budgets, providers, routing
         policies) and "project:manage" (model providers, project settings)
         are part of the default permission list
+
+    @unit
+    Scenario: project administration rides along with project settings
+      Given "project:manage" is in the default permission list, because model
+        providers and project settings check it
+      When a request checks "project:create" or "project:delete"
+      Then the manage grant answers it, so the default list names both rather
+        than withholding what the request path would still allow
+      And a user who wants project administration off the key sets Project to
+        Read on the authorize screen
 
   Rule: the user can customize scopes and permissions before approving
 
@@ -68,6 +77,14 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       When the user approves and the CLI exchanges the device code
       Then the minted key has exactly one PROJECT-scoped binding for that project
       And its permission list contains "traces:view" but not "traces:update"
+
+    @integration
+    Scenario: the offered permissions are the intersection of every selected scope
+      Given the user is ADMIN on one shared team and VIEWER on another
+      And both teams are in the scope selection
+      When the user opens the authorize screen for the device code
+      Then only the permissions both teams grant are sent on approval
+      And the write level is unavailable on a row only one of the teams grants
 
     @integration
     Scenario: approval with zero scopes selected is refused
@@ -105,6 +122,14 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       When the key is used to search traces on a project the owner can no
         longer view
       Then the request is refused with a 403
+
+    @integration
+    Scenario: a failed re-login leaves the previous key working
+      Given the user already has a login key for this device
+      When a second login from the same device fails at the mint
+      Then the previous key is still active, because the replacement is
+        created before the key it replaces is revoked
+      And no half-minted replacement outlives the failed exchange
 
     @integration
     Scenario: access lost between approve and exchange ends the login

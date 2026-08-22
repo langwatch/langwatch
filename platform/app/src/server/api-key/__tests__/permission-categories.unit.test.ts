@@ -2,7 +2,10 @@ import { ALL_PERMISSIONS } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { hasPermissionWithHierarchy } from "../../api/rbac";
 import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
-import { defaultCliKeyPermissions } from "../cli-key-defaults";
+import {
+  CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
+  defaultCliKeyPermissions,
+} from "../cli-key-defaults";
 import {
   categorizablePermissions,
   categoryPermissions,
@@ -70,24 +73,31 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Secrets", accessLevels: "read, write" },
       { category: "Audit Log", accessLevels: "read" },
       { category: "Team", accessLevels: "read, write" },
-      { category: "Project settings", accessLevels: "read, write" },
-      { category: "Project administration", accessLevels: "write" },
+      { category: "Project", accessLevels: "read, write" },
       { category: "Organization", accessLevels: "read, write" },
       { category: "Gateway", accessLevels: "read, write" },
       { category: "Governance", accessLevels: "read, write" },
     ]);
   });
 
-  it("splits project creation and deletion away from project settings", () => {
+  /** @scenario Project write carries creation and deletion, because manage implies them */
+  it("keeps the whole project resource in one category", () => {
+    expect(categoryPermissions({ key: "project", level: "write" })).toEqual([
+      "project:view",
+      "project:create",
+      "project:update",
+      "project:delete",
+      "project:manage",
+    ]);
+    // Why they cannot be offered separately: the request path answers a
+    // create or delete check with the category's own manage grant, so a
+    // narrower category would describe a separation that does not exist.
     expect(
-      categoryPermissions({ key: "projectSettings", level: "write" }),
-    ).toEqual(["project:view", "project:update", "project:manage"]);
+      hasPermissionWithHierarchy(["project:manage"], "project:create"),
+    ).toBe(true);
     expect(
-      categoryPermissions({ key: "projectAdministration", level: "write" }),
-    ).toEqual(["project:create", "project:delete"]);
-    expect(
-      categoryPermissions({ key: "projectAdministration", level: "read" }),
-    ).toEqual([]);
+      hasPermissionWithHierarchy(["project:manage"], "project:delete"),
+    ).toBe(true);
   });
 
   /** @scenario "write" access includes all mutating permissions for that resource */
@@ -223,14 +233,12 @@ describe("selectionsFromPermissions()", () => {
     });
   });
 
-  describe("when a category is write-only", () => {
-    it("never invents a read selection for it", () => {
-      expect(selectionsFromPermissions([]).projectAdministration).toBe(
-        undefined,
+  describe("when a category is read-only", () => {
+    it("never invents a write selection for it", () => {
+      expect(selectionsFromPermissions(["cost:view"]).cost).toBe("read");
+      expect(selectionsFromPermissions(["auditLog:view"]).auditLog).toBe(
+        "read",
       );
-      expect(
-        selectionsFromPermissions(["project:view"]).projectAdministration,
-      ).toBe(undefined);
     });
   });
 
@@ -257,8 +265,7 @@ describe("the CLI login key default", () => {
   it("seeds the expected levels from the default permission list", () => {
     const seed = selectionsFromPermissions(defaultCliKeyPermissions());
 
-    expect(seed.projectSettings).toBe("write");
-    expect(seed.projectAdministration).toBe(undefined);
+    expect(seed.project).toBe("write");
     expect(seed.team).toBe("read");
     expect(seed.organization).toBe("read");
     expect(seed.gateway).toBe("write");
@@ -270,19 +277,30 @@ describe("the CLI login key default", () => {
   });
 
   /** @scenario the organization-management permissions are off by default */
-  it("cannot reach project creation or deletion through project:manage", () => {
+  it("holds the organization exclusions in effect, not only in the list", () => {
     const defaults = defaultCliKeyPermissions();
 
-    // The exclusion has to hold in effect, not only in the list: the RBAC
-    // hierarchy promotes a `:create` or `:delete` check to `:manage` for
-    // every other resource, and `project:manage` IS in the defaults because
-    // model providers and project settings ride on it.
+    // An exclusion is only real when the request path agrees: the hierarchy
+    // promotes a `:create`, `:update` or `:delete` check to the resource's
+    // own `:manage`, so an excluded permission must not be reachable that way.
+    for (const excluded of CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS) {
+      expect(hasPermissionWithHierarchy(defaults, excluded)).toBe(false);
+    }
+  });
+
+  /** @scenario project administration rides along with project settings */
+  it("grants project administration with project:manage, and says so", () => {
+    const defaults = defaultCliKeyPermissions();
+
+    // `project:manage` is in the defaults because model providers, project
+    // settings and topic clustering check it, and it answers a create or
+    // delete check too. The list names both rather than implying an
+    // exclusion the request path would not honour.
     expect(defaults).toContain("project:manage");
-    expect(hasPermissionWithHierarchy(defaults, "project:create")).toBe(false);
-    expect(hasPermissionWithHierarchy(defaults, "project:delete")).toBe(false);
-    // The promotion still works everywhere else.
+    expect(defaults).toContain("project:create");
+    expect(defaults).toContain("project:delete");
     expect(
-      hasPermissionWithHierarchy(["datasets:manage"], "datasets:create"),
+      hasPermissionWithHierarchy(["project:manage"], "project:create"),
     ).toBe(true);
   });
 

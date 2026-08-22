@@ -98,15 +98,19 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Secrets                | read, write   |
       | Audit Log              | read          |
       | Team                   | read, write   |
-      | Project settings       | read, write   |
-      | Project administration | write         |
+      | Project                | read, write   |
       | Organization           | read, write   |
       | Gateway                | read, write   |
       | Governance             | read, write   |
 
-  # Project creation and deletion sit in their own write-only category, so a key
-  # can carry project settings without carrying the power to create or destroy
-  # a project.
+  @unit
+  Scenario: Project write carries creation and deletion, because manage implies them
+    Given a category "Project" with "write" selected
+    When I compute the backend permissions
+    Then the result includes "project:create" and "project:delete"
+    And a check for "project:create" is answered by "project:manage", so a
+      category that offered project settings alone would describe a
+      separation the request path does not make
 
   @unit
   Scenario: Every registry permission belongs to a category
@@ -133,8 +137,7 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Scenarios              | scenarios:view, scenarios:create, scenarios:update, scenarios:delete, scenarios:manage |
       | Audit Log              | auditLog:view                                                            |
       | Team                   | team:view, team:manage                                                   |
-      | Project settings       | project:view, project:update, project:manage                             |
-      | Project administration | project:create, project:delete                                           |
+      | Project                | project:view, project:create, project:update, project:delete, project:manage |
 
   @unit
   Scenario: Older stored keys keep reading as write via the manage hierarchy
