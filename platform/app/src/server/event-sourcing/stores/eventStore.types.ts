@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AggregateScope } from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId";
 import type { Event } from "../domain/types";
@@ -238,6 +239,6 @@ export interface EventStore<EventType extends Event = Event>
   storeEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
+    aggregateScope: AggregateType | AggregateScope,
   ): Promise<void>;
 }

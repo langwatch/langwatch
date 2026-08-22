@@ -1,3 +1,8 @@
+import {
+  type AggregateScope,
+  eventAggregateMismatch,
+  toAggregateScope,
+} from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
@@ -169,15 +174,21 @@ export function validateEventTenant<EventType extends Event>(
  */
 export function validateEventAggregateType<EventType extends Event>(
   event: EventType,
-  aggregateType: AggregateType,
+  scope: AggregateType | AggregateScope,
   index: number,
 ): void {
-  if (event.aggregateType !== aggregateType) {
+  const aggregateScope = toAggregateScope(scope);
+  const mismatch = eventAggregateMismatch(aggregateScope, event);
+  if (mismatch !== undefined) {
     throw new ValidationError(
-      `Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
+      `Event at index ${index}: ${mismatch}`,
       "aggregateType",
       event.aggregateType,
-      { index, expectedAggregateType: aggregateType },
+      {
+        index,
+        eventType: event.type,
+        declaredAggregateTypes: aggregateScope.types,
+      },
     );
   }
 }

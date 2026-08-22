@@ -1,3 +1,8 @@
+import {
+  type AggregateScope,
+  primaryAggregateType,
+  toAggregateScope,
+} from "../domain/aggregateScope";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import { ValidationError } from "../services/errorHandling";
@@ -498,14 +503,16 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
   async storeEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
+    scope: AggregateType | AggregateScope,
   ): Promise<void> {
+    const aggregateScope = toAggregateScope(scope);
     return await this.instrument(
       `${this.constructor.name}.storeEvents`,
       {
         "tenant.id": context.tenantId,
         "event.count": events.length,
-        "aggregate.type": aggregateType,
+        "aggregate.type": primaryAggregateType(aggregateScope),
+        "aggregate.types": aggregateScope.types.join(","),
       },
       async () => {
         try {
@@ -530,7 +537,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
               );
             }
             validateEventTenant(event, context, i);
-            validateEventAggregateType(event, aggregateType, i);
+            validateEventAggregateType(event, aggregateScope, i);
             if (!EventUtils.isValidEvent(event)) {
               throw new ValidationError(
                 `Invalid event at index ${i}: event must have id, aggregateId, timestamp, type, and data`,
