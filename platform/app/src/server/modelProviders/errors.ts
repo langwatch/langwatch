@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
+import { ROUTING_HANDLE_RULE } from "./routingHandle";
+
 /**
  * The model provider a read or write named does not exist, or is not visible
  * to the caller's scopes.
@@ -286,5 +288,67 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
       },
     );
     this.name = "ModelProviderCredentialsUnreadableError";
+  }
+}
+
+/**
+ * A routing handle the write cannot store.
+ *
+ * `shape` means the text is not a handle at all (wrong characters, or too
+ * long); `reserved` means the text already names a provider family, which the
+ * gateway reads before it reads handles, so accepting it would shadow that
+ * family for the whole organization.
+ *
+ * Both are the caller's to fix by typing a different name, which is what makes
+ * this a handled error rather than a validation crash.
+ */
+export class ModelProviderRoutingHandleInvalidError extends HandledError {
+  declare readonly code: "model_provider_routing_handle_invalid";
+
+  constructor({
+    handle,
+    problem,
+  }: {
+    handle: string;
+    problem: "shape" | "reserved";
+  }) {
+    super(
+      "model_provider_routing_handle_invalid",
+      problem === "reserved"
+        ? "That routing handle already names a provider type, so requests using it would be ambiguous. Choose a different name."
+        : `That routing handle is not a valid name. ${ROUTING_HANDLE_RULE}`,
+      {
+        meta: { handle, problem },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderRoutingHandleInvalidError";
+  }
+}
+
+/**
+ * Another provider in this organization already uses the routing handle.
+ *
+ * A handle has to resolve to exactly one provider or it cannot pin anything, so
+ * the organization owns the name space. Enforced by a unique index over
+ * (organizationId, routingHandle) as well, which is what makes two simultaneous
+ * saves safe; this error is the one a person reads. Postgres treats NULLs as
+ * distinct, so the providers that set no handle all still fit.
+ */
+export class ModelProviderRoutingHandleTakenError extends HandledError {
+  declare readonly code: "model_provider_routing_handle_taken";
+
+  constructor({ handle }: { handle: string }) {
+    super(
+      "model_provider_routing_handle_taken",
+      "Another model provider in this organization already uses that routing handle. Choose a different name.",
+      {
+        meta: { handle },
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderRoutingHandleTakenError";
   }
 }

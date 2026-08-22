@@ -114,6 +114,27 @@ const missingModelDescriptions = {
   passthrough: "Put the model in the Gemini request URL, then try again.",
 } as const satisfies Record<MissingModelRequestType, string>;
 
+/**
+ * Names the prefixes the key can reach, when the gateway listed them.
+ *
+ * The list arrives as data (`meta.options`) rather than as a finished
+ * sentence, so the words a customer reads stay here, in the registry, and a
+ * relayed message is never rendered back to them. Empty when the gateway sent
+ * nothing, and the surrounding copy then stands on its own.
+ */
+const reachableSentence = (error: HandledErrorShape): string => {
+  const options = strList(error, "options");
+  if (options.length === 0) return "";
+  return ` This key can reach ${listLabels(options)}.`;
+};
+
+/** Reads a `meta` string and compares it, treating anything unexpected as no match. */
+const strEq = (
+  error: HandledErrorShape,
+  key: string,
+  expected: string,
+): boolean => str(error, key, "") === expected;
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[
     str(error, "request_type", "")
@@ -2106,9 +2127,32 @@ const presentations = {
     describe: () => "Add a provider in settings to continue.",
   },
   model_provider_not_bound: {
+    // The gateway builds the list of prefixes this key actually reaches, so
+    // the reader is told what to type instead of only what failed. When the
+    // message is absent (an older gateway), the generic sentence still stands.
     title: "That provider isn't bound to this key",
+    describe: (error) =>
+      `The model name asks for a provider this virtual key has no slot for.${reachableSentence(error)} Bind that provider to the key, or drop the prefix from the model name.`,
+  },
+  model_not_recognized: {
+    // Different from model_provider_not_bound: there the caller named a
+    // provider, here they named a model and no bound provider serves it. The
+    // two fixes differ, so the two errors do.
+    title: "No provider on this key serves that model",
+    describe: (error) =>
+      `No provider bound to this virtual key declares that model.${reachableSentence(error)} Add the model to the provider that serves it, or name the provider in the model string.`,
+  },
+  model_provider_routing_handle_invalid: {
+    title: "That routing handle can't be used",
+    describe: (error) =>
+      strEq(error, "problem", "reserved")
+        ? "That name already means a provider type, so requests using it would be ambiguous. Choose a different name."
+        : "A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to 32 characters.",
+  },
+  model_provider_routing_handle_taken: {
+    title: "That routing handle is already in use",
     describe: () =>
-      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+      "Another model provider in this organization uses that routing handle. A handle has to name one provider, so choose a different name.",
   },
   realtime_session_limit: {
     // The request-rate limits do not bound voice: one mint opens a call that

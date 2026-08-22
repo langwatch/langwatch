@@ -64,6 +64,19 @@ function byProviderInProject({
   };
 }
 
+/**
+ * The routing-handle field of a write, or nothing when the caller left it out.
+ * Omitting keeps the stored handle; an explicit null clears it and releases
+ * the name for another provider in the organization.
+ */
+function routingHandleWrite({
+  routingHandle,
+}: {
+  routingHandle: string | null | undefined;
+}): { routingHandle?: string | null } {
+  return routingHandle === undefined ? {} : { routingHandle };
+}
+
 export class ModelProviderRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -246,6 +259,8 @@ export class ModelProviderRepository {
        * project it wrote through.
        */
       scopes: ScopeInput[];
+      /** Normalized routing handle, or null to store none. */
+      routingHandle?: string | null;
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
@@ -285,6 +300,7 @@ export class ModelProviderRepository {
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
+        ...routingHandleWrite({ routingHandle: data.routingHandle }),
         ...(data.rateLimitRpm !== undefined && {
           rateLimitRpm: data.rateLimitRpm,
         }),
@@ -334,6 +350,8 @@ export class ModelProviderRepository {
        * inserted; when omitted the scope set is untouched.
        */
       scopes?: ScopeInput[];
+      /** Normalized routing handle. null clears it and releases the name. */
+      routingHandle?: string | null;
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;

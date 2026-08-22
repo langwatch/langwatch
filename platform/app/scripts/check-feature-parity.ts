@@ -265,7 +265,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/caching-passthrough.feature",
   "specs/ai-gateway/cli-integrations.feature",
   "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/admin-oversight.feature",

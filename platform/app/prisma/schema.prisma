@@ -1151,6 +1151,13 @@ model ModelProvider {
   // scope for a project.
   name                   String
   provider               String
+  // Operator-chosen slug that addresses THIS instance in a gateway model
+  // string ("eu/claude-sonnet-5"). A provider family prefix names a kind, so
+  // with two Anthropic rows on one key "anthropic/..." matches both and the
+  // chain order decides; a handle is the name that pins one row. Lowercase
+  // [a-z0-9][a-z0-9_-]*, at most 32 characters, unique per organization, and
+  // never a provider family spelling. Null when the operator set none.
+  routingHandle          String?
   enabled                Boolean
   customKeys             Json?
   // Provider-side custom headers - appended on every request the
@@ -1191,6 +1198,12 @@ model ModelProvider {
   // provider resolves to the same organization, so this column is that org.
   organizationId String
 
+  // A handle names ONE row inside the organization, so the database owns the
+  // rule the gateway reads. Declared here rather than only in the migration:
+  // an index Prisma cannot see in the schema is drift to it, and the next
+  // `migrate dev` writes a DROP INDEX for it. Postgres treats NULLs as
+  // distinct in a unique index, so every row without a handle still fits.
+  @@unique([organizationId, routingHandle])
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
   @@index([organizationId])

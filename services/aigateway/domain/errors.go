@@ -69,9 +69,17 @@ const (
 	// the provider selected by the model prefix, which surfaces as opaque
 	// provider-config errors ("deployments not set", HTML error pages).
 	ErrProviderNotBound = herr.Code("model_provider_not_bound")
-	ErrProviderError    = herr.Code("provider_error")
-	ErrPayloadTooLarge  = herr.Code("payload_too_large")
-	ErrBadRequest       = herr.Code("bad_request")
+	// ErrModelNotRecognized means the request named a model that matches
+	// nothing this key can place: no provider declares it, its name matches no
+	// vendor the gateway can guess from, and the key holds more than one
+	// provider that told us what it serves. Sending it down the chain anyway
+	// makes every vendor answer for a model it never had, and the caller reads
+	// the last vendor's error instead of the real problem. Distinct from
+	// model_provider_not_bound, which is a provider the caller DID name.
+	ErrModelNotRecognized = herr.Code("model_not_recognized")
+	ErrProviderError      = herr.Code("provider_error")
+	ErrPayloadTooLarge    = herr.Code("payload_too_large")
+	ErrBadRequest         = herr.Code("bad_request")
 	// ErrMissingModel is a request-shape error with its own stable identity so
 	// clients and rejection metrics do not have to infer it from prose.
 	ErrMissingModel    = herr.Code("missing_model")

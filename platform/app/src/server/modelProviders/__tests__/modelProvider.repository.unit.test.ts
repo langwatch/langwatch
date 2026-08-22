@@ -84,6 +84,7 @@ function createModelProvider(
     name: "OpenAI",
     provider: "openai",
     enabled: true,
+    routingHandle: null,
     customKeys: null,
     customModels: null,
     customEmbeddingsModels: null,
