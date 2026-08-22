@@ -15,11 +15,18 @@ const {
   startConversationTurn,
   warmConversationWorker,
   auditLog,
+  getDecision,
 } = vi.hoisted(() => ({
   checkLangyMessageRateLimit: vi.fn(),
   startConversationTurn: vi.fn(),
   warmConversationWorker: vi.fn(),
   auditLog: vi.fn(),
+  // The declared permission middleware decides through the App; a permitted
+  // decision keeps it out of the way of the mutation under test.
+  getDecision: vi.fn(async () => ({
+    permitted: true,
+    organizationRole: null,
+  })),
 }));
 
 vi.mock("~/server/middleware/rate-limit-langy", () => ({
@@ -31,6 +38,7 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
     langy: { turns: { startConversationTurn, warmConversationWorker } },
+    permissions: { getDecision },
   }),
 }));
 
