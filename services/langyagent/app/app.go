@@ -25,9 +25,13 @@ var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
 // Pre-first-frame status lines. Plain and factual: the cold line names a boot
 // that is really happening, the warm line names a round-trip, and the resume
-// line names a checkpointed turn being picked back up (ADR-048).
+// line names a checkpointed turn being picked back up (ADR-048). The cold line
+// pairs with the panel's own pre-relay ladder ("Preparing Langy's workspace…",
+// langyThinkingLine.ts): the panel covers the spawn window before any frame
+// exists, this status takes over once the worker is up, and the two read as
+// one startup progressing.
 const (
-	statusStartingUp = "Starting up…"
+	statusStartingUp = "Starting Langy…"
 	statusConnecting = "Connecting…"
 	statusResuming   = "Picking up where it left off…"
 )
@@ -282,13 +286,12 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	sink := newFrameSink(stream)
 	// A true status for the cold window: between the prompt POST and the first
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
-	// home) and produces NO frames — the panel would sit on an escalating
-	// "Starting up…" that reads as a hang. The wording names the transition the
-	// manager actually knows (readyStatusFor): a resume from a shutdown handoff
-	// (ADR-048) is picking a checkpointed turn back up, a worker that has never
-	// answered is waking up, and a warm worker gets a short reaching-Langy line
-	// that varies by turn — one phrase repeated under every message reads as a
-	// looping machine. Emitted BEFORE onFirstFrame is wired, so time-to-first-
+	// home) and produces NO frames — without a status the panel would sit on
+	// its own waiting ladder and read as a hang. The wording names the
+	// transition the manager actually knows (readyStatusFor): a resume from a
+	// shutdown handoff (ADR-048) is picking a checkpointed turn back up, a
+	// worker that has never answered is starting, and a warm worker is a
+	// round-trip. Emitted BEFORE onFirstFrame is wired, so time-to-first-
 	// frame keeps meaning the agent's own first output; the client clears the
 	// status the moment real output arrives.
 	if f, err := frames.Status(readyStatusFor(req, worker)); err == nil {

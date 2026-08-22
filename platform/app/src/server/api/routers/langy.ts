@@ -1065,7 +1065,7 @@ export const langyRouter = createTRPCRouter({
         if (!terminal) {
           // A refresh mid-turn can miss the worker's terminal frame (its relay
           // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on "Starting up…" for minutes
+          // hard per-turn deadline, leaving the UI on the startup status for minutes
           // though the turn already finished. While we tail the live edge, watch
           // the durable fold + per-turn heartbeat; if the turn has settled with
           // no terminal in the buffer, synthesize one so the client resolves.

@@ -206,7 +206,7 @@ function subscribeTurnStream({
       controller.enqueue({ type: "start" });
       controller.enqueue({ type: "text-start", id: textId });
 
-      // The manager emits a readiness status ("Starting up…") into the cold window
+      // The manager emits a readiness status ("Starting Langy…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
       // placeholder for SILENCE, so the first real output — text, a tool, the
       // model's reasoning — retires it; without this the status line would

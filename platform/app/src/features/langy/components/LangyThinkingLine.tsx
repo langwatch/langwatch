@@ -60,7 +60,7 @@ export function LangyThinkingLine({
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
-   * turn would read as "Starting up…" — a false claim. The text itself is never
+   * turn would read as a startup wait — a false claim. The text itself is never
    * shown; see the module doc.
    */
   hasLiveReasoning?: boolean;
@@ -109,8 +109,8 @@ export function LangyThinkingLine({
     //
     // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
     // StreamingStatusLine): same gap, same padding, and the same leading orb
-    // slot as the status rows this line alternates with — so "Starting up…" →
-    // "Starting up…" → "Thinking…" reads as one line changing its words,
+    // slot as the status rows this line alternates with — so "Preparing Langy's
+    // workspace…" → "Starting Langy…" → "Thinking…" reads as one line changing its words,
     // never a line hopping between layouts.
     <HStack
       gap={STATUS_LINE_ROW.gap}

@@ -224,7 +224,7 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     And opened page context (an experiment or trace) rides as a removable chip inside the composer
 
   # The thinking line may only say true things (see langyThinkingLine.ts). Live
-  # reasoning IS the model working, so it must never read as "Starting up…".
+  # reasoning IS the model working, so it must never read as a startup wait.
   @unit
   Scenario: Live reasoning reads as thinking, not as starting up
     Given a turn is in flight with no prose and no tool call yet

@@ -31,14 +31,24 @@ const user = { role: "user", parts: [{ type: "text", text: "hi" }] };
 describe("langyThinkingLine", () => {
   describe("given a turn where NOTHING has happened", () => {
     /** The 97-second lie, in one test. */
-    it("never invents work — it says it is starting up", () => {
+    it("never invents work — it says the workspace is being prepared", () => {
       const line = langyThinkingLine({
         messages: [user, assistant([])],
         elapsedMs: 3_000,
       });
-      expect(line.text).toBe("Starting up…");
+      expect(line.text).toBe("Preparing Langy's workspace…");
       expect(line.tone).toBe("waiting");
       // And CRUCIALLY: no cycling. Cycling reads as progress.
+      expect(line.allowWhimsy).toBe(false);
+    });
+
+    it("moves to starting Langy once the workspace phase should be over", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 7_000,
+      });
+      expect(line.text).toBe("Starting Langy…");
+      expect(line.tone).toBe("waiting");
       expect(line.allowWhimsy).toBe(false);
     });
 
@@ -125,7 +135,7 @@ describe("langyThinkingLine", () => {
     it("never claims the turn is starting up once a tool has settled", () => {
       // The bug this pins: `elapsedMs` runs from the START of the turn, so the
       // gap BETWEEN two tool calls — nothing running, no tokens, no reasoning —
-      // fell through to the startup ladder. The panel said "Starting up…"
+      // fell through to the startup ladder. The panel claimed a startup
       // directly beneath "4 actions completed".
       const line = langyThinkingLine({
         messages: [
@@ -140,7 +150,8 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 5_000,
       });
-      expect(line.text).not.toContain("Starting up");
+      expect(line.text).not.toContain("Starting");
+      expect(line.text).not.toContain("Preparing");
       expect(line.tone).toBe("working");
     });
   });

@@ -24,7 +24,7 @@ import { describeToolCall, effectiveToolName } from "./langyToolLabel";
  *   2. Tokens are arriving  → "Writing…". The model really is generating.
  *   3. Reasoning is arriving → "Thinking…". The model IS working — live
  *                              reasoning deltas are on the wire — so it must
- *                              never read as "Starting up…".
+ *                              never read as a startup wait.
  *   4. None of those        → we are waiting for a worker that has not started.
  *                              Say so, plainly, and let it ESCALATE with time. A
  *                              turn that is stuck must eventually look stuck.
@@ -77,11 +77,15 @@ export interface ThinkingMessage {
 /**
  * How long we wait before admitting nothing is happening.
  *
- * A cold spawn legitimately takes a few seconds (fork opencode, lay out the
- * home, install skills, wait for readiness), so silence is normal at first. It
- * stops being normal quickly, and by 75s a spawn that has produced NOTHING has
- * almost certainly failed — the manager's own readiness budget is long gone.
+ * A cold spawn legitimately takes a few seconds (fork the worker, lay out the
+ * home, install skills, wait for readiness), so silence is normal at first. The
+ * first two steps name the startup's real phases — the control plane prepares
+ * the worker's workspace, then the agent starts — so the wait reads as
+ * progress, not one frozen line. It stops being normal quickly, and by 75s a
+ * spawn that has produced NOTHING has almost certainly failed — the manager's
+ * own readiness budget is long gone.
  */
+export const THINKING_STARTING_LANGY_MS = 6_000;
 export const THINKING_STILL_STARTING_MS = 12_000;
 export const THINKING_SLOW_MS = 35_000;
 export const THINKING_STUCK_MS = 75_000;
@@ -135,7 +139,7 @@ export function langyThinkingLine({
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts (they are live-edge only), so without this
-   * signal a reasoning-but-no-prose turn read as "Starting up…" — a false
+   * signal a reasoning-but-no-prose turn read as a startup wait — a false
    * claim: the model is provably working.
    */
   hasLiveReasoning?: boolean;
@@ -174,7 +178,7 @@ export function langyThinkingLine({
 
   // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but tool calls
   //    have already SETTLED on this turn — so the worker demonstrably started,
-  //    and the startup ladder below would be a plain lie ("Starting up…" under
+  //    and the startup ladder below would be a plain lie (a startup line under
   //    four completed actions). The model is choosing its next move, which is
   //    the same state as case 3 and reads the same way.
   if (settledTool(last)) {
@@ -202,5 +206,16 @@ export function langyThinkingLine({
   if (elapsedMs >= THINKING_STILL_STARTING_MS) {
     return { text: "Still starting up…", tone: "waiting", allowWhimsy: false };
   }
-  return { text: "Starting up…", tone: "waiting", allowWhimsy: false };
+  if (elapsedMs >= THINKING_STARTING_LANGY_MS) {
+    return { text: "Starting Langy…", tone: "waiting", allowWhimsy: false };
+  }
+  // The first phase of a cold turn: the control plane resolves credentials and
+  // lays out the worker's home before the agent process exists. The manager's
+  // own "Starting Langy…" status replaces this line the moment the worker is
+  // up (langyChatTransport), so on a warm turn this shows only for a blink.
+  return {
+    text: "Preparing Langy's workspace…",
+    tone: "waiting",
+    allowWhimsy: false,
+  };
 }

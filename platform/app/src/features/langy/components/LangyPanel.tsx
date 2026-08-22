@@ -1912,7 +1912,7 @@ function LangyPanel({
   //
   // OR them, and stop the moment anything terminal resolves (the branches below
   // own the error card / recovering line / connect card). The line we show is
-  // honest by construction: it escalates "Starting up…" → "taking longer…" →
+  // honest by construction: it escalates the startup steps → "taking longer…" →
   // "it may be stuck" and never fakes progress (see logic/langyThinkingLine.ts).
   const liveTurnInFlight =
     (isBusy || turnActive) &&

@@ -60,7 +60,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   Scenario: A worker that has not served a turn yet says it is starting up
     Given a turn is dispatched to a worker that has not served a turn yet
     When the manager opens the turn
-    Then it emits the status "Starting up…" before the first agent frame
+    Then it emits the status "Starting Langy…" before the first agent frame
 
   @unit
   Scenario: A warm worker says it is connecting
@@ -168,7 +168,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # A refresh that lands just as the turn finishes can miss the worker's terminal
   # frame (its relay connection dropped before it), so the buffer has no end/error
   # and the reconnected Stream A used to block until the hard per-turn deadline —
-  # the UI sat on "Starting up…" for minutes though the turn had finished. Stream A
+  # the UI sat on the startup status for minutes though the turn had finished. Stream A
   # now watches the durable fold + per-turn heartbeat and synthesizes the missed
   # terminal, but ONLY once the turn is provably settled so a live or cold-starting
   # turn is never cut off.
