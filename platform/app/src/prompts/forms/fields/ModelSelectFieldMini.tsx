@@ -12,13 +12,13 @@ import {
   useFormContext,
   useWatch,
 } from "react-hook-form";
+import { MODEL_ICON_SIZE_SM } from "~/components/llmPromptConfigs/constants";
 import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import { MODEL_ICON_SIZE_SM } from "~/components/llmPromptConfigs/constants";
 import {
   allModelOptions,
   useModelSelectionOptions,

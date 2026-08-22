@@ -129,4 +129,10 @@ Feature: Prompt version history panel
   @integration
   Scenario: The save button is quiet when there is nothing to save
     Given I am on the latest version and have made no edits
-    Then the save button reads "Saved" and is disabled
+    Then the save button reads "No changes to save" and is disabled
+
+  @integration
+  Scenario: A prompt with no versions yet is simply saved
+    Given a prompt that has never been saved
+    And I have edited it
+    Then the save button reads "Save"
