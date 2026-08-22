@@ -934,6 +934,7 @@ export class LangyTurnService {
           conversationId: conversation.id,
           turnId,
           questionParts,
+          model: turnModel,
           ...(conversation.isNew
             ? {
                 conversationStart: {

@@ -73,6 +73,7 @@ function MessageContentImpl({
   onApply,
   onDiscard,
   isStreaming = false,
+  interrupted = false,
   conversationId,
   showFeedback = false,
   shouldAskFeedback = false,
@@ -93,6 +94,12 @@ function MessageContentImpl({
   onDiscard: (proposalId: string) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
+  /**
+   * This browser stopped the turn behind this reply (ADR-078). An empty
+   * settled reply then reads "Interrupted" instead of "No content" — the
+   * emptiness was the user's own doing, and the copy should say so.
+   */
+  interrupted?: boolean;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /**
@@ -276,7 +283,9 @@ function MessageContentImpl({
     // spent the whole turn reasoning or the user stopped it before any text
     // arrived. Name the emptiness quietly rather than rendering a reply that
     // is not there (a failed turn never appends an assistant message, the
-    // error card owns that surface).
+    // error card owns that surface). When THIS browser stopped the turn, say
+    // that instead — the user did it two seconds ago, and "No content" reads
+    // like the panel lost their answer.
     return (
       <Text
         fontSize="langyAnswer"
@@ -285,7 +294,7 @@ function MessageContentImpl({
         fontStyle="italic"
         color="fg.muted"
       >
-        No content
+        {interrupted ? "Interrupted" : "No content"}
       </Text>
     );
   }

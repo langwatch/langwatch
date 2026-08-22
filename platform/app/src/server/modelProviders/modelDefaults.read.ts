@@ -16,7 +16,11 @@ import {
   MODEL_ROLES,
   type ModelRole,
 } from "./featureRegistry";
-import { resolveModelForFeature } from "./resolveModelForFeature";
+import {
+  type ResolutionScope,
+  type ResolutionSource,
+  resolveModelForFeature,
+} from "./resolveModelForFeature";
 import { buildSeedPlanForProvider } from "./seedOnboardingDefaults";
 
 export type ReadCtx = {
@@ -31,10 +35,16 @@ export type ScopeRef = {
   scopeId: string;
 };
 
+/**
+ * What the cascade resolved for one feature key. `source` and `scope` carry
+ * the resolver's own literals, so a caller that branches on them (the
+ * make-default offer, for one) fails to compile if the resolver ever renames
+ * a slug, instead of quietly going dead.
+ */
 export type DefaultModelEffective = {
   model: string;
-  source: string;
-  scope: string | null;
+  source: ResolutionSource;
+  scope: ResolutionScope;
 };
 
 export type ConfigSnapshotScope = {

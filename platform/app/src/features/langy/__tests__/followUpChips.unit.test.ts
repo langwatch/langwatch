@@ -223,6 +223,26 @@ describe("deriveFollowUpChips", () => {
     });
   });
 
+  describe("given a prompt listing", () => {
+    const promptList: SettledCall = {
+      name: "langwatch.prompt.list",
+      state: "output-available",
+      input: { command: "langwatch prompt list" },
+      output: JSON.stringify([
+        { id: "prompt_1", handle: "demo-prompt", version: 3 },
+      ]),
+    };
+
+    describe("when its consumers cannot carry the prompt across", () => {
+      /** @scenario A prompts result earns no bare surface chips */
+      it("offers no chip at all — no destination can receive a prompt", () => {
+        expect(
+          deriveFollowUpChips({ call: promptList, projectSlug: "demo" }),
+        ).toEqual([]);
+      });
+    });
+  });
+
   describe("given a result that is not a trace search", () => {
     /**
      * The regression this exists to prevent. `deriveFollowUpChips` used to bail

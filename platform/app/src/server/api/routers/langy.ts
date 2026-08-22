@@ -503,6 +503,13 @@ export const langyRouter = createTRPCRouter({
         eventCursor: { acceptedAt: number; eventId: string } | null;
         /** The turn in flight, or null — what a refresh reattaches to. */
         currentTurnId: string | null;
+        /**
+         * The model the latest accepted turn ran on, or null before any turn
+         * recorded one. Opening a conversation seeds the composer's picker
+         * from it, so a conversation keeps the model it was last used with
+         * across tabs and reloads.
+         */
+        lastModel: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -550,6 +557,7 @@ export const langyRouter = createTRPCRouter({
           shouldAskFeedback,
           eventCursor: conversation.eventCursor,
           currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+          lastModel: conversation.lastModel,
         };
       },
     ),

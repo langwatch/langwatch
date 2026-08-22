@@ -315,6 +315,59 @@ func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 	return nil
 }
 
+// SessionInfo is the slice of opencode's session document the resume decision
+// reads: identity and recency, nothing else.
+type SessionInfo struct {
+	ID   string `json:"id"`
+	Time struct {
+		Updated int64 `json:"updated"`
+	} `json:"time"`
+}
+
+// ListSessions reads the sessions opencode already holds for this home
+// (GET /session). The worker home outlives the process on an idle reap or a
+// crash, and opencode persists its sessions inside it — so a respawn can
+// resume the newest one instead of starting over.
+func ListSessions(ctx context.Context, port int, bearerToken string) ([]SessionInfo, error) {
+	url := fmt.Sprintf("http://127.0.0.1:%d/session", port)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	addBearer(req, bearerToken)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list sessions: %d %s", resp.StatusCode, string(b))
+	}
+	var sessions []SessionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
+		return nil, fmt.Errorf("list sessions: decode: %w", err)
+	}
+	return sessions, nil
+}
+
+// NewestSession picks the most recently updated session, or "" when there is
+// none worth resuming.
+func NewestSession(sessions []SessionInfo) string {
+	newest := ""
+	var newestAt int64 = -1
+	for _, s := range sessions {
+		if s.ID == "" {
+			continue
+		}
+		if s.Time.Updated > newestAt {
+			newest = s.ID
+			newestAt = s.Time.Updated
+		}
+	}
+	return newest
+}
+
 // CreateSession posts a fresh session to the worker. Returns the
 // session id we route subsequent prompts to.
 func CreateSession(ctx context.Context, port int, bearerToken string) (string, error) {

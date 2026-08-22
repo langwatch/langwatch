@@ -117,11 +117,23 @@ describe("startNewConversation", () => {
     });
   });
 
-  describe("given the user picked a model for this session", () => {
-    it("keeps it — the model is a preference, not conversation state", () => {
+  describe("given the user picked a model for a conversation", () => {
+    // A pick lives with its conversation (the durable record restores it when
+    // the conversation is reopened) — a new chat starts on the resolved
+    // default again. See langy-model-selection.feature and the make-default
+    // dialog, whose decline reads "Just this conversation".
+    it("does not carry it into the new chat", () => {
       useLangyStore.getState().setModelOverride("openai/gpt-5-mini");
       useLangyStore.getState().startNewConversation();
-      expect(useLangyStore.getState().modelOverride).toBe("openai/gpt-5-mini");
+      expect(useLangyStore.getState().modelOverride).toBe("");
+    });
+
+    // A marker left behind would refuse the next conversation's own model,
+    // because followConversationModel seeds a conversation only once.
+    it("clears the marker that says a conversation was already seeded", () => {
+      useLangyStore.setState({ modelSeededForConversationId: "conv-1" });
+      useLangyStore.getState().startNewConversation();
+      expect(useLangyStore.getState().modelSeededForConversationId).toBeNull();
     });
   });
 });

@@ -23,9 +23,13 @@ type CodingAgent interface {
 	// its control port, or fails closed. Returns a herr on a definite security
 	// failure or a readiness timeout.
 	WaitReady(ctx context.Context, ep Endpoint) error
-	// OpenSession starts a fresh session on the agent and returns its id; the
-	// per-turn calls below are routed to it.
-	OpenSession(ctx context.Context, ep Endpoint) (sessionID string, err error)
+	// OpenSession returns the session the per-turn calls below are routed to.
+	// The agent RESUMES the newest session it already holds on disk when one
+	// exists (`resumed` true) — the worker home outlives the process on an idle
+	// reap or a crash, and resuming keeps the conversation's own context and a
+	// byte-stable prompt prefix instead of re-seeding a transcript into a fresh
+	// session. With nothing to resume it starts fresh (`resumed` false).
+	OpenSession(ctx context.Context, ep Endpoint) (sessionID string, resumed bool, err error)
 	// Post queues a turn on sessionID. A herr(domain.ErrSessionNotFound) means the
 	// session vanished and the worker must be recycled.
 	Post(ctx context.Context, ep Endpoint, sessionID string, turn Turn) error

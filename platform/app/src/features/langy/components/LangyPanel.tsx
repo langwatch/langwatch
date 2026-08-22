@@ -85,6 +85,7 @@ import {
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
+import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
@@ -94,6 +95,7 @@ import {
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
+import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
   explainLangyError,
   isStaleLangyHistoryRead,
@@ -105,6 +107,10 @@ import {
   PANEL_SUGGESTION_COUNT,
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
+import {
+  type MakeDefaultWritePlan,
+  makeDefaultOffer,
+} from "../logic/langyMakeDefaultOffer";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
 import {
   APP_HEADER_HEIGHT,
@@ -147,6 +153,7 @@ import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
+import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
@@ -447,7 +454,8 @@ function LangyPanel({
   /** Activating the peeking sliver — its click, its Enter/Space. */
   onOpen: () => void;
 }) {
-  const { organization, project } = useOrganizationTeamProject();
+  const { organization, team, project, hasOrgPermission, hasPermission } =
+    useOrganizationTeamProject();
   const projectId = project?.id;
   const organizationId = organization?.id;
   const utils = api.useUtils();
@@ -460,6 +468,9 @@ function LangyPanel({
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const interruptedConversationId = useLangyStore(
+    (s) => s.interruptedConversationId,
+  );
   const historyLoadConversationId = useLangyStore(
     (s) => s.historyLoadConversationId,
   );
@@ -875,6 +886,89 @@ function LangyPanel({
     }
   }, [langyModelsAllowed, modelOverride, setModelOverride]);
 
+  // ── "Make it the default?" — the ask that follows a model pick ──────────
+  // The pick took effect for this conversation the moment it happened; the
+  // dialog only offers to write it as the default at the scope the current
+  // default lives at, and only to someone who can manage that scope (see
+  // logic/langyMakeDefaultOffer).
+  const setRoleAssignment =
+    api.modelProvider.setRoleAssignmentForScope.useMutation();
+  const setFeatureOverride =
+    api.modelProvider.setFeatureOverrideForScope.useMutation();
+  const [makeDefaultPlan, setMakeDefaultPlan] =
+    useState<MakeDefaultWritePlan | null>(null);
+  // Declines are per model per panel session: refusing once must not nag on
+  // the next pick of the same model, and must not mute the ask forever.
+  const makeDefaultDeclinedRef = useRef<Set<string>>(new Set());
+  const isMakeDefaultBusy =
+    setRoleAssignment.isPending || setFeatureOverride.isPending;
+
+  const offerMakeDefault = (picked: string) => {
+    if (makeDefaultDeclinedRef.current.has(picked)) return;
+    const plan = makeDefaultOffer({
+      picked,
+      resolvedDefault: resolvedDefaultQuery.data ?? null,
+      canManage: {
+        organization: hasOrgPermission("organization:manage"),
+        team: hasPermission("team:manage"),
+        project: hasPermission("project:update"),
+      },
+      scopeIds: {
+        organizationId: organizationId ?? null,
+        teamId: team?.id ?? null,
+        projectId: projectId ?? null,
+      },
+    });
+    if (plan) setMakeDefaultPlan(plan);
+  };
+
+  const confirmMakeDefault = async () => {
+    if (!makeDefaultPlan || !projectId) return;
+    const plan = makeDefaultPlan;
+    try {
+      // The write mirrors what it replaces: a feature-level default moves via
+      // the feature override, a role-level one via the LANGY role.
+      if (plan.kind === "feature-override") {
+        await setFeatureOverride.mutateAsync({
+          scopeType: plan.scopeType,
+          scopeId: plan.scopeId,
+          featureKey: LANGY_GATE_FEATURE_KEY,
+          model: plan.model,
+        });
+      } else {
+        await setRoleAssignment.mutateAsync({
+          scopeType: plan.scopeType,
+          scopeId: plan.scopeId,
+          role: "LANGY",
+          model: plan.model,
+        });
+      }
+      await syncLangyAfterDefaultModelWrite({
+        utils,
+        projectId,
+        fallbackModel: plan.model,
+      });
+      toaster.create({
+        title: "Langy default updated",
+        type: "success",
+        duration: 2500,
+      });
+      setMakeDefaultPlan(null);
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't update the Langy default",
+      });
+    }
+  };
+
+  const declineMakeDefault = () => {
+    if (makeDefaultPlan) {
+      makeDefaultDeclinedRef.current.add(makeDefaultPlan.model);
+    }
+    setMakeDefaultPlan(null);
+  };
+
   const {
     messages,
     sendMessage,
@@ -913,7 +1007,32 @@ function LangyPanel({
     refetch: refetchHistory,
     eventCursor: snapshotEventCursor,
     currentTurnId: snapshotCurrentTurnId,
+    lastModel: conversationLastModel,
   } = useLangyMessages(activeConversationId);
+
+  // A conversation keeps the model it was last used with: when its history
+  // lands, the picker follows the model of its latest turn — unless the user
+  // already picked one since opening it, and never a model the allowlist
+  // refuses (the snap effect above owns that rule).
+  useEffect(() => {
+    if (!activeConversationId || !conversationLastModel) return;
+    if (
+      langyModelsAllowed &&
+      !langyModelsAllowed.includes(conversationLastModel)
+    ) {
+      return;
+    }
+    useLangyStore.getState().followConversationModel({
+      conversationId: activeConversationId,
+      model: conversationLastModel,
+      resolvedDefault: resolvedDefaultQuery.data?.model ?? null,
+    });
+  }, [
+    activeConversationId,
+    conversationLastModel,
+    langyModelsAllowed,
+    resolvedDefaultQuery.data?.model,
+  ]);
 
   /**
    * The conversation's own history failed to load.
@@ -1054,14 +1173,35 @@ function LangyPanel({
 
   // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
   // where the durable-tail fold starts, and an in-flight turn id is what a
-  // refreshed tab adopts (making Stop + live signals work again). The seed
-  // reducer never rewinds a fresher local fold, so refetches are harmless.
+  // refreshed tab adopts (making Stop + live signals work again).
+  //
+  // A fold that is already seeded is never jump-seeded again: a fresher
+  // polled cursor instead drives the SAME durable catch-up the freshness
+  // signal does — fetch the tail, fold the events. Jump-seeding skipped the
+  // events between the two cursors and reset the turn document, which is why
+  // a tab whose SSE connection died froze mid-turn while the turn kept
+  // running: the poll kept delivering fresher cursors and the seed kept
+  // discarding the work they pointed at. With the poll as a second catch-up
+  // driver, a dead live stream is a latency problem, not a frozen panel.
   useEffect(() => {
     if (!activeConversationId) return;
-    useLangyStore.getState().seedTurnProjection({
-      cursor: snapshotEventCursor,
-      currentTurnId: snapshotCurrentTurnId,
-    });
+    const store = useLangyStore.getState();
+    if (store.turnProjection.cursor === null) {
+      store.seedTurnProjection({
+        cursor: snapshotEventCursor,
+        currentTurnId: snapshotCurrentTurnId,
+      });
+    } else if (projectId && snapshotEventCursor) {
+      catchUpConversationFold({
+        utils,
+        projectId,
+        conversationId: activeConversationId,
+        targetCursor: snapshotEventCursor,
+      }).catch(() => {
+        // A failed catch-up is retried by the next poll or signal; the fold
+        // never moved, so there is nothing to repair.
+      });
+    }
     useLangyDevLog.getState().recordSnapshot({
       conversationId: activeConversationId,
       cursor: snapshotEventCursor,
@@ -1069,6 +1209,8 @@ function LangyPanel({
     });
   }, [
     activeConversationId,
+    projectId,
+    utils,
     snapshotEventCursor?.acceptedAt,
     snapshotEventCursor?.eventId,
     snapshotCurrentTurnId,
@@ -2021,6 +2163,12 @@ function LangyPanel({
         panelHeightPx={panelHeightPx}
       />
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
+      <LangyMakeDefaultDialog
+        plan={makeDefaultPlan}
+        isBusy={isMakeDefaultBusy}
+        onDecline={declineMakeDefault}
+        onConfirm={() => void confirmMakeDefault()}
+      />
       <MotionBox
         ref={panelRef}
         {...contextDropProps}
@@ -2649,6 +2797,13 @@ function LangyPanel({
                                   index === displayMessages.length - 1 &&
                                   message.role === "assistant"
                                 }
+                                interrupted={
+                                  interruptedConversationId != null &&
+                                  interruptedConversationId ===
+                                    activeConversationId &&
+                                  index === displayMessages.length - 1 &&
+                                  message.role === "assistant"
+                                }
                                 // Only ever on a turn that COMPLETED. We were asking
                                 // "How did Langy do?" above a timeout card — rating an
                                 // answer that never arrived. The failure IS the feedback;
@@ -2878,6 +3033,9 @@ function LangyPanel({
                       // the panel on the sign-in it no longer needs.
                       setReconnectCodex(false);
                       setModelOverride(model);
+                      // The pick is done; this only ASKS whether it should also
+                      // become the default, when the picker can grant that.
+                      offerMakeDefault(model);
                     }}
                     onSend={send}
                     onStop={handleStop}

@@ -233,6 +233,18 @@ Feature: Langy renders domain-capability cards for tool calls
       Then reading it as a created-resource card succeeds
       And the recorded result does not mark the outcome as unconfirmed
 
+    # `prompt create` scaffolds a file on disk and exits 0 with
+    # { name, path, dependency: "file:..." } — a result about a local file,
+    # not about anything on the platform. Its name alone must not draw
+    # "Created and ready to use" with a deep link to a prompt the platform
+    # does not hold; that copy is only true after a successful push or sync.
+    @unit
+    Scenario: A create that only scaffolded a local file is not a platform create
+      When the CLI result for a create names a local file dependency and no server id
+      Then reading it as a created-resource card fails
+      And the recorded result marks the outcome as unconfirmed
+      But a create result that carries a server id still passes with a file path beside it
+
     @unit
     Scenario: A genuinely empty read still earns its card
       When Langy runs a read action and it genuinely matched nothing
