@@ -234,10 +234,21 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
   Rule: the harvest names the session
 
     Codex generates no session title and its telemetry withholds prompt text,
-    so without the harvest every codex session reads as untitled. The rollout
-    records what the user typed as user_message events; the harvest puts the
-    first typed prompt on the session-context record and the platform names
-    the session from it.
+    so without the harvest every codex session reads as untitled. The harvest
+    puts the first typed prompt on the session-context record and the platform
+    names the session from it.
+
+    Where that prompt is recorded depends on the codex release. Older ones
+    emit a user_message event carrying it. Newer ones emit no such event in
+    any mode, interactive or exec, and record the prompt only as a user-role
+    message inside the conversation, which is why every session created after
+    that release read as untitled. The harvest reads both, and prefers the
+    event wherever there is one.
+
+    Either place also carries the context codex injects into a session, and
+    that context must never name it. Codex bundles an injection into a single
+    message of several content parts, so a part can open with an untagged
+    heading while the tag sits in the part after it.
 
     @unit
     Scenario: The harvest names the session by the first thing the user asked
@@ -246,8 +257,8 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Then the session-context record carries the prompt's first line as the session title
 
     @unit
-    Scenario: A codex exec session is named by the prompt it was given
-      Given a session run with codex exec, which records the prompt only in the conversation
+    Scenario: A codex session is named by the prompt it was given
+      Given a codex release that records the prompt only in the conversation, emitting no user_message event in any mode
       When the rollout is parsed
       Then the prompt in the conversation names the session
 
@@ -270,6 +281,12 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       And a typed prompt recorded in the conversation
       When the rollout is parsed
       Then the injected block is skipped and the typed prompt names the session
+
+    @unit
+    Scenario: An injected bundle never names the session, whichever part carries the tag
+      Given an injected message of several content parts, the first opening with a heading and a later one with a tag
+      When the rollout is parsed
+      Then the whole message is skipped and the typed prompt after it names the session
 
     @unit
     Scenario: A machine-injected first prompt does not name the session

@@ -88,7 +88,8 @@ export interface CodexRolloutMeta {
 	 * The first thing the user typed, apart from the context codex injects as
 	 * user-role messages. What names the session, since codex generates no title
 	 * of its own. Read from the `user_message` event, and from the conversation
-	 * itself when there is none, which is every `codex exec` session.
+	 * itself when there is none. Codex 0.149 emits no such event in any mode,
+	 * interactive or exec, so the conversation is the only source there.
 	 */
 	firstUserMessage: string | null;
 }
@@ -100,11 +101,37 @@ export interface ParsedCodexRollout {
 }
 
 /**
- * A user-role message codex wrote to itself rather than one a person typed.
- * Codex opens each injected block with a tag naming it, and the typed prompt
- * never opens with one.
+ * A block codex wrote to itself rather than one a person typed. Codex opens
+ * each injected block with a tag naming it, and the typed prompt never opens
+ * with one.
  */
 const INJECTED_CONTEXT_BLOCK = /^<[A-Za-z_][\w-]*>/;
+
+/**
+ * Whether a user-role message is context codex injected.
+ *
+ * Codex bundles a whole injection into ONE message carrying several content
+ * parts, and only some of them open with a tag. A real session on the agents
+ * box opens part one with the markdown heading `# AGENTS.md instructions` and
+ * part two with `<environment_context>`. Flattening the parts first would put
+ * that heading at the front, hide the tag behind it, and let the heading name
+ * the session, so each part is tested on its own and any tagged part condemns
+ * the message.
+ *
+ * Which part carries the tag is not a signal: the parts of a bundle share a
+ * turn id and land hundredths of a second apart, so there is no order to lean
+ * on and nothing is reordered here.
+ */
+function isInjectedContent(content: unknown): boolean {
+	if (!Array.isArray(content)) return false;
+	return content.some((part) => {
+		if (!part || typeof part !== "object") return false;
+		const t = (part as { text?: unknown }).text;
+		const ot = (part as { output_text?: unknown }).output_text;
+		const text = typeof t === "string" ? t : typeof ot === "string" ? ot : "";
+		return INJECTED_CONTEXT_BLOCK.test(text.trim());
+	});
+}
 
 function truncate(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max)}…[truncated]` : text;
@@ -350,9 +377,11 @@ class CodexTurnAccumulator {
 	 * user-role text wrapped in a tag of its own (`<environment_context>`,
 	 * `<recommended_plugins>`, ...). Only what the person typed arrives
 	 * untagged, and a 10k-character plugin catalogue makes a poor session
-	 * title. Filtering here rather than at either call site is what keeps an
-	 * injected event from claiming the name and locking out the real prompt
-	 * waiting in the conversation.
+	 * title. The test below covers the event, which only ever carries a plain
+	 * string; a conversation message is screened by `isInjectedContent` at the
+	 * call site instead, because it can carry several content parts and the tag
+	 * may sit in any of them. Screening both is what keeps an injected block
+	 * from claiming the name and locking out the real prompt beside it.
 	 */
 	private rememberTypedPrompt(text: string): void {
 		if (this.firstUserMessage !== null) return;
@@ -421,7 +450,10 @@ class CodexTurnAccumulator {
 		} else if (role === "user") {
 			this.flushPendingAssistant();
 			this.history.push({ role: "user", content: text });
-			this.rememberTypedPrompt(text);
+			// Tested on the parts rather than the flattened text, because a
+			// bundle can open with an untagged heading and carry its tag in a
+			// later part.
+			if (!isInjectedContent(payload.content)) this.rememberTypedPrompt(text);
 		} else if (role === "assistant") {
 			// Hold: this may be a mid-turn preamble (committed to history when the
 			// next item arrives) or the turn's final answer (consumed by closeTurn).
