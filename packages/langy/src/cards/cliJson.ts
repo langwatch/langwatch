@@ -160,9 +160,17 @@ function numberEnd({ text, at }: { text: string; at: number }): number {
   let i = at;
   if (text[i] === "-") i++;
 
-  const integerFrom = i;
-  while (isDigit(text[i])) i++;
-  if (i === integerFrom) return -1;
+  // JSON writes no leading zero: a number is `0` on its own, or a non-zero
+  // digit and the digits after it. `01` is not one, so `[01,` is a line of
+  // prose and the document under it still gets read.
+  if (text[i] === "0") {
+    i++;
+  } else {
+    const integerFrom = i;
+    while (isDigit(text[i])) i++;
+    if (i === integerFrom) return -1;
+  }
+  if (isDigit(text[i])) return -1;
 
   if (text[i] === ".") {
     i++;

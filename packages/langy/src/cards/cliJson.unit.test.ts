@@ -96,6 +96,12 @@ describe("parseCliJson", () => {
       }
     });
 
+    it("lifts the document under a log line numbered with a leading zero", () => {
+      for (const line of ["[01,", "[-01,", "[007 retrying"]) {
+        expect(parseCliJson(`${line}\n{"total": 2}\n`)).toEqual({ total: 2 });
+      }
+    });
+
     it("still reads an array of literals as the document", () => {
       expect(parseCliJson("✔ Done\n[true, false, null]\n")).toEqual([
         true,
@@ -164,6 +170,14 @@ describe("parseCliJson", () => {
       expect(parseCliJson("reading…\n[true, false")).toBeNull();
     });
 
+    it("still stops on a truncated array of numbers", () => {
+      // These ARE numbers the way JSON writes them, so each array is a result
+      // cut short rather than a sentence.
+      expect(parseCliJson("reading…\n[0, 1")).toBeNull();
+      expect(parseCliJson("reading…\n[0.5, 1")).toBeNull();
+      expect(parseCliJson("reading…\n[-2e10, 1")).toBeNull();
+    });
+
     it("still stops on a result cut off at its first scalar", () => {
       // Nothing follows the scalar because the output ends there. This is what
       // the end anchor is for, so it has to keep working from the real end.
@@ -180,6 +194,35 @@ describe("parseCliJson", () => {
 
     it("returns null for an empty output", () => {
       expect(parseCliJson("")).toBeNull();
+    });
+
+    // The scan decides "result cut short" from the first scalar after the
+    // bracket, so its idea of a scalar has to be JSON's. Rather than restate
+    // the grammar here, ask the parser that owns it.
+    it("agrees with JSON.parse about what counts as a scalar", () => {
+      const scalars = [
+        "0", "-0", "1", "42", "-42", "0.5", "-0.5", "1e3", "1E3", "1e+3",
+        "1e-3", "-2e10", "0.0", "123456789012345678901234567890",
+        "01", "-01", "007", "00", "1.", ".5", "-", "+1", "1e", "1e+", "0x1f",
+        "1_000", "Infinity", "NaN", "true", "false", "null", "tru", "nul",
+      ];
+
+      for (const scalar of scalars) {
+        let isRealJson: boolean;
+        try {
+          JSON.parse(`[${scalar},1]`);
+          isRealJson = true;
+        } catch {
+          isRealJson = false;
+        }
+
+        // A real scalar makes the bracket a result cut short, which stops the
+        // scan. Anything else is prose, and the document below it is read.
+        expect({
+          scalar,
+          cutShort: parseCliJson(`[${scalar},\n{"total": 2}\n`) === null,
+        }).toEqual({ scalar, cutShort: isRealJson });
+      }
     });
   });
 });
