@@ -401,6 +401,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.",
   },
   {
+    name: "Gateway: Routing Policies",
+    dirName: "gateway-routing-policies",
+    pathPrefixes: ["/api/gateway/v1/routing-policies"],
+    overviewDescription:
+      "Manage routing policies for the AI Gateway. Define strategies and scopes to control how requests are routed.",
+  },
+  {
     name: "Gateway: Budgets",
     dirName: "gateway-budgets",
     pathPrefixes: ["/api/gateway/v1/budgets"],

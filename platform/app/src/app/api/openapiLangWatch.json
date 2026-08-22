@@ -26711,6 +26711,571 @@
         ]
       }
     },
+    "/api/gateway/v1/routing-policies": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Selectable routing policies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "strategy": {
+                            "type": "string",
+                            "enum": [
+                              "priority",
+                              "cost",
+                              "latency",
+                              "round_robin"
+                            ]
+                          },
+                          "is_default": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "strategy",
+                          "is_default"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiGatewayV1Routing-policies",
+        "tags": [
+          "Routing Policies"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "summary": "List routing policies",
+        "description": "Returns the routing policies selectable at the caller's project scope: those scoped to this project, to its team, or to the whole organization — irrespective of isDefault. The envelope matches the sibling gateway-platform list routes ({ data: [...], next_cursor }). Empty result is an empty data array, not a 404.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/gateway/v1/routing-policies/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The routing policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "priority",
+                        "cost",
+                        "latency",
+                        "round_robin"
+                      ]
+                    },
+                    "is_default": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "strategy",
+                    "is_default"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiGatewayV1Routing-policiesById",
+        "tags": [
+          "Routing Policies"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "summary": "Get routing policy",
+        "description": "One routing policy in the same five-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/governance/ingestion-templates": {
       "get": {
         "operationId": "getApiGovernanceIngestionTemplates",

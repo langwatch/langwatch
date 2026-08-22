@@ -19,6 +19,7 @@
  * service-to-service write path can drop the synthetic id entirely.
  */
 
+import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
@@ -27,7 +28,9 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
+import { RoutingPolicyScopeType } from "~/generated/prisma/client";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
@@ -258,6 +261,20 @@ const budgetDtoSchema = z.object({
     .describe(
       "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.",
     ),
+});
+
+/**
+ * The read-only summary a routing policy publishes on the REST surface.
+ * Exactly the five-field subset: no scope rows, no modelProviderIds, no
+ * policyRules, no modelAliases, no modelAllowlist, no organizationId. The
+ * route handler asserts exact key-set equality in tests via Object.keys.
+ */
+const routingPolicyDtoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  strategy: z.enum(["priority", "cost", "latency", "round_robin"]),
+  is_default: z.boolean(),
 });
 
 const spendSummaryDtoSchema = z.object({
@@ -2369,5 +2386,178 @@ function scopeFromWire(
 function machineActorForProject(projectId: string): string {
   return `svc_${projectId}`;
 }
+
+// ── Routing policies ────────────────────────────────────────────────────────
+// Read-only discovery surface. RoutingPolicyService is @ee-gated (see
+// requiresEnterprisePlanRest below), so this route file is itself a static
+// top-level import of @ee — no dynamic guard — which is the contract AC8b
+// checks: pre-existing import shape, not a new EE-absence surface.
+
+const enterpriseGate = requireEnterprisePlanRest("ROUTING_POLICIES");
+
+/**
+ * Middleware that fetches the organization from the resolved token and puts it on the context.
+ * This is needed for the enterprise gate to work with project-scoped apps.
+ */
+async function addOrganizationToContext(c: any, next: () => Promise<void>) {
+  const resolvedToken = c.get("resolvedToken") as any;
+  if (!resolvedToken) {
+    throw new Error("No resolved token found on context");
+  }
+
+  let organizationId: string;
+  if (resolvedToken.type === "legacyProjectKey") {
+    organizationId = resolvedToken.project.team.organizationId;
+  } else if (resolvedToken.type === "apiKey") {
+    organizationId = resolvedToken.organizationId;
+  } else {
+    throw new Error("Unsupported token type: " + resolvedToken.type);
+  }
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+  });
+
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+
+  c.set("organization", organization);
+  await next();
+}
+
+/**
+ * Map a full RoutingPolicy row onto the five-field REST summary.
+ * Strips scopes, modelProviderIds, modelAliases, modelAllowlist,
+ * policyRules, organizationId, createdAt/updatedAt — nothing but
+ * {id, name, description, strategy, is_default}.
+ */
+function toRoutingPolicyDto(policy: {
+  id: string;
+  name: string;
+  description: string | null;
+  strategy: string;
+  isDefault: boolean;
+}) {
+  return {
+    id: policy.id,
+    name: policy.name,
+    description: policy.description,
+    strategy: policy.strategy,
+    is_default: policy.isDefault,
+  };
+}
+
+secured.access(apiKeyPermission("routingPolicies:view")).get(
+  "/routing-policies",
+  addOrganizationToContext,
+  enterpriseGate,
+  describeRoute({
+    summary: "List routing policies",
+    description:
+      "Returns the routing policies selectable at the caller's project scope: those scoped to this project, to its team, or to the whole organization — irrespective of isDefault. The envelope matches the sibling gateway-platform list routes ({ data: [...], next_cursor }). Empty result is an empty data array, not a 404.",
+    tags: ["Routing Policies"],
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "Selectable routing policies",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                data: z.array(routingPolicyDtoSchema),
+                next_cursor: nextCursorSchema,
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("query", pageQuerySchema),
+  async (c) => {
+    const project = c.get("project");
+    const organizationId = await orgIdForProject(project.id);
+    const service = new RoutingPolicyService(prisma);
+    const rows = await service.list({
+      organizationId,
+      selectableForScope: {
+        scopeType: RoutingPolicyScopeType.PROJECT,
+        scopeId: project.id,
+      },
+    });
+    return c.json({
+      data: rows.map((p) => toRoutingPolicyDto(p)),
+      next_cursor: null,
+    });
+  },
+);
+
+secured.access(apiKeyPermission("routingPolicies:view")).get(
+  "/routing-policies/:id",
+  addOrganizationToContext,
+  enterpriseGate,
+  describeRoute({
+    summary: "Get routing policy",
+    description:
+      "One routing policy in the same five-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
+    tags: ["Routing Policies"],
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "The routing policy",
+        content: {
+          "application/json": {
+            schema: resolver(routingPolicyDtoSchema),
+          },
+        },
+      },
+      404: {
+        description: "Not found",
+        content: {
+          "application/json": { schema: resolver(apiErrorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const service = new RoutingPolicyService(prisma);
+    const policy = await service.findById(id);
+    if (!policy || policy.organizationId !== organizationId) {
+      // Collapse "not found" + "found-but-wrong-org" into the same 404:
+      // findById carries no tenancy filter, so a foreign org's id must
+      // NOT leak existence here.
+      return errorResponse(c, {
+        status: 404,
+        code: "routing_policy_not_found",
+        message: `routing policy ${id} not found`,
+      });
+    }
+    // Explicit scope authorization: a policy in this org is only visible
+    // if selectable from the project's cascade (PROJECT, the project's
+    // TEAM, or the ORG). A sibling-project or a sibling-team policy
+    // answers the SAME 404 so no 404 can leak existence across scopes.
+    const visible = policy.scopes.some(
+      (s) =>
+        (s.scopeType === RoutingPolicyScopeType.ORGANIZATION &&
+          s.scopeId === organizationId) ||
+        (s.scopeType === RoutingPolicyScopeType.TEAM &&
+          s.scopeId === project.teamId) ||
+        (s.scopeType === RoutingPolicyScopeType.PROJECT &&
+          s.scopeId === project.id),
+    );
+    if (!visible) {
+      return errorResponse(c, {
+        status: 404,
+        code: "routing_policy_not_found",
+        message: `routing policy ${id} not found`,
+      });
+    }
+    return c.json(toRoutingPolicyDto(policy));
+  },
+);
 
 export const app = secured.hono;
