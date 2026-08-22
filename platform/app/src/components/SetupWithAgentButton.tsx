@@ -1,4 +1,5 @@
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
+import type React from "react";
 import { useState } from "react";
 import {
   LuBookOpen,
@@ -188,8 +189,12 @@ export function AgentActionsMenu({
 }: {
   /** Labels the default outline button. Ignored when `trigger` is given. */
   triggerLabel?: string;
-  /** A trigger of the surface's own, in place of the default button. */
-  trigger?: React.ReactNode;
+  /**
+   * A trigger of the surface's own, in place of the default button.
+   * One element, because `Menu.Trigger asChild` clones it with the
+   * handlers and the ref: a string or a list has nowhere to put them.
+   */
+  trigger?: React.ReactElement;
   /** Match the sibling buttons of the surface this sits in. */
   size?: "sm" | "md";
   /**

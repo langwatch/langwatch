@@ -5,6 +5,7 @@ import {
   AgentActionsMenu,
   setupAgentPrompt,
 } from "~/components/SetupWithAgentButton";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { selfHostedEndpoint } from "~/features/traces-v2/onboarding/logic/selfHostedEndpoint";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
@@ -49,12 +50,16 @@ export function OnboardAgentPill({
     redirectToProjectOnboarding: false,
   });
   const publicEnv = usePublicEnv();
+  const canAsk = useCanAskLangy();
+  // The same condition the menu itself applies, so the tiles on the pill
+  // count the routes the menu actually opens with.
+  const hasLangy = !!onAskLangy && canAsk;
 
   return (
     <AgentActionsMenu
-      trigger={<OnboardPillTrigger prominent={prominent} />}
+      trigger={<OnboardPillTrigger prominent={prominent} hasLangy={hasLangy} />}
       langy={
-        onAskLangy
+        hasLangy && onAskLangy
           ? {
               prompt: LANGY_WALKTHROUGH_PROMPT,
               onAsk: onAskLangy,
@@ -92,14 +97,58 @@ export function OnboardAgentPill({
  * handlers and the ref it needs, so everything but `prominent` goes straight
  * through to the button. Swallow them and the pill stops opening anything.
  */
+/**
+ * The two presentations, side by side.
+ *
+ * `lead` is the filled control a project with no data needs; `quiet` is the
+ * outline one that sits at the end of a row once there is data. A DIFFERENT
+ * SHADE from the asks around it in both cases: those are borrowable
+ * questions on the panel's translucent chip surface, and this is the one
+ * control that goes and does something. The solid raised surface, a step
+ * darker than the chips, is what says "not one of those" before the caret
+ * confirms it.
+ */
+const PILL_STYLES = {
+  lead: {
+    borderColor: "orange.emphasized",
+    background: "orange.subtle",
+    paddingLeft: 4,
+    paddingY: "5px",
+    boxShadow: "xs",
+    label: "Send your first trace",
+    fontSize: "13px",
+    fontWeight: "medium",
+    color: "orange.fg",
+    _hover: { borderColor: "orange.solid", background: "orange.muted" },
+  },
+  quiet: {
+    borderColor: "border.emphasized",
+    background: "bg.muted",
+    paddingLeft: 3,
+    paddingY: "3px",
+    boxShadow: "2xs",
+    label: "Onboard your agent",
+    fontSize: "12px",
+    fontWeight: undefined,
+    color: "fg",
+    _hover: { borderColor: "border.emphasized", background: "bg.emphasized" },
+  },
+} as const;
+
 function OnboardPillTrigger({
   prominent,
+  hasLangy,
   ...menuProps
-}: { prominent: boolean } & React.ComponentProps<typeof chakra.button>) {
+}: {
+  prominent: boolean;
+  /** Drops the Langy tile where the menu drops the Langy route. */
+  hasLangy: boolean;
+} & React.ComponentProps<typeof chakra.button>) {
+  const style = prominent ? PILL_STYLES.lead : PILL_STYLES.quiet;
   return (
     <chakra.button
       type="button"
-      /* It opens a menu — it does not fire a prompt like the asks beside
+      /* It opens a menu, it does not fire a prompt like the asks beside
          it do. Announce that, and show it (the caret below). */
       aria-haspopup="menu"
       {...menuProps}
@@ -108,37 +157,28 @@ function OnboardPillTrigger({
       gap={2}
       whiteSpace="nowrap"
       borderWidth="1px"
-      borderColor={prominent ? "orange.emphasized" : "border.emphasized"}
+      borderColor={style.borderColor}
       borderRadius="full"
-      /* A DIFFERENT SHADE on purpose. The asks around this are borrowable
-         questions on the panel's translucent chip surface; this is the one
-         control that goes and does something — it hands you a prompt to
-         take away, or a link to follow. Sitting it on the solid raised
-         surface, a step darker than the chips, is what says "not one of
-         those" before the caret confirms it. */
-      background={prominent ? "orange.subtle" : "bg.muted"}
-      paddingLeft={prominent ? 4 : 3}
+      background={style.background}
+      paddingLeft={style.paddingLeft}
       paddingRight="4px"
-      paddingY={prominent ? "5px" : "3px"}
-      boxShadow={prominent ? "xs" : "2xs"}
+      paddingY={style.paddingY}
+      boxShadow={style.boxShadow}
       cursor="pointer"
       transition="border-color 130ms ease, background 130ms ease"
-      _hover={{
-        borderColor: prominent ? "orange.solid" : "border.emphasized",
-        background: prominent ? "orange.muted" : "bg.emphasized",
-      }}
+      _hover={style._hover}
     >
       <chakra.span
-        fontSize={prominent ? "13px" : "12px"}
-        fontWeight={prominent ? "medium" : undefined}
-        color={prominent ? "orange.fg" : "fg"}
+        fontSize={style.fontSize}
+        fontWeight={style.fontWeight}
+        color={style.color}
       >
-        {prominent ? "Send your first trace" : "Onboard your agent"}
+        {style.label}
       </chakra.span>
       <HStack gap="3px">
         {[
           { Glyph: LuTerminal, color: "fg.muted" },
-          { Glyph: LuSparkles, color: "orange.fg" },
+          ...(hasLangy ? [{ Glyph: LuSparkles, color: "orange.fg" }] : []),
           { Glyph: LuBot, color: "fg.muted" },
         ].map(({ Glyph, color }, i) => (
           <Box

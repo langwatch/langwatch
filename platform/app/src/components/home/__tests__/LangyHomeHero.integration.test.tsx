@@ -12,7 +12,7 @@
  * and store, the ambient dev state, and the project's reach.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -136,7 +136,11 @@ describe("LangyHomeHero onboarding control", () => {
 
       it("copies the tracing skill led by the project's keys", async () => {
         reachMock.mockReturnValue(NEW_PROJECT_REACH);
-        const writeText = vi.fn((_text: string) => Promise.resolve());
+        let copied = "";
+        const writeText = vi.fn((text: string) => {
+          copied = text;
+          return Promise.resolve();
+        });
         Object.defineProperty(navigator, "clipboard", {
           value: { writeText },
           configurable: true,
@@ -149,7 +153,6 @@ describe("LangyHomeHero onboarding control", () => {
         );
 
         await waitFor(() => expect(writeText).toHaveBeenCalled());
-        const copied = writeText.mock.calls[0]?.[0] ?? "";
         expect(copied.indexOf("Use these keys to instrument:")).toBe(0);
         expect(copied).toContain('LANGWATCH_API_KEY="sk-lw-home"');
         expect(copied.indexOf(SKILL_BODY)).toBeGreaterThan(0);
@@ -171,6 +174,23 @@ describe("LangyHomeHero onboarding control", () => {
         ).toBeDefined();
         expect(screen.queryByText("Walk me through it")).toBeNull();
         expect(screen.getByText("Read the integration guide")).toBeDefined();
+      });
+
+      it("drops the Langy glyph so the tiles still count the routes", () => {
+        canAskMock.mockReturnValue(false);
+        reachMock.mockReturnValue(NEW_PROJECT_REACH);
+        renderHero();
+
+        const withoutLangy =
+          onboardingTriggers()[0]!.querySelectorAll("svg").length;
+        cleanup();
+
+        canAskMock.mockReturnValue(true);
+        renderHero();
+        const withLangy =
+          onboardingTriggers()[0]!.querySelectorAll("svg").length;
+
+        expect(withoutLangy).toBe(withLangy - 1);
       });
     });
   });
