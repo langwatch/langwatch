@@ -163,6 +163,30 @@ captures a screenshot as evidence. This is wired into `scenario-logger.ts`'s
 `runScenarioAndLog`, so every transcript in `scenario-logs/` gets a "Browser QA"
 section with the verdict and screenshot path.
 
+### Video recording
+
+`LANGY_QA_VIDEO=1` records every browser-QA page to
+`scenario-logs/videos/*.webm` (1440x900). Playwright finalizes the files when
+the shared context closes, so a recording run must end through
+`closeBrowserQA()` or vitest's normal teardown; a killed run leaves
+half-written files.
+
+## Prompt optimization (langy-prompt-optimization.scenario.test.ts, langy-optimization-bootstrap.scenario.test.ts)
+
+The improvement-loop suite seeds a support-bot experiment through the
+workbench-state REST surface (`seed-optimization-workbench.ts`: prompt,
+inline dataset, optional answer-match evaluator, no baseline run) and grades
+the loop from `specs/langy/langy-prompt-optimization-loop.feature`; the
+bootstrap suite covers the evaluator-inference branches from
+`langy-prompt-optimization-bootstrap.feature`. Layer-2 assertions read
+`GET /api/experiments/:slug/workbench-state` (baseline byte-identical, the
+candidate's draft, evaluator wiring, the version counter) and the runs API.
+The adapter attaches no browser tab, so every workbench action in these
+suites exercises the backend fallback path of the UI-action channel; the
+browser-live half is covered by the channel's integration tests and by
+browser QA. Run one file per vitest invocation, same as every other suite
+here.
+
 ### Rule-adherence evaluator (over Langy's own traces)
 
 The scenario judge is the primary eval. To ALSO grade Langy on live traffic,

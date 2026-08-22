@@ -1,0 +1,105 @@
+Feature: Langy runs the prompt improvement loop on the workbench
+  As a non-technical owner of a prompt
+  I want Langy to improve it against my evaluation data in measured steps
+  So that I end with better numbers and my own work untouched
+
+  # The loop is taught by skills/prompt-optimization/SKILL.mdx and executed
+  # through the UI-action channel (specs/langy/langy-ui-actions.feature).
+  # These scenarios run as judge-graded conversations against a live stack:
+  # platform/app/e2e/langy/langy-prompt-optimization.scenario.test.ts.
+  # The scenario adapter attaches no browser tab, so every workbench action a
+  # scenario exercises here takes the backend path by construction.
+
+  Background:
+    Given an evaluations experiment with a dataset, a prompt target and a mapped evaluator
+
+  @e2e
+  Scenario: Langy assesses the workbench state before touching anything
+    When the user asks Langy to improve the prompt
+    Then Langy reads the workbench state before any edit
+    And the first mutation happens only after the state was read
+
+  @e2e
+  Scenario: With dataset, prompt target and evaluator present, Langy goes straight to improving
+    When the user asks Langy to improve the prompt
+    Then Langy states the current pass rate in one line
+    And starts the loop without asking setup questions
+
+  @e2e
+  Scenario: Langy duplicates the baseline target and never edits the original
+    When Langy runs the improvement loop
+    Then every prompt edit lands on a duplicate column
+    And the baseline target's prompt configuration is byte-identical afterwards
+
+  @e2e
+  Scenario: The duplicate carries evaluator mappings that resolve for the copy
+    When Langy duplicates the baseline target
+    Then the copy's evaluator mappings point at the copy's own output
+    And no mapping still points at the baseline where the copy was meant
+
+  @e2e
+  Scenario: Langy grounds its hypothesis in actual failing rows
+    When Langy proposes a prompt change
+    Then the hypothesis names a concrete failure pattern from row-level results
+    And a change with no named pattern does not happen
+
+  @e2e
+  Scenario: Langy runs a subset before the full dataset
+    When Langy tests a new prompt draft
+    Then the first run covers the failing rows or a small subset
+    And the full dataset runs only after the subset improves
+
+  @e2e
+  Scenario: Langy asks before a run that exceeds the spend threshold
+    Given the dataset holds more than thirty rows
+    When the loop reaches a full run
+    Then Langy states the row and target count and waits for a yes
+    And no run over the threshold starts without one
+
+  @e2e
+  Scenario: After an improvement, Langy offers three more attempts as one question
+    When a candidate beats the baseline but short of the goal
+    Then Langy offers to try three more attempts as a single short question
+
+  @e2e
+  Scenario: After a plateau, Langy offers a model swap as a cost and quality trade
+    When prompt edits stop improving the candidate
+    Then Langy offers one duplicate on a different model
+    And frames it as a cost and quality trade
+
+  @e2e
+  Scenario: Langy concludes with accuracy and cost deltas in a stats card
+    When the loop reaches a stop condition
+    Then the reply states the pass rate before and after and the cost change
+    And a stats card carries the same numbers
+
+  @e2e
+  Scenario: Langy reports a tie or inconclusive comparison as what it is
+    When the candidate and baseline end level
+    Then Langy says the result is level rather than declaring a winner
+
+  @e2e
+  Scenario: Langy stops after three attempts that fail to beat the best candidate
+    When three consecutive attempts fail to beat the best candidate
+    Then Langy stops and reports what it tried
+    And asks for direction instead of churning
+
+  @e2e
+  Scenario: A wrong golden answer is reported as a dataset problem, not prompt-fitted around
+    Given a dataset row whose expected answer is wrong
+    When Langy reads that row's failure
+    Then Langy reports the golden answer as the problem
+    And does not rewrite the prompt to reproduce the wrong answer
+
+  @e2e
+  Scenario: Progress is narrated before and after each run
+    When Langy runs the improvement loop
+    Then one short line before each run says what changed and why
+    And one short line after says what the numbers did
+
+  @e2e
+  Scenario: The user steps away and the loop continues on the backend
+    Given no browser tab is attached to the workbench
+    When Langy runs the improvement loop
+    Then every action executes against the saved state
+    And the loop completes without a browser
