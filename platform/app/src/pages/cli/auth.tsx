@@ -870,9 +870,9 @@ export default function CliAuthPage() {
                       ) : (
                         <Text textStyle="xs" color="fg.muted" lineHeight="tall">
                           The key gets your access for everyday work: traces,
-                          datasets, prompts, evaluations, and the AI Gateway. It
-                          cannot create projects, manage members and roles, or
-                          manage the organization.
+                          datasets, prompts, evaluations, the AI Gateway, and
+                          project settings. It cannot manage members and roles,
+                          or manage the organization.
                         </Text>
                       )}
                     </Box>
