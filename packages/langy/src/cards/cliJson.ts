@@ -123,9 +123,9 @@ function opensJsonContent({
  *
  * A scalar counts only when what follows it is what a document would put
  * there. The first character is not enough, and neither is the whole word: a
- * log line reads `[notice] using the cache`, `[failed to reach the api` or
- * `[true story, we retried]`, and all three open with the spelling of a JSON
- * value. In a document a scalar is followed by a comma or the closing bracket.
+ * log line reads `[null pointer while reading the cache` or `[2026-08-22
+ * fetching traces`, and both open with the spelling of a JSON value. In a
+ * document a scalar is followed by a comma or the closing bracket.
  */
 function opensJsonValue({ text, at }: { text: string; at: number }): boolean {
   const char = text[at]!;
