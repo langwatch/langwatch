@@ -133,6 +133,13 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleHostMS)),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
+			// The pi harness spawns this worktree's own built wrapper binary
+			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
+			// explicit path the manager falls back to bare `langy-worker` on
+			// PATH, which no dev machine has: every pi spawn then fails with
+			// exec-not-found while opencode keeps working, which reads as a
+			// harness bug instead of a setup gap.
+			"LANGY_PI_WORKER_BINARY_PATH="+filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker"),
 		),
 	}
 }
