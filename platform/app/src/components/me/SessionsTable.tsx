@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { ListTable } from "~/components/ui/ListTable";
 import { Pagination } from "~/components/ui/Pagination";
+import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { SessionRow } from "./sessions/SessionRow";
 import { SessionsTableHeader } from "./sessions/SessionsTableHeader";
@@ -206,6 +207,7 @@ const OnePageOfSessions: React.FC<{
   onPageSizeChange,
 }) => {
   const replay = useTerminalReplay({ projectId, projectSlug });
+  const { openDrawer } = useDrawer();
   const largestTotal = rows.reduce(
     (max, row) => Math.max(max, row.totalTokens),
     0,
@@ -230,6 +232,14 @@ const OnePageOfSessions: React.FC<{
               onOpenReplay={() => void replay.openReplay(row)}
               onOpenInExplorer={
                 projectSlug ? () => void replay.openInExplorer(row) : undefined
+              }
+              onOpenPullRequest={(pullRequest) =>
+                openDrawer("pullRequestDetail", {
+                  projectId,
+                  repositoryHost: row.repositoryHost,
+                  repositoryFullName: row.repositoryFullName,
+                  prNumber: pullRequest.number,
+                })
               }
               onPrefetch={() => replay.prefetch(row)}
             />
