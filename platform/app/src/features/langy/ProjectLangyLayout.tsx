@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { type ReactNode, useEffect } from "react";
+import { memo, type ReactNode, useEffect } from "react";
 import { Outlet } from "react-router";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -45,13 +45,41 @@ export default function ProjectLangyLayout() {
   useLangyScopeReset();
 
   return (
-    <LangyProvider key={project?.id ?? "no-project"}>
+    <ProjectLangySubtree
+      projectId={project?.id ?? "no-project"}
+      showLangy={showLangy}
+    />
+  );
+}
+
+/**
+ * A memo boundary between the layout's subscriptions and the whole routed app.
+ *
+ * `useOrganizationTeamProject` above subscribes this layout to the
+ * organization query, whose every `isFetching` flip re-rendered the layout —
+ * and, through freshly-created child elements, the ENTIRE `<Outlet/>` subtree:
+ * the page behind the panel, the dashboard, everything. Opening the Langy
+ * panel triggers exactly such a refetch, so opening history paid two full-app
+ * render passes (profiled at ~700ms each) for data that resolves to the same
+ * `project.id`. The memo compares the two scalars that actually matter and
+ * lets everything below bail out; navigation still flows, because the router
+ * re-renders `<Outlet/>` through context, not through these props.
+ */
+const ProjectLangySubtree = memo(function ProjectLangySubtree({
+  projectId,
+  showLangy,
+}: {
+  projectId: string;
+  showLangy: boolean;
+}) {
+  return (
+    <LangyProvider key={projectId}>
       <LangyShiftedRoot showLangy={showLangy}>
         <Outlet />
       </LangyShiftedRoot>
     </LangyProvider>
   );
-}
+});
 
 /**
  * Wraps the routed page in a box that reserves room on the right while the

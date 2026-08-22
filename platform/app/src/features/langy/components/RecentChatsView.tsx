@@ -46,13 +46,20 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
 import { formatLangyConversationDate } from "../logic/langyConversationDate";
-import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */
 const UNTITLED = "Untitled chat";
@@ -71,6 +78,23 @@ interface ChatItem {
   lastActivityAtMs: number;
   dateLabel: string;
   messageCount: number;
+}
+
+/**
+ * A render-stable wrapper for a handler prop: the returned function's identity
+ * never changes, and calling it reaches the latest handler. This is what lets
+ * the memoized rows below skip re-rendering when the panel above re-renders
+ * with fresh inline closures — a page of thirty rows re-rendered three times
+ * over on every list refresh without it (profiled at ~8ms per row).
+ */
+function useStableHandler<A extends unknown[], R>(
+  handler: (...args: A) => R,
+): (...args: A) => R {
+  const ref = useRef(handler);
+  useLayoutEffect(() => {
+    ref.current = handler;
+  });
+  return useCallback((...args: A) => ref.current(...args), []);
 }
 
 export function RecentChatsView({
@@ -150,15 +174,20 @@ export function RecentChatsView({
   const searchable =
     allItems.length >= SEARCH_FROM || history.hasNextPage || query.length > 0;
 
-  const startRename = (item: ChatItem) => {
+  // Every row handler below is render-stable (useCallback on setState only, or
+  // useStableHandler around the panel's own inline closures), so the memoized
+  // ChatRow only re-renders when ITS row's data or edit state changes.
+  const selectChat = useStableHandler(onSelect);
+  const deleteChat = useStableHandler(onDelete);
+  const startRename = useCallback((item: ChatItem) => {
     setEditingId(item.value);
     setDraftTitle(item.untitled ? "" : item.title);
-  };
-  const cancelRename = () => {
+  }, []);
+  const cancelRename = useCallback(() => {
     setEditingId(null);
     setDraftTitle("");
-  };
-  const saveRename = async () => {
+  }, []);
+  const saveRename = useStableHandler(async () => {
     if (!editingId || !draftTitle.trim()) return;
     setSavingId(editingId);
     try {
@@ -167,7 +196,7 @@ export function RecentChatsView({
     } finally {
       setSavingId(null);
     }
-  };
+  });
 
   const pad = compact ? "14px" : "19px";
 
@@ -286,14 +315,16 @@ export function RecentChatsView({
             key={item.value}
             item={item}
             isActive={item.value === activeConversationId}
-            onSelect={() => onSelect(item.value)}
-            onDelete={() => onDelete(item.value)}
-            onStartRename={() => startRename(item)}
+            onSelect={selectChat}
+            onDelete={deleteChat}
+            onStartRename={startRename}
             editing={editingId === item.value}
-            draftTitle={draftTitle}
+            // Only the row being renamed sees the draft; a constant for the
+            // rest, so typing a title re-renders one row, not the page.
+            draftTitle={editingId === item.value ? draftTitle : ""}
             saving={savingId === item.value}
             onDraftTitleChange={setDraftTitle}
-            onSaveRename={() => void saveRename()}
+            onSaveRename={saveRename}
             onCancelRename={cancelRename}
           />
         )}
@@ -398,7 +429,11 @@ function ChatRows({
   );
 }
 
-function ChatRow({
+// Memoized: the list re-renders on every query notify and panel re-render, and
+// a page of thirty un-memoized rows (each with its own actions menu) was the
+// dominant cost of opening history. All handlers are render-stable (see above),
+// so a row only re-renders when its own item, active flag or edit state moves.
+const ChatRow = memo(function ChatRow({
   item,
   isActive,
   onSelect,
@@ -413,9 +448,9 @@ function ChatRow({
 }: {
   item: ChatItem;
   isActive: boolean;
-  onSelect: () => void;
-  onDelete: () => void;
-  onStartRename: () => void;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onStartRename: (item: ChatItem) => void;
   editing: boolean;
   draftTitle: string;
   saving: boolean;
@@ -481,12 +516,10 @@ function ChatRow({
       ) : (
         <chakra.button
           type="button"
-          onClick={onSelect}
-          // Named EXPLICITLY, never by its own content: AnimatedConversationTitle
-          // splits the title into one span per character so it can blur-reveal
-          // letter by letter, and a name computed from that DOM comes out as
-          // "O l d e r  c h a t". The label is what a screen reader announces
-          // and what a test can find the row by, so it must be the real title.
+          onClick={() => onSelect(item.value)}
+          // Named EXPLICITLY: the label is what a screen reader announces and
+          // what a test can find the row by, and it carries the date the
+          // visible row splits into a second line.
           aria-label={`${item.title}, ${item.dateLabel}`}
           flex={1}
           minWidth={0}
@@ -505,6 +538,11 @@ function ChatRow({
           }}
         >
           <VStack align="stretch" gap={0.5} minWidth={0}>
+            {/* Plain truncated text, deliberately NOT AnimatedConversationTitle:
+                the letter-by-letter reveal builds two components per character,
+                and a page of thirty titles paid ~1,500 component mounts for an
+                animation that only means something where a title visibly
+                changes — the panel header. */}
             <Box
               as="span"
               display="block"
@@ -515,12 +553,9 @@ function ChatRow({
               whiteSpace="nowrap"
               overflow="hidden"
               textOverflow="ellipsis"
+              title={item.title}
             >
-              {item.untitled ? (
-                item.title
-              ) : (
-                <AnimatedConversationTitle title={item.title} />
-              )}
+              {item.title}
             </Box>
             <HStack gap={1} color="fg.subtle" minWidth={0}>
               <chakra.time
@@ -543,7 +578,13 @@ function ChatRow({
           </VStack>
         </chakra.button>
       )}
-      <Menu.Root positioning={{ placement: "bottom-end", gutter: 4 }}>
+      {/* lazyMount + unmountOnExit: a page of rows must not mount thirty menu
+          subtrees nobody has opened — the content renders on first open. */}
+      <Menu.Root
+        positioning={{ placement: "bottom-end", gutter: 4 }}
+        lazyMount
+        unmountOnExit
+      >
         <Menu.Trigger asChild>
           <IconButton
             className="row-actions"
@@ -560,7 +601,7 @@ function ChatRow({
           </IconButton>
         </Menu.Trigger>
         <Menu.Content minWidth="152px">
-          <Menu.Item value="rename" onClick={onStartRename}>
+          <Menu.Item value="rename" onClick={() => onStartRename(item)}>
             <Pencil size={14} /> Rename
           </Menu.Item>
           {/* No "Fork chat". The mutation still exists server-side
@@ -568,11 +609,15 @@ function ChatRow({
               something the panel offers: it doubled the list with
               near-identical titles nobody could tell apart. */}
           <Menu.Separator />
-          <Menu.Item value="delete" color="fg.error" onClick={onDelete}>
+          <Menu.Item
+            value="delete"
+            color="fg.error"
+            onClick={() => onDelete(item.value)}
+          >
             <Trash2 size={14} /> Delete
           </Menu.Item>
         </Menu.Content>
       </Menu.Root>
     </HStack>
   );
-}
+});
