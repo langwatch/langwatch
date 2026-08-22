@@ -31,9 +31,10 @@ inputs:
   install:
     description: >
       What to install. Omit to skip the install step. `all` installs every
-      workspace project. Anything else is passed straight to `pnpm --filter`,
-      so a trailing `...` selects a project together with its workspace
-      dependencies (e.g. `@langwatch/web...`).
+      workspace project. Anything else is split on whitespace and each word
+      becomes one `pnpm --filter`, so a trailing `...` selects a project
+      together with its workspace dependencies (e.g. `@langwatch/web...`,
+      or `@langwatch/web... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
 
@@ -98,5 +99,9 @@ runs:
         if [ "$INSTALL" = "all" ]; then
           CI=true pnpm install --frozen-lockfile
         else
-          CI=true pnpm install --frozen-lockfile --filter "$INSTALL"
+          filters=()
+          for target in $INSTALL; do
+            filters+=(--filter "$target")
+          done
+          CI=true pnpm install --frozen-lockfile "${filters[@]}"
         fi

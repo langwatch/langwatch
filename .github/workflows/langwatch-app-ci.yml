@@ -341,7 +341,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          # langyworker is not a dependency of web, and its tests and
+          # typecheck run on this job's shard 1, so it needs its own
+          # install root.
+          install: "@langwatch/web... @langwatch/langyworker..."
 
       - uses: ./.github/actions/prepare-generated-files
 
