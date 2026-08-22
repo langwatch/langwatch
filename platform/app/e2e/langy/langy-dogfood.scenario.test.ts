@@ -23,7 +23,11 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
-import { listDatasets, traceExists } from "./langwatch-api";
+import {
+  listDatasets,
+  resetEvaluationResources,
+  traceExists,
+} from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_ACTIVITY_OVERVIEW_CRITERIA,
@@ -309,36 +313,46 @@ describe("Langy dogfood: named flows", () => {
   describe("when the user asks for an eval without saying which kind", () => {
     /** @scenario An ambiguous "make me an eval" is asked about before anything is created */
     it("asks experiment-vs-evaluator first, then creates the right resource with a valid body", async () => {
-      const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog({
-        name: "make me an eval, ask before creating",
-        description:
-          "The user wants 'an eval' without saying whether they mean a batch experiment or an online evaluator. The choice picks what gets tested, so Langy must ask before creating anything; once answered, the create must go through with a type the platform accepts.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: LANGY_EVAL_CREATION_CRITERIA,
-          }),
-        ],
-        script: [
-          scenario.user("make me an eval"),
-          scenario.agent(),
-          // The answer picks the online side and names relevancy. The exact
-          // shape that once lured the agent into the stale
-          // "ragas/answer_relevancy" slug. If it reaches for it again, the
-          // error now carries the accepted types and the judge requires the
-          // corrected retry to happen inside the turn.
-          scenario.user(
-            "score my live production traffic, I want to know when answers go off-topic",
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
+      // The criteria describe a project with no matching monitor. A leftover
+      // from an earlier run flips the model into a correct reuse-versus-create
+      // question the criteria do not cover, so restore the designed state on
+      // both edges of the conversation (the after also unleaks the live
+      // monitor this scenario creates on purpose).
+      await resetEvaluationResources();
+      try {
+        const langy = makeLangyAdapter();
+        const result = await runScenarioAndLog({
+          name: "make me an eval, ask before creating",
+          description:
+            "The user wants 'an eval' without saying whether they mean a batch experiment or an online evaluator. The choice picks what gets tested, so Langy must ask before creating anything; once answered, the create must go through with a type the platform accepts.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: LANGY_EVAL_CREATION_CRITERIA,
+            }),
+          ],
+          script: [
+            scenario.user("make me an eval"),
+            scenario.agent(),
+            // The answer picks the online side and names relevancy. The exact
+            // shape that once lured the agent into the stale
+            // "ragas/answer_relevancy" slug. If it reaches for it again, the
+            // error now carries the accepted types and the judge requires the
+            // corrected retry to happen inside the turn.
+            scenario.user(
+              "score my live production traffic, I want to know when answers go off-topic",
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+      } finally {
+        await resetEvaluationResources();
+      }
     });
   });
 

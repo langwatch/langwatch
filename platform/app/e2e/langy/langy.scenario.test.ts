@@ -12,6 +12,8 @@ import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import {
+  deleteEvaluator,
+  deleteMonitor,
   listAgents,
   listDashboards,
   listDatasets,
@@ -20,6 +22,7 @@ import {
   listPrompts,
   listScenarios,
   listTriggers,
+  resetEvaluationResources,
 } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
@@ -808,38 +811,58 @@ describe("Langy via HTTP wrapper", () => {
       const monitorName = `langy-test-monitor-${Date.now()}`;
       const before = await listMonitors();
       const beforeIds = new Set(before.map((m) => m.id));
-
-      const result = await runScenarioAndLog({
-        name: "create monitor",
-        description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace.`,
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy reports the monitor was created, naming it; it never claims a permission problem.",
-              "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `create a production monitor "${monitorName}" running hallucination evaluation on every trace`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
-
-      const after = await listMonitors();
-      const created = after.filter((m) => !beforeIds.has(m.id));
-      console.log(
-        `Layer 2 monitor: ${created.length ? `created ${created.map((m) => m.name).join(", ")}` : "NOTHING CREATED"}`,
+      const beforeEvaluatorIds = new Set(
+        (await listEvaluators()).map((e) => e.id),
       );
-      expect(created.some((m) => m.name === monitorName)).toBe(true);
+
+      try {
+        const result = await runScenarioAndLog({
+          name: "create monitor",
+          description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace.`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports the monitor was created, naming it; it never claims a permission problem.",
+                "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `create a production monitor "${monitorName}" running hallucination evaluation on every trace`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+
+        const after = await listMonitors();
+        const created = after.filter((m) => !beforeIds.has(m.id));
+        console.log(
+          `Layer 2 monitor: ${created.length ? `created ${created.map((m) => m.name).join(", ")}` : "NOTHING CREATED"}`,
+        );
+        expect(created.some((m) => m.name === monitorName)).toBe(true);
+      } finally {
+        // A live monitor evaluates every ingested trace, and any leftover in
+        // the shared project changes what later evaluation scenarios find
+        // (they see a matching resource and correctly ask reuse-versus-create,
+        // a branch their criteria do not describe). The model usually creates
+        // an evaluator to back the monitor, so sweep both by before-diff. The
+        // suite key holds the manage grain Langy's own key lacks.
+        const leftover = (await listMonitors()).filter(
+          (m) => !beforeIds.has(m.id),
+        );
+        await Promise.all(leftover.map((m) => deleteMonitor(m.id)));
+        const leftoverEvaluators = (await listEvaluators()).filter(
+          (e) => !beforeEvaluatorIds.has(e.id),
+        );
+        await Promise.all(leftoverEvaluators.map((e) => deleteEvaluator(e.id)));
+      }
     });
 
     it("creates a prompt (Layer 2: appears in API)", async () => {
@@ -1472,33 +1495,42 @@ describe("Langy via HTTP wrapper", () => {
     });
 
     it("does not ask clarifying questions for an ambiguous but actionable request", async () => {
-      const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog({
-        name: "no clarifying questions",
-        description:
-          "The user says 'set up evaluations' — vague, but Langy should pick a sensible default and do it, not ask 10 questions.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              // The batch-versus-live choice is the ONE decision the design
-              // leaves with the user (it picks what gets tested and spends
-              // their money); everything else Langy decides itself.
-              "Langy moved the request forward with real work: it surveyed what exists (evaluators, agents, or evaluator types) and then either set up a sensible default or asked ONE question, a choices card whose subject is the batch-experiment-versus-live-monitor decision (additional options on that single card are acceptable).",
-              "Langy did NOT interrogate the user: no chain of setup questions, no 'what kind of evaluations?', no asking the user to restate the goal.",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user("set up evaluations for me"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
+      // Pre-existing monitors turn the designed batch-versus-live question
+      // into a reuse-versus-create one, which the criteria do not describe;
+      // restore the designed empty state on both edges (the after unleaks
+      // whatever a sensible-default setup created).
+      await resetEvaluationResources();
+      try {
+        const langy = makeLangyAdapter();
+        const result = await runScenarioAndLog({
+          name: "no clarifying questions",
+          description:
+            "The user says 'set up evaluations' — vague, but Langy should pick a sensible default and do it, not ask 10 questions.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                // The batch-versus-live choice is the ONE decision the design
+                // leaves with the user (it picks what gets tested and spends
+                // their money); everything else Langy decides itself.
+                "Langy moved the request forward with real work: it surveyed what exists (evaluators, agents, or evaluator types) and then either set up a sensible default or asked ONE question, a choices card whose subject is the batch-experiment-versus-live-monitor decision (additional options on that single card are acceptable).",
+                "Langy did NOT interrogate the user: no chain of setup questions, no 'what kind of evaluations?', no asking the user to restate the goal.",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("set up evaluations for me"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+      } finally {
+        await resetEvaluationResources();
+      }
     });
 
     it("does not offer next actions at the end of a response", async () => {

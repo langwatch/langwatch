@@ -55,7 +55,10 @@ function getSessionCookie(): Promise<string> {
         res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Origin: APP_BASE },
-          body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
+          body: JSON.stringify({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          }),
           signal: AbortSignal.timeout(15_000),
         });
         // Every vitest run signs in once, so a burst of runs (a suite driven
@@ -128,10 +131,12 @@ async function trpcMutate<T>({
     },
     body: JSON.stringify({ json: input }),
     // Generous on purpose: under a queue backlog the turn mutation has been
-    // measured completing server-side at 135s. Aborting earlier and retrying
-    // is worse — the retry races the accepted first attempt into
-    // langy_turn_in_progress.
-    signal: AbortSignal.timeout(180_000),
+    // measured completing server-side at 135s, and a full failure-analysis
+    // turn on the opencode harness has been measured working past 180s.
+    // Aborting a still-working turn destroys the run (the judge grades a
+    // one-token reply), and retrying is worse — the retry races the accepted
+    // first attempt into langy_turn_in_progress.
+    signal: AbortSignal.timeout(300_000),
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || !body || body.error) {
@@ -267,18 +272,22 @@ function parseHandledStreamError(entry: {
 }
 
 /**
- * The manager reduces oversized tool outputs STRUCTURALLY for the panel
- * (toolmap.TruncateToolOutput): array tails are elided behind an
- * "… N more items truncated" marker while the AGENT read the full payload.
- * The judge grades from these frames, so without a note it reads an elided
- * item as a nonexistent one and fails a genuinely grounded reply as
- * fabrication (it did: real seeded trace ids, cited from the elided tail,
- * were judged hallucinated). The note states the elision; it adds no
- * evidence.
+ * The judge grades from these frames while the AGENT read the full payload,
+ * so any cut between the two must be stated or the judge reads a missing item
+ * as a nonexistent one and fails a genuinely grounded reply as fabrication
+ * (it did, twice: real seeded trace ids cited from an elided array tail, and
+ * a result count that sat past this adapter's own byte cap). Two cuts exist:
+ * the manager's structural reduction for the panel (toolmap.TruncateToolOutput
+ * elides array tails behind an "… N more items truncated" marker), and the
+ * byte cap this adapter applies when building the judge's tool message. The
+ * note states that a cut happened; it adds no evidence.
  */
-function annotateReducedOutput(output: string): string {
-  if (!output.includes("more items truncated")) return output;
-  return `${output}\n\n[Display note: this tool output was reduced for display. The agent read the full payload, so items beyond the ones shown here existed. A reply citing an item that is not visible here is citing the elided part, not fabricating.]`;
+function boundOutputForJudge(output: string): string {
+  const capped = output.slice(0, 8192);
+  const cut =
+    output.length > capped.length || capped.includes("more items truncated");
+  if (!cut) return capped;
+  return `${capped}\n\n[Display note: this tool output was reduced for display. The agent read the full payload, so data beyond what is shown here existed. A reply citing an item or a count that is not visible here is citing the reduced part, not fabricating.]`;
 }
 
 /** One settled tool call observed on the turn stream, as the panel showed it. */
@@ -532,11 +541,12 @@ export function makeLangyAdapter(): AgentAdapter & {
             toolCallId: call.id,
             toolName: call.name,
             // The server already bounds tool output (8KB canonical reduction);
-            // mirror that bound rather than cutting deeper — a tighter slice
-            // has cost a judge the very count a reply was grounded on.
+            // mirror that bound rather than cutting deeper, and state the cut
+            // when one happens — a silent slice has cost a judge the very
+            // count a reply was grounded on.
             output: {
               type: call.isError ? ("error-text" as const) : ("text" as const),
-              value: annotateReducedOutput(call.output.slice(0, 8192)),
+              value: boundOutputForJudge(call.output),
             },
           })),
         },

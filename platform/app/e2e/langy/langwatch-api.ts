@@ -115,6 +115,45 @@ export async function ensureEvaluator({
   });
 }
 
+export async function deleteEvaluator(id: string): Promise<void> {
+  const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
+    method: "DELETE",
+    headers: { "X-Auth-Token": LW_KEY },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.ok || response.status === 404) return;
+  throw new Error(
+    `Failed to delete evaluator ${id}: ${response.status} ${response.statusText}.`,
+  );
+}
+
+/**
+ * Evaluators the reset below must never remove: scenario premises seed them by
+ * name (ensureEvaluator) and expect them present on any project state.
+ */
+const SEEDED_EVALUATOR_NAMES = new Set(["e2e-offtopic"]);
+
+/**
+ * Restores the project's designed evaluation state: zero monitors, and no
+ * evaluators beyond the seeded fixtures. Scenarios that create monitors or
+ * evaluators call this before AND after the conversation. Before, because a
+ * leftover from a crashed earlier run changes the model's behavior (finding a
+ * monitor matching the request, it correctly asks reuse-versus-create instead
+ * of creating, and the judge grades a branch the criteria do not describe).
+ * After, because a leaked live monitor evaluates every ingested trace and
+ * spends real money until someone notices.
+ */
+export async function resetEvaluationResources(): Promise<void> {
+  const monitors = await listMonitors();
+  await Promise.all(monitors.map((monitor) => deleteMonitor(monitor.id)));
+  const evaluators = await listEvaluators();
+  await Promise.all(
+    evaluators
+      .filter((evaluator) => !SEEDED_EVALUATOR_NAMES.has(evaluator.name))
+      .map((evaluator) => deleteEvaluator(evaluator.id)),
+  );
+}
+
 export async function listScenarios(): Promise<
   Array<{ id: string; name: string }>
 > {
