@@ -86,12 +86,6 @@ export type UiActionBackendRunner = (args: {
   experimentSlug?: string;
 }) => Promise<unknown>;
 
-/** The one presence read dispatch uses: is any of this project's tabs alive? */
-export interface UiActionPresence {
-  isEnabledForProject(projectId: string): Promise<boolean>;
-  getByProject(projectId: string): Promise<unknown[]>;
-}
-
 /** The minimal Redis surface the service needs (ioredis satisfies it). */
 export interface UiActionRedis {
   set(
@@ -127,20 +121,17 @@ export class LangyUiActionService {
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
   private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
-  private readonly presence?: UiActionPresence;
   private readonly backendRunner?: UiActionBackendRunner;
 
   constructor(deps: {
     redis: UiActionRedis;
     conversations: UiActionConversations;
     buffer: Pick<LangyTokenBuffer, "appendUiAction">;
-    presence?: UiActionPresence;
     backendRunner?: UiActionBackendRunner;
   }) {
     this.redis = deps.redis;
     this.conversations = deps.conversations;
     this.buffer = deps.buffer;
-    this.presence = deps.presence;
     this.backendRunner = deps.backendRunner;
   }
 
@@ -189,20 +180,14 @@ export class LangyUiActionService {
       throw new LangyUiPayloadInvalidError(kind, parsed.error.issues);
     }
 
-    // Nobody's home? Skip the publish entirely and apply the action to the
-    // saved state. Presence is a pre-check only: unavailable or disabled
-    // presence means "unknown", and the claim window below decides instead.
-    if (await this.projectHasNoLiveTab(projectId)) {
-      const actionId = nanoid();
-      return await this.runOnBackend({
-        actionId,
-        kind,
-        definition,
-        payload: parsed.data,
-        experimentSlug,
-      });
-    }
-
+    // Always publish and let the claim window decide whether a page is
+    // attached. Presence looked like a cheaper answer, but its heartbeat is
+    // mounted per view (today only traces-v2), so on every other page
+    // "presence enabled, zero sessions" is the permanent state and a
+    // pre-check on it sent EVERY action to the backend with an open tab
+    // right there. The claim window costs three seconds only when nobody is
+    // home, which is the rare case for an agent driving a page the user
+    // asked it to drive.
     const actionId = nanoid();
     const pending: PendingUiAction = {
       projectId,
@@ -232,22 +217,6 @@ export class LangyUiActionService {
       payload: parsed.data,
       experimentSlug,
     });
-  }
-
-  /**
-   * True only when presence is available, enabled for the project, and
-   * reports zero live sessions. Any uncertainty answers false, so the claim
-   * window stays the deciding signal.
-   */
-  private async projectHasNoLiveTab(projectId: string): Promise<boolean> {
-    if (!this.presence || !this.backendRunner) return false;
-    try {
-      if (!(await this.presence.isEnabledForProject(projectId))) return false;
-      const sessions = await this.presence.getByProject(projectId);
-      return sessions.length === 0;
-    } catch {
-      return false;
-    }
   }
 
   private async runOnBackend({

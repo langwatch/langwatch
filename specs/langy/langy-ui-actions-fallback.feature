@@ -1,13 +1,15 @@
 # The away half of the UI-action channel: the same verbs keep working when no
 # page answers, and the page reconciles when it comes back.
 #
-# The dispatch decides the fallback on its own: a presence pre-check (no live
-# tab in the project skips the publish entirely), or an unclaimed action after
-# the claim window. Either way the pending record is deleted BEFORE the
-# backend executes, so a tab waking up late finds nothing to claim and the
-# backend execution stays the only execution. The backend applies the SAME
-# transform to the SAVED workbench state through the server-owned seam, so
-# every fallback write is validated, versioned, and attributed to Langy.
+# The dispatch decides the fallback on its own: every action publishes to the
+# live stream, and an action unclaimed after the claim window falls back. The
+# claim window is the only authority on whether a page is attached: presence
+# cannot answer this, because its heartbeat mounts per view and a page
+# without it reads as "nobody home" forever. The pending record is deleted
+# BEFORE the backend executes, so a tab waking up late finds nothing to claim
+# and the backend execution stays the only execution. The backend applies the
+# SAME transform to the SAVED workbench state through the server-owned seam,
+# so every fallback write is validated, versioned, and attributed to Langy.
 #
 # Reconciliation is one rule applied to two signals (the experiment_updated
 # broadcast and a version probe when the tab returns): a CLEAN workbench

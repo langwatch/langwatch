@@ -136,7 +136,6 @@ function createService(context: {
     redis,
     conversations: getApp().langy.conversations,
     buffer: createLangyTokenBuffer({ redis: getApp().redis }),
-    presence: getApp().presence,
     backendRunner: ({ kind, definition, payload, experimentSlug }) =>
       executeBackendAction({
         experiments: getApp().experiments,

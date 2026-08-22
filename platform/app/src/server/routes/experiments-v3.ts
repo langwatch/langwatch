@@ -29,6 +29,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -1183,7 +1184,7 @@ secured.access(apiKeyAuthExperimentsUpdate).put(
 
     const body = c.req.valid("json");
 
-    const saved = await ExperimentService.create(prisma).saveWorkbenchState({
+    const saved = await getApp().experiments.saveWorkbenchState({
       projectId: project.id,
       slug,
       state: body.state,
@@ -1318,7 +1319,7 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
     }
     const { project, resolved, markUsed } = authResult;
 
-    const experiments = ExperimentService.create(prisma);
+    const experiments = getApp().experiments;
     const workbench = await experiments.getWorkbenchState({
       projectId: project.id,
       slug,

@@ -74,14 +74,12 @@ function makeService({
   currentTurnId = "turn-1",
   conversationExists = true,
   appended = [],
-  presenceSessions,
   backendRunner,
 }: {
   redis: UiActionRedis;
   currentTurnId?: string | null;
   conversationExists?: boolean;
   appended?: Array<{ actionId: string; kind: string; payload: unknown }>;
-  presenceSessions?: unknown[];
   backendRunner?: (args: {
     kind: string;
     payload: unknown;
@@ -99,14 +97,6 @@ function makeService({
         appended.push({ actionId, kind, payload });
       },
     },
-    ...(presenceSessions
-      ? {
-          presence: {
-            isEnabledForProject: async () => true,
-            getByProject: async () => presenceSessions,
-          },
-        }
-      : {}),
     ...(backendRunner
       ? {
           backendRunner: ({ kind, payload, experimentSlug }) =>
@@ -438,8 +428,12 @@ describe("LangyUiActionService", () => {
 
   describe("when no live tab is present for the project", () => {
     /** @scenario With no browser attached the same verb executes on the backend transparently */
-    it("skips the publish entirely and answers from the backend", async () => {
-      const { redis } = makeRedis();
+    it("publishes anyway and answers from the backend after the claim window", async () => {
+      // The claim window is the ONE authority on whether a page is attached.
+      // Presence cannot answer this: its heartbeat is mounted per view, so on
+      // pages without it "zero sessions" is the permanent state, and a
+      // pre-check on it sent every action to the backend past an open tab.
+      const { redis } = makeRedis(["wait-empty"]);
       const appended: Array<{
         actionId: string;
         kind: string;
@@ -449,7 +443,6 @@ describe("LangyUiActionService", () => {
       const service = makeService({
         redis,
         appended,
-        presenceSessions: [],
         backendRunner: async ({ kind, experimentSlug }) => {
           runnerCalls.push({ kind, experimentSlug });
           return { targetId: "t2" };
@@ -465,7 +458,7 @@ describe("LangyUiActionService", () => {
 
       expect(outcome.executedVia).toBe("backend");
       expect(outcome.result).toEqual({ targetId: "t2" });
-      expect(appended).toHaveLength(0);
+      expect(appended).toHaveLength(1);
       expect(runnerCalls).toEqual([
         { kind: "workbench.duplicateTarget", experimentSlug: "my-exp" },
       ]);
@@ -485,8 +478,6 @@ describe("LangyUiActionService", () => {
       const service = makeService({
         redis,
         appended,
-        // A live tab exists, so the publish happens; it just never claims.
-        presenceSessions: [{}],
         backendRunner: async () => {
           pendingAtRunnerTime = [...store.kv.keys()].some((key) =>
             key.startsWith("langy:ui:pending:"),
@@ -527,7 +518,6 @@ describe("LangyUiActionService", () => {
       let runnerCalled = false;
       const service = makeService({
         redis,
-        presenceSessions: [{}],
         backendRunner: async () => {
           runnerCalled = true;
           return {};
