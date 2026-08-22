@@ -50,7 +50,7 @@ export function LangyMakeDefaultDialog({
         <Dialog.Content bg="bg" maxWidth="480px" errorScope="Langy default ask">
           <Dialog.Header>
             <Dialog.Title fontSize="md" fontWeight="500">
-              Set default model?
+              Set model as default?
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.Body paddingTop={0}>
