@@ -2465,6 +2465,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("trace")
     .description("Search and inspect traces");
 
+  /**
+   * Help for `--project`, shared by every command that reads across projects.
+   * The default is the personal project, which is where these commands pointed
+   * before the flag existed, so an existing script keeps its meaning.
+   */
+  const PROJECT_FLAG_HELP =
+    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
+
   rendersOwnResult(
     traceCmd
       .command("search")
@@ -2484,6 +2492,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--errors-only",
         "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
       )
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
     const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
@@ -2514,7 +2523,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("-o, --output <file>", "Write output to file instead of stdout")
     .option("--limit <n>", "Max traces to export (default: 1000); limits above one server page are fetched by cursor paging")
     .option("--include-spans", "Include full span data for each trace (slower, larger output)")
-    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string; includeSpans?: boolean }) => {
+    .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string; includeSpans?: boolean; project?: string }) => {
       const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
       await impl(options);
     });
@@ -2523,6 +2533,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("get <traceId>")
       .description("Get full trace details by ID")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest"),
   ).action(async (traceId: string, _options: unknown, command: Command) => {
     const { getTraceCommand: impl } = await import("./commands/traces/get.js");
@@ -2533,6 +2544,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("transcript <traceId>")
       .description("Print the coding-agent transcript of a trace (what the agent did, in order)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default, human-readable) or json", "table"),
   ).action(async (traceId: string, _options: unknown, command: Command) => {
     const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
@@ -2552,6 +2564,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--limit <n>", "Max events to return (default: 500); larger limits are fetched by cursor paging")
       .option("--from <date>", "Start date (ISO string or epoch ms); with --to, prunes storage partitions for faster reads")
       .option("--to <date>", "End date (ISO string or epoch ms)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (sessionId: string, _options: unknown, command: Command) => {
     const { sessionEventsCommand: impl } = await import("./commands/sessions/events.js");

@@ -56,6 +56,7 @@ export const APP_ERROR_CODES = [
   "cannot_remove_last_admin",
   "cannot_remove_self",
   "cannot_remove_self_as_last_admin",
+  "cli_key_selection_invalid",
   "clickhouse_overloaded",
   "clickhouse_unavailable",
   "codex_auth_failed",

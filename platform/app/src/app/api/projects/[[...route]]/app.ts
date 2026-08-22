@@ -2,12 +2,14 @@ import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
 import {
+  anyAuthenticated,
   createOrgApp,
   requires,
   requiresOnProject,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
+import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -120,8 +122,15 @@ const secured = createOrgApp<ExtraVariables>({
 
 secured.hono.onError(handleProjectError);
 
+// The listing is not gated on organization-wide `project:view`: a credential
+// whose view does not reach org scope gets a 200 with exactly the projects it
+// holds `project:view` on (key bindings ∩ owner ceiling, resolved by
+// `resolveVisibleProjects`) instead of a 403. Content, not access, is what the
+// permission decides here, so the policy is anyAuthenticated and the handler
+// does the scoping — the same shape the model-defaults family uses.
+// Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
 secured
-  .access(requires("project:view"))
+  .access(anyAuthenticated())
   .get(
     "/",
     projectServiceMiddleware,
@@ -132,10 +141,18 @@ secured
       const { page, limit } = c.req.valid("query");
       const service = c.get("projectService") as ProjectService;
 
+      const visible = await resolveVisibleProjects({
+        prisma,
+        apiKeyId: c.get("apiKeyId") as string,
+        userId: (c.get("apiKeyUserId") as string | null) ?? null,
+        organizationId: organization.id,
+      });
+
       const result = await service.listByOrganization({
         organizationId: organization.id,
         page,
         limit,
+        ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
       });
 
       return c.json({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { categorizablePermissions } from "../../../server/api-key/permission-categories";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
@@ -572,7 +573,7 @@ describe("getUserPermissionsAtScope()", () => {
   const orgProjects = [{ id: "proj-1", teamId: "team-1" }];
 
   describe("when isServiceKey is true", () => {
-    it("returns ADMIN permissions regardless of bindings", () => {
+    it("returns everything grantable regardless of bindings", () => {
       const result = getUserPermissionsAtScope({
         myBindings: undefined,
         scopeType: "PROJECT",
@@ -582,7 +583,9 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: true,
         getTeamRolePermissions: mockGetPerms,
       });
-      expect(result).toEqual(["project:manage", "project:view"]);
+      // The team-role bags carry no organization, gateway, governance or
+      // playground permissions, so they understate a service key's ceiling.
+      expect(result).toEqual(categorizablePermissions());
     });
   });
 
@@ -635,8 +638,8 @@ describe("getUserPermissionsAtScope()", () => {
     });
   });
 
-  describe("when org-level binding covers a project scope", () => {
-    it("falls back to the org binding", () => {
+  describe("when an org-level ADMIN binding covers a project scope", () => {
+    it("returns everything grantable, not the team-role bag", () => {
       const result = getUserPermissionsAtScope({
         myBindings: [
           { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
@@ -648,7 +651,24 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: false,
         getTeamRolePermissions: mockGetPerms,
       });
-      expect(result).toEqual(["project:manage", "project:view"]);
+      // The resolver short-circuits an ORGANIZATION-scoped ADMIN binding to
+      // full access, so the ceiling shown here has to match it.
+      expect(result).toEqual(categorizablePermissions());
+    });
+
+    it("returns the team-role bag for a non-ADMIN org binding", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "PROJECT",
+        scopeId: "proj-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual(["project:view", "project:update"]);
     });
   });
 });

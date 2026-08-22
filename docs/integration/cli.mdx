@@ -79,6 +79,17 @@ You'll see two questions:
 
 The browser shows an "Approve" or "Send API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
 
+### What the login key can access
+
+The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
+
+- **Scopes**: an organization admin gets the whole organization by default; other members get their teams plus their personal workspace. You can narrow the selection to specific teams or projects.
+- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Organization management stays off by default: the key cannot create or delete projects, manage members and roles, or manage the organization unless you turn those on under **Customize**.
+
+Every request the key makes is checked against your live permissions, so the key can never do more than you can, and it shrinks with you if your role changes. A new login from the same machine replaces the previous login key, and `langwatch logout` revokes it.
+
+Data commands keep targeting your personal workspace by default. Pass `--project <id|slug>` to read another project the key covers, and run `langwatch projects list` to see which projects those are. `langwatch whoami` shows the key's reach.
+
 ### Storage discipline (where credentials land)
 
 | Scope | Path | What lives there |
@@ -288,6 +299,13 @@ langwatch trace search --limit 10              # most recent traces
 langwatch trace search --query "error"         # full-text search
 langwatch trace get <trace-id>                 # one trace in detail
 langwatch trace export --output traces.jsonl   # stream traces for offline analysis
+```
+
+With a device login, these commands read your personal workspace by default. Add `--project <id|slug>` to read any other project your login key covers:
+
+```bash
+langwatch projects list                              # projects the key can read
+langwatch trace search --project checkout-agent      # search another project by slug
 ```
 
 Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If nothing appears, the instrumentation is wrong, no need to read logs.

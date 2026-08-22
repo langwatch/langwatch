@@ -85,7 +85,7 @@ type RoleBindingBase = {
   scopeId: string;
 };
 
-type RoleBindingInput =
+export type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
   | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
 
@@ -567,6 +567,52 @@ export class ApiKeyService {
         meta: { userId, organizationId },
       });
     }
+  }
+
+  /**
+   * The mint-time validation of {@link create}, exposed as a dry run for
+   * callers that decide a selection long before they mint (the CLI device-flow
+   * approval stamps a selection that `create` only consumes at exchange time).
+   * Same checks, same errors, nothing persisted: the permission format, the
+   * empty-input refusals, org membership, every binding within the user's own
+   * ceiling for every permission, and personal-team scopes owned by the user.
+   * An input this method accepts is an input `create` mints.
+   */
+  async assertSelectionWithinCeiling({
+    userId,
+    organizationId,
+    bindings,
+    permissions,
+  }: {
+    userId: string;
+    organizationId: string;
+    bindings: RoleBindingInput[];
+    permissions: string[];
+  }): Promise<void> {
+    if (permissions.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "CUSTOM bindings require at least one permission",
+      );
+    }
+    if (bindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
+    }
+    ApiKeyService.assertPermissionFormat(permissions);
+    await this.ensureCallerIsOrgMember({ userId, organizationId });
+    await this.assertBindingsWithinCeiling({
+      prisma: this.prisma,
+      ceilingUserId: userId,
+      organizationId,
+      bindings,
+      rawPermissions: [...permissions].sort(),
+    });
+    await assertPersonalTeamScopesOwnedBy({
+      client: this.prisma,
+      scopes: bindings,
+      ownerUserId: userId,
+    });
   }
 
   /**

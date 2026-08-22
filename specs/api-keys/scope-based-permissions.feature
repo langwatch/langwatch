@@ -81,26 +81,40 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I list the available categories
     Then the categories include:
-      | category    | access levels |
-      | Traces      | read, write   |
-      | Cost        | read          |
-      | Scenarios   | read, write   |
-      | Annotations | read, write   |
-      | Analytics   | read, write   |
-      | Evaluations | read, write   |
-      | Datasets    | read, write   |
-      | Triggers    | read, write   |
-      | Workflows   | read, write   |
-      | Prompts     | read, write   |
-      | Secrets     | read, write   |
-      | Audit Log   | read          |
-      | Team        | read, write   |
-      | Project     | read, write   |
+      | category               | access levels |
+      | Traces                 | read, write   |
+      | Cost                   | read          |
+      | Scenarios              | read, write   |
+      | Annotations            | read, write   |
+      | Analytics              | read, write   |
+      | Evaluations            | read, write   |
+      | Langy                  | read, write   |
+      | Datasets               | read, write   |
+      | Triggers               | read, write   |
+      | Workflows              | read, write   |
+      | Experiments            | read, write   |
+      | Prompts                | read, write   |
+      | Playground             | read, write   |
+      | Secrets                | read, write   |
+      | Audit Log              | read          |
+      | Team                   | read, write   |
+      | Project settings       | read, write   |
+      | Project administration | write         |
+      | Organization           | read, write   |
+      | Gateway                | read, write   |
+      | Governance             | read, write   |
 
-  # Deferred: Gateway permissions (virtualKeys, gatewayBudgets, gatewayProviders,
-  # gatewayGuardrails, gatewayCacheRules, gatewayUsage) inherit from the scope's
-  # built-in role. Fine-grained gateway control will be added when the gateway UI
-  # supports per-key configuration.
+  # Project creation and deletion sit in their own write-only category, so a key
+  # can carry project settings without carrying the power to create or destroy
+  # a project.
+
+  @unit
+  Scenario: Every registry permission belongs to a category
+    Given the permission registry
+    When I list the permissions every category names
+    Then every registry permission appears in exactly one category
+    And the only permissions left out are the platform tier ("ops:view",
+      "ops:manage"), which can never ride on an API key
 
   @unit
   Scenario: "read" access maps to view permission
@@ -113,21 +127,21 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I compute "write" permissions for each category
     Then the exact backend permissions are:
-      | category    | permissions                                                    |
-      | Traces      | traces:view, traces:create, traces:update, traces:share        |
-      | Cost        | cost:view                                                      |
-      | Scenarios   | scenarios:view, scenarios:manage                               |
-      | Annotations | annotations:view, annotations:manage                           |
-      | Analytics   | analytics:view, analytics:manage                               |
-      | Evaluations | evaluations:view, evaluations:manage                           |
-      | Datasets    | datasets:view, datasets:manage                                 |
-      | Triggers    | triggers:view, triggers:manage                                 |
-      | Workflows   | workflows:view, workflows:manage                               |
-      | Prompts     | prompts:view, prompts:manage                                   |
-      | Secrets     | secrets:view, secrets:manage                                   |
-      | Audit Log   | auditLog:view                                                  |
-      | Team        | team:view, team:manage                                         |
-      | Project     | project:view, project:create, project:update, project:delete, project:manage |
+      | category               | permissions                                                              |
+      | Traces                 | traces:view, traces:create, traces:update, traces:share                  |
+      | Cost                   | cost:view                                                                |
+      | Scenarios              | scenarios:view, scenarios:create, scenarios:update, scenarios:delete, scenarios:manage |
+      | Audit Log              | auditLog:view                                                            |
+      | Team                   | team:view, team:manage                                                   |
+      | Project settings       | project:view, project:update, project:manage                             |
+      | Project administration | project:create, project:delete                                           |
+
+  @unit
+  Scenario: Older stored keys keep reading as write via the manage hierarchy
+    Given a stored key whose permissions are "datasets:view" and
+      "datasets:manage", written before the expanded write lists
+    When the drawer maps those permissions back to category selections
+    Then the Datasets category reads as "write"
 
   @unit
   Scenario: Selecting no categories produces an empty permission set

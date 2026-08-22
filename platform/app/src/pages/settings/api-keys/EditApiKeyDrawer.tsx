@@ -15,10 +15,7 @@ import {
   type ScopeChipPickerEntry,
 } from "../../../components/settings/ScopeChipPicker";
 import { Drawer } from "../../../components/ui/drawer";
-import {
-  getTeamRolePermissions,
-  hasPermissionWithHierarchy,
-} from "../../../server/api/rbac";
+import { getTeamRolePermissions } from "../../../server/api/rbac";
 import {
   computePermissionsFromSelections,
   PERMISSION_CATEGORIES,
@@ -34,6 +31,7 @@ import {
   bindingsToPermissionMode,
   bindingsToScopes,
   bindingsToSelections,
+  categoryAccessAvailability,
   deriveBindingRole,
   findBindingAtScope,
   type PermissionMode,
@@ -161,14 +159,10 @@ export function EditApiKeyDrawer({
     ) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
-        const canRead = cat.readPermissions.every((p) =>
-          hasPermissionWithHierarchy(userPermissions, p),
-        );
-        const canWrite =
-          cat.accessLevels.includes("write") &&
-          cat.writePermissions.every((p) =>
-            hasPermissionWithHierarchy(userPermissions, p),
-          );
+        const { canRead, canWrite } = categoryAccessAvailability({
+          category: cat,
+          userPermissions,
+        });
         allSelected[cat.key] = canWrite ? "write" : canRead ? "read" : "none";
       }
       setCategorySelections(allSelected);

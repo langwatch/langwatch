@@ -1675,6 +1675,55 @@ export async function batchProjectPermissions(
 }
 
 /**
+ * MANY permissions, MANY team scopes — the team-scope counterpart of
+ * `batchProjectPermissions`, resolved with one `loadScopeResolution` round
+ * for the whole team set.
+ *
+ * Exists for the CLI login-key default selection: the minted key carries one
+ * permission list asserted at every stamped team scope, so the default list
+ * has to be narrowed to what the user really holds per team BEFORE the mint
+ * asserts it — and asking per permission per team is the pool-starving
+ * fan-out `batchProjectPermissions` documents. Like that function, this is
+ * the legacy resolution on purpose: it feeds a mint whose ceiling is
+ * re-asserted (and forked on cut-over organizations) by
+ * `ApiKeyService.create`, so a divergence can only narrow the result, never
+ * widen it.
+ *
+ * Returns the held subset per team, in the order given.
+ */
+export async function batchTeamsPermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    teamIds: string[];
+    permissions: Permission[];
+  },
+): Promise<Map<string, Permission[]>> {
+  const result = new Map<string, Permission[]>();
+  const resolution = await loadScopeResolution(ctx, {
+    organizationId: args.organizationId,
+    scopeIds: args.teamIds,
+  });
+  for (const teamId of args.teamIds) {
+    if (!resolution) {
+      result.set(teamId, []);
+      continue;
+    }
+    result.set(
+      teamId,
+      args.permissions.filter((permission) =>
+        teamGrants(
+          resolution,
+          { organizationId: args.organizationId, teamId },
+          permission,
+        ),
+      ),
+    );
+  }
+  return result;
+}
+
+/**
  * The legacy batch resolution — the answering path in `batchScopePermissions`
  * when the organization is still on legacy. (It was also the fork's
  * reverse-shadow thunk before the shadow comparison was removed; the engine

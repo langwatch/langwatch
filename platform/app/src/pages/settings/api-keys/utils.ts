@@ -1,4 +1,42 @@
 import { createListCollection } from "@chakra-ui/react";
+import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
+import {
+  categorizablePermissions,
+  type PermissionCategory,
+} from "../../../server/api-key/permission-categories";
+
+/**
+ * Whether the user may hand a category's read or write level to an API key.
+ *
+ * A level is available when the category declares it, the matching permission
+ * array is non-empty, and the user holds every permission in it. The
+ * non-empty guard is what keeps a write-only category (project
+ * administration) from reading as available: `[].every(...)` is `true`.
+ *
+ * One copy for both consumers, the category rows and the drawer's
+ * select-all — a security-relevant predicate kept in two places drifts.
+ */
+export function categoryAccessAvailability({
+  category,
+  userPermissions,
+}: {
+  category: PermissionCategory;
+  userPermissions: string[];
+}): { canRead: boolean; canWrite: boolean } {
+  const holdsAll = (permissions: readonly string[]) =>
+    permissions.length > 0 &&
+    permissions.every((permission) =>
+      hasPermissionWithHierarchy(userPermissions, permission),
+    );
+  return {
+    canRead:
+      category.accessLevels.includes("read") &&
+      holdsAll(category.readPermissions),
+    canWrite:
+      category.accessLevels.includes("write") &&
+      holdsAll(category.writePermissions),
+  };
+}
 
 export const EXPIRATION_OPTIONS = [
   { label: "No expiration", value: "" },
@@ -298,7 +336,9 @@ export function bindingsToSelections(
   if (mode === "readonly") {
     const selections: Record<string, string> = {};
     for (const cat of deps.permissionCategories) {
-      selections[cat.key] = "read";
+      // Write-only categories (no read level) have nothing to show on a
+      // readonly key.
+      if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
     }
     return selections;
   }
@@ -316,7 +356,7 @@ export function bindingsToSelections(
   if (binding.role === "VIEWER") {
     const selections: Record<string, string> = {};
     for (const cat of deps.permissionCategories) {
-      selections[cat.key] = "read";
+      if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
     }
     return selections;
   }
@@ -353,7 +393,11 @@ export function getUserPermissionsAtScope({
   isServiceKey: boolean;
   getTeamRolePermissions: (role: string) => string[];
 }): string[] {
-  if (isServiceKey) return getRolePerms("ADMIN");
+  // Service keys and organization admins can grant anything grantable: the
+  // permission resolver short-circuits an ORGANIZATION-scoped ADMIN binding to
+  // full access, so the team-role bags (which carry no organization, gateway,
+  // governance or playground permissions) understate their ceiling.
+  if (isServiceKey) return categorizablePermissions();
 
   const binding = findBindingAtScope({
     bindings: myBindings,
@@ -363,5 +407,8 @@ export function getUserPermissionsAtScope({
     orgProjects,
   });
   if (!binding) return [];
+  if (binding.scopeType === "ORGANIZATION" && binding.role === "ADMIN") {
+    return categorizablePermissions();
+  }
   return getRolePerms(binding.role);
 }

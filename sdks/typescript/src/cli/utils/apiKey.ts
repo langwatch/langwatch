@@ -1,6 +1,9 @@
 import chalk from "chalk";
 import { config } from "dotenv";
-import { setResolvedApiKey } from "@/internal/credentialContext";
+import {
+  setResolvedApiKey,
+  setResolvedProjectId,
+} from "@/internal/credentialContext";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { maybePrintIdentityNotice } from "./identityNotice";
@@ -14,6 +17,11 @@ import {
   fetchPersonalProject,
   SessionApiError,
 } from "./governance/session-api";
+import {
+  projectScopeErrorLines,
+  ProjectScopeError,
+  resolveProjectSelector,
+} from "./projectScope";
 
 /**
  * Re-read the caller's .env, applying only the LANGWATCH_* keys.
@@ -51,6 +59,12 @@ export interface ResolvedCredentials {
   source: "flag" | "env" | "session";
   /** Control-plane endpoint the command targets (4-source resolver). */
   endpoint: string;
+  /**
+   * The project the request names, published into the credential context. A
+   * user-scoped key needs it (the server resolves the role binding from it);
+   * a legacy project key ignores it. Undefined when nothing named a project.
+   */
+  projectId?: string;
 }
 
 /**
@@ -75,8 +89,16 @@ export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
  *   2. `LANGWATCH_API_KEY` from the environment or the caller's .env
  *      (scoped load above, so CI and scripts are never surprised),
  *   3. the device session in ~/.langwatch/config.json, which resolves the
- *      PERSONAL PROJECT's API key: shipped by the login exchange, then
- *      periodically re-validated against session liveness (see below).
+ *      user-scoped LOGIN KEY (`cli_api_key`) when the login minted one, and
+ *      the PERSONAL PROJECT's API key otherwise: both are shipped by the login
+ *      exchange, then periodically re-validated against session liveness (see
+ *      below).
+ *
+ * The session path also decides WHICH PROJECT the request names. The login key
+ * carries no project identity, so the server reads it off the request: the
+ * personal project by default, or the one `--project <id|slug>` selects. Both
+ * the key and the project id go into the request-scoped credential store, and
+ * `buildAuthHeaders` turns the pair into `Basic base64(projectId:key)`.
  *
  * The winning key is published into the request-scoped credential store
  * (internal/credentialContext.ts), NOT the shared `process.env`. Every
@@ -98,7 +120,7 @@ export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 export const resolveCredentials = async (
-  opts: { apiKey?: string } = {},
+  opts: { apiKey?: string; project?: string } = {},
 ): Promise<ResolvedCredentials> => {
   // Load environment variables from .env file (scoped, see above)
   loadEnvFileScoped();
@@ -112,12 +134,14 @@ export const resolveCredentials = async (
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
     setResolvedApiKey(flagKey);
+    const projectId = await applyProjectScope({ project: opts.project });
+    setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
       apiKey: flagKey,
       endpoint,
     });
-    return { apiKey: flagKey, source: "flag", endpoint };
+    return { apiKey: flagKey, source: "flag", endpoint, projectId };
   }
 
   // Trimmed for use, not just for the emptiness check: a `.env` written as
@@ -126,12 +150,14 @@ export const resolveCredentials = async (
   const envKey = process.env.LANGWATCH_API_KEY?.trim();
   if (envKey) {
     setResolvedApiKey(envKey);
+    const projectId = await applyProjectScope({ project: opts.project });
+    setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
       apiKey: envKey,
       endpoint,
     });
-    return { apiKey: envKey, source: "env", endpoint };
+    return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
   // Stored state. Re-read from disk on every call, never cached in-process
@@ -143,15 +169,26 @@ export const resolveCredentials = async (
     cfg = undefined;
   }
   if (cfg && isLoggedIn(cfg)) {
-    const sessionKey = await resolveSessionProjectKey(cfg);
-    if (sessionKey) {
-      setResolvedApiKey(sessionKey);
-      await maybePrintIdentityNotice({
-        mode: "device",
-        apiKey: sessionKey,
-        endpoint,
-      });
-      return { apiKey: sessionKey, source: "session", endpoint };
+    const session = await resolveSessionCredential(cfg);
+    if (session) {
+      setResolvedApiKey(session.apiKey);
+      // `--project` decides the target BEFORE anything is published: the
+      // personal project is the default only when no flag says otherwise,
+      // and a flag that does not resolve must leave no target behind at all.
+      const projectId =
+        (await applyProjectScope({ project: opts.project, cfg })) ??
+        session.projectId;
+      setResolvedProjectId(projectId);
+      // An explicit --project names the identity on the command line, so
+      // there is nothing implicit left to warn about.
+      if (opts.project === undefined) {
+        await maybePrintIdentityNotice({
+          mode: session.usedLoginKey ? "device-login-key" : "device",
+          apiKey: session.apiKey,
+          endpoint,
+        });
+      }
+      return { apiKey: session.apiKey, source: "session", endpoint, projectId };
     }
   }
 
@@ -159,21 +196,102 @@ export const resolveCredentials = async (
 };
 
 /**
- * The personal-project key for a device session, gated on session liveness.
+ * Resolve `--project` into the request's target project and publish it.
  *
- * The cached key (delivered by the login exchange, or a prior lazy exchange)
- * is a long-lived `Project.apiKey`. Using it unconditionally is the
- * revocation bypass: a config carrying `personal_project.api_key` would
- * authenticate forever even after the device was revoked. So the cache is
- * trusted only within `SESSION_REVALIDATE_WINDOW_MS`; past it, every call
- * re-confirms the session through the session-authenticated
- * `GET /api/auth/cli/personal-project` (which fails once Redis has dropped
- * the revoked/expired tokens), and:
+ * Returns undefined when no flag was given, which leaves whatever the session
+ * path already published in place. A value that does not resolve ends the
+ * command: there is no safe fallback, since silently running against the
+ * personal project would answer a question the user did not ask.
+ */
+async function applyProjectScope({
+  project,
+  cfg,
+}: {
+  project?: string;
+  cfg?: GovernanceConfig;
+}): Promise<string | undefined> {
+  if (project === undefined) return undefined;
+  try {
+    const projectId = await resolveProjectSelector({
+      selector: project,
+      cfg,
+    });
+    return projectId;
+  } catch (err) {
+    if (err instanceof ProjectScopeError) reportProjectScopeError(err);
+    throw err;
+  }
+}
+
+function reportProjectScopeError(error: ProjectScopeError): never {
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: error.code,
+        kind: error.code,
+        message: error.message,
+        httpStatus: 0,
+        meta: { project: error.project },
+        isHandled: true,
+      }),
+    );
+    console.error(chalk.red(`Error: ${error.message}`));
+    process.exit(1);
+  }
+
+  const [headline, ...rest] = projectScopeErrorLines(error);
+  console.error(chalk.red(headline));
+  for (const line of rest) {
+    console.error(line.startsWith("  ") ? chalk.cyan(line) : chalk.gray(line));
+  }
+  process.exit(1);
+}
+
+/**
+ * A stored key, trimmed, or undefined when there is nothing usable there.
+ * Trimmed for USE, not just for the emptiness check: a hand-edited config
+ * would otherwise ship the stray whitespace into the Authorization header.
+ */
+const trimmedOrUndefined = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+/** The key a device session authenticates with, and the project it names. */
+interface SessionCredential {
+  apiKey: string;
+  /** The personal project. Undefined only on a session that never cached one. */
+  projectId?: string;
+  /** True when the credential is the user-scoped login key rather than the
+   * personal project's key; the identity notice words the two differently. */
+  usedLoginKey: boolean;
+}
+
+/**
+ * The key for a device session, gated on session liveness.
  *
- *   - success       : refresh the key + validation clock, use it.
- *   - 401 (revoked) : DELETE the cached key from config and return undefined,
- *                     so the command reports not-logged-in and the stolen
- *                     config is now inert.
+ * TWO KEYS CAN BE CACHED, and the login key wins when it is there. The
+ * user-scoped `cli_api_key` reaches every project the user selected while
+ * approving the login, so `--project` can move a command across projects with
+ * it; `personal_project.api_key` reaches exactly one project and is what a
+ * server predating the feature ships. Either way the request names the
+ * personal project by default, so a login with a login key behaves exactly
+ * like one without until a `--project` says otherwise.
+ *
+ * Both are long-lived credentials rather than session-bound tokens, so using
+ * either unconditionally is the revocation bypass: a stolen
+ * `~/.langwatch/config.json` would authenticate forever after the device was
+ * revoked. The cache is therefore trusted only within
+ * `SESSION_REVALIDATE_WINDOW_MS`; past it, every call re-confirms the session
+ * through the session-authenticated `GET /api/auth/cli/personal-project`
+ * (which fails once Redis has dropped the revoked/expired tokens), and:
+ *
+ *   - success       : refresh the personal project + validation clock, use it.
+ *   - 401 (revoked) : DELETE both cached keys from config and return
+ *                     undefined, so the command reports not-logged-in and the
+ *                     stolen config is now inert.
+ *   - 403 (session refused) : same as 401 — a session the server refuses is
+ *                     one the CLI must stop presenting.
  *   - 404 (a server predating the endpoint) : can't revalidate; keep the
  *                     legacy key and reset the clock so old servers still
  *                     "just work" (they have no device-revocation semantics
@@ -181,16 +299,24 @@ export const resolveCredentials = async (
  *   - network/other : offline; keep the last-known key WITHOUT resetting the
  *                     clock, so the very next online command revalidates.
  */
-async function resolveSessionProjectKey(
+async function resolveSessionCredential(
   cfg: GovernanceConfig,
-): Promise<string | undefined> {
-  const trimmedKey = cfg.personal_project?.api_key?.trim() ?? "";
-  const cached: string | undefined =
-    trimmedKey.length > 0 ? trimmedKey : undefined;
+): Promise<SessionCredential | undefined> {
+  const loginKey = trimmedOrUndefined(cfg.cli_api_key);
+  const personalKey = trimmedOrUndefined(cfg.personal_project?.api_key);
+  // One clock for both: the probe below confirms the SESSION, and the session
+  // is what either key's continued validity rests on.
+  const cached = loginKey ?? personalKey;
   const validatedAtMs = (cfg.personal_project?.validated_at ?? 0) * 1000;
-  const fresh =
+  const isFresh =
     !!cached && Date.now() - validatedAtMs < SESSION_REVALIDATE_WINDOW_MS;
-  if (fresh) return cached;
+  if (isFresh) {
+    return {
+      apiKey: cached,
+      projectId: cfg.personal_project?.id,
+      usedLoginKey: cached === loginKey,
+    };
+  }
 
   try {
     const project = await fetchPersonalProject(cfg);
@@ -200,7 +326,11 @@ async function resolveSessionProjectKey(
       // command.
       if (cached) {
         markPersonalProjectValidated(cfg);
-        return cached;
+        return {
+          apiKey: cached,
+          projectId: cfg.personal_project?.id,
+          usedLoginKey: cached === loginKey,
+        };
       }
       return undefined;
     }
@@ -212,19 +342,37 @@ async function resolveSessionProjectKey(
       validated_at: Math.floor(Date.now() / 1000),
     };
     saveConfig(cfg);
-    return project.api_key;
+    return {
+      apiKey: loginKey ?? project.api_key,
+      projectId: project.id,
+      usedLoginKey: loginKey !== undefined,
+    };
   } catch (err) {
-    if (err instanceof SessionApiError && err.status === 401) {
-      // Session revoked or expired: sever access. Drop the cached key so the
-      // retained config can no longer authenticate. (fetchPersonalProject's
-      // refresh path may already have cleared it; this is idempotent.)
+    if (
+      err instanceof SessionApiError &&
+      (err.status === 401 || err.status === 403)
+    ) {
+      // Session revoked, expired or refused: sever access. Drop both cached
+      // keys so the retained config can no longer authenticate. 403 counts
+      // the same as 401 — a session the server refuses is one the CLI must
+      // stop presenting, whichever status says so. (fetchPersonalProject's
+      // refresh path may already have cleared the personal project; this is
+      // idempotent.)
       delete cfg.personal_project;
+      delete cfg.cli_api_key;
+      delete cfg.cli_api_key_scope;
       saveConfig(cfg);
       return undefined;
     }
     // Offline / transient: fall back to the last-known key, but do NOT touch
     // the validation clock, so the next reachable command revalidates.
-    return cached;
+    return cached
+      ? {
+          apiKey: cached,
+          projectId: cfg.personal_project?.id,
+          usedLoginKey: cached === loginKey,
+        }
+      : undefined;
   }
 }
 

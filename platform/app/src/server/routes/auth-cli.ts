@@ -55,6 +55,11 @@ import {
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
+  type CliKeySelection,
+  CliLoginKeyService,
+} from "~/server/api-key/cli-login-key.service";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
@@ -206,6 +211,13 @@ interface DeviceCodeRecord {
     project_name: string;
     api_key: string;
   };
+  /**
+   * For `credential_type: "device_session"` after approval — the scope +
+   * permission selection the authorize screen approved (or the server-side
+   * default when the client sent none). Consumed by /exchange, which mints
+   * the user-scoped CLI ApiKey from it. Approval itself mints nothing.
+   */
+  key_selection?: CliKeySelection;
 }
 
 /**
@@ -237,6 +249,12 @@ interface RefreshTokenRecord {
   expires_at: number;
   /** Phase 8 — present when the CLI sent client_info on /exchange. */
   client_info?: ClientInfo;
+  /**
+   * The user-scoped CLI ApiKey /exchange minted for this session, carried
+   * across /refresh rotations so /logout can revoke the key alongside the
+   * tokens. Absent for sessions that minted no key.
+   */
+  cli_api_key_id?: string;
 }
 
 interface AccessTokenRecord {
@@ -247,6 +265,8 @@ interface AccessTokenRecord {
   /** Phase 8 — mirror of refresh-token client_info; useful for the
    * devices inventory, which reads access tokens directly. */
   client_info?: ClientInfo;
+  /** Mirror of the refresh-token field; see there. */
+  cli_api_key_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -829,6 +849,45 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // User-scoped CLI ApiKey — minted HERE, from the selection approval
+    // stamped, so an approval that is never exchanged mints nothing. Minted
+    // before the session tokens: a mint failure fails the whole exchange
+    // (handled error via onError) rather than leaving a half-logged-in CLI
+    // holding tokens but no key. Re-login from the same device label revokes
+    // the previous login key inside the service, so logins never accumulate
+    // credentials.
+    let cliApiKey: string | undefined;
+    let cliApiKeyId: string | undefined;
+    let cliApiKeyScope:
+      | { kind: "organization" | "projects"; project_ids: string[] }
+      | undefined;
+    if (record.key_selection) {
+      // Same normalization the other label paths use, and the user-chosen
+      // label wins over the machine hostname. The value names the key AND
+      // matches the previous login key for replacement, so an unnormalized
+      // value would leave the old key alive on a hostname or formatting
+      // change and let credentials accumulate.
+      const deviceLabel =
+        sanitizeDeviceLabel(
+          parsed.data.client_info?.device_label ??
+            parsed.data.client_info?.hostname,
+        ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
+      const minted = await CliLoginKeyService.create(
+        prisma,
+      ).mintForDeviceSession({
+        userId: user.id,
+        organizationId: organization.id,
+        deviceLabel,
+        selection: record.key_selection,
+      });
+      cliApiKey = minted.token;
+      cliApiKeyId = minted.apiKeyId;
+      cliApiKeyScope = {
+        kind: minted.scope.kind,
+        project_ids: minted.scope.projectIds,
+      };
+    }
+
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
     // tokens against an authoritative store.
@@ -848,6 +907,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     const refreshRecord: RefreshTokenRecord = {
       user_id: user.id,
@@ -855,6 +915,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot. The two records can briefly diverge
@@ -913,6 +974,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         },
         default_personal_vk: record.personal_vk,
         personal_project: personalProject,
+        // The user-scoped key + its reach summary. Additive: an older CLI
+        // ignores both and keeps using personal_project exactly as before.
+        ...(cliApiKey && cliApiKeyScope
+          ? { cli_api_key: cliApiKey, cli_api_key_scope: cliApiKeyScope }
+          : {}),
         endpoint: responseEndpoint,
       },
       200,
@@ -1032,6 +1098,9 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    // Carried across rotations so /logout can still revoke the CLI key
+    // this session minted at /exchange.
+    cli_api_key_id: record.cli_api_key_id,
   };
   const newRefreshRecord: RefreshTokenRecord = {
     user_id: record.user_id,
@@ -1039,6 +1108,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    cli_api_key_id: record.cli_api_key_id,
   };
 
   await redis
@@ -2402,6 +2472,30 @@ const approveRequestSchema = z.object({
    * verbatim copy of `Project.apiKey` for the SDK to consume).
    */
   project_id: z.string().optional(),
+  /**
+   * For `device_session` approvals — the scope + permission selection the
+   * authorize screen collected for the user-scoped CLI key /exchange mints.
+   * Optional: a client that sends none gets the server-side default (the
+   * widest scope the approving user holds, with the default CLI permission
+   * list narrowed to what they hold there).
+   */
+  key_selection: z
+    .object({
+      // Bounded at the edge: the ceiling assertion runs one database round
+      // per binding per permission, so an unbounded body is a request-thread
+      // fan-out that starves the connection pool, and every unrecognised
+      // permission is echoed back in the field errors.
+      bindings: z
+        .array(
+          z.object({
+            scope_type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+            scope_id: z.string().min(1).max(64),
+          }),
+        )
+        .max(200),
+      permissions: z.array(z.string().min(1).max(128)).max(500),
+    })
+    .optional(),
 });
 
 secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
@@ -2580,15 +2674,67 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     );
   }
 
-  // Approval proves identity and nothing else. The personal virtual key is
-  // minted later, by POST /virtual-key, the first time a tool resolves to
-  // gateway mode: a key issued here would be handed to users who only send
-  // traces, and every re-login on an already-keyed machine would leave one
-  // more VirtualKey row behind.
+  // Approval proves identity and stamps the key SELECTION — it still mints
+  // no credential. The personal virtual key is minted later, by POST
+  // /virtual-key, and the user-scoped CLI ApiKey is minted by /exchange from
+  // the selection stamped here, so an approval that is never exchanged
+  // leaves no ApiKey row behind.
+  const cliLoginKeys = CliLoginKeyService.create(prisma);
+  let keySelection: CliKeySelection | undefined;
+  if (parsed.data.key_selection) {
+    // Explicit selection from the authorize screen: validated against the
+    // registry and the approving user's own ceiling. A violation throws a
+    // HandledError (cli_key_selection_invalid / api_key_scope_violation /
+    // personal_workspace_not_managed_here) and nothing is stamped.
+    keySelection = await cliLoginKeys.validateSelection({
+      userId: session.user.id,
+      organizationId: organization_id,
+      selection: {
+        bindings: parsed.data.key_selection.bindings.map((binding) => ({
+          scopeType: binding.scope_type,
+          scopeId: binding.scope_id,
+        })),
+        permissions: parsed.data.key_selection.permissions,
+      },
+    });
+  } else {
+    // Legacy client (no selection): stamp the server-side default. The
+    // personal workspace is ensured first so its team can be part of the
+    // default reach — idempotent, and not a credential. Both steps are
+    // best-effort: a default that cannot be resolved must not fail the
+    // login, it just completes without a scoped key.
+    try {
+      await new PersonalWorkspaceService(prisma).ensure({
+        userId: session.user.id,
+        organizationId: organization_id,
+        displayName: session.user.name,
+        displayEmail: session.user.email,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not ensure personal workspace at approve; default key selection proceeds without it",
+      );
+    }
+    try {
+      keySelection =
+        (await cliLoginKeys.resolveDefaultSelection({
+          userId: session.user.id,
+          organizationId: organization_id,
+        })) ?? undefined;
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
+      );
+    }
+  }
+
   await approveDeviceCode({
     deviceCode: record.device_code,
     userId: session.user.id,
     organizationId: organization_id,
+    keySelection,
   });
 
   return c.json({ ok: true, organization_id }, 200);
@@ -2632,6 +2778,9 @@ secured.access(CLI_POLICY).post("/deny", async (c: Context) => {
 // only the refresh is revoked and the access token expires naturally
 // in up to 1h — which is a real security gap if the access token was
 // stolen, hence the new `access_token` field added alongside refresh.
+// Also revokes the user-scoped CLI ApiKey the session's /exchange minted
+// (its id rides on the token records), so a logout leaves no live
+// credential behind.
 // ---------------------------------------------------------------------------
 const logoutRequestSchema = z.object({
   refresh_token: z.string().optional(),
@@ -2647,6 +2796,19 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     // to fail if they pass garbage; just nothing to revoke.
     return c.json({ ok: true });
   }
+
+  // Read the records BEFORE the delete: they carry the id of the CLI ApiKey
+  // /exchange minted for this session, which logout revokes alongside the
+  // tokens so the wiped config leaves no live credential behind.
+  const [refreshRaw, accessRaw] = await Promise.all([
+    parsed.data.refresh_token
+      ? redis.get(refreshTokenKey(parsed.data.refresh_token))
+      : null,
+    parsed.data.access_token
+      ? redis.get(accessTokenKey(parsed.data.access_token))
+      : null,
+  ]);
+
   const ops = redis.multi();
   if (parsed.data.refresh_token) {
     ops.del(refreshTokenKey(parsed.data.refresh_token));
@@ -2655,8 +2817,47 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     ops.del(accessTokenKey(parsed.data.access_token));
   }
   await ops.exec();
+
+  await revokeCliKeysFromTokenRecords([refreshRaw, accessRaw]);
+
   return c.json({ ok: true });
 });
+
+/**
+ * Revokes the CLI ApiKeys named by a logout's token records. Best-effort and
+ * idempotent, like the token deletes beside it: logout stays a 200 whatever
+ * state the key is in, and a failed revoke is logged rather than surfaced —
+ * the key still dies with the owner's next re-login from the same device.
+ */
+async function revokeCliKeysFromTokenRecords(
+  raws: Array<string | null>,
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const raw of raws) {
+    if (!raw) continue;
+    let record: RefreshTokenRecord | AccessTokenRecord;
+    try {
+      record = JSON.parse(raw) as RefreshTokenRecord;
+    } catch {
+      continue;
+    }
+    const apiKeyId = record.cli_api_key_id;
+    if (!apiKeyId || seen.has(apiKeyId)) continue;
+    seen.add(apiKeyId);
+    try {
+      await CliLoginKeyService.create(prisma).revokeForLogout({
+        apiKeyId,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId, userId: record.user_id },
+        "[auth-cli] failed to revoke the CLI key on logout",
+      );
+    }
+  }
+}
 
 export const app = secured.hono;
 
@@ -2693,6 +2894,7 @@ export async function approveDeviceCode({
   userId,
   organizationId,
   projectApiKey,
+  keySelection,
 }: {
   deviceCode: string;
   userId: string;
@@ -2703,6 +2905,12 @@ export async function approveDeviceCode({
     project_name: string;
     api_key: string;
   };
+  /**
+   * For a `device_session` code — the validated scope + permission selection
+   * /exchange mints the user-scoped CLI key from. Stamping it here mints
+   * nothing.
+   */
+  keySelection?: CliKeySelection;
 }): Promise<{ approved: boolean }> {
   const redis = getRedis();
   const raw = await redis.get(deviceCodeKey(deviceCode));
@@ -2717,6 +2925,7 @@ export async function approveDeviceCode({
     user_id: userId,
     organization_id: organizationId,
     project_api_key: projectApiKey,
+    key_selection: keySelection,
   };
 
   // Preserve original TTL by computing remaining seconds.

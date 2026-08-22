@@ -6,10 +6,15 @@
  *   2. CLI prints: "Open https://app.langwatch.com/cli/auth?user_code=WDJB-MJHT"
  *   3. User clicks → lands here. If unauthenticated, gets bounced through SSO.
  *   4. Page calls GET /api/auth/cli/lookup to verify the code is still pending.
- *   5. User picks an organization (if they're in multiple) and clicks "Approve".
+ *   5. User picks an organization (if they're in multiple), reviews what the
+ *      CLI key will be able to access (scopes + permissions, preselected to
+ *      the widest access they hold minus organization management), and clicks
+ *      "Approve".
  *   6. Page calls POST /api/auth/cli/approve which:
  *        a. Mints (or returns existing) personal VK
- *        b. Flips the device-code record to `approved` with the VK secret
+ *        b. Flips the device-code record to `approved` with the VK secret and
+ *           the reviewed `key_selection` (scopes + permissions); the exchange
+ *           endpoint mints the user-scoped CLI key from it
  *   7. CLI's polling /exchange returns 200 with the secret on its next poll.
  *   8. Done, user closes the browser tab.
  *
@@ -35,14 +40,32 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CreateProjectDrawer } from "~/components/projects/CreateProjectDrawer";
-import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
+import {
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+} from "~/components/settings/ScopeChipPicker";
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { getTeamRolePermissions } from "~/server/api/rbac";
+import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
+import {
+  computePermissionsFromSelections,
+  selectionsFromPermissions,
+} from "~/server/api-key/permission-categories";
+import { api } from "~/utils/api";
 import { setAttributionIfAbsent } from "~/utils/attribution";
 import { useSession } from "~/utils/auth-client";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
+import {
+  PermissionCategoryList,
+  PermissionCounter,
+  type PermissionSelection,
+} from "../settings/api-keys/PermissionCategoryList";
+import { getUserPermissionsAtScope } from "../settings/api-keys/utils";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
+import { defaultCliKeyScopes } from "./cliKeyScopeDefaults";
 import { FirstTraceRedirect } from "./FirstTraceRedirect";
 
 /**
@@ -164,6 +187,21 @@ export default function CliAuthPage() {
     null,
   );
 
+  // device_session mode: what the minted CLI key will be able to access.
+  // Scopes preselect to the widest access the user holds (see
+  // defaultCliKeyScopes); permissions start from the everyday-work default
+  // and only switch to the category list when the user customizes.
+  const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
+  // The org the current scope defaults were computed for, so arriving data
+  // never clobbers a user's edited selection within the same org.
+  const [scopeDefaultsOrgId, setScopeDefaultsOrgId] = useState<string | null>(
+    null,
+  );
+  const [permissionsCustomized, setPermissionsCustomized] = useState(false);
+  const [permissionSelections, setPermissionSelections] = useState<
+    Record<string, PermissionSelection>
+  >({});
+
   // Auto-pick the first org if there's only one. The chooser is only
   // necessary when the user is in 2+.
   useEffect(() => {
@@ -223,10 +261,14 @@ export default function CliAuthPage() {
     [projectsForOrg, personalProject],
   );
 
-  // Reset when org changes so the picker is fresh per-org, then apply the
-  // computed default selection.
+  // Reset when org changes so the pickers are fresh per-org, then apply the
+  // computed default selections.
   useEffect(() => {
     setSelectedProjectId(null);
+    setSelectedScopes([]);
+    setScopeDefaultsOrgId(null);
+    setPermissionsCustomized(false);
+    setPermissionSelections({});
   }, [selectedOrgId]);
   useEffect(() => {
     if (defaultProjectId && !selectedProjectId) {
@@ -331,9 +373,120 @@ export default function CliAuthPage() {
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
 
+  // The user's own role bindings in the picked org: the ceiling the CLI key
+  // can never exceed. Drives the scope defaults and which permission rows
+  // are available in the customize list.
+  const myBindings = api.apiKey.myBindings.useQuery(
+    { organizationId: selectedOrgId ?? "" },
+    {
+      enabled: !!selectedOrgId && lookup.kind === "ready" && !requiresProject,
+    },
+  );
+
+  // Non-personal teams of the picked org, in display order. Personal teams
+  // are never offered as scopes; the user's own personal workspace is
+  // offered as its project instead.
+  const sharedTeams = useMemo(() => {
+    const org = organizations?.find((o) => o.id === selectedOrgId);
+    return (org?.teams ?? [])
+      .filter((team) => !team.isPersonal)
+      .map((team) => ({ id: team.id, name: team.name }));
+  }, [organizations, selectedOrgId]);
+
+  const selectedOrgName = useMemo(
+    () => organizations?.find((o) => o.id === selectedOrgId)?.name,
+    [organizations, selectedOrgId],
+  );
+
+  // Preselect the widest access the user holds, once the bindings for the
+  // picked org are in. Guarded by scopeDefaultsOrgId so a refetch never
+  // clobbers scopes the user already edited.
+  useEffect(() => {
+    if (requiresProject) return;
+    if (!selectedOrgId || !myBindings.data) return;
+    if (scopeDefaultsOrgId === selectedOrgId) return;
+    setSelectedScopes(
+      defaultCliKeyScopes({
+        organizationId: selectedOrgId,
+        bindings: myBindings.data,
+        sharedTeamIds: sharedTeams.map((team) => team.id),
+        personalProjectId: personalProject?.id ?? null,
+      }),
+    );
+    setScopeDefaultsOrgId(selectedOrgId);
+  }, [
+    requiresProject,
+    selectedOrgId,
+    myBindings.data,
+    scopeDefaultsOrgId,
+    sharedTeams,
+    personalProject,
+  ]);
+
+  // The permission list the approve request carries. Untouched, the default
+  // list goes out verbatim; customized, it is exactly what the category
+  // selections compute.
+  const cliKeyPermissions = useMemo<string[]>(
+    () =>
+      permissionsCustomized
+        ? computePermissionsFromSelections(permissionSelections)
+        : defaultCliKeyPermissions(),
+    [permissionsCustomized, permissionSelections],
+  );
+
+  // The user's own permissions across EVERY selected scope, mirroring the
+  // Create API key drawer: rows above this ceiling render locked. One
+  // permission list serves every binding on the minted key, so the ceiling
+  // is the intersection — a permission the user holds on one team but not
+  // on another would make approve fail with api_key_scope_violation.
+  const cliKeyUserPermissions = useMemo(() => {
+    if (selectedScopes.length === 0 || !selectedOrgId) return [];
+    const orgProjects = offeredProjects.map((p) => ({
+      id: p.id,
+      teamId: p.teamId,
+    }));
+    const perScope = selectedScopes.map(
+      (scope) =>
+        new Set(
+          getUserPermissionsAtScope({
+            myBindings: myBindings.data,
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+            organizationId: selectedOrgId,
+            orgProjects,
+            isServiceKey: false,
+            getTeamRolePermissions: (role) =>
+              getTeamRolePermissions(role as TeamUserRole),
+          }),
+        ),
+    );
+    const [first, ...rest] = perScope;
+    if (!first) return [];
+    return [...first].filter((permission) =>
+      rest.every((held) => held.has(permission)),
+    );
+  }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
+
+  const handleToggleCustomizePermissions = () => {
+    if (permissionsCustomized) {
+      setPermissionsCustomized(false);
+      setPermissionSelections({});
+    } else {
+      setPermissionSelections(
+        selectionsFromPermissions(defaultCliKeyPermissions()),
+      );
+      setPermissionsCustomized(true);
+    }
+  };
+
+  const deviceSessionSelectionIncomplete =
+    !requiresProject &&
+    (selectedScopes.length === 0 || cliKeyPermissions.length === 0);
+
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
     if (requiresProject && !selectedProjectId) return;
+    if (deviceSessionSelectionIncomplete) return;
     setAction({ kind: "submitting" });
     try {
       const r = await fetch("/api/auth/cli/approve", {
@@ -345,6 +498,17 @@ export default function CliAuthPage() {
           ...(requiresProject && selectedProjectId
             ? { project_id: selectedProjectId }
             : {}),
+          ...(requiresProject
+            ? {}
+            : {
+                key_selection: {
+                  bindings: selectedScopes.map((scope) => ({
+                    scope_type: scope.scopeType,
+                    scope_id: scope.scopeId,
+                  })),
+                  permissions: cliKeyPermissions,
+                },
+              }),
         }),
       });
       const data = (await r.json().catch(() => ({}))) as {
@@ -604,6 +768,82 @@ export default function CliAuthPage() {
                   </Box>
                 )}
 
+                {!requiresProject && (
+                  <>
+                    <Box>
+                      <Text
+                        textStyle="sm"
+                        fontWeight="semibold"
+                        color="fg"
+                        mb={1}
+                      >
+                        What the CLI can access
+                      </Text>
+                      <Text textStyle="xs" color="fg.muted" mb={2}>
+                        The key works inside these scopes, always limited to
+                        your own access.
+                      </Text>
+                      {myBindings.isLoading ? (
+                        <HStack>
+                          <Spinner size="sm" />
+                          <Text textStyle="sm" color="fg.muted">
+                            Loading your access…
+                          </Text>
+                        </HStack>
+                      ) : (
+                        <ScopeChipPicker
+                          value={selectedScopes}
+                          onChange={setSelectedScopes}
+                          organizationId={selectedOrgId ?? undefined}
+                          organizationName={selectedOrgName}
+                          availableTeams={sharedTeams}
+                          availableProjects={offeredProjects}
+                          label=""
+                          showSummary={false}
+                        />
+                      )}
+                    </Box>
+
+                    <Box>
+                      <HStack justify="space-between" align="center" mb={1}>
+                        <Text textStyle="sm" fontWeight="semibold" color="fg">
+                          Permissions
+                        </Text>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          color="fg.muted"
+                          onClick={handleToggleCustomizePermissions}
+                        >
+                          {permissionsCustomized ? "Use default" : "Customize"}
+                        </Button>
+                      </HStack>
+                      {permissionsCustomized ? (
+                        <VStack align="stretch" gap={2}>
+                          <PermissionCounter count={cliKeyPermissions.length} />
+                          <PermissionCategoryList
+                            selections={permissionSelections}
+                            userPermissions={cliKeyUserPermissions}
+                            onChange={setPermissionSelections}
+                          />
+                          {cliKeyPermissions.length === 0 && (
+                            <Text textStyle="xs" color="fg.muted">
+                              Select at least one permission to approve.
+                            </Text>
+                          )}
+                        </VStack>
+                      ) : (
+                        <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+                          The key gets your access for everyday work: traces,
+                          datasets, prompts, evaluations, and the AI Gateway. It
+                          cannot create projects, manage members and roles, or
+                          manage the organization.
+                        </Text>
+                      )}
+                    </Box>
+                  </>
+                )}
+
                 {action.kind === "error" && (
                   <StatusCard
                     palette="red"
@@ -621,7 +861,9 @@ export default function CliAuthPage() {
                     onClick={handleApprove}
                     loading={action.kind === "submitting"}
                     disabled={
-                      !selectedOrgId || (requiresProject && !selectedProjectId)
+                      !selectedOrgId ||
+                      (requiresProject && !selectedProjectId) ||
+                      deviceSessionSelectionIncomplete
                     }
                   >
                     {requiresProject ? "Send API key" : "Approve"}

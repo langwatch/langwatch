@@ -1,56 +1,52 @@
+import { ALL_PERMISSIONS } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import { Resources } from "~/utils/rbacVocabulary";
 import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
+import { defaultCliKeyPermissions } from "../cli-key-defaults";
 import {
+  categorizablePermissions,
   categoryPermissions,
   computePermissionsFromSelections,
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
 } from "../permission-categories";
 
-const RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES = new Set<string>([
-  Resources.ORGANIZATION,
-  Resources.PLAYGROUND,
-  Resources.OPS,
-  Resources.VIRTUAL_KEYS,
-  Resources.GATEWAY_BUDGETS,
-  Resources.GATEWAY_PROVIDERS,
-  Resources.GATEWAY_GUARDRAILS,
-  Resources.GATEWAY_LOGS,
-  Resources.GATEWAY_USAGE,
-  Resources.GATEWAY_CACHE_RULES,
-  // Org-anchored like the gateway surfaces above: managed through org API
-  // keys and RoleBindings, never through user-issued project API keys.
-  Resources.WEBHOOK_ENDPOINTS,
-  Resources.GATEWAY_SPEND,
-  // Iter 110 governance resources — admin-config surfaces governed by
-  // RoleBinding alone, never reachable through user-issued API keys.
-  Resources.ROUTING_POLICIES,
-  Resources.GOVERNANCE,
-  Resources.INGESTION_SOURCES,
-  Resources.ANOMALY_RULES,
-  Resources.COMPLIANCE_EXPORT,
-  Resources.ACTIVITY_MONITOR,
-  Resources.AI_TOOLS,
-]);
-
 describe("PERMISSION_CATEGORIES", () => {
-  it("covers every non-excluded Resource from the RBAC source of truth", () => {
-    const categoryResources = new Set(PERMISSION_CATEGORIES.map((c) => c.key));
-    const allResources = Object.values(Resources);
-    const uncovered = allResources.filter(
-      (r) =>
-        !categoryResources.has(r) &&
-        !RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES.has(r),
+  /** @scenario Every registry permission belongs to a category */
+  it("covers every registry permission except the platform tier", () => {
+    const covered = new Set<string>(
+      PERMISSION_CATEGORIES.flatMap((c) => [
+        ...c.readPermissions,
+        ...c.writePermissions,
+      ]),
+    );
+    const uncovered = categorizablePermissions().filter(
+      (permission) => !covered.has(permission),
     );
     expect(
       uncovered,
-      "Resources missing from PERMISSION_CATEGORIES — add a category or mark as excluded",
+      "Registry permissions missing from PERMISSION_CATEGORIES — add them to a category",
     ).toEqual([]);
+
+    // The only permissions outside the categories are the platform tier,
+    // which can never ride on an API key.
+    const categorizable = new Set<string>(categorizablePermissions());
+    const platformOnly = ALL_PERMISSIONS.filter(
+      (permission) => !categorizable.has(permission),
+    );
+    expect(platformOnly).toEqual(["ops:view", "ops:manage"]);
+  });
+
+  it("only names permissions that exist in the registry", () => {
+    const registry = new Set<string>(ALL_PERMISSIONS);
+    const unknown = PERMISSION_CATEGORIES.flatMap((c) => [
+      ...c.readPermissions,
+      ...c.writePermissions,
+    ]).filter((permission) => !registry.has(permission));
+    expect(unknown).toEqual([]);
   });
 
   /** @scenario Permission categories include all platform resources */
-  it("includes all 15 platform resource categories with correct access levels", () => {
+  it("lists the categories with their access levels", () => {
     const result = PERMISSION_CATEGORIES.map((c) => ({
       category: c.label,
       accessLevels: c.accessLevels.join(", "),
@@ -69,11 +65,62 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Workflows", accessLevels: "read, write" },
       { category: "Experiments", accessLevels: "read, write" },
       { category: "Prompts", accessLevels: "read, write" },
+      { category: "Playground", accessLevels: "read, write" },
       { category: "Secrets", accessLevels: "read, write" },
       { category: "Audit Log", accessLevels: "read" },
       { category: "Team", accessLevels: "read, write" },
-      { category: "Project", accessLevels: "read, write" },
+      { category: "Project settings", accessLevels: "read, write" },
+      { category: "Project administration", accessLevels: "write" },
+      { category: "Organization", accessLevels: "read, write" },
+      { category: "Gateway", accessLevels: "read, write" },
+      { category: "Governance", accessLevels: "read, write" },
     ]);
+  });
+
+  it("splits project creation and deletion away from project settings", () => {
+    expect(
+      categoryPermissions({ key: "projectSettings", level: "write" }),
+    ).toEqual(["project:view", "project:update", "project:manage"]);
+    expect(
+      categoryPermissions({ key: "projectAdministration", level: "write" }),
+    ).toEqual(["project:create", "project:delete"]);
+    expect(
+      categoryPermissions({ key: "projectAdministration", level: "read" }),
+    ).toEqual([]);
+  });
+
+  /** @scenario "write" access includes all mutating permissions for that resource */
+  it("grants a resource's full registry action set at the write level", () => {
+    expect(categoryPermissions({ key: "scenarios", level: "write" })).toEqual([
+      "scenarios:view",
+      "scenarios:create",
+      "scenarios:update",
+      "scenarios:delete",
+      "scenarios:manage",
+    ]);
+    expect(categoryPermissions({ key: "traces", level: "write" })).toEqual([
+      "traces:view",
+      "traces:create",
+      "traces:update",
+      "traces:share",
+    ]);
+
+    const gatewayWrite = categoryPermissions({
+      key: "gateway",
+      level: "write",
+    });
+    expect(gatewayWrite).toContain("virtualKeys:viewOtherPersonal");
+    expect(gatewayWrite).toContain("gatewaySpend:manage");
+    expect(gatewayWrite).toContain("webhookEndpoints:manage");
+    expect(gatewayWrite).toContain("routingPolicies:manage");
+
+    const governanceWrite = categoryPermissions({
+      key: "governance",
+      level: "write",
+    });
+    expect(governanceWrite).toContain("governance:manage");
+    expect(governanceWrite).toContain("aiTools:manage");
+    expect(governanceWrite).toContain("complianceExport:view");
   });
 });
 
@@ -85,70 +132,19 @@ describe("categoryPermissions()", () => {
         "traces:view",
       ]);
     });
-  });
 
-  describe("when level is write", () => {
-    /** @scenario "write" access includes all mutating permissions for that resource */
-    it("returns all mutating permissions per category", () => {
-      const results = PERMISSION_CATEGORIES.filter((c) =>
-        c.accessLevels.includes("write"),
-      ).map((c) => ({
-        category: c.label,
-        permissions: categoryPermissions({ key: c.key, level: "write" }).join(
-          ", ",
-        ),
-      }));
-
-      expect(results).toEqual([
-        {
-          category: "Traces",
-          permissions:
-            "traces:view, traces:create, traces:update, traces:share",
-        },
-        {
-          category: "Scenarios",
-          permissions: "scenarios:view, scenarios:manage",
-        },
-        {
-          category: "Annotations",
-          permissions: "annotations:view, annotations:manage",
-        },
-        {
-          category: "Analytics",
-          permissions: "analytics:view, analytics:manage",
-        },
-        {
-          category: "Evaluations",
-          permissions: "evaluations:view, evaluations:manage",
-        },
-        {
-          category: "Langy",
-          permissions: "langy:view, langy:create, langy:update, langy:delete",
-        },
-        {
-          category: "Datasets",
-          permissions: "datasets:view, datasets:manage",
-        },
-        {
-          category: "Triggers",
-          permissions: "triggers:view, triggers:manage",
-        },
-        {
-          category: "Workflows",
-          permissions: "workflows:view, workflows:manage",
-        },
-        {
-          category: "Experiments",
-          permissions: "experiments:view, experiments:manage",
-        },
-        { category: "Prompts", permissions: "prompts:view, prompts:manage" },
-        { category: "Secrets", permissions: "secrets:view, secrets:manage" },
-        { category: "Team", permissions: "team:view, team:manage" },
-        {
-          category: "Project",
-          permissions:
-            "project:view, project:create, project:update, project:delete, project:manage",
-        },
+    it("returns every view permission for multi-resource categories", () => {
+      expect(categoryPermissions({ key: "gateway", level: "read" })).toEqual([
+        "virtualKeys:view",
+        "gatewayBudgets:view",
+        "gatewayProviders:view",
+        "routingPolicies:view",
+        "gatewayGuardrails:view",
+        "gatewayLogs:view",
+        "gatewayUsage:view",
+        "gatewayCacheRules:view",
+        "gatewaySpend:view",
+        "webhookEndpoints:view",
       ]);
     });
   });
@@ -187,7 +183,10 @@ describe("computePermissionsFromSelections()", () => {
       });
 
       expect(result).toEqual([
+        "annotations:create",
+        "annotations:delete",
         "annotations:manage",
+        "annotations:update",
         "annotations:view",
         "traces:view",
       ]);
@@ -205,8 +204,9 @@ describe("selectionsFromPermissions()", () => {
     });
   });
 
-  describe("when permissions contain manage entries", () => {
-    it("maps to write for those categories", () => {
+  describe("when permissions come from a key stored before the expanded write lists", () => {
+    /** @scenario Older stored keys keep reading as write via the manage hierarchy */
+    it("maps [view, manage] to write through the hierarchy", () => {
       const result = selectionsFromPermissions([
         "datasets:view",
         "datasets:manage",
@@ -219,6 +219,15 @@ describe("selectionsFromPermissions()", () => {
   describe("when permissions are empty", () => {
     it("returns empty object", () => {
       expect(selectionsFromPermissions([])).toEqual({});
+    });
+
+    it("never invents a read selection for a write-only category", () => {
+      expect(selectionsFromPermissions([]).projectAdministration).toBe(
+        undefined,
+      );
+      expect(
+        selectionsFromPermissions(["project:view"]).projectAdministration,
+      ).toBe(undefined);
     });
   });
 
@@ -237,6 +246,45 @@ describe("selectionsFromPermissions()", () => {
 
       expect(reversed).toEqual(original);
     });
+  });
+});
+
+describe("the CLI login key default", () => {
+  /** @scenario the organization-management permissions are off by default */
+  it("seeds the expected levels from the default permission list", () => {
+    const seed = selectionsFromPermissions(defaultCliKeyPermissions());
+
+    expect(seed.projectSettings).toBe("write");
+    expect(seed.projectAdministration).toBe(undefined);
+    expect(seed.team).toBe("read");
+    expect(seed.organization).toBe("read");
+    expect(seed.gateway).toBe("write");
+    expect(seed.governance).toBe("write");
+    expect(seed.traces).toBe("write");
+    expect(seed.playground).toBe("write");
+    expect(seed.cost).toBe("read");
+    expect(seed.auditLog).toBe("read");
+  });
+
+  it("leaves out every platform-tier permission", () => {
+    const categorizable = new Set<string>(categorizablePermissions());
+    const platformOnly = ALL_PERMISSIONS.filter(
+      (permission) => !categorizable.has(permission),
+    );
+    const defaults = new Set<string>(defaultCliKeyPermissions());
+
+    expect(platformOnly.length).toBeGreaterThan(0);
+    expect(
+      platformOnly.filter((permission) => defaults.has(permission)),
+      "A platform-tier permission reached the CLI login key defaults",
+    ).toEqual([]);
+  });
+
+  it("round-trips the default permission list exactly", () => {
+    const seed = selectionsFromPermissions(defaultCliKeyPermissions());
+    const computed = computePermissionsFromSelections(seed);
+
+    expect(new Set(computed)).toEqual(new Set(defaultCliKeyPermissions()));
   });
 });
 

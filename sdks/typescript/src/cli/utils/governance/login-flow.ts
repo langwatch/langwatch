@@ -356,6 +356,22 @@ function persistDeviceSession(
 			validated_at: Math.floor(Date.now() / 1000),
 		};
 	}
+	// The user-scoped login key, and what it reaches. The previous login's key
+	// goes first for the same reason its personal project does: it belongs to
+	// the user who logged in before, and keeping it would authenticate the new
+	// session as them. A server that ships no key leaves both fields absent,
+	// which is what puts the resolver back on the personal-project path.
+	delete cfg.cli_api_key;
+	delete cfg.cli_api_key_scope;
+	if (result.cli_api_key) {
+		cfg.cli_api_key = result.cli_api_key;
+		if (result.cli_api_key_scope) {
+			cfg.cli_api_key_scope = {
+				kind: result.cli_api_key_scope.kind,
+				project_ids: result.cli_api_key_scope.project_ids ?? [],
+			};
+		}
+	}
 	if (result.endpoint) {
 		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}

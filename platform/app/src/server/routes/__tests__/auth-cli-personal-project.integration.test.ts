@@ -319,6 +319,11 @@ afterAll(async () => {
   await prisma.roleBinding
     .deleteMany({ where: { organizationId: ORG_ID } })
     .catch(() => {});
+  // The device-session exchange mints a user-scoped CLI ApiKey (plus its
+  // private custom role); ApiKey→Organization is a Restrict relation, so
+  // these must go before the organization delete or it silently no-ops.
+  await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
   await prisma.project
     .deleteMany({ where: { teamId: { in: teamIds } } })
     .catch(() => {});
