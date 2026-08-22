@@ -4,10 +4,10 @@ import { featureFlagService } from "~/server/featureFlag";
 const logger = createLogger("langwatch:langy:harness");
 
 /**
- * The rollout flag that moves a project's Langy turns from the opencode worker
- * harness to the pi one. SYSTEM-scoped and internal-store-only, mirroring
- * `release_langy_enabled`: /ops/feature-flags is the one lever, and
- * FEATURE_FLAG_FORCE_ENABLE=release_langy_pi_harness is the local-dev override.
+ * The flag that keeps a project's Langy turns on the pi worker harness. ON by
+ * default, so pi is what ships; turning it off per project is the rollback
+ * lever to opencode. SYSTEM-scoped and internal-store-only, mirroring
+ * `release_langy_enabled`: /ops/feature-flags is the one lever.
  */
 export const LANGY_PI_HARNESS_FLAG = "release_langy_pi_harness" as const;
 
@@ -46,10 +46,14 @@ export async function resolveLangyHarness({
     });
     return pi ? "pi" : "opencode";
   } catch (error) {
+    // Fall back to the flag's own default (pi): after the cutover that is
+    // what almost every project resolves to, so a flag-store blip changes
+    // nothing for them instead of churning every worker's credential
+    // signature back and forth.
     logger.warn(
       { error, projectId },
-      "langy harness flag evaluation failed, running on opencode",
+      "langy harness flag evaluation failed, running on pi",
     );
-    return "opencode";
+    return "pi";
   }
 }

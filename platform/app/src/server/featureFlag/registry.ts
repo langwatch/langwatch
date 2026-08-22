@@ -300,11 +300,11 @@ export const FEATURE_FLAGS = [
   {
     key: "release_langy_pi_harness",
     scope: "SYSTEM",
-    defaultValue: false,
+    defaultValue: true,
     envOverridable: false,
     family: "Langy",
     description:
-      "Runs Langy turns on the pi worker harness instead of opencode for the targeted projects. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default off = opencode everywhere. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_pi_harness.",
+      "Runs Langy turns on the pi worker harness instead of opencode. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default ON = pi everywhere; the flag is the per-project rollback lever to opencode. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
   },
   {
     key: "release_langy_promo_enabled",
