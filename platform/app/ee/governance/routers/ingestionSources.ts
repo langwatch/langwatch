@@ -41,6 +41,27 @@ const sourceTypeSchema = z.enum(
 const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
 
 /**
+ * Whether `pollerCursor` holds a real cursor.
+ *
+ * Not a `!= null` check, because the column is never SQL NULL in practice: a
+ * source that has not pulled stores JSON `null`. Prisma surfaces JSON null as
+ * either JS `null` or a sentinel object depending on version, so betting on one
+ * of those is how this silently answers "yes" for every source and locks a
+ * backfill start that was still editable.
+ *
+ * The cursor itself has been seen both as a JSON object and as a JSON *string*
+ * of serialised JSON, so neither is assumed. Both are handled by asking whether
+ * there is any content, rather than by trusting a particular null
+ * representation or a particular encoding.
+ */
+export function hasPollerCursor(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === "string") return value.length > 0 && value !== "null";
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return false;
+}
+
+/**
  * Strip the secret-hash + private rotation slot before serialising
  * over the wire — the UI never needs them, and the secret-hash leaking
  * to a malicious admin would let them craft replay tokens. The
@@ -62,6 +83,11 @@ function toDto(row: {
   name: string;
   description: string | null;
   parserConfig: unknown;
+  // Required, not optional: if a future `select` clause stops fetching this,
+  // `hasPollerCursor` would silently answer false for every source and the
+  // edit form would offer a backfill start that cannot take effect. Better a
+  // compile error than a setting that quietly does nothing.
+  pollerCursor: unknown;
   status: string;
   traceProjectId: string | null;
   lastEventAt: Date | null;
@@ -84,6 +110,18 @@ function toDto(row: {
     name: row.name,
     description: row.description,
     parserConfig: safeParser,
+    /**
+     * Whether a pull has already minted a cursor — NOT the cursor itself,
+     * which is adapter-internal and of no use to a client.
+     *
+     * The edit form needs this to know whether the backfill start is still in
+     * play: the usage cursor deliberately never rewinds, so once one exists
+     * the setting is accepted and then ignored. `status` is not a usable proxy
+     * for it in either direction — a source that pulled successfully but
+     * recorded zero events is still `awaiting_first_event` while holding a
+     * cursor, and one disabled before its first run never held one.
+     */
+    hasPollerCursor: hasPollerCursor(row.pollerCursor),
     status: row.status,
     traceProjectId: row.traceProjectId,
     lastEventAt: row.lastEventAt,
