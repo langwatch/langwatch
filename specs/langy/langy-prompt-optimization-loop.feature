@@ -50,22 +50,30 @@ Feature: Langy runs the prompt improvement loop on the workbench
     And the full dataset runs only after the subset improves
 
   @e2e
-  Scenario: Langy asks before a run that exceeds the spend threshold
-    Given the dataset holds more than thirty rows
-    When the loop reaches a full run
-    Then Langy states the row and target count and waits for a yes
-    And no run over the threshold starts without one
+  Scenario: Langy runs the loop without asking permission to continue
+    Given a dataset the experiment already holds
+    When the loop starts
+    Then Langy duplicates, edits, runs and compares without asking the user anything
+    And it never asks whether it may run the next attempt
 
   @e2e
-  Scenario: After an improvement, Langy offers three more attempts as one question
-    When a candidate beats the baseline but short of the goal
-    Then Langy offers to try three more attempts as a single short question
+  Scenario: Langy asks about spending once, for the whole loop
+    Given the dataset holds more than one hundred rows
+    When the loop reaches its first run
+    Then Langy states the row count and asks once, for the whole loop
+    And later attempts run on that one answer
 
   @e2e
-  Scenario: After a plateau, Langy offers a model swap as a cost and quality trade
+  Scenario: After an improvement short of the goal, Langy starts the next attempt itself
+    When a candidate beats the baseline but falls short of the goal
+    Then Langy forms the next hypothesis and runs the next attempt
+    And it does not offer the user a choice about continuing
+
+  @e2e
+  Scenario: After a plateau, Langy spends an attempt on a different model
     When prompt edits stop improving the candidate
-    Then Langy offers one duplicate on a different model
-    And frames it as a cost and quality trade
+    Then Langy runs one duplicate on a different model
+    And compares it as a cost and quality trade like any other attempt
 
   @e2e
   Scenario: Langy concludes with accuracy and cost deltas in a stats card

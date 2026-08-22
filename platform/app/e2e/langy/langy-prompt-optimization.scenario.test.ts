@@ -104,36 +104,34 @@ describe("Langy prompt optimization: the improvement loop", () => {
     });
   });
 
-  describe("when the full run would cross the spend threshold", () => {
-    /** @scenario Langy asks before a run that exceeds the spend threshold */
-    it("states the row and target count and waits instead of running everything", async () => {
+  describe("when the dataset is large enough to be worth a spend question", () => {
+    /** @scenario Langy asks about spending once, for the whole loop */
+    it("asks once for the whole loop rather than before each attempt", async () => {
       const seeded = await seedOptimizationWorkbench({
         name: "support-quality-large",
-        rows: 40,
+        rows: 120,
         goldenStyle: "free-text",
         withEvaluator: true,
       });
       const langy = makeLangyAdapter();
       const result = await runOptimizeScenario({
         langy,
-        name: "spend gate on a large dataset",
+        name: "one spend question covers the loop",
         description:
-          "The dataset holds 40 rows, over the skill's 30-row threshold. Before any full run, Langy must state the row and target count and wait; the user then declines the full run, so it must not happen.",
+          "The dataset holds 120 rows, over the skill's 100-row threshold. Langy states the row count and asks once, before the first run. Once the user agrees, later attempts run on that same answer without asking again.",
         slug: seeded.experimentSlug,
         script: [
           scenario.user(
             `improve the prompt in my "${seeded.experimentSlug}" experiment`,
           ),
           scenario.agent(),
-          scenario.user(
-            "no, don't run the whole dataset, the subset is enough for today",
-          ),
+          scenario.user("yes, go ahead"),
           scenario.agent(),
           scenario.judge(),
         ],
         criteria: [
-          "Before any run covering the full 40-row dataset, Langy states the row and target count and asks. Subset runs of 10 rows or fewer may run without asking.",
-          "After the user declines the full run, Langy does not run it, in this or any later step of the conversation.",
+          "Langy states the row count and asks about the cost of the loop exactly once, before the first run.",
+          "After the user agrees, Langy runs further attempts without asking permission again.",
           LANGY_BASELINE_UNTOUCHED_CRITERION,
           ...LANGY_CORE_RULE_CRITERIA,
         ],
@@ -143,13 +141,14 @@ describe("Langy prompt optimization: the improvement loop", () => {
     });
   });
 
-  describe("when the user asks for more attempts and then for the verdict", () => {
-    /** @scenario After an improvement, Langy offers three more attempts as one question */
-    /** @scenario After a plateau, Langy offers a model swap as a cost and quality trade */
+  describe("when the user asks once and then leaves Langy to it", () => {
+    /** @scenario Langy runs the loop without asking permission to continue */
+    /** @scenario After an improvement short of the goal, Langy starts the next attempt itself */
+    /** @scenario After a plateau, Langy spends an attempt on a different model */
     /** @scenario Langy concludes with accuracy and cost deltas in a stats card */
     /** @scenario Langy reports a tie or inconclusive comparison as what it is */
     /** @scenario Langy stops after three attempts that fail to beat the best candidate */
-    it("iterates on request and closes with before-and-after numbers", async () => {
+    it("iterates on its own and closes with before-and-after numbers", async () => {
       const seeded = await seedOptimizationWorkbench({
         name: "support-quality-iterate",
         rows: 20,
@@ -159,26 +158,25 @@ describe("Langy prompt optimization: the improvement loop", () => {
       const langy = makeLangyAdapter();
       const result = await runOptimizeScenario({
         langy,
-        name: "three more attempts, then the verdict",
+        name: "the loop runs itself to a verdict",
         description:
-          "After a first improvement pass the user accepts more attempts, then asks whether it actually got better and what it cost. The conclusion must carry numbers, and any plateau or tie must be reported as what it is.",
+          "The user asks once and says nothing useful afterwards. Langy must carry the whole loop by itself: several attempts, each measured, ending in a verdict with numbers. It must never hand the next step back to the user.",
         slug: seeded.experimentSlug,
         script: [
           scenario.user(
-            `improve the prompt in experiment "${seeded.experimentSlug}", small runs don't need my ok`,
+            `improve the prompt in experiment "${seeded.experimentSlug}"`,
           ),
           scenario.agent(),
-          scenario.user("yes, try a few more attempts"),
+          scenario.user("ok"),
           scenario.agent(),
-          scenario.user(
-            "so is it actually better? and did it get more expensive?",
-          ),
+          scenario.user("ok"),
           scenario.agent(),
           scenario.judge(),
         ],
         criteria: [
-          "When a pass improves the numbers but not to a clearly finished point, Langy offers continued attempts as one short question rather than open-ended churning. A conversation where the user asked for more attempts themselves satisfies this criterion.",
-          "If prompt edits plateau, Langy offers one duplicate on a different model, framed as a cost and quality trade. A run that keeps improving satisfies this criterion; do not mark it inconclusive.",
+          "Langy runs more than one measured attempt without the user asking it to continue.",
+          "Langy never asks the user whether it may run the next attempt, and never offers continuing as a choice.",
+          "If prompt edits plateau, Langy spends an attempt on a duplicate running a different model and compares it. A run that keeps improving satisfies this criterion; do not mark it inconclusive.",
           "The final verdict states the pass rate or score before and after, and what happened to cost. Numbers, not adjectives.",
           "If the candidate and baseline end level or the comparison is inconclusive, Langy says so instead of declaring a winner. A run with a real improvement satisfies this criterion.",
           "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried. A run that improves earlier satisfies this criterion.",

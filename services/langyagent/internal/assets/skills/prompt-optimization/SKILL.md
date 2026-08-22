@@ -15,10 +15,12 @@ When the user's browser has the workbench open, drive it live with `langwatch ui
 
 ## Ground rules
 
+- **Run the whole loop yourself.** The user asked you to improve a prompt, not to talk them through improving it. Duplicate, hypothesize, edit, run, read, revise, run again, and keep going until a stop condition holds. Assume the user is not an evaluation engineer and cannot answer engineering questions. Never hand the next step back to them.
+- **Two questions are the user's, and no others.** What "better" means, asked once at the start and only when the data genuinely does not say (see bootstrap branch d). And whether to publish the winner, asked once at the end. Everything between those two is your job.
 - The user's baseline column is never edited. Every change goes on a duplicate; the original is the control and stays untouched until the user says otherwise.
 - Edit prompt drafts on the workbench (`workbench.setTargetPrompt`), never the prompt library. Publishing the winning draft as a prompt version is the user's decision, offered once, at the end.
 - Never delete the user's work. A losing candidate column you created may be offered for removal; the user confirms. Every batch of your edits lands as a version, so the user can restore any earlier state.
-- Ask before spending at scale: before any run over 30 rows or over 2 targets, state the row and target count and wait. A subset run of 10 rows or fewer needs no ask.
+- Spend without asking inside the budget: up to 6 attempts, each measured on the dataset the experiment already holds. Ask once, before the first run, only when the dataset is over 100 rows, and ask for the whole loop in that one question, never per attempt.
 - Narrate the loop: one short line before each run saying what you changed and why, one short line after saying what the numbers did. Silence during a two minute run reads as a hang.
 
 ## Step 0: read the state
@@ -58,17 +60,48 @@ Sometimes the best move is a step back: a judge for a quality aspect the user ca
 2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed` for row level detail. If no run exists yet, run the baseline on a 10 row subset first. Read the actual outputs against the expected ones.
 3. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
 4. **Edit the candidate's draft only.** `langwatch ui call workbench.setTargetPrompt --payload '{"targetId":"<candidate>","localPromptConfig":{...}}'`. The draft executes without touching the prompt library.
-5. **Run scoped.** The candidate target only, on the failing rows or the first 10. Move to the full dataset once the subset improves, and ask first past the spend threshold.
+5. **Run scoped.** The candidate target only, on the failing rows or the first 10. Move to the full dataset once the subset improves.
 6. **Compare aggregates,** baseline against candidate: pass rate, average score, average cost, latency. Cost and latency are part of the answer, not a footnote.
-7. **Decide.** Improved and good enough: report. Improved but short: offer "Want me to try 3 more attempts?". Flat or worse after two revisions of the same hypothesis: say what you tried and ask for direction. After prompt edits plateau, offer one duplicate on a different model (`workbench.updateTargetModel`) as a cost and quality trade.
+7. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 3. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
+
+Keep every attempt as its own candidate column so the user can see the whole ladder, and carry the best one forward as the column to beat.
+
+### Waiting for a run
+
+A run of any size takes minutes. Poll it rather than sleeping through it in one block:
+
+```bash
+langwatch experiment status <slug> -o json
+```
+
+Check every 30 to 60 seconds, and post a progress line each time the count moves. Long single sleeps make the turn look dead and tell the user nothing.
 
 ## Stop conditions
 
-Stop and report when any of these holds: the pass rate reaches the user's goal or 100%; three consecutive attempts fail to beat the best candidate; the remaining failures are dataset problems (a wrong golden answer is reported as such, never prompt-fitted around); or the user says stop. Stopping with numbers is success; churning is not.
+Stop and report when any of these holds: the pass rate reaches the user's goal or 100%; three consecutive attempts fail to beat the best candidate; you have spent the 6 attempt budget; the remaining failures are dataset problems (a wrong golden answer is reported as such, never prompt-fitted around); or the user says stop. Stopping with numbers is success; churning is not.
+
+If the scoring service errors on every cell, say so plainly, score the outputs against the golden answers yourself, and label the numbers as your own read rather than the evaluator's. A broken scorer is a reason to caveat the report, not a reason to stop the loop.
 
 ## The report
 
-Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% and cut cost per row by 12%. The baseline column is unchanged." Add a `stats` card for the before and after, and a `table` card listing the attempts with their hypothesis and outcome. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
+Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% and cut cost per row by 12%. The baseline column is unchanged." Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
+
+Cards are ` ```langy-card ` fenced blocks in the reply text, never tool calls or echoed JSON:
+
+````markdown
+```langy-card
+{
+  "kind": "stats",
+  "blockId": "baseline-vs-candidate",
+  "items": [
+    { "label": "Baseline pass rate", "value": 60, "unit": "%" },
+    { "label": "Candidate pass rate", "value": 85, "unit": "%" }
+  ]
+}
+```
+````
+
+`table` and `choices` blocks use the same fence.
 
 ## No experiment yet
 
@@ -81,4 +114,4 @@ langwatch navigate open <experiment-id>
 
 ## The user steps away
 
-Runs continue on the backend and the page catches up when the user returns. Never block a run on the user. Post progress lines as results land, and put the ask-before-spending question before the run, not during it.
+Runs continue on the backend and the page catches up when the user returns. Never block a run on the user, and never pause the loop because they went quiet: finish every attempt in the budget and have the finished report waiting for them. Post progress lines as results land, and put any spend question before the first run, not during the loop.
