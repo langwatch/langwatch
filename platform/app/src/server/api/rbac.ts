@@ -424,6 +424,8 @@ export function hasPermissionWithHierarchy(
     return true;
   }
 
+  if (NOT_IMPLIED_BY_MANAGE.has(requestedPermission)) return false;
+
   // Hierarchy rule: manage permissions include view, create, update, delete,
   // and gateway-specific sub-actions (rotate, attach, detach).
   const actionSuffixes = [
@@ -446,6 +448,25 @@ export function hasPermissionWithHierarchy(
 
   return false;
 }
+
+/**
+ * Permissions the `:manage` hierarchy does NOT imply.
+ *
+ * Creating and deleting a project is not "managing" one. `project:manage` is
+ * what everyday project administration rides on — settings, model providers,
+ * topic clustering — and every API key that does that work would otherwise
+ * also be able to create and destroy projects, which is what the separate
+ * "Project administration" permission category exists to withhold.
+ *
+ * No built-in role loses anything: team ADMIN lists `project:create` and
+ * `project:delete` outright, and team MEMBER lists `project:create`. Only a
+ * custom role (an API key) holding `project:manage` alone is narrowed, which
+ * is the intended separation.
+ */
+const NOT_IMPLIED_BY_MANAGE = new Set<string>([
+  "project:create",
+  "project:delete",
+]);
 
 /**
  * Check if a team role has a specific permission

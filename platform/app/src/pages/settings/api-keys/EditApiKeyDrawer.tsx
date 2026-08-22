@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-import { TeamUserRole } from "~/generated/prisma/client";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
@@ -33,7 +33,7 @@ import {
   bindingsToSelections,
   categoryAccessAvailability,
   deriveBindingRole,
-  findBindingAtScope,
+  getUserPermissionsAtScope,
   type PermissionMode,
 } from "./utils";
 
@@ -103,20 +103,21 @@ export function EditApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
+  // Same ceiling the create drawer shows: the team-role bags carry no
+  // organization, gateway, governance or playground permissions, so reading
+  // them directly would lock rows a service key or an organization admin can
+  // in fact grant.
   const userPermissions = useMemo(() => {
-    if (isServiceKey) return getTeamRolePermissions(TeamUserRole.ADMIN);
-    if (!myBindings.data) return [];
-
-    const binding = findBindingAtScope({
-      bindings: myBindings.data,
+    return getUserPermissionsAtScope({
+      myBindings: myBindings.data,
       scopeType: primaryScope.scopeType,
       scopeId: primaryScope.scopeId,
       organizationId,
       orgProjects,
+      isServiceKey,
+      getTeamRolePermissions: (role) =>
+        getTeamRolePermissions(role as TeamUserRole),
     });
-
-    if (!binding) return [];
-    return getTeamRolePermissions(binding.role as TeamUserRole);
   }, [
     myBindings.data,
     primaryScope.scopeType,

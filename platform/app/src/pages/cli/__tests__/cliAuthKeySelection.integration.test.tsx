@@ -349,3 +349,60 @@ describe("/cli/auth key selection, given a regular member of two shared teams", 
     ).toBe(false);
   });
 });
+
+describe("/cli/auth key selection, given teams the user holds different roles on", () => {
+  beforeEach(() => {
+    // ADMIN on one shared team, VIEWER on the other. One permission list
+    // serves every binding on the minted key, so the ceiling the screen shows
+    // has to be the intersection — offering an ADMIN-only permission would
+    // make approve fail with api_key_scope_violation at the VIEWER team.
+    bindingsRef.current = [
+      { scopeType: "TEAM", scopeId: "team-eng", role: "ADMIN" },
+      { scopeType: "TEAM", scopeId: "team-res", role: "VIEWER" },
+      // Their own workspace, which the defaults always add as a scope.
+      { scopeType: "TEAM", scopeId: "team-personal", role: "ADMIN" },
+    ];
+  });
+
+  it("sends only the permissions every selected team grants", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+    await user.click(approveButton());
+
+    await waitFor(() => expect(approveBodies.length).toBe(1));
+    const permissions = approveBodies[0]?.key_selection?.permissions ?? [];
+    const held = new Set(permissions);
+
+    // A VIEWER holds the read side everywhere, so it survives the
+    // intersection.
+    expect(held.has("traces:view")).toBe(true);
+    // The write side is ADMIN-only on one team and absent on the other, so
+    // no permission the VIEWER team refuses may go out.
+    for (const adminOnly of [
+      "traces:update",
+      "datasets:manage",
+      "project:manage",
+    ]) {
+      expect(held.has(adminOnly)).toBe(false);
+    }
+  });
+
+  it("locks the write level on rows only one team grants", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(approveButton().disabled).toBe(false));
+    await user.click(screen.getByRole("button", { name: "Customize" }));
+
+    const tracesRow = screen.getByText("Traces").parentElement as HTMLElement;
+    await user.click(within(tracesRow).getByText("Read"));
+
+    // Only Read and None are offered: Write is above the intersected ceiling.
+    expect(
+      await screen.findByRole("menuitem", { name: "Read" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Write" })).toBeNull();
+  });
+});

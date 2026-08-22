@@ -160,6 +160,34 @@ export class ApiKeyReservedNameError extends HandledError {
   }
 }
 
+/**
+ * Thrown when answering "which projects can this credential see" would have
+ * to walk more projects than the resolution is allowed to. The caller can act
+ * on it: narrow the key's bindings to the projects or teams it works with.
+ *
+ * `platform` fault: the credential is legitimate and the request is
+ * well-formed, so this is our limit showing, not the caller's mistake.
+ */
+export class ProjectVisibilityTooWideError extends HandledError {
+  declare readonly code: "project_visibility_too_wide";
+
+  constructor(
+    message: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super("project_visibility_too_wide", message, {
+      httpStatus: 507,
+      fault: "platform",
+      ...remediation("project_visibility_too_wide"),
+      ...options,
+    });
+    this.name = "ProjectVisibilityTooWideError";
+  }
+}
+
 export class ApiKeyScopeViolationError extends HandledError {
   declare readonly code: "api_key_scope_violation";
 

@@ -176,4 +176,25 @@ describe("resolveProjectSelector()", () => {
       expect((failure as ProjectScopeError).code).toBe("project_lookup_failed");
     });
   });
+
+  describe("when the organization has more projects than the page walk covers", () => {
+    it("says the lookup failed rather than reporting the project as inaccessible", async () => {
+      // One more page than the walk will read, so the cap is reached with
+      // pages still to go. Answering "no accessible project matches" here
+      // would be a wrong answer, not a slow one.
+      const pages = Array.from({ length: 51 }, (_, index) => [
+        project({ id: `proj-${index}`, slug: `project-${index}` }),
+      ]);
+      const { service } = listing(pages);
+
+      const failure = await resolveProjectSelector({
+        selector: "project-50",
+        cfg: personalConfig,
+        service,
+      }).catch((err: unknown) => err);
+
+      expect((failure as ProjectScopeError).code).toBe("project_lookup_failed");
+      expect((failure as ProjectScopeError).message).toContain("5000");
+    });
+  });
 });

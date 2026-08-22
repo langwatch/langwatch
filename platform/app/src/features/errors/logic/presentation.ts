@@ -568,6 +568,12 @@ const presentations = {
     describe: () => "It doesn't include the required scope.",
   },
 
+  project_visibility_too_wide: {
+    title: "Too many projects to list for this key",
+    describe: () =>
+      "This key reaches more projects than we can list in one request. Bind it to the teams or projects it works with, then try again.",
+  },
+
   // ==========================================================================
   // Avatar upload. One set of codes for both halves of the same check: the
   // browser rejects the file before it is ever encoded (`processAvatarImage`)

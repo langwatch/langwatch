@@ -223,6 +223,7 @@ export const APP_ERROR_CODES = [
   "personal_workspace_not_managed_here",
   "project_not_found",
   "project_permission_denied",
+  "project_visibility_too_wide",
   "prompt_not_found",
   "provider_endpoint_redirected",
   "provider_key_invalid",

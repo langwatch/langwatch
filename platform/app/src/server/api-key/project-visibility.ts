@@ -5,6 +5,7 @@ import {
   checkRoleBindingPermission,
   resolveApiKeyPermission,
 } from "~/server/rbac/role-binding-resolver";
+import { ProjectVisibilityTooWideError } from "./errors";
 
 /**
  * The projects a credential may list: everything in the organization, or an
@@ -112,6 +113,10 @@ async function boundScopes({
   apiKeyId: string;
   organizationId: string;
 }): Promise<BoundScopes | null> {
+  // No key, no bindings to read: Prisma drops an `undefined` from the filter,
+  // which would widen this to every binding in the organization.
+  if (!apiKeyId) return null;
+
   const bindings = await prisma.roleBinding.findMany({
     where: { organizationId, apiKeyId },
     select: { scopeType: true, scopeId: true },
@@ -134,8 +139,39 @@ async function boundScopes({
   };
 }
 
+/**
+ * The most projects one visibility resolution will carry.
+ *
+ * An org-bound key whose owner has lost org-wide `project:view` cannot be
+ * answered from the fast path: the reach is "every project in the
+ * organization, minus what the owner can no longer see", so the candidates
+ * have to be enumerated. The cap bounds that work. It is not a silent
+ * truncation — going over it refuses the request, because a short list would
+ * be a wrong answer rather than a slow one.
+ */
+const MAX_CANDIDATE_PROJECTS = 5_000;
+
 /** Phase 2b: the non-archived projects those bound scopes can reach. */
 async function candidateProjects({
+  prisma,
+  organizationId,
+  bound,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  bound: BoundScopes;
+}): Promise<CandidateProject[]> {
+  const candidates = await findCandidates({ prisma, organizationId, bound });
+  if (candidates.length > MAX_CANDIDATE_PROJECTS) {
+    throw new ProjectVisibilityTooWideError(
+      `Resolving this credential's project visibility would scan more than ${MAX_CANDIDATE_PROJECTS} projects`,
+      { meta: { organizationId, limit: MAX_CANDIDATE_PROJECTS } },
+    );
+  }
+  return candidates;
+}
+
+async function findCandidates({
   prisma,
   organizationId,
   bound,
@@ -162,6 +198,9 @@ async function candidateProjects({
           }),
     },
     select: { id: true, teamId: true },
+    // One over the cap: enough to know it was exceeded, without reading an
+    // unbounded row set to find out.
+    take: MAX_CANDIDATE_PROJECTS + 1,
   });
 }
 

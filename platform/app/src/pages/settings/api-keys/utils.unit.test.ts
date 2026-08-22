@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { categorizablePermissions } from "../../../server/api-key/permission-categories";
+import {
+  categorizablePermissions,
+  PERMISSION_CATEGORIES,
+} from "../../../server/api-key/permission-categories";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
@@ -302,7 +305,7 @@ describe("permissionsSummary()", () => {
         permissionsSummary({
           permissionMode: "all",
           grantedCount: 0,
-          totalCount: 14,
+          totalCount: PERMISSION_CATEGORIES.length,
         }),
       ).toBe("All");
     });
@@ -315,9 +318,11 @@ describe("permissionsSummary()", () => {
         permissionsSummary({
           permissionMode: "restricted",
           grantedCount: 3,
-          totalCount: 14,
+          totalCount: PERMISSION_CATEGORIES.length,
         }),
-      ).toBe("3 of 14 permissions");
+        // The denominator is the number of categories a key can be given,
+        // read from the registry so it cannot drift as categories are added.
+      ).toBe(`3 of ${PERMISSION_CATEGORIES.length} permissions`);
     });
   });
 });
@@ -655,8 +660,10 @@ describe("getUserPermissionsAtScope()", () => {
       // full access, so the ceiling shown here has to match it.
       expect(result).toEqual(categorizablePermissions());
     });
+  });
 
-    it("returns the team-role bag for a non-ADMIN org binding", () => {
+  describe("when an org-level non-ADMIN binding covers a project scope", () => {
+    it("returns the team-role bag", () => {
       const result = getUserPermissionsAtScope({
         myBindings: [
           { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },

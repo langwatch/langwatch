@@ -53,6 +53,8 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then "organization:manage", "organization:delete", "project:create",
         "project:delete" and "team:manage" are not part of the default
         permission list
+      And a key holding "project:manage" still cannot create or delete a
+        project, so the exclusion holds in effect and not only in the list
       And gateway permissions (virtual keys, budgets, providers, routing
         policies) and "project:manage" (model providers, project settings)
         are part of the default permission list
@@ -103,6 +105,16 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       When the key is used to search traces on a project the owner can no
         longer view
       Then the request is refused with a 403
+
+    @integration
+    Scenario: access lost between approve and exchange ends the login
+      Given the user approved the device code
+      But the user loses the access the selection was approved against before
+        the CLI polls the exchange endpoint
+      When the CLI polls the exchange endpoint
+      Then the response is a fatal "access_denied" telling the user to log in
+        again
+      And the device code is gone, so the next poll cannot re-run the mint
 
     @integration
     Scenario: approve refuses bindings above the approving user's ceiling

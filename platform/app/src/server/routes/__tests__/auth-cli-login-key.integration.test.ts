@@ -669,6 +669,64 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
     });
   });
 
+  describe("when the approver loses access between approve and exchange", () => {
+    /** @scenario "access lost between approve and exchange ends the login" */
+    it("answers a fatal access_denied and burns the device code", async () => {
+      identity.current = memberUser;
+      const dc = await mintDeviceCode();
+      const approved = await approve({
+        userCode: dc.user_code,
+        keySelection: {
+          bindings: [{ scope_type: "TEAM", scope_id: TEAM_SHARED_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+      expect(approved.status).toBe(200);
+
+      // The window between approve and exchange is minutes wide in practice.
+      // Take the access the selection was approved against away inside it:
+      // removed from the organization, the approver holds nothing anywhere,
+      // so the mint refuses however the selection was scoped.
+      const removedBindings = await prisma.roleBinding.findMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      const removedMemberships = await prisma.organizationUser.findMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: ORG_ID, userId: MEMBER_ID },
+      });
+
+      try {
+        const exchanged = await exchange({
+          deviceCode: dc.device_code,
+          hostname: `lost-access-${suffix}`,
+        });
+
+        expect(exchanged.status).toBe(410);
+        expect((exchanged.json as unknown as { error: string }).error).toBe(
+          "access_denied",
+        );
+        // Burned, so the CLI's next poll cannot re-run the ceiling walk.
+        expect(
+          await redisConnection!.get(`lwcli:device:${dc.device_code}`),
+        ).toBeNull();
+      } finally {
+        await prisma.organizationUser.createMany({
+          data: removedMemberships,
+          skipDuplicates: true,
+        });
+        await prisma.roleBinding.createMany({
+          data: removedBindings,
+          skipDuplicates: true,
+        });
+      }
+    });
+  });
+
   describe("when the owner is demoted after the key was minted", () => {
     /** @scenario "the key can never exceed the owner's live permissions" */
     it("refuses a trace search on a project the owner can no longer view", async () => {

@@ -1,5 +1,6 @@
 import { ALL_PERMISSIONS } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
+import { hasPermissionWithHierarchy } from "../../api/rbac";
 import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
 import { defaultCliKeyPermissions } from "../cli-key-defaults";
 import {
@@ -220,8 +221,10 @@ describe("selectionsFromPermissions()", () => {
     it("returns empty object", () => {
       expect(selectionsFromPermissions([])).toEqual({});
     });
+  });
 
-    it("never invents a read selection for a write-only category", () => {
+  describe("when a category is write-only", () => {
+    it("never invents a read selection for it", () => {
       expect(selectionsFromPermissions([]).projectAdministration).toBe(
         undefined,
       );
@@ -264,6 +267,23 @@ describe("the CLI login key default", () => {
     expect(seed.playground).toBe("write");
     expect(seed.cost).toBe("read");
     expect(seed.auditLog).toBe("read");
+  });
+
+  /** @scenario the organization-management permissions are off by default */
+  it("cannot reach project creation or deletion through project:manage", () => {
+    const defaults = defaultCliKeyPermissions();
+
+    // The exclusion has to hold in effect, not only in the list: the RBAC
+    // hierarchy promotes a `:create` or `:delete` check to `:manage` for
+    // every other resource, and `project:manage` IS in the defaults because
+    // model providers and project settings ride on it.
+    expect(defaults).toContain("project:manage");
+    expect(hasPermissionWithHierarchy(defaults, "project:create")).toBe(false);
+    expect(hasPermissionWithHierarchy(defaults, "project:delete")).toBe(false);
+    // The promotion still works everywhere else.
+    expect(
+      hasPermissionWithHierarchy(["datasets:manage"], "datasets:create"),
+    ).toBe(true);
   });
 
   it("leaves out every platform-tier permission", () => {

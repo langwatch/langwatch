@@ -8,7 +8,7 @@ import {
   isOrgExclusivePermission,
   type Permission,
 } from "~/server/api/rbac";
-import { ApiKeyService, type RoleBindingInput } from "./api-key.service";
+import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";
 
@@ -278,6 +278,14 @@ export class CliLoginKeyService {
     deviceLabel: string;
     selection: CliKeySelection;
   }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
+    // Resolved BEFORE the mint, though it only describes it: these are two
+    // more reads, and a read that fails after the key row is live would fail
+    // the exchange while leaving that key behind, active and unreachable.
+    const scope = await this.resolveScopeSummary({
+      organizationId,
+      bindings: selection.bindings,
+    });
+
     await this.revokeLoginKeysForDevice({
       userId,
       organizationId,
@@ -295,14 +303,7 @@ export class CliLoginKeyService {
       createdByDeviceLabel: deviceLabel,
     });
 
-    return {
-      token: created.token,
-      apiKeyId: created.apiKey.id,
-      scope: await this.resolveScopeSummary({
-        organizationId,
-        bindings: selection.bindings,
-      }),
-    };
+    return { token: created.token, apiKeyId: created.apiKey.id, scope };
   }
 
   /**
@@ -486,7 +487,7 @@ function filterToGrantable({
 
 function asCustomBindings(
   bindings: CliKeyBindingSelection[],
-): RoleBindingInput[] {
+): CustomRoleBindingInput[] {
   return bindings.map((binding) => ({
     role: "CUSTOM" as const,
     scopeType: binding.scopeType,

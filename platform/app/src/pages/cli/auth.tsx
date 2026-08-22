@@ -197,7 +197,8 @@ export default function CliAuthPage() {
   const [scopeDefaultsOrgId, setScopeDefaultsOrgId] = useState<string | null>(
     null,
   );
-  const [permissionsCustomized, setPermissionsCustomized] = useState(false);
+  const [arePermissionsCustomized, setArePermissionsCustomized] =
+    useState(false);
   const [permissionSelections, setPermissionSelections] = useState<
     Record<string, PermissionSelection>
   >({});
@@ -267,7 +268,7 @@ export default function CliAuthPage() {
     setSelectedProjectId(null);
     setSelectedScopes([]);
     setScopeDefaultsOrgId(null);
-    setPermissionsCustomized(false);
+    setArePermissionsCustomized(false);
     setPermissionSelections({});
   }, [selectedOrgId]);
   useEffect(() => {
@@ -423,17 +424,6 @@ export default function CliAuthPage() {
     personalProject,
   ]);
 
-  // The permission list the approve request carries. Untouched, the default
-  // list goes out verbatim; customized, it is exactly what the category
-  // selections compute.
-  const cliKeyPermissions = useMemo<string[]>(
-    () =>
-      permissionsCustomized
-        ? computePermissionsFromSelections(permissionSelections)
-        : defaultCliKeyPermissions(),
-    [permissionsCustomized, permissionSelections],
-  );
-
   // The user's own permissions across EVERY selected scope, mirroring the
   // Create API key drawer: rows above this ceiling render locked. One
   // permission list serves every binding on the minted key, so the ceiling
@@ -467,26 +457,63 @@ export default function CliAuthPage() {
     );
   }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
 
+  // Whether the picker has anything at all to offer, which separates "you
+  // deselected everything" from "there is nothing here for you".
+  const hasAnyScopeToOffer =
+    sharedTeams.length > 0 || offeredProjects.length > 0;
+
+  // The default list, narrowed to what the user actually holds everywhere the
+  // key will be bound. The rule the key lives by is "never more than your own
+  // access", and the mint asserts it: sending `project:manage` for a member
+  // who does not hold it would refuse the whole approval rather than drop the
+  // one permission.
+  const defaultCliKeyPermissionsHeld = useMemo<string[]>(() => {
+    const held = new Set(cliKeyUserPermissions);
+    return defaultCliKeyPermissions().filter((permission) =>
+      held.has(permission),
+    );
+  }, [cliKeyUserPermissions]);
+
+  // The permission list the approve request carries. Untouched, the narrowed
+  // default goes out; customized, it is exactly what the category selections
+  // compute, itself bounded by the locked rows.
+  const cliKeyPermissions = useMemo<string[]>(
+    () =>
+      arePermissionsCustomized
+        ? computePermissionsFromSelections(permissionSelections)
+        : defaultCliKeyPermissionsHeld,
+    [
+      arePermissionsCustomized,
+      permissionSelections,
+      defaultCliKeyPermissionsHeld,
+    ],
+  );
+
   const handleToggleCustomizePermissions = () => {
-    if (permissionsCustomized) {
-      setPermissionsCustomized(false);
+    if (arePermissionsCustomized) {
+      setArePermissionsCustomized(false);
       setPermissionSelections({});
     } else {
       setPermissionSelections(
-        selectionsFromPermissions(defaultCliKeyPermissions()),
+        selectionsFromPermissions(defaultCliKeyPermissionsHeld),
       );
-      setPermissionsCustomized(true);
+      setArePermissionsCustomized(true);
     }
   };
 
-  const deviceSessionSelectionIncomplete =
+  // Approve stays unavailable while the bindings are still arriving: the
+  // ceiling is empty until they land, so an approval sent now would carry an
+  // empty permission list.
+  const isDeviceSessionSelectionIncomplete =
     !requiresProject &&
-    (selectedScopes.length === 0 || cliKeyPermissions.length === 0);
+    (myBindings.isLoading ||
+      selectedScopes.length === 0 ||
+      cliKeyPermissions.length === 0);
 
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
     if (requiresProject && !selectedProjectId) return;
-    if (deviceSessionSelectionIncomplete) return;
+    if (isDeviceSessionSelectionIncomplete) return;
     setAction({ kind: "submitting" });
     try {
       const r = await fetch("/api/auth/cli/approve", {
@@ -802,6 +829,16 @@ export default function CliAuthPage() {
                           showSummary={false}
                         />
                       )}
+                      {!myBindings.isLoading &&
+                        selectedScopes.length === 0 &&
+                        !hasAnyScopeToOffer && (
+                          <Text textStyle="xs" color="orange.fg" mt={2}>
+                            Your account holds no access in this organization,
+                            so there is nothing to give the CLI. Ask an
+                            administrator to add you to a team, then run{" "}
+                            <code>langwatch login</code> again.
+                          </Text>
+                        )}
                     </Box>
 
                     <Box>
@@ -815,10 +852,12 @@ export default function CliAuthPage() {
                           color="fg.muted"
                           onClick={handleToggleCustomizePermissions}
                         >
-                          {permissionsCustomized ? "Use default" : "Customize"}
+                          {arePermissionsCustomized
+                            ? "Use default"
+                            : "Customize"}
                         </Button>
                       </HStack>
-                      {permissionsCustomized ? (
+                      {arePermissionsCustomized ? (
                         <VStack align="stretch" gap={2}>
                           <PermissionCounter count={cliKeyPermissions.length} />
                           <PermissionCategoryList
@@ -863,7 +902,7 @@ export default function CliAuthPage() {
                     disabled={
                       !selectedOrgId ||
                       (requiresProject && !selectedProjectId) ||
-                      deviceSessionSelectionIncomplete
+                      isDeviceSessionSelectionIncomplete
                     }
                   >
                     {requiresProject ? "Send API key" : "Approve"}

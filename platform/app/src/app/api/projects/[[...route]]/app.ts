@@ -10,6 +10,7 @@ import {
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -141,10 +142,17 @@ secured
       const { page, limit } = c.req.valid("query");
       const service = c.get("projectService") as ProjectService;
 
+      // Read the resolved credential itself rather than the loose context
+      // key: this family authenticates organization API keys only, so
+      // `apiKeyId` is always a real key here, and taking it from the typed
+      // token is what keeps that true if the family ever grows another
+      // credential class.
+      const resolved = c.get("orgResolvedToken") as OrgResolvedToken;
+
       const visible = await resolveVisibleProjects({
         prisma,
-        apiKeyId: c.get("apiKeyId") as string,
-        userId: (c.get("apiKeyUserId") as string | null) ?? null,
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId,
         organizationId: organization.id,
       });
 

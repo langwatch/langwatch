@@ -183,7 +183,7 @@ export const resolveCredentials = async (
       // there is nothing implicit left to warn about.
       if (opts.project === undefined) {
         await maybePrintIdentityNotice({
-          mode: session.usedLoginKey ? "device-login-key" : "device",
+          mode: session.isLoginKey ? "device-login-key" : "device",
           apiKey: session.apiKey,
           endpoint,
         });
@@ -264,7 +264,7 @@ interface SessionCredential {
   projectId?: string;
   /** True when the credential is the user-scoped login key rather than the
    * personal project's key; the identity notice words the two differently. */
-  usedLoginKey: boolean;
+  isLoginKey: boolean;
 }
 
 /**
@@ -314,7 +314,7 @@ async function resolveSessionCredential(
     return {
       apiKey: cached,
       projectId: cfg.personal_project?.id,
-      usedLoginKey: cached === loginKey,
+      isLoginKey: cached === loginKey,
     };
   }
 
@@ -329,7 +329,7 @@ async function resolveSessionCredential(
         return {
           apiKey: cached,
           projectId: cfg.personal_project?.id,
-          usedLoginKey: cached === loginKey,
+          isLoginKey: cached === loginKey,
         };
       }
       return undefined;
@@ -345,7 +345,7 @@ async function resolveSessionCredential(
     return {
       apiKey: loginKey ?? project.api_key,
       projectId: project.id,
-      usedLoginKey: loginKey !== undefined,
+      isLoginKey: loginKey !== undefined,
     };
   } catch (err) {
     if (
@@ -370,7 +370,7 @@ async function resolveSessionCredential(
       ? {
           apiKey: cached,
           projectId: cfg.personal_project?.id,
-          usedLoginKey: cached === loginKey,
+          isLoginKey: cached === loginKey,
         }
       : undefined;
   }

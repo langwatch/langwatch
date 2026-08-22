@@ -270,9 +270,10 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   @unit
   Scenario: permissionsSummary counts granted categories for restricted keys
-    Given a key with 3 permission categories granted
+    Given a key with 3 of the registry's permission categories granted
     When I compute the permissions summary
-    Then the result is "3 of 14 permissions"
+    Then the result reads "3 of N permissions", where N is the number of
+      categories the registry offers
 
   @unit
   Scenario: scopeLabel formats project scope correctly

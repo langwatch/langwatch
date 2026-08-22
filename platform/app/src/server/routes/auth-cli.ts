@@ -60,6 +60,7 @@ import {
   type CliKeySelection,
   CliLoginKeyService,
 } from "~/server/api-key/cli-login-key.service";
+import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
@@ -872,14 +873,42 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           parsed.data.client_info?.device_label ??
             parsed.data.client_info?.hostname,
         ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
-      const minted = await CliLoginKeyService.create(
-        prisma,
-      ).mintForDeviceSession({
-        userId: user.id,
-        organizationId: organization.id,
-        deviceLabel,
-        selection: record.key_selection,
-      });
+      let minted: Awaited<
+        ReturnType<CliLoginKeyService["mintForDeviceSession"]>
+      >;
+      try {
+        minted = await CliLoginKeyService.create(prisma).mintForDeviceSession({
+          userId: user.id,
+          organizationId: organization.id,
+          deviceLabel,
+          selection: record.key_selection,
+        });
+      } catch (err) {
+        // A ceiling refusal is permanent: the selection was approved minutes
+        // ago and the approver has lost access since, so every later poll
+        // would refuse again. The CLI treats a non-200 as "keep polling", so
+        // leaving the record approved for its remaining TTL means one full
+        // ceiling walk every 4 seconds with no terminal error on screen.
+        // Burn the device code and answer with the one code the CLI already
+        // treats as fatal.
+        if (ApiKeyScopeViolationError.is(err)) {
+          logger.warn(
+            { err, userId: user.id, organizationId: organization.id },
+            "[auth-cli] CLI login key refused at exchange; terminating the device code",
+          );
+          await redis.del(deviceCodeKey(device_code));
+          await redis.del(userCodeKey(record.user_code));
+          return c.json(
+            {
+              error: "access_denied",
+              error_description:
+                "Your access changed after you approved this login. Run `langwatch login` again.",
+            },
+            410,
+          );
+        }
+        throw err;
+      }
       cliApiKey = minted.token;
       cliApiKeyId = minted.apiKeyId;
       cliApiKeyScope = {

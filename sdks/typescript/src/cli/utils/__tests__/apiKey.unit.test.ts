@@ -8,6 +8,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import type * as ProjectScopeNs from "../projectScope";
+import type * as SessionApiNs from "../governance/session-api";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -31,10 +33,9 @@ vi.mock("../governance/config", () => ({
 // Keep SessionApiError real (the resolver branches on `err.status`), mock only
 // the network call.
 vi.mock("../governance/session-api", async () => {
-  const actual =
-    await vi.importActual<typeof import("../governance/session-api")>(
-      "../governance/session-api",
-    );
+  const actual = await vi.importActual<typeof SessionApiNs>(
+    "../governance/session-api",
+  );
   return { SessionApiError: actual.SessionApiError, fetchPersonalProject: vi.fn() };
 });
 
@@ -44,8 +45,7 @@ vi.mock("../governance/session-api", async () => {
 // unresolvable value ends the command instead of silently falling back to
 // the personal project. `ProjectScopeError` stays real.
 vi.mock("../projectScope", async () => {
-  const actual =
-    await vi.importActual<typeof import("../projectScope")>("../projectScope");
+  const actual = await vi.importActual<typeof ProjectScopeNs>("../projectScope");
   return {
     ProjectScopeError: actual.ProjectScopeError,
     projectScopeErrorLines: actual.projectScopeErrorLines,
