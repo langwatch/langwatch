@@ -6,7 +6,6 @@ import {
   HStack,
   Input,
   SimpleGrid,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -194,20 +193,11 @@ function GovernanceOverviewPage() {
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading size="md">AI Governance</Heading>
-              <Badge colorPalette="purple" variant="subtle">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted" fontSize="sm">
-              Spend, users, anomalies, and ingestion-source health for the
-              organization. Window: last 30 days.
-            </Text>
-          </VStack>
-          <Spacer />
+        <HStack gap={2}>
+          <Heading size="md">AI Governance</Heading>
+          <Badge colorPalette="purple" variant="subtle">
+            Preview
+          </Badge>
         </HStack>
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
@@ -273,7 +263,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/ingestion-sources"
+                href="/governance/catalog"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -512,7 +502,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/ingestion-sources" color="blue.600">
+                    <Link href="/governance/catalog" color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -888,10 +878,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
     ] ?? "fg.muted";
 
   return (
-    <Link
-      href="/governance/ingestion-sources"
-      _hover={{ textDecoration: "none" }}
-    >
+    <Link href="/governance/catalog" _hover={{ textDecoration: "none" }}>
       <HStack
         borderWidth="1px"
         borderColor="border.muted"

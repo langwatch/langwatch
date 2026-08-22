@@ -109,7 +109,7 @@ test("complex product areas share one local navigation layout", async ({
   await governanceNavigation
     .getByRole("link", { name: "Catalog", exact: true })
     .click();
-  await expect(page).toHaveURL("/governance/ingestion-sources");
+  await expect(page).toHaveURL("/governance/catalog");
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav

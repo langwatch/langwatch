@@ -71,11 +71,7 @@ export function QuarantineFillAlert({
                 </VStack>
               </Box>
             )}
-            <Link
-              href="/governance/ingestion-sources"
-              fontSize="sm"
-              color="orange.600"
-            >
+            <Link href="/governance/catalog" fontSize="sm" color="orange.600">
               Review ingestion sources →
             </Link>
           </VStack>

@@ -1,4 +1,4 @@
-import { Heading, HStack, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Heading, Tabs, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -115,19 +115,7 @@ function ToolCatalogPage() {
 }
 
 function ToolCatalogHeading() {
-  return (
-    <HStack alignItems="end">
-      <VStack align="start" gap={0}>
-        <Heading as="h2" size="lg">
-          AI Tool Tiles
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          The tiles your members see on their <code>/me</code> portal.
-        </Text>
-      </VStack>
-      <Spacer />
-    </HStack>
-  );
+  return <Heading size="md">AI Tool Tiles</Heading>;
 }
 
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {

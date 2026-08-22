@@ -212,13 +212,16 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/index")),
       },
       {
-        path: "/governance/ingestion-sources",
+        // The catalog: a tabbed shell whose only tab today is Sources (the
+        // ingestion-sources table). The retired /governance/ingestion-sources
+        // prefix redirects here via legacyRedirectRoutes.
+        path: "/governance/catalog",
         ...page(
           () => import("@ee/governance/dashboard/pages/ingestion-sources"),
         ),
       },
       {
-        path: "/governance/ingestion-sources/:id",
+        path: "/governance/catalog/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
