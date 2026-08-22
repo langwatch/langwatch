@@ -59,6 +59,18 @@ Feature: Langy can run a conversation on the pi harness
     When the wrapper generates the model registry
     Then the entry is exactly the manager's config
 
+  # The model config passes unknown keys through so a new compat flag needs no
+  # wrapper change. Routing and credential keys must not travel that path: they
+  # decide where the request goes and what authenticates it, and the whole point
+  # of the mediated gateway is that the worker cannot choose either.
+  @unit
+  Scenario: A model entry cannot carry its own endpoint or credential
+    Given the manager's model config carries a base URL, a provider name or an API key
+    When the wrapper generates the model registry
+    Then those keys are dropped from the model entry
+    And the registry still routes through the gateway URL the environment names
+    And the key travels as an environment reference, so no secret is written to disk
+
   @unit
   Scenario: A cancel reaches the worker running the named turn
     Given a worker is running a turn the user asked to stop
@@ -72,6 +84,26 @@ Feature: Langy can run a conversation on the pi harness
     When a cancel arrives naming a different turn, or a conversation with no worker
     Then nothing is aborted
     And the running turn continues untouched
+
+  # Posting a turn and consuming its events are started in that order but are
+  # not ordered against each other, so a turn abandoned between the two leaves
+  # its events with no reader. The next turn on the same worker must not inherit
+  # it: reading the dead turn's events means the live turn's own events pile up
+  # unread, and once that backlog is full the worker stops answering at all.
+  @unit
+  Scenario: An abandoned pi turn cannot capture the next turn's stream
+    Given a turn was posted and then abandoned before anything read its events
+    When the next turn on that worker starts
+    Then it reads its own events, not the abandoned turn's
+    And the abandoned turn's events are released instead of waiting forever
+
+  @unit
+  Scenario: A command to a worker that stopped reading gives up instead of blocking
+    Given a worker has stopped reading the commands the manager sends it
+    When the manager sends a command, a cancel among them
+    Then the send gives up within its deadline
+    And later commands are refused rather than appended to a half-written one
+    And the conversation's other calls are not held up behind it
 
   # The session storage lives OUTSIDE the worker home, in a per-conversation
   # store the manager keeps. The home is wiped on every worker death (idle

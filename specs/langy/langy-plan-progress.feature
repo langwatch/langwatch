@@ -99,3 +99,15 @@ Feature: Langy shows a live plan checklist for multi-step work
     When that capability starts
     Then a present-continuous sub-status like "Searching traces" shows for the step
     And it is cleared once the step produces output
+
+  # A long scan reports its real position by writing the running count into the
+  # plan item, in one exact shape. The instructions Langy is given carry a single
+  # example of that shape, and it is the only description of it Langy ever reads,
+  # so an example the reader does not accept means Langy writes progress
+  # faithfully and none of it is ever shown, with nothing reporting a problem.
+  @unit
+  Scenario: The documented progress example is the format the parser accepts
+    Given the instructions show Langy how to write a running count
+    When that example is read back the way a live plan item is read
+    Then it is understood as measured progress and the count is drawn
+    And an example the reader cannot understand fails this check instead of shipping

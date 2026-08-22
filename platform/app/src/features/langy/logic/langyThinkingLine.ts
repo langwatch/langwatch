@@ -146,6 +146,84 @@ export function hasTokens(message: ThinkingMessage | undefined): boolean {
 }
 
 /**
+ * The escalation the two waiting paths share: silence is normal for a moment,
+ * then it is not, then it is a fault. Only the wording of the final admission
+ * differs between a cold start and a follow-up, so one ladder serves both.
+ * Returns nothing while the silence is still young enough to say something more
+ * specific than "this is slow".
+ */
+function silenceEscalation({
+  elapsedMs,
+  stuckText,
+}: {
+  elapsedMs: number;
+  stuckText: string;
+}): LangyThinkingLine | undefined {
+  if (elapsedMs >= THINKING_STUCK_MS) {
+    return { text: stuckText, tone: "stuck", allowWhimsy: false };
+  }
+  if (elapsedMs >= THINKING_SLOW_MS) {
+    return {
+      text: "This is taking longer than usual…",
+      tone: "waiting",
+      allowWhimsy: false,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Nothing is on the wire yet. What that MEANS depends on whether this
+ * conversation has answered before: a follow-up is waiting on a worker that is
+ * (almost always) alive, so the model is working; a first turn is waiting on a
+ * worker that does not exist yet, so the startup phases are the true account.
+ */
+function waitingLine({
+  messages,
+  elapsedMs,
+}: {
+  messages: ThinkingMessage[];
+  elapsedMs: number;
+}): LangyThinkingLine {
+  // A FOLLOW-UP IS WAITING. The manager's own "Thinking…" status lands moments
+  // later and takes over either way. The startup ladder here would claim a boot
+  // that is not happening, and a connection-flavoured line read as a lost
+  // connection. Long silence still escalates, because a follow-up can wedge.
+  if (hasPriorReply(messages)) {
+    return (
+      silenceEscalation({
+        elapsedMs,
+        stuckText: "Langy still hasn't answered — it may be stuck.",
+      }) ?? { text: "Thinking…", tone: "waiting", allowWhimsy: false }
+    );
+  }
+
+  // NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on a
+  // worker that has not started, and we must not pretend otherwise.
+  const escalated = silenceEscalation({
+    elapsedMs,
+    stuckText: "Langy still hasn't started — it may be stuck.",
+  });
+  if (escalated) return escalated;
+
+  if (elapsedMs >= THINKING_STILL_STARTING_MS) {
+    return { text: "Still starting up…", tone: "waiting", allowWhimsy: false };
+  }
+  if (elapsedMs >= THINKING_STARTING_LANGY_MS) {
+    return { text: "Starting Langy…", tone: "waiting", allowWhimsy: false };
+  }
+  // The first phase of a cold turn: the control plane resolves credentials and
+  // lays out the worker's home before the agent process exists. The manager's
+  // own "Starting Langy…" status replaces this line the moment the worker is
+  // up (langyChatTransport), so on a warm turn this shows only for a blink.
+  return {
+    text: "Preparing Langy's workspace…",
+    tone: "waiting",
+    allowWhimsy: false,
+  };
+}
+
+/**
  * The honest line for the current state of a turn.
  *
  * Pure: the caller measures `elapsedMs` (time since the turn was sent) and owns
@@ -208,61 +286,7 @@ export function langyThinkingLine({
     return { text: "Thinking…", tone: "working", allowWhimsy: true };
   }
 
-  // 5. A FOLLOW-UP IS WAITING. The conversation has answered before, so its
-  //    worker is (almost always) alive and the wait is the model working —
-  //    the manager's own "Thinking…" status lands moments later and takes
-  //    over either way. The startup ladder here would claim a boot that is
-  //    not happening; a connection-flavoured line read as a lost connection.
-  //    Long silence still escalates, because a follow-up can genuinely wedge.
-  if (hasPriorReply(messages)) {
-    if (elapsedMs >= THINKING_STUCK_MS) {
-      return {
-        text: "Langy still hasn't answered — it may be stuck.",
-        tone: "stuck",
-        allowWhimsy: false,
-      };
-    }
-    if (elapsedMs >= THINKING_SLOW_MS) {
-      return {
-        text: "This is taking longer than usual…",
-        tone: "waiting",
-        allowWhimsy: false,
-      };
-    }
-    return { text: "Thinking…", tone: "waiting", allowWhimsy: false };
-  }
-
-  // 6. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
-  //    a worker that has not started, and we must not pretend otherwise.
-  //    Escalate with time: silence is normal for a moment, then it isn't, then
-  //    it's a fault.
-  if (elapsedMs >= THINKING_STUCK_MS) {
-    return {
-      text: "Langy still hasn't started — it may be stuck.",
-      tone: "stuck",
-      allowWhimsy: false,
-    };
-  }
-  if (elapsedMs >= THINKING_SLOW_MS) {
-    return {
-      text: "This is taking longer than usual…",
-      tone: "waiting",
-      allowWhimsy: false,
-    };
-  }
-  if (elapsedMs >= THINKING_STILL_STARTING_MS) {
-    return { text: "Still starting up…", tone: "waiting", allowWhimsy: false };
-  }
-  if (elapsedMs >= THINKING_STARTING_LANGY_MS) {
-    return { text: "Starting Langy…", tone: "waiting", allowWhimsy: false };
-  }
-  // The first phase of a cold turn: the control plane resolves credentials and
-  // lays out the worker's home before the agent process exists. The manager's
-  // own "Starting Langy…" status replaces this line the moment the worker is
-  // up (langyChatTransport), so on a warm turn this shows only for a blink.
-  return {
-    text: "Preparing Langy's workspace…",
-    tone: "waiting",
-    allowWhimsy: false,
-  };
+  // 5. NOTHING IS ON THE WIRE. What the silence means, and how it escalates,
+  //    depends on whether this conversation has answered before.
+  return waitingLine({ messages, elapsedMs });
 }
