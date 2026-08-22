@@ -59,6 +59,16 @@ export interface ExchangePersonalProject {
 }
 
 /**
+ * What the minted `cli_api_key` reaches. `organization` covers every project
+ * of the organization and carries an empty `project_ids`; `projects` names the
+ * exact ids the user picked on the authorize screen.
+ */
+export interface ExchangeCliApiKeyScope {
+  kind: "organization" | "projects";
+  project_ids: string[];
+}
+
+/**
  * The CLI device-code flow can mint two distinct credential types:
  *   - "device_session" — the user-scoped OAuth-style access+refresh
  *     token pair used by `langwatch claude/codex/...` wrappers.
@@ -82,6 +92,13 @@ export interface ExchangeDeviceSessionResult {
   organization: ExchangeOrganization;
   default_personal_vk?: ExchangePersonalVK;
   personal_project?: ExchangePersonalProject;
+  /**
+   * The user-scoped API key minted for this login, reaching every project the
+   * user selected while approving. Absent on servers that predate the feature,
+   * and the CLI then authenticates with the personal project's own key.
+   */
+  cli_api_key?: string;
+  cli_api_key_scope?: ExchangeCliApiKeyScope;
   endpoint?: string;
 }
 

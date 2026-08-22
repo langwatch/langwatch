@@ -310,6 +310,11 @@ describe("CLI login personal-project guards", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
     });
+    // The device-session exchange now mints a user-scoped CLI ApiKey (plus
+    // its private custom role); ApiKey→Organization is a Restrict relation,
+    // so these go before the organization delete.
+    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.project.deleteMany({
       where: { team: { organizationId: ORG_ID } },
     });

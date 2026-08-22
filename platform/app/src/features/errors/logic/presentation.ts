@@ -377,6 +377,21 @@ const presentations = {
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
+  cli_key_selection_invalid: {
+    title: "Check the access selection",
+    describe: (error) => {
+      const fieldErrors = error.meta.fieldErrors;
+      if (fieldErrors && typeof fieldErrors === "object") {
+        if (Object.hasOwn(fieldErrors, "bindings")) {
+          return "Select at least one workspace, team, or project for the key.";
+        }
+        if (Object.hasOwn(fieldErrors, "permissions")) {
+          return "Select at least one valid permission for the key.";
+        }
+      }
+      return "The selected scopes and permissions aren't valid.";
+    },
+  },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
@@ -551,6 +566,12 @@ const presentations = {
   api_key_scope_violation: {
     title: "This API key can't do that",
     describe: () => "It doesn't include the required scope.",
+  },
+
+  project_visibility_too_wide: {
+    title: "Too many projects to list for this key",
+    describe: () =>
+      "This key reaches more projects than we can list in one request. Bind it to the teams or projects it works with, then try again.",
   },
 
   // ==========================================================================

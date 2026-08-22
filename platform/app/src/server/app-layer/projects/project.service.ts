@@ -425,6 +425,8 @@ export class ProjectService {
     organizationId: string;
     page: number;
     limit: number;
+    /** See {@link ProjectRepository.findAllByOrganization}. */
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return this.repo.findAllByOrganization(params);
   }
