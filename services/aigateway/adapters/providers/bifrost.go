@@ -182,6 +182,27 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 	return nil
 }
 
+// dispatchCredential resolves the credential every lane below dispatches
+// with, and is the gateway's single call site for
+// domain.WithDeploymentSelfMap.
+//
+// Azure / Bedrock / Vertex route on deployment name, and the control-plane/VK
+// path materializes credentials straight off the bundle wire
+// (adapters/controlplane/config_wire.go), which carries no deployment map at
+// all — so without this the provider is handed a nil map and rejects the
+// dispatch before dialing. Resolving at the two dispatch entry points rather
+// than per lane is what stops the next lane added from forgetting it, and it
+// lands before Bifrost's key SELECTION stage (GetKeysForProvider reads the
+// credential off the context), which filters out keys whose deployment map
+// does not cover the model — a stage that runs earlier than the key-config
+// validation the symptom names.
+//
+// model must be the same string the request carries to Bifrost, since that is
+// the key the provider looks the deployment up under.
+func dispatchCredential(cred domain.Credential, model string) domain.Credential {
+	return domain.WithDeploymentSelfMap(cred, model)
+}
+
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is
@@ -213,6 +234,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = dispatchCredential(cred, model)
 
 	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
 	// Voyage). The gateway proxies directly to api.voyageai.com — wire
@@ -598,6 +620,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = dispatchCredential(cred, model)
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
 	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
@@ -932,7 +955,7 @@ func rawResponseBytesResp(resp *bfschemas.BifrostResponsesResponse) ([]byte, boo
 	return extractRawResponseBytes(resp.ExtraFields.RawResponse)
 }
 
-// extractRawResponseBytes normalises the various concrete types
+// extractRawResponseBytes normalizes the various concrete types
 // Bifrost may stash into ExtraFields.RawResponse (typed `interface{}`)
 // into a []byte suitable for writing to the HTTP response.
 //
@@ -1157,6 +1180,7 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 			ProjectNumber:   envVar(cred.Extra["project_number"]),
 			Region:          envVar(cred.Extra["region"]),
 			AuthCredentials: envVar(cred.Extra["auth_credentials"]),
+			Deployments:     cred.DeploymentMap,
 		}
 
 	case bfschemas.VLLM:
@@ -1543,11 +1567,8 @@ func normalizeOpenAICompatBaseURL(u string) string {
 // error, so the upstream status + body ride on UpstreamError instead of a
 // *domain.Response.
 func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
-	}
-	if status <= 0 {
+	status := bifrostStatus(berr)
+	if status == 0 {
 		return classifyBifrostError(ctx, berr)
 	}
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
@@ -1601,24 +1622,145 @@ func forwardableUpstreamHeaders(in map[string]string) map[string]string {
 	return out
 }
 
-func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
+// bifrostStatus reports the upstream HTTP status a Bifrost error carries,
+// normalizing anything unusable to 0.
+//
+// Both readers of the status draw the "no upstream response" line, and they
+// have to draw it in the same place: errFromBifrost decides whether to forward
+// the status verbatim, classifyBifrostError decides which code it maps to. A
+// value neither of them can forward — nil, or a non-positive int — is the same
+// fact as no status at all, so it is collapsed here rather than at each reader.
+func bifrostStatus(berr *bfschemas.BifrostError) int {
+	if berr == nil || berr.StatusCode == nil || *berr.StatusCode <= 0 {
+		return 0
 	}
+	return *berr.StatusCode
+}
+
+func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
+	status := bifrostStatus(berr)
 
 	code := domain.ErrProviderError
 	switch status {
 	case http.StatusTooManyRequests:
 		code = domain.ErrRateLimited
-	case http.StatusGatewayTimeout, 0:
+	case http.StatusGatewayTimeout:
 		code = domain.ErrProviderTimeout
+	case 0:
+		code = statuslessBifrostCode(berr)
 	}
 
 	return herr.New(ctx, code, herr.M{
 		"status":  status,
 		"message": bfErrorMsg(berr),
 	})
+}
+
+// statuslessBifrostCode classifies a Bifrost error that carries no HTTP status
+// at all, which means no upstream response was ever received.
+//
+// Status 0 used to share the 504 branch, so a provider row Bifrost refuses to
+// dial ("endpoint not set", "deployments not set") reached the client as a
+// gateway timeout — transient-looking, and retryable, so the retry engine
+// re-attempted a fault no retry can clear and told the client to wait out a
+// stall that never happened. The consequence of making it non-retryable is
+// deliberate (AC17): a misconfigured row now fails the request rather than
+// falling through to a healthy row behind it, because that silent fallback is
+// what let the misconfiguration sit unnoticed.
+//
+// The primary discriminator is the vendor's error shape rather than its
+// message, because the messages are open-ended. What the shape separates is
+// narrower than "configuration", and the narrower claim is the one that holds:
+//
+//   - An attached Go error (NewBifrostOperationError) means a call was
+//     attempted and failed at something outside the row itself — transport,
+//     DNS, body marshaling, response read. A different credential may not fail
+//     at it, so it stays retryable.
+//   - An attached vendor code (NewUnsupportedOperationError) means this
+//     provider does not serve this request type. Another provider in the chain
+//     may, so it stays retryable.
+//   - Neither means the vendor rejected the request out of hand. Retrying it
+//     against the same row cannot help.
+//
+// The last bucket is not exclusively configuration. core@v1.4.22 raises the
+// same bare Message-only shape for its own request-validation rejections
+// ("chats not provided for chat completion request", "file_id is required"),
+// and for NewBifrostOperationError call sites that pass a nil error. Those are
+// swept in deliberately: they are permanent for this request too, so refusing
+// to walk the chain is the right answer even though provider_misconfigured
+// names the wrong culprit.
+//
+// The reverse direction — a transient fault landing in that bucket — is the
+// one this branch has to buy back explicitly, because the shape alone cannot
+// see it. An empty upstream response body is built as a bare Message-only
+// literal with no status, Go error, or code (providers/utils/utils.go:1277 and
+// five sibling sites), so a dropped or truncated response would otherwise be
+// classified permanent and stop the credential chain — the exact direction
+// this change exists to prevent. It is excluded by comparing against the
+// vendor's EXPORTED constant, not a string we type here: ErrProviderResponseEmpty
+// is a symbol, so a vendor rewording moves our code with it or fails the build,
+// which is what separates this from the message-substring matching the shape
+// test replaced.
+//
+// Two further transient faults have to be bought back the same way, and they
+// are why this branch compares text at all. Core raises "provider is shutting
+// down" and "request dropped: queue is full" in that same bare shape, from the
+// provider-queue dispatch machinery every request operation goes through. The
+// gateway reaches the shutdown one in production because it calls
+// RemoveProvider on anthropic-compat endpoint eviction: RemoveProvider signals
+// the queue closing and then waits for in-flight work, and every dispatch that
+// lands in that window is answered with it. Both faults are transient —
+// queue-full is pure backpressure, which is precisely when falling through to
+// another credential is worth most — so classifying either permanent is the
+// failure this change exists to prevent, pointed backwards.
+//
+// Neither literal is exported, and no structural discriminator exists to use
+// instead. NewConfigurationError (providers/utils/utils.go:1596), the
+// deployment-map error this change was written for, produces a structurally
+// identical value: IsBifrostError false, StatusCode nil, Error.Error nil,
+// Error.Code nil. ExtraFields cannot separate them either, because core
+// overwrites ExtraFields wholesale with Provider/ModelRequested/RequestType on
+// every error alike on its way out of the queue (bifrost.go:5260). Text is the
+// only discriminator there is; see bfTransientStatuslessMessages for how the
+// resulting drift exposure is covered.
+//
+// bifrost_config_error_classification_test.go pins both buckets against the
+// vendor's own constructors, so a vendor bump that changes a shape fails there
+// rather than in production.
+func statuslessBifrostCode(berr *bfschemas.BifrostError) herr.Code {
+	if berr.Error != nil && berr.Error.Error == nil && berr.Error.Code == nil {
+		if _, transient := bfTransientStatuslessMessages[berr.Error.Message]; transient {
+			return domain.ErrProviderError
+		}
+		return domain.ErrProviderMisconfigured
+	}
+	return domain.ErrProviderError
+}
+
+// bfMsgProviderShuttingDown and bfMsgRequestDroppedQueueFull are core@v1.4.22's
+// own literals for the transient faults it raises in the bare Message-only
+// shape. Named here so the classification and its drift check read the same
+// strings rather than two independently typed copies.
+//
+// ErrProviderResponseEmpty is the vendor's exported symbol and moves with a
+// rewording or fails the build. These two are vendor-internal and cannot, so
+// bifrost_config_error_classification_test.go covers the gap from both ends: it
+// drives a real bifrost instance into shutdown and asserts on the CLASSIFICATION
+// of the live error, so a reworded message fails there rather than in
+// production; and it greps the pinned module source for both literals, which is
+// the only cover the queue-full lane can have while the gateway leaves
+// DropExcessRequests off and cannot reach it.
+const (
+	bfMsgProviderShuttingDown    = "provider is shutting down"
+	bfMsgRequestDroppedQueueFull = "request dropped: queue is full"
+)
+
+// bfTransientStatuslessMessages is the set statuslessBifrostCode consults to
+// exempt a bare Message-only error from the permanent bucket.
+var bfTransientStatuslessMessages = map[string]struct{}{
+	bfschemas.ErrProviderResponseEmpty: {},
+	bfMsgProviderShuttingDown:          {},
+	bfMsgRequestDroppedQueueFull:       {},
 }
 
 func bfErrorMsg(e *bfschemas.BifrostError) string {

@@ -605,10 +605,11 @@ func firstHandledReasonCode(e herr.E) herr.Code {
 // provider's own error text — typed (gateway-authored, marker-verified)
 // but not OUR prose, so it must not reach the customer turn span.
 var upstreamRelayCodes = map[herr.Code]bool{
-	"provider_error":   true,
-	"provider_timeout": true,
-	"rate_limited":     true,
-	"chain_exhausted":  true,
+	"provider_error":         true,
+	"provider_timeout":       true,
+	"rate_limited":           true,
+	"chain_exhausted":        true,
+	"provider_misconfigured": true,
 }
 
 // scrubUpstreamRelayedProse deletes the upstream-derived message (and any
