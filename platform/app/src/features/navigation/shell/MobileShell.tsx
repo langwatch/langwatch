@@ -1,6 +1,12 @@
 import { Box, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AppHeaderUserMenu } from "~/components/AppHeaderUserMenu";
 import { LogoIcon } from "~/components/icons/LogoIcon";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
@@ -33,6 +39,7 @@ export function MobileShell({
   children: ReactNode;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
 
   // A tap on any menu entry navigates, and the new page is the reason
@@ -41,12 +48,18 @@ export function MobileShell({
     setIsMenuOpen(false);
   }, [pathname]);
 
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+    menuButtonRef.current?.focus();
+  };
+
   return (
     <>
       <MobileTopBar
         activeProductId={state.activeProductId}
         isMenuOpen={false}
-        onMenuToggle={() => setIsMenuOpen(true)}
+        onMenuButtonPress={() => setIsMenuOpen(true)}
+        menuButtonRef={menuButtonRef}
       />
       <Box
         width="full"
@@ -61,9 +74,7 @@ export function MobileShell({
       >
         {children}
       </Box>
-      {isMenuOpen && (
-        <MobileMenuOverlay state={state} onClose={() => setIsMenuOpen(false)} />
-      )}
+      {isMenuOpen && <MobileMenuOverlay state={state} onClose={closeMenu} />}
     </>
   );
 }
@@ -78,11 +89,13 @@ export function MobileShell({
 function MobileTopBar({
   activeProductId,
   isMenuOpen,
-  onMenuToggle,
+  onMenuButtonPress,
+  menuButtonRef,
 }: {
   activeProductId: ProductId | null;
   isMenuOpen: boolean;
-  onMenuToggle: () => void;
+  onMenuButtonPress: () => void;
+  menuButtonRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const showsOwnScope =
     activeProductId === "llm-ops" || activeProductId === "me";
@@ -118,12 +131,13 @@ function MobileTopBar({
         )}
       </HStack>
       <IconButton
+        ref={menuButtonRef}
         aria-label={
           isMenuOpen ? "Close navigation menu" : "Open navigation menu"
         }
         variant="ghost"
         size="sm"
-        onClick={onMenuToggle}
+        onClick={onMenuButtonPress}
       >
         {isMenuOpen ? <X size={20} /> : <MenuIcon size={20} />}
       </IconButton>
@@ -145,9 +159,27 @@ function MobileMenuOverlay({
   state: NavigationV2ShellReadyState;
   onClose: () => void;
 }) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The overlay is a modal: it takes focus on open, and Escape closes
+  // it the way the close button does.
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <Box
       data-testid="mobile-menu-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation menu"
       position="fixed"
       inset={0}
       zIndex={1300}
@@ -158,7 +190,8 @@ function MobileMenuOverlay({
       <MobileTopBar
         activeProductId={state.activeProductId}
         isMenuOpen
-        onMenuToggle={onClose}
+        onMenuButtonPress={onClose}
+        menuButtonRef={closeButtonRef}
       />
       <HStack
         paddingX={4}
@@ -177,7 +210,7 @@ function MobileMenuOverlay({
           <SidebarContent
             surface={state.activeProductId ?? "settings"}
             showExpanded
-            fullWidth
+            isFullWidth
           />
         </SideMenuDensityProvider>
       </Box>

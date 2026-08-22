@@ -265,16 +265,22 @@ describe("ScopeChipPicker search and team grouping", () => {
         expect(listbox().getByText("web-app")).toBeInTheDocument();
       });
       const groups = listbox().getAllByRole("group");
-      const groupHolding = (label: string, item: string) =>
+      const groupHolding = ({ label, item }: { label: string; item: string }) =>
         groups.some(
           (group) =>
             within(group).queryByText(label) !== null &&
             within(group).queryByText(item) !== null,
         );
-      expect(groupHolding("QA Shared Team", "web-app")).toBe(true);
-      expect(groupHolding("Platform Team", "billing-svc")).toBe(true);
+      expect(groupHolding({ label: "QA Shared Team", item: "web-app" })).toBe(
+        true,
+      );
+      expect(
+        groupHolding({ label: "Platform Team", item: "billing-svc" }),
+      ).toBe(true);
       // A project whose team is not listed keeps the flat group.
-      expect(groupHolding("Projects", "orphan-app")).toBe(true);
+      expect(groupHolding({ label: "Projects", item: "orphan-app" })).toBe(
+        true,
+      );
     });
   });
 
@@ -347,6 +353,51 @@ describe("ScopeChipPicker search and team grouping", () => {
           { scopeType: "PROJECT", scopeId: "p-bill" },
         ]),
       );
+    });
+  });
+
+  describe("given the single-select variant with more than eight scopes", () => {
+    /** @scenario The single-select dropdown searches the same way */
+    it("narrows by team name and takes the picked project", async () => {
+      const onChange = vi.fn();
+      renderPicker(
+        <ScopeChipPicker
+          variant="single-select"
+          value={[]}
+          onChange={onChange}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          availableTeams={teams}
+          availableProjects={manyProjects}
+          placeholder="Select a project"
+        />,
+      );
+      const user = await openDropdown();
+
+      await user.type(screen.getByLabelText("Search scopes"), "platform");
+      await waitFor(() => {
+        expect(listbox().queryByText("qa-app-1")).not.toBeInTheDocument();
+      });
+      // Both of the team's projects match through the team's name, and
+      // they stay under a group header carrying it.
+      expect(listbox().getByText("edge-router")).toBeInTheDocument();
+      expect(
+        listbox()
+          .getAllByRole("group")
+          .some(
+            (group) =>
+              within(group).queryByText("Platform Team") !== null &&
+              within(group).queryByText("billing-svc") !== null,
+          ),
+      ).toBe(true);
+
+      await user.click(listbox().getByText("billing-svc"));
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith([
+          { scopeType: "PROJECT", scopeId: "p-bill" },
+        ]);
+      });
     });
   });
 

@@ -405,7 +405,7 @@ describe("the mobile chrome", () => {
     });
 
     /** @scenario Navigating from the overlay closes it */
-    it("closes the overlay when the page underneath changes", async () => {
+    it("closes the overlay when a page is opened from it", async () => {
       const user = userEvent.setup();
       const view = renderShell();
 
@@ -415,6 +415,14 @@ describe("the mobile chrome", () => {
       await waitFor(() => {
         expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
       });
+
+      // Tap a real entry. jsdom cannot follow the anchor, so the route
+      // change the tap causes is applied to the mocked pathname by hand.
+      const overlay = within(screen.getByTestId("mobile-menu-overlay"));
+      const entry = overlay.getByRole("link", { name: /Analytics/ });
+      expect(entry).toHaveAttribute("href", "/demo/analytics");
+      entry.addEventListener("click", (event) => event.preventDefault());
+      await user.click(entry);
 
       mockNavPathname = "/demo/analytics";
       view.rerender(
@@ -431,6 +439,60 @@ describe("the mobile chrome", () => {
         ).not.toBeInTheDocument();
       });
       expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+
+    /** @scenario The close button dismisses the overlay without navigating */
+    it("closes when the close button is tapped and stays on the page", async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(
+        screen.getByRole("button", { name: "Open navigation menu" }),
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole("dialog", { name: "Navigation menu" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Close navigation menu" }),
+      ).toHaveFocus();
+
+      await user.click(
+        screen.getByRole("button", { name: "Close navigation menu" }),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mobile-menu-overlay"),
+        ).not.toBeInTheDocument();
+      });
+      expect(pushMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+
+    /** @scenario Escape closes the overlay and returns focus to the menu button */
+    it("closes on Escape and moves focus back to the menu button", async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      const menuButton = screen.getByRole("button", {
+        name: "Open navigation menu",
+      });
+      await user.click(menuButton);
+      await waitFor(() => {
+        expect(screen.getByTestId("mobile-menu-overlay")).toBeInTheDocument();
+      });
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mobile-menu-overlay"),
+        ).not.toBeInTheDocument();
+      });
+      expect(menuButton).toHaveFocus();
     });
   });
 

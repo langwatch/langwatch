@@ -291,11 +291,11 @@ function ProductSidebarBody({
 export function SidebarContent({
   surface,
   showExpanded,
-  fullWidth = false,
+  isFullWidth = false,
 }: {
   surface: SidebarSurface;
   showExpanded: boolean;
-  fullWidth?: boolean;
+  isFullWidth?: boolean;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   // Keyed by surface: each product's menu keeps its own place, and moving
@@ -309,7 +309,7 @@ export function SidebarContent({
       gap={0}
       height="100%"
       align="start"
-      width={fullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
+      width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
       {/* The way back out of Settings sits above the scroll region, so a

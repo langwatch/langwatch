@@ -7,10 +7,8 @@ import { useWorkspaceData } from "~/components/useWorkspaceData";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import type { ProductId } from "../products";
-import {
-  type ProjectPickGroup,
-  ProjectSwitcherCombobox,
-} from "./ProjectSwitcherCombobox";
+import { ProjectSwitcherCombobox } from "./ProjectSwitcherCombobox";
+import type { ProjectPickGroup } from "./projectPickItems";
 
 function ScopeDivider() {
   return (

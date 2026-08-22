@@ -45,6 +45,20 @@ Feature: Mobile chrome
     Then the overlay closes and the page shows
 
   @integration
+  Scenario: The close button dismisses the overlay without navigating
+    Given the navigation overlay is open
+    When I tap the close button
+    Then the overlay closes
+    And I stay on the same page
+
+  @integration
+  Scenario: Escape closes the overlay and returns focus to the menu button
+    Given the navigation overlay is open
+    When I press Escape
+    Then the overlay closes
+    And the menu button holds focus
+
+  @integration
   Scenario: Tablet and desktop widths keep the sidebar chrome
     Given I am on an LLM Ops page on a desktop-width viewport
     Then the sidebar renders and no menu button shows

@@ -549,7 +549,10 @@ describe("the product-switcher top bar", () => {
       renderShell();
       await openProjectPicker();
 
-      expect(screen.getByPlaceholderText("Search projects")).toHaveFocus();
+      // The field carries its own accessible name, not only a placeholder.
+      expect(
+        screen.getByRole("combobox", { name: "Search projects" }),
+      ).toHaveFocus();
       await waitFor(() => {
         expect(screen.getByText("Edge Router")).toBeInTheDocument();
       });

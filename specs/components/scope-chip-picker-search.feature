@@ -24,6 +24,12 @@ Feature: Scope picker search and team grouping
     And typing narrows the options to those whose name or team matches
 
   @integration
+  Scenario: The single-select dropdown searches the same way
+    Given the single-select picker offers more than eight scopes
+    When I search by a team name and pick one of its projects
+    Then the picker takes that project as the chosen scope
+
+  @integration
   Scenario: A short scope list has no search field
     Given the picker offers eight scopes or fewer
     When I open the scope dropdown
