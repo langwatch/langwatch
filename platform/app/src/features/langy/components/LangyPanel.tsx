@@ -485,6 +485,7 @@ function LangyPanel({
   const selectConversation = useLangyStore((s) => s.selectConversation);
   const startNewConversation = useLangyStore((s) => s.startNewConversation);
   const consumeHistoryLoad = useLangyStore((s) => s.consumeHistoryLoad);
+  const requestComposerFocus = useLangyStore((s) => s.requestComposerFocus);
   // The command bar's "Ask Langy" hands a question over via the store; the panel
   // opens itself and auto-sends it (see the pendingPrompt effect below).
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
@@ -964,6 +965,9 @@ function LangyPanel({
         duration: 2500,
       });
       setMakeDefaultPlan(null);
+      // The dialog took the cursor for one question about the model. Answering
+      // it gives the cursor back to the message being written.
+      requestComposerFocus();
     } catch (error) {
       showErrorToast({
         error,
@@ -977,6 +981,7 @@ function LangyPanel({
       makeDefaultDeclinedRef.current.add(makeDefaultPlan.model);
     }
     setMakeDefaultPlan(null);
+    requestComposerFocus();
   };
 
   const {
@@ -2919,11 +2924,15 @@ function LangyPanel({
                             />
                           ) : null}
                           {turnInFlight ? (
-                            // Extra air above the working lines: the column's gap
-                            // alone left them hugging the cards of the streaming
-                            // answer, which read as part of the message rather than
-                            // the live edge below it.
-                            <VStack align="stretch" gap={2.5} marginTop={1.5}>
+                            // No extra air above the working lines. The answer
+                            // takes this exact slot when it arrives, so any
+                            // margin here is a jump the reader sees at the one
+                            // moment they are watching: the line sat 8px lower
+                            // than the first line of the reply that replaced it.
+                            // The row's own padding is zero for the same reason
+                            // (STATUS_LINE_ROW), which lands the two text boxes
+                            // on the same optical line.
+                            <VStack align="stretch" gap={2.5}>
                               {/* Reasoning is a SIGNAL, never a surface: the model's
                           thinking is not shown to the user, so it reaches the
                           line as a boolean that only changes its words

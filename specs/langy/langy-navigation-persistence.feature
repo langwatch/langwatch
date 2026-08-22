@@ -48,6 +48,13 @@ Feature: Langy persists across in-project navigation
     # Conversation ids are project-scoped, so restoring one anywhere else would
     # ask the server for a conversation this project does not have.
 
+  # A new chat exists to be written in, so it opens ready for the first word.
+  @unit
+  Scenario: A new chat opens with the cursor in the composer
+    Given the Langy panel is open on a conversation
+    When I start a new chat
+    Then the composer holds keyboard focus and I can type at once
+
   @unit
   Scenario: Starting a new chat is what I come back to
     Given I had a conversation open and then started a new chat

@@ -211,14 +211,18 @@ interface LangyState extends TurnPhaseState {
   consumePendingPrompt: () => void;
 
   /**
-   * An `askLangy` handoff also asks the panel's composer to take focus: the
-   * reader just handed a question over and expects to keep typing, not to
-   * click the field first. A flag rather than an imperative call because the
-   * composer may not be mounted yet when the handoff fires — it honors the
-   * request on mount or on change, then consumes it so focus is taken exactly
-   * once. Ephemeral, like `pendingPrompt`.
+   * The panel's composer is asked to take focus. Three producers: an
+   * `askLangy` handoff (the reader just handed a question over and expects to
+   * keep typing), a new chat (the one gesture whose whole point is to write
+   * the next message), and a dialog that took the cursor away and gives it
+   * back on close. A flag rather than an imperative call because the composer
+   * may not be mounted yet when the request fires — it honors the request on
+   * mount or on change, then consumes it so focus is taken exactly once.
+   * Ephemeral, like `pendingPrompt`.
    */
   composerFocusRequested: boolean;
+  /** Ask the composer to take focus. */
+  requestComposerFocus: () => void;
   /** The composer has taken the requested focus — clear it so it fires once. */
   consumeComposerFocus: () => void;
 
@@ -704,6 +708,7 @@ export const useLangyStore = create<LangyState>()(
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
       composerFocusRequested: false,
+      requestComposerFocus: () => set({ composerFocusRequested: true }),
       consumeComposerFocus: () => set({ composerFocusRequested: false }),
 
       // Sidebar by default: docked inside the app shell as a second content
@@ -778,6 +783,9 @@ export const useLangyStore = create<LangyState>()(
           // them go (see its subscription).
           conversationEpoch: state.conversationEpoch + 1,
           ...emptyConversationState(),
+          // A new chat exists to be written in, so it opens with the cursor
+          // already in the composer.
+          composerFocusRequested: true,
         })),
       consumeHistoryLoad: () => set({ historyLoadConversationId: null }),
 

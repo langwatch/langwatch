@@ -58,10 +58,13 @@ function turn(state: "input-available" | "output-available"): UIMessage {
   ]);
 }
 
-function renderTurn(message: UIMessage) {
+function renderTurn(
+  message: UIMessage,
+  { live = true }: { live?: boolean } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <LangyToolActivity message={message} />
+      <LangyToolActivity message={message} live={live} />
     </ChakraProvider>,
   );
 }
@@ -236,6 +239,21 @@ describe("a turn's activity cards", () => {
       expect(
         screen.getByRole("button", { name: /1 action completed/i }),
       ).toBeTruthy();
+    });
+
+    describe("when a call was still open at the end", () => {
+      /** @scenario A call left open by a stopped turn reads as interrupted */
+      it("draws it as interrupted rather than as still running", () => {
+        const { container } = renderTurn(turn("input-available"), {
+          live: false,
+        });
+
+        expect(container.textContent).toContain("Running a command");
+        expect(container.textContent).not.toContain("Running a command…");
+        expect(container.textContent).toContain(
+          "Interrupted before it finished",
+        );
+      });
     });
   });
 });

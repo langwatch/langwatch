@@ -20,10 +20,16 @@ const MotionBox = motion.create(Box);
  * Both components (LangyThinkingLine, StreamingStatusLine) now share this row
  * frame — same leading-indicator slot, same gap, same padding, same text
  * metrics — so the words change and nothing moves.
+ *
+ * The row carries NO vertical padding, and that is what makes the answer land
+ * where the line stood: these lines and the reply's first paragraph are
+ * siblings in the same column, so 2px here plus the block's own margin put the
+ * working line 8px below the text that replaced it, and the whole column
+ * appeared to jump up the moment the answer arrived.
  */
 export const STATUS_LINE_ROW = {
   gap: 2,
-  paddingY: 0.5,
+  paddingY: 0,
   paddingLeft: 0.5,
 } as const;
 

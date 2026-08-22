@@ -78,6 +78,7 @@ import {
   LangyCapabilityRenderer,
   toolResultForCapability,
 } from "./capabilities/LangyCapabilityRenderer";
+import { LangyInterruptedNote } from "./LangyInterruptedNote";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
@@ -638,6 +639,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
 export function LangyToolActivity({
   message,
   reasoningTitles,
+  live = true,
 }: {
   message: UIMessage;
   /**
@@ -647,11 +649,14 @@ export function LangyToolActivity({
    * collapsed card, not a stack of loose bold lines above the answer.
    */
   reasoningTitles?: string[];
+  /** @see LangyActivityParts */
+  live?: boolean;
 }) {
   return (
     <LangyActivityParts
       parts={message.parts}
       reasoningTitles={reasoningTitles}
+      live={live}
     />
   );
 }
@@ -661,11 +666,19 @@ export function LangyToolActivity({
  * message (LangyToolActivity) and one plan step's attributed calls
  * (LangyPlanCard). Renders nothing when the parts carry no activity, so a bucket
  * with only prose collapses to nothing.
+ *
+ * `live` says whether the turn these parts belong to is still running. It is
+ * what tells an unfinished call apart from an INTERRUPTED one: a tool part is
+ * only ever closed by its own output, so a turn that the user stopped (or that
+ * died) leaves its open calls in the running state for good. On a settled turn
+ * those calls are drawn as interrupted, with no pulse and no shimmer, instead
+ * of a card that says "Searching traces…" for the rest of the conversation.
  */
 export function LangyActivityParts({
   parts,
   reasoningTitles = [],
-}: PartsView & { reasoningTitles?: string[] }) {
+  live = true,
+}: PartsView & { reasoningTitles?: string[]; live?: boolean }) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
@@ -732,7 +745,11 @@ export function LangyActivityParts({
       order: group.order,
       node: (
         <VStack align="stretch" gap={2} role="list">
-          <RunningActivityCard group={group} devMode={devMode} />
+          <RunningActivityCard
+            group={group}
+            devMode={devMode}
+            interrupted={!live}
+          />
         </VStack>
       ),
     })),
@@ -794,6 +811,7 @@ export function LangyActivityParts({
           progressSample={
             index === pending.length - 1 ? turnProgressSample : null
           }
+          interrupted={!live}
         />
       ),
     })),
@@ -1701,9 +1719,16 @@ function SettledActivityLabel({
 function RunningActivityCard({
   group,
   devMode,
+  interrupted = false,
 }: {
   group: ActivityGroup;
   devMode: boolean;
+  /**
+   * The turn ended while this call was still open — the user stopped it, or it
+   * died. The card keeps the work it named and drops every claim of activity:
+   * no pulse, no shimmer, no trailing ellipsis, and it says what happened.
+   */
+  interrupted?: boolean;
 }) {
   const reduce = useReducedMotion();
   // The raw payload has its OWN toggle. It used to ride a card-expansion state,
@@ -1711,9 +1736,10 @@ function RunningActivityCard({
   // the `{}` ever being clicked. Closed until asked, every time.
   const [jsonOpen, setJsonOpen] = useState(false);
   const detail = group.detail;
-  const shimmer = reduce
-    ? { ...langyThinkingShimmerStyles, animation: "none" }
-    : langyThinkingShimmerStyles;
+  const shimmer =
+    reduce || interrupted
+      ? { ...langyThinkingShimmerStyles, animation: "none" }
+      : langyThinkingShimmerStyles;
 
   return (
     <VStack
@@ -1729,52 +1755,23 @@ function RunningActivityCard({
       paddingX="15px"
       paddingY="12px"
     >
-      <HStack gap={1.5} align="center">
-        <Box
-          width="6px"
-          height="6px"
-          borderRadius="full"
-          background="orange.solid"
-          flexShrink={0}
-          css={
-            reduce
-              ? undefined
-              : { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-          }
-        />
-        <Text
-          textStyle="2xs"
-          fontWeight="500"
-          letterSpacing="0.03em"
-          textTransform="uppercase"
-          color="fg.subtle"
-          truncate
-          flex={1}
-          minWidth={0}
-        >
-          {groupCategory(group)}
-        </Text>
-        {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((v) => !v)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
-        ) : null}
-      </HStack>
+      <RunningActivityHeader
+        category={groupCategory(group)}
+        live={!interrupted && !reduce}
+        muted={interrupted}
+        devMode={devMode}
+        jsonOpen={jsonOpen}
+        onToggleJson={() => setJsonOpen((v) => !v)}
+      />
 
-      <Box textStyle="sm" fontWeight="640" lineHeight="1.3" css={shimmer}>
-        {`${group.label}…`}
+      <Box
+        textStyle="sm"
+        fontWeight="640"
+        lineHeight="1.3"
+        color={interrupted ? "fg.muted" : undefined}
+        css={interrupted ? undefined : shimmer}
+      >
+        {interrupted ? group.label : `${group.label}…`}
       </Box>
 
       {detail ? (
@@ -1782,6 +1779,8 @@ function RunningActivityCard({
           {detail}
         </Text>
       ) : null}
+
+      {interrupted ? <LangyInterruptedNote /> : null}
 
       {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1}>
@@ -1791,6 +1790,72 @@ function RunningActivityCard({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/** The card's top row: the state dot, what kind of work it is, the raw toggle. */
+function RunningActivityHeader({
+  category,
+  live,
+  muted,
+  devMode,
+  jsonOpen,
+  onToggleJson,
+}: {
+  category: string;
+  /** The dot pulses. False for reduced motion and for an interrupted card. */
+  live: boolean;
+  /** The work is over, so the dot drops to a quiet grey. */
+  muted: boolean;
+  devMode: boolean;
+  jsonOpen: boolean;
+  onToggleJson: () => void;
+}) {
+  return (
+    <HStack gap={1.5} align="center">
+      <Box
+        width="6px"
+        height="6px"
+        borderRadius="full"
+        background={muted ? "fg.subtle" : "orange.solid"}
+        opacity={muted ? 0.6 : 1}
+        flexShrink={0}
+        css={
+          live
+            ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
+            : undefined
+        }
+      />
+      <Text
+        textStyle="2xs"
+        fontWeight="500"
+        letterSpacing="0.03em"
+        textTransform="uppercase"
+        color="fg.subtle"
+        truncate
+        flex={1}
+        minWidth={0}
+      >
+        {category}
+      </Text>
+      {devMode ? (
+        <Tooltip
+          content={jsonOpen ? "Hide raw data" : "Show raw data"}
+          showArrow
+        >
+          <IconButton
+            size="2xs"
+            variant="ghost"
+            color={jsonOpen ? "orange.solid" : "fg.subtle"}
+            aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
+            aria-expanded={jsonOpen}
+            onClick={onToggleJson}
+          >
+            <Braces size={12} />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </HStack>
   );
 }
 

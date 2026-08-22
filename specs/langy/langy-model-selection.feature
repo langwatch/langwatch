@@ -91,6 +91,14 @@ Feature: Langy runs on the model the project chose
     And confirming writes the default at the same scope and kind that held it
     And declining keeps the pick for this conversation only
 
+  # The dialog interrupts a message being written, so it hands the cursor back
+  # when it closes. Both answers count: the reader was typing either way.
+  @unit
+  Scenario: A dialog gives the cursor back to the composer when it closes
+    Given the make-default dialog is open over the panel
+    When the user confirms it or keeps the pick for this conversation
+    Then the composer holds keyboard focus again
+
   @unit
   Scenario: No default offer without the right to change it
     Given the Langy default is configured at a scope the user cannot manage
