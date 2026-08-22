@@ -85,6 +85,31 @@ describe("SavePromptButton", () => {
     });
   });
 
+  describe("when the prompt has no versions yet", () => {
+    /** @scenario "A prompt with no versions yet is simply saved" */
+    it("names the action as a plain save", () => {
+      // Nothing to be the latest of, so there is no version to bump and no
+      // older version to republish: the only action is the first save.
+      mockUseLatestPromptVersion.mockReturnValue({
+        currentVersion: undefined,
+        latestVersion: undefined,
+        nextVersion: undefined,
+        isOutdated: false,
+        isLoading: false,
+      });
+
+      render(
+        <TestWrapper formValues={{ configId: undefined }}>
+          <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={true} />
+        </TestWrapper>,
+      );
+
+      const button = screen.getByTestId("save-prompt-button");
+      expect(button).toHaveTextContent("Save");
+      expect(button).toBeEnabled();
+    });
+  });
+
   describe("when at latest version with changes", () => {
     /** @scenario "The save button names saving, not the version number" */
     it("names the action as saving the changes", () => {

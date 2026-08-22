@@ -387,14 +387,6 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByText("New Prompt")).toBeInTheDocument();
     });
 
-    it("shows save button with Save text for new prompts", () => {
-      renderWithProviders(<PromptEditorDrawer open={true} />);
-      // New prompts show "Save" on the button (no version update)
-      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
-        "Save",
-      );
-    });
-
     it("shows model selector in header", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("model-select")).toBeInTheDocument();
@@ -518,10 +510,10 @@ describe("PromptEditorDrawer", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows Saved button initially (no changes)", () => {
+    it("says there is nothing to save initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
-        "Saved",
+        "No changes to save",
       );
     });
 

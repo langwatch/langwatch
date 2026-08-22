@@ -413,6 +413,17 @@ export const app = createService({
       "/prompt.execute",
       {
         docs: { hide: true },
+        // The check is real but not expressible as a bare `permission`: it
+        // also refuses the demo project, whose blanket `prompts:view` grant
+        // is a *view* grant and execution spends provider credit. So the
+        // endpoint declares self-managed access and runs the check itself,
+        // matching the `handlerManagedAuth` policy registered above.
+        noPermission: {
+          reason:
+            "prompts:view checked against the body's projectId by endpoint " +
+            "middleware, with the demo project refused because execution " +
+            "spends provider credit",
+        },
         middleware: [requirePromptsViewOnProject],
         input: executeRequestSchema,
       },
