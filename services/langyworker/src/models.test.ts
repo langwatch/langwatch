@@ -14,11 +14,14 @@ const model: LangyWorkerModelConfig = {
 };
 
 describe("buildModelsJson", () => {
-  describe("given the base URL env var is set", () => {
+  describe("when the base URL env var is set", () => {
     it("writes the resolved base URL literally and the API key as an env REFERENCE", () => {
-      const generated = buildModelsJson(model, {
-        OPENAI_BASE_URL: "http://127.0.0.1:41234/v1",
-        OPENAI_API_KEY: "sk-secret",
+      const generated = buildModelsJson({
+        model,
+        env: {
+          OPENAI_BASE_URL: "http://127.0.0.1:41234/v1",
+          OPENAI_API_KEY: "sk-secret",
+        },
       });
       const provider = generated.providers[PROVIDER_ID] as Record<string, unknown>;
       expect(provider.baseUrl).toBe("http://127.0.0.1:41234/v1");
@@ -29,10 +32,10 @@ describe("buildModelsJson", () => {
     });
 
     it("passes model fields (compat included) through verbatim, minus the env pointers", () => {
-      const generated = buildModelsJson(
-        { ...model, samplingParams: { temperature: 1 } } as LangyWorkerModelConfig,
-        { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" },
-      );
+      const generated = buildModelsJson({
+        model: { ...model, samplingParams: { temperature: 1 } } as LangyWorkerModelConfig,
+        env: { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" },
+      });
       const provider = generated.providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
       const entry = provider.models[0] as Record<string, unknown>;
       expect(entry.id).toBe("gpt-5-mini");
@@ -46,16 +49,18 @@ describe("buildModelsJson", () => {
     });
   });
 
-  describe("given a missing env var", () => {
+  describe("when a missing env var", () => {
     it("fails with the variable name", () => {
-      expect(() => buildModelsJson(model, { OPENAI_API_KEY: "k" })).toThrow(/OPENAI_BASE_URL/);
-      expect(() => buildModelsJson(model, { OPENAI_BASE_URL: "http://x" })).toThrow(
+      expect(() => buildModelsJson({ model, env: { OPENAI_API_KEY: "k" } })).toThrow(
+        /OPENAI_BASE_URL/,
+      );
+      expect(() => buildModelsJson({ model, env: { OPENAI_BASE_URL: "http://x" } })).toThrow(
         /OPENAI_API_KEY/,
       );
     });
   });
 
-  describe("given a model pi's own catalog lists for the same API dialect", () => {
+  describe("when a model pi's own catalog lists for the same API dialect", () => {
     const claude: LangyWorkerModelConfig = {
       id: "anthropic/claude-opus-5",
       api: "anthropic-messages",
@@ -66,7 +71,7 @@ describe("buildModelsJson", () => {
     const env = { ANTHROPIC_BASE_URL: "http://127.0.0.1:41234", ANTHROPIC_API_KEY: "k" };
 
     const entryOf = (config: LangyWorkerModelConfig) => {
-      const provider = buildModelsJson(config, env).providers[PROVIDER_ID] as {
+      const provider = buildModelsJson({ model: config, env }).providers[PROVIDER_ID] as {
         baseUrl: string;
         models: Record<string, unknown>[];
       };
@@ -92,7 +97,7 @@ describe("buildModelsJson", () => {
       expect(provider.baseUrl).toBe("http://127.0.0.1:41234");
       expect(entry.baseUrl).toBeUndefined();
       expect(entry.provider).toBeUndefined();
-      expect(JSON.stringify(buildModelsJson(claude, env))).not.toContain("api.anthropic.com");
+      expect(JSON.stringify(buildModelsJson({ model: claude, env }))).not.toContain("api.anthropic.com");
     });
 
     /** @scenario A known model's registry entry keeps pi's own catalog knowledge */
@@ -116,12 +121,14 @@ describe("buildModelsJson", () => {
     });
   });
 
-  describe("given a model pi's catalog does not know", () => {
+  describe("when a model pi's catalog does not know", () => {
     /** @scenario A model pi's catalog does not know is written from config alone */
     it("writes exactly the manager's config, for unknown ids and unprefixed ids alike", () => {
       const env = { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" };
       for (const id of ["anthropic/claude-acme-1", "gpt-5-mini"]) {
-        const provider = buildModelsJson({ ...model, id }, env).providers[PROVIDER_ID] as {
+        const provider = buildModelsJson({ model: { ...model, id }, env }).providers[
+          PROVIDER_ID
+        ] as {
           models: Record<string, unknown>[];
         };
         expect(provider.models[0]).toEqual({

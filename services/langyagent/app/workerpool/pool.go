@@ -74,6 +74,25 @@ type Options struct {
 	OTelRelay *otelrelay.Relay
 }
 
+// agentCloser is the optional capability an agent implements when it owns a
+// resource cmd.Wait does not release. The pi agent holds the parent's write end
+// of the worker's stdin pipe; the opencode agent holds nothing and does not
+// implement it.
+type agentCloser interface {
+	Close()
+}
+
+// closeAgentOf releases an agent's own pipes, if it holds any. Idempotent, so
+// the kill path and the exit watcher can both call it.
+func closeAgentOf(w *Worker) {
+	if w == nil {
+		return
+	}
+	if closer, ok := w.agent.(agentCloser); ok {
+		closer.Close()
+	}
+}
+
 // CredentialRevoker revokes the session key a dead worker was carrying.
 //
 // Consumer-side interface, deliberately one method wide: the pool must be able to
@@ -439,7 +458,7 @@ func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds dom
 	return p.acquire(ctx, conversationID, creds, false)
 }
 
-func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, evictIdleAtCapacity bool) (app.Worker, error) {
+func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, shouldEvictIdleAtCapacity bool) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
@@ -505,7 +524,7 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 	// loop re-checks because a concurrent spawner can take the freed slot first.
 	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
 		victim, found := "", false
-		if evictIdleAtCapacity {
+		if shouldEvictIdleAtCapacity {
 			victim, found = p.idleVictimLocked()
 		}
 		if !found {
@@ -913,6 +932,15 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		if err != nil {
 			return nil, fmt.Errorf("start authproxy: %w", err)
 		}
+		// The rollback registers the moment the proxy is live: a spawn failure
+		// below returns from this function, and a defer added after the switch
+		// would not exist yet, so the proxy would keep its port for the pool's
+		// whole lifetime.
+		defer func() {
+			if !success {
+				proxy.Shutdown()
+			}
+		}()
 
 		// The worker subprocess is bound to the POOL-lifetime context, the
 		// per-request context controls a single chat turn, but the worker stays
@@ -949,14 +977,6 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		ocSpan.End()
 		agent, cmd = ocAgent, ocCmd
 	}
-	// The authproxy rollback registers AFTER the branch (defers registered
-	// inside a switch case still run at function exit, but keeping it here
-	// makes the rollback stack read top to bottom). nil for pi, nil-guarded.
-	defer func() {
-		if !success && proxy != nil {
-			proxy.Shutdown()
-		}
-	}()
 	// The exit watcher goroutine is NOT started until success below, so this undo
 	// owns cmd.Wait() without a race: on a readiness/session failure it kills the
 	// process and drains its exit, and the rollbacks above shut the proxy, wipe
@@ -1116,6 +1136,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	// so the key is now pure liability: nothing can use it, and it would otherwise
 	// stay valid for hours.
 	if deletedOwnEntry {
+		closeAgentOf(exitedWorker)
 		p.revokeKeyOf(exitedWorker, "worker exited")
 		// Revoke the telemetry-relay routing token too: a dead worker's token must
 		// stop attributing spans / spending the virtual key, and the relay's
@@ -1162,6 +1183,7 @@ func (p *Pool) kill(conversationID, reason string) {
 		return
 	}
 	p.telemetry.WorkerKilled(p.baseCtx, reason)
+	closeAgentOf(w)
 	// The key's lifetime is the worker's. kill() is the funnel for EVERY
 	// deliberate death — capability change, idle reap, shutdown — so revoking here
 	// covers all three at once. Self-exit and crash are the other path, handled in

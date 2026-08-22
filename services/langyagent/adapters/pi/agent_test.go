@@ -327,6 +327,8 @@ func TestAgent_WaitReady_DeadProcessFailsFast(t *testing.T) {
 // turn's liveness fresh with no wrapper output at all.
 func TestAgent_Stream_HeartbeatsThroughSilence(t *testing.T) {
 	agent := spawnFake(t, "abort", 20*time.Second) // holds the turn open silently
+	// The real cadence is 5s; the test only proves the ticker fires at all.
+	agent.progressInterval = 50 * time.Millisecond
 	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}

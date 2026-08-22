@@ -48,23 +48,25 @@ describe("renderMessageLine", () => {
 });
 
 describe("buildHandoffDigest", () => {
-  describe("given a conversation that fits", () => {
+  describe("when a conversation that fits", () => {
     it("keeps every message in original order with no truncation header", () => {
-      const digest = buildHandoffDigest([
-        { role: "user", content: "first" },
-        { role: "assistant", content: [{ type: "text", text: "second" }] },
-      ]);
+      const digest = buildHandoffDigest({
+        messages: [
+          { role: "user", content: "first" },
+          { role: "assistant", content: [{ type: "text", text: "second" }] },
+        ],
+      });
       expect(digest).toBe("user: first\nassistant: second");
     });
   });
 
-  describe("given a conversation over the budget", () => {
+  describe("when a conversation over the budget", () => {
     it("keeps the newest messages, drops the oldest, and marks the drop", () => {
       const messages = Array.from({ length: 50 }, (_, i) => ({
         role: "user",
         content: `message ${i} ${"x".repeat(4000)}`,
       }));
-      const digest = buildHandoffDigest(messages, 16 * 1024);
+      const digest = buildHandoffDigest({ messages, maxBytes: 16 * 1024 });
       expect(Buffer.byteLength(digest, "utf8")).toBeLessThanOrEqual(16 * 1024);
       expect(digest.startsWith(DIGEST_TRUNCATION_HEADER)).toBe(true);
       expect(digest).toContain("message 49");
@@ -78,14 +80,14 @@ describe("buildHandoffDigest", () => {
         role: "user",
         content: `m${i} ${"y".repeat(2000)}`,
       }));
-      const digest = buildHandoffDigest(messages);
+      const digest = buildHandoffDigest({ messages });
       expect(Buffer.byteLength(digest, "utf8")).toBeLessThanOrEqual(DIGEST_MAX_BYTES);
     });
   });
 
-  describe("given garbage entries", () => {
+  describe("when garbage entries", () => {
     it("skips them instead of throwing", () => {
-      expect(buildHandoffDigest([null, 42, {}, { role: "user", content: "ok" }])).toBe("user: ok");
+      expect(buildHandoffDigest({ messages: [null, 42, {}, { role: "user", content: "ok" }] })).toBe("user: ok");
     });
   });
 });

@@ -122,6 +122,18 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
+	piWorkerPath := filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker")
+	// A missing wrapper binary fails every pi spawn with exec-not-found, which
+	// reads as a harness bug rather than a setup gap. Say so at startup, once,
+	// while the operator is still looking at the terminal.
+	if !isExecutableFile(piWorkerPath) {
+		fmt.Printf(
+			"  warning: the pi worker binary is not built at %s.\n"+
+				"  Every pi-harness worker spawn will fail until you run\n"+
+				"  `pnpm --filter @langwatch/langyworker build:binary`.\n",
+			piWorkerPath,
+		)
+	}
 	return Child{
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
 		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
@@ -139,7 +151,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			// PATH, which no dev machine has: every pi spawn then fails with
 			// exec-not-found while opencode keeps working, which reads as a
 			// harness bug instead of a setup gap.
-			"LANGY_PI_WORKER_BINARY_PATH="+filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker"),
+			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
 	}
 }
@@ -272,4 +284,15 @@ func langyImageEnsureShell(image string, forceRebuild bool, pullRef string) stri
 // a shell metacharacter from breaking out of the command.
 func shQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// isExecutableFile reports whether path is a regular file the current user can
+// execute. Used to tell a missing build apart from a working one before the
+// manager starts.
+func isExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Mode().Perm()&0o111 != 0
 }

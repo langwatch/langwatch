@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
 // configFileName is the wrapper's config file, read from $HOME at boot.
@@ -269,41 +269,29 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	_ = stdinR.Close()
 	_ = stdoutW.Close()
 
-	a.stdinMu.Lock()
+	rd := newReader(stdoutR)
+	a.pipesMu.Lock()
 	a.stdin = stdinW
-	a.stdinMu.Unlock()
-	a.reader = newReader(stdoutR)
-	go a.reader.run(ctx)
+	a.reader = rd
+	a.pipesMu.Unlock()
+	go rd.run(ctx)
 
 	return cmd, nil
 }
 
-// workerInheritedEnvKeys is the complete set of manager environment variables
-// a pi worker may inherit, kept in step with the opencode adapter's list, and
-// for the same reason: an allowlist keeps a newly introduced manager secret
-// private by default, regardless of its name.
-var workerInheritedEnvKeys = []string{
-	"PATH",
-	"LANG",
-	"LC_ALL",
-	"LC_CTYPE",
-	"TZ",
-	"TERM",
-	"COLORTERM",
-	"NO_COLOR",
-	"FORCE_COLOR",
-	"SSL_CERT_FILE",
-	"SSL_CERT_DIR",
-}
-
-func workerBaseEnv() []string {
-	out := make([]string, 0, len(workerInheritedEnvKeys))
-	for _, key := range workerInheritedEnvKeys {
-		if value, ok := os.LookupEnv(key); ok {
-			out = append(out, key+"="+value)
-		}
+// Close releases the parent's write end of the wrapper's stdin. cmd.Wait does
+// not close a directly assigned *os.File, so without this the pipe stays open
+// for the manager's whole life once a worker dies. Idempotent: the pool calls
+// it from both the exit and the kill path. The read end is closed by the
+// reader goroutine when the wrapper's stdout reaches EOF.
+func (a *Agent) Close() {
+	a.pipesMu.Lock()
+	stdin := a.stdin
+	a.stdin = nil
+	a.pipesMu.Unlock()
+	if stdin != nil {
+		_ = stdin.Close()
 	}
-	return out
 }
 
 // buildWorkerEnv assembles the environment for a langy-worker subprocess. Pure
@@ -323,7 +311,7 @@ func workerBaseEnv() []string {
 //     route loopback LLM traffic into the egress proxy. The W1 spike measured
 //     exactly this: one contract that holds on both runtimes.
 func buildWorkerEnv(in SpawnInput) []string {
-	env := workerBaseEnv()
+	env := workerenv.BaseEnv()
 
 	llmBaseURL, llmKey := in.Creds.GatewayBaseURL, in.Creds.LLMVirtualKey
 	if in.LLMBaseURL != "" {
@@ -349,7 +337,7 @@ func buildWorkerEnv(in SpawnInput) []string {
 	for _, c := range in.Capabilities {
 		env = append(env, c.Contribute()...)
 	}
-	noProxy := noProxyHosts(in.Creds)
+	noProxy := workerenv.NoProxyHosts(in.Creds)
 	if in.EgressPort > 0 {
 		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", in.EgressPort)
 		env = append(env,
@@ -369,42 +357,4 @@ func buildWorkerEnv(in SpawnInput) []string {
 		env = append(env, "NODE_EXTRA_CA_CERTS="+ca)
 	}
 	return env
-}
-
-// noProxyHosts is the NO_PROXY list for a worker: loopback plus the in-cluster
-// control-plane and gateway hosts (kept in step with the opencode adapter's
-// noProxyHosts, ADR-076: loopback and the in-cluster paths are unaffected by
-// the egress proxy).
-func noProxyHosts(creds domain.Credentials) string {
-	hosts := []string{"127.0.0.1", "localhost", "::1"}
-	seen := map[string]struct{}{"127.0.0.1": {}, "localhost": {}, "::1": {}}
-	for _, raw := range []string{creds.LangwatchEndpoint, creds.GatewayBaseURL} {
-		h := hostFromURL(raw)
-		if h == "" {
-			continue
-		}
-		if _, dup := seen[h]; dup {
-			continue
-		}
-		seen[h] = struct{}{}
-		hosts = append(hosts, h)
-	}
-	return strings.Join(hosts, ",")
-}
-
-// hostFromURL extracts the bare hostname from a URL, tolerating a value with
-// no scheme. Returns "" when nothing host-like can be parsed.
-func hostFromURL(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	if !strings.Contains(raw, "://") {
-		raw = "//" + raw
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return ""
-	}
-	return u.Hostname()
 }

@@ -20,7 +20,7 @@ const validConfig = {
 };
 
 describe("parseConfig", () => {
-  describe("given the full documented shape", () => {
+  describe("when the full documented shape", () => {
     it("parses it", () => {
       const config = parseConfig(JSON.stringify(validConfig));
       expect(config.model.id).toBe("gpt-5-mini");
@@ -29,7 +29,7 @@ describe("parseConfig", () => {
     });
   });
 
-  describe("given unknown model keys (future compat findings)", () => {
+  describe("when unknown model keys (future compat findings)", () => {
     it("passes them through", () => {
       const config = parseConfig(
         JSON.stringify({
@@ -42,7 +42,7 @@ describe("parseConfig", () => {
     });
   });
 
-  describe("given a minimal config", () => {
+  describe("when a minimal config", () => {
     it("parses without the optional fields", () => {
       const { thinkingLevel: _t, skillsDir: _s, ...rest } = validConfig;
       const config = parseConfig(
@@ -61,13 +61,14 @@ describe("parseConfig", () => {
     });
   });
 
-  describe("given invalid input", () => {
+  describe("when invalid input", () => {
     it("names the offending field", () => {
       expect(() =>
         parseConfig(JSON.stringify({ ...validConfig, model: { ...validConfig.model, api: "grpc" } })),
       ).toThrow(/model\.api/);
       expect(() => parseConfig(JSON.stringify({ personaPrompt: "x" }))).toThrow(/invalid/);
-      expect(() => parseConfig("not json")).toThrow();
+      // A corrupt file names itself, so the boot log points at the path.
+      expect(() => parseConfig("not json")).toThrow(/\.langy-worker\.json: not valid JSON/);
     });
   });
 });

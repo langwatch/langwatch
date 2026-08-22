@@ -75,7 +75,6 @@ describe("useLangyWarmWorker", () => {
         modelOverride: "openai/gpt-5-mini",
       });
 
-      // A re-render with the same key warms nothing again.
       rerender(props());
       expect(mutate).toHaveBeenCalledTimes(1);
     });
@@ -142,24 +141,62 @@ describe("useLangyWarmWorker", () => {
       const { rerender } = renderHook(useLangyWarmWorker, {
         initialProps: props(),
       });
-      // Open on a fresh chat: fresh warm 1 fires.
       expect(mutate).toHaveBeenCalledTimes(1);
       expect(mutate.mock.calls[0]![0]).toEqual({
         projectId: "proj-1",
         modelOverride: "openai/gpt-5-mini",
       });
 
-      // A conversation takes the panel over (a send adopted the fresh chat).
       rerender(props({ conversationId: "conv-adopted" }));
       expect(mutate).toHaveBeenCalledTimes(2);
 
-      // New chat: the fresh warm must fire AGAIN, minting a new pending id.
       rerender(props({ conversationId: null }));
       expect(mutate).toHaveBeenCalledTimes(3);
       expect(mutate.mock.calls[2]![0]).toEqual({
         projectId: "proj-1",
         modelOverride: "openai/gpt-5-mini",
       });
+    });
+  });
+
+  describe("when the user changes the model while the panel is open", () => {
+    it("warms again, because the worker signature carries the model", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      expect(mutate).toHaveBeenCalledTimes(1);
+
+      rerender(props({ model: "anthropic/claude-opus-5" }));
+      expect(mutate).toHaveBeenCalledTimes(2);
+      expect(mutate.mock.calls[1]![0]).toEqual({
+        projectId: "proj-1",
+        modelOverride: "anthropic/claude-opus-5",
+      });
+
+      // Back to the first model: that worker was already warmed in this open.
+      rerender(props({ model: "openai/gpt-5-mini" }));
+      expect(mutate).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the newest warm's id when an older one answers last", () => {
+      const { rerender } = renderHook(useLangyWarmWorker, {
+        initialProps: props(),
+      });
+      rerender(props({ model: "anthropic/claude-opus-5" }));
+      expect(mutate).toHaveBeenCalledTimes(2);
+
+      const first = mutate.mock.calls[0]![1]!;
+      const second = mutate.mock.calls[1]![1]!;
+      act(() => {
+        second.onSuccess?.({ conversationId: "conv-newest", warmed: true });
+      });
+      act(() => {
+        first.onSuccess?.({ conversationId: "conv-stale", warmed: true });
+      });
+
+      expect(useLangyStore.getState().pendingConversationId).toBe(
+        "conv-newest",
+      );
     });
   });
 

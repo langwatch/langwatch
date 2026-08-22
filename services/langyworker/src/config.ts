@@ -40,7 +40,15 @@ export type LangyWorkerConfig = z.infer<typeof configSchema>;
 export const CONFIG_FILE_NAME = ".langy-worker.json";
 
 export function parseConfig(raw: string): LangyWorkerConfig {
-  const parsed = configSchema.safeParse(JSON.parse(raw));
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `invalid ${CONFIG_FILE_NAME}: not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const parsed = configSchema.safeParse(json);
   if (!parsed.success) {
     throw new Error(`invalid ${CONFIG_FILE_NAME}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
   }

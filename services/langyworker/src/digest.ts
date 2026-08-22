@@ -61,10 +61,13 @@ export function renderMessageLine(message: DigestibleMessage): string | undefine
   return `${truncateToBytes(line, DIGEST_MESSAGE_MAX_BYTES)}\n[message truncated]`;
 }
 
-export function buildHandoffDigest(
-  messages: unknown[],
-  maxBytes: number = DIGEST_MAX_BYTES,
-): string {
+export function buildHandoffDigest({
+  messages,
+  maxBytes = DIGEST_MAX_BYTES,
+}: {
+  messages: unknown[];
+  maxBytes?: number;
+}): string {
   const headerBytes = Buffer.byteLength(`${DIGEST_TRUNCATION_HEADER}\n`, "utf8");
   const kept: string[] = [];
   let used = 0;

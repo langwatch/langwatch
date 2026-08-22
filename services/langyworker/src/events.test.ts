@@ -1,8 +1,8 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { TurnEventMapper, contentText, settledToolOutput } from "./events.js";
 import { MAX_FIELD_BYTES, TRUNCATION_MARKER } from "./protocol.js";
 
@@ -17,9 +17,16 @@ describe("contentText", () => {
 });
 
 describe("settledToolOutput", () => {
+  const scratchDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of scratchDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
   describe("when pi truncated the tool output to a saved file", () => {
     it("recovers the full text from the file the details name", () => {
       const dir = mkdtempSync(join(tmpdir(), "langyworker-out-"));
+      scratchDirs.push(dir);
       const full = join(dir, "pi-bash-full.log");
       const document = `{"traces":[{"id":"t1"}],"pagination":{"totalHits":44}}`;
       writeFileSync(full, document);
@@ -146,21 +153,39 @@ describe("TurnEventMapper", () => {
     });
 
     it("emits no plan for an errored or empty todowrite", () => {
-      const mapper = new TurnEventMapper("t1");
-      mapper.map({
+      const empty = new TurnEventMapper("t1");
+      empty.map({
         type: "tool_execution_start",
         toolCallId: "c1",
         toolName: "todowrite",
         args: { todos: [] },
       });
-      const events = mapper.map({
-        type: "tool_execution_end",
-        toolCallId: "c1",
+      expect(
+        empty.map({
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "todowrite",
+          isError: false,
+          result: { content: [] },
+        }),
+      ).toHaveLength(1);
+
+      const errored = new TurnEventMapper("t1");
+      errored.map({
+        type: "tool_execution_start",
+        toolCallId: "c2",
         toolName: "todowrite",
-        isError: false,
-        result: { content: [] },
+        args: { todos: [{ content: "Find the slowest traces", status: "in_progress" }] },
       });
-      expect(events).toHaveLength(1);
+      expect(
+        errored.map({
+          type: "tool_execution_end",
+          toolCallId: "c2",
+          toolName: "todowrite",
+          isError: true,
+          result: { content: [] },
+        }),
+      ).toHaveLength(1);
     });
   });
 

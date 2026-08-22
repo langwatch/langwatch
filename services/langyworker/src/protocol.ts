@@ -133,6 +133,8 @@ export type TerminalEvent = TurnDoneEvent | HandoffEvent;
 export function boundText(text: string, maxBytes: number = MAX_FIELD_BYTES): string {
   if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
   const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8");
+  // Below the marker's own size there is no room to say "truncated": the cap wins.
+  if (budget <= 0) return truncateToBytes(text, maxBytes);
   return truncateToBytes(text, budget) + TRUNCATION_MARKER;
 }
 
@@ -150,6 +152,7 @@ export function boundJsonValue(value: unknown, maxBytes: number = MAX_FIELD_BYTE
   }
   if (Buffer.byteLength(serialized, "utf8") <= maxBytes) return value;
   const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8");
+  if (budget <= 0) return truncateToBytes(serialized, maxBytes);
   return truncateToBytes(serialized, budget) + TRUNCATION_MARKER;
 }
 

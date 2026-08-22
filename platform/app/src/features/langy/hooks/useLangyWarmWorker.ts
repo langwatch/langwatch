@@ -3,6 +3,87 @@ import { api } from "~/utils/api";
 import { useLangyStore } from "../stores/langyStore";
 
 /**
+ * The dedup key one warm is remembered under. The model is part of it: a
+ * picker change must warm again, because the worker's signature includes the
+ * model and a worker warmed on the previous one cannot serve the turn.
+ */
+function warmKey({
+  projectId,
+  conversationId,
+  model,
+}: {
+  projectId: string;
+  conversationId: string | null;
+  model: string;
+}): string {
+  return `${projectId}:${conversationId ?? ""}:${model}`;
+}
+
+/**
+ * Forget every fresh-chat warm this project fired. A conversation taking over
+ * (a send adopted the fresh chat, or the user opened an existing one) consumes
+ * them, so the next fresh chat in this open is a NEW conversation with a new
+ * mint. Without this, the new-chat button after a first warm sent no warm at
+ * all, and the first message cold-started while the earlier warm worker sat
+ * idle.
+ */
+function forgetFreshWarms({
+  fired,
+  projectId,
+}: {
+  fired: Set<string>;
+  projectId: string;
+}): void {
+  const freshPrefix = `${projectId}::`;
+  for (const key of fired) {
+    if (key.startsWith(freshPrefix)) fired.delete(key);
+  }
+}
+
+/**
+ * Decide whether this render must fire a warm, and remember it when it does.
+ * A conversation on screen first forgets the project's fresh-chat warms, so
+ * the next new chat mints again.
+ */
+function claimWarm({
+  fired,
+  projectId,
+  conversationId,
+  model,
+}: {
+  fired: Set<string>;
+  projectId: string;
+  conversationId: string | null;
+  model: string;
+}): boolean {
+  if (conversationId) forgetFreshWarms({ fired, projectId });
+  const key = warmKey({ projectId, conversationId, model });
+  if (fired.has(key)) return false;
+  fired.add(key);
+  return true;
+}
+
+/**
+ * Hold a fresh-chat warm's server-minted id as the panel's pending id, unless
+ * the panel moved on while the warm was in flight: a send that made a
+ * conversation active, or a project switch, both win over this answer.
+ */
+function holdPendingConversation({
+  conversationId,
+  projectId,
+  latestProjectId,
+}: {
+  conversationId: string;
+  projectId: string;
+  latestProjectId: string | undefined;
+}): void {
+  if (latestProjectId !== projectId) return;
+  const store = useLangyStore.getState();
+  if (store.activeConversationId !== null) return;
+  store.setPendingConversationId(conversationId);
+}
+
+/**
  * Pre-warm the Langy worker when the panel is the strongest signal a message
  * is coming (specs/langy/langy-worker-prewarm.feature): on the panel-open
  * rising edge, and again whenever the panel points at a different conversation
@@ -56,9 +137,15 @@ export function useLangyWarmWorker({
   const latestProjectIdRef = useRef(projectId);
   latestProjectIdRef.current = projectId;
 
-  // One warm per (projectId, conversation-or-fresh) per open. Cleared when the
-  // panel closes so the next open warms again.
+  // One warm per (projectId, conversation-or-fresh, model) per open. Cleared
+  // when the panel closes so the next open warms again.
   const firedRef = useRef<Set<string>>(new Set());
+
+  // Every warm carries a number, and only the newest one may claim the pending
+  // id. Two warms can be in flight at once (a model switch fires a second while
+  // the first is still going), and answers can land out of order, so without
+  // this an older fresh-chat mint could overwrite a newer one.
+  const generationRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -66,16 +153,16 @@ export function useLangyWarmWorker({
       return;
     }
     if (!projectId || !model) return;
-    // A conversation taking over (a send adopted the fresh chat, or the user
-    // opened an existing one) consumes the fresh warm, so re-arm it: the next
-    // fresh chat in this open is a NEW conversation with a new mint. Without
-    // this, the new-chat button after a first warm sent no warm at all, and the
-    // first message cold-started while the earlier warm worker sat idle.
-    if (conversationId) firedRef.current.delete(`${projectId}:`);
-    const key = `${projectId}:${conversationId ?? ""}`;
-    if (firedRef.current.has(key)) return;
-    firedRef.current.add(key);
+    const claimed = claimWarm({
+      fired: firedRef.current,
+      projectId,
+      conversationId,
+      model,
+    });
+    if (!claimed) return;
 
+    generationRef.current += 1;
+    const generation = generationRef.current;
     const forProjectId = projectId;
     const forConversationId = conversationId;
     mutateRef.current(
@@ -86,14 +173,15 @@ export function useLangyWarmWorker({
       },
       {
         onSuccess: (result) => {
-          // Only a fresh-chat warm has an id worth holding, and only while the
-          // panel is still on that fresh chat in that project: a send or a
-          // project switch that landed while the warm was in flight wins.
+          // Only a fresh-chat warm has an id worth holding, and only when no
+          // newer warm has been fired since.
+          if (generationRef.current !== generation) return;
           if (forConversationId || !result.conversationId) return;
-          if (latestProjectIdRef.current !== forProjectId) return;
-          const store = useLangyStore.getState();
-          if (store.activeConversationId !== null) return;
-          store.setPendingConversationId(result.conversationId);
+          holdPendingConversation({
+            conversationId: result.conversationId,
+            projectId: forProjectId,
+            latestProjectId: latestProjectIdRef.current,
+          });
         },
         onError: () => {
           // Fire-and-forget by contract: a warm failure is a cold start.

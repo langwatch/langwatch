@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 
@@ -29,14 +31,15 @@ var _ app.TurnAborter = (*abortRecordingAgent)(nil)
 
 // claimedWorker registers a worker for conversationID whose agent is `agent`,
 // with turnID claimed in flight, and returns it.
-func claimedWorker(p *Pool, conversationID, turnID string, agent app.CodingAgent) *Worker {
+func claimedWorker(t *testing.T, p *Pool, conversationID, turnID string, agent app.CodingAgent) *Worker {
+	t.Helper()
 	w := &Worker{
 		conversationID:    conversationID,
 		agent:             agent,
 		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
 		openCodeSessionID: "sess",
 	}
-	w.ClaimTurn(turnID)
+	require.Equal(t, app.ClaimGranted, w.ClaimTurn(turnID))
 	p.mu.Lock()
 	p.workers[conversationID] = w
 	p.mu.Unlock()
@@ -52,7 +55,7 @@ func claimedWorker(p *Pool, conversationID, turnID string, agent app.CodingAgent
 func TestPoolCancelTurn_ReachesTheClaimedTurnsWorker(t *testing.T) {
 	p := newTestPool(4)
 	agent := &abortRecordingAgent{}
-	claimedWorker(p, "conv-1", "turn-1", agent)
+	claimedWorker(t, p, "conv-1", "turn-1", agent)
 
 	p.CancelTurn("conv-1", "turn-1")
 
@@ -72,7 +75,7 @@ func TestPoolCancelTurn_ReachesTheClaimedTurnsWorker(t *testing.T) {
 func TestPoolCancelTurn_StaleOrUnknownTurnIsANoOp(t *testing.T) {
 	p := newTestPool(4)
 	agent := &abortRecordingAgent{}
-	claimedWorker(p, "conv-1", "turn-1", agent)
+	claimedWorker(t, p, "conv-1", "turn-1", agent)
 
 	// A different turn than the one in flight.
 	p.CancelTurn("conv-1", "turn-2")
@@ -91,7 +94,7 @@ func TestPoolCancelTurn_StaleOrUnknownTurnIsANoOp(t *testing.T) {
 func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 	p := newTestPool(4)
 	agent := &abortRecordingAgent{}
-	w := claimedWorker(p, "conv-1", "turn-1", agent)
+	w := claimedWorker(t, p, "conv-1", "turn-1", agent)
 	w.Release()
 
 	p.CancelTurn("conv-1", "turn-1")
@@ -106,7 +109,7 @@ func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 func TestWorkerAbortTurn_NonAbortingAgentIsANoOp(t *testing.T) {
 	p := newTestPool(4)
 	agent := &seedRecordingAgent{} // no AbortTurn method
-	w := claimedWorker(p, "conv-1", "turn-1", agent)
+	w := claimedWorker(t, p, "conv-1", "turn-1", agent)
 
 	p.CancelTurn("conv-1", "turn-1")
 
@@ -120,7 +123,7 @@ func TestWorkerAbortTurn_NonAbortingAgentIsANoOp(t *testing.T) {
 func TestWorkerAbortTurn_AbortFailureIsNonFatal(t *testing.T) {
 	p := newTestPool(4)
 	agent := &abortRecordingAgent{abortErr: errors.New("wire dropped")}
-	claimedWorker(p, "conv-1", "turn-1", agent)
+	claimedWorker(t, p, "conv-1", "turn-1", agent)
 
 	p.CancelTurn("conv-1", "turn-1") // must not panic and has no error to return
 

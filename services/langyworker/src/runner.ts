@@ -181,7 +181,7 @@ export class TurnRunner {
 
       const prompt =
         command.resumeToken && !this.options.sessionResumed
-          ? prependResumeSeed(command.prompt, command.resumeToken)
+          ? prependResumeSeed({ prompt: command.prompt, seed: command.resumeToken })
           : command.prompt;
 
       let thrown: unknown;
@@ -213,7 +213,7 @@ export class TurnRunner {
     if (state.shutdownRequested) {
       let seed = "";
       try {
-        seed = buildHandoffDigest(session.agent.state.messages);
+        seed = buildHandoffDigest({ messages: session.agent.state.messages });
       } catch (error) {
         this.warn(`handoff digest failed: ${error instanceof Error ? error.message : String(error)}`);
       }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { listSkills, parseSkillFrontmatter, renderSkillInventory } from "./skill.js";
 
 describe("parseSkillFrontmatter", () => {
-  describe("given a SKILL.md with frontmatter", () => {
+  describe("when a SKILL.md with frontmatter", () => {
     it("reads name and description", () => {
       expect(
         parseSkillFrontmatter("---\nname: agent-performance\ndescription: Traces and stats\n---\n# Body"),
@@ -20,7 +20,7 @@ describe("parseSkillFrontmatter", () => {
     });
   });
 
-  describe("given no frontmatter", () => {
+  describe("when no frontmatter", () => {
     it("returns nothing", () => {
       expect(parseSkillFrontmatter("# Just markdown")).toEqual({});
       expect(parseSkillFrontmatter("---\nunclosed")).toEqual({});
@@ -39,7 +39,7 @@ describe("listSkills", () => {
     rmSync(skillsDir, { recursive: true, force: true });
   });
 
-  describe("given a skills directory with valid and invalid entries", () => {
+  describe("when a skills directory with valid and invalid entries", () => {
     it("lists only directories carrying a readable SKILL.md, sorted", () => {
       mkdirSync(join(skillsDir, "beta"));
       writeFileSync(join(skillsDir, "beta", "SKILL.md"), "---\nname: beta\ndescription: B\n---\n");
@@ -57,7 +57,7 @@ describe("listSkills", () => {
     });
   });
 
-  describe("given no skills directory", () => {
+  describe("when no skills directory", () => {
     it("returns an empty list", () => {
       expect(listSkills(undefined)).toEqual([]);
       expect(listSkills(join(skillsDir, "does-not-exist"))).toEqual([]);

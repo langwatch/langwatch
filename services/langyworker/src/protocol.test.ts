@@ -9,7 +9,7 @@ import {
 } from "./protocol.js";
 
 describe("parseCommand", () => {
-  describe("given a valid turn line", () => {
+  describe("when a valid turn line", () => {
     it("parses turnId, prompt and the optional fields", () => {
       expect(
         parseCommand('{"type":"turn","turnId":"t1","prompt":"hi","system":"s","resumeToken":"r"}'),
@@ -25,7 +25,7 @@ describe("parseCommand", () => {
     });
   });
 
-  describe("given abort, shutdown_imminent and ping lines", () => {
+  describe("when abort, shutdown_imminent and ping lines", () => {
     it("parses them", () => {
       expect(parseCommand('{"type":"abort","turnId":"t1"}')).toEqual({
         type: "abort",
@@ -39,7 +39,7 @@ describe("parseCommand", () => {
     });
   });
 
-  describe("given garbage input", () => {
+  describe("when garbage input", () => {
     it("returns undefined for non-JSON, non-objects, unknown types and missing fields", () => {
       expect(parseCommand("not json")).toBeUndefined();
       expect(parseCommand('"a string"')).toBeUndefined();
@@ -64,9 +64,16 @@ describe("boundText", () => {
   });
 
   it("never splits a multi-byte code point", () => {
-    const bounded = boundText("é".repeat(100), 21);
+    const bounded = boundText("é".repeat(100), 41);
+    expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(41);
     expect(bounded.endsWith(TRUNCATION_MARKER)).toBe(true);
     // Round trip must not contain a replacement char from a split code point.
+    expect(bounded.includes("�")).toBe(false);
+  });
+
+  it("keeps the cap when the budget is smaller than the marker", () => {
+    const bounded = boundText("é".repeat(100), 21);
+    expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(21);
     expect(bounded.includes("�")).toBe(false);
   });
 });

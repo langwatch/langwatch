@@ -140,9 +140,11 @@ func (r *reader) run(ctx context.Context) {
 	}
 }
 
-// handleLine decodes and routes one complete protocol line. Unparseable or
-// unknown lines are skipped with a warning: a bad line must never take the
-// stream down (mirror of the wrapper's own stdin posture).
+// handleLine decodes and routes one complete protocol line. Unparseable lines
+// and lines with no type are skipped with a warning: a bad line must never
+// take the stream down (mirror of the wrapper's own stdin posture). A line
+// whose type this build does not know is still delivered, so an event type a
+// later wrapper adds reaches the consumer instead of being lost here.
 func (r *reader) handleLine(ctx context.Context, raw []byte) {
 	line := bytes.TrimSuffix(bytes.TrimSuffix(raw, []byte("\n")), []byte("\r"))
 	if len(bytes.TrimSpace(line)) == 0 {

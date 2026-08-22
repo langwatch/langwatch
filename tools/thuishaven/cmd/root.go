@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -213,7 +212,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
-		RedisDBOverride:          redisDBOverride(devEnv("LANGWATCH_HAVEN_REDIS_DB")),
+		RedisDBOverride:          app.RedisDBOverrideFromEnv(devEnv("LANGWATCH_HAVEN_REDIS_DB")),
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
 		ShouldStartObservability:  devEnv("LANGWATCH_HAVEN_OBS") != "0",
@@ -781,20 +780,6 @@ func devEnv(key string) string {
 // empty" from "not set at all".
 func dotenvLookup(key string) (string, bool) {
 	return resolveKnob(key, os.LookupEnv, dotenvKnobs)
-}
-
-// redisDBOverride parses LANGWATCH_HAVEN_REDIS_DB into a Redis DB index, or -1
-// when unset or out of range (the allocator then assigns one normally).
-func redisDBOverride(v string) int {
-	if v == "" {
-		return -1
-	}
-	db, err := strconv.Atoi(v)
-	if err != nil || db < 0 || db >= domain.RedisDBCount {
-		fmt.Fprintf(os.Stderr, "haven: ignoring LANGWATCH_HAVEN_REDIS_DB=%q (want 0-%d)\n", v, domain.RedisDBCount-1)
-		return -1
-	}
-	return db
 }
 
 // shouldDisableGoogleDLP decides whether haven forces

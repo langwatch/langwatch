@@ -28,20 +28,20 @@ describe("ProtocolWriter", () => {
         return false;
       };
       const writer = new ProtocolWriter(sink);
-      let firstFlushed = false;
+      let hasFirstWriteFlushed = false;
       void writer.emit({ n: 1 }).then(() => {
-        firstFlushed = true;
+        hasFirstWriteFlushed = true;
       });
       const second = writer.emit({ n: 2 });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
       // Second write must not start before the first's callback fired.
       expect(chunks).toEqual(['{"n":1}\n']);
-      expect(firstFlushed).toBe(false);
+      expect(hasFirstWriteFlushed).toBe(false);
 
       pending.shift()?.();
       await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(firstFlushed).toBe(true);
+      expect(hasFirstWriteFlushed).toBe(true);
       expect(chunks).toEqual(['{"n":1}\n', '{"n":2}\n']);
 
       pending.shift()?.();

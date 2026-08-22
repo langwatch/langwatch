@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeTodos, renderTodoList } from "./todowrite.js";
 
 describe("normalizeTodos", () => {
-  describe("given the opencode wrapper shape", () => {
+  describe("when the opencode wrapper shape", () => {
     it("returns the items", () => {
       expect(
         normalizeTodos({
@@ -18,7 +18,7 @@ describe("normalizeTodos", () => {
     });
   });
 
-  describe("given a bare array", () => {
+  describe("when a bare array", () => {
     it("tolerates it", () => {
       expect(normalizeTodos([{ content: "A", status: "completed" }])).toEqual([
         { content: "A", status: "completed" },
@@ -26,7 +26,7 @@ describe("normalizeTodos", () => {
     });
   });
 
-  describe("given unknown statuses and junk rows", () => {
+  describe("when unknown statuses and junk rows", () => {
     it("maps unknown statuses to pending and drops empty rows", () => {
       expect(
         normalizeTodos({
@@ -45,7 +45,7 @@ describe("normalizeTodos", () => {
     });
   });
 
-  describe("given nothing usable", () => {
+  describe("when nothing usable", () => {
     it("returns an empty list", () => {
       expect(normalizeTodos(undefined)).toEqual([]);
       expect(normalizeTodos({ todos: "nope" })).toEqual([]);

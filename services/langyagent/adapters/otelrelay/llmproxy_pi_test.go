@@ -218,6 +218,40 @@ func TestLLMProxy_PiHarnessReadsUsageFromSSE(t *testing.T) {
 	}
 }
 
+// A call the proxy can never deliver still reaches the customer's trace: the
+// upstream never answers, so ModifyResponse never runs and the span has to be
+// closed from the proxy's error path, marked as a failure.
+func TestLLMProxy_PiHarnessSynthesizesSpanForAnUnreachableUpstream(t *testing.T) {
+	gateway := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	deadURL := gateway.URL
+	gateway.Close() // the listener is gone: every dial is refused.
+
+	relay := startRelay(t)
+	ingest := startSignallingIngest(t)
+	token := registerPiWorker(t, relay, deadURL, ingest.srv.URL)
+
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	_, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("relay answered %d for an unreachable upstream, want 502", resp.StatusCode)
+	}
+
+	_, span := firstSpan(t, ingest.await(t))
+	if span.Name() != "gen_ai.chat" {
+		t.Errorf("span name = %q, want gen_ai.chat", span.Name())
+	}
+	if span.Status().Code() != ptrace.StatusCodeError {
+		t.Errorf("status = %v, want Error", span.Status().Code())
+	}
+	if v, ok := span.Attributes().Get("error.type"); !ok || v.Str() != "transport_error" {
+		t.Errorf("error.type = %v, want transport_error", v.Str())
+	}
+}
+
 // Anthropic streams split usage across message_start (input) and message_delta
 // (cumulative output): both spellings land on the same span.
 func TestLLMProxy_PiHarnessReadsAnthropicStreamUsage(t *testing.T) {
@@ -262,7 +296,9 @@ func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {
 
 	relay := startRelay(t)
 	ingest := startIngest(t)
-	token, _ := relay.Register(WorkerInfo{
+	// The error is checked: an empty token would make the POST below miss every
+	// registered worker, so the negative assertion would pass for the wrong reason.
+	token, err := relay.Register(WorkerInfo{
 		ConversationID:    "conv-oc",
 		LangwatchEndpoint: ingest.srv.URL,
 		LangwatchAPIKey:   "sk-session",
@@ -270,6 +306,9 @@ func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {
 		LLMVirtualKey:     "vk",
 		Harness:           domain.HarnessOpenCode,
 	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 	relay.SetTurnContext(token, turnContext())
 
 	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
@@ -280,7 +319,7 @@ func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {
 	resp.Body.Close()
 
 	time.Sleep(300 * time.Millisecond)
-	if len(ingest.body) != 0 {
-		t.Fatalf("an opencode worker's LLM call must synthesize no span; ingest got %d bytes", len(ingest.body))
+	if len(ingest.lastBody()) != 0 {
+		t.Fatalf("an opencode worker's LLM call must synthesize no span; ingest got %d bytes", len(ingest.lastBody()))
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
 func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
@@ -56,7 +57,7 @@ func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 		t.Setenv(k, v)
 	}
 
-	env := workerBaseEnv()
+	env := workerenv.BaseEnv()
 
 	mustBeAbsent := []string{
 		"LANGY_INTERNAL_SECRET=",
@@ -110,14 +111,14 @@ func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 		}
 	}
 
-	allowed := make(map[string]bool, len(workerInheritedEnvKeys))
-	for _, key := range workerInheritedEnvKeys {
+	allowed := make(map[string]bool, len(workerenv.InheritedEnvKeys))
+	for _, key := range workerenv.InheritedEnvKeys {
 		allowed[key] = true
 	}
 	for _, kv := range env {
 		key, _, _ := strings.Cut(kv, "=")
 		if !allowed[key] {
-			t.Fatalf("workerBaseEnv inherited non-allowlisted key %q", key)
+			t.Fatalf("workerenv.BaseEnv inherited non-allowlisted key %q", key)
 		}
 	}
 }

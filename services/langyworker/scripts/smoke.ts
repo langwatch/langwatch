@@ -66,6 +66,21 @@ child.stderr.on("data", (chunk: Buffer) => {
   process.stderr.write(`[worker stderr] ${chunk}`);
 });
 
+// A spawn that never starts emits `error`, not `exit`, so the report and the
+// scratch-home cleanup below would never run without this handler.
+child.on("error", (error: Error) => {
+  clearTimeout(deadline);
+  rmSync(home, { recursive: true, force: true });
+  console.error("smoke: FAIL", { reason: "spawn failed", command, error: error.message });
+  process.exit(1);
+});
+
+// A dead child turns every write into an EPIPE `error` event on stdin.
+child.stdin.on("error", (error: Error) => {
+  console.error(`smoke: stdin write failed: ${error.message}`);
+  failed = true;
+});
+
 child.stdout.on("data", (chunk: Buffer) => {
   buffer += chunk.toString("utf8");
   let index = buffer.indexOf("\n");

@@ -24,6 +24,11 @@ import (
 // quiet turn is never mistaken for a dead one.
 const progressInterval = 5 * time.Second
 
+// maxStartedInputs caps the recorded tool-start inputs one turn keeps for the
+// replay fallback in applyToolEnd. Only a settle deletes its entry, so an
+// unbounded map would grow with every tool call the wrapper never settles.
+const maxStartedInputs = 256
+
 // Agent drives ONE langy-worker subprocess over stdio, per-worker stateful,
 // unlike the opencode Agent (which talks HTTP to a port). The pool constructs
 // one per worker, Provisions + Spawns through it, and the app then drives each
@@ -33,19 +38,32 @@ const progressInterval = 5 * time.Second
 type Agent struct {
 	readinessTimeout time.Duration
 
-	// stdin is the parent's write end of the wrapper's stdin. All writes are
-	// whole JSONL lines under stdinMu, so concurrent command writers (Post,
-	// AbortTurn, NotifyShutdownImminent) can never interleave mid-line.
-	stdinMu sync.Mutex
-	stdin   io.WriteCloser
+	// progressInterval is the heartbeat cadence. A field, not the package
+	// constant, so a test can shorten it instead of waiting a real tick.
+	progressInterval time.Duration
 
-	reader *reader
+	// stdin is the parent's write end of the wrapper's stdin, and reader owns
+	// the read end. Both are assigned by Spawn and read from every turn path,
+	// so pipesMu guards both. All stdin writes are whole JSONL lines under the
+	// same lock, so concurrent command writers (Post, AbortTurn,
+	// NotifyShutdownImminent) can never interleave mid-line.
+	pipesMu sync.Mutex
+	stdin   io.WriteCloser
+	reader  *reader
 
 	// posted hands the just-posted turn to its Stream goroutine. Capacity 1:
 	// turns are serialized per worker (ClaimTurn), so at most one handle is
 	// ever in flight; Post drains a stale handle (a turn whose Stream was
 	// canceled before attaching) before offering its own.
 	posted chan *postedTurn
+}
+
+// currentReader returns the reader Spawn installed, under the pipe lock, so
+// a turn path never reads the field while Spawn writes it.
+func (a *Agent) currentReader() *reader {
+	a.pipesMu.Lock()
+	defer a.pipesMu.Unlock()
+	return a.reader
 }
 
 // postedTurn pairs a turn id with its registered mailbox.
@@ -66,6 +84,7 @@ var (
 func NewAgent(readinessTimeout time.Duration) *Agent {
 	return &Agent{
 		readinessTimeout: readinessTimeout,
+		progressInterval: progressInterval,
 		posted:           make(chan *postedTurn, 1),
 	}
 }
@@ -75,15 +94,16 @@ func NewAgent(readinessTimeout time.Duration) *Agent {
 // herr(ErrWorkerNotReady) message the opencode readiness poll returns, so the
 // customer-facing copy does not depend on the harness.
 func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
-	if a.reader == nil {
+	r := a.currentReader()
+	if r == nil {
 		return errors.New("pi agent: WaitReady before Spawn")
 	}
 	timer := time.NewTimer(a.readinessTimeout)
 	defer timer.Stop()
 	select {
-	case <-a.reader.ready:
+	case <-r.ready:
 		return nil
-	case <-a.reader.dead:
+	case <-r.dead:
 		// The wrapper exited before its handshake, a boot failure, not a
 		// timeout. Deliberately handled: the caller retries a fresh spawn.
 		return herr.New(ctx, domain.ErrWorkerSpawn, herr.M{
@@ -115,7 +135,8 @@ func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
 // records the flag before closing ready, and the pool calls OpenSession only
 // after WaitReady, so the read is ordered.
 func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, error) {
-	resumed := a.reader != nil && a.reader.resumed
+	r := a.currentReader()
+	resumed := r != nil && r.resumed
 	return "pi-" + randomID(), resumed, nil
 }
 
@@ -124,7 +145,8 @@ func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, er
 // PostMessage with no ordering guarantee, and the wrapper can emit
 // turn_started the instant the line lands, so routing must exist first.
 func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
-	if a.reader == nil {
+	r := a.currentReader()
+	if r == nil {
 		return errors.New("pi agent: Post before Spawn")
 	}
 	turnID := turn.TurnID
@@ -134,7 +156,7 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 		// target it, which matches the no-id contract upstream.
 		turnID = "t-" + randomID()
 	}
-	mb := a.reader.register(turnID)
+	mb := r.register(turnID)
 	if err := a.writeCommand(command{
 		Type:        "turn",
 		TurnID:      turnID,
@@ -142,7 +164,7 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 		System:      turn.System,
 		ResumeToken: turn.ResumeToken,
 	}); err != nil {
-		a.reader.unregister(turnID, mb)
+		r.unregister(turnID, mb)
 		return err
 	}
 	// Hand the turn to its Stream. A stale handle can only be a prior turn
@@ -151,7 +173,7 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 	for {
 		select {
 		case stale := <-a.posted:
-			a.reader.unregister(stale.turnID, stale.mb)
+			r.unregister(stale.turnID, stale.mb)
 			continue
 		default:
 		}
@@ -175,18 +197,19 @@ func (a *Agent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn)
 //     app routes it to worker_stopped, never agent_error
 //   - ctx cancellation   -> nil
 func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.ChatSink) error {
-	if a.reader == nil {
+	r := a.currentReader()
+	if r == nil {
 		return errors.New("pi agent: Stream before Spawn")
 	}
 	var turn *postedTurn
 	select {
 	case turn = <-a.posted:
-	case <-a.reader.dead:
+	case <-r.dead:
 		return errors.New("pi worker exited before the turn was posted")
 	case <-ctx.Done():
 		return nil
 	}
-	defer a.reader.unregister(turn.turnID, turn.mb)
+	defer r.unregister(turn.turnID, turn.mb)
 
 	// All emits go through emitFrame so the concurrent heartbeat ticker can
 	// never interleave with the event loop: the relay push is ONE ordered
@@ -199,7 +222,7 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 		return sink.Emit(f) == nil
 	}
 
-	// Heartbeat: a frames.Heartbeat every progressInterval keeps the turn's
+	// Heartbeat: a frames.Heartbeat every a.progressInterval keeps the turn's
 	// liveness fresh through a long, silent tool call, the event loop blocks
 	// on mailbox events and cannot self-tick through silence. Best-effort;
 	// panic-guarded; joined before return so no heartbeat races teardown.
@@ -209,7 +232,7 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 	go func() {
 		defer wg.Done()
 		defer clog.HandlePanic(ctx, false)
-		ticker := time.NewTicker(progressInterval)
+		ticker := time.NewTicker(a.progressInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -237,19 +260,19 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 	for {
 		select {
 		case ev := <-turn.mb.ch:
-			done, err := a.consumeEvent(ctx, st, ev)
-			if done {
+			isDone, err := a.consumeEvent(ctx, st, ev)
+			if isDone {
 				return err
 			}
-		case <-a.reader.dead:
+		case <-r.dead:
 			// The wrapper flushes a turn's terminal before it can exit, so a
 			// terminal may already sit in the mailbox buffer, drain it before
 			// concluding the process died mid-turn.
 			for {
 				select {
 				case ev := <-turn.mb.ch:
-					done, err := a.consumeEvent(ctx, st, ev)
-					if done {
+					isDone, err := a.consumeEvent(ctx, st, ev)
+					if isDone {
 						return err
 					}
 					continue
@@ -265,10 +288,10 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 	}
 }
 
-// consumeEvent maps one wire event onto frames. done reports that the turn is
+// consumeEvent maps one wire event onto frames. isDone reports that the turn is
 // over (terminal seen, or the relay push broke) and err is the turn's mapped
 // outcome.
-func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent) (done bool, err error) {
+func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent) (isDone bool, err error) {
 	if isTerminal(ev.Type) {
 		return true, a.finishTurn(ctx, st, ev)
 	}
@@ -309,11 +332,11 @@ func (a *Agent) finishTurn(ctx context.Context, st *streamState, ev wireEvent) e
 // a tool call), the tool lifecycle through the shared toolmap tracker, and the
 // plan snapshots.
 type streamState struct {
-	emit         func(frames.Frame) bool
-	tools        *toolmap.ToolCallTracker
-	emittedText  bool
-	toolSince    bool
-	startedInput map[string]json.RawMessage
+	emit           func(frames.Frame) bool
+	tools          *toolmap.ToolCallTracker
+	hasEmittedText bool
+	isAfterTool    bool
+	startedInput   map[string]json.RawMessage
 }
 
 func newStreamState(emit func(frames.Frame) bool) *streamState {
@@ -337,11 +360,11 @@ func (s *streamState) apply(ev wireEvent) bool {
 		// deltas carry no boundary: everything downstream concatenates them
 		// into one string. Restore the paragraph the model actually produced
 		// (opencode parity).
-		if s.emittedText && s.toolSince {
+		if s.hasEmittedText && s.isAfterTool {
 			text = "\n\n" + text
 		}
-		s.emittedText = true
-		s.toolSince = false
+		s.hasEmittedText = true
+		s.isAfterTool = false
 		f, mErr := frames.Delta(text)
 		if mErr != nil {
 			return true
@@ -375,12 +398,23 @@ func (s *streamState) applyToolStart(ev wireEvent) bool {
 		return true
 	}
 	input := toolmap.RawToolValue(ev.Input)
+	// Only a tool end deletes its entry, so a turn that opens calls the wrapper
+	// never settles would hold every raw input for the turn's whole life. The
+	// cap drops the oldest recorded inputs instead.
+	if len(s.startedInput) >= maxStartedInputs {
+		for id := range s.startedInput {
+			delete(s.startedInput, id)
+			if len(s.startedInput) < maxStartedInputs {
+				break
+			}
+		}
+	}
 	s.startedInput[ev.ID] = input
 	f, mErr := frames.ToolStart(ev.ID, ev.Name, "", "", input)
 	if mErr != nil {
 		return true
 	}
-	s.toolSince = true
+	s.isAfterTool = true
 	return s.emit(f)
 }
 
@@ -399,7 +433,7 @@ func (s *streamState) applyToolEnd(ev wireEvent) bool {
 	// so the consumer is never asked to close a card it was never told to open.
 	if s.tools.StartIfNew(ev.ID) {
 		if f, mErr := frames.ToolStart(ev.ID, ev.Name, "", "", input); mErr == nil {
-			s.toolSince = true
+			s.isAfterTool = true
 			if !s.emit(f) {
 				return false
 			}
@@ -414,7 +448,7 @@ func (s *streamState) applyToolEnd(ev wireEvent) bool {
 	if mErr != nil {
 		return true
 	}
-	s.toolSince = true
+	s.isAfterTool = true
 	return s.emit(f)
 }
 
@@ -431,7 +465,7 @@ func (s *streamState) applyPlan(ev wireEvent) bool {
 		return true
 	}
 	if f, mErr := frames.Plan(bounded); mErr == nil {
-		s.toolSince = true
+		s.isAfterTool = true
 		if !s.emit(f) {
 			return false
 		}
@@ -469,8 +503,8 @@ func (a *Agent) writeCommand(cmd command) error {
 	if err != nil {
 		return fmt.Errorf("pi agent: marshal %s command: %w", cmd.Type, err)
 	}
-	a.stdinMu.Lock()
-	defer a.stdinMu.Unlock()
+	a.pipesMu.Lock()
+	defer a.pipesMu.Unlock()
 	if a.stdin == nil {
 		return errors.New("pi agent: worker stdin not open")
 	}

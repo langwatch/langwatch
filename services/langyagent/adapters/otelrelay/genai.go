@@ -74,6 +74,10 @@ type genAICall struct {
 	start time.Time
 
 	status int
+	// isTransportFailure marks a call the proxy could never deliver (dial
+	// failure, upstream reset). No response ever arrives, so observeResponse
+	// never runs and the span has to be closed from the proxy's ErrorHandler.
+	isTransportFailure bool
 
 	// Body scanning state. Reads are sequential per response body, so no lock.
 	sse          bool
@@ -221,6 +225,17 @@ func (g *genAICall) takeUsage(payload []byte) {
 	}
 }
 
+// finishTransportError closes the span for a call that got no response at all.
+// The default status is 0, which forwardSpan records as Ok, so the failure is
+// stamped before the finish. The error's own text stays out of the customer's
+// trace: it names manager-side hosts, and the file's rule is bounded
+// classification, never upstream prose.
+func (g *genAICall) finishTransportError() {
+	g.status = http.StatusBadGateway
+	g.isTransportFailure = true
+	g.finish()
+}
+
 // finish builds and forwards the span, exactly once.
 func (g *genAICall) finish() {
 	g.finishOnce.Do(func() {
@@ -280,6 +295,9 @@ func (g *genAICall) forwardSpan() {
 	span.Attributes().PutStr(attrSkipTokenAccumulation, "true")
 	if strings.HasPrefix(info.Model, codexModelPrefix) {
 		span.Attributes().PutStr(attrCostNonBillable, "true")
+	}
+	if g.isTransportFailure {
+		span.Attributes().PutStr("error.type", "transport_error")
 	}
 	if g.status >= 400 {
 		span.Status().SetCode(ptrace.StatusCodeError)

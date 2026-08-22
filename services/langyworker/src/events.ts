@@ -7,7 +7,7 @@
  * args) and mirrors successful `todowrite` calls as `plan` snapshots.
  */
 
-import { closeSync, openSync, readSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 
 import { boundJsonValue, boundText, type WorkerEvent } from "./protocol.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
@@ -56,9 +56,22 @@ export function settledToolOutput(result: unknown): string {
   try {
     const fd = openSync(path, "r");
     try {
-      const buffer = Buffer.alloc(MAX_RECOVERED_OUTPUT_BYTES);
-      const read = readSync(fd, buffer, 0, MAX_RECOVERED_OUTPUT_BYTES, 0);
-      return buffer.toString("utf8", 0, read);
+      // Size the read from the file so a small output does not allocate the cap.
+      const size = fstatSync(fd).size;
+      const want = Math.min(size, MAX_RECOVERED_OUTPUT_BYTES);
+      if (want <= 0) return text;
+      const buffer = Buffer.alloc(want);
+      const read = readSync(fd, buffer, 0, want, 0);
+      // A cut at the cap can land inside a code point; step back to a boundary.
+      let end = read;
+      if (read === MAX_RECOVERED_OUTPUT_BYTES && size > MAX_RECOVERED_OUTPUT_BYTES) {
+        while (end > 0) {
+          const byte = buffer[end];
+          if (byte === undefined || (byte & 0b1100_0000) !== 0b1000_0000) break;
+          end--;
+        }
+      }
+      return buffer.toString("utf8", 0, end);
     } finally {
       closeSync(fd);
     }

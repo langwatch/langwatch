@@ -185,6 +185,12 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				zap.String("conversation", entry.info.ConversationID),
 				zap.Error(err),
 			)
+			// No response reaches ModifyResponse on this path, so the gen_ai
+			// span is closed here or the call would never appear in the
+			// customer's trace at all.
+			if genAI != nil {
+				genAI.finishTransportError()
+			}
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	}

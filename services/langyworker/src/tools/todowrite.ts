@@ -65,12 +65,7 @@ export function renderTodoList(todos: TodoItem[]): string {
   return todos.map((t) => `${marks[t.status]} ${t.content}`).join("\n");
 }
 
-export type TodowriteExtensionOptions = {
-  /** Called with the full normalized list on every successful call. */
-  onPlan?: (todos: TodoItem[]) => void;
-};
-
-export function createTodowriteExtension(options: TodowriteExtensionOptions = {}): InlineExtension {
+export function createTodowriteExtension(): InlineExtension {
   return {
     name: "langy-todowrite",
     factory: (pi: ExtensionAPI) => {
@@ -89,8 +84,10 @@ export function createTodowriteExtension(options: TodowriteExtensionOptions = {}
             details?: { todos?: TodoItem[] };
           };
           if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
+          // A session file written by another worker version can carry statuses
+          // this build does not know, so it is validated and copied, not adopted.
           if (Array.isArray(message.details?.todos)) {
-            todos = message.details.todos;
+            todos = normalizeTodos(message.details.todos);
           }
         }
       };
@@ -106,7 +103,6 @@ export function createTodowriteExtension(options: TodowriteExtensionOptions = {}
         parameters: todowriteParams,
         async execute(_toolCallId, params) {
           todos = normalizeTodos(params);
-          options.onPlan?.(todos);
           return {
             content: [{ type: "text", text: renderTodoList(todos) }],
             details: { todos: [...todos] },

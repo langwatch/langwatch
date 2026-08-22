@@ -35,7 +35,6 @@ func tolerantTempDir(t *testing.T) string {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
-		_ = os.RemoveAll(dir)
 	})
 	return dir
 }

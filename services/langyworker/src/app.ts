@@ -64,12 +64,13 @@ export async function runApp(): Promise<void> {
   await writer.emit({ type: "ready", protocol: PROTOCOL_VERSION, resumed });
 
   return new Promise<void>((resolve) => {
-    attachJsonlReader(
-      process.stdin,
-      (line) => {
+    attachJsonlReader({
+      stream: process.stdin,
+      onLine: (line) => {
         const command = parseCommand(line);
         if (!command) {
-          warn(`ignoring unparseable stdin line: ${line.slice(0, 200)}`);
+          // The line can carry an end-user prompt, so only its size is logged.
+          warn(`ignoring unparseable stdin line of ${line.length} characters`);
           return;
         }
         switch (command.type) {
@@ -89,7 +90,7 @@ export async function runApp(): Promise<void> {
             break;
         }
       },
-      () => {
+      onEnd: () => {
         // Manager closed stdin: abort in-flight work (its aborted terminal
         // still lands), flush, exit.
         void (async () => {
@@ -98,7 +99,7 @@ export async function runApp(): Promise<void> {
           resolve();
         })();
       },
-    );
+    });
     process.stdin.resume();
   });
 }

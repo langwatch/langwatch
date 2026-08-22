@@ -6,6 +6,10 @@
   "license": "MIT",
   "type": "module",
   "main": "dist/src/main.js",
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.13"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

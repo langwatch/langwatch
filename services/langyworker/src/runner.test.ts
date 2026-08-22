@@ -63,11 +63,15 @@ function makeFakeSession() {
   };
 }
 
-function makeRunner(
-  session: SessionLike,
-  appliedSystemPrompts: string[] = [],
-  options: { sessionResumed?: boolean } = {},
-) {
+function makeRunner({
+  session,
+  appliedSystemPrompts = [],
+  options = {},
+}: {
+  session: SessionLike;
+  appliedSystemPrompts?: string[];
+  options?: { sessionResumed?: boolean };
+}) {
   const { writer, events } = makeWriter();
   const runner = new TurnRunner({
     session,
@@ -91,7 +95,7 @@ describe("TurnRunner", () => {
   describe("when a turn completes cleanly", () => {
     it("emits turn_started then turn_done ok, with the recomposed system prompt applied", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session, fake.appliedSystemPrompts);
+      const { runner, events } = makeRunner({ session: fake.session, appliedSystemPrompts: fake.appliedSystemPrompts });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi", system: "SYS" });
       await until(() => fake.promptCalls.length === 1);
       fake.finish();
@@ -108,7 +112,7 @@ describe("TurnRunner", () => {
   describe("when the turn carries a resumeToken", () => {
     it("prepends the labeled seed to the prompt", async () => {
       const fake = makeFakeSession();
-      const { runner } = makeRunner(fake.session);
+      const { runner } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({
         type: "turn",
         turnId: "t1",
@@ -128,7 +132,7 @@ describe("TurnRunner", () => {
     /** @scenario A resumed session ignores the handoff digest it no longer needs */
     it("does not prepend the resumeToken seed", async () => {
       const fake = makeFakeSession();
-      const { runner } = makeRunner(fake.session, [], { sessionResumed: true });
+      const { runner } = makeRunner({ session: fake.session, options: { sessionResumed: true } });
       const done = runner.submitTurn({
         type: "turn",
         turnId: "t1",
@@ -145,7 +149,7 @@ describe("TurnRunner", () => {
   describe("when prompt() rejects", () => {
     it("terminates with turn_done error carrying the message", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       fake.fail("provider exploded");
@@ -162,7 +166,7 @@ describe("TurnRunner", () => {
   describe("when the last assistant message carries a provider error", () => {
     it("maps a resolved prompt to turn_done error (the harness-pi rule)", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       fake.session.agent.state.messages.push({
@@ -185,7 +189,7 @@ describe("TurnRunner", () => {
     it("aborts the session and terminates with outcome aborted", async () => {
       const fake = makeFakeSession();
       fake.trackAborts();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       runner.abortTurn("t1");
@@ -199,7 +203,7 @@ describe("TurnRunner", () => {
     it("is ignored and the turn finishes ok", async () => {
       const fake = makeFakeSession();
       fake.trackAborts();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       runner.abortTurn("t-other");
@@ -213,7 +217,7 @@ describe("TurnRunner", () => {
   describe("when a new turn arrives while one runs", () => {
     it("aborts the running turn; its aborted terminal lands before the new turn_started", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       void runner.submitTurn({ type: "turn", turnId: "t1", prompt: "one" });
       await until(() => fake.promptCalls.length === 1);
       const second = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "two" });
@@ -234,7 +238,7 @@ describe("TurnRunner", () => {
   describe("when a second turn arrives before the first ever starts", () => {
     it("the first still gets its turn_started + aborted terminal pair, without prompting", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       void runner.submitTurn({ type: "turn", turnId: "t1", prompt: "one" });
       const second = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "two" });
       await until(() => fake.promptCalls.length === 1);
@@ -255,7 +259,7 @@ describe("TurnRunner", () => {
   describe("when shutdown_imminent arrives mid-turn", () => {
     it("terminates the turn with a handoff digest of the conversation", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       fake.session.agent.state.messages.push(
@@ -276,7 +280,7 @@ describe("TurnRunner", () => {
   describe("when shutdown_imminent arrives while idle", () => {
     it("is a no-op", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       runner.shutdownImminent();
       await runner.settled();
       expect(events).toEqual([]);
@@ -286,7 +290,7 @@ describe("TurnRunner", () => {
   describe("when session events arrive outside any turn", () => {
     it("drops them (terminal-last invariant)", async () => {
       const fake = makeFakeSession();
-      const { runner, events, writer } = makeRunner(fake.session);
+      const { runner, events, writer } = makeRunner({ session: fake.session });
       runner.onSessionEvent({
         type: "message_update",
         assistantMessageEvent: { type: "text_delta", delta: "stray" },
@@ -299,7 +303,7 @@ describe("TurnRunner", () => {
   describe("when session events arrive during a turn", () => {
     it("forwards them tagged with the turnId, before the terminal", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner(fake.session);
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
       await until(() => fake.promptCalls.length === 1);
       runner.onSessionEvent({

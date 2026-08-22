@@ -12,11 +12,15 @@ export interface LineSource {
   on(event: "end", listener: () => void): unknown;
 }
 
-export function attachJsonlReader(
-  stream: LineSource,
-  onLine: (line: string) => void,
-  onEnd?: () => void,
-): void {
+export function attachJsonlReader({
+  stream,
+  onLine,
+  onEnd,
+}: {
+  stream: LineSource;
+  onLine: (line: string) => void;
+  onEnd?: () => void;
+}): void {
   const decoder = new StringDecoder("utf8");
   let buffer = "";
 

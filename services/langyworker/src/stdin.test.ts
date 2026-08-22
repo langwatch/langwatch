@@ -6,13 +6,13 @@ function makeSource() {
   const emitter = new EventEmitter();
   const lines: string[] = [];
   let ended = false;
-  attachJsonlReader(
-    emitter as never,
-    (line) => lines.push(line),
-    () => {
+  attachJsonlReader({
+    stream: emitter as never,
+    onLine: (line) => lines.push(line),
+    onEnd: () => {
       ended = true;
     },
-  );
+  });
   return {
     push: (chunk: string | Buffer) => emitter.emit("data", chunk),
     end: () => emitter.emit("end"),
