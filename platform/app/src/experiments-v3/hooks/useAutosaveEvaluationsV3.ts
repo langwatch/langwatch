@@ -19,6 +19,40 @@ const stringifiedInitialState = JSON.stringify(
 );
 
 /**
+ * The persisted projection of the store as it is RIGHT NOW, read outside the
+ * render cycle. The load paths use it to record the saved baseline in the same
+ * effect that loads the state: a render-scope string from the same commit
+ * still describes the pre-load state, and capturing that made every page load
+ * look dirty and autosave a no-op change.
+ */
+const stringifyPersistedSnapshot = (): string => {
+  const s = useEvaluationsV3Store.getState();
+  return JSON.stringify(
+    extractPersistedState({
+      experimentId: s.experimentId,
+      experimentSlug: s.experimentSlug,
+      name: s.name,
+      datasets: s.datasets,
+      activeDatasetId: s.activeDatasetId,
+      evaluators: s.evaluators,
+      targets: s.targets,
+      results: s.results,
+      pendingSavedChanges: {},
+      ui: {
+        selectedRows: new Set(),
+        columnWidths: {},
+        rowHeightMode: "compact",
+        expandedCells: new Set(),
+        hiddenColumns: s.ui.hiddenColumns,
+        autosaveStatus: { evaluation: "idle", dataset: "idle" },
+        concurrency: s.ui.concurrency,
+        hasRunThisSession: false,
+      },
+    }),
+  );
+};
+
+/**
  * Manages syncing the evaluations v3 state with the database.
  * Uses workbenchState field in the Experiment model for persistence.
  *
@@ -170,7 +204,10 @@ export const useAutosaveEvaluationsV3 = () => {
       if (existingExperiment.data.workbenchState && loadState) {
         loadState(existingExperiment.data.workbenchState);
       }
-      // The state the next render derives from this load IS the saved state.
+      // The store now holds the saved state: record its projection as the
+      // baseline, and skip the autosave pass that runs in this same commit
+      // (its render-scope string still describes the pre-load state).
+      lastSavedRef.current = stringifyPersistedSnapshot();
       justLoadedRef.current = true;
     }
   }, [
@@ -227,10 +264,10 @@ export const useAutosaveEvaluationsV3 = () => {
 
   // Autosave effect with debounce
   useEffect(() => {
-    // The first state derived after a load is the saved state, not an edit.
+    // The pass that runs in the same commit as a load still sees the
+    // pre-load string; the load effect already recorded the real baseline.
     if (justLoadedRef.current) {
       justLoadedRef.current = false;
-      lastSavedRef.current = stringifiedState;
       return;
     }
     if (!project) return;
@@ -281,6 +318,12 @@ export const useAutosaveEvaluationsV3 = () => {
           setExperimentSlug(updatedExperiment.slug);
           setWorkbenchVersion(updatedExperiment.version);
           lastSavedRef.current = stringifiedState;
+          // Our own save's broadcast can outrun this response; a staleness it
+          // raised for a version this ack covers is not staleness.
+          const staleNow = useEvaluationsV3Store.getState().staleWorkbench;
+          if (staleNow && staleNow.serverVersion <= updatedExperiment.version) {
+            setStaleWorkbench(undefined);
+          }
           if (updatedExperiment.name && updatedExperiment.name !== name) {
             setName(updatedExperiment.name);
           }
@@ -378,6 +421,7 @@ export const useAutosaveEvaluationsV3 = () => {
     }
     setStaleWorkbench(undefined);
     setAutosaveStatus("evaluation", "idle");
+    lastSavedRef.current = stringifyPersistedSnapshot();
     justLoadedRef.current = true;
   }, [
     project,

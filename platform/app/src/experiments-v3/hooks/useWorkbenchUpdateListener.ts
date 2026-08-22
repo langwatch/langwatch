@@ -55,6 +55,15 @@ export function useWorkbenchUpdateListener({
     (serverVersion: number, actorLabel?: string) => {
       const known = versionRef.current;
       if (known === undefined || serverVersion <= known) return;
+      // A save in flight is usually the very write this signal announces; the
+      // mutation response carries the truth (the new version, or the stale
+      // error), so acting here would banner a tab for its own save.
+      if (
+        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation ===
+        "saving"
+      ) {
+        return;
+      }
       if (isDirtyRef.current) {
         setStaleWorkbench({ serverVersion, actorLabel });
         return;
