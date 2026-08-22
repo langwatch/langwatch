@@ -670,8 +670,24 @@ export type EvaluationsV3Actions = {
 
   // Target actions
   addTarget: (target: TargetConfig) => void;
+  /**
+   * Copy a target, keeping its wiring: its own mappings and every evaluator's
+   * mappings for it. Returns the copy's id.
+   *
+   * `name` only lands for evaluator targets, the one kind that carries a name
+   * in workbench state; prompt, agent and workflow targets take their name from
+   * the entity they reference.
+   */
+  duplicateTarget: (targetId: string, name?: string) => string | undefined;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
+  /** Write a target's unsaved prompt draft, and the variables that came with it */
+  setTargetPrompt: (payload: {
+    targetId: string;
+    localPromptConfig: LocalPromptConfig;
+    inputs?: Field[];
+    outputs?: Field[];
+  }) => void;
   /** Set a mapping for a target input field for a specific dataset */
   setTargetMapping: (
     targetId: string,

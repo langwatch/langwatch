@@ -1,0 +1,68 @@
+Feature: Workbench actions
+  As a user working with an assistant on an evaluation
+  I want the assistant to make the same edits I can make by hand
+  So that what it does to the workbench is exactly what I would have done
+
+  Background:
+    Given I have an evaluation workbench with a dataset, a target and an evaluator
+
+  # ============================================================================
+  # Duplicating a target
+  # ============================================================================
+
+  @unit
+  Scenario: A duplicated target keeps the wiring of the target it came from
+    Given the evaluator reads a field on the target that no name matching can guess
+    When I duplicate the target
+    Then the copy is added as a new column
+    And the evaluator reads the same field on the copy
+
+  @unit
+  Scenario: A duplicated target is graded on its own output
+    Given the evaluator reads the target's output
+    When I duplicate the target
+    Then the evaluator reads the copy's output for the copy's column
+    And the original column keeps its own wiring
+
+  # ============================================================================
+  # Prompt and model edits
+  # ============================================================================
+
+  @unit
+  Scenario: Changing the model needs a prompt draft to change
+    Given the target runs a saved prompt with no unsaved draft
+    When I ask to change the target's model
+    Then the change is refused and says the target has no draft prompt
+
+  # ============================================================================
+  # Dataset edits
+  # ============================================================================
+
+  @unit
+  Scenario: Rows and columns of a saved dataset are not edited through the workbench
+    Given the workbench holds a saved dataset
+    When I ask to write a cell of that dataset
+    Then the change is refused and says the dataset is saved
+
+  @unit
+  Scenario: New rows land in every column
+    When I add two rows that fill only one column
+    Then both rows are appended
+    And the other column gets an empty cell for each new row
+
+  # ============================================================================
+  # What the assistant is allowed to do, and what it can see
+  # ============================================================================
+
+  @unit
+  Scenario: Every action names the permission it needs
+    When I list the actions the workbench exposes
+    Then each one names a payload schema and a required permission
+    And reading the workbench needs only the permission to view experiments
+
+  @unit
+  Scenario: The state an assistant reads stays small
+    Given the workbench holds more data than the assistant's budget
+    When the assistant reads the workbench state
+    Then the sample rows are dropped first
+    And the state says it was truncated
