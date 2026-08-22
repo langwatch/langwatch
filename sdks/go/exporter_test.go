@@ -84,6 +84,7 @@ func TestExcludeHTTPRequests_KeepsUserSpansWithVerbPrefixedNames(t *testing.T) {
 	exporter := NewFilteringExporter(mock, ExcludeHTTPRequests())
 
 	userSpans := []string{
+		"POST-process",
 		"post-process",
 		"post-publish-smoke",
 		"get-user-profile",

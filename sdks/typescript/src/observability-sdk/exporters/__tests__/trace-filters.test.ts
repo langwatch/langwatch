@@ -278,6 +278,7 @@ describe("trace-filters", () => {
 
     it("keeps user spans whose name starts with a verb word plus punctuation", () => {
       for (const name of [
+        "POST-process",
         "post-process",
         "post-publish-smoke",
         "get-user-profile",

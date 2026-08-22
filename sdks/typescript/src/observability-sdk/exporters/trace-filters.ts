@@ -261,8 +261,8 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
  * }
  * ```
  */
-export function isHttpRequestSpan(span: ReadableSpan): boolean {
-  const name = span.name ?? "";
-  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?: |$)/.test(name);
-  return verbMatch;
+export function isHttpRequestSpan({ name }: ReadableSpan): boolean {
+  const spanName = name ?? "";
+  const isHttpVerbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?: |$)/.test(spanName);
+  return isHttpVerbMatch;
 }
