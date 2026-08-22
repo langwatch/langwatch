@@ -906,7 +906,10 @@ export function initializeDefaultApp(options?: {
   // The webhook delivery process manager scans the spend table, so it
   // shares the same ClickHouse gate. Registration is global; the per-org
   // enterprise flag is enforced inside the scan (and at the REST surface).
-  const webhookEndpointService = new WebhookEndpointService({ prisma });
+  const webhookEndpointService = new WebhookEndpointService({
+    prisma,
+    processStore: new PrismaProcessStore(prisma),
+  });
   const webhookDelivery = clickhouseEnabled
     ? {
         processStore: repositories.processStore,

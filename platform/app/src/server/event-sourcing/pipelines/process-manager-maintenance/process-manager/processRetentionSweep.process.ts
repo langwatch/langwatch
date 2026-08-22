@@ -49,8 +49,14 @@ export const PROCESS_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 export const DISPATCHED_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Dead rows are the operator's failure record, not completed work, so they get
- * a month rather than a day.
+ * Terminal rows are the operator's failure record, not completed work, so they
+ * get a month rather than a day.
+ *
+ * The window applies to `discarded` ONLY. A `dead` row is undelivered work
+ * that ran out of attempts, and no one chose to lose it; sweeping it deleted
+ * the message and its payload a month later without a word. Undelivered means
+ * retained — until it delivers, or until an operator discards it and starts
+ * this clock deliberately.
  */
 export const DEAD_OUTBOX_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 

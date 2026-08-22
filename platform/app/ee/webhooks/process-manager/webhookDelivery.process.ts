@@ -25,6 +25,9 @@ import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { DIAGNOSTIC_SAFE } from "~/server/event-sourcing/process-manager/failureDiagnostic";
+import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
+import { captureTraceCarrier } from "~/server/event-sourcing/process-manager/traceCarrier";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
@@ -45,25 +48,51 @@ export const WEBHOOK_DELIVERY_PROCESS_NAME = "webhookDelivery" as const;
 
 /**
  * The Stripe-shaped retry ladder. `attempt` is the 1-based attempt that
- * just failed: the delay to the next one. After the sixth failure the
- * cadence holds at 12h; 11 attempts keep the last retry inside 72h of the
- * first failure (1m + 5m + 30m + 2h + 6h + 12h + 4 * 12h = 68h36m).
+ * just failed: the delay to the next one. After the seventh failure the
+ * cadence holds at 4h; 11 attempts keep the last retry inside 24h of the
+ * first failure (1m + 5m + 15m + 30m + 1h + 2h + 4h + 4h * 3 = 19h51m,
+ * which holds under full +20% jitter too).
+ *
+ * A day, not three. Retrying is only worth what a receiver's outage costs to
+ * ride out, and past that the message is better parked where someone can see
+ * it and push it through than quietly rattling around for another two days.
+ * Retiring does not discard it: the row is retained until it delivers or an
+ * operator discards it, so the ladder's end is where retrying stops, not
+ * where the event stops existing.
  */
 export const WEBHOOK_RETRY_LADDER_MS: readonly number[] = [
   60_000,
   5 * 60_000,
+  15 * 60_000,
   30 * 60_000,
+  60 * 60_000,
   2 * 60 * 60_000,
-  6 * 60 * 60_000,
-  12 * 60 * 60_000,
+  4 * 60 * 60_000,
 ];
 export const WEBHOOK_SEND_MAX_ATTEMPTS = 11;
 
-export function webhookRetryDelayMs({ attempt }: { attempt: number }): number {
-  return (
+/**
+ * How far either side of the ladder step a retry may land, as a fraction.
+ *
+ * Without it the ladder is a set of fixed offsets, so everything that failed
+ * together retries together — and a batch of deliveries that collided once
+ * re-collides at every rung, all the way to the end. The spread is what lets
+ * a cohort come apart instead of marching in step.
+ */
+const WEBHOOK_RETRY_JITTER = 0.2;
+
+export function webhookRetryDelayMs({
+  attempt,
+  random = Math.random,
+}: {
+  attempt: number;
+  random?: () => number;
+}): number {
+  const step =
     WEBHOOK_RETRY_LADDER_MS[attempt - 1] ??
-    WEBHOOK_RETRY_LADDER_MS[WEBHOOK_RETRY_LADDER_MS.length - 1]!
-  );
+    WEBHOOK_RETRY_LADDER_MS[WEBHOOK_RETRY_LADDER_MS.length - 1]!;
+  const spread = step * WEBHOOK_RETRY_JITTER;
+  return Math.max(0, Math.round(step - spread + random() * spread * 2));
 }
 
 /** How soon a stream capped on in-flight rechecks, and the floor for a
@@ -151,6 +180,27 @@ export interface EndpointStreamState {
 
 export function isEndpointStreamKey(processKey: string): boolean {
   return processKey.startsWith("endpoint:");
+}
+
+/**
+ * The one address of an endpoint's delivery stream and its outbox rows.
+ * Endpoints belong to the ORGANIZATION, so the stream does too: one row per
+ * endpoint holds one buffer, one outstanding-send count, and therefore one
+ * max_in_flight, no matter how many of the org's projects feed it. Keying by
+ * project would give an endpoint N of each.
+ */
+export function endpointStreamRef({
+  organizationId,
+  endpointId,
+}: {
+  organizationId: string;
+  endpointId: string;
+}): ProcessRef {
+  return {
+    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+    projectId: organizationId,
+    processKey: `endpoint:${endpointId}`,
+  };
 }
 
 /** Every quantity added after the first deploy carries a default: this rides
@@ -354,12 +404,14 @@ function planEndpointBatches({
   pending,
   outstanding,
   now,
+  traceCarrier,
 }: {
   organizationId: string;
   endpoint: WebhookEndpointView;
   pending: readonly PendingEnvelope[];
   outstanding: number;
   now: number;
+  traceCarrier: Record<string, string>;
 }): {
   messages: NewOutboxMessage[];
   remaining: PendingEnvelope[];
@@ -389,29 +441,45 @@ function planEndpointBatches({
         batchId,
         envelopes: batch,
       } as unknown as JsonValue,
-      traceCarrier: {},
+      traceCarrier,
     });
     inFlight++;
   }
   return { messages, remaining, inFlight };
 }
 
-/** Anything still buffered arms a wake: the coalescing deadline when the
- *  delay is holding it, a short recheck when the in-flight cap is. */
+/**
+ * Anything still buffered arms a wake: the coalescing deadline when the
+ * delay is holding it, and when the in-flight cap is, the soonest instant a
+ * slot can actually free.
+ *
+ * That second case matters. The cap counts pending sendBatch rows, and a row
+ * riding the retry ladder stays pending for the whole wait — hours at the
+ * ladder's tail. A flat short recheck there is a poll: every cycle takes the
+ * stream's lock, rewrites the whole buffer row and ships nothing, thousands
+ * of times per laddered retry. `outstandingDueAt` is when the earliest of
+ * those rows next becomes due, so the wake lands where something can have
+ * changed. The recheck floor still applies — a row that is due NOW is one a
+ * dispatcher is about to pick up, and the floor gives it time to settle.
+ */
 function nextStreamWakeAt({
   endpoint,
   remaining,
   inFlight,
+  outstandingDueAt,
   now,
 }: {
   endpoint: WebhookEndpointView;
   remaining: readonly PendingEnvelope[];
   inFlight: number;
+  outstandingDueAt: number | null;
   now: number;
 }): number | null {
   const oldest = remaining[0];
   if (!oldest) return null;
-  if (inFlight >= endpoint.maxInFlight) return now + WEBHOOK_FLUSH_RECHECK_MS;
+  if (inFlight >= endpoint.maxInFlight) {
+    return Math.max(outstandingDueAt ?? 0, now + WEBHOOK_FLUSH_RECHECK_MS);
+  }
   return Math.max(
     coalescingDeadline(oldest, endpoint),
     now + WEBHOOK_FLUSH_RECHECK_MS,
@@ -445,62 +513,98 @@ async function flushEndpointStream({
   sourceEventId?: string;
 }): Promise<void> {
   const now = (deps.now ?? Date.now)();
-  // Endpoints belong to the ORGANIZATION, so the stream does too: one row
-  // per endpoint holds one buffer, one outstanding-send count, and
-  // therefore one max_in_flight, no matter how many of the org's projects
-  // feed it. Keying by project would give an endpoint N of each.
-  const ref = {
-    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId: organizationId,
-    processKey: `endpoint:${endpoint.id}`,
-  };
-  const existing = await deps.processStore.findByRef<EndpointStreamState>({
+  const ref = endpointStreamRef({ organizationId, endpointId: endpoint.id });
+  // The in-flight count is read outside the stream's lock on purpose: it
+  // counts rows this transition does not own, and holding a lock across the
+  // query would put every one of the org's appends behind it. A count that
+  // races is what `max_in_flight` has always been — the cap bounds parallel
+  // POSTs to a slow receiver, and the wake rechecks it a moment later.
+  const outstanding = await deps.processStore.countPendingMessages({
     ref,
+    intentType: "sendBatch",
   });
-  const pending: PendingEnvelope[] = [
-    ...(existing?.state.pending ?? []),
-    ...(append
-      ? [
-          {
-            envelope: append,
-            appendedAtMs: now,
-            ...(appendSalt ? { salt: appendSalt } : {}),
-          },
-        ]
-      : []),
-  ];
+  const traceCarrier = captureTraceCarrier();
 
-  const outstanding = (
-    await deps.processStore.findMessagesByRef({ ref })
-  ).filter(
-    (m) => m.intentType === "sendBatch" && m.status === "pending",
-  ).length;
-
-  const { messages, remaining, inFlight } = planEndpointBatches({
-    organizationId,
-    endpoint,
-    pending,
-    outstanding,
-    now,
-  });
-
-  const result = await deps.processStore.commit<EndpointStreamState>({
-    ref,
-    tenantId: organizationId,
-    sourceEventId: sourceEventId ?? null,
-    expectedRevision: existing?.revision ?? 0,
-    state: { pending: remaining },
-    nextWakeAt: nextStreamWakeAt({ endpoint, remaining, inFlight, now }),
-    messages,
-    now,
-  });
-  if (result.outcome === "revisionConflict") {
-    // A concurrent append or flush won the stream's revision; retry this
-    // intent so nothing is lost (idempotent by inbox id and content key).
-    throw new Error(
-      `webhook stream flush hit a revision conflict on endpoint ${endpoint.id}; retrying`,
-    );
+  try {
+    // Every gateway request in the organization appends here, so the buffer
+    // is read INSIDE the store's lock rather than before it. Reading first
+    // and committing against the revision it saw is what made concurrent
+    // appends fail: the lock serialised them correctly and then the
+    // compare-and-swap rejected everyone who had read the pre-lock snapshot,
+    // which under real traffic is everyone but the winner. Appends have no
+    // order to preserve — two envelopes arriving together are equally valid
+    // in either sequence — so there is nothing for optimistic concurrency to
+    // protect here.
+    await deps.processStore.transact<EndpointStreamState>({
+      ref,
+      tenantId: organizationId,
+      sourceEventId: sourceEventId ?? null,
+      now,
+      apply: (current) => {
+        const pending: PendingEnvelope[] = [
+          ...(current?.state.pending ?? []),
+          ...(append
+            ? [
+                {
+                  envelope: append,
+                  appendedAtMs: now,
+                  ...(appendSalt ? { salt: appendSalt } : {}),
+                },
+              ]
+            : []),
+        ];
+        const { messages, remaining, inFlight } = planEndpointBatches({
+          organizationId,
+          endpoint,
+          pending,
+          outstanding: outstanding.count,
+          now,
+          traceCarrier,
+        });
+        return {
+          state: { pending: remaining },
+          nextWakeAt: nextStreamWakeAt({
+            endpoint,
+            remaining,
+            inFlight,
+            outstandingDueAt: outstanding.nextAttemptAt,
+            now,
+          }),
+          messages,
+        };
+      },
+    });
+  } catch (error) {
+    // An error whose message already survives redaction (a DispatchError, or
+    // one stamped diagnostic-safe) says more than any wrapper would.
+    if (
+      error instanceof Error &&
+      (error.name === "DispatchError" ||
+        Reflect.get(error, DIAGNOSTIC_SAFE) === true)
+    ) {
+      throw error;
+    }
+    // A foreign error's message is redacted at every telemetry surface, and
+    // this call is where a week-long retry storm once hid behind "Operation
+    // failed" — so name the failure ourselves. The wrapped message carries
+    // only ids we already log and the error's class, never its text.
+    throw new DispatchError({
+      message: `webhook stream flush failed on endpoint ${endpoint.id}: ${failureClassOf(error)}`,
+      retryable: true,
+    });
   }
+}
+
+/**
+ * The class of a foreign failure, safe to quote: the constructor name plus a
+ * machine code when the error carries one (Prisma's P-codes, node's ERRNO),
+ * and never the message text.
+ */
+function failureClassOf(error: unknown): string {
+  if (typeof error !== "object" || error === null) return "non-error";
+  const name = error instanceof Error ? error.name : "non-error";
+  const code = Reflect.get(error, "code");
+  return typeof code === "string" ? `${name} (${code})` : name;
 }
 
 /** Settled requests are their own event type: an endpoint subscribed only
@@ -832,20 +936,36 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     payload: SendBatchPayload,
     context: IntentContext,
   ): Promise<void> => {
-    // The service's deliverable read owns the liveness predicate. A deleted
-    // or disabled endpoint drains its queue without delivering: the spend
-    // record keeps the events, re-enable plus replay covers the gap.
-    const endpoint = await deps.endpoints.getDeliverable({
+    // The service's disposition read owns the liveness predicate, and the
+    // two ways a batch can fail to ship are not the same thing.
+    //
+    // Gone means the customer deleted the endpoint: they asked us to stop, so
+    // acknowledging the batch is honouring that, not losing it.
+    //
+    // Paused means disabled — by the customer for now, or by our own
+    // auto-disable after a failing streak. The receiver is expected back, so
+    // the batch waits. It used to drain here on the premise that "the spend
+    // record keeps the events, re-enable plus replay covers the gap", which
+    // asks a customer to notice a gap they were never told about and replay it
+    // by hand. Staying queued costs a retry and covers the gap by itself.
+    const disposition = await deps.endpoints.getDeliveryDisposition({
       organizationId: payload.organizationId,
       endpointId: payload.endpointId,
     });
-    if (!endpoint) {
+    if (disposition.state === "gone") {
       logger.info(
         { endpointId: payload.endpointId, batchId: payload.batchId },
-        "webhook batch dropped: endpoint disabled or gone (replay covers the gap)",
+        "webhook batch discarded: endpoint deleted",
       );
       return;
     }
+    if (disposition.state === "paused") {
+      throw new DispatchError({
+        message: `Webhook endpoint ${payload.endpointId} is disabled; batch ${payload.batchId} stays queued`,
+        retryable: true,
+      });
+    }
+    const endpoint = disposition.endpoint;
 
     const startedAt = (deps.now ?? Date.now)();
     const result = await dispatchWebhookBatch({

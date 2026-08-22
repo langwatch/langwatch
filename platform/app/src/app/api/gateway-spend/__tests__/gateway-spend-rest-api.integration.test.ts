@@ -18,6 +18,7 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   startTestContainers,
   stopTestContainers,
@@ -582,7 +583,10 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     );
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = new WebhookEndpointService({
+      prisma,
+      processStore: new PrismaProcessStore(prisma),
+    });
     let endpointId = "";
     const ns2 = `${ns}-replay`;
     try {
@@ -701,7 +705,10 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     );
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = new WebhookEndpointService({
+      prisma,
+      processStore: new PrismaProcessStore(prisma),
+    });
     const emitted = vi.spyOn(
       WebhookEventsService.prototype,
       "getEmittedEvents",

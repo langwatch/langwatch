@@ -125,6 +125,56 @@ export type CommitResult =
   | { outcome: "revisionConflict"; actualRevision: number };
 
 /**
+ * A read-modify-write held inside the store's own lock.
+ *
+ * `commit` asks the caller for `expectedRevision`, which means the caller read
+ * the state BEFORE the store took its advisory lock. The lock still serialises
+ * the writes, so nothing is lost — but every writer that read from the same
+ * pre-lock snapshot arrives holding a revision that the winner has already
+ * moved, and the compare-and-swap turns a serialisation that succeeded into a
+ * failure the caller has to handle. For a process key that many writers append
+ * to, that is not an edge case: it is the steady state, and each loser pays a
+ * whole outbox attempt for a race whose outcome it did not care about.
+ *
+ * `transact` closes the window instead of retrying inside it. The store takes
+ * the lock, reads the current instance, hands it to `apply`, and writes what
+ * comes back — one transaction, no gap for another writer to slip through, so
+ * there is no `revisionConflict` outcome to return.
+ *
+ * `expectedRevision` keeps its place for callers that genuinely want optimistic
+ * concurrency: a wake that must not act on state another commit has already
+ * advanced still wants to be told, rather than to recompute from underneath it.
+ *
+ * `apply` runs INSIDE the transaction and while the lock is held, so it must be
+ * pure and prompt: derive the next state from what it was handed, and nothing
+ * else. An I/O call in there holds the lock across a network round trip and
+ * turns one process key into everyone's bottleneck.
+ */
+export interface ProcessTransaction<State = unknown> {
+  ref: ProcessRef;
+  tenantId: string;
+  userId?: string;
+  /** Inbox identity, exactly as {@link ProcessCommit.sourceEventId}. */
+  sourceEventId: string | null;
+  now: number;
+  apply: (current: PersistedProcessInstance<State> | null) => {
+    state: State;
+    nextWakeAt: number | null;
+    messages: NewOutboxMessage[];
+  };
+}
+
+/** {@link CommitResult} minus the outcome `transact` exists to remove. */
+export type TransactResult =
+  | {
+      outcome: "committed";
+      revision: number;
+      insertedMessageKeys: string[];
+      duplicateMessageKeys: string[];
+    }
+  | { outcome: "duplicateEvent" };
+
+/**
  * The transient append: intents only, no instance row, no inbox row, and no
  * transaction.
  *
@@ -177,6 +227,14 @@ export interface ProcessStore {
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
   /**
+   * The same write, with the read held inside the lock so no
+   * `revisionConflict` is possible. See {@link ProcessTransaction}.
+   */
+  transact<State = unknown>(
+    transaction: ProcessTransaction<State>,
+  ): Promise<TransactResult>;
+
+  /**
    * Appends a transient evolution's intents. See {@link AppendIntentsResult}
    * for why this is neither transactional nor inbox-backed.
    *
@@ -198,6 +256,22 @@ export interface ProcessStore {
   findMessagesByRef(params: {
     ref: ProcessRef;
   }): Promise<OutboxMessageRecord[]>;
+
+  /**
+   * How many of one process's messages of one intent type are still pending,
+   * and the soonest instant any of them becomes due again.
+   *
+   * This is the in-flight read on a hot append path, and it is a dedicated
+   * method because {@link findMessagesByRef} is the wrong tool there: that
+   * one fetches every row the ref has ever minted — dispatched history and
+   * payloads included — to answer what is ultimately a count. `nextAttemptAt`
+   * rides along because the caller holding a full in-flight cap wants to
+   * sleep until a slot can actually free, not poll.
+   */
+  countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }>;
 
   /**
    * Lease pending, due messages for exclusive dispatch until

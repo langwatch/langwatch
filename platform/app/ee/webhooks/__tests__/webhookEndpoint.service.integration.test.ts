@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Organization } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
@@ -14,7 +15,11 @@ const ns = `webhook-svc-${nanoid(8)}`;
 
 let organization: Organization;
 const notifyAutoDisabled = vi.fn().mockResolvedValue(undefined);
-const service = new WebhookEndpointService({ prisma, notifyAutoDisabled });
+const service = new WebhookEndpointService({
+  prisma,
+  processStore: new PrismaProcessStore(prisma),
+  notifyAutoDisabled,
+});
 
 beforeAll(async () => {
   organization = await prisma.organization.create({
