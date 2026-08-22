@@ -65123,6 +65123,15 @@ openapi: "POST /api/experiment/init"
 
 ---
 
+# FILE: ./api-reference/experiments/list-an-experiment-s-versions.mdx
+
+---
+title: "List an experiment's versions"
+openapi: "GET /api/experiments/{slug}/versions"
+---
+
+---
+
 # FILE: ./api-reference/experiments/list-experiments-for-the-project.mdx
 
 ---
@@ -65163,6 +65172,24 @@ openapi: "GET /api/experiments/runs/{runId}"
 
 ---
 
+# FILE: ./api-reference/experiments/post-create-an-experiment.mdx
+
+---
+title: "Create an experiment"
+openapi: "POST /api/experiments"
+---
+
+---
+
+# FILE: ./api-reference/experiments/read-an-experiment-s-setup.mdx
+
+---
+title: "Read an experiment's setup"
+openapi: "GET /api/experiments/{slug}/workbench-state"
+---
+
+---
+
 # FILE: ./api-reference/experiments/read-run-results.mdx
 
 ---
@@ -65181,11 +65208,29 @@ openapi: "POST /api/dspy/log_steps"
 
 ---
 
+# FILE: ./api-reference/experiments/restore-an-experiment-version.mdx
+
+---
+title: "Restore an experiment version"
+openapi: "POST /api/experiments/{slug}/versions/{version}/restore"
+---
+
+---
+
 # FILE: ./api-reference/experiments/run-an-experiment.mdx
 
 ---
 title: "Run an experiment"
 openapi: "POST /api/experiments/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/experiments/save-an-experiment-s-setup.mdx
+
+---
+title: "Save an experiment's setup"
+openapi: "PUT /api/experiments/{slug}/workbench-state"
 ---
 
 ---
