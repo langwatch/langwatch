@@ -200,6 +200,7 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "TraceIngested",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: '{"key":"value"}',
           },
@@ -225,6 +226,7 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "TraceIngested",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: "not-json",
           },
@@ -269,6 +271,7 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "ExperimentStarted",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: "{}",
           },
@@ -298,12 +301,14 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "TraceIngested",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: "{}",
           },
           {
             eventId: "e2",
             eventType: "TraceUpdated",
+            aggregateType: "Trace",
             eventTimestamp: "1700000001000",
             payload: "{}",
           },
@@ -331,6 +336,7 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "UnrelatedEvent",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: "{}",
           },
@@ -373,12 +379,14 @@ describe("EventExplorerService", () => {
           {
             eventId: "e1",
             eventType: "TraceIngested",
+            aggregateType: "Trace",
             eventTimestamp: "1700000000000",
             payload: "{}",
           },
           {
             eventId: "e2",
             eventType: "TraceIngested",
+            aggregateType: "Trace",
             eventTimestamp: "1700000001000",
             payload: "{}",
           },

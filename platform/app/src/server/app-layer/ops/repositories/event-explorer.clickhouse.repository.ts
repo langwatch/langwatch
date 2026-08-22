@@ -187,6 +187,7 @@ export class EventExplorerClickHouseRepository
         SELECT
           EventId AS eventId,
           EventType AS eventType,
+          AggregateType AS aggregateType,
           EventTimestamp AS eventTimestamp,
           EventPayload AS payload
         FROM event_log

@@ -7,7 +7,6 @@ import type { CommandSchema } from "../../commands/commandSchema";
 import {
   type AggregateScope,
   commandAggregateType,
-  primaryAggregateType,
   toAggregateScope,
 } from "../../domain/aggregateScope";
 import type { AggregateType } from "../../domain/aggregateType";
@@ -139,8 +138,6 @@ interface QueuedEventConsumerDefinition<E extends Event> {
  */
 export class QueueManager<EventType extends Event = Event> {
   private readonly aggregateScope: AggregateScope;
-  /** The first declared type — a label, never a key (ADR-113). */
-  private readonly aggregateType: AggregateType;
   private readonly pipelineName: string;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:queue-manager",
@@ -171,7 +168,6 @@ export class QueueManager<EventType extends Event = Event> {
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateScope = toAggregateScope(aggregateScope);
-    this.aggregateType = primaryAggregateType(this.aggregateScope);
     this.pipelineName = pipelineName;
     this.globalQueue = globalQueue;
     this.globalJobRegistry = globalJobRegistry;

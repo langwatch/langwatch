@@ -15,6 +15,8 @@ export interface AggregateSearchResult {
 export interface RawEventRow {
   eventId: string;
   eventType: string;
+  /** The aggregate type the row was stored under — its own, not the pipeline's first. */
+  aggregateType: string;
   eventTimestamp: string;
   payload: string;
 }

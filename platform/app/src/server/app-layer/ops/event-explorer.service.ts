@@ -191,7 +191,7 @@ export class EventExplorerService {
       const event = {
         id: row.eventId,
         aggregateId: params.aggregateId,
-        aggregateType: projection.aggregateType,
+        aggregateType: row.aggregateType,
         tenantId: params.tenantId,
         createdAt: timestampMs,
         occurredAt: timestampMs,
