@@ -36,10 +36,14 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
   ExperimentNotFoundError,
+  ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  ExperimentService,
+  type WorkbenchActor,
+} from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -62,9 +66,15 @@ import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/
 import {
   handledErrorEnvelopeSchema,
   listRunsResponseSchema,
+  listWorkbenchVersionsResponseSchema,
+  restoreWorkbenchVersionResponseSchema,
   runResultsResponseSchema,
   runStatusResponseSchema,
+  saveWorkbenchStateBodySchema,
+  saveWorkbenchStateResponseSchema,
   startRunResponseSchema,
+  workbenchStateResponseSchema,
+  workbenchVersionProbeResponseSchema,
 } from "./experiments-v3.schemas";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -98,6 +108,35 @@ const experimentErrorResponses = {
   },
 };
 
+/**
+ * The two extra answers a workbench WRITE has.
+ *
+ * A 409 means someone else saved on top of the state this caller read; its
+ * `currentVersion` is what to read again. A 400 means the payload itself was
+ * refused: either the setup does not match the schema, or it points at a
+ * prompt, dataset or evaluator this project no longer has.
+ */
+const workbenchWriteErrorResponses = {
+  400: {
+    description:
+      "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+  409: {
+    description:
+      "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+};
+
 const secured = createServiceApp({ basePath: "/api/experiments" });
 const sessionAuth = handlerManagedAuth({
   reason: "user session validated in-handler via getServerAuthSession",
@@ -117,6 +156,21 @@ const apiKeyAuthRun = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
+  credential: "apiKey",
+});
+// The workbench endpoints gate on the experiments grains rather than the
+// evaluations ones: they read and write the experiment's own setup, which is
+// what `experiments:view` and `experiments:update` name.
+const apiKeyAuthExperimentsView = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["experiments:view"],
+  credential: "apiKey",
+});
+const apiKeyAuthExperimentsUpdate = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["experiments:update"],
   credential: "apiKey",
 });
 
@@ -184,6 +238,32 @@ const authenticateRequest = async (
   };
 
   return { project: resolved.project, resolved, markUsed };
+};
+
+/**
+ * Who a REST workbench write is attributed to.
+ *
+ * Langy signs its own writes: the chat mints an ephemeral key for itself, and
+ * a version written through it must read as "Langy" in the history rather than
+ * as an anonymous integration. Every other key is an integration, which is
+ * what `api` means. The user id rides along when the key has one, so a
+ * personal key still names the person who minted it.
+ */
+const workbenchActorFrom = (
+  resolved: Awaited<ReturnType<TokenResolver["resolve"]>>,
+): WorkbenchActor => {
+  if (resolved?.type !== "apiKey") return { label: "api" };
+  return {
+    ...(resolved.userId ? { userId: resolved.userId } : {}),
+    label: resolved.isLangySessionKey ? "langy" : "api",
+  };
+};
+
+/** Query parameters that are optional positive integers, or nothing. */
+const parseOptionalPositiveInt = (value: string | undefined) => {
+  if (value === undefined) return undefined;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
 const buildState = (
@@ -1048,6 +1128,286 @@ secured.access(apiKeyAuthRead).get(
       logger.error({ error, runId }, "Failed to fetch run results");
       throw error;
     }
+  },
+);
+
+// ── GET /:slug/workbench-state ───────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsView).get(
+  "/:slug/workbench-state",
+  describeRoute({
+    summary: "Read an experiment's setup",
+    description:
+      "The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "query",
+        name: "fields",
+        required: false,
+        schema: { type: "string", enum: ["version"] },
+        description:
+          "Set to `version` to answer with the version and timestamp only",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      200: {
+        description: "The experiment's setup, or its version alone",
+        content: {
+          "application/json": {
+            schema: resolver(
+              workbenchStateResponseSchema.or(
+                workbenchVersionProbeResponseSchema,
+              ),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:view");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
+
+    const workbench = await ExperimentService.create(prisma).getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    markUsed();
+
+    const identity = {
+      id: workbench.experimentId,
+      slug: workbench.slug,
+      version: workbench.version,
+      updatedAt: workbench.updatedAt.toISOString(),
+    };
+
+    // The probe exists so a poller can ask "did this change?" without pulling
+    // a setup it already holds. It reads the same row; what it saves is the
+    // payload, which is the part that grows with the experiment.
+    if (c.req.query("fields") === "version") {
+      return c.json(identity);
+    }
+
+    return c.json({
+      ...identity,
+      name: workbench.name,
+      state: workbench.state,
+    });
+  },
+);
+
+// ── PUT /:slug/workbench-state ───────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsUpdate).put(
+  "/:slug/workbench-state",
+  describeRoute({
+    summary: "Save an experiment's setup",
+    description:
+      "Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.",
+    tags: ["Experiments"],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchWriteErrorResponses,
+      200: {
+        description: "Setup saved",
+        content: {
+          "application/json": {
+            schema: resolver(saveWorkbenchStateResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", saveWorkbenchStateBodySchema),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:update");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, resolved, markUsed } = authResult;
+
+    const body = c.req.valid("json");
+
+    const saved = await ExperimentService.create(prisma).saveWorkbenchState({
+      projectId: project.id,
+      slug,
+      state: body.state,
+      ...(body.expectedVersion !== undefined
+        ? { expectedVersion: body.expectedVersion }
+        : {}),
+      ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
+      actor: workbenchActorFrom(resolved),
+    });
+
+    markUsed();
+    return c.json({ version: saved.version });
+  },
+);
+
+// ── GET /:slug/versions ──────────────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsView).get(
+  "/:slug/versions",
+  describeRoute({
+    summary: "List an experiment's versions",
+    description:
+      "Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "query",
+        name: "limit",
+        required: false,
+        schema: { type: "integer", default: 50, maximum: 100 },
+        description: "Versions per page, capped at 100",
+      },
+      {
+        in: "query",
+        name: "cursor",
+        required: false,
+        schema: { type: "integer" },
+        description: "The `nextCursor` of the previous page",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      200: {
+        description: "Versions of the experiment",
+        content: {
+          "application/json": {
+            schema: resolver(listWorkbenchVersionsResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:view");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
+
+    const experiments = ExperimentService.create(prisma);
+    // The service lists by id; the REST surface addresses experiments by slug
+    // everywhere else, so the read that resolves one to the other also answers
+    // the 404 for a slug this project does not have.
+    const workbench = await experiments.getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    const { versions, nextCursor } = await experiments.listWorkbenchVersions({
+      projectId: project.id,
+      id: workbench.experimentId,
+      ...(() => {
+        const limit = parseOptionalPositiveInt(c.req.query("limit"));
+        return limit !== undefined ? { limit } : {};
+      })(),
+      ...(() => {
+        const cursor = parseOptionalPositiveInt(c.req.query("cursor"));
+        return cursor !== undefined ? { cursor } : {};
+      })(),
+    });
+
+    markUsed();
+
+    return c.json({
+      versions: versions.map((version) => ({
+        version: version.version,
+        autoSaved: version.autoSaved,
+        commitMessage: version.commitMessage,
+        authorLabel: version.authorLabel,
+        authorId: version.authorId,
+        createdAt: version.createdAt.toISOString(),
+      })),
+      nextCursor,
+    });
+  },
+);
+
+// ── POST /:slug/versions/:version/restore ────────────────────────────
+
+secured.access(apiKeyAuthExperimentsUpdate).post(
+  "/:slug/versions/:version/restore",
+  describeRoute({
+    summary: "Restore an experiment version",
+    description:
+      "Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.",
+    tags: ["Experiments"],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchWriteErrorResponses,
+      200: {
+        description: "Version restored",
+        content: {
+          "application/json": {
+            schema: resolver(restoreWorkbenchVersionResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug, version } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:update");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, resolved, markUsed } = authResult;
+
+    const experiments = ExperimentService.create(prisma);
+    const workbench = await experiments.getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    // A path segment that is not a version number names a version this
+    // experiment never had, which is the same answer as a number it never
+    // had. One code, so a caller branches once.
+    const parsedVersion = parseOptionalPositiveInt(version);
+    if (parsedVersion === undefined) {
+      throw new ExperimentVersionNotFoundError({
+        experimentId: workbench.experimentId,
+        version: Number(version),
+      });
+    }
+
+    const restored = await experiments.restoreWorkbenchVersion({
+      projectId: project.id,
+      id: workbench.experimentId,
+      version: parsedVersion,
+      actor: workbenchActorFrom(resolved),
+    });
+
+    logger.info(
+      { projectId: project.id, slug, version: parsedVersion },
+      "Experiment version restored over REST",
+    );
+    markUsed();
+
+    return c.json({ version: restored.version });
   },
 );
 

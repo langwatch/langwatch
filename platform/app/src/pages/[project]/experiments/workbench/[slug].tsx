@@ -11,6 +11,7 @@ import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
+import { VersionHistoryButton } from "~/experiments-v3/components/VersionHistoryButton";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
@@ -429,6 +430,7 @@ export default function ExperimentsWorkbenchPage() {
             <UndoRedo />
             <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
+            <VersionHistoryButton disabled={isLoadingExperiment} />
             <RunEvaluationButton
               disabled={isLoadingExperiment || isLoadingDatasets}
             />

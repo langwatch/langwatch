@@ -317,7 +317,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("experiments:view")
     .query(async ({ input }) => {
-      return await experimentService()
+      const page = await experimentService()
         .listWorkbenchVersions({
           projectId: input.projectId,
           id: input.experimentId,
@@ -325,6 +325,38 @@ export const experimentsRouter = createTRPCRouter({
           cursor: input.cursor,
         })
         .catch(mapExperimentError);
+
+      // The history names the person who saved each version, and the service
+      // stores only their id. Resolved here rather than in the service because
+      // it is a display concern: the REST surface publishes the id and lets
+      // the caller decide, while this list is read straight into a drawer.
+      const authorIds = [
+        ...new Set(
+          page.versions
+            .map((version) => version.authorId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const authors =
+        authorIds.length > 0
+          ? await prisma.user.findMany({
+              where: { id: { in: authorIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+      const nameById = new Map(
+        authors.map((author) => [author.id, author.name]),
+      );
+
+      return {
+        ...page,
+        versions: page.versions.map((version) => ({
+          ...version,
+          authorName: version.authorId
+            ? (nameById.get(version.authorId) ?? null)
+            : null,
+        })),
+      };
     }),
 
   commitWorkbenchVersion: protectedProcedure

@@ -210,6 +210,51 @@ export interface ExperimentRunResultsResponse {
   };
 }
 
+/**
+ * The experiment setup as the API carries it: datasets, targets and
+ * evaluators. Read it, change it, send it back whole. The canonical shape is
+ * the control plane's `persistedEvaluationsV3StateSchema`, which validates
+ * every write, so this stays open rather than restating it here.
+ */
+export type ExperimentWorkbenchState = Record<string, unknown>;
+
+export interface ExperimentCreateResponse {
+  id: string;
+  slug: string;
+  version: number;
+}
+
+export interface ExperimentWorkbenchStateResponse {
+  id: string;
+  slug: string;
+  name: string | null;
+  state: ExperimentWorkbenchState | null;
+  version: number;
+  updatedAt: string;
+}
+
+/** What `fields: "version"` answers: the staleness probe without the setup. */
+export interface ExperimentWorkbenchVersionProbe {
+  id: string;
+  slug: string;
+  version: number;
+  updatedAt: string;
+}
+
+export interface ExperimentVersionSummary {
+  version: number;
+  autoSaved: boolean;
+  commitMessage: string | null;
+  authorLabel: string;
+  authorId: string | null;
+  createdAt: string;
+}
+
+export interface ExperimentVersionsResponse {
+  versions: ExperimentVersionSummary[];
+  nextCursor: number | null;
+}
+
 export class ExperimentsApiServiceError extends Error {
   constructor(
     message: string,
@@ -314,6 +359,154 @@ export class ExperimentsApiService {
     );
     if (error) this.handleApiError(`start experiment run for "${slug}"`, error);
     return data as unknown as ExperimentRunStartResponse;
+  }
+
+  /**
+   * Create an experiment.
+   *
+   * Sending no state creates a blank workbench with one inline dataset, so a
+   * caller that only wants somewhere to put its setup does not have to build
+   * one first.
+   */
+  async create({
+    name,
+    state,
+  }: {
+    name?: string;
+    state?: ExperimentWorkbenchState;
+  } = {}): Promise<ExperimentCreateResponse> {
+    const { data, error } = await this.apiClient.POST("/api/experiments", {
+      body: {
+        ...(name !== undefined ? { name } : {}),
+        ...(state !== undefined ? { state } : {}),
+      },
+    });
+    if (error) this.handleApiError("create experiment", error);
+    return data as unknown as ExperimentCreateResponse;
+  }
+
+  /**
+   * Read an experiment's setup, with the version to send back when saving.
+   *
+   * `fields: "version"` answers with the version and timestamp only, which is
+   * what a poller checking for changes wants: it costs the same round trip and
+   * none of the payload.
+   */
+  async getWorkbenchState(options: {
+    slug: string;
+    fields: "version";
+  }): Promise<ExperimentWorkbenchVersionProbe>;
+  async getWorkbenchState(options: {
+    slug: string;
+    fields?: undefined;
+  }): Promise<ExperimentWorkbenchStateResponse>;
+  async getWorkbenchState({
+    slug,
+    fields,
+  }: {
+    slug: string;
+    fields?: "version";
+  }): Promise<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe> {
+    const { data, error } = await this.apiClient.GET(
+      "/api/experiments/{slug}/workbench-state",
+      {
+        params: {
+          path: { slug },
+          ...(fields !== undefined ? { query: { fields } } : {}),
+        },
+      },
+    );
+    if (error) {
+      this.handleApiError(`get workbench state for "${slug}"`, error);
+    }
+    return data as unknown as ExperimentWorkbenchStateResponse;
+  }
+
+  /**
+   * Save an experiment's setup.
+   *
+   * Send `expectedVersion` with the version you read and the platform refuses
+   * the save with a 409 when someone else wrote first, instead of overwriting
+   * their work.
+   */
+  async setWorkbenchState({
+    slug,
+    state,
+    expectedVersion,
+    commitMessage,
+  }: {
+    slug: string;
+    state: ExperimentWorkbenchState;
+    expectedVersion?: number;
+    commitMessage?: string;
+  }): Promise<{ version: number }> {
+    const { data, error } = await this.apiClient.PUT(
+      "/api/experiments/{slug}/workbench-state",
+      {
+        params: { path: { slug } },
+        body: {
+          state,
+          ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+          ...(commitMessage !== undefined ? { commitMessage } : {}),
+        },
+      },
+    );
+    if (error) {
+      this.handleApiError(`save workbench state for "${slug}"`, error);
+    }
+    return data as unknown as { version: number };
+  }
+
+  /** The experiment's saved versions, newest first. */
+  async listVersions({
+    slug,
+    limit,
+    cursor,
+  }: {
+    slug: string;
+    limit?: number;
+    cursor?: number;
+  }): Promise<ExperimentVersionsResponse> {
+    const { data, error } = await this.apiClient.GET(
+      "/api/experiments/{slug}/versions",
+      {
+        params: {
+          path: { slug },
+          query: {
+            ...(limit !== undefined ? { limit } : {}),
+            ...(cursor !== undefined ? { cursor } : {}),
+          },
+        },
+      },
+    );
+    if (error) {
+      this.handleApiError(`list versions for experiment "${slug}"`, error);
+    }
+    return data as unknown as ExperimentVersionsResponse;
+  }
+
+  /**
+   * Bring an old version back by writing it forward as a new save. History is
+   * never rewritten: the version restored from stays in the list.
+   */
+  async restoreVersion({
+    slug,
+    version,
+  }: {
+    slug: string;
+    version: number;
+  }): Promise<{ version: number }> {
+    const { data, error } = await this.apiClient.POST(
+      "/api/experiments/{slug}/versions/{version}/restore",
+      { params: { path: { slug, version: String(version) } } },
+    );
+    if (error) {
+      this.handleApiError(
+        `restore version ${version} of experiment "${slug}"`,
+        error,
+      );
+    }
+    return data as unknown as { version: number };
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {

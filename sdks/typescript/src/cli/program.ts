@@ -1491,6 +1491,69 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    experimentCmd
+      .command("create")
+      .description("Create an experiment")
+      .option("--name <name>", "Name for the experiment")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { name?: string }) => {
+      const { experimentCreateCommand: impl } = await import("./commands/experiment/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("get-state <experiment>")
+      .description("Read an experiment's setup, with the version to save it back at")
+      .option("--fields <fields>", "Set to `version` to read the version only, without the setup")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { fields?: string }) => {
+      const { experimentGetStateCommand: impl } = await import("./commands/experiment/get-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("set-state <experiment>")
+      .description("Save an experiment's setup from a file, or from stdin with --file -")
+      .option("--file <path>", "File holding the setup as JSON, or - to read stdin")
+      .option("--expected-version <n>", "Refuse the save if someone else already wrote on top of this version")
+      .option("--message <text>", "Name this version in the history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string,
+      options: { file?: string; expectedVersion?: string; message?: string },
+    ) => {
+      const { experimentSetStateCommand: impl } = await import("./commands/experiment/set-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("versions <experiment>")
+      .description("List the saved versions of an experiment's setup")
+      .option("--limit <n>", "Maximum versions to fetch (default 50, max 100)", "50")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { limit?: string }) => {
+      const { experimentVersionsCommand: impl } = await import("./commands/experiment/versions.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("restore <experiment> <version>")
+      .description("Restore an experiment to one of its saved versions")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, version: string) => {
+      const { experimentRestoreCommand: impl } = await import("./commands/experiment/restore.js");
+      return impl(experiment, version);
+    },
+  );
 
   // Add workflow command group
   const workflowCmd = program

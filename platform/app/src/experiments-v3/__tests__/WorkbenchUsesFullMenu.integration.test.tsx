@@ -79,6 +79,7 @@ vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
 // here, so stub the hook to a no-op.
 vi.mock("~/features/langy/LangyContext", () => ({
   useRegisterLangyHandlers: () => undefined,
+  useRegisterLangyActions: () => undefined,
 }));
 
 // Heavy children are never rendered (DashboardLayout mock drops them), but the
