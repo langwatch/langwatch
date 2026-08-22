@@ -92,6 +92,39 @@ Feature: Versioned workbench saves
     When the run loads its execution data
     Then the run fails and names the missing evaluator
 
+  Rule: A run with no browser writes its cells into the saved state
+
+    A run started over REST, from the command line or by the assistant has no
+    page to stream its cells to, so the workbench state knew nothing about them
+    and the table read "No output yet" after the run finished. The runner
+    writes the cells back through the same seam every other write uses, and the
+    update signal lets an open page pick them up.
+
+    @regression @integration
+    Scenario: A completed backend run fills the cells the workbench shows
+      Given an evaluation whose saved state carries no results
+      When a backend run of every row completes
+      Then the saved state holds each row's output, its metadata and its evaluator results
+      And the stored version is higher than before the run
+
+    @regression @integration
+    Scenario: A run of some rows keeps the cells of the rows it did not run
+      Given an evaluation whose saved state already holds results for every row
+      When a backend run of one row completes
+      Then that row's cells carry the new output and the other rows keep theirs
+
+    @regression @unit
+    Scenario: A run given its own rows or parameters is not written back
+      Given run inputs that replace or override the saved dataset
+      When the run decides whether to write its cells back
+      Then it writes nothing back, and a plain run or a row subset writes back
+
+    @regression @integration
+    Scenario: A failure to write the cells back does not fail the run
+      Given a saved state that cannot be written
+      When a backend run completes
+      Then the run still reports completed
+
   Rule: The same seam is reachable over REST
 
     An agent or a CI job builds an experiment without a browser. It creates

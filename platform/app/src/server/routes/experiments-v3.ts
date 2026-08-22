@@ -56,6 +56,7 @@ import {
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
+  runsSavedDataset,
 } from "~/server/experiments-v3/execution/types";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { trackServerEvent } from "~/server/posthog";
@@ -588,7 +589,7 @@ secured.access(apiKeyAuthRun).post(
         status: authResult.status,
       });
     }
-    const { project, markUsed } = authResult;
+    const { project, resolved, markUsed } = authResult;
 
     // An empty body is allowed (a full run); malformed JSON must 400 rather than
     // silently default to {} and start a full run on invalid input.
@@ -716,6 +717,17 @@ secured.access(apiKeyAuthRun).post(
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
       loadedEvaluators,
       loadedWorkflows,
+      // A run of the saved dataset fills the cells the workbench shows. The
+      // app-layer service is the one that tells the tenant the experiment
+      // moved, which is what makes an open page pick the cells up.
+      ...(runsSavedDataset(runInputs)
+        ? {
+            persistResults: {
+              experiments: getApp().experiments,
+              actor: workbenchActorFrom(resolved),
+            },
+          }
+        : {}),
     });
 
     return c.json({ runId, status: "running", total, runUrl });

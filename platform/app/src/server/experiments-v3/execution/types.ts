@@ -189,6 +189,22 @@ export const runInputsBodySchema = z
   });
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
+/**
+ * True when a run evaluates the experiment's own saved dataset, untouched.
+ *
+ * Only such a run may write its cells back into the workbench state. Rows sent
+ * in the request, a different saved dataset, or constant parameters all make
+ * the outputs disagree with the rows the workbench shows, so those runs leave
+ * the saved cells alone. A row subset is not an override: it fills the rows it
+ * ran and leaves the rest as they were.
+ */
+export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {
+  if (!runInputs) return true;
+  if (runInputs.data !== undefined) return false;
+  if (runInputs.dataset_id !== undefined) return false;
+  return Object.keys(runInputs.parameters ?? {}).length === 0;
+};
+
 // ============================================================================
 // SSE Event Types
 // ============================================================================

@@ -61,6 +61,12 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When the backend starts the run
     Then it loads the saved state through the same path a CI run uses
 
+  @unit
+  Scenario: A run started with no browser fills the cells the workbench shows
+    Given no page answered a workbench.run dispatch
+    When the backend starts the run
+    Then the run writes its cells back into the saved workbench state
+
   @integration
   Scenario: A backend edit refreshes an idle workbench automatically
     Given the workbench is open with no unsaved edits

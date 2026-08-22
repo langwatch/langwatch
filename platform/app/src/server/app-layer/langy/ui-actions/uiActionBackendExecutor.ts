@@ -64,7 +64,13 @@ export async function executeBackendAction({
         payload,
       });
     case "run":
-      return await startSavedStateRun({ context, slug, kind, payload });
+      return await startSavedStateRun({
+        experiments,
+        context,
+        slug,
+        kind,
+        payload,
+      });
   }
 }
 
@@ -175,11 +181,13 @@ async function applyTransform({
 }
 
 async function startSavedStateRun({
+  experiments,
   context,
   slug,
   kind,
   payload,
 }: {
+  experiments: ExperimentService;
   context: BackendActionContext;
   slug: string;
   kind: string;
@@ -209,6 +217,13 @@ async function startSavedStateRun({
     loadedAgents: prepared.loadedAgents,
     loadedEvaluators: prepared.loadedEvaluators,
     loadedWorkflows: prepared.loadedWorkflows,
+    // The run evaluates the saved dataset, so its cells belong in the saved
+    // state: without this the page the assistant is working for still reads
+    // "No output yet" after the run finishes.
+    persistResults: {
+      experiments,
+      actor: { userId: context.userId, label: "langy" },
+    },
   });
 
   return { runId, status: "running", total };

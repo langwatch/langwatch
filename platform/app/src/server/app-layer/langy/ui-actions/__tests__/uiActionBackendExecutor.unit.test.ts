@@ -238,6 +238,42 @@ describe("executeBackendAction", () => {
       expect(scope).toEqual({ type: "rows", rowIndices: [0] });
     });
 
+    /** @scenario A run started with no browser fills the cells the workbench shows */
+    it("asks the run to write its cells back into the saved state", async () => {
+      const experiments = makeExperiments();
+      vi.mocked(prepareSavedStateExecution).mockResolvedValue({
+        experiment: { id: "experiment_1", slug: "my-exp" },
+        workbenchState: BASE_STATE,
+        state: BASE_STATE,
+        datasetRows: [{ input: "hi" }],
+        datasetColumns: [{ id: "input", name: "input", type: "string" }],
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+        loadedEvaluators: new Map(),
+        loadedWorkflows: new Map(),
+      } as never);
+      vi.mocked(startPollingRun).mockResolvedValue({
+        runId: "run-3",
+        runUrl: "https://example/run-3",
+        total: 1,
+      } as never);
+
+      await executeBackendAction({
+        experiments,
+        context: CONTEXT,
+        kind: "workbench.run",
+        definition: WORKBENCH_ACTIONS["workbench.run"],
+        payload: {},
+      });
+
+      const { persistResults } = vi.mocked(startPollingRun).mock.calls[0]![0];
+      expect(persistResults?.experiments).toBe(experiments);
+      expect(persistResults?.actor).toEqual({
+        userId: "user-1",
+        label: "langy",
+      });
+    });
+
     /** @scenario A run scoped to a target and a row subset covers only those cells */
     it("keeps both the target and the row filters when the payload carries both", async () => {
       const experiments = makeExperiments();
