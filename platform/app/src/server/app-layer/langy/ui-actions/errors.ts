@@ -122,7 +122,23 @@ export class LangyUiExperimentRequiredError extends HandledError {
   }
 }
 
-/** The page executed the action and it failed there (HTTP 502). */
+/**
+ * The generic code the browser reports when a handler threw something that
+ * named no code of its own.
+ */
+const UNTYPED_HANDLER_FAILURE = "langy_ui_handler_failed";
+
+/**
+ * The action ran on the page or on the backend and failed there (HTTP 502).
+ *
+ * The fault follows `errorCode`: a code names the handler's own typed refusal
+ * (a transform's `target_not_found`, an experiment with no saved state), which
+ * the agent asked for and can act on, so the caller is at fault. No code, or
+ * the generic one the browser sends for a throw that named none, is a failure
+ * we cannot explain, so it stays a platform fault and keeps alerting. The
+ * status stays 502 either way: the page is the upstream that did not carry the
+ * action out, and `fault` is the axis log level and alerts read.
+ */
 export class LangyUiHandlerFailedError extends HandledError {
   declare readonly code: "langy_ui_handler_failed";
   constructor(kind: string, errorCode?: string) {
@@ -131,7 +147,10 @@ export class LangyUiHandlerFailedError extends HandledError {
       `The page could not carry out "${kind}".`,
       {
         httpStatus: 502,
-        fault: "platform",
+        fault:
+          errorCode && errorCode !== UNTYPED_HANDLER_FAILURE
+            ? "customer"
+            : "platform",
         meta: { kind, ...(errorCode ? { errorCode } : {}) },
         ...remediation("langy_ui_handler_failed"),
       },

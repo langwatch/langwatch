@@ -122,7 +122,7 @@ describe("executionScope utilities", () => {
       });
     });
 
-    describe("target-rows scope", () => {
+    describe("when the scope is target-rows", () => {
       it("returns only the requested target's cells for the requested rows", () => {
         const scope: ExecutionScope = {
           type: "target-rows",

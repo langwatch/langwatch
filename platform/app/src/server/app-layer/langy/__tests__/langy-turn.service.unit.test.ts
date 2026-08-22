@@ -1,5 +1,6 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -599,6 +600,44 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       prompt.indexOf("THE USER'S MESSAGE:"),
     );
     expect(prompt.trimEnd().endsWith("hi")).toBe(true);
+  });
+
+  describe("when the page the user is on accepts live UI actions", () => {
+    /** The chip kind that maps to a page manifest today. */
+    const experimentContext = {
+      pageContext: [
+        { kind: "experiment" as const, ref: "my-exp", label: "my-exp" },
+      ],
+    } as StartConversationTurnInput["turnContext"];
+
+    const promptFor = async (isEnabled: boolean) => {
+      vi.spyOn(featureFlagService, "isEnabled").mockImplementation(
+        async (key) => key !== "release_langy_ui_actions" || isEnabled,
+      );
+      const { deps: ownDeps, mocks: ownMocks } = makeDeps();
+      await LangyTurnService.create(ownDeps).startConversationTurn(
+        input({ turnContext: experimentContext }),
+      );
+      return dispatchedOf(ownMocks.dispatch).prompt;
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("offers the UI-action commands while the surface is open", async () => {
+      expect(await promptFor(true)).toContain("langwatch ui actions");
+    });
+
+    /** @scenario With page control rolled back, the agent is never offered the ui commands */
+    it("stays quiet about them while the surface is closed", async () => {
+      // The dispatch route answers a dark 404 with the flag off, so naming the
+      // commands would send the agent to a path that looks undeployed.
+      const prompt = await promptFor(false);
+      expect(prompt).not.toContain("langwatch ui actions");
+      // The rest of the screen context still travels.
+      expect(prompt).toContain("my-exp");
+    });
   });
 
   /** @scenario A follow-up turn carries the conversation so far */

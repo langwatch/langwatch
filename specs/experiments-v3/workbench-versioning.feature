@@ -51,6 +51,27 @@ Feature: Versioned workbench saves
     And the earlier version row is still in the list
     And the current version is higher than both
 
+  # A snapshot holds the setup only, so writing one back on its own would clear
+  # the output cells and evaluator scores of the run the evaluation holds now,
+  # and history never kept them to bring back. A restore changes what the
+  # evaluation will run, not what it ran.
+  @regression @integration
+  Scenario: A restore keeps the current run's results
+    Given an evaluation with an earlier version and a completed run
+    When the caller restores that version
+    Then the setup comes from the restored version
+    And the run's cells are still there
+
+  # Both writers read the same stored version, so the version check the seam
+  # makes before the write cannot tell them apart. Only the compare-and-set can:
+  # the second update matches no row and is refused.
+  @regression @integration
+  Scenario: Two saves that race are not both accepted
+    Given two saves of one evaluation that both read the same version
+    When they reach the database together
+    Then one is accepted and the other is refused as stale
+    And the stored state is the accepted one
+
   @regression @integration
   Scenario: An archived evaluation refuses a save
     Given an evaluation that was archived
@@ -73,6 +94,29 @@ Feature: Versioned workbench saves
   Scenario: A state pointing at a row that no longer exists is refused
     When a caller saves a state naming a deleted prompt, agent, evaluator, workflow or dataset
     Then the save is refused and names which kind of row and which id is missing
+
+  # A target keeps every id it ever held, because the workbench merges target
+  # edits field by field. The run reads only the id that matches the target's
+  # own type, so checking the others would refuse a save the run would accept.
+  @regression @unit
+  Scenario: A reference the run would not read is not checked
+    Given a target changed to another type that still carries its old id
+    When it is saved
+    Then the save is accepted
+
+  @regression @unit
+  Scenario: A reference the run would read is still checked
+    Given a target whose own type names a row that no longer exists
+    When it is saved
+    Then the save is refused and names that reference
+
+  # These endpoints serialise a handled error only, so a plain error answered a
+  # type mismatch with a 500 and a trace id instead of the documented 400.
+  @regression @unit
+  Scenario: A workbench call on another kind of experiment is refused with a code
+    Given an experiment that is not an evaluations workbench
+    When a caller reads or writes its workbench state
+    Then the call is refused with the type-mismatch code and a 400
 
   @regression @unit
   Scenario: Run results are not stored in the version snapshot
@@ -125,6 +169,14 @@ Feature: Versioned workbench saves
       When a backend run completes
       Then the run still reports completed
 
+    # The rows that finished before the stop are the run's whole output.
+    # Dropping them leaves the table reading "No output yet" for work that ran.
+    @regression @integration
+    Scenario: A stopped backend run keeps the cells it already produced
+      Given a backend run that filled some cells
+      When the run is stopped
+      Then the saved state holds the cells it produced before the stop
+
     # The engine reports a cell that failed as its own event rather than as a
     # result with an error on it. A run where every cell fails still has to
     # reach the table: a workbench that reads "No output yet" after a failed
@@ -154,6 +206,15 @@ Feature: Versioned workbench saves
       Given a caller with a project API key
       When it creates an experiment and sends no setup
       Then the experiment starts at version 1 with one empty dataset
+
+    # Only the app-layer's own experiment service carries a broadcaster, so a
+    # route that builds its own writes the row and tells nobody, and an open
+    # experiments list shows the new row only after a reload.
+    @regression @integration
+    Scenario: A create over REST tells the tenant the list moved
+      Given a caller with a project API key
+      When it creates an experiment
+      Then the tenant gets an experiment update naming the new experiment
 
     @integration
     Scenario: An agent edits an experiment through the REST surface

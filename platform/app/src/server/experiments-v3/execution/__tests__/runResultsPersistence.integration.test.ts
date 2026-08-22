@@ -18,6 +18,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { EvaluationsV3State } from "~/experiments-v3/types";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 import type { Project } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
@@ -29,12 +30,18 @@ const orchestratorEvents = vi.hoisted(() => ({
   current: [] as EvaluationV3Event[],
 }));
 
-vi.mock("~/server/experiments-v3/execution/orchestrator", () => ({
-  runOrchestrator: async function* () {
-    for (const event of orchestratorEvents.current) yield event;
-  },
-  requestAbort: vi.fn(),
-}));
+// The real cell planner stays in place: the run total the runner publishes is
+// counted from it, so a stub would make that count agree with itself.
+vi.mock(
+  "~/server/experiments-v3/execution/orchestrator",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    runOrchestrator: async function* () {
+      for (const event of orchestratorEvents.current) yield event;
+    },
+    requestAbort: vi.fn(),
+  }),
+);
 
 import { startPollingRun } from "../experimentRunner";
 import { runStateManager } from "../runStateManager";
@@ -120,7 +127,7 @@ describe("backend run results in the workbench state", () => {
 
   beforeAll(async () => {
     project = await getTestProject("backend-run-results");
-    experiments = ExperimentService.create(prisma);
+    experiments = ExperimentService.create({ prisma });
   });
 
   afterAll(async () => {
@@ -148,14 +155,25 @@ describe("backend run results in the workbench state", () => {
     return created;
   };
 
+  /** The state the runner reads: the columns and the dataset it counts over. */
+  const runnerState = (targetIds: string[] = [TARGET_ID]) =>
+    ({
+      datasets: [{ id: "dataset-1" }],
+      activeDatasetId: "dataset-1",
+      targets: targetIds.map((id) => ({ id, type: "prompt" })),
+      evaluators: [],
+    }) as unknown as EvaluationsV3State;
+
   const runToCompletion = async ({
     experimentId,
     scope,
     service = experiments,
+    state = runnerState(),
   }: {
     experimentId: string;
     scope: ExecutionScope;
     service?: ExperimentService;
+    state?: EvaluationsV3State;
   }) => {
     const started = await startPollingRun({
       projectId: project.id,
@@ -163,7 +181,7 @@ describe("backend run results in the workbench state", () => {
       experimentId,
       experimentSlug: "backend-run",
       scope,
-      state: { targets: [{ id: TARGET_ID }] } as never,
+      state,
       datasetRows: [{ input: "first" }, { input: "second" }],
       datasetColumns: [{ id: "input", name: "input", type: "string" }],
       loadedPrompts: new Map(),
@@ -274,6 +292,40 @@ describe("backend run results in the workbench state", () => {
     });
   });
 
+  describe("given an evaluation with two columns and two rows", () => {
+    describe("when a run names one column and one row", () => {
+      it("reports only the cells that run as the run total", async () => {
+        const { experimentId } = await createExperiment(savedState());
+
+        const started = await runToCompletion({
+          experimentId,
+          scope: {
+            type: "target-rows",
+            targetIds: [TARGET_ID],
+            rowIndices: [1],
+          },
+          state: runnerState([TARGET_ID, "target-2"]),
+        });
+
+        expect(started.total).toBe(1);
+      });
+    });
+
+    describe("when a run names one column and no rows", () => {
+      it("reports that column against every row as the run total", async () => {
+        const { experimentId } = await createExperiment(savedState());
+
+        const started = await runToCompletion({
+          experimentId,
+          scope: { type: "target-rows", targetIds: [TARGET_ID] },
+          state: runnerState([TARGET_ID, "target-2"]),
+        });
+
+        expect(started.total).toBe(2);
+      });
+    });
+  });
+
   describe("given a saved state that cannot be written", () => {
     describe("when a backend run completes", () => {
       /** @scenario A failure to write the cells back does not fail the run */
@@ -309,6 +361,33 @@ describe("backend run results in the workbench state", () => {
         const after = await readState(experimentId);
         expect(after.state?.results).toBeUndefined();
         completeRun.mockRestore();
+      });
+    });
+  });
+
+  describe("given a backend run that filled some cells before it was stopped", () => {
+    describe("when the run stops", () => {
+      /** @scenario A stopped backend run keeps the cells it already produced */
+      it("writes the cells it produced into the workbench state", async () => {
+        const { experimentId, version } = await createExperiment(savedState());
+        orchestratorEvents.current = [
+          { type: "execution_started", runId: "run-stopped", total: 2 },
+          ...cellEvents({ rowIndex: 0, output: "before the stop", score: 1 }),
+          { type: "stopped", reason: "user" },
+        ];
+
+        await runToCompletion({ experimentId, scope: { type: "full" } });
+
+        const after = await vi.waitFor(async () => {
+          const current = await readState(experimentId);
+          expect(current.state?.results?.runId).toBe("run-stopped");
+          return current;
+        });
+
+        expect(after.state?.results?.targetOutputs[TARGET_ID]).toEqual([
+          { output: "before the stop" },
+        ]);
+        expect(after.version).toBeGreaterThan(version);
       });
     });
   });

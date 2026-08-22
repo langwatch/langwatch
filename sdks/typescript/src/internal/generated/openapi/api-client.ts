@@ -1235,7 +1235,7 @@ export interface paths {
         get: operations["getApiExperiments"];
         put?: never;
         /**
-         * Create an experiment
+         * Create an experiment and its setup
          * @description Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.
          */
         post: operations["postApiExperiments"];
@@ -8863,6 +8863,25 @@ export interface operations {
                     };
                 };
             };
+            /** @description The experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
             /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
@@ -8939,7 +8958,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference) */
+            /** @description The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -9010,6 +9029,8 @@ export interface operations {
                         fault?: string;
                         tips?: string[];
                         docsUrl?: string;
+                        /** @description The stored version now. Read the setup again at this one. */
+                        currentVersion: number;
                     } & {
                         [key: string]: unknown;
                     };
@@ -9061,6 +9082,25 @@ export interface operations {
                     };
                 };
             };
+            /** @description The experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
             /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
@@ -9106,8 +9146,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The version to restore, as listed by `GET /api/experiments/{slug}/versions` */
+                version: number;
                 slug: string;
-                version: string;
             };
             cookie?: never;
         };
@@ -9125,7 +9166,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference) */
+            /** @description The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -9196,6 +9237,8 @@ export interface operations {
                         fault?: string;
                         tips?: string[];
                         docsUrl?: string;
+                        /** @description The stored version now. Read the setup again at this one. */
+                        currentVersion: number;
                     } & {
                         [key: string]: unknown;
                     };

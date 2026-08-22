@@ -114,10 +114,14 @@ export const executionRequestSchema = z
       z.object({ type: z.literal("full") }),
       z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
       z.object({ type: z.literal("target"), targetId: z.string() }),
+      // Neither filter may be empty. Omitting `rowIndices` is how a caller
+      // asks for every row, so an empty list can only mean no rows, and an
+      // empty `targetIds` says the same about the columns. Either one reaches
+      // the engine as a run that reports success over zero cells.
       z.object({
         type: z.literal("target-rows"),
-        targetIds: z.array(z.string()),
-        rowIndices: z.array(z.number()).optional(),
+        targetIds: z.array(z.string()).min(1),
+        rowIndices: z.array(z.number()).min(1).optional(),
       }),
       z.object({
         type: z.literal("cell"),

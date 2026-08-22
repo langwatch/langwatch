@@ -3,7 +3,7 @@
  * Postgres. They exist to prove the parts a mocked repository cannot: that the
  * compare-and-set really refuses a racing write, that exactly one rolling
  * autosave row survives a long editing session, and that a restore adds to the
- * history instead of rewriting it.
+ * history instead of rewriting it while keeping the current run's cells.
  *
  * @see specs/experiments-v3/workbench-versioning.feature
  */
@@ -11,10 +11,14 @@ import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
-import type { Project } from "~/generated/prisma/client";
+import type { Prisma, Project } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { getTestProject } from "~/utils/testUtils";
+import { ExperimentRepository } from "../experiment.repository";
 import { ExperimentService } from "../experiment.service";
+import { WorkbenchReferenceRepository } from "../workbenchReference.repository";
+
+const TARGET_ID = "target-1";
 
 const stateNamed = (name: string): PersistedEvaluationsV3State =>
   ({
@@ -31,6 +35,58 @@ const stateNamed = (name: string): PersistedEvaluationsV3State =>
     evaluators: [],
     targets: [],
   }) as PersistedEvaluationsV3State;
+
+/** What a completed run leaves on the live row. */
+const runResults = (
+  output: string,
+): PersistedEvaluationsV3State["results"] => ({
+  runId: "run_1",
+  targetOutputs: { [TARGET_ID]: [{ output }] },
+  targetMetadata: { [TARGET_ID]: [{ traceId: "trace-0" }] },
+  evaluatorResults: {},
+  errors: {},
+});
+
+const stateWithResults = (
+  name: string,
+  output: string,
+): PersistedEvaluationsV3State => ({
+  ...stateNamed(name),
+  results: runResults(output),
+});
+
+/**
+ * The real repository, with a gate between the transactional read and the
+ * compare-and-set update.
+ *
+ * Holding one writer there while the other reads is what makes both of them
+ * name the same stored version. That interleaving is what the pre-check cannot
+ * catch, because both writers read the same number and only the database can
+ * tell which of them wrote first.
+ */
+class GatedExperimentRepository extends ExperimentRepository {
+  constructor(
+    prismaClient: typeof prisma,
+    private readonly onTransactionalRead: () => Promise<void>,
+  ) {
+    super(prismaClient);
+  }
+
+  override async findWorkbenchRow(
+    input: { projectId: string; id?: string; slug?: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ) {
+    const row = await super.findWorkbenchRow(input, options);
+    if (options?.tx) await this.onTransactionalRead();
+    return row;
+  }
+}
+
+const gatedService = (onTransactionalRead: () => Promise<void>) =>
+  new ExperimentService(
+    new GatedExperimentRepository(prisma, onTransactionalRead),
+    new WorkbenchReferenceRepository(prisma),
+  );
 
 const codeOf = async (promise: Promise<unknown>): Promise<string> => {
   try {
@@ -50,7 +106,7 @@ describe("workbench versioning", () => {
   beforeAll(async () => {
     project = await getTestProject("workbench-versioning");
     otherProject = await getTestProject("workbench-versioning-other");
-    service = ExperimentService.create(prisma);
+    service = ExperimentService.create({ prisma });
   });
 
   afterAll(async () => {
@@ -306,6 +362,122 @@ describe("workbench versioning", () => {
             }),
           ),
         ).toBe("experiment_version_not_found");
+      });
+    });
+  });
+
+  describe("given an evaluation with an earlier version and a completed run", () => {
+    describe("when that version is restored", () => {
+      /** @scenario A restore keeps the current run's results */
+      it("brings the old setup back and keeps the run's cells", async () => {
+        const { experimentId } = await createEvaluation();
+        const earlier = await service.commitWorkbenchVersion({
+          projectId: project.id,
+          id: experimentId,
+          commitMessage: "The setup to come back to",
+          actor: { label: "user" },
+        });
+        const earlierName = (
+          await service.getWorkbenchState({
+            projectId: project.id,
+            id: experimentId,
+          })
+        ).state?.name;
+
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("A setup nobody wants"),
+          actor: { label: "user" },
+        });
+        // The run lands on the live row, which is the only place results live.
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateWithResults("A setup nobody wants", "what the run said"),
+          actor: { label: "api" },
+          commitMessage: "Results from run run_1",
+        });
+
+        await service.restoreWorkbenchVersion({
+          projectId: project.id,
+          id: experimentId,
+          version: earlier.version,
+          actor: { label: "user" },
+        });
+
+        const current = await service.getWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+        });
+        expect(current.state?.name).toBe(earlierName);
+        expect(current.state?.results?.targetOutputs[TARGET_ID]).toEqual([
+          { output: "what the run said" },
+        ]);
+        expect(current.state?.results?.runId).toBe("run_1");
+      });
+    });
+  });
+
+  describe("given two saves of the same evaluation that both read one version", () => {
+    describe("when they race in the database", () => {
+      // Neither save names an expected version, so the pre-check is skipped
+      // and the only thing that can refuse one of them is the compare-and-set
+      // itself: the update matches no row, Prisma raises P2025, and the seam
+      // turns that into the stale answer.
+      /** @scenario Two saves that race are not both accepted */
+      it("accepts one and refuses the other as stale", async () => {
+        const { experimentId, version } = await createEvaluation();
+
+        let releaseWaitingWriter: () => void = () => undefined;
+        const otherWriterHasRead = new Promise<void>((resolve) => {
+          releaseWaitingWriter = resolve;
+        });
+
+        // Whichever writer reads first waits there. The other reads the same
+        // stored version while it waits, updates and commits. Only then does
+        // the waiting one try its compare-and-set, which now matches no row.
+        let isFirstRead = true;
+        const racingService = gatedService(async () => {
+          if (!isFirstRead) {
+            releaseWaitingWriter();
+            return;
+          }
+          isFirstRead = false;
+          await otherWriterHasRead;
+        });
+
+        const attempt = async (name: string) => ({
+          name,
+          code: await codeOf(
+            racingService.saveWorkbenchState({
+              projectId: project.id,
+              id: experimentId,
+              state: stateNamed(name),
+              actor: { label: "user" },
+            }),
+          ),
+        });
+
+        const outcomes = await Promise.all([
+          attempt("Writer A"),
+          attempt("Writer B"),
+        ]);
+
+        const accepted = outcomes.filter((one) => one.code === "no_error");
+        const refused = outcomes.filter(
+          (one) => one.code === "experiment_stale_workbench_state",
+        );
+        expect(accepted).toHaveLength(1);
+        expect(refused).toHaveLength(1);
+
+        const row = await prisma.experiment.findFirstOrThrow({
+          where: { id: experimentId, projectId: project.id },
+        });
+        expect((row.workbenchState as { name: string }).name).toBe(
+          accepted[0]?.name,
+        );
+        expect(row.workbenchVersion).toBe(version + 1);
       });
     });
   });

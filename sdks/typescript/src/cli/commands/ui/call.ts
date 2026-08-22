@@ -2,6 +2,16 @@ import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 
 /**
+ * Bound the request so a wedged control plane cannot hold the whole turn.
+ *
+ * This call blocks by design: the server keeps it open for the claim window
+ * (3s) plus the action's execute budget, which the platform caps at 30s. 60s
+ * clears that ceiling with room to spare, so a slow page still answers here
+ * while a half-open socket fails instead of hanging the agent worker.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/**
  * Dispatch one typed UI action to the page the user has open, and print the
  * result (specs/langy/langy-ui-actions.feature).
  *
@@ -41,21 +51,38 @@ export const uiCallCommand = async (
     }
   }
 
-  const response = await fetch(`${endpoint}/api/langy/ui/actions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Auth-Token": apiKey,
-    },
-    body: JSON.stringify({
-      conversationId,
-      kind,
-      payload,
-      // Names the experiment a backend fallback applies the action to when no
-      // page answers. The open page never needs it.
-      ...(options.experiment ? { experimentSlug: options.experiment } : {}),
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": apiKey,
+      },
+      body: JSON.stringify({
+        conversationId,
+        kind,
+        payload,
+        // Names the experiment a backend fallback applies the action to when no
+        // page answers. The open page never needs it.
+        ...(options.experiment ? { experimentSlug: options.experiment } : {}),
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // A tripped deadline rejects with a bare TimeoutError, which reads as a
+    // crash rather than as the limit this command set. Name it, and say the
+    // action may still have applied: the next step is to read the state again,
+    // not to retry blind. Every other failure is left to the caller's error
+    // path.
+    if ((error as { name?: string } | null)?.name !== "TimeoutError") throw error;
+    process.stderr.write(
+      `${endpoint} did not answer "${kind}" within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
+        "The action may still have applied: read the state again before you retry.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const text = await response.text();
   if (!response.ok) {

@@ -946,9 +946,9 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const experiment = await ExperimentService.create(
-        ctx.prisma,
-      ).findByIdWithWorkflowLatestVersion({
+      const experiment = await ExperimentService.create({
+        prisma: ctx.prisma,
+      }).findByIdWithWorkflowLatestVersion({
         projectId: input.sourceProjectId,
         id: input.experimentId,
       });

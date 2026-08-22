@@ -80,6 +80,13 @@ const baseState = (): WorkbenchState => ({
   evaluators: [evaluator()],
 });
 
+const utf8Bytes = (text: string): number =>
+  new TextEncoder().encode(text).length;
+
+/** What the budget counts: the UTF-8 size of the serialized projection. */
+const serializedBytes = (value: unknown): number =>
+  utf8Bytes(JSON.stringify(value));
+
 const results = (): EvaluationResults => ({
   runId: "run-1",
   status: "success",
@@ -212,7 +219,7 @@ describe("projectWorkbenchState", () => {
       expect(projection.datasets[0]!.sampleRows).toBeUndefined();
       // Mappings survive: only the free-text sample went.
       expect(projection.targets[0]!.mappings).toBeDefined();
-      expect(JSON.stringify(projection).length).toBeLessThanOrEqual(
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(
         PROJECTION_BUDGET_BYTES,
       );
     });
@@ -250,6 +257,53 @@ describe("projectWorkbenchState", () => {
       expect(projection.targets[0]!.mappings).toBeUndefined();
       expect(projection.targets[0]!.mappingCount).toBe(2);
       expect(projection.evaluators[0]!.mappingCount).toBe(1);
+    });
+
+    /** @scenario "The state an assistant reads never exceeds the budget" */
+    it("drops whole entries when collapsing every detail is not enough", () => {
+      const state = baseState();
+      state.targets = Array.from(
+        { length: 2_000 },
+        (_, index): TargetConfig => ({ ...target(), id: `target-${index}` }),
+      );
+
+      const projection = projectWorkbenchState({ state });
+
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(
+        PROJECTION_BUDGET_BYTES,
+      );
+      expect(projection.targets.length).toBeLessThan(2_000);
+      expect(projection.omittedTargets).toBe(2_000 - projection.targets.length);
+      // The entries that survive are the head of the list, so an agent can ask
+      // for the rest by name.
+      expect(projection.targets[0]!.id).toBe("target-0");
+    });
+
+    /** @scenario "The state an assistant reads never exceeds the budget" */
+    it("counts non-ASCII text by its UTF-8 size", () => {
+      const state = baseState();
+      // Three UTF-8 bytes per character, one UTF-16 code unit: 60 names of 240
+      // characters fit the budget counted by `String.length` and overrun it
+      // counted in the bytes a transport carries.
+      state.datasets = Array.from({ length: 60 }, (_, index) => {
+        const copy = dataset();
+        copy.id = `ds-${index}`;
+        copy.name = "評価データ".repeat(48);
+        copy.inline!.records = { input: [], expected_output: [] };
+        return copy;
+      });
+
+      const names = state.datasets.map((d) => d.name).join("");
+      expect(names.length).toBeLessThan(PROJECTION_BUDGET_BYTES);
+      expect(utf8Bytes(names)).toBeGreaterThan(PROJECTION_BUDGET_BYTES);
+
+      const projection = projectWorkbenchState({ state });
+
+      expect(projection.truncated).toBe(true);
+      expect(projection.omittedDatasets).toBeGreaterThan(0);
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(
+        PROJECTION_BUDGET_BYTES,
+      );
     });
   });
 

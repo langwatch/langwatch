@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
@@ -138,12 +139,17 @@ func TestFrameSink_PushFailureIsAbsorbedAndReconnects(t *testing.T) {
 // When the reopen also fails, the sink goes deaf under a cooldown instead of
 // retrying per frame: frames keep folding, nothing errors, and the turn runs
 // to its real terminal with the durable final intact.
+//
+// The clock is injected and held still for the burst. On the real clock the
+// assertion would hold only while five pushes finish inside reopenCooldown,
+// which is true on an idle machine and not guaranteed on a loaded one.
 func TestFrameSink_ReopenFailureGoesDeafUnderCooldown(t *testing.T) {
 	reopens := 0
-	sink := newFrameSink(&brokenStream{}, func() FrameStream {
+	now := time.Now()
+	sink := newFrameSinkWithClock(&brokenStream{}, func() FrameStream {
 		reopens++
 		return nil
-	})
+	}, func() time.Time { return now })
 
 	for range 5 {
 		if err := sink.Emit(okf(frames.Delta("x"))); err != nil {
@@ -157,6 +163,16 @@ func TestFrameSink_ReopenFailureGoesDeafUnderCooldown(t *testing.T) {
 	}
 	if text, _ := sink.result(); text != "xxxxx" {
 		t.Errorf("text = %q, want all frames folded", text)
+	}
+
+	// Past the cooldown the sink tries again, so a control plane that comes
+	// back is picked up rather than ignored for the rest of the turn.
+	now = now.Add(reopenCooldown + time.Second)
+	if err := sink.Emit(okf(frames.Delta("y"))); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	if reopens != 2 {
+		t.Fatalf("reopen attempts after the cooldown = %d, want 2", reopens)
 	}
 }
 

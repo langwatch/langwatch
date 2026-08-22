@@ -61,7 +61,13 @@ const pulseAnimation = keyframes`
 type TargetHeaderProps = {
   target: TargetConfig;
   /** Hands the prompt to Langy for the improvement loop. Prompt targets only. */
-  onOptimize?: (target: TargetConfig, name: string) => void;
+  onOptimize?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
   onSwitch?: (target: TargetConfig) => void;
@@ -535,7 +541,7 @@ export const TargetHeader = memo(function TargetHeader({
           {onOptimize && target.type === "prompt" && (
             <Menu.Item
               value="optimize"
-              onClick={() => onOptimize(target, headerName)}
+              onClick={() => onOptimize({ target, name: headerName })}
               data-testid="target-optimize-menu-item"
             >
               <HStack gap={2}>

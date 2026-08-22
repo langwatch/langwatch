@@ -39,6 +39,11 @@ type frameSink struct {
 	reopen       func() FrameStream
 	nextReopenAt time.Time
 
+	// now reads the clock the cooldown is measured against. Injectable so a
+	// test states where in the cooldown each push lands, instead of depending
+	// on a burst of pushes finishing inside reopenCooldown.
+	now func() time.Time
+
 	// onFirstFrame, when set, fires exactly once on the first Emit — the moment the
 	// agent produces its first output (time-to-first-token). driveTurn wires it to a
 	// span event so the turn trace shows how long the worker sat before it spoke.
@@ -56,11 +61,17 @@ type frameSink struct {
 	onFrame func(frames.Frame)
 }
 
-// newFrameSink builds the sink over the turn's initial relay stream. reopen,
-// when non-nil, is how the sink gets a replacement stream after a push failure;
-// it must be cheap to call and may return nil (relay still unreachable).
+// newFrameSink builds the sink over the turn's initial relay stream, on the
+// real clock. reopen, when non-nil, is how the sink gets a replacement stream
+// after a push failure; it must be cheap to call and may return nil (relay
+// still unreachable).
 func newFrameSink(stream FrameStream, reopen func() FrameStream) *frameSink {
-	return &frameSink{stream: stream, reopen: reopen, acc: turnfold.New()}
+	return newFrameSinkWithClock(stream, reopen, time.Now)
+}
+
+// newFrameSinkWithClock builds the sink on an injected clock (tests).
+func newFrameSinkWithClock(stream FrameStream, reopen func() FrameStream, now func() time.Time) *frameSink {
+	return &frameSink{stream: stream, reopen: reopen, acc: turnfold.New(), now: now}
 }
 
 // Emit folds the frame into the durable-final accumulator and pushes it to the
@@ -100,7 +111,7 @@ func (s *frameSink) push(f frames.Frame) {
 			if err := s.stream.Emit(f); err != nil {
 				_ = s.stream.Close()
 				s.stream = nil
-				s.nextReopenAt = time.Now().Add(reopenCooldown)
+				s.nextReopenAt = s.now().Add(reopenCooldown)
 			}
 		}
 	}
@@ -109,12 +120,12 @@ func (s *frameSink) push(f frames.Frame) {
 // tryReopenLocked attempts one relay reconnect, respecting the cooldown.
 // Caller holds s.mu.
 func (s *frameSink) tryReopenLocked() {
-	if s.reopen == nil || time.Now().Before(s.nextReopenAt) {
+	if s.reopen == nil || s.now().Before(s.nextReopenAt) {
 		return
 	}
 	s.stream = s.reopen()
 	if s.stream == nil {
-		s.nextReopenAt = time.Now().Add(reopenCooldown)
+		s.nextReopenAt = s.now().Add(reopenCooldown)
 	}
 }
 

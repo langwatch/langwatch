@@ -39,6 +39,12 @@ Feature: A derived stats card reads as a comparison, at any panel width
     Then it draws them as a bar comparison
 
   @unit
+  Scenario: Readings whose unit words draw the same symbol are one scale
+    Given two numeric stats items, one with the unit percent and one with the unit pct
+    When the card decides how to draw them
+    Then it draws them as a bar comparison
+
+  @unit
   Scenario: Readings that share no scale are not a comparison
     Given stats items whose units differ, or that are not all numeric
     When the card decides how to draw them

@@ -7,10 +7,12 @@ import {
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import type { CommandResult } from "../../utils/output";
 
 export interface ExperimentVersionsOptions {
   limit?: string;
+  cursor?: string;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -30,16 +32,34 @@ export const experimentVersionsCommand = async (
   await resolveCredentials();
 
   const limit = (() => {
-    const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
-    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT;
+    const parsed = options.limit
+      ? parsePositiveIntOrNull(options.limit)
+      : DEFAULT_LIMIT;
+    if (parsed === null) return DEFAULT_LIMIT;
     return Math.min(parsed, MAX_PAGE_SIZE);
+  })();
+
+  const cursor = (() => {
+    if (options.cursor === undefined) return undefined;
+    const parsed = parsePositiveIntOrNull(options.cursor);
+    if (parsed !== null) return parsed;
+    // Dropping an unreadable cursor would silently serve page one again, so a
+    // caller walking the history would loop over the same versions forever.
+    console.error(
+      `--cursor takes the nextCursor of the previous page, like 42. Got "${options.cursor}".`,
+    );
+    process.exit(1);
   })();
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(`Fetching versions of "${slug}"...`).start();
 
   try {
-    const result = await service.listVersions({ slug, limit });
+    const result = await service.listVersions({
+      slug,
+      limit,
+      ...(cursor !== undefined ? { cursor } : {}),
+    });
     spinner.succeed(
       `Found ${result.versions.length} version${result.versions.length === 1 ? "" : "s"}`,
     );
@@ -73,7 +93,9 @@ export const experimentVersionsCommand = async (
           console.log();
           console.log(
             chalk.gray(
-              `More versions below v${result.nextCursor}. Raise ${chalk.cyan("--limit")} to see them.`,
+              `More versions below v${result.nextCursor}. Next page: ${chalk.cyan(
+                `langwatch experiment versions ${slug} --cursor ${result.nextCursor}`,
+              )}`,
             ),
           );
         }

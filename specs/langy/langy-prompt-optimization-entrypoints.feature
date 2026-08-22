@@ -21,8 +21,8 @@ Feature: Prompt optimization entry points
   @integration
   Scenario: The optimize handoff carries the experiment and prompt context chips
     When the user chooses "Optimize this prompt"
-    Then the experiment chip the page offers is chosen
-    And the column's prompt is absorbed as picked context
+    Then Langy works on the experiment the user came from, with nothing to pick
+    And Langy has the column's prompt in front of it, with nothing to attach
 
   @e2e
   Scenario: From anywhere, improving a prompt with no experiment sets one up and navigates there

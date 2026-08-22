@@ -772,6 +772,21 @@ function LangyPanel({
   // same per-turn reset, as the navigate dedup above.
   const uiActionSeenRef = useRef<Set<string>>(new Set());
 
+  // The rollback lever for agent-driven page control: with the flag off this
+  // page ignores `ui` stream entries, so switching it off during a live turn
+  // stops the page changing under the user. Read through a ref because the
+  // transport below is memoised once (`[]`), the same reason `routerRef` has
+  // one. Only a RESOLVED off closes the channel: an unanswered flag query
+  // means "not known yet", and dropping actions there would break the feature
+  // for the first turn after every reload.
+  const uiActionsFlag = useFeatureFlag("release_langy_ui_actions", {
+    projectId,
+    organizationId,
+  });
+  const isUiActionChannelClosedRef = useRef(false);
+  isUiActionChannelClosedRef.current =
+    !uiActionsFlag.isLoading && !uiActionsFlag.enabled;
+
   // `router` (from react-router underneath) gets a new identity on every
   // route change; the transport below is memoised once (`[]`), so it reads
   // through a ref the render keeps fresh rather than closing over a router
@@ -819,6 +834,7 @@ function LangyPanel({
           void routerRef.current.push(entry.href);
         },
         onUiAction: (entry) => {
+          if (isUiActionChannelClosedRef.current) return;
           dispatchUiActionToPage({
             entry,
             projectId: turnContextRef.current?.projectId,

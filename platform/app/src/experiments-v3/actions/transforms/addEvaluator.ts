@@ -6,7 +6,7 @@ import {
   type AddEvaluatorPayload,
   addEvaluatorPayloadSchema,
 } from "../schemas";
-import type { Transform, WorkbenchState } from "./types";
+import { type Transform, TransformError, type WorkbenchState } from "./types";
 
 export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
 
@@ -37,11 +37,24 @@ export const attachEvaluator = ({
   ],
 });
 
+/**
+ * A caller-supplied id has to be free. Two evaluators under one id make the
+ * mappings and the scores filed against it ambiguous, and the table could not
+ * say which one a score column belongs to.
+ */
 export const addEvaluator: Transform<
   AddEvaluatorPayload,
   { evaluatorId: string }
 > = ({ state, payload }) => {
   const parsed = addEvaluatorPayloadSchema.parse(payload);
+
+  if (parsed.id && state.evaluators.some((e) => e.id === parsed.id)) {
+    throw new TransformError({
+      code: "evaluator_already_exists",
+      message: `Evaluator ${parsed.id} is already in the workbench`,
+      meta: { evaluatorId: parsed.id },
+    });
+  }
 
   const evaluator: EvaluatorConfig = {
     ...parsed,

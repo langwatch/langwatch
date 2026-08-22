@@ -27,13 +27,11 @@ import { z } from "zod";
 import type { Experiment } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import type { ResolvedToken } from "~/server/api-key/token-resolver";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { createBlankWorkbenchState } from "~/server/experiments/blankWorkbenchState";
-import {
-  ExperimentService,
-  type WorkbenchActor,
-} from "~/server/experiments/experiment.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
+import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import {
   createExperimentBodySchema,
@@ -121,6 +119,7 @@ secured.access(requires("experiments:view")).get(
     summary: "List experiments for the project",
     description:
       "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+    tags: ["Experiments"],
     parameters: [
       {
         in: "query",
@@ -170,9 +169,9 @@ secured.access(requires("experiments:view")).get(
       "Listing experiments",
     );
 
-    const { experiments: paged, totalHits } = await ExperimentService.create(
+    const { experiments: paged, totalHits } = await ExperimentService.create({
       prisma,
-    ).getPage({
+    }).getPage({
       projectId: project.id,
       page,
       pageSize,
@@ -213,31 +212,13 @@ secured.access(requires("experiments:view")).get(
   },
 );
 
-/**
- * Who a REST create is attributed to.
- *
- * Langy signs its own writes: the chat mints an ephemeral key for itself, and
- * an experiment it creates must read as "Langy" in the version history rather
- * than as an anonymous integration. Every other key is an integration, which
- * is what `api` means. The user id rides along when the key has one, so a
- * personal key still names the person who minted it.
- */
-const workbenchActorFrom = (
-  resolved: ResolvedToken | undefined,
-): WorkbenchActor => {
-  if (resolved?.type !== "apiKey") return { label: "api" };
-  return {
-    ...(resolved.userId ? { userId: resolved.userId } : {}),
-    label: resolved.isLangySessionKey ? "langy" : "api",
-  };
-};
-
 secured.access(requires("experiments:create")).post(
   "/",
   describeRoute({
-    summary: "Create an experiment",
+    summary: "Create an experiment and its setup",
     description:
       "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
+    tags: ["Experiments"],
     responses: {
       ...baseResponses,
       400: {
@@ -269,11 +250,14 @@ secured.access(requires("experiments:create")).post(
     // create-then-save pair.
     const state = body.state ?? createBlankWorkbenchState({ name: body.name });
 
-    const created = await ExperimentService.create(prisma).createEvaluationsV3({
+    // The wired instance, not a fresh one: only it carries the broadcaster, so
+    // only it tells the tenant a new experiment exists. An open experiments
+    // list picks the row up from that signal instead of waiting for a reload.
+    const created = await getApp().experiments.createEvaluationsV3({
       projectId: project.id,
       ...(body.name ? { name: body.name } : {}),
       state,
-      actor: workbenchActorFrom(c.get("resolvedToken")),
+      actor: workbenchActorFrom({ resolved: c.get("resolvedToken") }),
     });
 
     logger.info(

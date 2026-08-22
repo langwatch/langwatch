@@ -44,6 +44,11 @@ const CLAIM_TTL_SECONDS = 60;
 const RESULT_TTL_SECONDS = 30;
 /** A page result bigger than this is a bug, not a payload. */
 const MAX_RESULT_BYTES = 64 * 1024;
+/**
+ * What the dispatch writes into the claim key when it takes the action for the
+ * backend. It is not a user id, so a page can never complete against it.
+ */
+const BACKEND_CLAIMANT = "langy:backend";
 
 export const uiActionKeys = {
   pending: (actionId: string) => `langy:ui:pending:${actionId}`,
@@ -251,11 +256,11 @@ export class LangyUiActionService {
   /**
    * Two-stage wait on the result list. Stage one covers the claim window: a
    * result OR a claim must appear inside it, else the page counts as away and
-   * the pending record is deleted FIRST, so a zombie tab claiming late finds
-   * nothing and drops (no double execution — see `claim`). Stage two waits out
-   * the action's own execute budget once something claimed it; a claimed but
-   * silent page is a timeout, never a re-dispatch, because the page may have
-   * half-applied the action.
+   * the dispatch takes the claim key for the backend, which is what makes the
+   * handover atomic (see the take below). Stage two waits out the action's own
+   * execute budget once something claimed it; a claimed but silent page is a
+   * timeout, never a re-dispatch, because the page may have half-applied the
+   * action.
    */
   private async awaitResult({
     actionId,
@@ -279,12 +284,22 @@ export class LangyUiActionService {
       );
       if (first) return this.toOutcome({ actionId, kind, raw: first[1] });
 
-      const claimed = await this.redis.get(uiActionKeys.claim(actionId));
-      if (!claimed) {
-        // Nothing is listening. Delete the pending record before deciding, so
-        // a tab that wakes up later cannot claim and execute an action whose
-        // dispatch already answered — the backend execution below must stay
-        // the only execution.
+      // Take the claim key for the backend with the same SET NX a page uses:
+      // both sides then contend for one key, so exactly one of them can win.
+      // Only reading the key here would leave a window where a tab that has
+      // already validated the pending record claims right after the dispatch
+      // decided, and the page and the backend both run the action.
+      const isClaimedForBackend =
+        (await this.redis.set(
+          uiActionKeys.claim(actionId),
+          BACKEND_CLAIMANT,
+          "EX",
+          CLAIM_TTL_SECONDS,
+          "NX",
+        )) === "OK";
+      if (isClaimedForBackend) {
+        // Nothing is listening, and no page can claim now. Drop the pending
+        // record so a zombie tab finds nothing left to validate either.
         await this.redis.del(uiActionKeys.pending(actionId));
         return await this.runOnBackend({
           actionId,
@@ -345,11 +360,13 @@ export class LangyUiActionService {
 
   /**
    * The page asking to execute `actionId`. First caller wins (SET NX); every
-   * other tab, and every stream replay, gets `claimed: false` and drops. The
-   * pending record is the authority: a claim naming a different turn,
-   * conversation, or project than the dispatch pinned is refused exactly like
-   * an unknown action, so this cannot be used to probe or hijack another
-   * dispatch. The claim value records the executing user for `complete`.
+   * other tab, every stream replay, and a tab racing the dispatch's own
+   * handover to the backend gets `claimed: false` and drops. The pending
+   * record is the authority on WHERE the action belongs: a claim naming a
+   * different turn, conversation, or project than the dispatch pinned is
+   * refused exactly like an unknown action, so this cannot be used to probe or
+   * hijack another dispatch. The claim value records the executing user for
+   * `complete`.
    */
   async claim({
     projectId,
@@ -417,7 +434,10 @@ export class LangyUiActionService {
     if (claimant !== userId) return { accepted: false };
 
     const raw = JSON.stringify(completion);
-    if (raw.length > MAX_RESULT_BYTES) {
+    // Measure what Redis stores: a string's length counts UTF-16 code units,
+    // so a result of multi-byte characters passes a length check at up to
+    // three times the ceiling.
+    if (Buffer.byteLength(raw, "utf8") > MAX_RESULT_BYTES) {
       await this.redis.lpush(
         uiActionKeys.result(actionId),
         JSON.stringify({

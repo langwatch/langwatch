@@ -1,6 +1,8 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 
+import { showErrorToast } from "~/features/errors";
+
 /**
  * Shown when the server holds a newer version of this workbench and the user
  * has unsaved edits. Reloading discards those edits, so it is the user's
@@ -44,7 +46,17 @@ export function WorkbenchStaleBanner({
         loading={isReloading}
         onClick={() => {
           setIsReloading(true);
-          void onReload().finally(() => setIsReloading(false));
+          void onReload()
+            .catch((error) => {
+              // The user pressed Reload, so a failure has to reach them. Their
+              // unsaved edits are still here and the banner stays up, so the
+              // button is worth pressing again.
+              showErrorToast({
+                error,
+                fallbackTitle: "Couldn't reload this evaluation",
+              });
+            })
+            .finally(() => setIsReloading(false));
         }}
       >
         Reload

@@ -103,6 +103,38 @@ function makeExperiments({
   };
 }
 
+/**
+ * Arrange the saved-state execution and the run it starts.
+ *
+ * One shape, not three: `prepareSavedStateExecution` returns a wide record, and
+ * three hand-copied literals of it drift the moment it gains a field — each
+ * copy then pins a different idea of what the executor is handed.
+ */
+function mockSavedStateRun({
+  datasetRows,
+  runId,
+}: {
+  datasetRows: Array<Record<string, string>>;
+  runId: string;
+}): void {
+  vi.mocked(prepareSavedStateExecution).mockResolvedValue({
+    experiment: { id: "experiment_1", slug: "my-exp" },
+    workbenchState: BASE_STATE,
+    state: BASE_STATE,
+    datasetRows,
+    datasetColumns: [{ id: "input", name: "input", type: "string" }],
+    loadedPrompts: new Map(),
+    loadedAgents: new Map(),
+    loadedEvaluators: new Map(),
+    loadedWorkflows: new Map(),
+  } as never);
+  vi.mocked(startPollingRun).mockResolvedValue({
+    runId,
+    runUrl: `https://example/${runId}`,
+    total: datasetRows.length,
+  } as never);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -180,6 +212,9 @@ describe("executeBackendAction", () => {
         }),
       ).rejects.toMatchObject({
         code: "langy_ui_handler_failed",
+        // The agent named a target the saved state does not have, so the
+        // refusal is the caller's to fix, not an incident.
+        fault: "customer",
         meta: expect.objectContaining({ errorCode: "target_not_found" }),
       });
       expect(experiments.saves).toHaveLength(0);
@@ -208,22 +243,7 @@ describe("executeBackendAction", () => {
     /** @scenario A run started with no browser executes from the saved state */
     it("starts a polling run and returns its id", async () => {
       const experiments = makeExperiments();
-      vi.mocked(prepareSavedStateExecution).mockResolvedValue({
-        experiment: { id: "experiment_1", slug: "my-exp" },
-        workbenchState: BASE_STATE,
-        state: BASE_STATE,
-        datasetRows: [{ input: "hi" }],
-        datasetColumns: [{ id: "input", name: "input", type: "string" }],
-        loadedPrompts: new Map(),
-        loadedAgents: new Map(),
-        loadedEvaluators: new Map(),
-        loadedWorkflows: new Map(),
-      } as never);
-      vi.mocked(startPollingRun).mockResolvedValue({
-        runId: "run-1",
-        runUrl: "https://example/run-1",
-        total: 1,
-      } as never);
+      mockSavedStateRun({ datasetRows: [{ input: "hi" }], runId: "run-1" });
 
       const result = (await executeBackendAction({
         experiments,
@@ -241,22 +261,7 @@ describe("executeBackendAction", () => {
     /** @scenario A run started with no browser fills the cells the workbench shows */
     it("asks the run to write its cells back into the saved state", async () => {
       const experiments = makeExperiments();
-      vi.mocked(prepareSavedStateExecution).mockResolvedValue({
-        experiment: { id: "experiment_1", slug: "my-exp" },
-        workbenchState: BASE_STATE,
-        state: BASE_STATE,
-        datasetRows: [{ input: "hi" }],
-        datasetColumns: [{ id: "input", name: "input", type: "string" }],
-        loadedPrompts: new Map(),
-        loadedAgents: new Map(),
-        loadedEvaluators: new Map(),
-        loadedWorkflows: new Map(),
-      } as never);
-      vi.mocked(startPollingRun).mockResolvedValue({
-        runId: "run-3",
-        runUrl: "https://example/run-3",
-        total: 1,
-      } as never);
+      mockSavedStateRun({ datasetRows: [{ input: "hi" }], runId: "run-3" });
 
       await executeBackendAction({
         experiments,
@@ -277,22 +282,10 @@ describe("executeBackendAction", () => {
     /** @scenario A run scoped to a target and a row subset covers only those cells */
     it("keeps both the target and the row filters when the payload carries both", async () => {
       const experiments = makeExperiments();
-      vi.mocked(prepareSavedStateExecution).mockResolvedValue({
-        experiment: { id: "experiment_1", slug: "my-exp" },
-        workbenchState: BASE_STATE,
-        state: BASE_STATE,
+      mockSavedStateRun({
         datasetRows: [{ input: "hi" }, { input: "again" }],
-        datasetColumns: [{ id: "input", name: "input", type: "string" }],
-        loadedPrompts: new Map(),
-        loadedAgents: new Map(),
-        loadedEvaluators: new Map(),
-        loadedWorkflows: new Map(),
-      } as never);
-      vi.mocked(startPollingRun).mockResolvedValue({
         runId: "run-2",
-        runUrl: "https://example/run-2",
-        total: 2,
-      } as never);
+      });
 
       await executeBackendAction({
         experiments,

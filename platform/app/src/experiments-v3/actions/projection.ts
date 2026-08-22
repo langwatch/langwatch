@@ -13,7 +13,7 @@ import type { WorkbenchState } from "./transforms";
  * evaluator results, drawer and selection state.
  */
 
-/** Serialized size the projection stays under. */
+/** UTF-8 size of the serialized projection, which the output never exceeds. */
 export const PROJECTION_BUDGET_BYTES = 32 * 1024;
 
 /** Characters of one sampled cell that survive the projection. */
@@ -70,6 +70,8 @@ export type ProjectedResults = {
   runId?: string;
   status: string;
   targets: ProjectedTargetResults[];
+  /** Target summaries left out to fit the size budget. */
+  omittedTargets?: number;
 };
 
 export type ProjectedWorkbenchState = {
@@ -81,6 +83,12 @@ export type ProjectedWorkbenchState = {
   results?: ProjectedResults;
   /** Set when the projection dropped detail to fit the size budget. */
   truncated?: boolean;
+  /** Entries left out of `datasets` to fit the size budget. */
+  omittedDatasets?: number;
+  /** Entries left out of `targets` to fit the size budget. */
+  omittedTargets?: number;
+  /** Entries left out of `evaluators` to fit the size budget. */
+  omittedEvaluators?: number;
 };
 
 const datasetRowCount = (dataset: DatasetReference): number => {
@@ -133,8 +141,18 @@ const countEvaluatorMappings = (
     0,
   );
 
+const utf8Encoder = new TextEncoder();
+
+/**
+ * The budget counts UTF-8 bytes, which is what a transport carries. A string's
+ * `length` counts UTF-16 code units, so it under-reports every non-ASCII
+ * character by a byte or two.
+ */
 const serializedSize = (projection: ProjectedWorkbenchState): number =>
-  JSON.stringify(projection).length;
+  utf8Encoder.encode(JSON.stringify(projection)).length;
+
+const isWithinBudget = (projection: ProjectedWorkbenchState): boolean =>
+  serializedSize(projection) <= PROJECTION_BUDGET_BYTES;
 
 const projectDataset = (dataset: DatasetReference): ProjectedDataset => ({
   id: dataset.id,
@@ -205,13 +223,74 @@ const projectResults = ({
 });
 
 /**
+ * One list the last resort may shorten, with the counter that records what it
+ * left out.
+ */
+type TrimmableCollection = {
+  items: unknown[];
+  countOmitted: (omitted: number) => void;
+};
+
+/**
+ * Last resort: drop whole entries, longest list first, until the projection
+ * fits. Every stage before this one drops detail from an entry, and enough
+ * entries overflow the budget on their own.
+ */
+const trimEntries = (projection: ProjectedWorkbenchState): void => {
+  const collections: TrimmableCollection[] = [
+    {
+      items: projection.datasets,
+      countOmitted: (omitted) => {
+        projection.omittedDatasets =
+          (projection.omittedDatasets ?? 0) + omitted;
+      },
+    },
+    {
+      items: projection.targets,
+      countOmitted: (omitted) => {
+        projection.omittedTargets = (projection.omittedTargets ?? 0) + omitted;
+      },
+    },
+    {
+      items: projection.evaluators,
+      countOmitted: (omitted) => {
+        projection.omittedEvaluators =
+          (projection.omittedEvaluators ?? 0) + omitted;
+      },
+    },
+  ];
+  const results = projection.results;
+  if (results) {
+    collections.push({
+      items: results.targets,
+      countOmitted: (omitted) => {
+        results.omittedTargets = (results.omittedTargets ?? 0) + omitted;
+      },
+    });
+  }
+
+  // Halving rather than popping one entry at a time: each step re-serializes
+  // the projection, so a linear walk over thousands of targets is a lot of work
+  // to reach the same place.
+  while (!isWithinBudget(projection)) {
+    const longest = collections.reduce((widest, candidate) =>
+      candidate.items.length > widest.items.length ? candidate : widest,
+    );
+    if (longest.items.length === 0) break;
+    const kept = Math.floor(longest.items.length / 2);
+    longest.countOmitted(longest.items.length - kept);
+    longest.items.length = kept;
+  }
+};
+
+/**
  * Drop detail until the projection fits the budget, in order of what an agent
  * can most easily ask for again. Mutates and returns the same object.
  */
 const fitToBudget = (
   projection: ProjectedWorkbenchState,
 ): ProjectedWorkbenchState => {
-  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
+  if (isWithinBudget(projection)) {
     return projection;
   }
 
@@ -221,7 +300,7 @@ const fitToBudget = (
   for (const dataset of projection.datasets) {
     dataset.sampleRows = undefined;
   }
-  if (serializedSize(projection) <= PROJECTION_BUDGET_BYTES) {
+  if (isWithinBudget(projection)) {
     return projection;
   }
 
@@ -235,6 +314,17 @@ const fitToBudget = (
     evaluator.mappingCount = countEvaluatorMappings(evaluator.mappings ?? {});
     evaluator.mappings = undefined;
   }
+  if (isWithinBudget(projection)) {
+    return projection;
+  }
+
+  trimEntries(projection);
+  if (isWithinBudget(projection)) {
+    return projection;
+  }
+
+  // With every list empty, the name is the only free text left.
+  projection.name = truncateCell(projection.name);
 
   return projection;
 };
@@ -244,8 +334,9 @@ const fitToBudget = (
  *
  * Pass `results` to include a per-target summary of the last run; without it
  * the projection is state only. The output is capped at
- * `PROJECTION_BUDGET_BYTES`: sample rows go first, then mappings collapse to
- * counts, and `truncated` says so either way.
+ * `PROJECTION_BUDGET_BYTES` UTF-8 bytes: sample rows go first, then mappings
+ * collapse to counts, then whole entries are dropped and counted in the
+ * `omitted*` fields. `truncated` says so whenever anything was left out.
  */
 export const projectWorkbenchState = ({
   state,

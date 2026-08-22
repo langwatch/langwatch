@@ -199,7 +199,13 @@ type EvaluationsV3TableProps = {
    * "Optimize this prompt": hand the column to Langy. The page owns the
    * hook (it is the Langy integration point); undefined hides the menu item.
    */
-  onOptimizeTarget?: (target: TargetConfig, name: string) => void;
+  onOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
 };
 
 export function EvaluationsV3Table({
@@ -813,7 +819,7 @@ export function EvaluationsV3Table({
   // Handler for duplicating a target
   const handleDuplicateTarget = useCallback(
     (target: TargetConfig) => {
-      const duplicatedId = duplicateTarget(target.id);
+      const duplicatedId = duplicateTarget({ targetId: target.id });
       if (!duplicatedId) return;
       // Read the copy back: the store wired it up (its own mappings plus every
       // evaluator's mappings for it), so this is not the target we passed in.

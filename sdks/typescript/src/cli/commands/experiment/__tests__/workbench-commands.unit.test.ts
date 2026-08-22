@@ -209,6 +209,22 @@ describe("the experiment workbench commands", () => {
         expect(mockSetWorkbenchState).not.toHaveBeenCalled();
       });
     });
+
+    describe("when the expected version is not a whole number", () => {
+      it.each(["1abc", "1.5", "latest", "0", "-2", ""])(
+        "refuses %j instead of saving against a version nobody named",
+        async (expectedVersion) => {
+          const directory = await mkdtemp(join(tmpdir(), "langwatch-cli-"));
+          const file = join(directory, "state.json");
+          await writeFile(file, JSON.stringify(state), "utf8");
+
+          await expect(
+            experimentSetStateCommand("checkout", { file, expectedVersion }),
+          ).rejects.toThrow(ProcessExitError);
+          expect(mockSetWorkbenchState).not.toHaveBeenCalled();
+        },
+      );
+    });
   });
 
   describe("given a versions call", () => {
@@ -262,6 +278,57 @@ describe("the experiment workbench commands", () => {
         expect(printed.toLowerCase()).toContain("no saved versions");
       });
     });
+
+    describe("when the history is longer than one page", () => {
+      it("prints a command that fetches the next page", async () => {
+        mockListVersions.mockResolvedValue({
+          versions: [
+            {
+              version: 101,
+              autoSaved: false,
+              commitMessage: null,
+              authorLabel: "user",
+              authorId: "user_1",
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          nextCursor: 100,
+        });
+
+        const result = await experimentVersionsCommand("checkout");
+        result?.table();
+        const printed = logSpy.mock.calls.flat().join("\n");
+
+        // --limit is capped at the page size, so raising it cannot reach the
+        // rest of the history; the cursor is the only way through.
+        expect(printed).toContain(
+          "langwatch experiment versions checkout --cursor 100",
+        );
+      });
+    });
+
+    describe("when a cursor is passed", () => {
+      it("asks the API for that page", async () => {
+        mockListVersions.mockResolvedValue({ versions: [], nextCursor: null });
+
+        await experimentVersionsCommand("checkout", { cursor: "100" });
+
+        expect(mockListVersions).toHaveBeenCalledWith({
+          slug: "checkout",
+          limit: 50,
+          cursor: 100,
+        });
+      });
+    });
+
+    describe("when the cursor is not a version number", () => {
+      it("refuses instead of silently serving page one again", async () => {
+        await expect(
+          experimentVersionsCommand("checkout", { cursor: "abc" }),
+        ).rejects.toThrow(ProcessExitError);
+        expect(mockListVersions).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given a restore call", () => {
@@ -283,13 +350,16 @@ describe("the experiment workbench commands", () => {
       });
     });
 
-    describe("when the version is not a number", () => {
-      it("refuses and exits", async () => {
-        await expect(
-          experimentRestoreCommand("checkout", "latest"),
-        ).rejects.toThrow(ProcessExitError);
-        expect(mockRestoreVersion).not.toHaveBeenCalled();
-      });
+    describe("when the version is not a whole number", () => {
+      it.each(["latest", "3abc", "1.5", "0", "-2"])(
+        "refuses %j instead of restoring a version nobody named",
+        async (version) => {
+          await expect(
+            experimentRestoreCommand("checkout", version),
+          ).rejects.toThrow(ProcessExitError);
+          expect(mockRestoreVersion).not.toHaveBeenCalled();
+        },
+      );
     });
   });
 });

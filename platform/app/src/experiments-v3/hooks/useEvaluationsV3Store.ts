@@ -631,7 +631,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     return result;
   },
 
-  duplicateTarget: (targetId, name) => {
+  duplicateTarget: ({ targetId, name }) => {
     let duplicatedId: string | undefined;
     set((state) => {
       try {
@@ -708,11 +708,11 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   setTargetPrompt: (payload) => {
     set(
       (state) =>
-        runTransform({
+        runTransformOrKeep({
           state,
           transform: setTargetPromptTransform,
           payload,
-        }).slice,
+        }) ?? state,
     );
   },
 

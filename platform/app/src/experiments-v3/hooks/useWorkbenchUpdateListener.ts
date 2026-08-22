@@ -58,9 +58,22 @@ const useApplyServerVersion = ({
       }
       if (reloadingRef.current) return;
       reloadingRef.current = true;
-      void reloadRef.current().finally(() => {
-        reloadingRef.current = false;
-      });
+      void (async () => {
+        try {
+          await reloadRef.current();
+        } catch (error) {
+          // Nobody asked for this pull, so nothing is lost when it fails and a
+          // toast would interrupt the user for work they did not start. The
+          // page keeps the version it has, and the next update signal or the
+          // next time the tab becomes visible tries again.
+          console.error("Failed to refresh the workbench from the server:", {
+            error,
+            serverVersion,
+          });
+        } finally {
+          reloadingRef.current = false;
+        }
+      })();
     },
     [setStaleWorkbench],
   );

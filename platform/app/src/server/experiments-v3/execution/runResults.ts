@@ -36,7 +36,7 @@ export interface RunResultsDraft {
  */
 export type RunMergePlan =
   | { mode: "replace" }
-  | { mode: "merge"; keepTargetCells: boolean; evaluatorId?: string };
+  | { mode: "merge"; shouldKeepTargetCells: boolean; evaluatorId?: string };
 
 type MergePlan = Extract<RunMergePlan, { mode: "merge" }>;
 
@@ -207,11 +207,11 @@ export const planRunMerge = (scope: ExecutionScope): RunMergePlan => {
   if (scope.type === "evaluator" || scope.type === "evaluator-all-rows") {
     return {
       mode: "merge",
-      keepTargetCells: true,
+      shouldKeepTargetCells: true,
       evaluatorId: scope.evaluatorId,
     };
   }
-  return { mode: "merge", keepTargetCells: false };
+  return { mode: "merge", shouldKeepTargetCells: false };
 };
 
 const cloneRows = <T>(rows: Record<string, T[]> | undefined) => {
@@ -292,7 +292,7 @@ const clearCoveredCell = ({
   rowIndex: number;
   targetId: string;
 }): void => {
-  if (!plan.keepTargetCells) {
+  if (!plan.shouldKeepTargetCells) {
     clearRow(merged.targetOutputs, targetId, rowIndex);
     clearRow(merged.targetMetadata, targetId, rowIndex);
     clearRow(merged.errors, targetId, rowIndex);

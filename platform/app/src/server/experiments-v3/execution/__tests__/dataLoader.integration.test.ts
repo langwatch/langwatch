@@ -97,12 +97,16 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       if ("error" in result) {
         throw new Error(`loadExecutionData failed: ${result.error}`);
@@ -146,12 +150,16 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       expect("error" in result).toBe(true);
       if ("error" in result) {
@@ -166,12 +174,16 @@ describe("loadExecutionData", () => {
       it("fails and names the missing agent", async () => {
         const missingAgentId = `test_agent_${nanoid(8)}`;
 
-        const result = await loadExecutionData(
+        const result = await loadExecutionData({
           projectId,
-          { type: "inline", columns: [], inline: { columns: [], records: {} } },
-          [{ type: "agent", dbAgentId: missingAgentId }],
-          [],
-        );
+          dataset: {
+            type: "inline",
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [{ type: "agent", dbAgentId: missingAgentId }],
+          evaluators: [],
+        });
 
         expect("error" in result).toBe(true);
         if ("error" in result) {
@@ -188,12 +200,16 @@ describe("loadExecutionData", () => {
       it("fails and names the missing evaluator", async () => {
         const missingEvaluatorId = `test_eval_${nanoid(8)}`;
 
-        const result = await loadExecutionData(
+        const result = await loadExecutionData({
           projectId,
-          { type: "inline", columns: [], inline: { columns: [], records: {} } },
-          [],
-          [{ dbEvaluatorId: missingEvaluatorId }],
-        );
+          dataset: {
+            type: "inline",
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [],
+          evaluators: [{ dbEvaluatorId: missingEvaluatorId }],
+        });
 
         expect("error" in result).toBe(true);
         if ("error" in result) {

@@ -44,11 +44,10 @@ export interface SavedStateExecutionRefusal {
 export const buildStateFromWorkbench = (
   workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
 ): EvaluationsV3State => {
-  const dataset = workbenchState.datasets[0]!;
   return {
     name: workbenchState.name,
     datasets: workbenchState.datasets as EvaluationsV3State["datasets"],
-    activeDatasetId: dataset.id ?? "dataset-1",
+    activeDatasetId: workbenchState.activeDatasetId,
     targets: workbenchState.targets as EvaluationsV3State["targets"],
     evaluators: workbenchState.evaluators as EvaluationsV3State["evaluators"],
     results: {
@@ -78,7 +77,9 @@ export async function prepareSavedStateExecution({
   slug: string;
   runInputs?: ExecutionDataInputs;
 }): Promise<SavedStateExecution | SavedStateExecutionRefusal> {
-  const experiment = await ExperimentService.create(prisma).findBySlugAndType({
+  const experiment = await ExperimentService.create({
+    prisma,
+  }).findBySlugAndType({
     projectId,
     slug,
     type: ExperimentType.EVALUATIONS_V3,
@@ -96,18 +97,22 @@ export async function prepareSavedStateExecution({
   }
 
   const workbenchState = parseResult.data;
-  const dataset = workbenchState.datasets[0];
+  // The run must use the dataset the saved workbench has selected. Taking the
+  // first one instead executes a different dataset than the browser shows.
+  const dataset = workbenchState.datasets.find(
+    (candidate) => candidate.id === workbenchState.activeDatasetId,
+  );
   if (!dataset) {
     return { error: "No dataset configured", status: 400 };
   }
 
-  const dataResult = await loadExecutionData(
+  const dataResult = await loadExecutionData({
     projectId,
     dataset,
-    workbenchState.targets,
-    workbenchState.evaluators,
-    runInputs ?? {},
-  );
+    targets: workbenchState.targets,
+    evaluators: workbenchState.evaluators,
+    inputs: runInputs ?? {},
+  });
   if ("error" in dataResult) {
     return { error: dataResult.error, status: dataResult.status };
   }

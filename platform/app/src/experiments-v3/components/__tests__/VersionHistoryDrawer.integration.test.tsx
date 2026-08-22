@@ -200,7 +200,7 @@ describe("VersionHistoryDrawer", () => {
   });
 
   describe("given the experiment has no versions", () => {
-    it("says so", async () => {
+    it("shows the empty state", async () => {
       versionsQuery = {
         data: { versions: [], nextCursor: null },
         isLoading: false,

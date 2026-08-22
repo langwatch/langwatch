@@ -15,17 +15,17 @@ export const experimentGetStateCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const versionOnly = options.fields === "version";
+  const isVersionOnly = options.fields === "version";
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(
-    versionOnly
+    isVersionOnly
       ? `Checking version of "${slug}"...`
       : `Fetching setup for "${slug}"...`,
   ).start();
 
   try {
-    const workbench = versionOnly
+    const workbench = isVersionOnly
       ? await service.getWorkbenchState({ slug, fields: "version" })
       : await service.getWorkbenchState({ slug });
 
@@ -39,7 +39,7 @@ export const experimentGetStateCommand = async (
         console.log(`  ${chalk.gray("Version:")}  ${workbench.version}`);
         console.log(`  ${chalk.gray("Updated:")}  ${workbench.updatedAt}`);
         console.log();
-        if (versionOnly) return;
+        if (isVersionOnly) return;
         console.log(
           chalk.gray(
             `Use ${chalk.cyan("--format json")} to read the full setup, and ${chalk.cyan(

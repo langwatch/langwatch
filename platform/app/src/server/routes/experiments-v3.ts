@@ -38,10 +38,8 @@ import {
   ExperimentVersionNotFoundError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
-import {
-  ExperimentService,
-  type WorkbenchActor,
-} from "~/server/experiments/experiment.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
+import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -72,6 +70,7 @@ import {
   runStatusResponseSchema,
   saveWorkbenchStateBodySchema,
   saveWorkbenchStateResponseSchema,
+  staleWorkbenchStateErrorSchema,
   startRunResponseSchema,
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
@@ -109,17 +108,37 @@ const experimentErrorResponses = {
 };
 
 /**
+ * The answer every workbench route has for a slug that names another kind of
+ * experiment, such as a DSPy run or a legacy batch evaluation.
+ *
+ * Only the workbench routes reach it. The run routes look the experiment up by
+ * type, so for them the same slug is a 404 instead.
+ */
+const workbenchTypeErrorResponse = {
+  400: {
+    description:
+      "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+};
+
+/**
  * The two extra answers a workbench WRITE has.
  *
  * A 409 means someone else saved on top of the state this caller read; its
- * `currentVersion` is what to read again. A 400 means the payload itself was
- * refused: either the setup does not match the schema, or it points at a
- * prompt, dataset or evaluator this project no longer has.
+ * `currentVersion` is what to read again. A 400 means the request was refused
+ * before anything was written: the setup does not match the schema, it points
+ * at a prompt, dataset or evaluator this project no longer has, or the slug
+ * names another kind of experiment.
  */
 const workbenchWriteErrorResponses = {
   400: {
     description:
-      "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+      "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
     content: {
       "application/json": {
         schema: resolver(handledErrorEnvelopeSchema),
@@ -131,7 +150,7 @@ const workbenchWriteErrorResponses = {
       "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
     content: {
       "application/json": {
-        schema: resolver(handledErrorEnvelopeSchema),
+        schema: resolver(staleWorkbenchStateErrorSchema),
       },
     },
   },
@@ -240,25 +259,6 @@ const authenticateRequest = async (
   return { project: resolved.project, resolved, markUsed };
 };
 
-/**
- * Who a REST workbench write is attributed to.
- *
- * Langy signs its own writes: the chat mints an ephemeral key for itself, and
- * a version written through it must read as "Langy" in the history rather than
- * as an anonymous integration. Every other key is an integration, which is
- * what `api` means. The user id rides along when the key has one, so a
- * personal key still names the person who minted it.
- */
-const workbenchActorFrom = (
-  resolved: Awaited<ReturnType<TokenResolver["resolve"]>>,
-): WorkbenchActor => {
-  if (resolved?.type !== "apiKey") return { label: "api" };
-  return {
-    ...(resolved.userId ? { userId: resolved.userId } : {}),
-    label: resolved.isLangySessionKey ? "langy" : "api",
-  };
-};
-
 /** Query parameters that are optional positive integers, or nothing. */
 const parseOptionalPositiveInt = (value: string | undefined) => {
   if (value === undefined) return undefined;
@@ -308,17 +308,17 @@ secured.access(sessionAuth).post(
       );
     }
 
-    const dataResult = await loadExecutionData(
+    const dataResult = await loadExecutionData({
       projectId,
-      request.dataset,
-      request.targets,
-      request.evaluators,
-      {
+      dataset: request.dataset,
+      targets: request.targets,
+      evaluators: request.evaluators,
+      inputs: {
         data: request.data,
         datasetId: request.dataset_id,
         parameters: request.parameters,
       },
-    );
+    });
 
     if ("error" in dataResult) {
       return c.json(
@@ -724,7 +724,7 @@ secured.access(apiKeyAuthRun).post(
         ? {
             persistResults: {
               experiments: getApp().experiments,
-              actor: workbenchActorFrom(resolved),
+              actor: workbenchActorFrom({ resolved }),
             },
           }
         : {}),
@@ -899,7 +899,7 @@ secured.access(apiKeyAuthRead).get(
     // cache for the rest of the 24h TTL. Without this, archive visibility
     // silently depends on run age.
     if (runState.experimentId) {
-      const stillLive = await ExperimentService.create(prisma).isActive({
+      const stillLive = await ExperimentService.create({ prisma }).isActive({
         projectId: project.id,
         id: runState.experimentId,
       });
@@ -1030,7 +1030,7 @@ secured.access(apiKeyAuthRead).get(
 
     const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
     let experimentId = experimentIdFromState;
-    const experiments = ExperimentService.create(prisma);
+    const experiments = ExperimentService.create({ prisma });
 
     if (!experimentId && experimentSlug) {
       const experiment = await experiments.findIdBySlug({
@@ -1106,6 +1106,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     ],
     responses: {
       ...experimentErrorResponses,
+      ...workbenchTypeErrorResponse,
       200: {
         description: "The experiment's setup, or its version alone",
         content: {
@@ -1131,7 +1132,9 @@ secured.access(apiKeyAuthExperimentsView).get(
     }
     const { project, markUsed } = authResult;
 
-    const workbench = await ExperimentService.create(prisma).getWorkbenchState({
+    const workbench = await ExperimentService.create({
+      prisma,
+    }).getWorkbenchState({
       projectId: project.id,
       slug,
     });
@@ -1204,7 +1207,7 @@ secured.access(apiKeyAuthExperimentsUpdate).put(
         ? { expectedVersion: body.expectedVersion }
         : {}),
       ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
-      actor: workbenchActorFrom(resolved),
+      actor: workbenchActorFrom({ resolved }),
     });
 
     markUsed();
@@ -1239,6 +1242,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     ],
     responses: {
       ...experimentErrorResponses,
+      ...workbenchTypeErrorResponse,
       200: {
         description: "Versions of the experiment",
         content: {
@@ -1260,7 +1264,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     }
     const { project, markUsed } = authResult;
 
-    const experiments = ExperimentService.create(prisma);
+    const experiments = ExperimentService.create({ prisma });
     // The service lists by id; the REST surface addresses experiments by slug
     // everywhere else, so the read that resolves one to the other also answers
     // the 404 for a slug this project does not have.
@@ -1307,6 +1311,16 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
     description:
       "Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.",
     tags: ["Experiments"],
+    parameters: [
+      {
+        in: "path",
+        name: "version",
+        required: true,
+        schema: { type: "integer", minimum: 1 },
+        description:
+          "The version to restore, as listed by `GET /api/experiments/{slug}/versions`",
+      },
+    ],
     responses: {
       ...experimentErrorResponses,
       ...workbenchWriteErrorResponses,
@@ -1340,11 +1354,15 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
     // A path segment that is not a version number names a version this
     // experiment never had, which is the same answer as a number it never
     // had. One code, so a caller branches once.
+    //
+    // The reported version is 0, a number no experiment version ever has.
+    // `Number("abc")` is `NaN`, which JSON writes as `null`, so a caller that
+    // reads `version` as a number could not parse its own 404.
     const parsedVersion = parseOptionalPositiveInt(version);
     if (parsedVersion === undefined) {
       throw new ExperimentVersionNotFoundError({
         experimentId: workbench.experimentId,
-        version: Number(version),
+        version: 0,
       });
     }
 
@@ -1352,7 +1370,7 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
       projectId: project.id,
       id: workbench.experimentId,
       version: parsedVersion,
-      actor: workbenchActorFrom(resolved),
+      actor: workbenchActorFrom({ resolved }),
     });
 
     logger.info(

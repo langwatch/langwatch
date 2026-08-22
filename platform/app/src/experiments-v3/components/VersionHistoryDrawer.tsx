@@ -107,7 +107,6 @@ const useVersionRestore = ({
   return { restore, restoringVersion };
 };
 
-/** One saved version: who wrote it, when, and the restore affordance. */
 function VersionRow({
   entry,
   isCurrent,
@@ -188,7 +187,6 @@ function VersionRow({
   );
 }
 
-/** The list itself, with its loading, failed and empty states. */
 function VersionList({
   experimentId,
   experimentSlug,

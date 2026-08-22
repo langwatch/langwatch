@@ -107,14 +107,14 @@ export class ExperimentService {
     private readonly options: ExperimentServiceOptions = {},
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    options: ExperimentServiceOptions = {},
-  ): ExperimentService {
+  static create({
+    prisma,
+    broadcaster,
+  }: { prisma: PrismaClient } & ExperimentServiceOptions): ExperimentService {
     return new ExperimentService(
       new ExperimentRepository(prisma),
       new WorkbenchReferenceRepository(prisma),
-      options,
+      { broadcaster },
     );
   }
 
@@ -860,6 +860,11 @@ export class ExperimentService {
    * Brings an old version back by writing it FORWARD as a new save. History is
    * never rewritten: the version you restored from is still there, and the
    * restore itself is one more entry in the list.
+   *
+   * The current run's results ride across unchanged. A snapshot carries the
+   * setup only, so writing one back on its own would clear every output cell
+   * and evaluator score on the live row, and history never held them to bring
+   * back. A restore changes what the evaluation will run, not what it ran.
    */
   async restoreWorkbenchVersion({
     projectId,
@@ -885,10 +890,13 @@ export class ExperimentService {
       });
     }
 
+    const restored = parseWorkbenchState(found.state);
+    const liveResults = current.state?.results;
+
     return await this.saveWorkbenchState({
       projectId,
       id: current.experimentId,
-      state: found.state,
+      state: liveResults ? { ...restored, results: liveResults } : restored,
       expectedVersion: current.version,
       actor,
       commitMessage: `Restored from v${version}`,

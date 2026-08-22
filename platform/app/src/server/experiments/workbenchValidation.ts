@@ -31,6 +31,26 @@ export const parseWorkbenchState = (
 };
 
 /**
+ * The single reference the executor resolves for a target, by target type.
+ *
+ * It mirrors `execution/dataLoader.ts`, which loads a prompt only for a prompt
+ * target, an agent only for an agent target, and so on. A target keeps every
+ * id it ever held, because the workbench shallow-merges target edits: a target
+ * switched from prompt to agent still carries its old `promptId`. The executor
+ * ignores that id, so checking it would refuse a save for a row the run never
+ * reads.
+ */
+const TARGET_REFERENCE_BY_TYPE = {
+  prompt: { refType: "prompt", field: "promptId" },
+  agent: { refType: "agent", field: "dbAgentId" },
+  evaluator: { refType: "evaluator", field: "targetEvaluatorId" },
+  workflow: { refType: "workflow", field: "workflowId" },
+} as const satisfies Record<
+  PersistedEvaluationsV3State["targets"][number]["type"],
+  { refType: WorkbenchReferenceType; field: string }
+>;
+
+/**
  * Every row the state points at, grouped by kind. Duplicates are kept out so
  * a state naming one prompt on six targets still costs one lookup.
  */
@@ -47,10 +67,8 @@ export const collectWorkbenchReferences = (
   };
 
   for (const target of state.targets) {
-    add("prompt", target.promptId);
-    add("agent", target.dbAgentId);
-    add("evaluator", target.targetEvaluatorId);
-    add("workflow", target.workflowId);
+    const reference = TARGET_REFERENCE_BY_TYPE[target.type];
+    add(reference.refType, target[reference.field]);
   }
 
   for (const evaluator of state.evaluators) {

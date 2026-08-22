@@ -1537,8 +1537,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("versions <experiment>")
       .description("List the saved versions of an experiment's setup")
       .option("--limit <n>", "Maximum versions to fetch (default 50, max 100)", "50")
+      .option("--cursor <version>", "The nextCursor of the previous page")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (experiment: string, options: { limit?: string }) => {
+    async (experiment: string, options: { limit?: string; cursor?: string }) => {
       const { experimentVersionsCommand: impl } = await import("./commands/experiment/versions.js");
       return impl(experiment, options);
     },

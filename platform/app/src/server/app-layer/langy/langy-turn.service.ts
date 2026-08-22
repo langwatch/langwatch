@@ -55,6 +55,7 @@ import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyT
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
+import { featureFlagService } from "~/server/featureFlag";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
@@ -185,6 +186,46 @@ async function resolveLangyTurnOverride(
  */
 export function __resetLangyTurnOverrideCacheForTests(): void {
   lastRegistryOverrideText = null;
+}
+
+/** The flag that opens the agent-to-page UI-action channel. */
+const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
+
+/**
+ * Whether this turn may be told the open page accepts live UI actions.
+ *
+ * The turn context advertises `langwatch ui actions` / `langwatch ui call`, and
+ * `routes/langy-ui-actions.ts` refuses both with a dark 404 while the flag is
+ * off. Resolved here so the two ends agree: an agent told about a command that
+ * answers "never deployed" spends the turn on a surface it cannot reach.
+ *
+ * Never throws — the same contract `resolveLangyHarness` holds. A flag-store
+ * blip must not keep a turn from starting, and it resolves to the flag's own
+ * default (on), which is what almost every project evaluates to, so a blip
+ * changes nothing for them.
+ */
+async function resolveLangyUiActionsOpen({
+  userId,
+  projectId,
+  organizationId,
+}: {
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<boolean> {
+  try {
+    return await featureFlagService.isEnabled(LANGY_UI_ACTIONS_FLAG, {
+      distinctId: userId,
+      projectId,
+      organizationId,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "langy ui-actions flag evaluation failed, advertising the channel",
+    );
+    return true;
+  }
 }
 
 /**
@@ -893,6 +934,7 @@ export class LangyTurnService {
         modelsAllowedResult,
         memoryResult,
         overrideResult,
+        uiActionsOpenResult,
       ] = await Promise.allSettled([
         // The busy-hint read, for EXISTING conversations only. A new
         // conversation has no projection row by construction, and this read
@@ -942,6 +984,15 @@ export class LangyTurnService {
         // a value that is the same for every tenant. Unconfigured (the default)
         // resolves synchronously and costs nothing here either.
         resolveLangyTurnOverride(this.deps),
+        // Whether the turn context may advertise live UI actions. In this
+        // batch for the same reason as the override: it is one cached flag
+        // read, and awaiting it at the composition site would put a serial
+        // round trip in front of time-to-first-token on every turn.
+        resolveLangyUiActionsOpen({
+          userId,
+          projectId,
+          organizationId: credentials.organizationId,
+        }),
       ]);
 
       // The runToken IS the frame-signing key, and a turn without one is
@@ -1134,11 +1185,22 @@ export class LangyTurnService {
         (block): block is string => !!block && block.trim().length > 0,
       );
 
+      // `resolveLangyUiActionsOpen` never rejects, so a settled-rejected slot
+      // can only mean the batch itself failed; the flag's own default (on) is
+      // the same answer that resolver would have given.
+      const isUiActionSurfaceOpen =
+        uiActionsOpenResult.status === "fulfilled"
+          ? uiActionsOpenResult.value
+          : true;
+
       // The per-turn user-message lane: what the user is looking at and the
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
       const { prompt, labelled } = composeLangyTurnPrompt({
-        contextBlock: renderLangyTurnContext(turnContext),
+        contextBlock: renderLangyTurnContext({
+          context: turnContext,
+          isUiActionSurfaceOpen,
+        }),
         capNote: capReachedNote,
         userText,
       });

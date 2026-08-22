@@ -2,7 +2,7 @@ import {
   type SetEvaluatorMappingPayload,
   setEvaluatorMappingPayloadSchema,
 } from "../schemas";
-import { requireEvaluator } from "./helpers";
+import { requireDataset, requireEvaluator, requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
 /**
@@ -10,7 +10,9 @@ import type { Transform } from "./types";
  *
  * Evaluator mappings are three levels deep because every evaluator applies to
  * every target: the same evaluator grades target A's `output` and target B's,
- * and those two live in different columns.
+ * and those two live in different columns. All three ids have to resolve: a
+ * mapping filed under one that resolves to nothing is wiring a run can never
+ * apply.
  */
 export const setEvaluatorMapping: Transform<
   SetEvaluatorMappingPayload,
@@ -19,6 +21,8 @@ export const setEvaluatorMapping: Transform<
   const { evaluatorId, datasetId, targetId, inputField, mapping } =
     setEvaluatorMappingPayloadSchema.parse(payload);
   requireEvaluator({ state, evaluatorId });
+  requireDataset({ state, datasetId });
+  requireTarget({ state, targetId });
 
   return {
     state: {

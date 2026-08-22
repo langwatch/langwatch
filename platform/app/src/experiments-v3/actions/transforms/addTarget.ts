@@ -6,7 +6,7 @@ import {
   inferAllTargetMappings,
 } from "../../utils/mappingInference";
 import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas";
-import type { Transform, WorkbenchState } from "./types";
+import { type Transform, TransformError, type WorkbenchState } from "./types";
 
 export const newTargetId = () => `target-${nanoid(8)}`;
 
@@ -55,11 +55,24 @@ export const attachTarget = ({
   };
 };
 
+/**
+ * A caller-supplied id has to be free. Two targets under one id make every
+ * mapping filed against it ambiguous, and a scoped run could not say which
+ * column it covers.
+ */
 export const addTarget: Transform<AddTargetPayload, { targetId: string }> = ({
   state,
   payload,
 }) => {
   const parsed = addTargetPayloadSchema.parse(payload);
+
+  if (parsed.id && state.targets.some((t) => t.id === parsed.id)) {
+    throw new TransformError({
+      code: "target_already_exists",
+      message: `Target ${parsed.id} is already in the workbench`,
+      meta: { targetId: parsed.id },
+    });
+  }
 
   const target: TargetConfig = {
     ...parsed,

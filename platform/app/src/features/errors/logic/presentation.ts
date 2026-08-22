@@ -530,6 +530,11 @@ const presentations = {
     describe: () =>
       "Part of it is incomplete. Check the targets, evaluators and datasets, then save again.",
   },
+  experiment_type_mismatch: {
+    title: "This experiment is not an evaluation workbench",
+    describe: () =>
+      "It was made with another kind of experiment and opens in its own view. Pick an evaluation instead.",
+  },
   experiment_version_not_found: {
     title: "That version is not available",
     describe: () =>

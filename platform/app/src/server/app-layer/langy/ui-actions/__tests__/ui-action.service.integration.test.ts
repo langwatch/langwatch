@@ -26,10 +26,13 @@ const IDS = {
   turnId: "turn-ui",
 };
 
-function makeService(
-  appended: Array<{ actionId: string }>,
-  backendRunner?: (args: { kind: string }) => Promise<unknown>,
-) {
+function makeService({
+  appended,
+  backendRunner,
+}: {
+  appended: Array<{ actionId: string }>;
+  backendRunner?: (args: { kind: string }) => Promise<unknown>;
+}) {
   return new LangyUiActionService({
     redis: redis as unknown as UiActionRedis,
     conversations: {
@@ -66,7 +69,7 @@ describe("LangyUiActionService against real Redis", () => {
   /** @scenario Agent invokes a workbench action and the attached browser applies it live */
   it("returns the completion a concurrent claim and complete deliver", async () => {
     const appended: Array<{ actionId: string }> = [];
-    const service = makeService(appended);
+    const service = makeService({ appended });
 
     const dispatch = service.dispatch({
       ...IDS,
@@ -105,7 +108,7 @@ describe("LangyUiActionService against real Redis", () => {
   /** @scenario With two tabs open, only the claiming tab executes */
   it("lets exactly one of two concurrent claims through", async () => {
     const appended: Array<{ actionId: string }> = [];
-    const service = makeService(appended);
+    const service = makeService({ appended });
 
     const dispatch = service
       .dispatch({
@@ -142,12 +145,15 @@ describe("LangyUiActionService against real Redis", () => {
   it("falls back to the backend when the real claim window lapses unclaimed", async () => {
     const appended: Array<{ actionId: string }> = [];
     let pendingAtRunnerTime: string | null = "unread";
-    const service = makeService(appended, async ({ kind }) => {
-      // The pending record must be gone BEFORE the backend runs, so a zombie
-      // tab waking later finds nothing to claim.
-      const actionId = appended[0]!.actionId;
-      pendingAtRunnerTime = await redis.get(uiActionKeys.pending(actionId));
-      return { via: "backend", kind };
+    const service = makeService({
+      appended,
+      backendRunner: async ({ kind }) => {
+        // The pending record must be gone BEFORE the backend runs, so a zombie
+        // tab waking later finds nothing to claim.
+        const actionId = appended[0]!.actionId;
+        pendingAtRunnerTime = await redis.get(uiActionKeys.pending(actionId));
+        return { via: "backend", kind };
+      },
     });
 
     const outcome = await service.dispatch({

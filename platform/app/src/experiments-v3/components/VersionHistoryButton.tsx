@@ -7,6 +7,7 @@
  */
 import { Button } from "@chakra-ui/react";
 import { History } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -22,10 +23,12 @@ export function VersionHistoryButton({
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 
-  const { experimentId, experimentSlug } = useEvaluationsV3Store((state) => ({
-    experimentId: state.experimentId,
-    experimentSlug: state.experimentSlug,
-  }));
+  const { experimentId, experimentSlug } = useEvaluationsV3Store(
+    useShallow((state) => ({
+      experimentId: state.experimentId,
+      experimentSlug: state.experimentSlug,
+    })),
+  );
 
   // Nothing has a history until it has been saved once.
   if (!project || !experimentId || !experimentSlug) return null;

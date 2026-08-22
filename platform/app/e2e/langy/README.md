@@ -171,14 +171,18 @@ the shared context closes, so a recording run must end through
 `closeBrowserQA()` or vitest's normal teardown; a killed run leaves
 half-written files.
 
-## Prompt optimization (langy-prompt-optimization.scenario.test.ts, langy-optimization-bootstrap.scenario.test.ts)
+## Prompt optimization (langy-prompt-optimization.scenario.test.ts, langy-optimization-bootstrap.scenario.test.ts, langy-evaluator-inference.scenario.test.ts)
 
 The improvement-loop suite seeds a support-bot experiment through the
 workbench-state REST surface (`seed-optimization-workbench.ts`: prompt,
 inline dataset, optional answer-match evaluator, no baseline run) and grades
-the loop from `specs/langy/langy-prompt-optimization-loop.feature`; the
-bootstrap suite covers the evaluator-inference branches from
-`langy-prompt-optimization-bootstrap.feature`. Layer-2 assertions read
+the loop from `specs/langy/langy-prompt-optimization-loop.feature`. The other
+two cover `langy-prompt-optimization-bootstrap.feature`: the bootstrap suite
+takes the branches that build a missing piece, the evaluator-inference suite
+takes the evaluator Langy picks from what the dataset holds. Both share
+`optimization-bootstrap-harness.ts` for the scenario shape, the seed, and the
+check that an evaluator resolves its inputs rather than only existing.
+Layer-2 assertions read
 `GET /api/experiments/:slug/workbench-state` (baseline byte-identical, the
 candidate's draft, evaluator wiring, the version counter) and the runs API.
 The adapter attaches no browser tab, so every workbench action in these

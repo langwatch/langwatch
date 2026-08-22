@@ -19,13 +19,19 @@ import type { LangyUiActionHandlers } from "./types";
  *     executes and the loser drops silently.
  *  4. re-parse, run, complete — a handler failure still completes (ok: false)
  *     so the agent reads the failure instead of waiting out the budget.
+ *
+ * Running the handler and reporting the outcome are separate steps on purpose.
+ * The handler changes the page; the completion only tells the agent about it.
+ * Folding them together made a failed completion look like a failed handler,
+ * which recorded a failure for a change the user can see on screen.
  */
 export type UiActionExecution =
   | "duplicate"
   | "no-handler"
   | "not-claimed"
   | "executed"
-  | "handler-failed";
+  | "handler-failed"
+  | "completion-failed";
 
 /** The dedup identity of one dispatched action on this client. */
 export function uiActionDedupKey({
@@ -36,6 +42,56 @@ export function uiActionDedupKey({
   actionId: string;
 }): string {
   return `${turnId ?? ""}:${actionId}`;
+}
+
+/** Tell the server how one action ended. */
+type CompleteUiAction = (args: {
+  actionId: string;
+  ok: boolean;
+  result?: unknown;
+  errorCode?: string;
+}) => Promise<unknown>;
+
+/**
+ * What a thrown handler owes the two audiences: an error code for the agent
+ * and a message for the user.
+ *
+ * A typed handler failure (e.g. a TransformError's `target_not_found`) travels
+ * as its own code so the agent can act on the real reason; an untyped throw
+ * degrades to the generic handler-failed code.
+ */
+function readHandlerFailure(error: unknown): {
+  errorCode: string;
+  message: string;
+} {
+  const code = (error as { code?: unknown }).code;
+  return {
+    errorCode: typeof code === "string" ? code : "langy_ui_handler_failed",
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+/**
+ * Report the outcome, and answer whether the report landed.
+ *
+ * The report is the agent's channel, never the page's: the page has already
+ * done (or not done) the work by the time this runs, and the agent's dispatch
+ * times out on its own. So a failed report must not become the outcome of the
+ * action, and the caller uses the answer to keep the two apart.
+ */
+async function reportOutcome({
+  complete,
+  outcome,
+}: {
+  complete: CompleteUiAction;
+  outcome: Parameters<CompleteUiAction>[0];
+}): Promise<boolean> {
+  try {
+    await complete(outcome);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function executeUiAction({
@@ -52,12 +108,7 @@ export async function executeUiAction({
   seen: Set<string>;
   handlers: LangyUiActionHandlers;
   claim: (args: { actionId: string }) => Promise<{ claimed: boolean }>;
-  complete: (args: {
-    actionId: string;
-    ok: boolean;
-    result?: unknown;
-    errorCode?: string;
-  }) => Promise<unknown>;
+  complete: CompleteUiAction;
   onHandlerError?: (info: { kind: string; message: string }) => void;
 }): Promise<UiActionExecution> {
   const key = uiActionDedupKey({ turnId, actionId: entry.actionId });
@@ -71,34 +122,39 @@ export async function executeUiAction({
 
   const parsed = handler.payloadSchema.safeParse(entry.payload);
   if (!parsed.success) {
-    await complete({
-      actionId: entry.actionId,
-      ok: false,
-      errorCode: "langy_ui_payload_invalid",
+    await reportOutcome({
+      complete,
+      outcome: {
+        actionId: entry.actionId,
+        ok: false,
+        errorCode: "langy_ui_payload_invalid",
+      },
     });
     return "handler-failed";
   }
 
+  let result: unknown;
   try {
-    const result = await handler.run(parsed.data as never);
-    await complete({
-      actionId: entry.actionId,
-      ok: true,
-      ...(result !== undefined ? { result } : {}),
-    });
-    return "executed";
+    result = await handler.run(parsed.data as never);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    // A typed handler failure (e.g. a TransformError's `target_not_found`)
-    // travels as the errorCode so the agent can act on the real reason; an
-    // untyped throw degrades to the generic handler-failed code.
-    const code = (error as { code?: unknown }).code;
-    await complete({
-      actionId: entry.actionId,
-      ok: false,
-      errorCode: typeof code === "string" ? code : "langy_ui_handler_failed",
+    const { errorCode, message } = readHandlerFailure(error);
+    await reportOutcome({
+      complete,
+      outcome: { actionId: entry.actionId, ok: false, errorCode },
     });
     onHandlerError?.({ kind: entry.kind, message });
     return "handler-failed";
   }
+
+  const isReported = await reportOutcome({
+    complete,
+    outcome: {
+      actionId: entry.actionId,
+      ok: true,
+      ...(result !== undefined ? { result } : {}),
+    },
+  });
+  // The handler already applied the change, so a failed report is not a
+  // handler failure and must never be recorded as one.
+  return isReported ? "executed" : "completion-failed";
 }

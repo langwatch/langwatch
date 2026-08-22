@@ -11,14 +11,18 @@
  *
  * @see specs/experiments-v3/workbench-versioning.feature
  */
+import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { app as publicApp } from "~/app/api/experiments/[[...route]]/app";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 import type { Project } from "~/generated/prisma/client";
 import { allRegisteredRoutes } from "~/server/api/security";
+import { policyPermissions } from "~/server/api/security/access-policy";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestProject } from "~/utils/testUtils";
+import { app as workbenchApp } from "../experiments-v3";
 
 wireDefaultTestApp();
 
@@ -47,14 +51,8 @@ describe("the experiments workbench REST surface", () => {
    * endpoints from `experiments-v3`, and the list / create endpoints from the
    * public experiments app, in the order `createApiRouter` mounts them.
    */
-  const namespace = async () => {
-    const { Hono } = await import("hono");
-    const { app: workbenchApp } = await import("../experiments-v3");
-    const { app: publicApp } = await import(
-      "~/app/api/experiments/[[...route]]/app"
-    );
-    return new Hono().route("/", workbenchApp).route("/", publicApp);
-  };
+  const namespace = () =>
+    new Hono().route("/", workbenchApp).route("/", publicApp);
 
   const request = async ({
     path,
@@ -67,8 +65,7 @@ describe("the experiments workbench REST surface", () => {
     body?: unknown;
     token?: string;
   }) => {
-    const app = await namespace();
-    return app.request(`/api/experiments${path}`, {
+    return namespace().request(`/api/experiments${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -308,11 +305,37 @@ describe("the experiments workbench REST surface", () => {
       });
     });
 
+    describe("when a restore names a segment that is not a version number", () => {
+      /** @scenario "A restore of a version that does not exist reads as not found" */
+      it("answers 404 with a version a caller can parse", async () => {
+        const created = await createExperiment({
+          state: stateNamed("Only one version"),
+        });
+
+        const res = await request({
+          path: `/${created.slug}/versions/abc/restore`,
+          method: "POST",
+        });
+        const body = (await res.json()) as {
+          error: string;
+          experimentId: string;
+          version: unknown;
+        };
+
+        expect(res.status).toBe(404);
+        expect(body.error).toBe("experiment_version_not_found");
+        expect(body.experimentId).toBe(created.id);
+        // `Number("abc")` is `NaN`, and JSON writes `NaN` as `null`. A caller
+        // that reads `version` as a number has to be able to parse the 404 it
+        // just got, so the envelope carries a real number.
+        expect(body.version).toBe(0);
+      });
+    });
+
     describe("when the request carries no credentials", () => {
       /** @scenario "The workbench endpoints refuse an unauthenticated caller" */
       it("answers 401", async () => {
-        const app = await namespace();
-        const res = await app.request("/api/experiments", {
+        const res = await namespace().request("/api/experiments", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -323,6 +346,10 @@ describe("the experiments workbench REST surface", () => {
     });
   });
 
+  /**
+   * The registry is filled at module-load time, so the `workbenchApp` and
+   * `publicApp` imports at the top of this file are what put these routes in it.
+   */
   describe("given the route registry", () => {
     /** @scenario "Each workbench endpoint declares the grain it needs" */
     it.each([
@@ -335,8 +362,7 @@ describe("the experiments workbench REST surface", () => {
         "/api/experiments/:slug/versions/:version/restore",
         "experiments:update",
       ],
-    ])("declares %s %s as %s", async (method, path, permission) => {
-      await namespace();
+    ])("declares %s %s as %s", (method, path, permission) => {
       const route = allRegisteredRoutes().find(
         (registered) =>
           registered.method === method &&
@@ -344,14 +370,14 @@ describe("the experiments workbench REST surface", () => {
       );
 
       expect(route).toBeDefined();
-      // Two policy kinds share this namespace: the workbench routes
-      // authenticate in-handler and declare `permissions`, the create route
-      // goes through the builder chain and declares one `permission`.
-      const policy = route?.policy as {
-        permission?: string;
-        permissions?: readonly string[];
-      };
-      expect(policy.permission ?? policy.permissions?.[0]).toBe(permission);
+      // The WHOLE set the route demands, not its first entry: a route that also
+      // asked for `admin:everything` would still read as least-privilege if
+      // only one entry were checked, and pinning the exact grain is what this
+      // suite is for. `policyPermissions` covers both declaration kinds that
+      // share this namespace: the workbench routes authenticate in-handler and
+      // declare `permissions`, the create route goes through the builder chain
+      // and declares one `permission`.
+      expect(policyPermissions(route!.policy)).toEqual([permission]);
     });
   });
 });

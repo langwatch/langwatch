@@ -370,6 +370,41 @@ export const generateCells = (
 };
 
 /**
+ * How many cells a scope will dispatch, before the run starts.
+ *
+ * A polling run publishes its total when it registers, which is before the
+ * orchestrator has produced anything. Counting rows times every target
+ * overstates every scope that names a subset of the targets, and the run's
+ * progress then never reaches its own total. Counting the plan itself is the
+ * only count that cannot disagree with what runs, comparison dependencies
+ * included. Phase 1 only, as `runOrchestrator` starts from the same number and
+ * adds the comparison cells once it knows how many there are.
+ */
+export const countScopedCells = ({
+  state,
+  datasetRows,
+  scope,
+  seedTargetOutputs,
+}: {
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >;
+  datasetRows: Array<Record<string, unknown>>;
+  scope: ExecutionScope;
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
+}): number =>
+  generateCells(
+    state,
+    datasetRows,
+    scope,
+    seedTargetOutputs ? { seedTargetOutputs } : {},
+  ).length;
+
+/**
  * Phase 2 cell generator for comparison evaluators — the one column-vs-column
  * judge, whether it compares two candidates or ten.
  *

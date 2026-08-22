@@ -694,7 +694,13 @@ export type EvaluationsV3Actions = {
    * in workbench state; prompt, agent and workflow targets take their name from
    * the entity they reference.
    */
-  duplicateTarget: (targetId: string, name?: string) => string | undefined;
+  duplicateTarget: ({
+    targetId,
+    name,
+  }: {
+    targetId: string;
+    name?: string;
+  }) => string | undefined;
   /**
    * Run one transform-backed workbench action from `actions/manifest.ts`
    * against the live store — the browser leg of the agent's UI-action channel
@@ -865,7 +871,13 @@ export type TableMeta = {
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
   /** Absent while the Langy UI-action channel is flagged off. */
-  handleOptimizeTarget?: (target: TargetConfig, name: string) => void;
+  handleOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
   handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;

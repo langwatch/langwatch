@@ -28,11 +28,15 @@ Calls one action and blocks until it is done. The result carries `executedVia`:
 - `"browser"`: the user's open page applied it. They saw it. Say "watch the table" style things.
 - `"backend"`: no page answered, the platform applied it to the saved state. Say "reload when you are back" style things.
 
+`executedVia` names the path that ran the action, not the outcome. The write landed only when the answer's `result` names what it touched, such as the new target id, the model, or the row count. When `result` names nothing, read the state again before you build on it.
+
 ```bash
 langwatch workbench get-state <experiment-slug>
 ```
 
 The workbench read, sugar over `ui call workbench.getState`. Browser first, so it includes unsaved prompt drafts and in-memory results; falls back to the saved state and marks the source. Use it before you change anything and after anything surprising.
+
+All three print the platform's answer as JSON already, so parse what they print. They take no `--format` flag: adding one fails the command with an unknown-option error before it runs.
 
 ## Rules
 

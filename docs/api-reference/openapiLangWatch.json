@@ -9336,6 +9336,9 @@
         "operationId": "getApiExperiments",
         "summary": "List experiments for the project",
         "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+        "tags": [
+          "Experiments"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -9547,8 +9550,11 @@
       },
       "post": {
         "operationId": "postApiExperiments",
-        "summary": "Create an experiment",
+        "summary": "Create an experiment and its setup",
         "description": "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
+        "tags": [
+          "Experiments"
+        ],
         "responses": {
           "200": {
             "description": "Experiment created",
@@ -12863,6 +12869,42 @@
               }
             }
           },
+          "400": {
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid API key, or the key lacks the permission",
             "content": {
@@ -12970,7 +13012,7 @@
             }
           },
           "400": {
-            "description": "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -13103,10 +13145,15 @@
                     },
                     "docsUrl": {
                       "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "description": "The stored version now. Read the setup again at this one."
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "currentVersion"
                   ],
                   "additionalProperties": true
                 }
@@ -13267,6 +13314,42 @@
               }
             }
           },
+          "400": {
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid API key, or the key lacks the permission",
             "content": {
@@ -13355,6 +13438,26 @@
         "tags": [
           "Experiments"
         ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The version to restore, as listed by `GET /api/experiments/{slug}/versions`"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
         "responses": {
           "200": {
             "description": "Version restored",
@@ -13376,7 +13479,7 @@
             }
           },
           "400": {
-            "description": "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -13509,10 +13612,15 @@
                     },
                     "docsUrl": {
                       "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "description": "The stored version now. Read the setup again at this one."
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "currentVersion"
                   ],
                   "additionalProperties": true
                 }
@@ -13520,24 +13628,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "slug",
-            "required": true
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "version",
-            "required": true
-          }
-        ],
         "security": [
           {
             "project_api_key": []

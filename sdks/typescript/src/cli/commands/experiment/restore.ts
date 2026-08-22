@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import type { CommandResult } from "../../utils/output";
 
 export const experimentRestoreCommand = async (
@@ -16,9 +17,11 @@ export const experimentRestoreCommand = async (
   ).start();
 
   try {
-    const parsedVersion = parseInt(version, 10);
-    if (!Number.isFinite(parsedVersion) || parsedVersion <= 0) {
-      throw new Error("The version to restore is a version number, like 3");
+    const parsedVersion = parsePositiveIntOrNull(version);
+    if (parsedVersion === null) {
+      throw new Error(
+        `The version to restore is a version number, like 3. Got "${version}".`,
+      );
     }
 
     const service = new ExperimentsApiService();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scopeFromRunPayload } from "../runScope";
+import { runPayloadSchema } from "../schemas";
 
 describe("scopeFromRunPayload", () => {
   describe("when the payload names both targets and rows", () => {
@@ -43,6 +44,28 @@ describe("scopeFromRunPayload", () => {
       expect(scopeFromRunPayload({})).toEqual({ type: "full" });
       expect(scopeFromRunPayload({ targetIds: [], rowIndices: [] })).toEqual({
         type: "full",
+      });
+    });
+  });
+
+  describe("when a target id is a blank string", () => {
+    /** @scenario "A scoped run names real targets" */
+    it("is refused by the payload schema", () => {
+      expect(runPayloadSchema.safeParse({ targetIds: [""] }).success).toBe(
+        false,
+      );
+      expect(
+        runPayloadSchema.safeParse({ targetIds: ["t1", ""] }).success,
+      ).toBe(false);
+    });
+
+    /** @scenario "A scoped run names real targets" */
+    it("keeps a payload that names a real target scoped to that target", () => {
+      const parsed = runPayloadSchema.parse({ targetIds: ["t1"] });
+
+      expect(scopeFromRunPayload(parsed)).toEqual({
+        type: "target",
+        targetId: "t1",
       });
     });
   });

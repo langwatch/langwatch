@@ -284,9 +284,9 @@ describe("LangyUiActionService", () => {
     });
   });
 
-  describe("when the page reports a failure", () => {
+  describe("when the page reports a failure it can name", () => {
     /** @scenario A browser handler failure reaches the agent as langy_ui_handler_failed and the user as a toast */
-    it("carries the page's error code to the agent", async () => {
+    it("carries the page's error code to the agent as a caller mistake", async () => {
       const appended: Array<{
         actionId: string;
         kind: string;
@@ -310,79 +310,124 @@ describe("LangyUiActionService", () => {
         }),
       ).rejects.toMatchObject({
         code: "langy_ui_handler_failed",
+        // The agent named a target the page does not have: the caller can fix
+        // it, so it must not count against the platform's fault rate.
+        fault: "customer",
         meta: expect.objectContaining({ errorCode: "target_not_found" }),
       });
     });
   });
 
-  describe("the claim", () => {
-    async function dispatchPending(service: LangyUiActionService) {
-      // Dispatch with an immediate no-browser refusal is not usable to seed a
-      // pending record (it deletes it), so seed one the way dispatch does.
-      return service;
-    }
+  describe("when the page reports a failure it cannot name", () => {
+    /** @scenario An unexplained handler failure stays a platform fault */
+    it("keeps the generic code a platform fault", async () => {
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      const { redis, store } = makeRedis([
+        () => {
+          const actionId = appended[0]!.actionId;
+          // What the browser sends for a throw that named no code of its own.
+          store.lists.set(uiActionKeys.result(actionId), [
+            JSON.stringify({
+              ok: false,
+              errorCode: "langy_ui_handler_failed",
+            }),
+          ]);
+        },
+      ]);
+      const service = makeService({ redis, appended });
 
-    /** @scenario With two tabs open, only the claiming tab executes */
-    it("lets exactly one caller claim", async () => {
-      const { redis, store } = makeRedis();
-      const service = makeService({ redis });
-      await dispatchPending(service);
-      store.kv.set(
-        uiActionKeys.pending("a1"),
-        JSON.stringify({
-          projectId: "project-1",
-          conversationId: "conv-1",
-          turnId: "turn-1",
+      await expect(
+        service.dispatch({
+          ...DISPATCH,
           kind: "workbench.duplicateTarget",
+          payload: { targetId: "t1" },
         }),
-      );
-
-      const args = {
-        projectId: "project-1",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        actionId: "a1",
-      };
-      expect(await service.claim({ ...args, userId: "user-1" })).toEqual({
-        claimed: true,
+      ).rejects.toMatchObject({
+        code: "langy_ui_handler_failed",
+        fault: "platform",
       });
-      expect(await service.claim({ ...args, userId: "user-2" })).toEqual({
-        claimed: false,
-      });
-    });
-
-    /** @scenario A claim naming a different turn than the dispatch pinned is refused */
-    it("refuses a claim whose pin does not match", async () => {
-      const { redis, store } = makeRedis();
-      const service = makeService({ redis });
-      store.kv.set(
-        uiActionKeys.pending("a1"),
-        JSON.stringify({
-          projectId: "project-1",
-          conversationId: "conv-1",
-          turnId: "turn-1",
-          kind: "workbench.duplicateTarget",
-        }),
-      );
-
-      for (const mismatch of [
-        { projectId: "project-2", conversationId: "conv-1", turnId: "turn-1" },
-        { projectId: "project-1", conversationId: "conv-2", turnId: "turn-1" },
-        { projectId: "project-1", conversationId: "conv-1", turnId: "turn-2" },
-      ]) {
-        expect(
-          await service.claim({
-            ...mismatch,
-            userId: "user-1",
-            actionId: "a1",
-          }),
-        ).toEqual({ claimed: false });
-      }
     });
   });
 
-  describe("the completion", () => {
-    function seed(store: FakeStore) {
+  describe("given a pending record the dispatch already wrote", () => {
+    // An unclaimed dispatch deletes its own pending record before it answers,
+    // so it cannot be used to leave one behind: write it the way dispatch does.
+    function seedPending(store: FakeStore) {
+      store.kv.set(
+        uiActionKeys.pending("a1"),
+        JSON.stringify({
+          projectId: "project-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          kind: "workbench.duplicateTarget",
+        }),
+      );
+    }
+
+    describe("when two tabs claim the same action", () => {
+      /** @scenario With two tabs open, only the claiming tab executes */
+      it("lets exactly one caller claim", async () => {
+        const { redis, store } = makeRedis();
+        const service = makeService({ redis });
+        seedPending(store);
+
+        const args = {
+          projectId: "project-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: "a1",
+        };
+        expect(await service.claim({ ...args, userId: "user-1" })).toEqual({
+          claimed: true,
+        });
+        expect(await service.claim({ ...args, userId: "user-2" })).toEqual({
+          claimed: false,
+        });
+      });
+    });
+
+    describe("when a claim names another project, conversation or turn", () => {
+      /** @scenario A claim naming a different turn than the dispatch pinned is refused */
+      it("refuses a claim whose pin does not match", async () => {
+        const { redis, store } = makeRedis();
+        const service = makeService({ redis });
+        seedPending(store);
+
+        for (const mismatch of [
+          {
+            projectId: "project-2",
+            conversationId: "conv-1",
+            turnId: "turn-1",
+          },
+          {
+            projectId: "project-1",
+            conversationId: "conv-2",
+            turnId: "turn-1",
+          },
+          {
+            projectId: "project-1",
+            conversationId: "conv-1",
+            turnId: "turn-2",
+          },
+        ]) {
+          expect(
+            await service.claim({
+              ...mismatch,
+              userId: "user-1",
+              actionId: "a1",
+            }),
+          ).toEqual({ claimed: false });
+        }
+      });
+    });
+  });
+
+  describe("given user-1's session claimed the action", () => {
+    function seedClaimed(store: FakeStore) {
       store.kv.set(
         uiActionKeys.pending("a1"),
         JSON.stringify({
@@ -395,53 +440,80 @@ describe("LangyUiActionService", () => {
       store.kv.set(uiActionKeys.claim("a1"), "user-1");
     }
 
-    /** @scenario Only the claiming user's session may complete an action */
-    it("drops a completion from anyone but the claimant", async () => {
-      const { redis, store } = makeRedis();
-      seed(store);
-      const service = makeService({ redis });
+    describe("when another session reports the completion", () => {
+      /** @scenario Only the claiming user's session may complete an action */
+      it("drops a completion from anyone but the claimant", async () => {
+        const { redis, store } = makeRedis();
+        seedClaimed(store);
+        const service = makeService({ redis });
 
-      const fromOther = await service.complete({
-        projectId: "project-1",
-        userId: "user-2",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        actionId: "a1",
-        completion: { ok: true },
-      });
-      expect(fromOther).toEqual({ accepted: false });
-      expect(store.lists.get(uiActionKeys.result("a1"))).toBeUndefined();
+        const fromOther = await service.complete({
+          projectId: "project-1",
+          userId: "user-2",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: "a1",
+          completion: { ok: true },
+        });
+        expect(fromOther).toEqual({ accepted: false });
+        expect(store.lists.get(uiActionKeys.result("a1"))).toBeUndefined();
 
-      const fromClaimant = await service.complete({
-        projectId: "project-1",
-        userId: "user-1",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        actionId: "a1",
-        completion: { ok: true, result: { targetId: "t2" } },
+        const fromClaimant = await service.complete({
+          projectId: "project-1",
+          userId: "user-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: "a1",
+          completion: { ok: true, result: { targetId: "t2" } },
+        });
+        expect(fromClaimant).toEqual({ accepted: true });
+        expect(store.lists.get(uiActionKeys.result("a1"))).toHaveLength(1);
+        expect(store.kv.has(uiActionKeys.pending("a1"))).toBe(false);
       });
-      expect(fromClaimant).toEqual({ accepted: true });
-      expect(store.lists.get(uiActionKeys.result("a1"))).toHaveLength(1);
-      expect(store.kv.has(uiActionKeys.pending("a1"))).toBe(false);
     });
 
-    it("replaces an oversized result with a typed failure", async () => {
-      const { redis, store } = makeRedis();
-      seed(store);
-      const service = makeService({ redis });
+    describe("when the result is over the size ceiling", () => {
+      it("replaces an oversized result with a typed failure", async () => {
+        const { redis, store } = makeRedis();
+        seedClaimed(store);
+        const service = makeService({ redis });
 
-      await service.complete({
-        projectId: "project-1",
-        userId: "user-1",
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        actionId: "a1",
-        completion: { ok: true, result: "x".repeat(70 * 1024) },
+        await service.complete({
+          projectId: "project-1",
+          userId: "user-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: "a1",
+          completion: { ok: true, result: "x".repeat(70 * 1024) },
+        });
+        const [raw] = store.lists.get(uiActionKeys.result("a1"))!;
+        expect(JSON.parse(raw!)).toEqual({
+          ok: false,
+          errorCode: "result_too_large",
+        });
       });
-      const [raw] = store.lists.get(uiActionKeys.result("a1"))!;
-      expect(JSON.parse(raw!)).toEqual({
-        ok: false,
-        errorCode: "result_too_large",
+
+      /** @scenario A result over the ceiling is measured by its encoded bytes */
+      it("measures multi-byte characters by their encoded size", async () => {
+        const { redis, store } = makeRedis();
+        seedClaimed(store);
+        const service = makeService({ redis });
+
+        // 30k characters, three bytes each: under the ceiling counted as UTF-16
+        // code units, 90KB once encoded.
+        await service.complete({
+          projectId: "project-1",
+          userId: "user-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: "a1",
+          completion: { ok: true, result: "あ".repeat(30 * 1024) },
+        });
+        const [raw] = store.lists.get(uiActionKeys.result("a1"))!;
+        expect(JSON.parse(raw!)).toEqual({
+          ok: false,
+          errorCode: "result_too_large",
+        });
       });
     });
   });
@@ -550,8 +622,57 @@ describe("LangyUiActionService", () => {
           kind: "workbench.duplicateTarget",
           payload: { targetId: "t1" },
         }),
-      ).rejects.toThrow(/did not finish inside the action's time budget/);
+      ).rejects.toMatchObject({ code: "langy_ui_timeout" });
       expect(runnerCalled).toBe(false);
+    });
+  });
+
+  describe("when a tab claims as the dispatch hands the action to the backend", () => {
+    /** @scenario A tab claiming as the dispatch gives up never double-executes */
+    it("refuses the late claim, so only the backend runs the action", async () => {
+      const { redis } = makeRedis(["wait-empty"]);
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      let runnerCalls = 0;
+      const service = makeService({
+        redis,
+        appended,
+        backendRunner: async () => {
+          runnerCalls += 1;
+          return { ok: true };
+        },
+      });
+
+      // The tab already read and validated the pending record and only gets to
+      // its SET NX now. Hooking the pending delete puts that claim at the exact
+      // interleaving: the dispatch has decided to run on the backend, and the
+      // record the tab validated is still there.
+      let lateClaim: { claimed: boolean } | undefined;
+      const del = redis.del.bind(redis);
+      redis.del = async (...keys) => {
+        lateClaim ??= await service.claim({
+          projectId: "project-1",
+          userId: "user-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          actionId: appended[0]!.actionId,
+        });
+        return await del(...keys);
+      };
+
+      const outcome = await service.dispatch({
+        ...DISPATCH,
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+        experimentSlug: "my-exp",
+      });
+
+      expect(outcome.executedVia).toBe("backend");
+      expect(lateClaim).toEqual({ claimed: false });
+      expect(runnerCalls).toBe(1);
     });
   });
 });

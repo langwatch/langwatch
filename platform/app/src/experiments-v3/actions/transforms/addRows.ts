@@ -6,6 +6,20 @@ import {
 } from "./helpers";
 import type { Transform } from "./types";
 
+const paddedTo = ({
+  values,
+  length,
+}: {
+  values: string[];
+  length: number;
+}): string[] => {
+  const padded = [...values];
+  while (padded.length < length) {
+    padded.push("");
+  }
+  return padded;
+};
+
 /**
  * Append rows to an inline dataset.
  *
@@ -26,10 +40,10 @@ export const addRows: Transform<
   const records: Record<string, string[]> = {};
 
   for (const column of dataset.inline.columns) {
-    const values = [...(dataset.inline.records[column.id] ?? [])];
-    while (values.length < startRowCount) {
-      values.push("");
-    }
+    const values = paddedTo({
+      values: dataset.inline.records[column.id] ?? [],
+      length: startRowCount,
+    });
     for (const row of rows) {
       values.push(row[column.id] ?? row[column.name] ?? "");
     }
@@ -37,10 +51,15 @@ export const addRows: Transform<
   }
 
   // Keep any column that only exists in the records (never surfaced by the
-  // table, but dropping it here would lose data).
+  // table, but dropping it here would lose data). It grows with the rest: a
+  // caller cannot address it, so its new cells are empty, and leaving it short
+  // would write ragged records.
   for (const [columnId, values] of Object.entries(dataset.inline.records)) {
     if (records[columnId]) continue;
-    records[columnId] = [...values];
+    records[columnId] = paddedTo({
+      values,
+      length: startRowCount + rows.length,
+    });
   }
 
   return {

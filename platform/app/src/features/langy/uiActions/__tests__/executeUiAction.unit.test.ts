@@ -162,4 +162,53 @@ describe("executeUiAction", () => {
       });
     });
   });
+
+  describe("when the handler succeeded but the completion call fails", () => {
+    it("does not report it as a handler failure", async () => {
+      const legs = makeLegs();
+      const onHandlerError = vi.fn();
+      legs.complete.mockRejectedValue(new Error("network down"));
+
+      const outcome = await executeUiAction({
+        entry: ENTRY,
+        turnId: "turn-1",
+        seen: new Set(),
+        handlers: makeHandlers(),
+        ...legs,
+        onHandlerError,
+      });
+
+      // The page applied the change, so the only thing lost is the report.
+      expect(outcome).toBe("completion-failed");
+      expect(legs.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ ok: true }),
+      );
+      expect(onHandlerError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the handler failed and its completion call fails too", () => {
+    it("still tells the user, and reports the handler failure", async () => {
+      const legs = makeLegs();
+      const onHandlerError = vi.fn();
+      legs.complete.mockRejectedValue(new Error("network down"));
+
+      const outcome = await executeUiAction({
+        entry: ENTRY,
+        turnId: "turn-1",
+        seen: new Set(),
+        handlers: makeHandlers(() => {
+          throw new Error("no such target");
+        }),
+        ...legs,
+        onHandlerError,
+      });
+
+      expect(outcome).toBe("handler-failed");
+      expect(onHandlerError).toHaveBeenCalledWith({
+        kind: ENTRY.kind,
+        message: "no such target",
+      });
+    });
+  });
 });

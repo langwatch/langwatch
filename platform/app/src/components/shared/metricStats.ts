@@ -22,10 +22,13 @@ export type MetricStats = {
 /**
  * Computes percentile from a sorted array using linear interpolation.
  */
-const computePercentile = (
-  sortedValues: number[],
-  percentile: number,
-): number => {
+const computePercentile = ({
+  sortedValues,
+  percentile,
+}: {
+  sortedValues: number[];
+  percentile: number;
+}): number => {
   if (sortedValues.length === 0) return 0;
   const index = (percentile / 100) * (sortedValues.length - 1);
   const lower = Math.floor(index);
@@ -50,11 +53,11 @@ export const computeMetricStats = (values: number[]): MetricStats | null => {
     min: sorted[0]!,
     max: sorted[sorted.length - 1]!,
     avg: total / values.length,
-    median: computePercentile(sorted, 50),
-    p75: computePercentile(sorted, 75),
-    p90: computePercentile(sorted, 90),
-    p95: computePercentile(sorted, 95),
-    p99: computePercentile(sorted, 99),
+    median: computePercentile({ sortedValues: sorted, percentile: 50 }),
+    p75: computePercentile({ sortedValues: sorted, percentile: 75 }),
+    p90: computePercentile({ sortedValues: sorted, percentile: 90 }),
+    p95: computePercentile({ sortedValues: sorted, percentile: 95 }),
+    p99: computePercentile({ sortedValues: sorted, percentile: 99 }),
     total,
     count: values.length,
   };

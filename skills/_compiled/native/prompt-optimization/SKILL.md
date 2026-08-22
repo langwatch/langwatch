@@ -16,7 +16,7 @@ When the user's browser has the workbench open, drive it live with `langwatch ui
 ## Ground rules
 
 - **Run the whole loop yourself.** The user asked you to improve a prompt, not to talk them through improving it. Duplicate, hypothesize, edit, run, read, revise, run again, and keep going until a stop condition holds. Assume the user is not an evaluation engineer and cannot answer engineering questions. Never hand the next step back to them.
-- **Two questions are the user's, and no others.** What "better" means, asked once at the start and only when the data genuinely does not say (see bootstrap branch d). And whether to publish the winner, asked once at the end. Everything between those two is your job.
+- **Three questions are the user's, and no others.** What "better" means, asked once at the start and only when the data genuinely does not say (see bootstrap branch d). Whether to spend, asked once before the first run and only when the dataset is over 100 rows (see the budget rule below). And whether to publish the winner, asked once at the end. Everything else is your job.
 - The user's baseline column is never edited. Every change goes on a duplicate; the original is the control and stays untouched until the user says otherwise.
 - Edit prompt drafts on the workbench (`workbench.setTargetPrompt`), never the prompt library. Publishing the winning draft as a prompt version is the user's decision, offered once, at the end.
 - Never delete the user's work. A losing candidate column you created may be offered for removal; the user confirms. Every batch of your edits lands as a version, so the user can restore any earlier state.
@@ -56,8 +56,10 @@ Sometimes the best move is a step back: a judge for a quality aspect the user ca
 
 ## The improvement loop
 
-1. **Duplicate the baseline.** `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}'`. The copy carries the baseline's mappings and evaluator wiring, repointed at itself. Refer to it as the candidate.
-2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed` for row level detail. If no run exists yet, run the baseline on a 10 row subset first. Read the actual outputs against the expected ones.
+Every write here is confirmed by its answer, not by the command exiting. The `result` field names what changed: the target the write touched, the model it set, the run it started. When it names nothing, read the workbench state again before the next step.
+
+1. **Duplicate the baseline.** `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}'`. The copy carries the baseline's mappings and evaluator wiring, repointed at itself. Its id comes from the answer. Refer to it as the candidate.
+2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. If no run exists yet, run the baseline on a 10 row subset first. Read the actual outputs against the expected ones.
 3. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
 4. **Edit the candidate's draft only.** `langwatch ui call workbench.setTargetPrompt --payload '{"targetId":"<candidate>","localPromptConfig":{...}}'`. The draft executes without touching the prompt library.
 5. **Run scoped.** The candidate target only, on the failing rows or the first 10. Move to the full dataset once the subset improves.
@@ -71,7 +73,7 @@ Keep every attempt as its own candidate column so the user can see the whole lad
 A run of any size takes minutes. Poll it rather than sleeping through it in one block:
 
 ```bash
-langwatch experiment status <slug> -o json
+langwatch experiment status <slug> --format json
 ```
 
 Check every 30 to 60 seconds, and post a progress line each time the count moves. Long single sleeps make the turn look dead and tell the user nothing.
@@ -112,9 +114,16 @@ Cards are ` ```langy-card ` fenced blocks in the reply text, never tool calls or
 From the prompt playground or anywhere else, when the user asks to improve a prompt and no experiment exists, say "ok, let me set up an experiment for this." Create it, add a prompt target from the prompt in context, then run the bootstrap branches for the dataset and the evaluator, and navigate the user to the workbench page before the first run so they watch the loop rather than hear about it.
 
 ```bash
-langwatch experiment create --name "<prompt name> optimization"
+langwatch experiment create --name "<prompt name> optimization" --format json
+```
+
+The answer carries the new experiment's id and slug. Say what you created, then move the browser with its own command, using the id the create returned:
+
+```bash
 langwatch navigate open <experiment-id>
 ```
+
+Never chain the two with `&&`. The id has to come from the create's answer, and `navigate open` takes no format flag: it prints a plain confirmation.
 
 ## The user steps away
 

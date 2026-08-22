@@ -50,6 +50,37 @@ Feature: Workbench actions
     Then both rows are appended
     And the other column gets an empty cell for each new row
 
+  @unit
+  Scenario: A cell is only written to a column the table shows
+    When I ask to write a cell of a column the dataset does not have
+    Then the change is refused and says the column does not exist
+    And no column is added to the dataset
+
+  # ============================================================================
+  # Wiring a target or an evaluator
+  # ============================================================================
+
+  @unit
+  Scenario: A mapping only names entities the workbench holds
+    When I ask to map a field to a dataset, a target or an evaluator that does not exist
+    Then the change is refused and says which one is missing
+    And no mapping is stored
+
+  # ============================================================================
+  # Adding a column, and running a subset of them
+  # ============================================================================
+
+  @unit
+  Scenario: An id the workbench already holds is refused
+    When I ask to add a target or an evaluator under an id the workbench already holds
+    Then the change is refused and says the id is in use
+    And the workbench keeps the column it already had
+
+  @unit
+  Scenario: A scoped run names real targets
+    When I ask to run a list of targets and one entry names no target
+    Then the run is refused instead of covering every target
+
   # ============================================================================
   # What the assistant is allowed to do, and what it can see
   # ============================================================================
@@ -66,3 +97,10 @@ Feature: Workbench actions
     When the assistant reads the workbench state
     Then the sample rows are dropped first
     And the state says it was truncated
+
+  @unit
+  Scenario: The state an assistant reads never exceeds the budget
+    Given the workbench still overruns the budget with every detail dropped
+    When the assistant reads the workbench state
+    Then whole entries are left out until the state fits
+    And the state counts how many entries it left out

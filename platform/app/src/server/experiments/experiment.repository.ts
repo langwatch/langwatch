@@ -7,6 +7,29 @@ import type {
 } from "~/generated/prisma/client";
 
 /**
+ * Max wall-clock a workbench save may run before Prisma aborts it with P2028.
+ *
+ * The body is four indexed statements, but two of them write a whole workbench
+ * state, and an inline dataset makes that state megabytes rather than
+ * kilobytes. On top of that, a second writer on the same experiment waits on
+ * the row lock the first one holds until it commits, so the wait is bounded by
+ * the slowest write ahead of it and not by this transaction's own work.
+ *
+ * 20 seconds is the same budget `invite.service.ts` gives its batch: enough
+ * that only a database in real trouble reaches it, small enough that one save
+ * cannot pin a pool connection for a minute. `dataset-lock.ts` sits at 120s
+ * because its body does object-storage round-trips, which nothing here does.
+ */
+const WORKBENCH_TXN_TIMEOUT_MS = 20_000;
+
+/**
+ * How long to wait for a pool connection before starting, raised from Prisma's
+ * 2s default for the same reason the dataset and invite transactions raise it:
+ * a busy pool must not fail a save before it has done any work.
+ */
+const WORKBENCH_TXN_MAX_WAIT_MS = 10_000;
+
+/**
  * Repository layer for experiment data access.
  *
  * Every read method in this repository enforces `archivedAt: null` and that
@@ -234,11 +257,24 @@ export class ExperimentRepository {
     return { exists: true, archived: row.archivedAt !== null, slug: row.slug };
   }
 
-  /** Runs `fn` inside one transaction. The seam's compare-and-set needs it. */
+  /**
+   * Runs `fn` inside one transaction. The seam's compare-and-set needs it.
+   *
+   * The options are not tuning. Prisma's 5s default would abort a legitimate
+   * save with P2028, which is an unnamed failure the caller cannot act on, and
+   * it would do so from inside the compare-and-set, so the caller loses the
+   * 409 that tells it to reload. The body is four indexed statements, but two
+   * of them carry a whole workbench state, and a second writer on the same
+   * experiment waits on the row lock until the first commits.
+   */
   async runInTransaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    return await this.prisma.$transaction(fn);
+    return await this.prisma.$transaction(fn, {
+      timeout: WORKBENCH_TXN_TIMEOUT_MS,
+      maxWait: WORKBENCH_TXN_MAX_WAIT_MS,
+      isolationLevel: "ReadCommitted",
+    });
   }
 
   /**

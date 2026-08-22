@@ -211,49 +211,54 @@ export interface ExperimentRunResultsResponse {
 }
 
 /**
+ * The workbench types below are projections of the generated OpenAPI `paths`,
+ * never hand-written copies of them. The control plane owns these shapes, so a
+ * restated interface can only drift out of date, and a cast onto it would hide
+ * the drift instead of failing the build.
+ */
+
+/**
  * The experiment setup as the API carries it: datasets, targets and
  * evaluators. Read it, change it, send it back whole. The canonical shape is
  * the control plane's `persistedEvaluationsV3StateSchema`, which validates
  * every write, so this stays open rather than restating it here.
  */
-export type ExperimentWorkbenchState = Record<string, unknown>;
+export type ExperimentWorkbenchState =
+  paths["/api/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
 
-export interface ExperimentCreateResponse {
-  id: string;
-  slug: string;
-  version: number;
-}
+export type ExperimentCreateResponse =
+  paths["/api/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
-export interface ExperimentWorkbenchStateResponse {
-  id: string;
-  slug: string;
-  name: string | null;
-  state: ExperimentWorkbenchState | null;
-  version: number;
-  updatedAt: string;
-}
+/**
+ * The read answers one of two documents, chosen by the `fields` query. The
+ * full setup is the one carrying `state`, so that field is what splits the
+ * union into the two shapes the overloads promise.
+ */
+type WorkbenchStateReadResponse =
+  paths["/api/experiments/{slug}/workbench-state"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export type ExperimentWorkbenchStateResponse = Extract<
+  WorkbenchStateReadResponse,
+  { state: unknown }
+>;
 
 /** What `fields: "version"` answers: the staleness probe without the setup. */
-export interface ExperimentWorkbenchVersionProbe {
-  id: string;
-  slug: string;
-  version: number;
-  updatedAt: string;
-}
+export type ExperimentWorkbenchVersionProbe = Exclude<
+  WorkbenchStateReadResponse,
+  { state: unknown }
+>;
 
-export interface ExperimentVersionSummary {
-  version: number;
-  autoSaved: boolean;
-  commitMessage: string | null;
-  authorLabel: string;
-  authorId: string | null;
-  createdAt: string;
-}
+export type ExperimentSaveWorkbenchStateResponse =
+  paths["/api/experiments/{slug}/workbench-state"]["put"]["responses"]["200"]["content"]["application/json"];
 
-export interface ExperimentVersionsResponse {
-  versions: ExperimentVersionSummary[];
-  nextCursor: number | null;
-}
+export type ExperimentRestoreVersionResponse =
+  paths["/api/experiments/{slug}/versions/{version}/restore"]["post"]["responses"]["200"]["content"]["application/json"];
+
+export type ExperimentVersionsResponse =
+  paths["/api/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export type ExperimentVersionSummary =
+  ExperimentVersionsResponse["versions"][number];
 
 export class ExperimentsApiServiceError extends Error {
   constructor(
@@ -382,7 +387,7 @@ export class ExperimentsApiService {
       },
     });
     if (error) this.handleApiError("create experiment", error);
-    return data as unknown as ExperimentCreateResponse;
+    return data;
   }
 
   /**
@@ -419,7 +424,7 @@ export class ExperimentsApiService {
     if (error) {
       this.handleApiError(`get workbench state for "${slug}"`, error);
     }
-    return data as unknown as ExperimentWorkbenchStateResponse;
+    return data;
   }
 
   /**
@@ -439,7 +444,7 @@ export class ExperimentsApiService {
     state: ExperimentWorkbenchState;
     expectedVersion?: number;
     commitMessage?: string;
-  }): Promise<{ version: number }> {
+  }): Promise<ExperimentSaveWorkbenchStateResponse> {
     const { data, error } = await this.apiClient.PUT(
       "/api/experiments/{slug}/workbench-state",
       {
@@ -454,7 +459,7 @@ export class ExperimentsApiService {
     if (error) {
       this.handleApiError(`save workbench state for "${slug}"`, error);
     }
-    return data as unknown as { version: number };
+    return data;
   }
 
   /** The experiment's saved versions, newest first. */
@@ -482,7 +487,7 @@ export class ExperimentsApiService {
     if (error) {
       this.handleApiError(`list versions for experiment "${slug}"`, error);
     }
-    return data as unknown as ExperimentVersionsResponse;
+    return data;
   }
 
   /**
@@ -495,10 +500,10 @@ export class ExperimentsApiService {
   }: {
     slug: string;
     version: number;
-  }): Promise<{ version: number }> {
+  }): Promise<ExperimentRestoreVersionResponse> {
     const { data, error } = await this.apiClient.POST(
       "/api/experiments/{slug}/versions/{version}/restore",
-      { params: { path: { slug, version: String(version) } } },
+      { params: { path: { slug, version } } },
     );
     if (error) {
       this.handleApiError(
@@ -506,7 +511,7 @@ export class ExperimentsApiService {
         error,
       );
     }
-    return data as unknown as { version: number };
+    return data;
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {

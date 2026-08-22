@@ -45,17 +45,29 @@ const target = (overrides: Record<string, unknown>) => ({
 interface Recorded {
   liveState: unknown;
   versionState: unknown;
+  /**
+   * Whether the write ever opened its transaction. The seam promises that
+   * parsing and the reference checks happen BEFORE it opens, so a refused
+   * write must leave this false and the version counter where it was.
+   */
+  hasEnteredTransaction: boolean;
 }
 
 const makeService = ({
   existingIds = [],
+  rowType = "EVALUATIONS_V3",
 }: {
   existingIds?: string[];
+  rowType?: string;
 } = {}): {
   service: ExperimentService;
   recorded: Recorded;
 } => {
-  const recorded: Recorded = { liveState: null, versionState: null };
+  const recorded: Recorded = {
+    liveState: null,
+    versionState: null,
+    hasEnteredTransaction: false,
+  };
 
   const references = {
     findExistingIds: async ({
@@ -75,12 +87,15 @@ const makeService = ({
     }),
     runInTransaction: async <T>(
       fn: (tx: Prisma.TransactionClient) => Promise<T>,
-    ) => await fn({} as Prisma.TransactionClient),
+    ) => {
+      recorded.hasEnteredTransaction = true;
+      return await fn({} as Prisma.TransactionClient);
+    },
     findWorkbenchRow: async () => ({
       id: "experiment_1",
       slug: "my-evaluation",
       name: "My evaluation",
-      type: "EVALUATIONS_V3",
+      type: rowType,
       workbenchState: null,
       workbenchVersion: 3,
       updatedAt: new Date(),
@@ -106,10 +121,13 @@ const makeService = ({
   };
 };
 
-const save = async (
-  service: ExperimentService,
-  state: unknown,
-): Promise<void> => {
+const save = async ({
+  service,
+  state,
+}: {
+  service: ExperimentService;
+  state: unknown;
+}): Promise<void> => {
   await service.saveWorkbenchState({
     projectId: "project_1",
     id: "experiment_1",
@@ -135,7 +153,7 @@ describe("workbench state validation", () => {
         const { service } = makeService();
         const invalid = { ...baseState(), activeDatasetId: 42 };
 
-        expect(await codeOf(save(service, invalid))).toBe(
+        expect(await codeOf(save({ service, state: invalid }))).toBe(
           "experiment_invalid_workbench_state",
         );
       });
@@ -145,12 +163,21 @@ describe("workbench state validation", () => {
         const invalid = { ...baseState(), activeDatasetId: 42 };
 
         try {
-          await save(service, invalid);
+          await save({ service, state: invalid });
           expect.unreachable("the save should have been refused");
         } catch (error) {
           const meta = HandledError.isHandled(error) ? error.meta : {};
           expect(JSON.stringify(meta)).toContain("activeDatasetId");
         }
+      });
+
+      it("refuses before it opens the transaction", async () => {
+        const { service, recorded } = makeService();
+        const invalid = { ...baseState(), activeDatasetId: 42 };
+
+        await codeOf(save({ service, state: invalid }));
+
+        expect(recorded.hasEnteredTransaction).toBe(false);
       });
     });
   });
@@ -217,7 +244,7 @@ describe("workbench state validation", () => {
           const { service } = makeService();
 
           try {
-            await save(service, state);
+            await save({ service, state });
             expect.unreachable("the save should have been refused");
           } catch (error) {
             expect(HandledError.isHandled(error)).toBe(true);
@@ -226,8 +253,67 @@ describe("workbench state validation", () => {
             expect(error.meta).toEqual({ refType, refId });
           }
         });
+
+        it("refuses before it opens the transaction", async () => {
+          const { service, recorded } = makeService();
+
+          await codeOf(save({ service, state }));
+
+          expect(recorded.hasEnteredTransaction).toBe(false);
+        });
       });
     }
+  });
+
+  describe("given a target switched to another type that kept its old id", () => {
+    describe("when it is saved", () => {
+      /** @scenario A reference the run would not read is not checked */
+      it("accepts the write, because the run reads the id of its own type", async () => {
+        const { service } = makeService({ existingIds: ["agent_1"] });
+        const state = baseState({
+          targets: [
+            target({
+              type: "agent",
+              dbAgentId: "agent_1",
+              promptId: "prompt_deleted",
+            }),
+          ] as any,
+        });
+
+        expect(await codeOf(save({ service, state }))).toBe("no_error");
+      });
+    });
+  });
+
+  describe("given a target whose own type names a row that is gone", () => {
+    describe("when it is saved", () => {
+      /** @scenario A reference the run would read is still checked */
+      it("refuses the write and names that reference", async () => {
+        const { service } = makeService({ existingIds: ["prompt_1"] });
+        const state = baseState({
+          targets: [
+            target({
+              type: "agent",
+              dbAgentId: "agent_deleted",
+              promptId: "prompt_1",
+            }),
+          ] as any,
+        });
+
+        try {
+          await save({ service, state });
+          expect.unreachable("the save should have been refused");
+        } catch (error) {
+          expect(HandledError.isHandled(error)).toBe(true);
+          if (!HandledError.isHandled(error)) return;
+          expect(error.code).toBe("experiment_workbench_missing_reference");
+          expect(error.meta).toEqual({
+            refType: "agent",
+            refId: "agent_deleted",
+          });
+        }
+      });
+    });
   });
 
   describe("given a state whose evaluator config names a database evaluator", () => {
@@ -246,7 +332,7 @@ describe("workbench state validation", () => {
           ] as any,
         });
 
-        expect(await codeOf(save(service, state))).toBe("no_error");
+        expect(await codeOf(save({ service, state }))).toBe("no_error");
       });
     });
   });
@@ -267,7 +353,7 @@ describe("workbench state validation", () => {
       it("keeps the results on the live row and strips them from the snapshot", async () => {
         const { service, recorded } = makeService();
 
-        await save(service, withResults);
+        await save({ service, state: withResults });
 
         expect(recorded.liveState).toHaveProperty("results");
         expect(recorded.versionState).not.toHaveProperty("results");
@@ -281,6 +367,38 @@ describe("workbench state validation", () => {
         expect(snapshot.results).toBeUndefined();
         expect(snapshot.name).toBe(withResults.name);
         expect(snapshot.datasets).toEqual(withResults.datasets);
+      });
+    });
+  });
+
+  describe("given an experiment that is not an evaluations workbench", () => {
+    describe("when its workbench state is read", () => {
+      /** @scenario A workbench call on another kind of experiment is refused with a code */
+      it("refuses with the type-mismatch code and a 400", async () => {
+        const { service } = makeService({ rowType: "BATCH_EVALUATION" });
+
+        try {
+          await service.getWorkbenchState({
+            projectId: "project_1",
+            id: "experiment_1",
+          });
+          expect.unreachable("the read should have been refused");
+        } catch (error) {
+          expect(HandledError.isHandled(error)).toBe(true);
+          if (!HandledError.isHandled(error)) return;
+          expect(error.code).toBe("experiment_type_mismatch");
+          expect(error.httpStatus).toBe(400);
+        }
+      });
+    });
+
+    describe("when a workbench save targets it", () => {
+      it("refuses with the same code", async () => {
+        const { service } = makeService({ rowType: "BATCH_EVALUATION" });
+
+        expect(await codeOf(save({ service, state: baseState() }))).toBe(
+          "experiment_type_mismatch",
+        );
       });
     });
   });

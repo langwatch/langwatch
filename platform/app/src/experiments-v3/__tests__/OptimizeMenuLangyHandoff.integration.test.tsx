@@ -55,13 +55,20 @@ const promptTarget: TargetConfig = {
   mappings: {},
 };
 
-function renderHeader(
-  target: TargetConfig,
-  onOptimize?: (target: TargetConfig, name: string) => void,
-) {
+/**
+ * The header as the page builds it. The hook decides whether there is a
+ * handler at all, so the menu item and the flag it hangs on are exercised
+ * together rather than by handing the header a stub.
+ */
+function LangyWiredHeader({ target }: { target: TargetConfig }) {
+  const onOptimize = useOptimizeWithLangy();
+  return <TargetHeader target={target} onOptimize={onOptimize} />;
+}
+
+function renderHeader({ target }: { target: TargetConfig }) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <TargetHeader target={target} onOptimize={onOptimize} />
+      <LangyWiredHeader target={target} />
     </ChakraProvider>,
   );
 }
@@ -70,13 +77,16 @@ async function openMenu() {
   await userEvent.click(screen.getByTestId("target-header-button"));
 }
 
+beforeEach(() => {
+  flagEnabled.value = true;
+});
 afterEach(cleanup);
 
 describe("given a prompt column on the workbench", () => {
   describe("when the column menu opens", () => {
     /** @scenario The prompt column menu offers Optimize this prompt on prompt targets only */
     it("offers Optimize this prompt as the first item", async () => {
-      renderHeader(promptTarget, vi.fn());
+      renderHeader({ target: promptTarget });
       await openMenu();
 
       const item = await screen.findByTestId("target-optimize-menu-item");
@@ -85,8 +95,8 @@ describe("given a prompt column on the workbench", () => {
 
     /** @scenario The prompt column menu offers Optimize this prompt on prompt targets only */
     it("offers nothing on an evaluator column", async () => {
-      renderHeader(
-        {
+      renderHeader({
+        target: {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: "eval_1",
@@ -94,8 +104,7 @@ describe("given a prompt column on the workbench", () => {
           outputs: [],
           mappings: {},
         },
-        vi.fn(),
-      );
+      });
       await openMenu();
       await screen.findByRole("menuitem", { name: /Duplicate/ });
 
@@ -103,7 +112,8 @@ describe("given a prompt column on the workbench", () => {
     });
 
     it("offers nothing while the channel is flagged off", async () => {
-      renderHeader(promptTarget, undefined);
+      flagEnabled.value = false;
+      renderHeader({ target: promptTarget });
       await openMenu();
       await screen.findByRole("menuitem", { name: /Duplicate/ });
 
@@ -114,7 +124,6 @@ describe("given a prompt column on the workbench", () => {
 
 describe("given the optimize handoff", () => {
   beforeEach(() => {
-    flagEnabled.value = true;
     useLangyStore.setState({
       isOpen: false,
       pendingPrompt: null,
@@ -130,7 +139,9 @@ describe("given the optimize handoff", () => {
     return (
       <button
         type="button"
-        onClick={() => optimize?.(promptTarget, "Support draft")}
+        onClick={() =>
+          optimize?.({ target: promptTarget, name: "Support draft" })
+        }
       >
         go
       </button>

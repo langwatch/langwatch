@@ -44,6 +44,19 @@ Feature: Langy drives the open page through typed UI actions
     When the action entry reaches it
     Then the page does not claim, leaving the server free to fall back
 
+  @integration
+  Scenario: With page control rolled back, the open page ignores dispatched actions
+    Given agent-driven page control is switched off for my project
+    When a dispatched action reaches my open page
+    Then the page does not claim it, and nothing on the page changes
+
+  @unit
+  Scenario: With page control rolled back, the agent is never offered the ui commands
+    Given agent-driven page control is switched off for my project
+    When I send a turn from a page that accepts UI actions
+    Then the turn does not tell the agent about the ui commands
+    And the agent is still told what I am looking at
+
   @unit
   Scenario: An action outside a running turn is refused
     Given the conversation has no turn in flight
@@ -72,6 +85,12 @@ Feature: Langy drives the open page through typed UI actions
     Then the pending record is deleted first, so a late claim finds nothing
 
   @unit
+  Scenario: A tab claiming as the dispatch gives up never double-executes
+    Given nothing claimed the action inside the claim window
+    When a tab claims while the dispatch hands the action to the backend
+    Then the claim is refused and only the backend runs the action
+
+  @unit
   Scenario: A claimed action that never completes times out without re-dispatching
     Given a page claimed the action and went silent
     When the action's execute budget runs out
@@ -82,6 +101,19 @@ Feature: Langy drives the open page through typed UI actions
     Given the page's handler threw while applying the action
     When the page reports the failure
     Then the agent reads the handler's own error code and the user sees a toast
+    And the refusal counts as the caller's fault, not the platform's
+
+  @unit
+  Scenario: An unexplained handler failure stays a platform fault
+    Given the page's handler threw something that named no error code
+    When the page reports the failure
+    Then the agent reads the generic code and the failure counts as the platform's fault
+
+  @unit
+  Scenario: A result over the ceiling is measured by its encoded bytes
+    Given the page reports a result of multi-byte characters
+    When the result is over the size ceiling once encoded
+    Then the agent gets result_too_large instead of the payload
 
   @unit
   Scenario: A claim naming a different turn than the dispatch pinned is refused

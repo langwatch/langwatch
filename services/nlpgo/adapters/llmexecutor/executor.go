@@ -149,7 +149,8 @@ func (e *GatewayHTTPError) Error() string {
 // error" while `error.metadata.raw` carries the upstream's own error
 // text and `error.metadata.provider_name` says which upstream failed.
 // Without the metadata the surfaced message gives the user zero signal,
-// so it is appended when present.
+// so it is appended when present — flattened and bounded first, see
+// flattenErrorDetail.
 func extractProviderErrorMessage(body []byte) string {
 	if len(body) == 0 {
 		return ""
@@ -176,14 +177,48 @@ func extractProviderErrorMessage(body []byte) string {
 	if message == "" {
 		return ""
 	}
-	if raw := strings.TrimSpace(envelope.Error.Metadata.Raw); raw != "" {
+	if raw := flattenErrorDetail(envelope.Error.Metadata.Raw, maxAggregatorRawRunes); raw != "" {
 		detail := raw
-		if name := strings.TrimSpace(envelope.Error.Metadata.ProviderName); name != "" {
+		if name := flattenErrorDetail(
+			envelope.Error.Metadata.ProviderName,
+			maxAggregatorProviderNameRunes,
+		); name != "" {
 			detail = name + ": " + raw
 		}
 		message = message + " (" + detail + ")"
 	}
 	return message
+}
+
+// Bounds for the aggregator metadata appended to a surfaced message.
+// `raw` is the upstream's whole error RESPONSE rather than a curated
+// message field, so it can be kilobytes of JSON or an HTML page; the
+// name is a vendor label and only ever a few words.
+const (
+	maxAggregatorRawRunes          = 512
+	maxAggregatorProviderNameRunes = 64
+)
+
+// flattenErrorDetail makes an upstream error fragment safe to concatenate
+// into the message the engine surfaces.
+//
+// The surfaced message travels in an SSE error frame and a trace
+// attribute, where a multi-line or multi-kilobyte fragment either breaks
+// the frame's line shape or buries the part the reader needs. Bounding it
+// here is the same posture evaluatorblock and agentblock take on upstream
+// bodies (truncate before embedding in an error). The complete response
+// stays on GatewayHTTPError.Body for server-side reading, so nothing is
+// lost for diagnostics.
+//
+// Bounds run over runes rather than bytes so a cut cannot split a UTF-8
+// sequence and leave a replacement character where the text was.
+func flattenErrorDetail(detail string, maxRunes int) string {
+	flattened := strings.Join(strings.Fields(detail), " ")
+	runes := []rune(flattened)
+	if len(runes) <= maxRunes {
+		return flattened
+	}
+	return strings.TrimRight(string(runes[:maxRunes]), " ") + "..."
 }
 
 // buildGatewayRequest performs all the shape mapping in one place so the

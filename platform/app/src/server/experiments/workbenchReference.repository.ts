@@ -8,6 +8,9 @@ export type WorkbenchReferenceType =
   | "workflow"
   | "dataset";
 
+/** The where clause every plain project-scoped existence check shares. */
+type ProjectScopedIdWhere = { projectId: string; id: { in: string[] } };
+
 /**
  * Existence checks for the rows a workbench state points at.
  *
@@ -25,6 +28,28 @@ export class WorkbenchReferenceRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
+   * One entry per reference that is a plain project-scoped id. The query, the
+   * where and the mapping are the same for all of them, so only the table
+   * differs and a sixth kind of reference is one line here.
+   *
+   * `prompt` is not in the table: it resolves handles as well as ids and
+   * reaches organization-scoped rows, so it has its own method.
+   */
+  private readonly projectScopedFinders: Record<
+    Exclude<WorkbenchReferenceType, "prompt">,
+    (where: ProjectScopedIdWhere) => Promise<{ id: string }[]>
+  > = {
+    agent: (where) =>
+      this.prisma.agent.findMany({ where, select: { id: true } }),
+    evaluator: (where) =>
+      this.prisma.evaluator.findMany({ where, select: { id: true } }),
+    workflow: (where) =>
+      this.prisma.workflow.findMany({ where, select: { id: true } }),
+    dataset: (where) =>
+      this.prisma.dataset.findMany({ where, select: { id: true } }),
+  };
+
+  /**
    * Returns the subset of `ids` this project can reach. The caller compares
    * the result with what it asked for and names the first id that is absent.
    */
@@ -40,38 +65,15 @@ export class WorkbenchReferenceRepository {
     if (ids.length === 0) return new Set();
     const unique = [...new Set(ids)];
 
-    switch (refType) {
-      case "prompt":
-        return this.findExistingPromptIds({ ids: unique, projectId });
-      case "agent": {
-        const rows = await this.prisma.agent.findMany({
-          where: { projectId, id: { in: unique } },
-          select: { id: true },
-        });
-        return new Set(rows.map((row) => row.id));
-      }
-      case "evaluator": {
-        const rows = await this.prisma.evaluator.findMany({
-          where: { projectId, id: { in: unique } },
-          select: { id: true },
-        });
-        return new Set(rows.map((row) => row.id));
-      }
-      case "workflow": {
-        const rows = await this.prisma.workflow.findMany({
-          where: { projectId, id: { in: unique } },
-          select: { id: true },
-        });
-        return new Set(rows.map((row) => row.id));
-      }
-      case "dataset": {
-        const rows = await this.prisma.dataset.findMany({
-          where: { projectId, id: { in: unique } },
-          select: { id: true },
-        });
-        return new Set(rows.map((row) => row.id));
-      }
+    if (refType === "prompt") {
+      return await this.findExistingPromptIds({ ids: unique, projectId });
     }
+
+    const rows = await this.projectScopedFinders[refType]({
+      projectId,
+      id: { in: unique },
+    });
+    return new Set(rows.map((row) => row.id));
   }
 
   /**

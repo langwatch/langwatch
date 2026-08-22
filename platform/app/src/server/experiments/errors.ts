@@ -66,14 +66,23 @@ export class InvalidExperimentConfigurationError extends HandledError {
  * Raised when a workbench operation is asked to act on an experiment that is
  * not an evaluations workbench (a DSPy run, a legacy batch evaluation).
  *
- * A plain `Error`, not a `HandledError`: the tRPC boundary already answers
- * this with BAD_REQUEST and the prose below, and promoting it would mint a
- * code no client branches on. The boundary owns the promotion if one is ever
- * needed, the same way the dataset layer promotes `DatasetConflictError`.
+ * The caller can act: the id or slug it sent names a different kind of
+ * experiment, so it has to send another one. The REST workbench endpoints
+ * serialise only a `HandledError`, so a plain `Error` here answered a
+ * type mismatch with 500 and a trace id instead of the documented 400.
+ *
+ * `mapExperimentError` on the tRPC router still turns it into BAD_REQUEST,
+ * so the tRPC answer does not change.
  */
-export class ExperimentTypeMismatchError extends Error {
-  constructor(message = "Experiment is not an EVALUATIONS_V3 type") {
-    super(message);
+export class ExperimentTypeMismatchError extends HandledError {
+  declare readonly code: "experiment_type_mismatch";
+
+  constructor() {
+    super(
+      "experiment_type_mismatch",
+      "This experiment is not an evaluation workbench",
+      { httpStatus: 400, fault: "customer" },
+    );
     this.name = "ExperimentTypeMismatchError";
   }
 }

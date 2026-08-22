@@ -1105,6 +1105,9 @@ model Experiment {
 //
 // `state` never carries run results: those live only on the live experiment
 // row, because a snapshot exists to restore a setup, not to replay an old run.
+// A restore therefore writes the snapshot's setup and carries the live row's
+// current results across, so bringing an old setup back never clears the
+// output cells and evaluator scores of the run the experiment holds now.
 model ExperimentVersion {
   id           String @id @default(nanoid())
   experimentId String
@@ -1127,6 +1130,10 @@ model ExperimentVersion {
 
   @@unique([experimentId, version])
   @@index([projectId, experimentId, autoSaved])
+  // The version list pages by version inside one experiment, and a restore
+  // reads one version number. Both name all three columns, so the sort key
+  // belongs in the index rather than being applied to fetched rows.
+  @@index([projectId, experimentId, version])
   @@index([createdAt])
 }
 

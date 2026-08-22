@@ -93,6 +93,12 @@ Feature: Langy runs the prompt improvement loop on the workbench
     And asks for direction instead of churning
 
   @e2e
+  Scenario: Langy stops once it spends the attempt budget
+    When six measured attempts have run and the goal is still not met
+    Then Langy stops and reports the best result it found
+    And it does not start a seventh attempt
+
+  @e2e
   Scenario: A wrong golden answer is reported as a dataset problem, not prompt-fitted around
     Given a dataset row whose expected answer is wrong
     When Langy reads that row's failure

@@ -74,6 +74,22 @@ describe("isComparableSeries", () => {
     it("reads unitless numbers on one scale as a comparison too", () => {
       expect(isComparableSeries([{ value: 3 }, { value: 9 }])).toBe(true);
     });
+
+    /** @scenario "Readings whose unit words draw the same symbol are one scale" */
+    it("reads unit words that draw the same symbol as one scale", () => {
+      expect(
+        isComparableSeries([
+          { value: 35, unit: "percent" },
+          { value: 45, unit: "pct" },
+        ]),
+      ).toBe(true);
+      expect(
+        isComparableSeries([
+          { value: 35, unit: "%" },
+          { value: 45, unit: "percentage" },
+        ]),
+      ).toBe(true);
+    });
   });
 
   describe("given readings that share no scale", () => {

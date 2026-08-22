@@ -30,7 +30,7 @@ const targetObjectSchema = targetConfigSchema.innerType();
 
 export const addTargetPayloadSchema = targetObjectSchema.extend({
   /** Generated as `target-<nanoid(8)>` when omitted. */
-  id: z.string().optional(),
+  id: z.string().min(1).optional(),
   inputs: z.array(fieldSchema).default([]),
   outputs: z.array(fieldSchema).default([]),
   mappings: z
@@ -151,7 +151,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
   })
   .extend({
     /** Generated as `evaluator_<nanoid(8)>` when omitted. */
-    id: z.string().optional(),
+    id: z.string().min(1).optional(),
     inputs: z.array(fieldSchema).default([]),
     /** Given mappings win; every gap is auto-inferred across datasets x targets. */
     mappings: z
@@ -223,8 +223,14 @@ export const getStatePayloadSchema = z.object({
 export type GetStatePayload = z.infer<typeof getStatePayloadSchema>;
 
 export const runPayloadSchema = z.object({
-  /** Targets to run. Omitted means every target in the workbench. */
-  targetIds: z.array(z.string()).optional(),
+  /**
+   * Targets to run. Omitted means every target in the workbench.
+   *
+   * An entry has to name a target: an empty string is not a target, and a list
+   * holding one narrows to nothing, which the scope mapping would read as "no
+   * filter given" and widen back to the whole workbench.
+   */
+  targetIds: z.array(z.string().min(1)).optional(),
   /** Rows to run. Omitted means every row of the active dataset. */
   rowIndices: z.array(z.number().int().min(0)).optional(),
 });

@@ -1,12 +1,14 @@
 import { type SetMappingPayload, setMappingPayloadSchema } from "../schemas";
-import { requireTarget } from "./helpers";
+import { requireDataset, requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
 /**
  * Point one target input field at a source, for one dataset.
  *
  * Mappings are per dataset because the same field is rarely called the same
- * thing in two datasets.
+ * thing in two datasets. Both the target and the dataset have to exist: a
+ * mapping filed under an id that resolves to nothing is wiring a run can never
+ * apply.
  */
 export const setTargetMapping: Transform<
   SetMappingPayload,
@@ -15,6 +17,7 @@ export const setTargetMapping: Transform<
   const { targetId, datasetId, inputField, mapping } =
     setMappingPayloadSchema.parse(payload);
   requireTarget({ state, targetId });
+  requireDataset({ state, datasetId });
 
   return {
     state: {

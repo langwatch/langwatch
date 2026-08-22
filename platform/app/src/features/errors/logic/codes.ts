@@ -85,6 +85,7 @@ export const APP_ERROR_CODES = [
   "experiment_invalid_workbench_state",
   "experiment_not_found",
   "experiment_stale_workbench_state",
+  "experiment_type_mismatch",
   "experiment_version_not_found",
   "experiment_workbench_missing_reference",
   "export_failed",

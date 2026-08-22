@@ -16,12 +16,18 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
  * Returns undefined while the UI-action channel is flagged off, which is
  * what hides the menu item.
  */
-type OptimizeHandler = (target: TargetConfig, name: string) => void;
+type OptimizeHandler = ({
+  target,
+  name,
+}: {
+  target: TargetConfig;
+  name: string;
+}) => void;
 
 export const useOptimizeWithLangy = (): OptimizeHandler | undefined => {
   const uiActionsEnabled = useFeatureFlag("release_langy_ui_actions");
 
-  const optimize = useCallback((target: TargetConfig, name: string) => {
+  const optimize = useCallback<OptimizeHandler>(({ target, name }) => {
     const slug = useEvaluationsV3Store.getState().experimentSlug;
     const { chooseChip, askLangy } = useLangyStore.getState();
     if (slug) chooseChip(`experiment:${slug}`);

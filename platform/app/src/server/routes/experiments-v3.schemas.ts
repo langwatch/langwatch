@@ -59,6 +59,23 @@ export const handledErrorEnvelopeSchema = z
   .passthrough();
 
 /**
+ * The 409 a workbench write answers with when someone else saved first.
+ *
+ * `StaleWorkbenchStateError` carries `currentVersion` in `meta`, and the REST
+ * boundary spreads `meta` flat, so the number arrives as a sibling of `error`.
+ * It is declared here because reloading is the whole remedy: a client that
+ * reads it can go straight to the current version instead of guessing.
+ */
+export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.extend(
+  {
+    currentVersion: z
+      .number()
+      .int()
+      .describe("The stored version now. Read the setup again at this one."),
+  },
+);
+
+/**
  * A failure we could name, serialised for a client to branch on (ADR-045).
  *
  * This is the NESTED form, carried as a `domainError` field on a run or a row —

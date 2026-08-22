@@ -8,14 +8,71 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
-import { createInitialState } from "../types";
-import { extractPersistedState } from "../types/persistence";
+import { createInitialState, type EvaluationsV3State } from "../types";
+import {
+  extractPersistedState,
+  type PersistedEvaluationsV3State,
+} from "../types/persistence";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
+/** Everything the persisted projection reads, and nothing else. */
+type PersistedProjectionSource = Pick<
+  EvaluationsV3State,
+  | "experimentId"
+  | "experimentSlug"
+  | "name"
+  | "datasets"
+  | "activeDatasetId"
+  | "evaluators"
+  | "targets"
+  | "results"
+> & { ui: Pick<EvaluationsV3State["ui"], "hiddenColumns" | "concurrency"> };
+
+/**
+ * The one persisted projection of the workbench.
+ *
+ * The render-scope value and the out-of-render snapshot are compared against
+ * each other through `lastSavedRef`, so they have to be built the same way. A
+ * field one of them carried and the other missed would make every render look
+ * dirty and autosave a no-op change on every pass.
+ */
+const buildPersistedState = ({
+  experimentId,
+  experimentSlug,
+  name,
+  datasets,
+  activeDatasetId,
+  evaluators,
+  targets,
+  results,
+  ui,
+}: PersistedProjectionSource): PersistedEvaluationsV3State =>
+  extractPersistedState({
+    experimentId,
+    experimentSlug,
+    name,
+    datasets,
+    activeDatasetId,
+    evaluators,
+    targets,
+    results,
+    pendingSavedChanges: {},
+    ui: {
+      selectedRows: new Set(),
+      columnWidths: {},
+      rowHeightMode: "compact",
+      expandedCells: new Set(),
+      hiddenColumns: ui.hiddenColumns,
+      autosaveStatus: { evaluation: "idle", dataset: "idle" },
+      concurrency: ui.concurrency,
+      hasRunThisSession: false,
+    },
+  });
+
 const stringifiedInitialState = JSON.stringify(
-  extractPersistedState(createInitialState()),
+  buildPersistedState(createInitialState()),
 );
 
 /**
@@ -25,32 +82,8 @@ const stringifiedInitialState = JSON.stringify(
  * still describes the pre-load state, and capturing that made every page load
  * look dirty and autosave a no-op change.
  */
-const stringifyPersistedSnapshot = (): string => {
-  const s = useEvaluationsV3Store.getState();
-  return JSON.stringify(
-    extractPersistedState({
-      experimentId: s.experimentId,
-      experimentSlug: s.experimentSlug,
-      name: s.name,
-      datasets: s.datasets,
-      activeDatasetId: s.activeDatasetId,
-      evaluators: s.evaluators,
-      targets: s.targets,
-      results: s.results,
-      pendingSavedChanges: {},
-      ui: {
-        selectedRows: new Set(),
-        columnWidths: {},
-        rowHeightMode: "compact",
-        expandedCells: new Set(),
-        hiddenColumns: s.ui.hiddenColumns,
-        autosaveStatus: { evaluation: "idle", dataset: "idle" },
-        concurrency: s.ui.concurrency,
-        hasRunThisSession: false,
-      },
-    }),
-  );
-};
+const readPersistedSnapshot = (): string =>
+  JSON.stringify(buildPersistedState(useEvaluationsV3Store.getState()));
 
 /**
  * Manages syncing the evaluations v3 state with the database.
@@ -113,7 +146,7 @@ export const useAutosaveEvaluationsV3 = () => {
     })),
   );
 
-  const persistedState = extractPersistedState({
+  const persistedState = buildPersistedState({
     experimentId,
     experimentSlug,
     name,
@@ -122,17 +155,7 @@ export const useAutosaveEvaluationsV3 = () => {
     evaluators,
     targets,
     results,
-    pendingSavedChanges: {},
-    ui: {
-      selectedRows: new Set(),
-      columnWidths: {},
-      rowHeightMode: "compact",
-      expandedCells: new Set(),
-      hiddenColumns,
-      autosaveStatus: { evaluation: "idle", dataset: "idle" },
-      concurrency,
-      hasRunThisSession: false,
-    },
+    ui: { hiddenColumns, concurrency },
   });
 
   const stringifiedState = JSON.stringify(persistedState);
@@ -188,9 +211,30 @@ export const useAutosaveEvaluationsV3 = () => {
   const lastSavedRef = useRef<string | null>(null);
   const justLoadedRef = useRef(false);
 
+  /**
+   * Record what the store holds after a load as the saved baseline, and decide
+   * whether the autosave pass that follows has to be skipped.
+   *
+   * A load that replaced the projection leaves one pass holding the pre-load
+   * render string, and that pass must not save it back. A load that replaced
+   * nothing produces no pass at all, because the autosave effect only runs when
+   * one of its inputs changed: arming the skip there would make the user's next
+   * edit consume it, and that edit would never be saved.
+   */
+  const recordLoadedBaseline = useCallback(
+    ({ snapshotBeforeLoad }: { snapshotBeforeLoad: string }) => {
+      const snapshotAfterLoad = readPersistedSnapshot();
+      lastSavedRef.current = snapshotAfterLoad;
+      justLoadedRef.current = snapshotAfterLoad !== snapshotBeforeLoad;
+    },
+    [],
+  );
+
   // Load existing experiment data into store
   useEffect(() => {
     if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
+      const snapshotBeforeLoad = readPersistedSnapshot();
+
       // Mark this slug as loaded BEFORE updating store to prevent race conditions
       loadedSlugRef.current = routerSlug ?? null;
 
@@ -204,11 +248,7 @@ export const useAutosaveEvaluationsV3 = () => {
       if (existingExperiment.data.workbenchState && loadState) {
         loadState(existingExperiment.data.workbenchState);
       }
-      // The store now holds the saved state: record its projection as the
-      // baseline, and skip the autosave pass that runs in this same commit
-      // (its render-scope string still describes the pre-load state).
-      lastSavedRef.current = stringifyPersistedSnapshot();
-      justLoadedRef.current = true;
+      recordLoadedBaseline({ snapshotBeforeLoad });
     }
   }, [
     existingExperiment.data,
@@ -218,6 +258,7 @@ export const useAutosaveEvaluationsV3 = () => {
     setWorkbenchVersion,
     setStaleWorkbench,
     loadState,
+    recordLoadedBaseline,
   ]);
 
   // Clear timeouts and invalidate query cache on unmount
@@ -292,11 +333,19 @@ export const useAutosaveEvaluationsV3 = () => {
       title: "Failed to autosave evaluation",
       type: "error",
     });
+    // Identifiers, sizes and counts only. The persisted state carries dataset
+    // records, prompt text and run results, which are customer content and
+    // must never reach telemetry.
     captureException(toError(error), {
       extra: {
         context: "Failed to autosave evaluations v3",
         projectId: project?.id,
-        persistedState,
+        experimentId,
+        workbenchVersion,
+        stateByteSize: stringifiedState.length,
+        datasetCount: datasets.length,
+        targetCount: targets.length,
+        evaluatorCount: evaluators.length,
       },
     });
   };
@@ -422,6 +471,7 @@ export const useAutosaveEvaluationsV3 = () => {
       projectId: project.id,
       experimentSlug: routerSlug,
     });
+    const snapshotBeforeLoad = readPersistedSnapshot();
     setExperimentId(fresh.id);
     setExperimentSlug(fresh.slug);
     setWorkbenchVersion(fresh.version);
@@ -430,8 +480,7 @@ export const useAutosaveEvaluationsV3 = () => {
     }
     setStaleWorkbench(undefined);
     setAutosaveStatus("evaluation", "idle");
-    lastSavedRef.current = stringifyPersistedSnapshot();
-    justLoadedRef.current = true;
+    recordLoadedBaseline({ snapshotBeforeLoad });
   }, [
     project,
     routerSlug,
@@ -442,6 +491,7 @@ export const useAutosaveEvaluationsV3 = () => {
     setStaleWorkbench,
     setAutosaveStatus,
     loadState,
+    recordLoadedBaseline,
   ]);
 
   return {

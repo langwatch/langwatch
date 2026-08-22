@@ -65177,7 +65177,7 @@ openapi: "GET /api/experiments/runs/{runId}"
 # FILE: ./api-reference/experiments/post-create-an-experiment.mdx
 
 ---
-title: "Create an experiment"
+title: "Create an experiment and its setup"
 openapi: "POST /api/experiments"
 ---
 

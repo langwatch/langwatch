@@ -7,6 +7,7 @@ import {
 } from "@/client-sdk/services/experiments/experiments-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import type { CommandResult } from "../../utils/output";
 
 export interface ExperimentSetStateOptions {
@@ -63,9 +64,13 @@ export const experimentSetStateCommand = async (
 
     const expectedVersion = (() => {
       if (options.expectedVersion === undefined) return undefined;
-      const parsed = parseInt(options.expectedVersion, 10);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        throw new Error("--expected-version takes a version number");
+      const parsed = parsePositiveIntOrNull(options.expectedVersion);
+      if (parsed === null) {
+        // Guessing here would write on top of a version the caller never named,
+        // which is the exact collision --expected-version exists to prevent.
+        throw new Error(
+          `--expected-version takes a version number, like 3. Got "${options.expectedVersion}".`,
+        );
       }
       return parsed;
     })();

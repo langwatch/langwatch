@@ -204,22 +204,23 @@ export const LANGY_BASELINE_UNTOUCHED_CRITERION =
 
 /**
  * Outcome rubric for the prompt improvement loop
- * (skills/prompt-optimization/SKILL.mdx). Threshold numbers quote the skill:
- * runs over 30 rows or over 2 targets ask first, subset runs of 10 rows or
- * fewer do not. Several criteria are conditional and pass when their
- * condition never arises in the run, stated inline so the judge never marks
- * them inconclusive.
+ * (skills/prompt-optimization/SKILL.mdx). Threshold numbers quote the skill: a
+ * dataset over 100 rows gets one spend question before the first run, and the
+ * loop stops once it spends its 6 attempt budget. Several criteria are
+ * conditional and pass when their condition never arises in the run, stated
+ * inline so the judge never marks them inconclusive.
  */
 export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   "Langy reads the workbench state (or the experiment's current results) before making any edit. A run whose first mutation happens with no read behind it fails.",
   LANGY_BASELINE_UNTOUCHED_CRITERION,
   "Each prompt change comes with a one-sentence hypothesis naming a concrete failure pattern taken from row-level results Langy actually read. A rewrite justified only by generic prompt advice fails.",
   "Runs are scoped before they are broad: a subset (the failing rows, or about 10 rows) runs before any full-dataset run. If the dataset is small enough that the skill's spend threshold never applies, a single full run passes this.",
-  "Before any run over 30 rows or over 2 targets, Langy states the row and target count and waits for the user's yes. A run where no run exceeds the threshold satisfies this criterion; do not mark it inconclusive.",
+  "On a dataset over 100 rows, Langy states the row count and waits for the user's yes before the first run, asking once for the whole loop rather than per attempt. A run whose dataset never passes 100 rows satisfies this criterion; do not mark it inconclusive.",
   "Langy narrates the loop: a short line before each run saying what changed and why, and a short line after saying what the numbers did. Silence across a whole run fails.",
   "The conclusion carries numbers: the pass rate (or score) before and after, and what happened to cost. Improvement claims without numbers fail.",
   "If the numbers end level or worse, Langy says so plainly instead of declaring a winner. A run that ends with a real improvement satisfies this criterion.",
   "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that improves before that point satisfies this criterion.",
+  "Langy runs at most 6 measured attempts. On the sixth it stops and reports the best result it found instead of starting a seventh. A run that stops earlier, on any other stop condition, satisfies this criterion; do not mark it inconclusive.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 

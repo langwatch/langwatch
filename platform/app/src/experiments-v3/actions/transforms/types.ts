@@ -32,6 +32,10 @@ export const TRANSFORM_ERROR_CODES = [
   "target_prompt_config_missing",
   "column_not_found",
   "column_already_exists",
+  /** The payload named a target id the workbench already holds. */
+  "target_already_exists",
+  /** The payload named an evaluator id the workbench already holds. */
+  "evaluator_already_exists",
   "invalid_payload",
 ] as const;
 

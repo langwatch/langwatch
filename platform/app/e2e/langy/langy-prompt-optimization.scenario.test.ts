@@ -16,7 +16,6 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
-import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_BASELINE_UNTOUCHED_CRITERION,
@@ -29,6 +28,7 @@ import {
   listExperimentRuns,
   seedOptimizationWorkbench,
 } from "./seed-optimization-workbench";
+import { api, ensurePromptId, request } from "./workbench-rest";
 
 const model = openai("gpt-5-mini");
 
@@ -148,6 +148,7 @@ describe("Langy prompt optimization: the improvement loop", () => {
     /** @scenario Langy concludes with accuracy and cost deltas in a stats card */
     /** @scenario Langy reports a tie or inconclusive comparison as what it is */
     /** @scenario Langy stops after three attempts that fail to beat the best candidate */
+    /** @scenario Langy stops once it spends the attempt budget */
     it("iterates on its own and closes with before-and-after numbers", async () => {
       const seeded = await seedOptimizationWorkbench({
         name: "support-quality-iterate",
@@ -204,18 +205,11 @@ describe("Langy prompt optimization: the improvement loop", () => {
       const state = before.state as any;
       state.datasets[0].inline.records.expected_output[5] =
         "Refunds take 90 days and are only ever issued as store credit, never back to the payment method.";
-      const corrupt = await fetch(
-        `${LW_BASE_URL}/api/experiments/${seeded.experimentSlug}/workbench-state`,
-        {
-          method: "PUT",
-          headers: {
-            "X-Auth-Token": LANGWATCH_API_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ state, expectedVersion: before.version }),
-          signal: AbortSignal.timeout(20_000),
-        },
-      );
+      const corrupt = await request({
+        method: "PUT",
+        path: `/api/experiments/${seeded.experimentSlug}/workbench-state`,
+        body: { state, expectedVersion: before.version },
+      });
       if (!corrupt.ok) {
         throw new Error(
           `Corrupting the golden failed: ${corrupt.status} ${await corrupt.text()}`,
@@ -253,22 +247,14 @@ describe("Langy prompt optimization: the improvement loop", () => {
     it("creates the experiment, adds the prompt as a target, and navigates to the workbench", async () => {
       const stamp = String(Math.floor(Date.now() / 60_000));
       const handle = `optimize-me-${stamp}`;
-      const promptRes = await fetch(`${LW_BASE_URL}/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": LANGWATCH_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          handle,
-          prompt:
-            "You write friendly order-status replies for Brightcart customers.",
-        }),
-        signal: AbortSignal.timeout(20_000),
+      // The id has to be THIS prompt's: without it the target check below
+      // would compare undefined against undefined and pass on any prompt
+      // target at all.
+      const seededPromptId = await ensurePromptId({
+        handle,
+        prompt:
+          "You write friendly order-status replies for Brightcart customers.",
       });
-      if (!promptRes.ok && promptRes.status !== 409) {
-        throw new Error(`Seeding prompt failed: ${promptRes.status}`);
-      }
 
       const langy = makeLangyAdapter();
       const result = await runOptimizeScenario({
@@ -292,28 +278,38 @@ describe("Langy prompt optimization: the improvement loop", () => {
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
 
-      // Layer 2: an experiment holding that prompt as a target really exists,
-      // and the turn stream carried a workbench navigation.
-      const list = await fetch(`${LW_BASE_URL}/api/experiments`, {
-        headers: { "X-Auth-Token": LANGWATCH_API_KEY },
-        signal: AbortSignal.timeout(20_000),
-      }).then((r) => r.json());
-      const experiments: Array<{ slug: string }> = Array.isArray(list?.data)
-        ? list.data
-        : Array.isArray(list)
-          ? list
-          : [];
-      let holdsPromptTarget = false;
-      for (const entry of experiments.slice(0, 20)) {
+      // Layer 2: an experiment holding THIS prompt as a target really exists,
+      // and the turn stream carried a workbench navigation. The prompt id is
+      // what makes this a fact about Langy: every seeded experiment in this
+      // project already holds some prompt target, so a shape-only check would
+      // pass on work Langy never did.
+      const list = await api({
+        method: "GET",
+        path: "/api/experiments?pageSize=20",
+      });
+      const experiments: Array<{ slug: string }> = list?.experiments ?? [];
+      expect(
+        experiments.length,
+        `the experiments list came back empty or in an unexpected shape: ${JSON.stringify(list).slice(0, 300)}`,
+      ).toBeGreaterThan(0);
+      // Newest first (the list sorts on updatedAt), so the experiment Langy
+      // just wrote sits at the top of this page.
+      let holdingSlug: string | undefined;
+      for (const entry of experiments) {
         const ws = await getWorkbenchState(entry.slug).catch(() => null);
         if (
-          ws?.state?.targets?.some((t) => t.type === "prompt" && t.promptId)
+          ws?.state?.targets?.some(
+            (t) => t.type === "prompt" && t.promptId === seededPromptId,
+          )
         ) {
-          holdsPromptTarget = true;
+          holdingSlug = entry.slug;
           break;
         }
       }
-      expect(holdsPromptTarget).toBe(true);
+      expect(
+        holdingSlug,
+        `no experiment among the ${experiments.length} most recently updated holds prompt "${handle}" (${seededPromptId}) as a target`,
+      ).toBeDefined();
       expect(
         langy.state.navigateHrefs.some((href) =>
           href.includes("/experiments/workbench/"),

@@ -11,7 +11,7 @@ const entries = Object.entries(WORKBENCH_ACTIONS) as [
   (typeof WORKBENCH_ACTIONS)[WorkbenchActionKind],
 ][];
 
-describe("WORKBENCH_ACTIONS", () => {
+describe("given the workbench action manifest", () => {
   it("lists every action the workbench exposes", () => {
     expect(WORKBENCH_ACTION_KINDS).toEqual([
       "workbench.duplicateTarget",
@@ -88,10 +88,22 @@ describe("WORKBENCH_ACTIONS", () => {
     }
   });
 
-  describe("isWorkbenchActionKind", () => {
+  describe("when a caller checks a kind against the manifest", () => {
     it("accepts a listed kind and rejects anything else", () => {
       expect(isWorkbenchActionKind("workbench.addTarget")).toBe(true);
       expect(isWorkbenchActionKind("workbench.deleteEverything")).toBe(false);
+    });
+
+    it("rejects a key inherited from Object.prototype", () => {
+      for (const inherited of [
+        "constructor",
+        "toString",
+        "hasOwnProperty",
+        "__proto__",
+        "valueOf",
+      ]) {
+        expect(isWorkbenchActionKind(inherited), inherited).toBe(false);
+      }
     });
   });
 });
