@@ -98,7 +98,14 @@ var envHelpText = `Environment variables.
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
-    PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
+    PORTLESS=0                   Bypass the portless proxy entirely — no proxy
+                                 install/start/trust, no hostname routing. Each
+                                 service is served plain HTTP on its own
+                                 loopback port instead (still at its usual
+                                 app.<slug>.langwatch.localhost hostname, which
+                                 resolves to loopback with no proxy needed).
+                                 The escape hatch for a machine where the
+                                 proxy's TLS handshake won't come up.
     HAVEN_AGENT=1                Plain, colorless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)
                                  — zero token waste when an AI agent drives haven.

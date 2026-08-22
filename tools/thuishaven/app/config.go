@@ -55,6 +55,13 @@ type Config struct {
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves
 	// the console to .env. Resolved from LW_OBS_CONSOLE_LEVEL.
 	ObservabilityConsoleLevel string
+	// PortlessDisabled is PORTLESS=0: `up` never starts, trusts, or registers
+	// with the portless proxy, and every service's own loopback port is served
+	// plain HTTP instead of routing through the proxy's shared hostname+TLS
+	// port — the documented escape hatch for a machine where the proxy's TLS
+	// won't come up. The zero value is false (portless enabled), matching every
+	// stack provisioned before this knob existed — see domain.Stack.PortlessDisabled.
+	PortlessDisabled bool
 }
 
 // PlanOptions decide which services `up` runs and how.
