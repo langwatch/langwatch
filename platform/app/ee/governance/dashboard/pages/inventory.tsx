@@ -155,6 +155,7 @@ function fmtRelative(date: Date | string | null): string {
  */
 function resolvePullConfig(
   composer: ComposerState,
+  { requireCredentials = true }: { requireCredentials?: boolean } = {},
 ): { pullConfig: Record<string, unknown> | null } | null {
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
@@ -175,9 +176,11 @@ function resolvePullConfig(
       "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     anthropic_admin: [
-      () => buildAnthropicAdminPullConfig(composer),
+      () => buildAnthropicAdminPullConfig(composer, { requireCredentials }),
       "Missing or invalid Anthropic fields",
-      "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
+      requireCredentials
+        ? "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
+        : "Report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
     ],
   };
 
@@ -1052,7 +1055,11 @@ function SourceComposerDrawer({
  * the upstream's running configuration); admins who need to change it
  * archive + recreate.
  */
-function SourceEditDrawer({
+/**
+ * Shared by the source list and the source detail page, so the two cannot
+ * drift into offering different edits of the same row.
+ */
+export function SourceEditDrawer({
   organizationId,
   source,
   onClose,
@@ -1068,6 +1075,7 @@ function SourceEditDrawer({
     name: string;
     description: string | null;
     parserConfig: Record<string, unknown>;
+    pullSchedule?: string | null;
   }) => void;
   isPending: boolean;
 }) {
@@ -1075,6 +1083,30 @@ function SourceEditDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [statements, setStatements] = useState<string[]>([]);
+  const [parserConfig, setParserConfig] = useState<Record<string, string>>({});
+  const [pullSchedule, setPullSchedule] = useState("");
+
+  // The DTO carries `sourceType` as a bare string; every lookup below is keyed
+  // by `SourceType`, and an unknown value simply misses every table rather
+  // than throwing — which is the behaviour we want for a row written by a
+  // newer deploy than the one serving this page.
+  const sourceType = source?.sourceType as SourceType | undefined;
+  const pullAdapter = sourceType
+    ? PULL_ADAPTER_FOR_SOURCE[sourceType]
+    : undefined;
+  const isPullMode =
+    !!pullAdapter &&
+    !!sourceType &&
+    EDITABLE_PULL_CONFIG_SOURCE_TYPES.includes(sourceType);
+
+  // A source holding no cursor has its backfill start genuinely still in play.
+  // Once one exists the usage cursor never rewinds, so the setting would be
+  // accepted and then ignored — it is shown read-only rather than offered as a
+  // lie. This reads the row's own answer rather than inferring one from
+  // `status`, which is wrong in both directions: a pull that succeeded with
+  // zero events leaves the source `awaiting_first_event` holding a cursor, and
+  // a source disabled before its first run never minted one.
+  const hasPulled = source?.hasPollerCursor ?? false;
 
   // Sync local state when the drawer opens for a new source - drives
   // the form fields off whatever the row carries on the wire.
@@ -1089,6 +1121,17 @@ function SourceEditDrawer({
         ? raw.filter((s): s is string => typeof s === "string")
         : [],
     );
+    setParserConfig(
+      seedComposerParserConfig({
+        sourceType: source.sourceType as SourceType,
+        storedParserConfig: parser,
+      }),
+    );
+    // The `pullSchedule` column is not on the DTO, but the adapter's own copy
+    // of it rides along inside parserConfig, written there by the composer on
+    // create. Seeding from it keeps the field showing the cadence that is
+    // actually running rather than an empty box that reads as "no schedule".
+    setPullSchedule(typeof parser.schedule === "string" ? parser.schedule : "");
   }, [source?.id]);
 
   if (!source) {
@@ -1101,24 +1144,43 @@ function SourceEditDrawer({
 
   const handleSubmit = () => {
     if (!name.trim()) return;
-    const parser = (source.parserConfig as Record<string, unknown>) ?? {};
-    // Strip empty rows from the OTTL list and merge into the existing
-    // parserConfig so we don't accidentally drop other fields the
-    // adapter cares about (workspaceId, sharedSecretLastFour, …).
-    const cleanedOttl = statements.filter((s) => s.trim().length > 0);
-    const nextParser = {
-      ...parser,
-      ottlStatements: cleanedOttl.length > 0 ? cleanedOttl : undefined,
-    };
-    if (nextParser.ottlStatements === undefined) {
-      delete nextParser.ottlStatements;
+    let rebuilt: Record<string, unknown> | null = null;
+
+    if (isPullMode && sourceType) {
+      // Reuses the create path's dispatcher, and with it the toast that names
+      // which field is wrong — a second builder here is how the two forms
+      // would drift into disagreeing about what a valid bucket width is.
+      const resolved = resolvePullConfig(
+        {
+          sourceType,
+          name: name.trim(),
+          description: description.trim(),
+          parserConfig,
+          ottlStatements: statements,
+          pullSchedule,
+        },
+        { requireCredentials: false },
+      );
+      // null means a field the adapter cannot parse. Refusing here is the
+      // whole point of the builder: nothing validates this server-side, so a
+      // bad value saved now surfaces as a failing pull an hour later.
+      if (!resolved?.pullConfig) return;
+      rebuilt = resolved.pullConfig;
     }
+
     onSubmit({
       organizationId,
       id: source.id,
       name: name.trim(),
       description: description.trim() || null,
-      parserConfig: nextParser,
+      parserConfig: buildEditedParserConfig({
+        sourceType: source.sourceType as SourceType,
+        storedParserConfig:
+          (source.parserConfig as Record<string, unknown>) ?? {},
+        rebuiltPullConfig: rebuilt,
+        ottlStatements: statements,
+      }),
+      ...(isPullMode ? { pullSchedule: pullSchedule.trim() || null } : {}),
     });
   };
 
@@ -1162,6 +1224,31 @@ function SourceEditDrawer({
               />
             </VStack>
 
+            {isPullMode && (
+              <>
+                <ParserConfigFields
+                  sourceType={source.sourceType as SourceType}
+                  values={parserConfig}
+                  onChange={setParserConfig}
+                  mode="edit"
+                  readOnlyKeys={hasPulled ? ["startingAt"] : undefined}
+                />
+                {hasPulled && (
+                  <Text fontSize="xs" color="fg.muted">
+                    The backfill start is fixed once a source has pulled: the
+                    cursor has already moved past it and never rewinds. To
+                    re-read older data, archive this source and create a new one
+                    with an earlier start.
+                  </Text>
+                )}
+                <PullCadenceField
+                  sourceType={source.sourceType as SourceType}
+                  value={pullSchedule}
+                  onChange={setPullSchedule}
+                />
+              </>
+            )}
+
             <OttlEditor
               organizationId={organizationId}
               sourceType={source.sourceType}
@@ -1171,9 +1258,9 @@ function SourceEditDrawer({
             />
 
             <Text fontSize="xs" color="fg.muted">
-              Source type and ingest secret are immutable after create. Use
-              “Rotate secret” for the secret; archive + recreate to change
-              source type.
+              {isPullMode
+                ? "Source type is immutable after create — archive and recreate to change it."
+                : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
             </Text>
           </VStack>
         </Drawer.Body>
@@ -1221,6 +1308,14 @@ interface FieldDef {
    */
   advanced?: boolean;
 }
+
+/**
+ * Which form the parser-config fields are being rendered on. The only field
+ * that behaves differently is a secret: mandatory and typed in front of you on
+ * create, never shown and optional on edit, where blank means "keep the stored
+ * one". Everything else — validation, masking, storage routing — is shared.
+ */
+export type ParserConfigMode = "create" | "edit";
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
@@ -1593,14 +1688,28 @@ function buildHttpCustomPullConfig(
  * validates pullConfig against the adapter schema at save time — a bad value
  * here would sit in the row looking fine and fail on every pull — so the
  * builder is the last checkpoint before the database.
+ *
+ * `requireCredentials` is the one thing that differs between creating a source
+ * and editing one, and it defaults to the stricter case. On create there is no
+ * stored secret to fall back on, so a blank token is a broken source. On edit
+ * the secret is never shown — `toDto` strips it — so a blank token means
+ * "leave it alone", and the key must be OMITTED rather than emitted empty:
+ * `updateSource` carries the stored envelope across only for a key that is
+ * genuinely absent, so `credentials: { token: "" }` would overwrite a working
+ * key with an empty one and break the source on its next run.
+ *
+ * Every other check stays shared. Forking a second builder for the edit form
+ * is how the two paths would drift into disagreeing about what a valid bucket
+ * width is.
  */
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
+  { requireCredentials = true }: { requireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
   const report = trimmedField(p, "report").toLowerCase();
-  if (!token) return null;
+  if (!token && requireCredentials) return null;
   if (report !== "usage" && report !== "cost") return null;
 
   const bucketWidth = validBucketWidth(trimmedField(p, "bucketWidth"), report);
@@ -1618,7 +1727,7 @@ export function buildAnthropicAdminPullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
       "0 * * * *",
-    credentials: { token },
+    ...(token ? { credentials: { token } } : {}),
   };
 }
 
@@ -1758,16 +1867,32 @@ function ParserConfigField({
   field,
   values,
   onChange,
+  mode = "create",
+  readOnly = false,
 }: {
   field: FieldDef;
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
+  mode?: ParserConfigMode;
+  readOnly?: boolean;
 }) {
+  const isSecret = isSecretFieldKey(field.key);
+  // On edit the stored secret is never sent to the client, so the field opens
+  // blank and stays blank unless the admin is deliberately replacing the key.
+  // Create's hint tells them where to generate one, which read on the edit
+  // form would suggest they have to — and re-typing a key they do not have to
+  // hand is how a working source gets archived and recreated instead.
+  const hint =
+    isSecret && mode === "edit"
+      ? "Leave blank to keep the current key. Enter a new one only to replace it."
+      : field.hint;
+  const isRequired = field.required && !(isSecret && mode === "edit");
+
   return (
     <VStack align="stretch" gap={1}>
       <Text fontSize="xs" fontWeight="medium">
         {field.label}
-        {field.required && (
+        {isRequired && (
           <Text as="span" color="red.500" marginLeft={1}>
             *
           </Text>
@@ -1781,19 +1906,24 @@ function ParserConfigField({
           onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
           placeholder={field.placeholder}
           fontFamily="mono"
+          readOnly={readOnly}
         />
       ) : (
         <Input
           size="sm"
-          type={isSecretFieldKey(field.key) ? "password" : "text"}
+          type={isSecret ? "password" : "text"}
           value={values[field.key] ?? ""}
           onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
-          placeholder={field.placeholder}
+          placeholder={
+            isSecret && mode === "edit" ? "Unchanged" : field.placeholder
+          }
+          readOnly={readOnly}
+          disabled={readOnly}
         />
       )}
-      {field.hint && (
+      {hint && (
         <Text fontSize="xs" color="fg.muted">
-          {field.hint}
+          {hint}
         </Text>
       )}
     </VStack>
@@ -1804,15 +1934,26 @@ export function ParserConfigFields({
   sourceType,
   values,
   onChange,
+  mode = "create",
+  readOnlyKeys,
 }: {
   sourceType: SourceType;
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
+  mode?: ParserConfigMode;
+  /**
+   * Fields rendered but not editable. Used on the edit form for settings the
+   * adapter can no longer act on — a backfill start once the cursor has moved
+   * past it is accepted and then ignored, and an input that silently does
+   * nothing is worse than no input at all.
+   */
+  readOnlyKeys?: readonly string[];
 }) {
   const fields = PARSER_FIELDS[sourceType];
   const primaryFields = fields.filter((f) => !f.advanced);
   const advancedFields = fields.filter((f) => f.advanced);
   if (fields.length === 0) return null;
+  const isReadOnly = (key: string) => readOnlyKeys?.includes(key) ?? false;
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -1824,6 +1965,8 @@ export function ParserConfigFields({
           field={f}
           values={values}
           onChange={onChange}
+          mode={mode}
+          readOnly={isReadOnly(f.key)}
         />
       ))}
       {advancedFields.length > 0 && (
@@ -1844,6 +1987,8 @@ export function ParserConfigFields({
                   field={f}
                   values={values}
                   onChange={onChange}
+                  mode={mode}
+                  readOnly={isReadOnly(f.key)}
                 />
               ))}
             </VStack>
@@ -1922,6 +2067,126 @@ export function buildParserConfig(c: ComposerState): Record<string, unknown> {
     out.ottlStatements = ottl;
   }
   return out;
+}
+
+/**
+ * `buildParserConfig` read backwards: the stored config as the composer's flat
+ * string form-state, for the edit form to open on.
+ *
+ * Only keys declared in `PARSER_FIELDS` are read, so nothing internal to the
+ * row (`adapter`, `schedule`, the `_`-prefixed slots) leaks into a text input
+ * an admin could then edit into something the adapter cannot parse.
+ *
+ * Secrets come back blank, always. `toDto` strips `credentials` before the row
+ * reaches the client, so there is nothing to pre-fill even in principle — and
+ * a blank field is what tells the builder to omit the key and leave the stored
+ * secret alone. `isSecretFieldKey` is the same predicate the masking render
+ * and the storage routing use; this must not become a third, drifting answer
+ * to "is this a secret".
+ */
+export function seedComposerParserConfig({
+  sourceType,
+  storedParserConfig,
+}: {
+  sourceType: SourceType;
+  storedParserConfig: Record<string, unknown>;
+}): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const field of PARSER_FIELDS[sourceType] ?? []) {
+    if (isSecretFieldKey(field.key)) {
+      values[field.key] = "";
+      continue;
+    }
+    const stored = storedParserConfig[field.key];
+    if (stored == null) continue;
+    values[field.key] = String(stored);
+  }
+  return values;
+}
+
+/**
+ * Pull source types whose adapter configuration the edit form can rebuild.
+ *
+ * The gate exists because "blank secret means keep the stored one" has to be
+ * answered by each builder, and only Anthropic's answers it today. Databricks
+ * accepts either a workspace token or a service-principal pair, so a blank
+ * form there is ambiguous — it could mean "keep what is stored" or "switch
+ * auth modes" — and guessing wrong locks an admin out of their own source.
+ * The rest of the edit form (name, description, OTTL) is unaffected for every
+ * type; only these get the adapter fields and the cadence control.
+ *
+ * See the follow-up issue noted in the PR for extending this to Databricks
+ * Genie and the BYO `http_custom` shape.
+ */
+const EDITABLE_PULL_CONFIG_SOURCE_TYPES: readonly SourceType[] = [
+  "anthropic_admin",
+];
+
+/**
+ * The stored-credential envelope, recognised without importing the server's
+ * `isEncryptedCredentials` — that module reaches for node `crypto` and has no
+ * business in a browser bundle. The prefix is the whole check the client needs:
+ * it is refusing to send something back, not trying to read it.
+ */
+function isEncryptedCredentialValue(value: unknown): boolean {
+  return typeof value === "string" && value.startsWith("enc:v1:");
+}
+
+/**
+ * The parserConfig an edit should persist: the stored row, with the fields the
+ * form owns replaced by what the form now holds.
+ *
+ * The subtlety is deletion. A builder omits an optional key when its field was
+ * cleared, so merging the rebuilt config over the stored one with a plain
+ * spread would leave the old value in place — an admin clearing a bucket width
+ * would watch the save succeed and the setting stay. Every key the form owns is
+ * therefore dropped first, and the rebuilt config reinstates only the ones that
+ * still have a value.
+ *
+ * Keys the form does NOT own are carried through untouched, which is what keeps
+ * an edit from dropping `workspaceId`, `sharedSecretLastFour` and the rest of
+ * the adapter's own bookkeeping.
+ */
+export function buildEditedParserConfig({
+  sourceType,
+  storedParserConfig,
+  rebuiltPullConfig,
+  ottlStatements,
+}: {
+  sourceType: SourceType;
+  storedParserConfig: Record<string, unknown>;
+  /** null for a push-mode source, whose adapter config the form cannot edit. */
+  rebuiltPullConfig: Record<string, unknown> | null;
+  ottlStatements: string[];
+}): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...storedParserConfig };
+
+  const cleanedOttl = ottlStatements.filter((s) => s.trim().length > 0);
+  if (cleanedOttl.length > 0) {
+    next.ottlStatements = cleanedOttl;
+  } else {
+    delete next.ottlStatements;
+  }
+
+  if (rebuiltPullConfig) {
+    for (const field of PARSER_FIELDS[sourceType] ?? []) {
+      delete next[field.key];
+    }
+    for (const key of PULL_CONFIG_OWNED_FIELDS[sourceType] ?? []) {
+      delete next[key];
+    }
+    Object.assign(next, rebuiltPullConfig);
+  }
+
+  // Never hand back a stored envelope. `toDto` strips it, so this should be
+  // unreachable — but the seed-and-respread path above only stays safe for as
+  // long as that holds, and the server answers an envelope with a hard
+  // ValidationError rather than a no-op.
+  if (isEncryptedCredentialValue(next.credentials)) {
+    delete next.credentials;
+  }
+
+  return next;
 }
 
 /**
