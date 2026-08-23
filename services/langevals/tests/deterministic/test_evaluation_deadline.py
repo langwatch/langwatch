@@ -27,10 +27,12 @@ import pytest
 
 # Same import guard as the other server tests (see test_server_concurrency):
 # `langevals.server` reads sys.argv and DISABLE_EVALUATORS_PRELOAD at import
-# time, and both are restored right after.
+# time, and both are restored right after. The evaluator selection must match
+# the other files exactly, because only the first of them that pytest collects
+# actually imports the module and the rest inherit whatever it loaded.
 _original_argv = sys.argv
 _original_preload = os.environ.get("DISABLE_EVALUATORS_PRELOAD")
-sys.argv = ["server.py", "--only", "langevals"]
+sys.argv = ["server.py", "--only", "langevals,ragas"]
 os.environ["DISABLE_EVALUATORS_PRELOAD"] = "1"
 try:
     from langevals import server
