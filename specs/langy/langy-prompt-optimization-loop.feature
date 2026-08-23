@@ -111,6 +111,22 @@ Feature: Langy runs the prompt improvement loop on the workbench
     Then one short line before each run says what changed and why
     And one short line after says what the numbers did
 
+  # Waiting used to be `sleep 30; langwatch experiment status`, one command that
+  # prints nothing for half a minute. The panel showed the sleep as the work in
+  # progress, and a turn that ended while it was open lost the run it was
+  # waiting for. Waiting is the run's own command now.
+  @unit
+  Scenario: Waiting for a run returns as soon as the run reaches a terminal state
+    Given a run that finishes while the caller is waiting for it
+    When the caller asks for the status with a wait
+    Then it answers as soon as the run is finished, without waiting out the limit
+
+  @unit
+  Scenario: Waiting for a run answers with the progress when the limit is reached
+    Given a run still going when the wait limit is reached
+    When the caller asks for the status with a wait
+    Then it answers with how far the run has got, rather than failing
+
   @e2e
   Scenario: The user steps away and the loop continues on the backend
     Given no browser tab is attached to the workbench

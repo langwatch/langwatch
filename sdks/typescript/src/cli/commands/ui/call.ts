@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 
@@ -10,6 +11,24 @@ import type { CommandResult } from "../../utils/output";
  * while a half-open socket fails instead of hanging the agent worker.
  */
 const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Everything on stdin, for `--payload-file -`. */
+const readStdin = async (): Promise<string> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+};
+
+const readPayloadFile = async (file: string): Promise<string> => {
+  if (file === "-") return await readStdin();
+  try {
+    return await readFile(file, "utf8");
+  } catch {
+    throw new Error(`Could not read the payload file ${file}`);
+  }
+};
 
 /**
  * Dispatch one typed UI action to the page the user has open, and print the
@@ -24,10 +43,16 @@ const REQUEST_TIMEOUT_MS = 60_000;
  * The payload is opaque here on purpose — the server owns the action schemas
  * (`langwatch ui actions` prints them) and refuses anything that does not
  * parse, so this command never has to track them.
+ *
+ * `--payload-file` exists because the payloads that matter carry prose. A
+ * prompt draft has apostrophes in it, and one apostrophe ends the shell's
+ * single-quoted argument: the rest of the prompt then arrives as separate
+ * arguments, the command refuses them, and the edit is lost. A file (or `-`
+ * for stdin) never passes through the shell's quoting at all.
  */
 export const uiCallCommand = async (
   kind: string,
-  options: { payload?: string; experiment?: string },
+  options: { payload?: string; payloadFile?: string; experiment?: string },
 ): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();
 
@@ -40,12 +65,37 @@ export const uiCallCommand = async (
     return;
   }
 
+  if (options.payload && options.payloadFile) {
+    // Picking one silently would apply a payload the caller did not name, and
+    // this command writes to the page the user is watching.
+    process.stderr.write(
+      "Pass either --payload or --payload-file, not both.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   let payload: unknown = {};
-  if (options.payload) {
+  const source = options.payloadFile
+    ? { flag: "--payload-file", read: () => readPayloadFile(options.payloadFile!) }
+    : options.payload
+      ? { flag: "--payload", read: async () => options.payload! }
+      : null;
+  if (source) {
+    let raw: string;
     try {
-      payload = JSON.parse(options.payload);
+      raw = await source.read();
+    } catch (error) {
+      process.stderr.write(
+        `${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      payload = JSON.parse(raw);
     } catch {
-      process.stderr.write("--payload is not valid JSON\n");
+      process.stderr.write(`${source.flag} is not valid JSON\n`);
       process.exitCode = 1;
       return;
     }

@@ -78,4 +78,79 @@ describe("the ui call command", () => {
       );
     });
   });
+
+  /**
+   * The payload that broke this in practice is a prompt draft. Prose has
+   * apostrophes, and one apostrophe ends the shell's single-quoted argument, so
+   * the rest of the prompt arrived as extra arguments and the edit was lost.
+   */
+  describe("given a payload too awkward to quote on a command line", () => {
+    const AWKWARD = {
+      targetId: "target-1",
+      localPromptConfig: {
+        messages: [
+          {
+            role: "system",
+            content: "Don't invent policy.\nSay \"I don't know\" instead.",
+          },
+        ],
+      },
+    };
+
+    /** @scenario "A payload too awkward to quote is read from a file or from stdin" */
+    it("reads it from a file", async () => {
+      const { mkdtemp, writeFile } = await import("node:fs/promises");
+      const { tmpdir } = await import("node:os");
+      const { join } = await import("node:path");
+      const dir = await mkdtemp(join(tmpdir(), "ui-call-"));
+      const file = join(dir, "payload.json");
+      await writeFile(file, JSON.stringify(AWKWARD), "utf8");
+
+      const fetchMock = vi.fn(
+        async (_url: string, _init?: RequestInit) =>
+          new Response('{"executedVia":"browser"}'),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await uiCallCommand("workbench.setTargetPrompt", { payloadFile: file });
+
+      const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+      expect(sent.payload).toEqual(AWKWARD);
+    });
+
+    it("reads it from stdin when the file is a dash", async () => {
+      vi.spyOn(process, "stdin", "get").mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (async function* () {
+          yield Buffer.from(JSON.stringify(AWKWARD));
+        })() as any,
+      );
+
+      const fetchMock = vi.fn(
+        async (_url: string, _init?: RequestInit) =>
+          new Response('{"executedVia":"browser"}'),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await uiCallCommand("workbench.setTargetPrompt", { payloadFile: "-" });
+
+      const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+      expect(sent.payload).toEqual(AWKWARD);
+    });
+
+    /** @scenario "Naming both a payload and a payload file is refused" */
+    it("refuses when both an inline payload and a file are named", async () => {
+      const fetchMock = vi.fn(async () => new Response("{}"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await uiCallCommand("workbench.setTargetPrompt", {
+        payload: "{}",
+        payloadFile: "somewhere.json",
+      });
+
+      expect(process.exitCode).toBe(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(stderr.join("")).toContain("--payload-file");
+    });
+  });
 });

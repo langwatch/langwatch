@@ -67,7 +67,16 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
 1. **Duplicate the baseline.** `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}' --experiment <slug>`. The copy carries the baseline's mappings and evaluator wiring, repointed at itself. Its id comes from the answer. Refer to it as the candidate.
 2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. If no run exists yet, run the baseline on a 10 row subset first. Read the actual outputs against the expected ones.
 3. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
-4. **Edit the candidate's draft only.** `langwatch ui call workbench.setTargetPrompt --payload '{"targetId":"<candidate>","localPromptConfig":{...}}' --experiment <slug>`. The draft executes without touching the prompt library.
+4. **Edit the candidate's draft only.** The draft executes without touching the prompt library. Send the payload through a file, never inline: a prompt is prose, one apostrophe in it ends the shell's quoting, and the rest of your prompt then arrives as separate arguments and the edit is lost.
+
+   ```bash
+   cat > /tmp/candidate.json <<'JSON'
+   {"targetId":"<candidate>","localPromptConfig":{"messages":[{"role":"system","content":"..."},{"role":"user","content":"{{input}}"}]}}
+   JSON
+   langwatch ui call workbench.setTargetPrompt --payload-file /tmp/candidate.json --experiment <slug>
+   ```
+
+   `--payload-file -` reads stdin instead. Keep `--payload` for short payloads that are ids and numbers only.
 5. **Run scoped.** `langwatch ui call workbench.run --payload '{"targetIds":["<candidate>"]}' --experiment <slug>`, adding `"rowIndices"` for a subset. The candidate target only, on the failing rows or the first 10; move to the full dataset once the subset improves. Use this command, never `langwatch experiment run`: on the open page this one fills the cells one at a time in front of the user, and it falls back to the same server-side run on its own when no page answers.
 6. **Compare aggregates,** baseline against candidate: pass rate, average score, average cost, latency. Cost and latency are part of the answer, not a footnote.
 7. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 3. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
@@ -76,15 +85,15 @@ Keep every attempt as its own candidate column so the user can see the whole lad
 
 ### Waiting for a run
 
-A run of any size takes minutes. Poll it rather than sleeping through it in one block:
+A run of any size takes minutes. The status command does the waiting:
 
 ```bash
-langwatch experiment status <slug> --format json
+langwatch experiment status <slug> --wait --format json
 ```
 
-Check every 30 to 60 seconds, and post a progress line each time the count moves. Long single sleeps make the turn look dead and tell the user nothing.
+It answers as soon as the run reaches a terminal state, or after a minute with the progress so far, and `--timeout <seconds>` moves that limit. Call it again while the run is still going, and post a progress line each time the count moves.
 
-Sleep in its own command, never `sleep 60; langwatch experiment status`. Joined into one call it is a single command that prints nothing for a minute, so the panel shows the sleep as the work in progress and the user learns nothing until it is over. The page the user is watching narrates the run's own progress on its own; what they need from you is a line between polls when something changed.
+**Never use `sleep`.** Not on its own and above all not joined, as in `sleep 60; langwatch experiment status`. Joined into one call it is a single command that prints nothing for a minute, so the panel shows the sleep as the work in progress and the user learns nothing until it is over; and a turn that ends while that call is open loses the run it was waiting for. The page the user is watching narrates the run's own progress on its own; what they need from you is a line between polls when something changed.
 
 A status poll is not a retry, so the two attempt rule does not cap it: each call answers with fresh progress rather than repeating a failed one. Stop polling when the run reaches a terminal state, when the status call itself fails twice, or after 20 minutes, and report where the run stood.
 

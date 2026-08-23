@@ -133,6 +133,20 @@ Feature: Langy drives the open page through typed UI actions
     When the page claims naming the turn its own send returned
     Then the claim succeeds and the page executes the action
 
+  # A prompt draft is prose, and prose has apostrophes. Written into a shell
+  # command as a single-quoted argument, the first one ends the quoting and the
+  # rest of the prompt arrives as extra arguments, so the whole edit is lost.
+  @unit
+  Scenario: A payload too awkward to quote is read from a file or from stdin
+    Given the action's payload carries a prompt with quotes and newlines in it
+    When the caller passes the payload as a file, or as "-" for stdin
+    Then the action is dispatched with exactly that payload
+
+  @unit
+  Scenario: Naming both a payload and a payload file is refused
+    When the caller passes an inline payload and a payload file together
+    Then the command refuses rather than picking one
+
   @unit
   Scenario: Only the claiming user's session may complete an action
     Given one user's session claimed the action

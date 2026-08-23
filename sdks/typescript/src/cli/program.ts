@@ -1455,8 +1455,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("status <experiment>")
       .description("Check the status of an experiment run (defaults to the latest run)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)"),
-    async (experiment: string, options: { runId?: string }) => {
+      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+      .option(
+        "--wait",
+        "Keep reading until the run finishes, or until the limit is up. Answers with the progress either way",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait waits before answering with the progress so far (default: 60)",
+      ),
+    async (
+      experiment: string,
+      options: { runId?: string; wait?: boolean; timeout?: string },
+    ) => {
       const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
       return impl(experiment, options);
     },
@@ -3155,11 +3166,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Dispatch one UI action to the open page and print its result")
       .option("--payload <json>", "The action's payload as JSON (default: {})")
       .option(
+        "--payload-file <path>",
+        "Read the payload from a file, or from stdin with -. Use this for prompts and any other text a shell would mangle",
+      )
+      .option(
         "--experiment <slug>",
         "Experiment for the backend fallback to apply the action to when no page answers",
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (kind: string, options: { payload?: string; experiment?: string }) => {
+    async (
+      kind: string,
+      options: { payload?: string; payloadFile?: string; experiment?: string },
+    ) => {
       const { uiCallCommand: impl } = await import("./commands/ui/call.js");
       return impl(kind, options);
     },

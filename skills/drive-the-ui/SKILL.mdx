@@ -21,9 +21,12 @@ Lists the action kinds the current page accepts, with the JSON schema for each p
 
 ```bash
 langwatch ui call <kind> --payload '<json>'
+langwatch ui call <kind> --payload-file <path>   # or - for stdin
 ```
 
-Calls one action and blocks until it is done. The result carries `executedVia`:
+Calls one action and blocks until it is done. Use `--payload-file` for any payload holding text a person wrote, above all a prompt: prose has apostrophes, one apostrophe ends the shell's quoting, and the rest of the payload then arrives as separate arguments, which the command refuses. Write the JSON to a file first, or pipe it in. Keep `--payload` for payloads that are only ids and numbers.
+
+The result carries `executedVia`:
 
 - `"browser"`: the user's open page applied it. They saw it. Say "watch the table" style things.
 - `"backend"`: no page answered, the platform applied it to the saved state. Say "reload when you are back" style things.
@@ -36,7 +39,7 @@ langwatch workbench get-state <experiment-slug>
 
 The workbench read, sugar over `ui call workbench.getState`. Browser first, so it includes unsaved prompt drafts and in-memory results; falls back to the saved state and marks the source. Use it before you change anything and after anything surprising.
 
-All three print the platform's answer as JSON already, so parse what they print. They take no `--format` flag: adding one fails the command with an unknown-option error before it runs.
+All three print the platform's answer as JSON already, so parse what they print. They also take `--format`, `-o` and `--jq` like every other command, which is how you ask for less than the whole answer.
 
 ## Rules
 
