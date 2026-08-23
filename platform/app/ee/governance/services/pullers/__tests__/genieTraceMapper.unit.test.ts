@@ -204,11 +204,16 @@ describe("given a completed Genie message from the capture shape", () => {
   });
 
   it("labels the step row with the query description and the SQL as its argument", () => {
-    const params = JSON.parse(attrsOf(step)["langwatch.params"] as string);
-    expect(params.tool_name).toBe("Total sales by region");
-    expect(params.full_command).toContain("SELECT region");
-    expect(params.row_count).toBe(4);
-    expect(params.statement_id).toBe("stmt-1");
+    // Bare keys, matching the Claude Code tool-span contract: the span read
+    // unflattens every attribute onto `Span.params`, so TurnSteps finds these
+    // at `params.tool_name` / `params.full_command`. A `langwatch.params`
+    // JSON blob would be dot-flattened at the trace door and never read.
+    const stepAttrs = attrsOf(step);
+    expect(stepAttrs["tool_name"]).toBe("Total sales by region");
+    expect(stepAttrs["full_command"]).toContain("SELECT region");
+    expect(stepAttrs["row_count"]).toBe("4");
+    expect(stepAttrs["statement_id"]).toBe("stmt-1");
+    expect(stepAttrs["langwatch.params"]).toBeUndefined();
   });
 
   it("copies no token counts — the puller's literal zeros never become measurements", () => {

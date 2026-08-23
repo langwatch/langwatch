@@ -449,14 +449,22 @@ function queryStepSpan(
 ): OtlpJsonSpan {
   const stepKey = attachment.attachment_id ?? `index:${index}`;
   const rowCount = attachment.query?.query_result_metadata?.row_count;
-  const params: Record<string, unknown> = {
-    tool_name: attachment.query?.description || "SQL query",
-    full_command: attachment.query?.query ?? "",
-  };
+  // Bare keys, not a `langwatch.params` JSON blob: the span read unflattens
+  // every attribute onto `Span.params`, so `params.tool_name` only resolves
+  // for keys stored bare — the same contract Claude Code's tool spans use,
+  // and the one TurnSteps reads (`params.tool_name` / `params.full_command`).
+  // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
+  // and lands at `params.langwatch.params.*`, where no reader looks.
+  const stepAttrs = [
+    stringAttr("tool_name", attachment.query?.description || "SQL query"),
+    stringAttr("full_command", attachment.query?.query ?? ""),
+  ];
   if (attachment.query?.statement_id) {
-    params.statement_id = attachment.query.statement_id;
+    stepAttrs.push(stringAttr("statement_id", attachment.query.statement_id));
   }
-  if (typeof rowCount === "number") params.row_count = rowCount;
+  if (typeof rowCount === "number") {
+    stepAttrs.push(stringAttr("row_count", String(rowCount)));
+  }
   return {
     traceId: frame.traceId,
     spanId: hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
@@ -467,7 +475,7 @@ function queryStepSpan(
     endTimeUnixNano: msToNano(frame.endMs),
     attributes: [
       stringAttr("langwatch.span.type", "tool"),
-      stringAttr("langwatch.params", JSON.stringify(params)),
+      ...stepAttrs,
       ...originAttrs(frame.origin),
     ],
     status: { code: frame.isCompleted ? 1 : 2 },
