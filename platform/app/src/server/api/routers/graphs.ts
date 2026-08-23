@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
@@ -12,16 +13,44 @@ import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * The kinds that can sit on a dashboard grid.
+ * The kinds that can sit on a dashboard grid *when the workbench is on*.
  *
  * Used only by the procedures that move, resize or remove a *card*. Anything
  * that reads or writes a row's `graph` payload stays scoped to the single kind
  * whose shape it understands.
  */
-const PLACEABLE_CHART_KINDS: string[] = [
+const PLACEABLE_CHART_KINDS = [
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
-];
+] as const;
+
+/**
+ * The kinds a placement procedure may touch for this project.
+ *
+ * Asked by every card-level procedure — the read and all three writes — so
+ * that a deployment with the workbench off sees exactly the grid it saw
+ * before, and cannot move, resize or delete a `workbench_sql` row left behind
+ * by a trial. Gating only the read would leave the rows invisible but still
+ * mutable: a member's reflow of the charts they *can* see would silently
+ * rewrite the placement of ones they cannot, and a delete by id would remove a
+ * row the surface never admitted existed.
+ */
+async function placeableKindFilter({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<{ kind: string | { in: string[] } }> {
+  // The filter itself rather than the kind list, so all four procedures emit
+  // the identical clause. With the workbench off that clause is the bare
+  // `kind: "builder"` the grid used before this feature existed — which is
+  // what makes "exactly the old grid" a statement about the query and not
+  // just about the rows it happens to return.
+  return (await lwqlEnabled({ prisma, projectId }))
+    ? { kind: { in: [...PLACEABLE_CHART_KINDS] } }
+    : { kind: BUILDER_CHART_KIND };
+}
 
 /**
  * Read-side hydration shape for the `Add / Edit alert` bell icon on the
@@ -124,16 +153,17 @@ export const graphsRouter = createTRPCRouter({
       // would offer a member a chart the builder cannot open.
       //
       // Gated on the workbench flag so a deployment with the feature off sees
-      // exactly the grid it saw before, even if rows exist from a trial.
-      const includeWorkbenchCharts =
-        !!dashboardId && (await lwqlEnabled({ prisma, projectId }));
+      // exactly the grid it saw before, even if rows exist from a trial —
+      // the same gate every placement mutation below applies, so what the
+      // grid shows and what a card action may touch cannot disagree.
+      const placeable = dashboardId
+        ? await placeableKindFilter({ prisma, projectId })
+        : { kind: BUILDER_CHART_KIND };
 
       const graphs = await prisma.customGraph.findMany({
         where: {
           projectId,
-          ...(includeWorkbenchCharts
-            ? { kind: { in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND] } }
-            : { kind: BUILDER_CHART_KIND }),
+          ...placeable,
           ...(dashboardId ? { dashboardId } : {}),
         },
         orderBy: dashboardId
@@ -185,24 +215,23 @@ export const graphsRouter = createTRPCRouter({
 
       // Removing a card removes the row, whichever kind it is — a member who
       // deletes a workbench widget from a dashboard means the widget, and
-      // leaving the row behind would strand a chart on no dashboard.
+      // leaving the row behind would strand a chart on no dashboard. Scoped by
+      // the same flag the read is: with the workbench off a `workbench_sql`
+      // row is not on this grid, so deleting one by id answers not-found.
+      const placeable = await placeableKindFilter({
+        prisma,
+        projectId: input.projectId,
+      });
+
       const graph = await prisma.customGraph.findUnique({
-        where: {
-          id,
-          projectId: input.projectId,
-          kind: { in: PLACEABLE_CHART_KINDS },
-        },
+        where: { id, projectId: input.projectId, ...placeable },
       });
       if (!graph) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
       await prisma.customGraph.delete({
-        where: {
-          id,
-          projectId: input.projectId,
-          kind: { in: PLACEABLE_CHART_KINDS },
-        },
+        where: { id, projectId: input.projectId, ...placeable },
       });
 
       return graph;
@@ -339,14 +368,19 @@ export const graphsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Placement, not definition: where a card sits on the grid is a fact
       // about the dashboard rather than about the chart's shape, so both kinds
-      // are movable. The kind-scoped reads that matter are the ones that
-      // *interpret* `graph` — `getById` and `update` below — and they stay
-      // builder-only.
+      // are movable — while the workbench is on for this project. The
+      // kind-scoped reads that matter are the ones that *interpret* `graph` —
+      // `getById` and `update` below — and they stay builder-only.
+      const placeable = await placeableKindFilter({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+
       return ctx.prisma.customGraph.update({
         where: {
           id: input.graphId,
           projectId: input.projectId,
-          kind: { in: PLACEABLE_CHART_KINDS },
+          ...placeable,
         },
         data: {
           gridColumn: input.gridColumn,
@@ -374,12 +408,17 @@ export const graphsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
+      const placeable = await placeableKindFilter({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+
       const updates = input.layouts.map((layout) =>
         ctx.prisma.customGraph.update({
           where: {
             id: layout.graphId,
             projectId: input.projectId,
-            kind: { in: PLACEABLE_CHART_KINDS },
+            ...placeable,
           },
           data: {
             gridColumn: layout.gridColumn,

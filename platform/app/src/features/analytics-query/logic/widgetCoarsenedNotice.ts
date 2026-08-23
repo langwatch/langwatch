@@ -15,20 +15,17 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { LWQL_GRANULARITY_MAX_BUCKETS } from "~/server/analytics/lwql/timeWindow";
+import {
+  describeLangWatchQLGranularityStep,
+  LWQL_GRANULARITY_MAX_BUCKETS,
+} from "~/server/analytics/lwql/timeWindow";
 
 /**
- * How one datapoint step is named in member-facing copy.
- *
- * The three offered steps get words; anything else falls back to seconds,
- * which is a shape this should never be handed but must not crash on.
+ * How one datapoint step is named inside this notice: the adjective form,
+ * because every mention here modifies "buckets".
  */
-export function describeGranularityStep(seconds: number): string {
-  if (seconds === 1) return "1-second";
-  if (seconds === 60) return "1-minute";
-  if (seconds === 3600) return "1-hour";
-  return `${seconds}-second`;
-}
+const step = (seconds: number): string =>
+  describeLangWatchQLGranularityStep(seconds, "adjective");
 
 /** The notice a widget shows when its period forced a coarser step. */
 export function widgetCoarsenedNotice({
@@ -41,9 +38,9 @@ export function widgetCoarsenedNotice({
   readonly to: number;
 }): string {
   return (
-    `Showing ${describeGranularityStep(to)} buckets instead of ` +
-    `${describeGranularityStep(from)}: this period at ` +
-    `${describeGranularityStep(from)} would exceed the ` +
+    `Showing ${step(to)} buckets instead of ` +
+    `${step(from)}: this period at ` +
+    `${step(from)} would exceed the ` +
     `${LWQL_GRANULARITY_MAX_BUCKETS.toLocaleString()} datapoint limit.`
   );
 }

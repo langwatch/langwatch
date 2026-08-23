@@ -1,7 +1,10 @@
 import { Button } from "@chakra-ui/react";
 import { Clock, Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
-import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
+import {
+  describeLangWatchQLGranularityStep,
+  LWQL_GRANULARITY_STEPS,
+} from "~/server/analytics/lwql/timeWindow";
 import { useRouter } from "~/utils/compat/next-router";
 
 type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";
@@ -19,20 +22,12 @@ const sizeOptions: {
 ];
 
 /**
- * How each offered datapoint step is named in the menu.
- *
- * Keyed off the steps the contract offers rather than listed independently, so
- * a step added to `LWQL_GRANULARITY_STEPS` cannot silently render as a bare
- * number here.
+ * How each offered datapoint step is named in the menu: the noun form, because
+ * a menu item names the step rather than modifying a following word. Shared
+ * with the widget's coarsened notice so the two cannot drift apart.
  */
-const granularityLabels: Readonly<Record<number, string>> = {
-  1: "1 second",
-  60: "1 minute",
-  3600: "1 hour",
-};
-
 const granularityLabel = (seconds: number): string =>
-  granularityLabels[seconds] ?? `${seconds} seconds`;
+  describeLangWatchQLGranularityStep(seconds, "noun");
 
 const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
   if (colSpan === 2 && rowSpan === 2) return "2x2";

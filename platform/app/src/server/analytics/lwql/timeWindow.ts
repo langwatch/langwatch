@@ -134,6 +134,46 @@ export type LangWatchQLGranularityStep =
   (typeof LWQL_GRANULARITY_STEPS)[number];
 
 /**
+ * The unit each offered step is named by, keyed off the steps themselves so a
+ * step added to {@link LWQL_GRANULARITY_STEPS} without a name here is a
+ * compile error rather than a card rendering a bare number.
+ */
+const LWQL_GRANULARITY_STEP_UNITS: Readonly<
+  Record<(typeof LWQL_GRANULARITY_STEPS)[number], string>
+> = {
+  1: "second",
+  60: "minute",
+  3600: "hour",
+};
+
+/**
+ * How a datapoint step is named in member-facing copy.
+ *
+ * One naming table for every surface that says a step out loud — the card
+ * menu's picker and the widget's coarsened notice — because two tables drift,
+ * and the drift shows up as a member being offered "1 minute" and then told
+ * their card is running at "1-minute" buckets as if they were different things.
+ *
+ * The two forms differ only in their separator: `"noun"` reads as a menu label
+ * ("1 minute"), `"adjective"` as a modifier of what follows ("1-minute
+ * buckets"). A step the surface does not offer falls back to seconds, a shape
+ * this should never be handed but must not crash on.
+ */
+export function describeLangWatchQLGranularityStep(
+  seconds: number,
+  form: "noun" | "adjective" = "noun",
+): string {
+  const separator = form === "adjective" ? "-" : " ";
+  const unit = (
+    LWQL_GRANULARITY_STEP_UNITS as Readonly<Record<number, string | undefined>>
+  )[seconds];
+
+  return unit === undefined
+    ? `${seconds}${separator}second${form === "noun" ? "s" : ""}`
+    : `1${separator}${unit}`;
+}
+
+/**
  * The ceiling on datapoint buckets one governed run may produce through the
  * granularity contract.
  *

@@ -397,6 +397,36 @@ describe("resolveLangWatchQLGranularity", () => {
         maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
       });
     });
+
+    it("reports no coarsening when the floor fallback lands on the requested step", () => {
+      // The same nothing-fits decade, asked for at the COARSEST offered step.
+      // `finestFittingStep` falls back to that step, so effective equals
+      // requested and nothing was coarsened — a notice here would tell a
+      // member their numbers were substituted when the run used exactly the
+      // step they asked for.
+      //
+      // This is the case that keeps the guard honest as the steps list grows.
+      // While every offered step is sub-day the fallback can only ever land
+      // at or above the request, so `>` and `!==` agree; add a day-scale step
+      // and the fallback can land BELOW a finer request, at which point only
+      // `>` still refuses to call a widening-that-narrowed a coarsening.
+      const decade = {
+        start: new Date("2026-02-20T00:00:00.000Z"),
+        end: new Date("2036-02-20T00:00:00.000Z"),
+      };
+      const coarsest =
+        LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1];
+
+      const resolution = resolveLangWatchQLGranularity({
+        declared: [...PERIOD, ...GRANULARITY],
+        timeWindow: decade,
+        granularitySeconds: coarsest,
+        onBudgetOverflow: "coarsen",
+      });
+
+      expect(resolution.granularitySeconds).toBe(coarsest);
+      expect(resolution.coarsenedFromSeconds).toBeUndefined();
+    });
   });
 
   describe("given a window whose length lands exactly on the ceiling boundary", () => {

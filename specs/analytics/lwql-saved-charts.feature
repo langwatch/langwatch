@@ -359,6 +359,48 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
     When the saved chart paths are looked up in it
     Then all five operations are described, each with a summary, a tag and a response schema
 
+  # Dashboard placement — what a placed workbench chart draws, asks for, and
+  # is offered. The routing claims are the load-bearing ones: `kind` decides
+  # which renderer receives the row, and both directions of getting it wrong
+  # are silent rather than a type error.
+
+  @integration
+  Scenario: A placed workbench card draws the widget, not the builder
+    Given a dashboard grid holding a saved workbench chart
+    When the card is rendered
+    Then the LangWatchQL widget draws it, and the builder renderer is not mounted
+
+  @integration
+  Scenario: A builder card keeps the builder renderer and its alert bell
+    Given a dashboard grid holding a builder graph
+    When the card is rendered
+    Then the builder renderer draws it and the add-alert control is offered
+
+  @integration
+  Scenario: A workbench card is not offered an alert it cannot evaluate
+    Given a dashboard grid holding a saved workbench chart
+    When the card is rendered
+    Then no add-alert control is offered, because a saved statement has no series to threshold
+
+  @integration
+  Scenario: A placed widget asks the run to coarsen rather than refuse
+    Given a placed workbench chart whose card is showing
+    When the widget runs its chart for the dashboard's period
+    Then the request asks for coarsening on budget overflow, so a wide period redraws the card instead of blanking it
+
+  @integration
+  Scenario: A coarsened widget says which step it actually ran at
+    Given a placed workbench chart whose period forced a coarser step
+    When the widget draws the answer
+    Then it shows a notice naming both the step asked for and the step used
+    And a run that coarsened nothing shows no notice
+
+  @integration
+  Scenario: A widget ignores an answer for a period it has left
+    Given a placed workbench chart whose period changed while a run was in flight
+    When the older run resolves after the newer one
+    Then the card keeps the newer answer, rather than settling on the period it has left
+
 # --- AC Coverage Map ---
 # Issue #6582, slice 1 ("Schema + repository + service — model decision,
 # validation choke point, unit/integration tests").

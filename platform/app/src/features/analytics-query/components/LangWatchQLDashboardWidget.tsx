@@ -33,7 +33,7 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
@@ -95,20 +95,53 @@ export function LangWatchQLDashboardWidget({
   const lastRequest = useRef<string | null>(null);
   const requestKey = `${chartId}:${start}:${end}:${step}`;
 
+  // Which request the rendered answer belongs to.
+  //
+  // A period drag fires a run per intermediate window, and nothing orders the
+  // responses: a query over a narrow window can resolve after one over a wide
+  // window issued later, leaving the card showing an answer for a period the
+  // dashboard is no longer on — with no spinner and nothing on screen saying
+  // so. Each issued request takes the next sequence number, and a resolution
+  // is drawn only when it carries the latest one, so a straggler is dropped
+  // rather than winning by arriving last.
+  const issuedRequests = useRef(0);
+  const [answer, setAnswer] = useState<{
+    readonly sequence: number;
+    // Derived from the mutation rather than re-declared, so the widget cannot
+    // drift from the shape the procedure actually returns.
+    readonly result: NonNullable<typeof run.data>;
+  } | null>(null);
+
   useEffect(() => {
     if (!chartQuery.data) return;
     if (lastRequest.current === requestKey) return;
     lastRequest.current = requestKey;
 
-    mutate({
-      id: chartId,
-      projectId,
-      timeWindow: { start, end },
-      granularitySeconds: step,
-      // The whole reason this surface differs from the workbench: see the
-      // module docblock.
-      onBudgetOverflow: "coarsen",
-    });
+    issuedRequests.current += 1;
+    const sequence = issuedRequests.current;
+
+    mutate(
+      {
+        id: chartId,
+        projectId,
+        timeWindow: { start, end },
+        granularitySeconds: step,
+        // The whole reason this surface differs from the workbench: see the
+        // module docblock.
+        onBudgetOverflow: "coarsen",
+      },
+      {
+        onSuccess: (data) => {
+          // Strictly-newer rather than equal, so an answer already on screen
+          // is never replaced by an older one that resolved late.
+          setAnswer((current) =>
+            current !== null && current.sequence > sequence
+              ? current
+              : { sequence, result: data },
+          );
+        },
+      },
+    );
   }, [
     chartQuery.data,
     requestKey,
@@ -120,7 +153,7 @@ export function LangWatchQLDashboardWidget({
     step,
   ]);
 
-  const result = run.data;
+  const result = answer?.result;
 
   const columns = useMemo(
     () => (result?.columns ?? []) as readonly LangWatchQLDatasetColumn[],

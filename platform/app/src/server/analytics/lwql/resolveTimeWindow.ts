@@ -279,11 +279,11 @@ function assertSurfaceStepIsClean({
 
   // Only this resolver's own reserved name: the window sweep owns the other
   // two, and refusing them here would answer a window question from the
-  // granularity path.
+  // granularity path. The name is a member of `LWQL_SURFACE_PARAMETERS` by
+  // construction, so an `isLangWatchQLSurfaceParameter` check alongside would
+  // be implied by this equality and could never disagree with it.
   const supplied = Object.keys(parameters ?? {}).filter(
-    (name) =>
-      isLangWatchQLSurfaceParameter(name) &&
-      name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+    (name) => name === LWQL_PERIOD_GRANULARITY_PARAMETER,
   );
   if (supplied.length > 0) {
     throw new LangWatchQLReservedParameterSuppliedError(supplied);
@@ -352,7 +352,12 @@ function resolveAgainstBudget({
   return {
     followsGranularity: true,
     granularitySeconds: effective,
-    ...(effective !== granularitySeconds
+    // Strictly greater, not merely different: a step equal to or finer than
+    // the requested one did not coarsen anything, and reporting it as a
+    // coarsening would put a notice on a card whose answer never changed.
+    // Reachable the moment a day-scale step joins the offered list, where the
+    // fallback to the coarsest fitting step can land below the request.
+    ...(effective > granularitySeconds
       ? { coarsenedFromSeconds: granularitySeconds }
       : {}),
   };

@@ -8,11 +8,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
+import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -174,25 +174,22 @@ function ReportsContent() {
     );
   };
 
-  // The datapoint step each workbench widget runs at, keyed by chart id.
+  // The datapoint step each workbench widget runs at, keyed by chart id, held
+  // in URL state beside the period.
   //
-  // Session state rather than a stored column: `CustomGraph` has no
-  // `granularitySeconds` field, and adding one is a migration this slice does
-  // not own. A member's pick therefore holds while they are on the page and
-  // resets to the widget's default on reload — visible, reversible, and not a
-  // silent wrong answer. Persisting it is the follow-up that adds the column.
-  const [granularityByGraphId, setGranularityByGraphId] = useState<
-    Readonly<Record<string, number>>
-  >({});
+  // Not a stored column: `CustomGraph` has no `granularitySeconds` field, and
+  // adding one is a migration this slice does not own. Not component state
+  // either — that would lose the pick on reload and leave it out of a shared
+  // link, so a member who coarsened a card to read it would send a colleague a
+  // different chart from the one they were describing. Persisting per member
+  // is the follow-up that adds the column.
+  const { granularityByGraphId, setGranularity } = useWidgetGranularity();
 
   const handleGraphGranularityChange = (
     graphId: string,
     granularitySeconds: number,
   ) => {
-    setGranularityByGraphId((current) => ({
-      ...current,
-      [graphId]: granularitySeconds,
-    }));
+    setGranularity(graphId, granularitySeconds);
   };
 
   const graphs = (graphsQuery.data ?? []).map((graph) => {
