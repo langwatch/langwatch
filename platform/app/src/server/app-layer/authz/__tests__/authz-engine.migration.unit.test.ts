@@ -54,8 +54,13 @@ type Data = {
   credentials?: ProjectCredentialFact[];
   groupMemberships?: Array<{ userId: string; groupId: string }>;
   grantHeads?: GrantHeadRow[];
-  roleHeads?: RoleHeadRow[];
+  /** `deleted` defaults to false: a head is live unless a test buries it. */
+  roleHeads?: Array<Omit<RoleHeadRow, "deleted"> & { deleted?: boolean }>;
   resourceRows?: ResourceGrantRow[];
+  /** Grant ids whose budget handover the seed's guard refuses — a usage row
+   *  that disagrees about which project it belongs to. Their heads keep the
+   *  count the test gave them, however high the seed goes. */
+  unseededGrantIds?: string[];
   /** Wraps the recording ledger, for tests that need to observe or fail a
    *  send rather than only read what was sent. */
   wrapLedger?: (ledger: Ledger) => Ledger;
@@ -67,6 +72,8 @@ function harness(data: Data = {}) {
   const sent: Sent[] = [];
   const seeded: ResourceGrantUsageSeed[][] = [];
   const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
+  /** Call order, for the steps whose ORDER is the behaviour under test. */
+  const order: string[] = [];
   const store: AuthzEngineMigrationStore = {
     findOrganizationCreatedAtMs: async () =>
       data.organizationCreatedAtMs === undefined
@@ -86,13 +93,33 @@ function harness(data: Data = {}) {
     },
     findRoleHeads: async () => {
       reads.roleHeads += 1;
-      return data.roleHeads ?? [];
+      return (data.roleHeads ?? []).map((head) => ({
+        ...head,
+        deleted: head.deleted ?? false,
+      }));
     },
     findResourceGrantRows: async () => {
       reads.resourceRows += 1;
-      return data.resourceRows ?? [];
+      order.push("readResourceRows");
+      // The budget table is a plain row the pass writes DIRECTLY, not a fact
+      // it states and waits on, so a read taken after the seed sees it and a
+      // read taken before does not. Modelling that raise is the only way a
+      // test can tell those two orders apart.
+      const refused = new Set(data.unseededGrantIds ?? []);
+      const budgets = new Map(
+        seeded.flat().map((seed) => [seed.grantId, seed.viewCount]),
+      );
+      return (data.resourceRows ?? []).map((row) =>
+        refused.has(row.grantId)
+          ? row
+          : {
+              ...row,
+              viewCount: Math.max(row.viewCount, budgets.get(row.grantId) ?? 0),
+            },
+      );
     },
     seedResourceGrantUsage: async ({ seeds }) => {
+      order.push("seedBudgets");
       seeded.push([...seeds]);
     },
   };
@@ -116,7 +143,7 @@ function harness(data: Data = {}) {
     ledger: data.wrapLedger ? data.wrapLedger(recording) : recording,
     now: () => NOW,
   });
-  return { migration, sent, seeded, reads };
+  return { migration, sent, seeded, reads, order };
 }
 
 function attachedFacts(sent: Sent[]): GrantFact[] {
@@ -683,14 +710,75 @@ describe("given an organization with legacy access rows", () => {
       );
     });
 
-    it("treats a head behind the legacy view count as lag, not disagreement", async () => {
-      // Views land legacy-side between passes and the monotonic seed raises
-      // the usage row next pass — outstanding, so the organization heals
-      // instead of re-holding forever on an actively-viewed link.
+    /** @scenario "A link viewed between passes does not hold the organization" */
+    it("hands the budget over before it reads what it will check against", async () => {
+      const { migration, order } = harness({
+        shareLinks: [shareLink({ maxViews: 10, viewCount: 3 })],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(order).toEqual(["seedBudgets", "readResourceRows"]);
+    });
+
+    /** @scenario "A link viewed between passes does not hold the organization" */
+    it("does not hold an organization for a link viewed since the last pass", async () => {
+      // The race this closes: seeding AFTER the read compared a count the
+      // seed had already superseded, so a link viewed at any point between
+      // one pass's seed and the next pass's read counted outstanding all over
+      // again — and an organization whose links are viewed at all could never
+      // finalize, however many passes it was given.
       const row = shareLink({ maxViews: 10, viewCount: 3 });
       const { migration } = harness({
         shareLinks: [row],
         organizationCreatedAtMs: null,
+        resourceRows: [
+          {
+            grantId: row.id,
+            source: "migration",
+            token: row.token,
+            resourceKind: "TRACE",
+            resourceId: row.resourceId,
+            projectId: row.projectId,
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAtMs: null,
+            maxViews: 10,
+            // Two views landed legacy-side since the last pass.
+            viewCount: 1,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("finalized");
+    });
+
+    /** @scenario "A view budget is raised on a re-run, never lowered" */
+    it("treats a budget the handover could not raise as lag, not disagreement", async () => {
+      // The one case the seed's guard refuses: a GRANTUSAGE row that
+      // disagrees about which project it belongs to. Outstanding rather than
+      // a diff, so it heals the moment the row is corrected instead of
+      // latching.
+      //
+      // The grant below sits on the RIGHT project — `projectId: row.projectId`
+      // — so nothing here is a `resource_changed` diff. That comparison is
+      // over the grant's project, which is checked; the budget row's project
+      // is a different column that `findResourceGrantRows` does not select.
+      // What differs is the count alone, which is why this is lag.
+      //
+      // And only while the COUNTS disagree, which is what this pins. A budget
+      // row already at the right count reads as agreement and the
+      // organization finalizes over it — deliberately: the row is not the
+      // seed's to move, the mismatch fails toward fewer views (the consume
+      // fences on the same columns and simply misses), and holding on it
+      // would be a hold no later pass could clear.
+      const row = shareLink({ maxViews: 10, viewCount: 3 });
+      const { migration } = harness({
+        shareLinks: [row],
+        organizationCreatedAtMs: null,
+        unseededGrantIds: [row.id],
         resourceRows: [
           {
             grantId: row.id,
@@ -927,6 +1015,74 @@ describe("given an organization with legacy access rows", () => {
         "role_gone",
         "role_system",
       ]);
+    });
+
+    /** @scenario "A custom role deleted before the migration finished stays deleted" */
+    it("finalizes over a buried role head whose legacy row is gone", async () => {
+      // The organization an API key deletion held forever: the delete a
+      // previous pass sent has landed, the tombstone is permanent — a role's
+      // name stays taken — and nothing about it is still outstanding.
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roleHeads: [
+          {
+            id: "role_buried",
+            name: "apikey:gone",
+            description: null,
+            permissions: [],
+            kind: "system_api_key",
+            deleted: true,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("finalized");
+      expect(sent.filter((entry) => entry.kind === "deleteRole")).toEqual([]);
+    });
+
+    /** @scenario "A deleted custom role that exists again is reported, not quietly restored" */
+    it("names a buried head whose legacy row is back, and states nothing for it", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roles: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+            createdAtMs: CREATED,
+          },
+        ],
+        roleHeads: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+            deleted: true,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        outstanding: number;
+        diffs: Array<{ kind: string; id: string }>;
+      };
+      // Named, not repaired: `role.upsert` leaves `deletedAt` alone, so no
+      // restatement could raise the row.
+      expect(report.diffs).toContainEqual({
+        kind: "role_deleted",
+        id: "role_1",
+      });
+      expect(report.outstanding).toBe(0);
+      expect(sent.filter((entry) => entry.kind === "defineRole")).toEqual([]);
     });
   });
 

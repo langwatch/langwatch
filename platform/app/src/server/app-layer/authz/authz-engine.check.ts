@@ -31,7 +31,12 @@ import {
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
  *  has not caught up with what this pass stated or revoked. */
 export type AuthzEngineDiff = {
-  kind: "grant_revoked" | "grant_changed" | "role_changed" | "resource_changed";
+  kind:
+    | "grant_revoked"
+    | "grant_changed"
+    | "role_changed"
+    | "role_deleted"
+    | "resource_changed";
   id: string;
   field?: string;
   expected?: string | null;
@@ -104,10 +109,24 @@ export function checkRoleHeads({
       outstanding.push(role.roleId);
       continue;
     }
+    // A buried head is not agreement, and it is not lag either: the fold has
+    // no un-delete — `role.upsert` never touches `deletedAt`, and the delete
+    // moved the row's business time past anything a restatement could carry —
+    // so the disagreement is named for an operator rather than waited on. The
+    // `grant_revoked` treatment, one tier over.
+    if (head.deleted) {
+      diffs.push({ kind: "role_deleted", id: role.roleId });
+      continue;
+    }
     diffs.push(...roleDiffs({ role, head }));
   }
   for (const head of heads.roleHeads) {
-    if (!expectedRoleIds.has(head.id)) {
+    // An extra is a head whose legacy row is gone, waiting on the deletion
+    // this pass sent. A head ALREADY deleted is that deletion applied, and it
+    // never leaves this read — the name a role took stays taken, so the
+    // tombstone is permanent — which makes counting it outstanding a hold no
+    // later pass can clear.
+    if (!head.deleted && !expectedRoleIds.has(head.id)) {
       outstanding.push(head.id);
     }
   }
@@ -278,12 +297,37 @@ function roleDiffs({
  * said, mapped to that spelling.
  *
  * The view budget cuts both ways and the two directions mean different
- * things. A head BEHIND the legacy count is convergence lag — views land
- * legacy-side between passes and the monotonic seed raises the usage row
- * next pass — so it is `outstanding`, not a disagreement; reporting it as
- * one made an actively-viewed link re-hold the organization forever. A
- * head AHEAD of the legacy count is a budget that grew back, which nothing
- * legitimate produces, so that is the named diff.
+ * things. A head BEHIND the legacy count is convergence lag and never a
+ * disagreement: reporting it as one made an actively-viewed link re-hold the
+ * organization forever. The pass now hands the budget over BEFORE it takes
+ * the read this walks (see `migrateTenant`), so the lag is already repaired
+ * by the time the comparison runs and this should find nothing. It stays
+ * `outstanding` rather than becoming a diff for the one case the handover
+ * cannot cover — a usage row that disagrees about which project it belongs
+ * to, which the seed's guard deliberately will not move — because that heals
+ * the moment the row is corrected and must not latch. A head AHEAD of the
+ * legacy count is a budget that grew back, which nothing legitimate
+ * produces, so that is the named diff.
+ *
+ * That last case is only VISIBLE while the counts also disagree, and it is a
+ * different column from the `projectId` compared below. Two projects are in
+ * play and only one of them is checked:
+ *
+ * - `head.projectId` is the GRANT row's, and the table below compares it, so
+ *   a share whose grant sits on the wrong project is a `resource_changed`
+ *   diff whatever its view count says.
+ * - `GrantUsage.projectId` is the BUDGET row's. `findResourceGrantRows`
+ *   selects only `grantId` and `viewCount` from that table, so it never
+ *   reaches this comparison at all.
+ *
+ * A budget row on the wrong project but already at the right count therefore
+ * reads as agreement here and the organization finalizes over it. That is
+ * deliberate: the row is not the seed's to move, the mismatch fails toward
+ * fewer views rather than more (the consume fences on the same three columns,
+ * so it simply does not match), and holding on it would be a hold no pass
+ * could ever clear — the exact disease the rest of this file exists to cure.
+ * The budget VALUE, which is what the proof is actually about, is correct
+ * either way.
  *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the

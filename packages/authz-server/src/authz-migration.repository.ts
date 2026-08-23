@@ -83,6 +83,11 @@ export type RoleHeadRow = {
   description: string | null;
   permissions: unknown;
   kind: string;
+  /** Whether the fold has marked this head deleted. A tombstone is still a
+   *  row - the name it took stays taken - so the read that serves the proof
+   *  returns it and says so, rather than dropping it and leaving the check to
+   *  read an absence as "not folded yet". */
+  deleted: boolean;
 };
 
 /**

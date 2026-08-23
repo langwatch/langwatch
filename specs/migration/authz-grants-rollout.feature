@@ -124,6 +124,56 @@ Feature: Moving an organization onto the grants projection
     When the migration runs again
     Then that grant is revoked
 
+  @unit
+  Scenario: A custom role deleted before the migration finished stays deleted
+    Given a custom role the migration has already deleted
+    And the organization no longer has that role
+    When the migration runs again
+    Then the organization finalizes
+    And that role's deletion is not repeated
+
+  @unit
+  Scenario: A deleted custom role that exists again is reported, not quietly restored
+    Given a custom role the migration has already deleted
+    And the organization has that role again under the same id
+    When the migration runs again
+    Then the organization is held
+    And the report names that role as a disagreement
+    And the role is not restored automatically
+
+  @unit
+  Scenario: A view budget is raised on a re-run, never lowered
+    Given a share link whose usage row was seeded on an earlier pass
+    When the migration seeds the budgets again
+    Then a usage row below the legacy count is raised to it
+    And a usage row already at or above it is left exactly as it is
+    And a usage row that disagrees about which project it belongs to is untouched
+
+  @unit
+  Scenario: The view budget handover costs statements, not round trips
+    Given an organization with more share links than one statement can carry
+    When the migration seeds the budgets
+    Then the seeds are stated in whole chunks, not one round trip per link
+    And an organization with no share links states nothing at all
+
+  # A pass that handed the budget over AFTER checking compared a count it had
+  # already superseded, so any link viewed between two passes was reported as
+  # unfinished work again, and an organization whose links are viewed at all
+  # could never finish.
+  @unit
+  Scenario: A link viewed between passes does not hold the organization
+    Given a share link that has been viewed since the last pass
+    When the migration runs
+    Then the new view count is handed over before the organization is checked
+    And the organization is not held for that link
+
+  @unit
+  Scenario: A pass is not limited by how many share links an organization has
+    Given an organization with hundreds of thousands of share links
+    When the migration reads their view budgets
+    Then the budgets are read for the organization as a whole
+    And the pass is not asked to name every link at once
+
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is
     Given the queue is unavailable
