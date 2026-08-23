@@ -106,6 +106,11 @@ function harness(data: Data = {}) {
       }));
     },
     seedResourceGrantUsage: async ({ seeds }) => {
+      // Land the budget on a later microtask, so the raise above is only
+      // visible to a pass that AWAITS this. A synchronous push would read as
+      // ordered even if the migration dropped the await and left the write
+      // in flight.
+      await Promise.resolve();
       seeded.push([...seeds]);
     },
   };
