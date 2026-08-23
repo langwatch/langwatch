@@ -1,15 +1,6 @@
 import type { IdentifierProvider } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 
-export type WriteOperation =
-  | "create"
-  | "update"
-  | "updateMany"
-  | "delete"
-  | "deleteMany"
-  | "consumeOne"
-  | "incrementOne";
-
-export const WRITE_OPERATIONS: readonly WriteOperation[] = [
+export const WRITE_OPERATIONS = [
   "create",
   "update",
   "updateMany",
@@ -17,7 +8,9 @@ export const WRITE_OPERATIONS: readonly WriteOperation[] = [
   "deleteMany",
   "consumeOne",
   "incrementOne",
-];
+] as const;
+
+export type WriteOperation = (typeof WRITE_OPERATIONS)[number];
 
 export type Route = "protocol" | "domain";
 

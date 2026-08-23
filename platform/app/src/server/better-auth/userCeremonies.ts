@@ -1,7 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { newIdentityCommandId } from "~/server/app-layer/identity/identity-ceremonies";
 import { mintUserHashKeyIfMissing } from "~/server/app-layer/identity/user-hash-key";
-import type { AdapterContext, DbAdapter } from "./identityAdapterContext";
+import {
+  type AdapterContext,
+  type DbAdapter,
+  findAllRows,
+} from "./identityAdapterContext";
 import { routeWrite } from "./identityRouting";
 
 const logger = createLogger("langwatch:better-auth:identity-adapter");
@@ -27,7 +31,7 @@ export async function eraseBeforeUserDelete(
 ): Promise<string[] | null> {
   const route = routeWrite(args.model, operation);
   if (route !== "domain" || args.model !== "user") return null;
-  const rows = await ctx.base.findMany<{ id: string }>({
+  const rows = await findAllRows<{ id: string }>(ctx.base, {
     model: "user",
     where: args.where,
   });

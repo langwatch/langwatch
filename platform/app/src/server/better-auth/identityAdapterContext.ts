@@ -19,6 +19,35 @@ export interface AdapterContext {
 }
 
 /**
+ * The adapter's `findMany` defaults its `limit` to 100 when none is given,
+ * so a ceremony selection over an unbounded predicate must page or it
+ * silently sees only the first 100 rows — and `pinnedToIds` would then
+ * narrow the protocol delete to that subset. Ordered by id so offset
+ * paging is stable.
+ */
+export async function findAllRows<Row extends { id: string }>(
+  base: DbAdapter,
+  {
+    model,
+    where,
+  }: { model: string; where: Parameters<DbAdapter["delete"]>[0]["where"] },
+): Promise<Row[]> {
+  const pageSize = 100;
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await base.findMany<Row>({
+      model,
+      where,
+      limit: pageSize,
+      offset,
+      sortBy: { field: "id", direction: "asc" },
+    });
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
+/**
  * The rows the ceremony pass saw (detach or erasure) are the rows the
  * protocol write removes:
  * re-evaluating the caller's `where` after the ceremonies ran could delete

@@ -2,7 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { newIdentityCommandId } from "~/server/app-layer/identity/identity-ceremonies";
-import type { AdapterContext, DbAdapter } from "./identityAdapterContext";
+import {
+  type AdapterContext,
+  type DbAdapter,
+  findAllRows,
+} from "./identityAdapterContext";
 import { identifierProviderFor, routeWrite } from "./identityRouting";
 
 const logger = createLogger("langwatch:better-auth:identity-adapter");
@@ -26,7 +30,7 @@ export async function detachBeforeAccountDelete(
 ): Promise<string[] | null> {
   const route = routeWrite(args.model, operation);
   if (route !== "domain" || args.model !== "account") return null;
-  const rows = await ctx.base.findMany<AccountRowShape>({
+  const rows = await findAllRows<AccountRowShape>(ctx.base, {
     model: "account",
     where: args.where,
   });

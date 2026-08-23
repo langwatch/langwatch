@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { IdentityPrimaryMustDemoteFirstError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
+import { findAllRows } from "../identityAdapterContext";
 import { createIdentityDatabase } from "../identityDatabase";
 import {
   IdentityAdapterUnroutedWriteError,
@@ -144,6 +145,33 @@ describe("identity adapter routing table", () => {
       expect(() => routeWrite("twoFactor", "delete")).toThrow(
         /twoFactor.*delete/,
       );
+    });
+  });
+});
+
+describe("findAllRows", () => {
+  describe("when the predicate matches more rows than one adapter page", () => {
+    it("pages until the selection is complete", async () => {
+      const rows = Array.from({ length: 250 }, (_, index) => ({
+        id: `row_${String(index).padStart(3, "0")}`,
+      }));
+      const findMany = vi.fn(
+        async ({ limit, offset }: { limit: number; offset: number }) =>
+          rows.slice(offset, offset + limit),
+      );
+      const base = { findMany } as never;
+
+      const all = await findAllRows<{ id: string }>(base, {
+        model: "user",
+        where: [],
+      });
+
+      // The adapter caps an unbounded findMany at 100 rows; three pages
+      // cover 250, and a ceremony pass sees every matching row.
+      expect(all).toHaveLength(250);
+      expect(all[0]?.id).toBe("row_000");
+      expect(all[249]?.id).toBe("row_249");
+      expect(findMany).toHaveBeenCalledTimes(3);
     });
   });
 });
