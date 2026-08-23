@@ -1,0 +1,33 @@
+{
+  "name": "@langwatch/architecture-lint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executable package-boundary policies for the LangWatch monorepo.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "lint": "tsx src/cli.ts --root ../..",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "typescript": "6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "oxlint": "^1.78.0",
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.9"
+  }
+}

@@ -13,6 +13,8 @@
 packages:
   - "platform/app"
   - "packages/*"
+  - "packages/features/*/*"
+  - "packages/enterprise/features/*/*"
   - "mcp/typescript"
   - "plugins/*"
   - "sdks/typescript"

@@ -38,6 +38,7 @@
     "packages/authz-server/",
     "packages/automations/",
     "packages/clickhouse-client/",
+    "packages/config/",
     "packages/handled-error/",
     "packages/langy/",
     "packages/observability/",
@@ -46,6 +47,9 @@
     "packages/redis-client/",
     "packages/ssrf/",
     "packages/system-migrations/",
+    "packages/design-system/",
+    "packages/features/",
+    "packages/enterprise/features/",
     "platform/app/",
     "services/langevals/",
     "sdks/python/",
@@ -73,7 +77,7 @@
     "build": "pnpm -r --filter \"!@langwatch/server\" build",
     "build:app": "pnpm --filter @langwatch/web... build",
     "build:cli": "pnpm --filter @langwatch/server-cli build",
-    "test": "pnpm -r --filter \"./packages/*\" test",
+    "test": "pnpm -r --filter \"./packages/*\" --filter \"./packages/features/*/*\" --filter \"./packages/enterprise/features/*/*\" test",
     "test:unit": "pnpm --filter @langwatch/web test:unit",
     "test:component": "pnpm --filter @langwatch/web test:component",
     "test:integration": "pnpm --filter @langwatch/web test:integration",
@@ -82,7 +86,8 @@
     "test:sdk": "pnpm --filter langwatch test",
     "typecheck": "pnpm --filter @langwatch/web typecheck",
     "typecheck:all": "pnpm --filter @langwatch/web typecheck:all",
-    "lint": "pnpm --filter @langwatch/web lint",
+    "lint": "pnpm --filter @langwatch/web lint && pnpm lint:architecture",
+    "lint:architecture": "oxlint --quiet --config .oxlintrc.architecture.json packages/features packages/config packages/design-system platform/app/src && pnpm --filter @langwatch/architecture-lint lint",
     "lint:fix": "pnpm --filter @langwatch/web lint:fix",
     "format": "pnpm --filter @langwatch/web format",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
@@ -92,6 +97,7 @@
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
   },
   "devDependencies": {
+    "oxlint": "^1.78.0",
     "typescript": "^7.0.2"
   }
 }

@@ -95,12 +95,16 @@ function manifestDir(manifest: string): string {
 /** Whether dir is a workspace member per the `packages:` globs. */
 function isWorkspaceMember(dir: string): boolean {
 	if (dir === "") return false;
-	return workspaceMembers().some((glob) =>
-		glob.endsWith("/*")
-			? dir.startsWith(`${glob.slice(0, -2)}/`) &&
-				!dir.slice(glob.length - 1).includes("/")
-			: dir === glob,
-	);
+	const directoryParts = dir.split("/");
+	return workspaceMembers().some((glob) => {
+		const globParts = glob.split("/");
+		return (
+			globParts.length === directoryParts.length &&
+			globParts.every(
+				(part, index) => part === "*" || part === directoryParts[index],
+			)
+		);
+	});
 }
 
 describe("the repo is a single pnpm workspace", () => {

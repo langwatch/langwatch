@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": [
+    {
+      "name": "langwatch",
+      "specifier": "./packages/architecture-lint/oxlint-plugin.mjs"
+    }
+  ],
+  "rules": {
+    "langwatch/package-boundaries": "error",
+    "langwatch/feature-module-classes": "error",
+    "langwatch/service-classes": "error",
+    "langwatch/no-conditional-spread": "error"
+  },
+  "overrides": [
+    {
+      "files": [
+        "packages/features/*/server/src/**/*.ts",
+        "packages/enterprise/features/*/server/src/**/*.ts"
+      ],
+      "rules": {
+        "no-nested-ternary": "error"
+      }
+    }
+  ]
+}
