@@ -257,7 +257,7 @@ describe("PATCH /:traceId/metadata", () => {
       const docsPath = path.resolve(
         __dirname,
         "../../../../../../../..",
-        "docs/api-reference/traces/update-metadata.mdx",
+        "docs/api-reference/traces/update-trace-metadata.mdx",
       );
       expect(fs.existsSync(docsPath)).toBe(true);
 
