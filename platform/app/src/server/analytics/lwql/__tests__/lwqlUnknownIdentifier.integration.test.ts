@@ -65,7 +65,7 @@ describe("given a statement naming a column no dataset defines", () => {
     if (!harness) return;
     // The executor owns a connection pool against this server; release it
     // before the container stops, or the sockets outlive the suite.
-    await executor.close();
+    await executor.close?.();
     await harness.stop();
   });
 

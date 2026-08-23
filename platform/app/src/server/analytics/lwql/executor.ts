@@ -236,10 +236,13 @@ const LWQL_MAX_OPEN_CONNECTIONS = 10;
  * Exported so the translation is testable without a live server; the executor
  * is its only production caller.
  */
-export function translateLangWatchQLExecutionError(
-  error: unknown,
-  durationMs: number,
-): unknown {
+export function translateLangWatchQLExecutionError({
+  error,
+  durationMs,
+}: {
+  error: unknown;
+  durationMs: number;
+}): unknown {
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
       identifiers: clickHouseMissingIdentifiers(error),
@@ -301,10 +304,10 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        throw translateLangWatchQLExecutionError(
+        throw translateLangWatchQLExecutionError({
           error,
-          Date.now() - startedAt,
-        );
+          durationMs: Date.now() - startedAt,
+        });
       }
     },
 
