@@ -29,7 +29,7 @@ function ReasoningSection({ reasoning }: { reasoning?: string }) {
       <Text fontWeight="semibold" color="fg" fontSize="md" mb={2}>
         Reasoning:
       </Text>
-      <Text color="fg" fontSize="sm" lineHeight="tall">
+      <Text color="fg" fontSize="sm" lineHeight="tall" wordBreak="break-word">
         {reasoning}
       </Text>
     </Box>
@@ -66,7 +66,12 @@ function CriteriaSection({
                 mt={2}
                 flexShrink={0}
               />
-              <Text color={textColor} fontSize="sm" lineHeight="tall">
+              <Text
+                color={textColor}
+                fontSize="sm"
+                lineHeight="tall"
+                wordBreak="break-word"
+              >
                 {criterion}
               </Text>
             </HStack>

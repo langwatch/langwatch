@@ -34,7 +34,12 @@ export function ScenarioRunHeader({
             <VStack align="start" gap={0} ml={0}>
               {copyableIds.map((id) => (
                 <HStack key={id.label} gap={1}>
-                  <Text fontSize="xs" color="fg.muted" lineHeight="0">
+                  <Text
+                    fontSize="xs"
+                    color="fg.muted"
+                    lineHeight="0"
+                    wordBreak="break-word"
+                  >
                     {id.label}: {id.value}
                   </Text>
                   <CopyButton

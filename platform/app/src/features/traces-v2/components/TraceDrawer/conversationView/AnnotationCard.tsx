@@ -345,6 +345,9 @@ function SuggestedCorrection({
         whiteSpace="pre-wrap"
         maxHeight="160px"
         overflowY="auto"
+        // Explicit, so an overflowing unbreakable token clips here instead of
+        // computing overflow-x to auto and growing a horizontal scrollbar.
+        overflowX="hidden"
       >
         {expectedOutput}
       </Box>

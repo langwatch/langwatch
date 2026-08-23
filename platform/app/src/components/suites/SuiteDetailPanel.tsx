@@ -77,7 +77,7 @@ export function SuiteDetailPanel({
       <Box paddingX={6} paddingY={4}>
         <HStack justify="space-between" align="start">
           <VStack align="start" gap={1}>
-            <Text fontSize="xl" fontWeight="bold">
+            <Text fontSize="xl" fontWeight="bold" wordBreak="break-word">
               {suite.name}
             </Text>
             {suite.description && (

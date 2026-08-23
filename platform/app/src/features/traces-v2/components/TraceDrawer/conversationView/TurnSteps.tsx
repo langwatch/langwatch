@@ -166,7 +166,7 @@ function StepRow({ step }: { step: Step }) {
       >
         {isTool ? "⏺" : "◆"}
       </Text>
-      <Text {...CELL} color="fg" flexShrink={0}>
+      <Text {...CELL} color="fg" flexShrink={0} wordBreak="break-word">
         {step.label}
       </Text>
       {step.arg && (

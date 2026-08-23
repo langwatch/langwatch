@@ -344,6 +344,9 @@ export function ScenarioRunDetailDrawer({
               paddingY={0}
               paddingX={0}
               overflowY="auto"
+              // Explicit, so a stray overflow clips instead of computing
+              // overflow-x to auto and growing a horizontal scrollbar.
+              overflowX="hidden"
               display="flex"
               flexDirection="column"
               width="full"
@@ -633,6 +636,7 @@ function ParameterRow({
         color="fg.muted"
         width="180px"
         flexShrink={0}
+        wordBreak="break-word"
       >
         {name}
       </Text>

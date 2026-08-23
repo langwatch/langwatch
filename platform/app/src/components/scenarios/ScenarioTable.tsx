@@ -83,7 +83,11 @@ export function ScenarioTable({
       }),
       columnHelper.accessor("name", {
         header: "Name",
-        cell: (info) => <Text fontWeight="medium">{info.getValue()}</Text>,
+        cell: (info) => (
+          <Text fontWeight="medium" wordBreak="break-word">
+            {info.getValue()}
+          </Text>
+        ),
       }),
       columnHelper.accessor("labels", {
         header: "Labels",

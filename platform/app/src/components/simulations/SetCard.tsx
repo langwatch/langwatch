@@ -55,7 +55,7 @@ export function SetCard({
             {"\uD83C\uDFAD"}
           </Text>
         )}
-        <Text fontWeight="500" color="fg">
+        <Text fontWeight="500" color="fg" wordBreak="break-word">
           {displayName}
         </Text>
 
