@@ -420,10 +420,17 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
  * A Langy reason carries only `kind`; the registry matches on `code` OR
  * `kind`, so the one name fills both. Nothing is read out of a reason except
  * membership of an enumerated set, so no upstream prose can ride along.
+ *
+ * Returns the mutable element array rather than the readonly one the shape
+ * declares: a nested `reasons` field is `SerializedReason[]`, so the recursive
+ * step has to produce that to build the chain. A caller reading the whole
+ * result as readonly still works, since mutable widens to readonly.
  */
+type RegistryReason = HandledErrorShape["reasons"][number];
+
 function toRegistryReasons(
   reasons: LangySerializedReason[] | undefined,
-): HandledErrorShape["reasons"] {
+): RegistryReason[] {
   return (reasons ?? []).map((reason) => ({
     code: reason.kind,
     kind: reason.kind,
