@@ -21,11 +21,8 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import {
-  authorizeInResolver,
-  checkOrganizationPermission,
-  hasOrganizationPermission,
-} from "../rbac";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -85,7 +82,12 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         targetUserId: z.string().optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "assertOrgMembership refuses non-members; own keys only, unless virtualKeys:viewOtherPersonal is held at this organization",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await assertOrgMembership({
         prisma: ctx.prisma,
@@ -100,8 +102,8 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       if (input.targetUserId === callerId) {
         principalUserId = callerId;
       } else {
-        const canViewOthers = await hasOrganizationPermission(
-          { prisma: ctx.prisma, session: ctx.session },
+        const canViewOthers = await probeOrganizationPermission(
+          ctx,
           input.organizationId,
           "virtualKeys:viewOtherPersonal",
         );
@@ -154,7 +156,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         routingPolicyId: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       await assertOrgMembership({
         prisma: ctx.prisma,
@@ -245,7 +247,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
   /** Revoke one of the caller's personal VKs. Idempotent. */
   revokePersonal: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       await assertOrgMembership({
         prisma: ctx.prisma,

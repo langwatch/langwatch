@@ -19,10 +19,13 @@ import {
   runParameterValuesSchema,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
+import {
+  encryptRunSecretValues,
+  type RunSecretCiphertext,
+} from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("SimulationRunnerRouter");
@@ -53,12 +56,13 @@ const runScenarioSchema = projectSchema.extend({
 });
 
 /**
- * Resolves what the run reads as `params.NAME`: the scenario's declared
- * defaults, with the supplied values over the top.
+ * Resolves what the run reads as `params.NAME` and what it reads as
+ * `secrets.NAME`: the scenario's declared defaults, with the supplied values
+ * over the top, and the secret values split out and encrypted.
  *
  * Runs before anything is queued, the same way a suite run does, so an unknown
- * name, a reference with no value, or unrenderable text refuses the request
- * rather than producing a run that fails halfway through.
+ * name, a secret with no value, a reference with no value, or unrenderable text
+ * refuses the request rather than producing a run that fails halfway through.
  */
 async function resolveParametersForRun({
   prisma,
@@ -70,13 +74,24 @@ async function resolveParametersForRun({
   projectId: string;
   scenarioId: string;
   values?: RunParameterValues;
-}): Promise<RunParameterValues> {
+}): Promise<{
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+}> {
   const scenarios = await ScenarioService.create(prisma).getRunConfigByIds({
     ids: [scenarioId],
     projectId,
   });
   const resolved = await resolveRunParameters({ scenarios, values });
-  return resolved.get(scenarioId) ?? {};
+  const forScenario = resolved.get(scenarioId);
+  return {
+    parameters: forScenario?.parameters ?? {},
+    // Encrypted here, before the validation prefetch and before the queued
+    // command: neither is allowed to hold a readable credential.
+    secretParameters: encryptRunSecretValues(
+      forScenario?.secretParameters ?? {},
+    ),
+  };
 }
 
 /**
@@ -84,6 +99,10 @@ async function resolveParametersForRun({
  * ClickHouse before the execution job is scheduled, the same order
  * SuiteRunService.startRun uses. The resolved parameters travel on the
  * metadata, which is the only channel that carries them into execution.
+ *
+ * The secret values travel beside the metadata rather than inside it, so the
+ * fold projection cannot copy them into the runs store. Only their names go on
+ * the metadata.
  */
 async function queueRun({
   projectId,
@@ -94,6 +113,7 @@ async function queueRun({
   name,
   target,
   parameters,
+  secretParameters,
 }: {
   projectId: string;
   scenarioId: string;
@@ -103,7 +123,13 @@ async function queueRun({
   name: string;
   target: z.infer<typeof simulationTargetSchema>;
   parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
 }): Promise<void> {
+  const secretParameterNames = Object.keys(secretParameters);
+  const metadata = {
+    ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+    ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
+  };
   try {
     await getApp().simulations.queueRun({
       tenantId: projectId,
@@ -112,9 +138,8 @@ async function queueRun({
       batchRunId,
       scenarioSetId: setId,
       name,
-      ...(Object.keys(parameters).length > 0
-        ? { metadata: { parameters } }
-        : {}),
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      ...(secretParameterNames.length > 0 ? { secretParameters } : {}),
       target: { type: target.type, referenceId: target.referenceId },
       occurredAt: Date.now(),
     });
@@ -144,12 +169,12 @@ export const simulationRunnerRouter = createTRPCRouter({
    */
   run: protectedProcedure
     .input(runScenarioSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();
 
-      const parameters = await resolveParametersForRun({
+      const { parameters, secretParameters } = await resolveParametersForRun({
         prisma: ctx.prisma,
         projectId: input.projectId,
         scenarioId: input.scenarioId,
@@ -165,6 +190,7 @@ export const simulationRunnerRouter = createTRPCRouter({
           setId,
           batchRunId,
           parameters,
+          secretParameters,
         },
         target: input.target,
         deps,
@@ -206,6 +232,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         name: prefetchResult.data.scenario.name,
         target: input.target,
         parameters,
+        secretParameters,
       });
 
       // No explicit job scheduling — the execution subscriber picks up the queued

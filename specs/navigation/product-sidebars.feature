@@ -18,6 +18,18 @@ Feature: Product sidebars in the new navigation modes
   the column, and the scrollbar sits against the content panel with no
   gap.
 
+  The rule above the bottom block is the bottom edge of the part that
+  scrolls: it keeps the same distance from both edges of the column, and
+  the entries pass under it and are cut there. The space between the
+  last entry and the rule belongs to the scrolling part, so it is there
+  when the menu rests and the entries travel through it as it moves.
+
+  The menu moves only when it must. It keeps the place the reader put it
+  while they move around the product, and it brings the open page's entry
+  to the top only when that entry would otherwise be out of view. A page
+  near the start of the menu therefore opens with Quick Search and the
+  first group heading still on screen.
+
   @integration
   Scenario: Quick Search sits first and opens the command bar
     Given a product sidebar in a new navigation mode
@@ -40,6 +52,12 @@ Feature: Product sidebars in the new navigation modes
   Scenario: The Gateway sidebar promotes the gateway pages
     Given I am on a Gateway page in a new navigation mode
     Then the sidebar lists the gateway pages from the shared registry
+
+  @integration
+  Scenario: Every gateway entry opens in the tab the reader is in
+    Given the gateway pages in the shared registry
+    Then no entry opens a new tab
+    And no entry carries a new-tab marker
 
   @integration
   Scenario: The Governance sidebar promotes the governance pages
@@ -88,10 +106,34 @@ Feature: Product sidebars in the new navigation modes
     Then a rule runs above the bottom block
 
   @integration
-  Scenario: Opening a page by its address reveals its sidebar entry
-    Given I open a product page by its address
+  Scenario: The rule keeps the same distance from both edges of the column
+    Given a product sidebar in a new navigation mode
+    Then the rule starts as far from the left edge as it ends from the right
+    And the entries of the bottom block line up with the entries above it
+
+  @integration
+  Scenario: The entries are cut at the rule as they scroll under it
+    Given a product sidebar in a new navigation mode
+    Then the part that scrolls ends at the rule
+    And the space above the rule scrolls with the entries
+
+  @integration
+  Scenario: Opening a page whose entry is in view leaves the menu alone
+    Given I open a product page whose entry is in view
+    Then the menu does not scroll
+    And Quick Search and the group heading above the entry stay in view
+
+  @integration
+  Scenario: Opening a page below the fold reveals its sidebar entry
+    Given I open a product page whose entry is below the fold
     Then the sidebar brings that page's entry into view
     And the entry sits as near the top of the menu as the menu allows
+
+  @integration
+  Scenario: The menu keeps its place while I move around the product
+    Given I scroll the menu to reach a page further down
+    When I open that page
+    Then the menu is where I left it
 
   @integration
   Scenario: Moving inside the menu leaves the scroll where it is

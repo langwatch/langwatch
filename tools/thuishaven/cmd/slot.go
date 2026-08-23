@@ -233,11 +233,13 @@ func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int 
 	if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {
 		cmd.Env = append(cmd.Env, "GOMAXPROCS="+procs)
 	}
+	relay := notifySignalRelay()
 	if err := cmd.Start(); err != nil {
+		relay.stopNotify()
 		fmt.Fprintf(os.Stderr, "checks: could not run %s: %v\n", argv[0], err)
 		return 127
 	}
-	relay := startSignalRelay(cmd.Process)
+	relay.forwardTo(cmd.Process)
 	err := cmd.Wait()
 	death := slotDeath{forwarded: relay.close(), canceled: ctx.Err() != nil}
 	reportOutsideKill(err, argv[0], death)
@@ -267,12 +269,30 @@ type signalRelay struct {
 	done      chan struct{}
 }
 
-func startSignalRelay(proc *os.Process) *signalRelay {
+// notifySignalRelay starts listening before there is a child to forward to.
+// Until signal.Notify runs, a terminating signal keeps its default disposition
+// and ends the wrapper where it stands: the interrupt reaches nobody and the
+// command runs on with no parent. The OS drops the slot's flock with the
+// wrapper, so the queue counts that slot free and can start another check on
+// top of a run that is still using the machine, which is the oversubscription
+// the queue exists to prevent. The channel is buffered, so a signal that
+// arrives before the child exists waits in it for forwardTo.
+func notifySignalRelay() *signalRelay {
 	signals := make(chan os.Signal, 4)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	relay := newSignalRelay(signals)
-	go relay.pump(proc)
-	return relay
+	return newSignalRelay(signals)
+}
+
+// forwardTo starts passing signals to the child, including any that arrived
+// while it was starting.
+func (r *signalRelay) forwardTo(proc *os.Process) {
+	go r.pump(proc)
+}
+
+// stopNotify gives up the listening for a run that never started, where there
+// is no pump for close to wait on.
+func (r *signalRelay) stopNotify() {
+	signal.Stop(r.signals)
 }
 
 // newSignalRelay builds the relay over a channel the caller owns, so a test

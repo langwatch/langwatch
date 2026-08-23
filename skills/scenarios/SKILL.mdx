@@ -10,6 +10,7 @@ import CliSetup from "../_shared/cli-setup.mdx";
 import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
 import PlanLimits from "../_shared/plan-limits.mdx";
 import ConsultantMode from "../_shared/consultant-mode.mdx";
+import ImprovingTheAgent from "../_shared/improving-the-agent.mdx";
 
 # Test Your Agent with Scenarios
 
@@ -23,7 +24,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -51,6 +52,10 @@ Best practices:
 - NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
+
+## Improving the Agent When a Scenario Fails
+
+<ImprovingTheAgent />
 
 ## Plan Limits
 
@@ -847,6 +852,8 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`). Run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
 - Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
+- Do NOT fix a failing scenario by pasting new rules, or the failing conversation itself, into the agent's system prompt (see Improving the Agent When a Scenario Fails)
+- Do NOT write judge criteria by restating the agent's system prompt. Criteria describe user outcomes; a rubric that quotes the prompt grades obedience, not quality
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
 - Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)

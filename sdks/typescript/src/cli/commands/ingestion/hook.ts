@@ -84,9 +84,13 @@ import {
  * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
  * wrong session, on the wrong checkout, under the wrong agent.
  *
- * `projectDirVar` matters because a session can `cd` away from where it
- * started: Claude Code exports the root it was launched in, so that beats the
- * payload's `cwd`. Codex and opencode publish no such variable, and their
+ * The payload's `cwd` beats `projectDirVar`. Claude Code's payload `cwd` is
+ * the harness's own working directory: a `cd` inside the Bash tool never moves
+ * it, and a native worktree switch (EnterWorktree) does. `CLAUDE_PROJECT_DIR`
+ * stays pinned to the directory the session was launched in, so preferring it
+ * would keep reporting the launch checkout after the session moved into a
+ * worktree to work on another branch. It remains the fallback for a payload
+ * with no `cwd`. Codex and opencode publish no such variable, and their
  * payload `cwd` is already the session's own directory.
  */
 const TOOLS: Record<
@@ -227,7 +231,7 @@ async function runHook({
   });
 
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
-  const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
+  const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
   // The session's own name, as claude itself holds it. The SessionStart
   // payload carries it at start; the live registry is what makes a
   // mid-session /rename observable from the Stop hook, which runs after

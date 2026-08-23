@@ -10,12 +10,8 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"go.uber.org/zap"
 
@@ -23,6 +19,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
 // terminalEventTypes are the SSE event types that close the per-turn stream:
@@ -147,7 +144,9 @@ func addBearer(req *http.Request, bearerToken string) {
 // opencode binding the port, but it is short enough in practice (and opencode's
 // listen() retries the SO_REUSEADDR socket).
 func GetFreePort() (int, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	// The bind/close pair completes in microseconds; there is no cancellation
+	// to thread, so Background keeps noctx satisfied without changing callers.
+	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, err
 	}
@@ -294,7 +293,7 @@ func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		// Listener not up yet / reset — retryable, not a security verdict.
-		return fmt.Errorf("%w: %v", errAuthProbeUnreachable, err)
+		return fmt.Errorf("%w: %w", errAuthProbeUnreachable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -313,6 +312,59 @@ func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 		})
 	}
 	return nil
+}
+
+// SessionInfo is the slice of opencode's session document the resume decision
+// reads: identity and recency, nothing else.
+type SessionInfo struct {
+	ID   string `json:"id"`
+	Time struct {
+		Updated int64 `json:"updated"`
+	} `json:"time"`
+}
+
+// ListSessions reads the sessions opencode already holds for this home
+// (GET /session). The worker home outlives the process on an idle reap or a
+// crash, and opencode persists its sessions inside it — so a respawn can
+// resume the newest one instead of starting over.
+func ListSessions(ctx context.Context, port int, bearerToken string) ([]SessionInfo, error) {
+	url := fmt.Sprintf("http://127.0.0.1:%d/session", port)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	addBearer(req, bearerToken)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list sessions: %d %s", resp.StatusCode, string(b))
+	}
+	var sessions []SessionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
+		return nil, fmt.Errorf("list sessions: decode: %w", err)
+	}
+	return sessions, nil
+}
+
+// NewestSession picks the most recently updated session, or "" when there is
+// none worth resuming.
+func NewestSession(sessions []SessionInfo) string {
+	newest := ""
+	var newestAt int64 = -1
+	for _, s := range sessions {
+		if s.ID == "" {
+			continue
+		}
+		if s.Time.Updated > newestAt {
+			newest = s.ID
+			newestAt = s.Time.Updated
+		}
+	}
+	return newest
 }
 
 // CreateSession posts a fresh session to the worker. Returns the
@@ -405,7 +457,7 @@ func PostMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 // must checkpoint before — strictly inside the graceful window (see the ADR-048
 // deadline math). Best-effort: a non-2xx or transport error is returned to the
 // caller, which logs and proceeds with the drain (a worker that cannot be
-// notified simply cold-starts on its next turn, today's behaviour). opencode is
+// notified simply cold-starts on its next turn, today's behavior). opencode is
 // expected to answer 2xx/204; a 404 means the session already vanished.
 func NotifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID string, deadline time.Time) error {
 	body := bytes.NewBufferString(fmt.Sprintf(`{"deadline":%d}`, deadline.UnixMilli()))
@@ -533,7 +585,7 @@ func recordPartType(partTypes map[string]string, ev *sseEvent) {
 // opencode's `part.type` for a tool call, and the `state.status` values a tool
 // part transitions through. `completed` and `error` are the settle transitions.
 // `failed` is not a shape opencode is known to emit — it is tolerated as an
-// error alias purely so an unrecognised settle status can never strand a card
+// error alias purely so an unrecognized settle status can never strand a card
 // spinning forever with no `end`.
 const (
 	toolPartType        = "tool"
@@ -542,86 +594,6 @@ const (
 	toolStatusError     = "error"
 	toolStatusFailed    = "failed"
 )
-
-// The plan channel. opencode's `todowrite` is a first-class tool that rewrites
-// the whole todo list per call; when one settles the manager mirrors its input
-// as a typed plan frame (the panel's live checklist). Bounds keep a runaway list
-// from flooding the wire — the plan is capped, and long item text truncated,
-// never dropped.
-const (
-	todowriteToolName   = "todowrite"
-	maxPlanItems        = 30
-	maxPlanContentChars = 200
-)
-
-// isTodoWriteTool reports whether a tool part is the plan tool.
-func isTodoWriteTool(name string) bool {
-	return strings.EqualFold(name, todowriteToolName)
-}
-
-// truncatePlanContent caps one item's text at maxPlanContentChars runes, marking
-// an overflow with an ellipsis (truncate, never drop).
-func truncatePlanContent(s string) string {
-	r := []rune(s)
-	if len(r) <= maxPlanContentChars {
-		return s
-	}
-	return string(r[:maxPlanContentChars]) + "…"
-}
-
-// todoEntry is one row of a `todowrite` input, in either shape opencode emits.
-type todoEntry struct {
-	Content string `json:"content"`
-	Status  string `json:"status"`
-}
-
-// planItemsFromInput derives the capped, truncated plan snapshot from a settled
-// `todowrite` tool part's input. It tolerates the `{ "todos": [...] }` wrapper
-// and a bare array, and reports ok=false when there is no non-empty item to
-// carry (so a malformed/empty todowrite emits no plan frame, not an empty one).
-func planItemsFromInput(raw json.RawMessage) ([]frames.PlanItem, bool) {
-	raw = rawToolValue(raw)
-	if len(raw) == 0 {
-		return nil, false
-	}
-	var wrapper struct {
-		Todos []todoEntry `json:"todos"`
-	}
-	var todos []todoEntry
-	if err := json.Unmarshal(raw, &wrapper); err == nil && len(wrapper.Todos) > 0 {
-		todos = wrapper.Todos
-	} else {
-		var arr []todoEntry
-		if err := json.Unmarshal(raw, &arr); err != nil || len(arr) == 0 {
-			return nil, false
-		}
-		todos = arr
-	}
-	items := make([]frames.PlanItem, 0, len(todos))
-	for _, td := range todos {
-		content := strings.TrimSpace(td.Content)
-		if content == "" {
-			continue
-		}
-		items = append(items, frames.PlanItem{
-			Content: truncatePlanContent(content),
-			Status:  td.Status,
-		})
-		if len(items) >= maxPlanItems {
-			break
-		}
-	}
-	if len(items) == 0 {
-		return nil, false
-	}
-	return items, true
-}
-
-// maxToolOutputBytes caps a forwarded tool result. A tool can return megabytes
-// (a big file read, a wide query); the card only ever shows a preview, so the
-// stream must not carry the whole thing. Overflow is cut on a rune boundary and
-// marked with a trailing ellipsis.
-const maxToolOutputBytes = 8 * 1024
 
 // toolStateSettled classifies a tool state.status: reports whether the call has
 // finished, and whether it finished badly.
@@ -661,194 +633,6 @@ func toolCallID(part *ssePart) string {
 	return part.ID
 }
 
-// rawToolValue normalises an optional raw JSON field: an absent field and an
-// explicit `null` both become nil, so the frame omits them rather than carrying
-// a meaningless `"input":null`.
-func rawToolValue(raw json.RawMessage) json.RawMessage {
-	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
-		return nil
-	}
-	return raw
-}
-
-// hasToolInput reports whether a tool part actually tells us WHAT the call is
-// doing — i.e. whether its input carries any argument at all.
-//
-// `{}` is the case that matters and the one `rawToolValue` cannot see: it is a
-// present, valid, entirely uninformative object. opencode really does emit a
-// `running` transition whose input is still `{}` and then RE-SEND the same
-// `running` once the arguments have materialised (the re-send is a known shape —
-// see the tracker's dedupe). Treating that first empty `{}` as "we know the
-// input" is what stranded every card: the start frame went out with no command,
-// the tracker latched the call as started, and the re-send carrying the actual
-// command was dropped as a duplicate. The command then existed nowhere on the
-// wire — not on the start, not on the end — so the control plane could not
-// re-type `bash("langwatch trace search")` into the capability it was, and the
-// panel had nothing to label the card with but the tool's own name ("Bash…").
-//
-// So an empty object is NOT input. Waiting one more transition for the real
-// thing is the whole difference between a card that says what it is doing and a
-// card that says "Bash".
-func hasToolInput(raw json.RawMessage) bool {
-	raw = rawToolValue(raw)
-	if len(raw) == 0 {
-		return false
-	}
-	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &probe); err == nil {
-		return len(probe) > 0
-	}
-	// A non-object input (opencode types tool input loosely) is information.
-	return true
-}
-
-// toolTextFromRaw renders a raw tool result as the STRING the frame contract
-// requires. A JSON string is unquoted to its value; any other JSON value (an
-// object, an array, a number — opencode types tool output loosely) is carried
-// as its compact JSON text, which is exactly its marshalled form.
-func toolTextFromRaw(raw json.RawMessage) string {
-	raw = rawToolValue(raw)
-	if len(raw) == 0 {
-		return ""
-	}
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil {
-		return s
-	}
-	return string(raw)
-}
-
-// carriesFailureDocument reports whether stdout holds the LangWatch CLI's own
-// failure document — `{"ok": false, "error": {"code": …}}`.
-//
-// `ok: false` is the CLI's discriminant and no successful result carries it, so
-// this asks the one question that matters and reads nothing else: is there
-// structure here worth keeping in preference to the human summary? Anything it
-// cannot parse is not a document, and the summary wins as before.
-func carriesFailureDocument(output string) bool {
-	trimmed := strings.TrimSpace(output)
-	if start := strings.IndexByte(trimmed, '{'); start > 0 {
-		trimmed = trimmed[start:]
-	}
-	if !strings.HasPrefix(trimmed, "{") {
-		return false
-	}
-	var doc struct {
-		OK    *bool           `json:"ok"`
-		Error json.RawMessage `json:"error"`
-	}
-	if err := json.Unmarshal([]byte(trimmed), &doc); err != nil {
-		return false
-	}
-	return doc.OK != nil && !*doc.OK && len(doc.Error) > 0
-}
-
-// truncateToolOutput caps a result at maxToolOutputBytes so one huge tool return
-// cannot bloat the stream — WITHOUT severing a JSON document mid-token.
-//
-// A blind byte cut was how every oversized `langwatch … --format json` result
-// became an unreadable card: the CLI prints one JSON document to stdout, the cut
-// left half a document, and everything downstream that parses it (the CLI
-// envelope's card payload, the panel) got syntax garbage while the prose claimed
-// success. So JSON output is now reduced STRUCTURALLY under the cap — arrays
-// capped, long strings clipped — and stays a valid document whatever its size;
-// only non-JSON text falls back to the rune-boundary byte cut.
-func truncateToolOutput(s string) string {
-	if len(s) <= maxToolOutputBytes {
-		return s
-	}
-	if reduced, ok := reduceJSONOutput(s); ok {
-		return reduced
-	}
-	cut := maxToolOutputBytes
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "…"
-}
-
-// reduceJSONOutput shrinks a JSON document under maxToolOutputBytes by reducing
-// its STRUCTURE — never by cutting bytes. Long strings are clipped (with an
-// ellipsis), arrays keep a head of items — while every field name, count and
-// scalar that fits survives, which is exactly what a result card needs (ids,
-// totals, pagination) and what a byte cut destroys first. Tightens iteratively;
-// reports ok=false when the input isn't a JSON document (or somehow still
-// doesn't fit), so the caller falls back to the byte cut.
-func reduceJSONOutput(s string) (string, bool) {
-	// The document may sit behind console noise (the langwatch CLI prints an
-	// ora spinner + "✔ Found N traces" line before its JSON): parse from the
-	// first brace/bracket. The noise itself is dropped — every consumer of an
-	// oversized result (the CLI envelope, the cards) wants the document.
-	start := strings.IndexAny(s, "{[")
-	if start < 0 {
-		return "", false
-	}
-	var doc any
-	if err := json.Unmarshal([]byte(strings.TrimSpace(s[start:])), &doc); err != nil {
-		return "", false
-	}
-	// Successive budgets: generous first (keep list shape), brutal last.
-	budgets := []struct {
-		maxString int
-		maxItems  int
-	}{
-		{maxString: 512, maxItems: 25},
-		{maxString: 256, maxItems: 12},
-		{maxString: 96, maxItems: 5},
-		{maxString: 48, maxItems: 2},
-	}
-	for _, b := range budgets {
-		reduced := reduceJSONValue(doc, b.maxString, b.maxItems)
-		out, err := json.Marshal(reduced)
-		if err != nil {
-			return "", false
-		}
-		if len(out) <= maxToolOutputBytes {
-			return string(out), true
-		}
-	}
-	return "", false
-}
-
-func reduceJSONValue(v any, maxString, maxItems int) any {
-	switch value := v.(type) {
-	case string:
-		if len(value) > maxString {
-			cut := maxString
-			for cut > 0 && !utf8.RuneStart(value[cut]) {
-				cut--
-			}
-			return value[:cut] + "…"
-		}
-		return value
-	case []any:
-		items := value
-		clipped := false
-		if len(items) > maxItems {
-			items = items[:maxItems]
-			clipped = true
-		}
-		out := make([]any, 0, len(items)+1)
-		for _, item := range items {
-			out = append(out, reduceJSONValue(item, maxString, maxItems))
-		}
-		if clipped {
-			// An in-band, shape-preserving marker: cards render the head as the
-			// sample it already is; totals ride the document's own count fields.
-			out = append(out, fmt.Sprintf("… %d more items truncated", len(value)-maxItems))
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(value))
-		for k, item := range value {
-			out[k] = reduceJSONValue(item, maxString, maxItems)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
 // toolStateOpensCard reports whether a not-yet-settled tool state exposes enough
 // to open a card — and the bar is the INPUT, not the status.
 //
@@ -866,7 +650,7 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 // the settle transition (see framesFor), which is the last shape that could
 // possibly carry one.
 func toolStateOpensCard(part *ssePart) bool {
-	return hasToolInput(part.State.Input)
+	return toolmap.HasToolInput(part.State.Input)
 }
 
 // toolStartFrame opens the card: the tool's identity plus, when opencode has
@@ -874,7 +658,7 @@ func toolStateOpensCard(part *ssePart) bool {
 // frames union `tool` start frame; a marshal failure (never realistically) drops
 // the frame, best-effort like the rest of the lifecycle.
 func toolStartFrame(id string, part *ssePart) (frames.Frame, bool) {
-	f, err := frames.ToolStart(id, part.Tool, part.State.Title, "", rawToolValue(part.State.Input))
+	f, err := frames.ToolStart(id, part.Tool, part.State.Title, "", toolmap.RawToolValue(part.State.Input))
 	return f, err == nil
 }
 
@@ -886,11 +670,11 @@ func toolStartFrame(id string, part *ssePart) (frames.Frame, bool) {
 // with the start frame: it makes each event self-describing, so "what command
 // was this, and how did it end?" is answerable from the end event alone — by the
 // card, by the durable event log, and by anyone debugging a turn after the fact.
-// It also means a call whose start went out before its arguments materialised is
+// It also means a call whose start went out before its arguments materialized is
 // still correctly identified when it settles, rather than being permanently
 // anonymous because of the transition it happened to open on.
 func toolEndFrame(id string, part *ssePart, isError bool) (frames.Frame, bool) {
-	output := toolTextFromRaw(part.State.Output)
+	output := toolmap.ToolTextFromRaw(part.State.Output)
 	if isError {
 		// The error message is what the card shows for a failed call — UNLESS
 		// the command already said, precisely, what went wrong.
@@ -903,90 +687,33 @@ func toolEndFrame(id string, part *ssePart, isError bool) (frames.Frame, bool) {
 		// structurally, was left with a sentence it could not act on. It then
 		// showed the user "This step couldn't be completed" for a failure the
 		// platform had explained in full.
-		if msg := toolTextFromRaw(part.State.Error); msg != "" && !carriesFailureDocument(output) {
+		if msg := toolmap.ToolTextFromRaw(part.State.Error); msg != "" && !toolmap.CarriesFailureDocument(output) {
 			output = msg
 		}
 	}
-	output = truncateToolOutput(output)
+	output = toolmap.TruncateToolOutput(output)
 	// durationMs is not surfaced by opencode's part stream; the durable milestone
 	// carries none (0 ⇒ omitted). isError routes succeeded vs failed on the relay.
 	// The input rides the end too, so the settle event is self-describing.
-	f, err := frames.ToolEnd(id, part.Tool, rawToolValue(part.State.Input), isError, output, 0)
+	f, err := frames.ToolEnd(id, part.Tool, toolmap.RawToolValue(part.State.Input), isError, output, 0)
 	return f, err == nil
 }
 
-// toolCallTracker de-dupes the tool lifecycle across the re-sent part updates
-// opencode emits: a tool part is re-published on every state transition (and can
-// repeat within one), so the same callID lands on the stream many times. The
-// tracker holds the per-turn set of ids it has already opened and closed, which
-// is what guarantees EXACTLY one `start` and one `end` per call. Scoped to a
-// single StreamSession call — one turn, one tracker, no cross-turn leak.
+// toolCallTracker binds the shared per-turn de-dupe tracker (internal/toolmap)
+// to opencode's part shapes: the tracker guarantees exactly one `start` and one
+// `end` frame per callID across opencode's re-sent part updates; framesFor
+// keeps the part-decoding half here. Scoped to a single StreamSession call,
+// one turn, one tracker, no cross-turn leak.
 type toolCallTracker struct {
-	started         map[string]struct{}
-	ended           map[string]struct{}
-	startedAt       map[string]time.Time
-	progressCurrent map[string]int64
-	lastWorkMs      int64
-	now             func() time.Time
+	*toolmap.ToolCallTracker
 }
 
 func newToolCallTracker() *toolCallTracker {
-	return newToolCallTrackerWithClock(time.Now)
+	return &toolCallTracker{toolmap.NewToolCallTracker()}
 }
 
 func newToolCallTrackerWithClock(now func() time.Time) *toolCallTracker {
-	return &toolCallTracker{
-		started:         map[string]struct{}{},
-		ended:           map[string]struct{}{},
-		startedAt:       map[string]time.Time{},
-		progressCurrent: map[string]int64{},
-		now:             now,
-	}
-}
-
-var measuredProgressPattern = regexp.MustCompile(`^\s*(.+?)\s+[—–-]\s+([0-9][0-9,]*)\s*/\s*([0-9][0-9,]*)\s*$`)
-
-// measuredProgressFromPlan recognises the exact X/Y todo protocol documented in
-// AGENTS.md. The model owns the label and observed counts; the manager owns the
-// timing. Keeping the conversion here makes progress a typed frame instead of
-// prose parsing in the browser, and works for every batched tool/resource.
-func (t *toolCallTracker) measuredProgressFromPlan(items []frames.PlanItem) (frames.Frame, bool) {
-	for _, item := range items {
-		status := strings.ToLower(strings.TrimSpace(item.Status))
-		if status != "in_progress" && status != "completed" {
-			continue
-		}
-		match := measuredProgressPattern.FindStringSubmatch(strings.TrimSpace(item.Content))
-		if len(match) != 4 {
-			continue
-		}
-		parseCount := func(raw string) (int64, error) {
-			return strconv.ParseInt(strings.ReplaceAll(raw, ",", ""), 10, 64)
-		}
-		current, currentErr := parseCount(match[2])
-		total, totalErr := parseCount(match[3])
-		if currentErr != nil || totalErr != nil || total <= 0 || current < 0 || current > total {
-			continue
-		}
-
-		key := strings.ToLower(strings.TrimSpace(match[1]))
-		previous := t.progressCurrent[key]
-		batchItems := current - previous
-		if batchItems < 0 {
-			batchItems = 0
-		}
-		t.progressCurrent[key] = current
-
-		frame, err := frames.MeasuredProgress(
-			strings.TrimSpace(item.Content),
-			current,
-			total,
-			batchItems,
-			t.lastWorkMs,
-		)
-		return frame, err == nil
-	}
-	return frames.Frame{}, false
+	return &toolCallTracker{toolmap.NewToolCallTrackerWithClock(now)}
 }
 
 // framesFor maps one decoded opencode event onto the frames-union tool frames it
@@ -1012,9 +739,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 	}
 
 	var out []frames.Frame
-	if _, seen := t.started[id]; !seen {
-		t.started[id] = struct{}{}
-		t.startedAt[id] = t.now()
+	if t.StartIfNew(id) {
 		if f, ok := toolStartFrame(id, part); ok {
 			out = append(out, f)
 		}
@@ -1022,25 +747,19 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 	if !settled {
 		return out
 	}
-	if _, seen := t.ended[id]; !seen {
-		t.ended[id] = struct{}{}
-		if startedAt, ok := t.startedAt[id]; ok && !isTodoWriteTool(part.Tool) {
-			if elapsed := t.now().Sub(startedAt).Milliseconds(); elapsed > 0 {
-				t.lastWorkMs = elapsed
-			}
-		}
+	if t.EndIfNew(id, part.Tool) {
 		if f, ok := toolEndFrame(id, part, isError); ok {
 			out = append(out, f)
 		}
 		// A settled `todowrite` also mirrors as a typed plan snapshot — emitted
 		// alongside the tool frame above (which stays for the durable audit
 		// trail). Manager as sole frame author; the panel renders the checklist.
-		if isTodoWriteTool(part.Tool) {
-			if items, ok := planItemsFromInput(part.State.Input); ok {
+		if toolmap.IsTodoWriteTool(part.Tool) {
+			if items, ok := toolmap.PlanItemsFromInput(part.State.Input); ok {
 				if f, err := frames.Plan(items); err == nil {
 					out = append(out, f)
 				}
-				if f, ok := t.measuredProgressFromPlan(items); ok {
+				if f, ok := t.MeasuredProgressFromPlan(items); ok {
 					out = append(out, f)
 				}
 			}
@@ -1051,7 +770,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 
 // StreamSession tails /event from the worker and maps every event belonging to
 // sessionID onto typed internal/frames values, handing each to emit. Returns when
-// a terminal event lands or the context is cancelled — nil on a clean completion,
+// a terminal event lands or the context is canceled, nil on a clean completion,
 // domain.ErrTurnHandedOff on an ADR-048 handoff, an error for an opencode `error`
 // event or a transport failure. The fetch carries the same ctx so a cancel aborts
 // the upstream socket immediately — opencode would otherwise hold it open until it
@@ -1062,7 +781,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 // sees: a text delta becomes frames.Delta, the tool lifecycle frames.ToolStart/
 // ToolEnd, the keep-alive frames.Heartbeat. The verbatim opencode line is NOT
 // forwarded — the relay speaks only the frames union; app.Chat assembles the
-// durable final from the emitted frames. emit is serialised by a single mutex so
+// durable final from the emitted frames. emit is serialized by a single mutex so
 // the concurrent heartbeat ticker never interleaves with the scan loop.
 func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, emit func(frames.Frame) error) error {
 	url := baseURL + "/event"
@@ -1086,7 +805,7 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 
 	// All emits go through emitFrame so the concurrent heartbeat ticker can never
 	// interleave with the scan loop: the relay push is ONE ordered stream, so a
-	// single mutex serialises frame writes exactly like the old in-band writeMu (and
+	// single mutex serializes frame writes exactly like the old in-band writeMu (and
 	// keeps the durable-final accumulator, fed inside emit, free of a data race).
 	// Returns false on an emit error (the relay push broke) so callers stop.
 	var emitMu sync.Mutex
@@ -1232,7 +951,7 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		if !eventBelongsToSession(&ev, sessionID) {
 			// Error events without a session id still terminate this turn: the
 			// worker serves one conversation, so an unrouted error can only be ours.
-			if !(isErrorEventType(ev.Type) && !eventCarriesSession(&ev)) {
+			if !isErrorEventType(ev.Type) || eventCarriesSession(&ev) {
 				continue
 			}
 		}

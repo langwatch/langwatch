@@ -277,10 +277,9 @@ describe("the personal Sessions table", () => {
       expect(screen.getByText("38m waiting")).toBeInTheDocument();
 
       expect(screen.getByText("$12.50")).toBeInTheDocument();
-      expect(screen.getByText("#4218").closest("a")).toHaveAttribute(
-        "href",
-        "https://github.com/acme/widgets/pull/4218",
-      );
+      expect(
+        screen.getByRole("button", { name: "Open pull request #4218" }),
+      ).toBeInTheDocument();
     });
 
     it("explains what the two context figures each count", async () => {
@@ -364,6 +363,38 @@ describe("the personal Sessions table", () => {
       // Every other cell on this row has something to say, so the one
       // placeholder on screen is the pull request cell's.
       expect(screen.getAllByText("—")).toHaveLength(1);
+    });
+  });
+
+  describe("given a session row that lists a pull request", () => {
+    /** @scenario "A pull request number opens what the change cost, not GitHub" */
+    it("opens the pull request's detail and not the session replay", async () => {
+      pinSessions([sessionRow()]);
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("#4218"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith("pullRequestDetail", {
+        projectId: "proj-personal",
+        repositoryHost: "github.com",
+        repositoryFullName: "acme/widgets",
+        prNumber: 4218,
+      });
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "traceV2Details",
+        expect.anything(),
+      );
+    });
+
+    /** @scenario "A pull request number is drawn as something to choose" */
+    it("underlines the number", () => {
+      pinSessions([sessionRow()]);
+      renderTable();
+
+      expect(screen.getByText("#4218")).toHaveStyle({
+        textDecoration: "underline",
+      });
     });
   });
 
@@ -729,14 +760,19 @@ describe("the personal Sessions table", () => {
       );
     });
 
-    it("leaves a pull request chip to GitHub rather than to the replay", async () => {
+    /** @scenario "A pull request number opens what the change cost, not GitHub" */
+    it("leaves a pull request number to its own detail rather than to the replay", async () => {
       const user = userEvent.setup();
       renderTable();
 
       await user.click(screen.getByText("#4218"));
 
       expect(mockOpenTrace).not.toHaveBeenCalled();
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
+      expect(mockOpenDrawer).toHaveBeenCalledTimes(1);
+      expect(mockOpenDrawer).toHaveBeenCalledWith(
+        "pullRequestDetail",
+        expect.objectContaining({ prNumber: 4218 }),
+      );
     });
   });
 

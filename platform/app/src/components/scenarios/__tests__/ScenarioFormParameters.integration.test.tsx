@@ -7,6 +7,7 @@
  * grammar is refused where it was typed instead of failing silently on save.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -265,6 +266,25 @@ describe("scenario editor parameters", () => {
           "gold",
         );
       });
+
+      /** @scenario "The definitions editor disables the default value for a secret parameter" */
+      it("shows a stored secret declaration as secret, with no default to fill", async () => {
+        mocks.mockGetByIdData = scenarioDeclaring([
+          {
+            name: "api_token",
+            description: "The tenant API token",
+            secret: true,
+          },
+        ]);
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+
+        expect(screen.getByTestId("scenario-parameter-secret-0")).toBeChecked();
+        expect(
+          screen.getByTestId("scenario-parameter-default-0"),
+        ).toBeDisabled();
+      });
     });
 
     describe("when a row is removed and the scenario is saved", () => {
@@ -379,6 +399,78 @@ describe("scenario editor parameters", () => {
         expect(await save(user)).toMatchObject({
           parameters: [{ name: "seats", defaultValue: 12 }],
         });
+      });
+    });
+
+    describe("when a parameter is marked secret", () => {
+      /** @scenario "The definitions editor disables the default value for a secret parameter" */
+      it("clears the default value it was given and stops taking one", async () => {
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+        await user.type(
+          screen.getByTestId("scenario-parameter-name-0"),
+          "api_token",
+        );
+        await user.type(
+          screen.getByTestId("scenario-parameter-default-0"),
+          "abc",
+        );
+        await user.click(screen.getByTestId("scenario-parameter-secret-0"));
+
+        await waitFor(() => {
+          expect(
+            screen.getByTestId("scenario-parameter-default-0"),
+          ).toHaveValue("");
+        });
+        expect(
+          screen.getByTestId("scenario-parameter-default-0"),
+        ).toBeDisabled();
+        expect(screen.getByLabelText("Parameter 1 secret")).toBeChecked();
+      });
+
+      /** @scenario "The definitions editor disables the default value for a secret parameter" */
+      it("saves the declaration as secret and with no default value", async () => {
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+        await user.type(
+          screen.getByTestId("scenario-parameter-name-0"),
+          "api_token",
+        );
+        await user.type(
+          screen.getByTestId("scenario-parameter-default-0"),
+          "abc",
+        );
+        await user.click(screen.getByTestId("scenario-parameter-secret-0"));
+        await clickDone(user);
+
+        const saved = await save(user);
+        expect(saved).toMatchObject({
+          parameters: [{ name: "api_token", secret: true }],
+        });
+        expect(
+          (saved?.parameters as Record<string, unknown>[])[0],
+        ).not.toHaveProperty("defaultValue");
+      });
+
+      it("takes a default value again once it is no longer secret", async () => {
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+        await user.type(
+          screen.getByTestId("scenario-parameter-name-0"),
+          "api_token",
+        );
+        await user.click(screen.getByTestId("scenario-parameter-secret-0"));
+        await user.click(screen.getByTestId("scenario-parameter-secret-0"));
+
+        await waitFor(() => {
+          expect(
+            screen.getByTestId("scenario-parameter-default-0"),
+          ).not.toBeDisabled();
+        });
+        expect(screen.getByLabelText("Parameter 1 secret")).not.toBeChecked();
       });
     });
 

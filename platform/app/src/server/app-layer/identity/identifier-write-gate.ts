@@ -6,16 +6,20 @@
  *
  * The gate's question is the one fact that already means "this user's whole
  * identifier history is in the log": their `SystemMigrationTenantState` row
- * for the D01 backfill (tenant = the user; the runner gains a user-rooted
- * tenant source in PR 2). `migrated` or `finalized` means live ceremonies
- * may emit events without preceding their own history; anything else means
- * the ceremony performs its protocol write only, exactly as the stock
- * adapter would, and the next backfill pass adopts the rows it wrote.
+ * for the D01 backfill (tenant = the user, driven by the runner's user-rooted
+ * tenant source). Only `finalized` opens it — the same predicate as the authz
+ * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
+ * is the HELD state: the history landed but the proof found the projection
+ * behind or disagreeing, so the ceremony performs its protocol write only,
+ * exactly as the stock adapter would, and the next backfill pass restates
+ * the rows it wrote. Anything else (absent, parked, rolled back) is closed.
  *
  * Rollback is an ops action, not a deploy: `rolled_back` on the user's row
- * closes the gate fleet-wide within the cache TTL. Fail-safe direction is
- * CLOSED — an unreadable state table can only delay event history, never
- * break sign-in.
+ * closes the gate fleet-wide within the cache TTL — there is no
+ * cross-pod invalidation, so both directions take effect within
+ * `IDENTITY_WRITE_GATE_TTL_MS`, which is the bound an operator should expect.
+ * Fail-safe direction is CLOSED — an unreadable state table can only delay
+ * event history, never break sign-in.
  */
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -25,23 +29,21 @@ import { identityWriteGateReadFailuresTotal } from "./metrics";
 
 const logger = createLogger("langwatch:identity:identifier-write-gate");
 
-/** The D01 backfill rider's name (PR 2 registers the migration itself; the
- *  gate keys on its state rows from PR 1 so the flip is data, not a deploy).
- *  Renaming orphans every stored record — the standard migration-name rule. */
+/** The D01 backfill's name. The gate keys on its state rows, so the flip is
+ *  data, not a deploy. Renaming orphans every stored record — the standard
+ *  migration-name rule. */
 export const IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME =
   "identity-d01-identifier-backfill" as const;
 
-/** `migrated` is enough for the WRITE side: the history is in and the
- *  projection is fed. Finalization (the self-proving parity latch) gates
- *  the D03 READ fork, a later and separate question. */
-const IDENTITY_WRITE_STATUSES = ["migrated", "finalized"] as const;
+/** Only `finalized` opens the gate; `migrated` is held (see above). The D03
+ *  READ fork will ask the same question of the same row. */
+const IDENTITY_WRITE_STATUSES = ["finalized"] as const;
 
 export const IDENTITY_WRITE_GATE_TTL_MS = 60_000;
 
 const gate = perSubjectCachedFlag({
   name: "identity-identifier-write-gate",
-  positiveTtlMs: IDENTITY_WRITE_GATE_TTL_MS,
-  negativeTtlMs: IDENTITY_WRITE_GATE_TTL_MS,
+  ttlMs: IDENTITY_WRITE_GATE_TTL_MS,
 });
 
 async function readUserOnIdentityWrites({

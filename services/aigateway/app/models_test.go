@@ -291,3 +291,94 @@ func TestListModels_LiteralAllowlistReportsNoGaps(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, gaps, "no discovery ran, so no gap applies")
 }
+
+// A handled instance is listed under the handle-qualified spelling, because
+// that is the only name that reaches THAT instance when the key holds two of
+// one family: the bare id reaches whichever the chain order puts first. The
+// listing and the dispatcher have to agree about which provider a name means.
+func TestListModels_QualifiesAHandledInstanceByItsHandle(t *testing.T) {
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic},
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+				}, nil, nil
+			},
+		}),
+	)
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+			{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+		},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"claude-sonnet-5", "eu/claude-sonnet-5"}, modelIDs(models))
+
+	// owned_by is the vendor a client groups its picker by, so both entries
+	// stay attributed to the family rather than to the handle.
+	for _, m := range models {
+		assert.Equal(t, domain.ProviderAnthropic, m.ProviderID, "model %q must keep its family", m.ID)
+	}
+}
+
+// A handle-qualified alias target reaches the instance the handle names, so
+// the listing has to judge that instance. The wire leaves "eu/claude-haiku-4-5"
+// whole, because only the key's config tells a handle from a model id with a
+// slash in it, and judging the whole string asked models_allowed about a model
+// no provider serves. The alias then vanished from the list while dispatch
+// served it.
+// Spec: specs/ai-gateway/instance-routing-handle.feature
+func TestListModels_ReadsAnAliasTargetingARoutingHandle(t *testing.T) {
+	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+			{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+		},
+		Config: domain.BundleConfig{
+			ModelAliases: map[string]domain.ModelAlias{
+				"fast": {Model: "eu/claude-haiku-4-5"},
+			},
+			AllowedModels: []string{"claude-haiku-4-5"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, modelIDs(models), "fast")
+
+	for _, m := range models {
+		if m.ID == "fast" {
+			assert.Equal(t, domain.ProviderAnthropic, m.ProviderID,
+				"the alias is owned by the family behind its handle")
+			assert.Equal(t, "eu", m.Handle, "the alias reaches the handled instance")
+		}
+	}
+}
+
+// An alias pinned to a handle on a row the key cannot dispatch to reaches
+// nothing. Listing it would offer a name that is refused on use, and the
+// surviving row of the same family must not answer for it.
+// Spec: specs/ai-gateway/instance-routing-handle.feature
+func TestListModels_DropsAnAliasPinnedToAnExcludedInstance(t *testing.T) {
+	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
+
+	models, _, err := application.ListModels(context.Background(), &domain.Bundle{
+		Credentials: []domain.Credential{
+			{ID: "cred-1", ProviderID: domain.ProviderAnthropic},
+		},
+		Config: domain.BundleConfig{
+			ModelAliases: map[string]domain.ModelAlias{
+				"fast": {Model: "eu/claude-haiku-4-5"},
+			},
+			RoutingExcludedProviders: []domain.ExcludedModelProvider{
+				{ID: "cred-2", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, modelIDs(models), "fast")
+}

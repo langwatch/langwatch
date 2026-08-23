@@ -45,5 +45,5 @@ first is the ADR-092 stage-B authorization backfill in
 `@langwatch/authz-server`; the identity program's D01 Account backfill is
 the expected second.
 
-Spec: `specs/rbac/in-place-authz-migration.feature`. Delivery plan:
-`dev/docs/plans/adr-092-authz-delivery-plan.md` (runbook rows M1/M2).
+Spec: `specs/migration/system-migrations-runner.feature`. Delivery plan:
+`dev/docs/adr/110-grant-aggregates-are-grants.md` (runbook rows M1/M2).

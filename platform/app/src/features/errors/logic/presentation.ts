@@ -114,6 +114,27 @@ const missingModelDescriptions = {
   passthrough: "Put the model in the Gemini request URL, then try again.",
 } as const satisfies Record<MissingModelRequestType, string>;
 
+/**
+ * Names the prefixes the key can reach, when the gateway listed them.
+ *
+ * The list arrives as data (`meta.options`) rather than as a finished
+ * sentence, so the words a customer reads stay here, in the registry, and a
+ * relayed message is never rendered back to them. Empty when the gateway sent
+ * nothing, and the surrounding copy then stands on its own.
+ */
+const reachableSentence = (error: HandledErrorShape): string => {
+  const options = strList(error, "options");
+  if (options.length === 0) return "";
+  return ` This key can reach ${listLabels(options)}.`;
+};
+
+/** Reads a `meta` string and compares it, treating anything unexpected as no match. */
+const strEq = (
+  error: HandledErrorShape,
+  key: string,
+  expected: string,
+): boolean => str(error, key, "") === expected;
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[
     str(error, "request_type", "")
@@ -165,9 +186,7 @@ const MIGRATION_STATUS_LABELS: Record<string, string> = {
  * sentence rather than leaking the identifier.
  */
 const MIGRATION_NAME_LABELS: Record<string, string> = {
-  "authz-team-user-backfill": "the team membership backfill",
-  "authz-grants-genesis-import": "the grants ledger import",
-  "authz-grants-cutover": "the authorization engine cutover",
+  "authz-engine": "the authorization upgrade",
 };
 
 /**
@@ -379,6 +398,21 @@ const presentations = {
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
+  cli_key_selection_invalid: {
+    title: "Check the access selection",
+    describe: (error) => {
+      const fieldErrors = error.meta.fieldErrors;
+      if (fieldErrors && typeof fieldErrors === "object") {
+        if (Object.hasOwn(fieldErrors, "bindings")) {
+          return "Select at least one workspace, team, or project for the key.";
+        }
+        if (Object.hasOwn(fieldErrors, "permissions")) {
+          return "Select at least one valid permission for the key.";
+        }
+      }
+      return "The selected scopes and permissions aren't valid.";
+    },
+  },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
@@ -541,6 +575,11 @@ const presentations = {
     title: "You don't have permission to manage API keys",
     describe: () => "Ask an admin on your team for access.",
   },
+  api_key_permission_not_delegable: {
+    title: "This is not something the assistant can do for you",
+    describe: () =>
+      "A wider key or a higher role will not change it. Make this change in LangWatch yourself.",
+  },
   api_key_reserved_name: {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
@@ -548,6 +587,12 @@ const presentations = {
   api_key_scope_violation: {
     title: "This API key can't do that",
     describe: () => "It doesn't include the required scope.",
+  },
+
+  project_visibility_too_wide: {
+    title: "Too many projects to list for this key",
+    describe: () =>
+      "This key reaches more projects than we can list in one request. Bind it to the teams or projects it works with, then try again.",
   },
 
   // ==========================================================================
@@ -644,6 +689,11 @@ const presentations = {
     title: "Choose where this provider applies",
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
+  },
+  model_provider_credentials_unreadable: {
+    title: "This provider needs its credentials again",
+    describe: () =>
+      "The ones it has can no longer be used, and saving without new ones would take them away. Type the credentials again, then save.",
   },
   model_provider_credentials_would_be_dropped: {
     title: "That save would delete the stored credentials",
@@ -1069,9 +1119,9 @@ const presentations = {
     },
   },
   migration_pass_already_running: {
-    title: "A migration pass is already running",
+    title: "This organization appears to be mid-migration",
     describe: () =>
-      "Only one pass runs at a time, and it may already be processing this organization. Wait for it to conclude, then retry.",
+      "The migration cannot start for this organization right now — another pass appears to be working it. Wait a moment, then retry.",
   },
   migration_not_available_on_installation: {
     title: "This migration is not available here yet",
@@ -1363,6 +1413,11 @@ const presentations = {
     describe: () =>
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
+  contested_credentials: {
+    title: "This request carried more than one credential",
+    describe: () =>
+      "Send exactly one: either an API key or a signed-in session, not both.",
+  },
   invalid_credentials: {
     // Deliberately says nothing about which credential class the route
     // wanted. A key of the wrong class gets `credential_class_mismatch` and
@@ -1429,6 +1484,43 @@ const presentations = {
   scenario_run_export_forbidden: {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
+  },
+  // ---- secret run parameters ----
+  // Only names reach these strings. The value is the thing the whole feature
+  // exists to keep out of anything a person or a log can read.
+  scenario_secret_parameter_missing: {
+    title: "This run needs a secret value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are secret parameters" : "is a secret parameter"} with no value.`
+          : "A secret parameter has no value.";
+      return `${subject} A secret has no default, so ${plural ? "each value" : "the value"} has to be typed in for this run.`;
+    },
+  },
+  scenario_secret_parameter_conflict: {
+    title: "One name is secret in one scenario and plain in another",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${listLabels(names)} ${names.length > 1 ? "are" : "is"} declared secret by one scenario in this run and plain by another.`
+          : "A name is declared secret by one scenario in this run and plain by another.";
+      return `${subject} Declare it the same way in every scenario, or rename one of them, then start the run again.`;
+    },
+  },
+  scenario_secret_parameter_in_text: {
+    title: "A scenario reads a secret parameter in its own text",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${scenarioFieldLabel(error)} reads ${listLabels(names)}, which ${names.length > 1 ? "are secret parameters" : "is a secret parameter"}.`
+          : `${scenarioFieldLabel(error)} reads a secret parameter.`;
+      return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
+    },
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -1741,6 +1833,17 @@ const presentations = {
   // and "a network policy an admin must fix" there, and only one of them was
   // true. One code, one set of words.
   // ==========================================================================
+  langy_conversation_id_unadoptable: {
+    title: "That conversation id can't be used",
+    // The two reasons need different words because they need different fixes:
+    // one is the caller's id to correct, the other is a conversation that is
+    // over. Collapsing them into one sentence would tell half the readers to
+    // change something that is already fine.
+    describe: (error) =>
+      str(error, "reason", "") === "archived"
+        ? "That conversation is archived, and archived conversations can't be reopened. Start a new one."
+        : "Conversation ids are 6-120 characters, using letters, numbers, dashes and underscores.",
+  },
   langy_conversation_not_found: {
     title: "Conversation not found",
     describe: () =>
@@ -2036,9 +2139,46 @@ const presentations = {
     describe: () => "Add a provider in settings to continue.",
   },
   model_provider_not_bound: {
+    // The gateway builds the list of prefixes this key actually reaches, so
+    // the reader is told what to type instead of only what failed. When the
+    // message is absent (an older gateway), the generic sentence still stands.
     title: "That provider isn't bound to this key",
+    describe: (error) =>
+      `The model name asks for a provider this virtual key has no slot for.${reachableSentence(error)} Bind that provider to the key, or drop the prefix from the model name.`,
+  },
+  model_not_recognized: {
+    // Different from model_provider_not_bound: there the caller named a
+    // provider, here they named a model and no bound provider serves it. The
+    // two fixes differ, so the two errors do.
+    title: "No provider on this key serves that model",
+    describe: (error) =>
+      `No provider bound to this virtual key declares that model.${reachableSentence(error)} Add the model to the provider that serves it, or name the provider in the model string.`,
+  },
+  model_provider_routing_handle_invalid: {
+    title: "That routing handle can't be used",
+    describe: (error) =>
+      strEq(error, "problem", "reserved")
+        ? "That name already means a provider type, so requests using it would be ambiguous. Choose a different name."
+        : "A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to 32 characters.",
+  },
+  model_provider_routing_handle_taken: {
+    title: "That routing handle is already in use",
     describe: () =>
-      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+      "Another model provider in this organization uses that routing handle. A handle has to name one provider, so choose a different name.",
+  },
+  realtime_session_limit: {
+    // The request-rate limits do not bound voice: one mint opens a call that
+    // bills for as long as it runs. What frees a slot is a call ending, so
+    // the copy says that rather than "slow down".
+    title: "This key has all its voice calls open",
+    describe: () =>
+      "Wait for a call to end, or raise the key's max open sessions in settings.",
+  },
+  realtime_registry_unavailable: {
+    // Nothing was minted, so the reader is not holding a half-open session.
+    // Saying so is what stops them looking for one.
+    title: "Couldn't start the voice session",
+    describe: () => "No session was created. Try again in a moment.",
   },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
@@ -2673,6 +2813,7 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   url: "the URL",
   prompt: "the prompt",
   model: "the model",
+  modelOverride: "the model",
   value: "the value",
   label: "the label",
   title: "the title",

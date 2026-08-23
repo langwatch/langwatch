@@ -107,6 +107,28 @@ export const virtualKeyConfigSchema = z.object({
       rpd: z.number().int().nullable().default(null),
     })
     .default({ rpm: null, tpm: null, rpd: null }),
+  /**
+   * How many brokered realtime voice sessions this key may hold open at
+   * once. `null` is unlimited.
+   *
+   * Voice needs its own cap because the arrival-rate limits above do not
+   * bound it. `rpm` counts requests as they arrive, and a session mint is
+   * one request that opens a call billing by the minute for as long as it
+   * runs, so a key at 60 rpm can hold sixty ten-minute calls per replica
+   * without tripping anything.
+   *
+   * Deliberately NOT carried on the gateway config bundle. The cap is read
+   * inside the control plane's reserve transaction, next to the count it
+   * gates, so a limit edited a minute ago applies to the next mint. Shipping
+   * it on the bundle would put the limit on the config cache's clock and the
+   * count on the database's, and this chain already carries one field that
+   * is materialized, sent and then dropped at decode with nothing reading it.
+   */
+  realtime: z
+    .object({
+      maxOpenSessions: z.number().int().positive().nullable().default(null),
+    })
+    .default({ maxOpenSessions: null }),
   metadata: z
     .object({
       label: z.string().optional(),

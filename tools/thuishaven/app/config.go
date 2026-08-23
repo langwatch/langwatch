@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -37,6 +40,16 @@ type Config struct {
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
 	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
 	ShouldManageRedis        bool          // haven ensures a shared brew-services Redis is running
+	// RedisDBOverride pins this worktree's Redis DB index
+	// (LANGWATCH_HAVEN_REDIS_DB). nil = unset, so a Config built without the
+	// field never pins database 0 by accident — which a plain int sentinel does
+	// on every zero-valued Config in the package.
+	// The allocator's collision avoidance only sees haven-managed
+	// stacks; a plain `pnpm dev` process from another worktree sits on its .env
+	// db invisibly and shares the job queue, which lands work in the wrong
+	// stack's database. The override makes the assignment deterministic for a
+	// worktree that has to route around such a neighbor.
+	RedisDBOverride *int
 	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
 	// default: it shares ClickHouse's colima VM, so the VM is already paying for
 	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
@@ -81,4 +94,20 @@ type PlanOptions struct {
 	LangyTier domain.LangyTier
 	IsStub    bool // verification: echo servers instead of the real apps
 	RepoRoot  string
+}
+
+// RedisDBOverrideFromEnv parses LANGWATCH_HAVEN_REDIS_DB into a Redis DB index,
+// or nil when unset or out of range (the allocator then assigns one normally).
+// An out-of-range value is reported on stderr rather than accepted: clamping it
+// would put the stack on a database the operator did not name.
+func RedisDBOverrideFromEnv(v string) *int {
+	if v == "" {
+		return nil
+	}
+	db, err := strconv.Atoi(v)
+	if err != nil || db < 0 || db >= domain.RedisDBCount {
+		fmt.Fprintf(os.Stderr, "haven: ignoring LANGWATCH_HAVEN_REDIS_DB=%q (want 0-%d)\n", v, domain.RedisDBCount-1)
+		return nil
+	}
+	return &db
 }

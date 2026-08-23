@@ -1,24 +1,20 @@
 import { definePipeline } from "../..";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
-  AttachGrantsCommand,
+  AttachGrantCommand,
   ChangeGrantRoleCommand,
-  CompleteCutoverCommand,
-  DefineRolesCommand,
+  ChangeRolePermissionsCommand,
+  DefineRoleCommand,
   DeleteRoleCommand,
-  OffboardMemberCommand,
-  ProveMigrationParityCommand,
-  RecordMigrationTenantStateCommand,
-  RevokeGrantsCommand,
-  RollBackCutoverCommand,
+  RevokeGrantCommand,
 } from "./commands/grantsLedgerCommands";
 import {
-  type AuthzGrantsFoldState,
-  AuthzGrantsStateFoldProjection,
-} from "./projections/authzGrantsState.foldProjection";
+  AUTHZ_GRANTS_WRITE_PROJECTION_NAME,
+  AuthzGrantsWriteProjection,
+  type GrantProjectionWriteStore,
+} from "./projections/authzGrantsWrite.projection";
 import {
-  AUTHZ_GRANTS_AGGREGATE_TYPE,
-  AUTHZ_GRANTS_PIPELINE_NAME,
+  AUTHZ_GRANT_AGGREGATE_TYPE,
+  AUTHZ_GRANT_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { AuthzGrantsEvent } from "./schemas/events";
 import {
@@ -27,49 +23,43 @@ import {
 } from "./subscribers/authzAuditTrail.subscriber";
 
 export interface AuthzGrantsPipelineDeps {
-  authzGrantsProjectionStore: StateProjectionStore<AuthzGrantsFoldState>;
-  /** Insert-only sink for the audit trail (ADR-092 decision 17). An
-   *  interface with one method, so the pipeline never names a storage
-   *  engine — the Prisma implementation lives in the app layer. */
+  /** Writes one guarded statement per event into the Grant and Role tables. */
+  authzGrantsWriteStore: GrantProjectionWriteStore;
+  /** Insert-only sink for the audit trail. One method, so the pipeline never
+   *  names a storage engine. */
   authzAuditTrailStore: AuthzAuditTrailStore;
 }
 
 /**
- * The grants ledger pipeline (ADR-092 §13). One aggregate per organization;
- * commands append (waited) and the operational projection folds through the
- * queue in per-org FIFO into the two-headed Postgres store. Ships dark in
- * PR 1: registered so the machinery is live and testable, but no production
- * writer calls the commands until the backfill refactor and PR 2 move the
- * write paths.
+ * The authorization pipeline (ADR-110).
+ *
+ * A grant is its own aggregate and so is a role, so a command names one
+ * entity and its events apply independently of every other. The organization
+ * is the tenant of all of them and the aggregate of none.
+ *
+ * Both families ride this one pipeline, so both stamp its aggregate TYPE —
+ * that is not a label. It is the storage partition key, and the event store
+ * refuses at append any event whose type differs from the one declared here.
+ * What separates one entity's fold from another's is the aggregate ID its
+ * command stamped: a grant id, or a role id.
  */
 export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
   return definePipeline<AuthzGrantsEvent>()
-    .withName(AUTHZ_GRANTS_PIPELINE_NAME)
-    .withAggregateType(AUTHZ_GRANTS_AGGREGATE_TYPE)
-    .withProjection(
-      "authzGrantsState",
-      new AuthzGrantsStateFoldProjection({
-        store: deps.authzGrantsProjectionStore,
-      }),
+    .withName(AUTHZ_GRANT_PIPELINE_NAME)
+    .withAggregateType(AUTHZ_GRANT_AGGREGATE_TYPE)
+    .withMapProjection(
+      AUTHZ_GRANTS_WRITE_PROJECTION_NAME,
+      new AuthzGrantsWriteProjection({ store: deps.authzGrantsWriteStore }),
     )
     .withSubscriber(
       "auditTrail",
-      createAuthzAuditTrailSubscriber({
-        store: deps.authzAuditTrailStore,
-      }),
+      createAuthzAuditTrailSubscriber({ store: deps.authzAuditTrailStore }),
     )
-    .withCommand("attachGrants", AttachGrantsCommand)
+    .withCommand("attachGrant", AttachGrantCommand)
     .withCommand("changeGrantRole", ChangeGrantRoleCommand)
-    .withCommand("revokeGrants", RevokeGrantsCommand)
-    .withCommand("defineRoles", DefineRolesCommand)
+    .withCommand("revokeGrant", RevokeGrantCommand)
+    .withCommand("defineRole", DefineRoleCommand)
+    .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
     .withCommand("deleteRole", DeleteRoleCommand)
-    .withCommand("offboardMember", OffboardMemberCommand)
-    .withCommand("proveMigrationParity", ProveMigrationParityCommand)
-    .withCommand("completeCutover", CompleteCutoverCommand)
-    .withCommand("rollBackCutover", RollBackCutoverCommand)
-    .withCommand(
-      "recordMigrationTenantState",
-      RecordMigrationTenantStateCommand,
-    )
     .build();
 }

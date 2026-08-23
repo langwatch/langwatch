@@ -86,6 +86,7 @@
               },
               "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
+              "agent-simulations/run-suites-from-ci",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -336,6 +337,27 @@
                     "pages": [
                       "integration/python/tutorials/capturing-metadata",
                       "integration/typescript/tutorials/capturing-metadata"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Images",
+                    "pages": [
+                      "integration/python/tutorials/capturing-images",
+                      "integration/typescript/tutorials/capturing-images"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Documents",
+                    "pages": [
+                      "integration/python/tutorials/capturing-documents",
+                      "integration/typescript/tutorials/capturing-documents"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Audio and Voice",
+                    "pages": [
+                      "integration/python/tutorials/capturing-audio",
+                      "integration/typescript/tutorials/capturing-audio"
                     ]
                   },
                   {
@@ -649,6 +671,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -1100,7 +1123,8 @@
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
               "api-reference/simulation-runs/list-list",
-              "api-reference/simulation-runs/get-simulation-runs"
+              "api-reference/simulation-runs/get-simulation-runs",
+              "api-reference/simulation-runs/get-batches"
             ]
           },
           {
@@ -1496,7 +1520,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1787185179",
+      "source": "/ci/cache/busted/1787409592",
       "destination": "/"
     },
     {

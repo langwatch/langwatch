@@ -8,9 +8,9 @@
  * Each test file mocks `../epoch` itself: vi.mock is per-file, so it cannot
  * live here.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { vi } from "vitest";
 import {
   Prisma,
@@ -24,16 +24,12 @@ export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
 
 const COMMAND_VERBS = [
-  "attachGrants",
+  "attachGrant",
   "changeGrantRole",
-  "revokeGrants",
-  "defineRoles",
+  "revokeGrant",
+  "defineRole",
+  "changeRolePermissions",
   "deleteRole",
-  "offboardMember",
-  "proveMigrationParity",
-  "completeCutover",
-  "rollBackCutover",
-  "recordMigrationTenantState",
 ] as const;
 
 export function uniqueViolation(): Error {
@@ -79,14 +75,15 @@ export function harness({
     },
     role: { findFirst: vi.fn().mockResolvedValue(null) },
     grant: {
+      // Revocation MARKS: the synchronous deny is an updateMany, not a
+      // delete. `deleteMany` stays stubbed so a test that expects nothing
+      // deleted can assert on it rather than on an absent property.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      // Known to the fold's head by default, so a test that does not care
+      // A row the head already knows about, so a test that does not care
       // about the stranded-row adoption path (`changeBindingRole`) keeps
       // taking the ordinary `changeGrantRole` branch.
       findFirst: vi.fn().mockResolvedValue({ id: "known" }),
-      // Enforcement reads the revoked rows' projectIds before deleting them
-      // (the resource tier's compat ShareLink head is scoped by project);
-      // none here, so no share delete follows.
       findMany: vi.fn().mockResolvedValue([]),
     },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },

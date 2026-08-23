@@ -5,7 +5,6 @@ import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -35,7 +34,7 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2).optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:create"))
+    .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
@@ -97,7 +96,7 @@ export const graphsRouter = createTRPCRouter({
         dashboardId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ input, ctx }) => {
       const { projectId, dashboardId } = input;
       const prisma = ctx.prisma;
@@ -138,7 +137,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:delete"))
+    .permission("analytics:delete")
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -158,7 +157,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -248,7 +247,7 @@ export const graphsRouter = createTRPCRouter({
         filterParams: z.any().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 
@@ -284,7 +283,7 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.customGraph.update({
         where: {
@@ -316,7 +315,7 @@ export const graphsRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       const updates = input.layouts.map((layout) =>
         ctx.prisma.customGraph.update({

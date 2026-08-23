@@ -534,10 +534,6 @@ function runCommand(commandArgv, pressure = "green") {
     };
     const procs = goMaxProcs(pressure);
     if (procs !== null) childEnv.GOMAXPROCS = procs;
-    const child = spawn(commandArgv[0], commandArgv.slice(1), {
-      stdio: "inherit",
-      env: childEnv,
-    });
     // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
     // slot after the child is done, instead of dying first and leaving an entry
     // for the next run to prune.
@@ -545,12 +541,21 @@ function runCommand(commandArgv, pressure = "green") {
     // interrupted and then killed by the OS dies of a signal nobody forwarded,
     // and that is the death worth naming; a flag would have suppressed it
     // because an earlier SIGINT set it.
+    // They go on before the spawn, not after. A signal keeps its default
+    // disposition until the first listener exists, so one arriving between the
+    // two ends the wrapper in the kernel: the interrupt reaches nobody and the
+    // command runs on with no parent. Occupancy follows the wrapper's pid, so
+    // the queue then counts that slot free and can start another check on top
+    // of a run that is still using the machine, which is the oversubscription
+    // the queue exists to prevent. No handler can see a null child, because a
+    // signal raised during this synchronous block only reaches JS a turn later.
+    let child = null;
     const forwarded = new Set();
     const handlers = ["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => {
       const handler = () => {
         forwarded.add(signal);
         try {
-          child.kill(signal);
+          child?.kill(signal);
         } catch {
           // The child is already gone; its exit event is what resolves us.
         }
@@ -561,6 +566,10 @@ function runCommand(commandArgv, pressure = "green") {
     const detach = () => {
       for (const { signal, handler } of handlers) process.off(signal, handler);
     };
+    child = spawn(commandArgv[0], commandArgv.slice(1), {
+      stdio: "inherit",
+      env: childEnv,
+    });
     child.on("error", (err) => {
       detach();
       stderr(`${PREFIX} could not run ${commandArgv[0]}: ${err.message}\n`);

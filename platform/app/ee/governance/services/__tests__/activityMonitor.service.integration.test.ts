@@ -38,6 +38,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 import {
   ensureHiddenGovernanceProject,
@@ -197,6 +201,9 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
+    // The service resolves its org client through getApp().clickhouse now
+    // (two-door access), so the fixture installs the App the seam expects.
+    installClickHouseTestApp({ resolveClient: async () => ch });
 
     primaryOrg = await prisma.organization.create({
       data: {
@@ -373,6 +380,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await ch
       .command({
         query:

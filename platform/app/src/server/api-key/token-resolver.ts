@@ -2,6 +2,7 @@ import type { PrismaClient, Project } from "~/generated/prisma/client";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { ApiKeyService } from "./api-key.service";
 import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
+import { LANGY_SESSION_API_KEY_NAME } from "./reserved-names";
 
 /**
  * The result of resolving a token. Contains enough context to set up the
@@ -25,6 +26,15 @@ export type ResolvedToken =
       ingestSourceType: string | null;
       /** The template this ingestion key was minted for, if any. */
       ingestionTemplateId: string | null;
+      /**
+       * Set when the resolved ApiKey is the ephemeral key a Langy chat mints
+       * for itself. The permission ceiling reads it to tell two refusals
+       * apart: a permission the caller could hold, and one the platform never
+       * delegates to Langy however the key or the role is widened. Absent
+       * means an ordinary key, so a caller that never sets it keeps the
+       * generic refusal.
+       */
+      isLangySessionKey?: boolean;
       project: Project & { team: { id: string; organizationId: string } };
     };
 
@@ -178,6 +188,7 @@ export class TokenResolver {
       organizationId: apiKey.organizationId,
       ingestSourceType: apiKey.ingestSourceType,
       ingestionTemplateId: apiKey.ingestionTemplateId,
+      isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
       project,
     };
   }

@@ -22,12 +22,14 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";
 import { prisma } from "../../db";
 import { getDefaultModelsSnapshot } from "../modelDefaults.read";
 import { ModelDefaultsRepository } from "../modelDefaults.repository";
+
+wireDefaultTestApp();
 
 describe("Default Models visibility for role-binding-only members (real DB)", () => {
   const ns = `mdcfg-vis-${nanoid(8)}`;

@@ -240,7 +240,7 @@ While optional, we strongly recommend setting stable identifiers for your scenar
 
 ## 5. Let the Judge Read Your Traces
 
-When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on remote trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
+When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
 
 <Tabs>
   <Tab title="Python">
@@ -263,4 +263,4 @@ When your adapter calls an agent that runs as a separate service, the judge cann
   </Tab>
 </Tabs>
 
-Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Remote traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
+Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.

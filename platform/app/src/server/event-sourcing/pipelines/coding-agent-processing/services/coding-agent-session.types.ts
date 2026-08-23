@@ -178,7 +178,19 @@ export interface CodingAgentSessionData {
    * cache is burning money in a way raw token counts do not show.
    */
   cacheCreationTokens: number;
+  /**
+   * Priced from the session's own tokens against the model registry — the
+   * same formula the trace pipeline applies to the same calls, so a session
+   * and its traces state one figure. A logs-only agent, with no token-bearing
+   * span to compute from, carries its reported cost here instead.
+   */
   costUsd: number;
+  /**
+   * What the agent says it was billed, summed off its api_request events.
+   * Kept beside the computed cost, never shown as it: the two drifting apart
+   * per model is the alarm that a price went stale — ours or theirs.
+   */
+  agentReportedCostUsd: number;
 
   // ── Time ──────────────────────────────────────────────────────────────
   /** Wall-clock inside model calls, and inside tools. */

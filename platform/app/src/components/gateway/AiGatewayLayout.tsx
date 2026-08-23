@@ -1,4 +1,3 @@
-import { ExternalLink } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { gatewayNavItems } from "~/features/navigation/sectionNavItems";
@@ -33,12 +32,6 @@ export default function AiGatewayLayout({
         href: item.href,
         includePath: item.includePath,
         icon: <item.icon size={14} />,
-        ...(item.isExternal
-          ? {
-              menuEnd: <ExternalLink size={12} aria-hidden />,
-              target: "_blank" as const,
-            }
-          : {}),
       }))}
     >
       {children}

@@ -1,6 +1,6 @@
 /**
- * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both delegate to.
- * ./cutover-gate.unit.test.ts and ledger-write-gate.unit.test.ts
+ * The shape ../authz/engine-gate.ts and ../identity/identifier-write-gate.ts delegate to.
+ * Their own tests
  * already cover the per-gate TTL/fail-safe contract through the two public
  * gates; this suite covers the behaviours that live in the shared helper
  * itself and previously had no test anywhere: a read that throws is LOGGED,
@@ -30,8 +30,7 @@ describe("perSubjectCachedFlag", () => {
   ) {
     return perSubjectCachedFlag({
       name: "test-gate",
-      positiveTtlMs: 60_000,
-      negativeTtlMs: 60_000,
+      ttlMs: 60_000,
       ...overrides,
     });
   }

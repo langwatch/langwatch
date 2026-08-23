@@ -12,14 +12,23 @@
  * running-owner that the orchestrator records.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+wireDefaultTestApp();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),
 }));
 
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The route reads probeProjectPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092); mocking the old
+// path leaves the real check running.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 // Interactive runs have no polling run-state record.

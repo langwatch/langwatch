@@ -1,14 +1,13 @@
 /**
- * The shape the authz gates (../authz/cutover-gate.ts,
- * ../authz/ledger-write-gate.ts) and the identity write gate
- * (../identity/identifier-write-gate.ts) all are: a boolean answer, asked
- * once per check, cached per SUBJECT — an organization for authz, a user for
- * identity — with a TTL so a rollback or a finalization takes effect
- * fleet-wide without a deploy. This module owns that shape once; each gate
- * supplies only its own query and its own TTLs.
+ * The cache behind the authz engine gate (../authz/engine-gate.ts) and the
+ * identity write gate (../identity/identifier-write-gate.ts): a boolean
+ * answer, asked once per check, cached per SUBJECT - an organization for
+ * authz, a user for identity - with a TTL so a finishing migration takes
+ * effect fleet-wide without a deploy. Each gate owns its question; this
+ * module owns the caching once.
  *
- * Two behaviours live here that the two gates used to (not) have on their
- * own:
+ * Three behaviours live here that the hand-rolled caches this replaced did
+ * not have:
  *
  *   - A read that throws is LOGGED, not swallowed. A silent catch turned a
  *     genuine outage into "the fallback is still on" or "not cut over yet"
@@ -47,29 +46,29 @@ type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
 export type PerSubjectCachedFlag = {
   /**
-   * The cached answer for one organization, reading through `read` on a
-   * cache miss. Concurrent calls for the same organization while that read
+   * The cached answer for one subject, reading through `read` on a
+   * cache miss. Concurrent calls for the same subject while that read
    * is in flight all resolve to the SAME promise - `read` runs once.
    */
   get(args: {
     subject: string;
     read: () => Promise<boolean>;
   }): Promise<boolean>;
-  /** Drop ONE organization's cached answer AND its in-flight read's right
+  /** Drop ONE subject's cached answer AND its in-flight read's right
    *  to cache: a read racing the invalidation may still answer its own
    *  callers with the old value, but it will not cache it, and the next
    *  `get` starts a fresh read. Pod-local, exactly as the TTL is pod-local;
    *  every other pod converges on the TTL. */
   invalidate(args: { subject: string }): void;
-  /** The cache, dropped - for tests that flip an organization mid-suite. */
+  /** The cache, dropped - for tests that flip a subject mid-suite. */
   resetForTesting(): void;
 };
 
 /**
- * Hard cap on distinct organizations one gate holds at once.
+ * Hard cap on distinct subjects one gate holds at once.
  *
- * An organization that is only ever read once (a stale customer, a
- * decommissioned tenant) would otherwise leave its entry in the map for the
+ * A subject that is only ever read once (a stale customer, a
+ * decommissioned tenant, a user who never returns) would otherwise leave its entry in the map for the
  * life of the pod, since nothing revisits it to notice it expired. So a
  * write amortized-sweeps expired entries once size crosses this cap, and if
  * the map is still over it afterwards, the oldest entries (by insertion
@@ -77,23 +76,16 @@ export type PerSubjectCachedFlag = {
  */
 export const MAX_CACHE_ENTRIES = 5_000;
 
-/**
- * One cached boolean per organization. `positiveTtlMs` and `negativeTtlMs`
- * are separate because the two gates need them separate (the cutover gate's
- * two directions cost the same; the fallback gate's positive answer is a
- * one-way latch and can be trusted far longer than its negative one) - a
- * single TTL is just both arguments given the same value.
- */
+/** One cached boolean per subject (an organization for authz, a user for
+ *  identity), both directions on one bound. */
 export function perSubjectCachedFlag({
   name,
-  positiveTtlMs,
-  negativeTtlMs,
+  ttlMs,
 }: {
   /** Identifies the gate in the warn log - never used to key the cache
    *  (each gate gets its own map by having its own closure over this call). */
   name: string;
-  positiveTtlMs: number;
-  negativeTtlMs: number;
+  ttlMs: number;
 }): PerSubjectCachedFlag {
   const cached = new Map<string, CacheEntry>();
   const inFlight = new Map<string, InFlightEntry>();
@@ -151,7 +143,7 @@ export function perSubjectCachedFlag({
       // silence is new, and it is gone.
       logger.warn(
         { subject, gate: name, error },
-        "could not read the per-organization gate; caching the failure briefly and answering false",
+        "could not read the per-subject gate; caching the failure briefly and answering false",
       );
       isOn = false;
     }
@@ -161,10 +153,7 @@ export function perSubjectCachedFlag({
     // `get` re-reads the source.
     if (flight.isStale) return isOn;
     if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
-    cached.set(subject, {
-      isOn,
-      expiresAt: Date.now() + (isOn ? positiveTtlMs : negativeTtlMs),
-    });
+    cached.set(subject, { isOn, expiresAt: Date.now() + ttlMs });
     return isOn;
   }
 

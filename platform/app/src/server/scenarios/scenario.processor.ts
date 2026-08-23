@@ -273,6 +273,19 @@ export function parseChildProcessResult(
   return null;
 }
 
+/** The identity and resolved values the prefetch reads off one pool job. */
+function prefetchContext(jobData: ExecutionJobData) {
+  return {
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
+    parameters: jobData.parameters,
+    secretParameters: jobData.secretParameters,
+  };
+}
+
 /**
  * Execute a scenario run by spawning an isolated child process.
  *
@@ -297,14 +310,7 @@ export async function executeScenarioRun(
 
     const prefetchDeps = createDataPrefetcherDependencies();
     const prefetchResult = await prefetchScenarioData({
-      context: {
-        projectId: jobData.projectId,
-        scenarioId: jobData.scenarioId,
-        setId: jobData.setId,
-        batchRunId: jobData.batchRunId,
-        scenarioRunId: jobData.scenarioRunId,
-        parameters: jobData.parameters,
-      },
+      context: prefetchContext(jobData),
       target: jobData.target,
       deps: prefetchDeps,
     });

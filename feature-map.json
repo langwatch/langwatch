@@ -1044,8 +1044,8 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Ingestion Sources",
-          "description": "OCSF-normalised event ingestion: inspect sources, tail events, check health, and recover coding-agent conversation content",
+          "name": "Catalog (ingestion)",
+          "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1623,7 +1623,7 @@
     ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
-      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
+      "agent-performance": "Cross-cutting skill for querying performance (works for both code and platform users)",
       "datasets": "Generate realistic synthetic evaluation datasets from codebase, prompts, and traces"
     },
     "recipes": {
@@ -1632,7 +1632,7 @@
       "debug-with-langwatch": "Root-cause production errors: errored traces, span inspection, monitor/evaluator scores",
       "eval-triage": "Investigate failing experiments and evaluation regressions",
       "setup-lw": "Set up and troubleshoot the LangWatch CLI (login, endpoint, project)",
-      "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
+      "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
       "test-compliance": "Test that your agent stays observational in regulated domains"

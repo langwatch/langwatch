@@ -142,26 +142,66 @@ function outputToText(output: unknown): string {
 }
 
 /**
+ * One message's capped form and the number of bytes it costs in the serialized
+ * array, remembered against the message it came from.
+ *
+ * Every turn caps the conversation SO FAR, so the same early messages are
+ * measured again on every later turn, and a session that runs for weeks
+ * measures its first message thousands of times. The messages never change
+ * once the accumulator pushes them, so each one is capped and measured once
+ * and the answer is kept here. A WeakMap, so a parsed rollout costs nothing
+ * once its messages are unreachable.
+ */
+const cappedMessages = new WeakMap<
+	CodexChatMessage,
+	{ message: CodexChatMessage; bytes: number }
+>();
+
+function capOneMessage(message: CodexChatMessage): {
+	message: CodexChatMessage;
+	bytes: number;
+} {
+	const remembered = cappedMessages.get(message);
+	if (remembered) return remembered;
+	const capped =
+		typeof message.content === "string" &&
+		message.content.length > MAX_CONTENT_CHARS
+			? { ...message, content: truncate(message.content, MAX_CONTENT_CHARS) }
+			: message;
+	const entry = { message: capped, bytes: JSON.stringify(capped).length };
+	cappedMessages.set(message, entry);
+	return entry;
+}
+
+/**
  * Bound the serialized input: cap each message's content, then drop the oldest
  * NON-system messages until the whole array is under the total cap. System
  * messages (the prompt the user actually asked to see) are always preserved.
+ *
+ * The total is tracked as the messages are dropped rather than measured again
+ * after each one. Measuring again read the whole conversation per dropped
+ * message, which on a long session took minutes per turn: codex runs the
+ * harvest after every completed turn, so the next harvest started before the
+ * last one finished and the conversation never reached the server.
  */
 function capInputMessages(messages: CodexChatMessage[]): CodexChatMessage[] {
-	const capped = messages.map((m) =>
-		typeof m.content === "string" && m.content.length > MAX_CONTENT_CHARS
-			? { ...m, content: truncate(m.content, MAX_CONTENT_CHARS) }
-			: m,
-	);
-	const serializedLength = () => JSON.stringify(capped).length;
-	let i = 0;
-	while (serializedLength() > MAX_INPUT_CHARS && i < capped.length) {
-		if (capped[i]?.role === "system") {
-			i++;
-			continue;
-		}
-		capped.splice(i, 1);
+	const entries = messages.map(capOneMessage);
+	let bytes = entries.reduce((total, entry) => total + entry.bytes, 0);
+	let kept = entries.length;
+	// What `JSON.stringify` of the kept messages would answer: the brackets,
+	// every message, and one comma between each neighbouring pair.
+	const serializedLength = () => 2 + bytes + Math.max(kept - 1, 0);
+	const dropped = new Set<number>();
+	for (let i = 0; i < entries.length && serializedLength() > MAX_INPUT_CHARS; i++) {
+		const entry = entries[i];
+		if (!entry || entry.message.role === "system") continue;
+		dropped.add(i);
+		bytes -= entry.bytes;
+		kept -= 1;
 	}
-	return capped;
+	return entries
+		.filter((_, index) => !dropped.has(index))
+		.map((entry) => entry.message);
 }
 
 /** One parsed rollout JSONL line: a tagged envelope with an opaque payload. */

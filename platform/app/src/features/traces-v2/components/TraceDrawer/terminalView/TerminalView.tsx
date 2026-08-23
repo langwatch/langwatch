@@ -358,6 +358,15 @@ interface TerminalViewProps {
   earlierTotals?: EarlierTotals | null;
   /** When the session's first turn started — anchors the bar's elapsed time. */
   sessionStartAtMs?: number | null;
+  /**
+   * The whole session's cost off the session row — the same figure the Usage
+   * tab shows. The bar states it beside the running figure ("$12.34 of
+   * $210.00") so the position-scoped number can never pass for the session
+   * total: the replay walks backward only and its turn list is bounded, so
+   * the running figure alone understates any session bigger than what
+   * loaded.
+   */
+  sessionCostUsd?: number | null;
 }
 
 /**
@@ -387,6 +396,7 @@ export const TerminalView = memo(function TerminalView({
   scrollback,
   earlierTotals,
   sessionStartAtMs,
+  sessionCostUsd,
 }: TerminalViewProps) {
   const timeline = useMemo(
     () => buildEntryTimeline({ entries, startAtMs: sessionStartAtMs }),
@@ -730,6 +740,7 @@ export const TerminalView = memo(function TerminalView({
           earlier: earlierTotals?.costUsd,
           loaded: point?.cumulativeCostUsd ?? 0,
         })}
+        sessionCostUsd={sessionCostUsd ?? null}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
         sessionName={sessionName}
@@ -1731,6 +1742,7 @@ function StatusLine({
   currentStep,
   tokens,
   costUsd,
+  sessionCostUsd,
   elapsedMs,
   model,
   sessionName,
@@ -1740,10 +1752,13 @@ function StatusLine({
   /** Null when the session total cannot be stated, which is not zero. */
   tokens: number | null;
   costUsd: number | null;
+  /** The whole session's cost off the session row; null when there is none. */
+  sessionCostUsd: number | null;
   elapsedMs: number;
   model?: string | null;
   sessionName?: string | null;
 }) {
+  const costLabel = statusLineCostLabel({ costUsd, sessionCostUsd });
   return (
     <VStack
       align="stretch"
@@ -1802,13 +1817,37 @@ function StatusLine({
           {tokens !== null && tokens > 0 && (
             <Stat label={`${formatTokens(tokens)} tokens`} />
           )}
-          {costUsd !== null && costUsd > 0 && (
-            <Stat label={formatCost(costUsd)} accent />
-          )}
+          {costLabel !== null && <Stat label={costLabel} accent />}
         </HStack>
       </HStack>
     </VStack>
   );
+}
+
+/**
+ * The bar's cost stat: the running figure at the reader's position, and the
+ * session total beside it when the session holds more than the position
+ * covers. "$12.34 of $210.00" — the first number moves with the scroll, the
+ * second is the same figure the Usage tab shows. They fold from the same
+ * spans, so once everything is loaded and read to the end the two meet, and
+ * the suffix drops rather than stating "$210.00 of $210.00". Tiny fold
+ * rounding is not "more session", hence the cent of slack.
+ */
+export function statusLineCostLabel({
+  costUsd,
+  sessionCostUsd,
+}: {
+  costUsd: number | null;
+  sessionCostUsd: number | null;
+}): string | null {
+  const running = costUsd !== null && costUsd > 0 ? costUsd : null;
+  const session =
+    sessionCostUsd !== null && sessionCostUsd > 0 ? sessionCostUsd : null;
+  if (running === null) return session === null ? null : formatCost(session);
+  if (session === null || session <= running + 0.01) {
+    return formatCost(running);
+  }
+  return `${formatCost(running)} of ${formatCost(session)}`;
 }
 
 function Stat({ label, accent }: { label: string; accent?: boolean }) {

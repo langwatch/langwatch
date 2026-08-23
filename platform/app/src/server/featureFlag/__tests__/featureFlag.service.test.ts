@@ -3,14 +3,6 @@ import { FeatureFlagService } from "../featureFlag.service";
 import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
 import type { FeatureFlagServiceInterface } from "../types";
 
-vi.mock("../featureFlagService.posthog", () => ({
-  FeatureFlagServicePostHog: {
-    create: () => ({
-      isEnabled: vi.fn().mockResolvedValue(false),
-    }),
-  },
-}));
-
 vi.mock("../featureFlagService.memory", () => ({
   FeatureFlagServiceMemory: {
     create: () => ({
@@ -216,7 +208,6 @@ describe("FeatureFlagService", () => {
       it("runs at the top level so the legacy service is bypassed", async () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE =
           "release_ui_ai_gateway_menu_enabled";
-        delete process.env.POSTHOG_KEY;
         const legacy = buildLegacy(false);
         const service = new FeatureFlagService({
           legacy,

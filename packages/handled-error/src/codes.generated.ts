@@ -243,6 +243,18 @@ export const goErrorCodes = {
    */
   model_not_allowed: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrModelNotRecognized — means the request named a model that matches
+   * nothing this key can place: no provider declares it, its name matches no
+   * vendor the gateway can guess from, and the key holds more than one
+   * provider that told us what it serves. Sending it down the chain anyway
+   * makes every vendor answer for a model it never had, and the caller reads
+   * the last vendor's error instead of the real problem. Distinct from
+   * model_provider_not_bound, which is a provider the caller DID name.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_not_recognized: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrProviderNotBound — means the request names a provider (explicit
    * "provider/model" prefix or alias) that has no credential slot on this VK.
    * Dispatching anyway would hand a mismatched credential to the provider
@@ -329,6 +341,24 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   rate_limited: { service: "aigateway", httpStatus: 429 },
+  /**
+   * ErrRealtimeRegistryUnavailable — means the control plane could not record
+   * the session, so the gateway refused to mint one. This is a deliberate
+   * departure from the budget fail-open rule: an unrecorded session is voice
+   * nobody can bill and a cap nobody can enforce.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_registry_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrRealtimeSessionLimit — means the virtual key already holds as many open
+   * realtime voice sessions as its realtime.maxOpenSessions allows. A voice
+   * session bills for as long as it runs, so the arrival-rate limits do not
+   * bound it and this is the only cap that does.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_session_limit: { service: "aigateway", httpStatus: 429 },
   /**
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).

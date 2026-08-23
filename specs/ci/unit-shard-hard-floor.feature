@@ -48,6 +48,13 @@ Feature: The unit shard hard floor reports what it never finished
     And it reads the gap as a shard too slow for the floor rather than a hang
 
   @unit
+  Scenario: A shard is measured against its own files, not the whole suite
+    Given a run split into shards
+    When the hard floor fires on a shard that started every file it was given
+    Then the message counts the files this shard was given
+    And it does not call the shard too slow for the floor
+
+  @unit
   Scenario: A skipped file is never mistaken for one that never completed
     Given a test file whose tests are all skipped
     When that file reports its result

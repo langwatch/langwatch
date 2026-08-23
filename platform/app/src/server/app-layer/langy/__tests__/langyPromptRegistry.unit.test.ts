@@ -112,23 +112,33 @@ describe("resolveLangyPrompt", () => {
   });
 
   describe("the override fallback constant", () => {
-    it("is the same terse role framing the turn service composes", () => {
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
-        "you are Langy, the in-product LangWatch assistant.",
-      );
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
-        "never hand the work back",
-      );
+    it("carries the persona and defers to the operating contract", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("Langy");
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("AGENTS.md");
     });
 
-    // The cards ARE the record of what happened. Prose that repeats them is a
-    // second source of truth that can disagree with the first, and it spends
-    // the most valuable line on screen narrating the past.
-    it("sends the prose after an action forward, not back over the card", () => {
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("never restates one");
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
-        "what the reader might want next",
-      );
+    // The one rule this block spends its last-position budget on, because it
+    // is the measured defect: 40% of turns reaching `status: "completed"` in
+    // production make zero tool calls. Without this assertion the size check
+    // below passes just as happily on a block that dropped it.
+    it("keeps the grounding rule", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("retrieve this turn");
+    });
+
+    // The other measured defect: replies closing with a next-actions question.
+    // The ban lives in AGENTS.md; this last-position pointer is what makes the
+    // model obey it, so dropping it regresses reply endings silently.
+    it("keeps the ending rule", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("End on the answer");
+    });
+
+    // The worker already reads the persona in the agent's config prompt and
+    // the operating rules in AGENTS.md. This block is the operator hot-patch
+    // channel; when it also repeated the rules, the model read the same
+    // commandments three times and drift between the copies became
+    // contradictions. Keep it sentence-scale.
+    it("stays a pointer, not a third copy of the rules", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK.length).toBeLessThan(300);
     });
   });
 });

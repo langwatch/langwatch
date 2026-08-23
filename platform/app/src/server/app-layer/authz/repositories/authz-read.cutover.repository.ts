@@ -53,7 +53,7 @@ import type {
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
-import { cutoverOnEngine } from "../cutover-gate";
+import { organizationOnAuthzEngine } from "../engine-gate";
 import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
 
@@ -176,7 +176,7 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
   ): Promise<AuthzReadRepository> {
     const pinned = this.pinnedHeads.get(organizationId);
     if (pinned) return pinned;
-    const resolving = cutoverOnEngine({
+    const resolving = organizationOnAuthzEngine({
       prisma: this.prisma,
       organizationId,
     }).then((onEngine) =>

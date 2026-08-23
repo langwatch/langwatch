@@ -61,6 +61,12 @@ function enrollmentStoreStub() {
     create: vi
       .fn<SystemMigrationEnrollmentStore["create"]>()
       .mockResolvedValue(undefined),
+    findCohortEligibleOrganizations: vi
+      .fn<SystemMigrationEnrollmentStore["findCohortEligibleOrganizations"]>()
+      .mockResolvedValue([]),
+    createMany: vi
+      .fn<SystemMigrationEnrollmentStore["createMany"]>()
+      .mockResolvedValue({ insertedCount: 0 }),
     delete: vi
       .fn<SystemMigrationEnrollmentStore["delete"]>()
       .mockResolvedValue(undefined),
@@ -73,7 +79,7 @@ function targetedPassStub() {
       (args: {
         organizationId: string;
         migrationName: string;
-      }) => Promise<MigrationPassSummary | null>
+      }) => Promise<MigrationPassSummary>
     >()
     .mockResolvedValue({
       tenantsSeen: 1,
@@ -81,6 +87,7 @@ function targetedPassStub() {
       held: 0,
       parked: 0,
       skipped: 0,
+      claimed: 0,
     });
 }
 
@@ -93,6 +100,7 @@ function serviceWith({
   enrollments = enrollmentStoreStub(),
   migrations = [migrationOf({ name: MIGRATION })],
   runTargetedPass = targetedPassStub(),
+  privateDataplaneOrganizationIds = [],
 }: {
   record: TenantMigrationRecord | null;
   waitingReports?: Record<string, (report: unknown) => boolean>;
@@ -112,6 +120,7 @@ function serviceWith({
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
   migrations?: Array<ReturnType<typeof migrationOf>>;
   runTargetedPass?: ReturnType<typeof targetedPassStub>;
+  privateDataplaneOrganizationIds?: string[];
 }) {
   const upserts: TenantMigrationRecord[] = [];
   const audit = vi.fn().mockResolvedValue(undefined);
@@ -138,6 +147,7 @@ function serviceWith({
     migrations: () => migrations,
     isSaaS: () => isSaaS,
     enrollments,
+    privateDataplaneOrganizationIds: () => privateDataplaneOrganizationIds,
     audit,
     runPass: vi.fn(),
     runTargetedPass,
@@ -751,7 +761,7 @@ describe("SystemMigrationsService enrollment", () => {
 
 describe("SystemMigrationsService.runForOrganization", () => {
   describe("given an enrolled organization on cloud", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("runs the targeted pass and answers the status the organization ended in", async () => {
       const { service, runTargetedPass } = serviceWith({
         record: {
@@ -843,12 +853,19 @@ describe("SystemMigrationsService.runForOrganization", () => {
     });
   });
 
-  describe("when another pass holds the fleet-wide lease", () => {
+  describe("when another pass holds the organization's claim", () => {
     /** @scenario "A targeted run while a pass is already running is refused" */
     it("refuses with migration_pass_already_running", async () => {
       const { service } = serviceWith({
         record: null,
-        runTargetedPass: targetedPassStub().mockResolvedValue(null),
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 1,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          claimed: 1,
+        }),
       });
 
       await expect(

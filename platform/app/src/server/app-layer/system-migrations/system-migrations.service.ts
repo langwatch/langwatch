@@ -17,7 +17,7 @@ import {
 
 /**
  * The statuses a tenant may be rolled back from. The same pair as
- * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts, but the premise
+ * `ON_ENGINE_STATUSES` in ../authz/engine-gate.ts, but the premise
  * is weaker than "already on the ledger": what `migrated` MEANS is each
  * migration's own business (the cutover parks tenants in `migrated` while
  * they merely WAIT on prerequisites or a cohort, and those never touched
@@ -86,6 +86,18 @@ export interface SystemMigrationEnrollmentStore {
     migrationName: string;
     enrolledByUserId: string;
   }): Promise<void>;
+  findCohortEligibleOrganizations(args: {
+    migrationName: string;
+    /** When set, the pool is restricted to organizations already enrolled
+     *  for this migration - a later step samples the step before it. */
+    enrolledForMigrationName?: string;
+    excludeOrganizationIds: string[];
+  }): Promise<Array<{ id: string; name: string }>>;
+  createMany(args: {
+    organizationIds: string[];
+    migrationName: string;
+    enrolledByUserId: string;
+  }): Promise<{ insertedCount: number }>;
   delete(args: {
     organizationId: string;
     migrationName: string;
@@ -148,6 +160,21 @@ export type MigrationOverview = {
 };
 
 /**
+ * A uniform sample without replacement: Fisher-Yates over a copy, first
+ * `count` entries. A pool smaller than the ask returns the whole pool -
+ * the caller reports how many it got rather than erroring.
+ */
+function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
+  const copy = [...pool];
+  const size = Math.min(count, copy.length);
+  for (let index = 0; index < size; index++) {
+    const swap = index + Math.floor(Math.random() * (copy.length - index));
+    [copy[index], copy[swap]] = [copy[swap] as T, copy[index] as T];
+  }
+  return copy.slice(0, size);
+}
+
+/**
  * The ops dashboard's view of the in-place migrations, and the operator's one
  * lever over them. Routes call this and nothing else - the state repository
  * stays behind the app layer.
@@ -168,16 +195,12 @@ export class SystemMigrationsService {
       isSaaS: () => boolean;
       enrollments: SystemMigrationEnrollmentStore;
       /**
-       * Synthetic cohort ids an operator may enroll for specific migrations,
-       * per migration name. A USER-rooted migration is paced by organization
-       * enrollment, which leaves nothing to enroll for users outside every
-       * organization — the final "everyone else" sweep enrolls one of these
-       * ids instead of an organization. Enrolling one skips the
-       * organization-existence check and nothing else: it still creates a
-       * real enrollment row, is withdrawn the same way, and only the
-       * migrations listed here accept it.
+       * The organizations whose data plane is a private ClickHouse instance,
+       * read from the environment's routing table. A cohort must never sweep
+       * one up, and the environment - not a list in code - is what names
+       * them.
        */
-      syntheticCohorts?: Record<string, readonly string[]>;
+      privateDataplaneOrganizationIds: () => string[];
       /**
        * The ops audit trail. Enrollment decides which organizations the
        * platform migrates, so both actions are recorded the way the
@@ -191,17 +214,18 @@ export class SystemMigrationsService {
         action: string;
         args?: Record<string, unknown>;
       }) => Promise<void>;
-      runPass: () => Promise<MigrationPassSummary | null>;
+      runPass: () => Promise<MigrationPassSummary>;
       /**
-       * One migration for one organization, now, under the same fleet-wide
-       * lease as a full pass (null when another pass holds it). The
+       * One migration for one organization, now, under the same
+       * per-organization claim as a full pass (the summary's `claimed`
+       * says another pass is already working the organization). The
        * composition supplies it because only the composition can build a
        * runner scoped to a single (tenant, migration) pair.
        */
       runTargetedPass: (args: {
         organizationId: string;
         migrationName: string;
-      }) => Promise<MigrationPassSummary | null>;
+      }) => Promise<MigrationPassSummary>;
       /**
        * Whether a migration's stored report means it merely WAITED, per
        * migration name. The state machine has no waiting status, so a
@@ -346,7 +370,7 @@ export class SystemMigrationsService {
 
   /**
    * Enroll one organization for one registered migration
-   * (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+   * (specs/migration/system-migrations-runner.feature, the enrollment scenarios).
    * Takes effect on the next pass - the runner reads enrollment fresh each
    * time - and refuses rather than lies: off cloud (where a row would change
    * nothing, see MigrationEnrollmentCloudOnlyError), for a migration nothing
@@ -364,13 +388,11 @@ export class SystemMigrationsService {
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
-    if (!this.isSyntheticCohort({ migrationName, organizationId })) {
-      const organization = await this.deps.enrollments.findOrganizationById({
-        organizationId,
-      });
-      if (!organization) {
-        throw new MigrationEnrollmentOrganizationNotFoundError();
-      }
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
     }
     await this.deps.enrollments.create({
       organizationId,
@@ -387,6 +409,82 @@ export class SystemMigrationsService {
       action: "systemMigrations.enroll",
       args: { migrationName },
     });
+  }
+
+  /**
+   * Enroll a sampled cohort for one migration in a single action
+   * (specs/migration/system-migrations-runner.feature, the cohort scenarios).
+   * The pool is every organization not yet enrolled for the migration,
+   * minus the ones the platform already knows to leave alone by data
+   * rather than by a hand-kept list: an active enterprise subscription, or
+   * a private ClickHouse route in the environment. The sample is drawn at
+   * random so a cohort is a spread of the long tail, not the same head of
+   * some fixed order every time - and the result names every organization
+   * it picked, because an action over N organizations is only auditable if
+   * it says which N.
+   */
+  async enrollCohort({
+    migrationName,
+    sampleSize,
+    actorUserId,
+  }: {
+    migrationName: string;
+    sampleSize: number;
+    actorUserId: string;
+  }): Promise<{
+    enrolled: Array<{ id: string; name: string }>;
+    eligibleCount: number;
+  }> {
+    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    this.requireRegisteredMigration(migrationName);
+    // The steps run as an ordered pipeline per organization, so a later
+    // step's pool is the step before it: an organization enrolled for a
+    // step whose predecessor nothing will ever run would sit pending
+    // forever. The first step keeps sampling the whole installation.
+    const ordered = this.deps.migrations();
+    const index = ordered.findIndex(
+      (migration) => migration.name === migrationName,
+    );
+    const previous = index > 0 ? ordered[index - 1] : undefined;
+    const eligible =
+      await this.deps.enrollments.findCohortEligibleOrganizations({
+        migrationName,
+        enrolledForMigrationName: previous?.name,
+        excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+      });
+    const picked = sample({ pool: eligible, count: sampleSize });
+    const { insertedCount } = await this.deps.enrollments.createMany({
+      organizationIds: picked.map((organization) => organization.id),
+      migrationName,
+      enrolledByUserId: actorUserId,
+    });
+    logger.info(
+      {
+        migrationName,
+        actorUserId,
+        sampleSize,
+        // Both counts on purpose: `skipDuplicates` drops a row a concurrent
+        // single enrollment already wrote, and the trail must not overclaim.
+        pickedCount: picked.length,
+        insertedCount,
+        eligibleCount: eligible.length,
+        organizationIds: picked.map((organization) => organization.id),
+      },
+      "operator enrolled a cohort for the in-place migration rollout",
+    );
+    // One audit row PER organization, mirroring `enroll`'s shape: the row's
+    // indexed organizationId column is how "what touched org X" is answered,
+    // and a single row holding a thousand-id array loses every id to the
+    // audit writer's size cap.
+    for (const organization of picked) {
+      await this.deps.audit({
+        userId: actorUserId,
+        organizationId: organization.id,
+        action: "systemMigrations.enrollCohort",
+        args: { migrationName, sampleSize, cohortSize: picked.length },
+      });
+    }
+    return { enrolled: picked, eligibleCount: eligible.length };
   }
 
   /**
@@ -420,13 +518,14 @@ export class SystemMigrationsService {
 
   /**
    * Run one migration for one organization now
-   * (specs/rbac/in-place-authz-migration.feature, "An operator runs one
+   * (specs/migration/system-migrations-runner.feature, "An operator runs one
    * migration for one organization now"). Awaited rather than
    * fire-and-forget - the operator asked about one organization and wants
    * its outcome. Enrollment stays the pacing source of truth on cloud: an
    * unenrolled organization is refused, never quietly migrated. The
-   * fleet-wide lease still applies, so a run during a full pass is refused
-   * with a retry-shaped error instead of double-driving the organization.
+   * organization's own claim still applies, so a run while another pass is
+   * working that organization is refused with a retry-shaped error instead
+   * of double-driving it.
    */
   async runForOrganization({
     organizationId,
@@ -441,13 +540,11 @@ export class SystemMigrationsService {
     if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
       throw new MigrationNotAvailableOnInstallationError();
     }
-    if (!this.isSyntheticCohort({ migrationName, organizationId })) {
-      const organization = await this.deps.enrollments.findOrganizationById({
-        organizationId,
-      });
-      if (!organization) {
-        throw new MigrationEnrollmentOrganizationNotFoundError();
-      }
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
     }
     if (this.deps.isSaaS()) {
       const enrolled = await this.deps.enrollments.isEnrolled({
@@ -468,7 +565,7 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    if (summary === null) throw new MigrationPassAlreadyRunningError();
+    if (summary.claimed > 0) throw new MigrationPassAlreadyRunningError();
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId: organizationId,
@@ -502,20 +599,6 @@ export class SystemMigrationsService {
   }
 
   /** The migration a name refers to, or the refusal the operator can act on. */
-  /** Whether this (migration, id) pair names a declared synthetic cohort. */
-  private isSyntheticCohort({
-    migrationName,
-    organizationId,
-  }: {
-    migrationName: string;
-    organizationId: string;
-  }): boolean {
-    return (
-      this.deps.syntheticCohorts?.[migrationName]?.includes(organizationId) ??
-      false
-    );
-  }
-
   private requireRegisteredMigration(migrationName: string): {
     name: string;
     title: string;
@@ -533,9 +616,9 @@ export class SystemMigrationsService {
   /**
    * Kick a pass now instead of waiting for the next worker boot - the lever
    * for processing a fresh enrollment right away or re-verifying held
-   * tenants after remediation. Fire-and-forget: the fleet-wide lease already guarantees a
-   * single driver, so the worst case for a double click is a pass that
-   * stands down immediately.
+   * tenants after remediation. Fire-and-forget: per-organization claims keep
+   * two passes off the same organization, so the worst case for a double
+   * click is a pass that finds everything claimed and does nothing.
    */
   startPass(): void {
     void this.deps.runPass().catch((error) => {
@@ -548,7 +631,7 @@ export class SystemMigrationsService {
 
   /**
    * The operator's rollback: pin a migrated or finalized organization back
-   * onto its legacy path (specs/rbac/in-place-authz-migration.feature, "An
+   * onto its legacy path (specs/migration/system-migrations-runner.feature, "An
    * operator rolls a finalized organization back to its legacy path", "An
    * operator rolls a migrated organization back to its legacy path"), then
    * apply whatever that migration's rollback has to DO.
@@ -557,7 +640,7 @@ export class SystemMigrationsService {
    *
    *   `migrated`     held on the ledger with parity still disagreeing —
    *   `finalized`    parity clean. Both are already live on ledger writes
-   *                  (ledger-write-gate.ts), so both are the operator's to
+   *                  (engine-gate.ts), so both are the operator's to
    *                  pull back. The pin is written FIRST — the stored
    *                  `rolled_back` status is what stops the next pass
    *                  re-finalizing the tenant, so it must land even if the

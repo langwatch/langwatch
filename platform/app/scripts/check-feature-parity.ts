@@ -66,7 +66,16 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // The Langy dogfood scenario suite (e2e/langy) runs against a live stack, so
+  // it is not in any CI vitest lane — but its scenario tests are still the
+  // binding surface for @e2e-tagged specs about Langy's conversational
+  // behavior. Without this root those specs could only be @unimplemented.
+  "platform/app/e2e",
   "packages",
+  // Langy's pi-harness wrapper: the process that turns the manager's config
+  // into pi's model registry and speaks the stdio protocol. Scenarios about
+  // what the wrapper generates can only bind from its own vitest suite.
+  "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
@@ -260,7 +269,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/caching-passthrough.feature",
   "specs/ai-gateway/cli-integrations.feature",
   "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/admin-oversight.feature",
@@ -305,7 +313,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
@@ -451,11 +458,9 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-card-taxonomy.feature",
   "specs/langy/langy-choice-questions.feature",
   "specs/langy/langy-command-bar-activation.feature",
-  "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-derived-cards.feature",
-  "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-native-skills.feature",
@@ -463,7 +468,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
   "specs/langy/langy-session-key-lifecycle.feature",
-  "specs/langy/langy-session-key.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
@@ -570,7 +574,6 @@ const LEGACY_INERT: string[] = [
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
-  "specs/skills/empty-state-skill-setup.feature",
   "specs/skills/onboarding-skills-architecture.feature",
   "specs/skills/platform-integration.feature",
   "specs/skills/prompt-compiler.feature",

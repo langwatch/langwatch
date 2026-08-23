@@ -107,11 +107,17 @@ export type LangyMessageImportedEventData = z.infer<
  * per-turn document (langyConversationTurn) is self-contained — question AND
  * answer in one render doc — without a join back to message history. Optional:
  * an accepted turn without a captured question still records.
+ *
+ * `model` is the provider-prefixed model this turn runs on (the composer's
+ * pick, or the resolved default when none). The conversation fold keeps the
+ * latest as `LastModel`, so reopening a conversation restores the model it
+ * last ran on. Optional: events predating the field still fold.
  */
 export const langyAgentTurnAcceptedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   questionParts: z.array(langyMessagePartSchema).optional(),
+  model: z.string().optional(),
 });
 export type LangyAgentTurnAcceptedEventData = z.infer<
   typeof langyAgentTurnAcceptedEventDataSchema

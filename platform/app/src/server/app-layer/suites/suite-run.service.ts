@@ -5,6 +5,7 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -53,6 +54,35 @@ function withParameters(
   parameters: RunParameterValues | undefined,
 ): { parameters: RunParameterValues } | Record<string, never> {
   return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+}
+
+/**
+ * The names of the secrets a run used, for the run's metadata.
+ *
+ * Names only. They are what lets a person see which credentials a run needed;
+ * the values ride the event beside the metadata, encrypted, and never enter it.
+ */
+function withSecretParameterNames(
+  secretParameters: RunSecretCiphertext | undefined,
+): { secretParameterNames: string[] } | Record<string, never> {
+  const names = Object.keys(secretParameters ?? {});
+  return names.length > 0 ? { secretParameterNames: names } : {};
+}
+
+/**
+ * The encrypted secret values, as a sibling of the metadata rather than a
+ * member of it.
+ *
+ * The fold projection stringifies the metadata object into a stored column, so
+ * a worker running an older build would copy anything inside it into the runs
+ * store. A sibling field is dropped by that same worker instead.
+ */
+function withSecretParameters(
+  secretParameters: RunSecretCiphertext | undefined,
+): { secretParameters: RunSecretCiphertext } | Record<string, never> {
+  return secretParameters && Object.keys(secretParameters).length > 0
+    ? { secretParameters }
+    : {};
 }
 
 export class SuiteRunService {
@@ -107,6 +137,13 @@ export class SuiteRunService {
      * resolution pass reaching a different answer.
      */
     parametersByScenarioId?: Map<string, RunParameterValues>;
+    /**
+     * The secret values each scenario resolved, already encrypted, keyed by
+     * scenario id. They ride the queued event beside the metadata so the run
+     * carries them into execution without any store holding a readable
+     * credential.
+     */
+    secretParametersByScenarioId?: Map<string, RunSecretCiphertext>;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -118,6 +155,7 @@ export class SuiteRunService {
       skippedArchived,
       idempotencyKey,
       parametersByScenarioId,
+      secretParametersByScenarioId,
     } = params;
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
@@ -174,8 +212,11 @@ export class SuiteRunService {
 
     const now = Date.now();
     await Promise.allSettled(
-      items.map((item) =>
-        this.queueSimulationRunCommand({
+      items.map((item) => {
+        const secretParameters = secretParametersByScenarioId?.get(
+          item.scenarioId,
+        );
+        return this.queueSimulationRunCommand({
           tenantId: projectId,
           scenarioRunId: item.scenarioRunId,
           scenarioId: item.scenarioId,
@@ -185,14 +226,16 @@ export class SuiteRunService {
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
+            ...withSecretParameterNames(secretParameters),
           },
+          ...withSecretParameters(secretParameters),
           target: {
             type: item.target.type,
             referenceId: item.target.referenceId,
           },
           occurredAt: now,
-        }),
-      ),
+        });
+      }),
     );
 
     // No explicit job scheduling — the execution subscriber picks up queued events

@@ -2,7 +2,6 @@ import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
 import {
@@ -11,6 +10,7 @@ import {
   type ProductId,
   productById,
 } from "../products";
+import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 
 /** The trigger reads as a raised pill on the top bar's gray. */
@@ -47,11 +47,7 @@ export function ProductSwitcherMenu({
 }) {
   const router = useRouter();
   const { reachableProducts } = useReachableProducts();
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  const projectSlug = project && !project.isPersonal ? project.slug : null;
+  const projectSlug = useLlmOpsProjectSlug();
 
   const active = productById(activeProductId);
   const ActiveIcon = active.icon;

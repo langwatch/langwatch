@@ -34,24 +34,37 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 // resolves (unmocked here, same as before this repository moved off the
 // route's own inline resolver).
 let planHasWebhookEndpoints = true;
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    planProvider: {
-      getActivePlan: async () => ({
-        webhookEndpointsEnabled: planHasWebhookEndpoints,
-      }),
-    },
-    gateway: {
-      webhookEvents: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForTenant(tenantId);
-        if (!client) throw new Error("ClickHouse is not configured");
-        return client;
-      }),
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  // The REST org-auth middleware decides through
+  // appFromContext(c).permissions (ADR-092); the fake carries the real
+  // composition over the real test database so requests reach the routes.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const permissions = permissionsServiceFor(dbForPermissions);
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({
+          webhookEndpointsEnabled: planHasWebhookEndpoints,
+        }),
+      },
+      gateway: {
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          async (tenantId) => {
+            const client = await getClickHouseClientForTenant(tenantId);
+            if (!client) throw new Error("ClickHouse is not configured");
+            return client;
+          },
+        ),
+      },
+    }),
+  };
+});
 
 import { app } from "../[[...route]]/app";
 

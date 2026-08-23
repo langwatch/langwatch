@@ -1,3 +1,4 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
@@ -64,6 +65,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
@@ -217,6 +219,16 @@ export interface AppDependencies {
   clickhouse: {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
+    /** Per-organization resolution, for aggregates keyed by organization
+     *  rather than project (usage rollups, the grants ledger). */
+    resolveOrganizationClient: (
+      organizationId: string,
+    ) => Promise<ClickHouseClient>;
+    /** Every configured instance - shared plus private - for fleet sweeps
+     *  and admin surfaces that legitimately touch all of them. */
+    allInstances: () => Promise<
+      Array<{ target: string; client: ClickHouseClient }>
+    >;
   };
   /**
    * The process's one Redis connection, owned by the composition root and
@@ -322,6 +334,13 @@ export interface AppDependencies {
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;
+  /**
+   * ADR-092 decision 25 — the one permission-checking service. Every grant
+   * check on every surface (tRPC declarations, Hono session and API-key
+   * middlewares, the management API) resolves THIS instance via
+   * `getApp().permissions`; nothing composes its own from a client.
+   */
+  permissions: PermissionsService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

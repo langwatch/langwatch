@@ -8,6 +8,7 @@ import {
   type BrowserQAResult,
   browserQA,
 } from "./browser-qa";
+import { isTransientInfrastructureError } from "./langy-agent";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,7 +46,31 @@ export async function runScenarioAndLog(
   config: RunConfig,
   browserQAOptions?: BrowserQAOptions,
 ): Promise<Result> {
-  const result = await scenario.run(config);
+  // Two transients get one retry, both infrastructure rather than agent
+  // behaviour: langy_worker_stopped (the worker died mid-reply, server-side
+  // recovery already exhausted — the panel offers the user a retry too), and a
+  // turn that never settled because the conversation lock was still held or the
+  // machine was too loaded to answer inside the adapter's retry budget.
+  // Judge verdicts never come through here — a scenario that FAILS its criteria
+  // returns normally and is not retried.
+  //
+  // The retry replays the WHOLE scenario, and the worker can die after Langy
+  // finished a create. So every scenario reaching this helper has to tolerate
+  // its writes happening twice: the platform accepts a repeated name and gives
+  // it a fresh id, and each Layer 2 check reads back the resource it asked for
+  // rather than counting how many appeared. A scenario whose write cannot be
+  // repeated must not run through here until the library can resume a single
+  // turn instead of the whole script.
+  // The adapter marks both on the error it throws, so this reads a flag rather
+  // than looking for a code inside prose that is free to be reworded.
+  let result: Result;
+  try {
+    result = await scenario.run(config);
+  } catch (error) {
+    if (!isTransientInfrastructureError(error)) throw error;
+    console.log(`[scenario] transient infrastructure failure, retrying once`);
+    result = await scenario.run(config);
+  }
   const testName =
     expect.getState().currentTestName ??
     (config as { name?: string }).name ??

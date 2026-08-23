@@ -61,7 +61,9 @@ import {
   allocateWarehouseCost,
   costReadFloorMs,
   GENIE_CLIENT_APPLICATION,
+  mergeWarehouseCost,
   WAREHOUSE_COST_MAX_HOLD_MS,
+  WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
   type WarehousePricedStatement,
   warehouseCostChunks,
   warehouseCostPieces,
@@ -300,11 +302,12 @@ async function resolveWorkspaceToken(params: {
  *
  * Read it as three independent facts joined by the hour they share:
  *
- *   `windowed`    every statement the warehouse ran, Genie's or not
+ *   `sliced`      every statement the warehouse ran, Genie's or not, cut into
+ *                 one row per hour it was awake in
  *   `hour_total`  how much execution time that hour held IN TOTAL
  *   `hour_dbu`    what the warehouse was billed for that hour, per SKU
  *
- * `hour_total` deliberately sums `windowed` rather than filtering to Genie. A
+ * `hour_total` deliberately sums `sliced` rather than filtering to Genie. A
  * warehouse shared with dashboards and scheduled jobs whose denominator counted
  * only Genie's queries would hand Genie the entire warehouse bill. Live
  * validation put Genie at 13.3% of one workspace's warehouse compute; the rest
@@ -317,10 +320,43 @@ async function resolveWorkspaceToken(params: {
  * it. Rows with no matching price come back with nulls rather than being
  * dropped, so the caller can say so instead of silently reporting zero.
  *
- * Statements are bucketed by the hour their `start_time` falls in, which is how
- * the billing table buckets too. A statement straddling an hour boundary is
- * charged wholly to the hour it began — an approximation, and the same one the
- * live validation used.
+ * A statement is cut at every hour boundary it crosses, because the billing
+ * table is: `system.billing.usage` charges each hour for the compute that
+ * actually RAN in it. Bucketing a statement wholly into the hour it began — the
+ * shape this query used to have — put a 40-minute job's whole runtime in its
+ * start hour's denominator while 38 of those minutes were billed to the next
+ * one, leaving that next hour's bill to divide among whatever happened to start
+ * inside it. A one-second Genie question landing there could take the lot. The
+ * error ran in one direction: toward over-charging short questions, which is
+ * exactly what Genie sends.
+ *
+ * Three approximations survive, and this is what each costs:
+ *
+ *   Execution time is prorated across the hours by WALL-CLOCK overlap, because
+ *   the table reports one `execution_duration_ms` per statement and never says
+ *   which hour it was spent in. A statement that idles on a lock for 50 minutes
+ *   and computes for 10 has those 10 minutes spread evenly over the hour it
+ *   waited in. It moves a share between adjacent hours of the SAME statement;
+ *   it cannot invent or lose one, so a statement's total share is unaffected
+ *   and only its per-hour split is approximate.
+ *
+ *   A statement still running when the chunk's upper edge falls is priced from
+ *   both sides — this chunk emits the hours below the edge, the next one emits
+ *   the hours above it, and the sweep adds them. What does not survive is a
+ *   tail whose chunk is HELD: an hour there with no bill yet stops the sweep,
+ *   the question is emitted with the part that did price, and the re-read drops
+ *   the hint rather than restating it. Bounded to statements that straddle a
+ *   chunk edge AND run into an hour the workspace has not billed.
+ *
+ *   The look-back that catches statements which began BEFORE the window is
+ *   bounded (`WAREHOUSE_COST_STRADDLE_LOOKBACK_MS`). A statement running longer
+ *   than it is invisible to the window's first hours, whose denominators then
+ *   under-count — the same direction as the original bug, and the reason the
+ *   bound is a day rather than an hour.
+ *
+ * The row cap counts hour SLICES now, not statements: a warehouse whose
+ * statements routinely span hours reaches it sooner. Whichever it counts, the
+ * consequence is unchanged — the chunk is refused whole.
  */
 /**
  * The most rows one cost read will accept.
@@ -340,7 +376,7 @@ async function resolveWorkspaceToken(params: {
 export const WAREHOUSE_COST_ROW_LIMIT = 50_000;
 
 const WAREHOUSE_COST_STATEMENT = `
-WITH windowed AS (
+WITH ran AS (
   SELECT
     statement_id,
     client_application,
@@ -351,16 +387,101 @@ WITH windowed AS (
     query_source.genie_space_id AS genie_space_id,
     execution_duration_ms,
     compute.warehouse_id AS warehouse_id,
-    date_trunc('HOUR', start_time) AS usage_hour
+    start_time,
+    -- \`end_time\` is nullable; the duration reconstructs it when it is missing.
+    -- GREATEST pins the result at or after \`start_time\`, which is not defensive
+    -- tidiness: \`sequence()\` below RAISES on a stop before its start, so one
+    -- clock-skewed row would fail the whole read rather than skew one share.
+    GREATEST(
+      COALESCE(
+        end_time,
+        timestamp_millis(unix_millis(start_time) + execution_duration_ms)
+      ),
+      start_time
+    ) AS ended_at
   FROM system.query.history
-  WHERE start_time >= :from_ts
+  -- Wider than the window on purpose: a statement that BEGAN before it is still
+  -- burning compute inside it, and an hour whose denominator omits that
+  -- statement over-states everyone else's share of the hour.
+  WHERE start_time >= :scan_from_ts
     AND start_time < :to_ts
     AND execution_duration_ms IS NOT NULL
     AND compute.warehouse_id IS NOT NULL
 ),
+sliced AS (
+  SELECT
+    r.statement_id,
+    r.client_application,
+    r.genie_space_id,
+    r.warehouse_id,
+    r.start_time,
+    h.usage_hour,
+    -- The statement's execution time, prorated onto THIS hour by how much of its
+    -- wall clock fell inside it. \`div\` and not \`/\`: Spark's \`/\` returns a
+    -- DOUBLE, and no float may enter the money path. Truncation errs downward,
+    -- so the slices of a statement never add up to more than it ran.
+    --
+    -- The zero-wall branch is not a divide-by-zero guard bolted on: a statement
+    -- whose end lands on its start explodes to exactly one hour, so handing that
+    -- hour the whole duration is the correct answer, not a fallback.
+    CASE
+      WHEN unix_millis(r.ended_at) <= unix_millis(r.start_time)
+        THEN r.execution_duration_ms
+      ELSE (
+        r.execution_duration_ms * GREATEST(
+          0,
+          LEAST(unix_millis(r.ended_at), unix_millis(h.usage_hour) + 3600000)
+            - GREATEST(unix_millis(r.start_time), unix_millis(h.usage_hour))
+        )
+      ) div (unix_millis(r.ended_at) - unix_millis(r.start_time))
+    END AS execution_ms_in_hour
+  FROM ran r
+  -- The last hour is half-open, because \`sequence\` includes its stop value and
+  -- an hour is not. A statement ending at exactly 10:00:00.000 worked in hour
+  -- 09 and not at all in hour 10, and every hourly scheduled query ends on a
+  -- boundary. Emitting that empty hour is not merely untidy: if the warehouse
+  -- shut down at 10:00 no bill for hour 10 will ever arrive, the null SKU reads
+  -- as "not billed yet", and one such statement holds the whole source at this
+  -- chunk until the seven-day hold expires.
+  --
+  -- Backing the stop off by a millisecond cannot invert the range: it is only
+  -- done when the statement ran for at least that long, and a statement that
+  -- did not still needs its one hour to land somewhere.
+  LATERAL VIEW explode(
+    sequence(
+      date_trunc('HOUR', r.start_time),
+      date_trunc('HOUR',
+        CASE
+          WHEN unix_millis(r.ended_at) > unix_millis(r.start_time)
+            THEN timestamp_millis(unix_millis(r.ended_at) - 1)
+          ELSE r.start_time
+        END
+      ),
+      INTERVAL 1 HOUR
+    )
+  ) h AS usage_hour
+  -- Hours outside the window are dropped after the split, not before it: the
+  -- split needs the statement's real span to divide, the totals only want the
+  -- hours this read is answering for.
+  --
+  -- This clip is also what decides which chunk answers for which row, and it
+  -- has to be the HOUR rather than the statement's start. Chunks tile the
+  -- window, so every hour falls in exactly one of them and every statement-hour
+  -- is emitted exactly once — a statement that begins near the end of a chunk
+  -- comes back from the next one too, carrying the hours it burned there.
+  -- Gating on \`start_time\` instead looks like the same duplicate-avoidance
+  -- rule and is not: it hands the straddler wholly to the chunk it began in,
+  -- which has already dropped every hour past its own end, while the next chunk
+  -- counts that statement in its denominators and then excludes it from its
+  -- rows. Those hours are then billed to nobody and still dilute every other
+  -- question's share of them, permanently and silently, at every interior chunk
+  -- boundary a backfill crosses.
+  WHERE h.usage_hour >= :from_ts
+    AND h.usage_hour < :to_ts
+),
 hour_total AS (
-  SELECT usage_hour, warehouse_id, SUM(execution_duration_ms) AS total_ms
-  FROM windowed
+  SELECT usage_hour, warehouse_id, SUM(execution_ms_in_hour) AS total_ms
+  FROM sliced
   GROUP BY usage_hour, warehouse_id
 ),
 hour_dbu AS (
@@ -399,13 +520,14 @@ priced AS (
   WHERE pick = 1
 )
 SELECT
-  w.statement_id                          AS statement_id,
-  CAST(w.execution_duration_ms AS STRING) AS execution_duration_ms,
-  CAST(t.total_ms AS STRING)              AS hour_total_ms,
-  CAST(pr.billable_usd AS STRING)         AS hour_billable_usd,
-  pr.currency_code                        AS currency_code,
-  pr.sku_name                             AS sku_name
-FROM windowed w
+  w.statement_id                        AS statement_id,
+  CAST(w.usage_hour AS STRING)          AS usage_hour,
+  CAST(w.execution_ms_in_hour AS STRING) AS execution_ms_in_hour,
+  CAST(t.total_ms AS STRING)            AS hour_total_ms,
+  CAST(pr.billable_usd AS STRING)       AS hour_billable_usd,
+  pr.currency_code                      AS currency_code,
+  pr.sku_name                           AS sku_name
+FROM sliced w
 JOIN hour_total t
   ON t.usage_hour = w.usage_hour AND t.warehouse_id = w.warehouse_id
 -- LEFT, not inner, and that is the whole fix for the zero-cost stall. An inner
@@ -470,19 +592,75 @@ const warehouseCostResponseSchema = z.object({
  * The columns `WAREHOUSE_COST_STATEMENT` selects, in order.
  *
  * The API answers in `JSON_ARRAY` form — rows are positional, with the names
- * only in the manifest — so reading a row means trusting that its third value
+ * only in the manifest — so reading a row means trusting that its fourth value
  * is still the hour's total. Every value here is a string, which means a
  * reordered SELECT would not fail any parse: it would quietly price questions
- * off the wrong column. Checking the manifest turns that into a refusal.
+ * off the wrong column. `execution_ms_in_hour` and `hour_total_ms` are now
+ * adjacent and both whole milliseconds, so a swap between them is a share of
+ * exactly one that nothing else would catch. Checking the manifest turns that
+ * into a refusal.
  */
 const WAREHOUSE_COST_COLUMNS = [
   "statement_id",
-  "execution_duration_ms",
+  "usage_hour",
+  "execution_ms_in_hour",
   "hour_total_ms",
   "hour_billable_usd",
   "currency_code",
   "sku_name",
 ] as const;
+
+/**
+ * The window this question is asked about, as bound parameters.
+ *
+ * Bound, never interpolated. The window arrives from a clock, but the statement
+ * is a constant either way and this keeps it one.
+ *
+ * The warehouse id is deliberately absent. It says where this query runs, not
+ * what it may answer about: a Genie space answers on the warehouse it was
+ * authored against, which is routinely not the one the credential holds
+ * `CAN USE` on, and filtering to the executor would price every question at
+ * nothing.
+ */
+function warehouseCostParameters(chunk: {
+  fromMs: number;
+  toMs: number;
+}): { name: string; value: string; type: string }[] {
+  return [
+    // Whole hours, both ends. The warehouse is billed per hour and the
+    // statements are bucketed per hour, but the two are filtered separately: a
+    // window starting at 10:37 keeps hour 10's queries and drops hour 10's
+    // bill, so every question in that hour prices at nothing — and on a re-read
+    // that nothing would overwrite a cost an earlier run had already worked out
+    // correctly.
+    {
+      name: "from_ts",
+      value: new Date(startOfHourMs(chunk.fromMs)).toISOString(),
+      type: "TIMESTAMP",
+    },
+    // Where the SCAN starts, which is earlier than where the answer starts.
+    // Statements that began before the window still burn compute inside it, and
+    // an hour whose denominator omits them over-states everyone else's share of
+    // that hour.
+    {
+      name: "scan_from_ts",
+      value: new Date(
+        startOfHourMs(chunk.fromMs) - WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
+      ).toISOString(),
+      type: "TIMESTAMP",
+    },
+    {
+      name: "to_ts",
+      value: new Date(endOfHourMs(chunk.toMs)).toISOString(),
+      type: "TIMESTAMP",
+    },
+    {
+      name: "genie_app",
+      value: GENIE_CLIENT_APPLICATION,
+      type: "STRING",
+    },
+  ];
+}
 
 /**
  * What one cost reply turned out to be worth.
@@ -564,14 +742,6 @@ const WAREHOUSE_COST_UNFINISHED_STATES = new Set([
  */
 function unpricedFloor(chunk: { fromMs: number }): number {
   return chunk.fromMs - 1;
-}
-
-/** Fold one chunk's priced statements into the sweep's running total. */
-function mergeWarehouseCost(
-  into: Map<string, WarehousePricedStatement>,
-  from: Map<string, WarehousePricedStatement>,
-): void {
-  for (const [statementId, priced] of from) into.set(statementId, priced);
 }
 
 /**
@@ -719,14 +889,15 @@ function readWarehouseCost({
   const rows = data.flatMap((columns) => {
     const parsed = warehouseCostRowSchema.safeParse({
       statementId: columns[0],
-      executionDurationMs: columns[1],
-      hourTotalMs: columns[2],
-      hourBillableUsd: columns[3] ?? null,
-      currencyCode: columns[4] ?? null,
+      usageHour: columns[1],
+      executionMsInHour: columns[2],
+      hourTotalMs: columns[3],
+      hourBillableUsd: columns[4] ?? null,
+      currencyCode: columns[5] ?? null,
       // Null is meaningful now, not an empty-string fallback: the LEFT JOIN
       // returns a null SKU for a statement whose hour has no billing row yet,
       // and the allocator reads that as "seen but unbilled".
-      skuName: columns[5] ?? null,
+      skuName: columns[6] ?? null,
     });
     if (!parsed.success) {
       unreadable += 1;
@@ -2582,9 +2753,15 @@ export class DatabricksGeniePuller
     }
 
     if (read.outcome === "priced") {
-      // A statement is bucketed by the hour it started in and every hour lies
-      // inside exactly one chunk, so no two chunks answer for the same one.
-      mergeWarehouseCost(costByStatementId, read.costByStatementId);
+      // A statement is emitted for every chunk it burned compute in, carrying
+      // that chunk's hours only, so a statement running across a boundary
+      // arrives here twice with a different part of itself. `mergeWarehouseCost`
+      // adds rather than replaces for exactly that reason — see the ownership
+      // note on the hour clip in `WAREHOUSE_COST_STATEMENT`.
+      mergeWarehouseCost({
+        into: costByStatementId,
+        from: read.costByStatementId,
+      });
       // Priced, but not wholly: a statement here was seen and has no bill yet.
       // Hold the watermark at the chunk's start so the whole chunk is re-read
       // once billing lands, rather than moving past the unbilled statement and
@@ -2699,10 +2876,11 @@ export class DatabricksGeniePuller
   }
 
   /**
-   * The pieces in order: each that prices whole is merged, and the first that
-   * cannot be — refused, still owing a bill, or outrunning the run's budget —
-   * is returned as where the watermark holds. `"failed"` ends the whole sweep;
-   * `null` says every piece priced.
+   * The pieces in order: every piece that prices is merged — even one still
+   * owing a bill keeps its billed hours' worth — and the first that stops the
+   * walk (refused, owing, or outrunning the run's budget) is returned as where
+   * the watermark holds. `"failed"` ends the whole sweep; `null` says every
+   * piece priced whole.
    */
   private async walkWarehouseCostPieces({
     config,
@@ -2741,15 +2919,22 @@ export class DatabricksGeniePuller
       if (pieceRead.outcome !== "priced") {
         return piece;
       }
-      // Priced, but a statement in this piece has no bill yet. Hold at the
-      // piece, exactly as a refusal to it would: the pieces before it kept
-      // their cost and are never re-asked, and this one is re-read once its
-      // billing settles. Merging the piece first would be overwritten by that
-      // re-read, so it is left for the re-read to price whole.
+      // Merged BEFORE the owed check, the same order the full-chunk path
+      // uses: a piece can be owed for one hour and priced for others, and the
+      // priced shares belong to this run's records rather than to nothing. The
+      // hold below re-reads the piece once billing settles, and that re-read
+      // replaces the ledger rows with the same figure — so keeping the cost
+      // now costs nothing later.
+      mergeWarehouseCost({
+        into: costByStatementId,
+        from: pieceRead.costByStatementId,
+      });
+      // A statement in this piece has no bill yet. Hold at the piece, exactly
+      // as a refusal to it would: the pieces before it kept their cost and are
+      // never re-asked, and this one is re-read once its billing settles.
       if (pieceRead.owed) {
         return piece;
       }
-      mergeWarehouseCost(costByStatementId, pieceRead.costByStatementId);
     }
     return null;
   }
@@ -2770,7 +2955,6 @@ export class DatabricksGeniePuller
     warehouseId: string;
     chunk: { fromMs: number; toMs: number };
   }): Promise<WarehouseCostRead> {
-    const { fromMs, toMs } = chunk;
     const askedAtMs = Date.now();
     const observed = warehouseCostObserved({
       adapter: this.id,
@@ -2807,37 +2991,7 @@ export class DatabricksGeniePuller
           on_wait_timeout: "CANCEL",
           format: "JSON_ARRAY",
           disposition: "INLINE",
-          // Bound, never interpolated. The window arrives from a clock, but the
-          // statement is a constant either way and this keeps it one.
-          //
-          // The warehouse id is deliberately absent. It says where this query
-          // runs, not what it may answer about: a Genie space answers on the
-          // warehouse it was authored against, which is routinely not the one
-          // the credential holds `CAN USE` on, and filtering to the executor
-          // would price every question at nothing.
-          parameters: [
-            // Whole hours, both ends. The warehouse is billed per hour and the
-            // statements are bucketed per hour, but the two are filtered
-            // separately: a window starting at 10:37 keeps hour 10's queries
-            // and drops hour 10's bill, so every question in that hour prices
-            // at nothing — and on a re-read that nothing would overwrite a
-            // cost an earlier run had already worked out correctly.
-            {
-              name: "from_ts",
-              value: new Date(startOfHourMs(fromMs)).toISOString(),
-              type: "TIMESTAMP",
-            },
-            {
-              name: "to_ts",
-              value: new Date(endOfHourMs(toMs)).toISOString(),
-              type: "TIMESTAMP",
-            },
-            {
-              name: "genie_app",
-              value: GENIE_CLIENT_APPLICATION,
-              type: "STRING",
-            },
-          ],
+          parameters: warehouseCostParameters(chunk),
         },
       });
 

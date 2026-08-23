@@ -5,13 +5,14 @@
  * router names the migration at the boundary, stamps the acting
  * user from the session, and delegates everything else to
  * `systemMigrationsService`. Corresponds to
- * specs/rbac/in-place-authz-migration.feature (the enrollment scenarios).
+ * specs/migration/authz-grants-rollout.feature (the enrollment scenarios).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 
 const service = vi.hoisted(() => ({
   enroll: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  enrollCohort: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   withdraw: vi.fn<(...args: unknown[]) => Promise<void>>(),
   getEnrollments: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   getOverview: vi.fn(),
@@ -137,8 +138,65 @@ describe("ops migration enrollment procedures", () => {
     });
   });
 
+  describe("when an operator enrolls a cohort", () => {
+    /** @scenario "An operator enrolls a sampled cohort in one action" */
+    it("delegates to the service with the acting user stamped from the session", async () => {
+      service.enrollCohort.mockResolvedValue({
+        enrolled: [{ id: "org_a", name: "A" }],
+        eligibleCount: 1,
+      });
+      const caller = buildCaller();
+
+      const result = await caller.enrollMigrationCohort({
+        migrationName: "authz-team-user-backfill",
+        sampleSize: 25,
+      });
+
+      expect(result).toEqual({
+        enrolled: [{ id: "org_a", name: "A" }],
+        eligibleCount: 1,
+      });
+      expect(service.enrollCohort).toHaveBeenCalledWith({
+        migrationName: "authz-team-user-backfill",
+        sampleSize: 25,
+        actorUserId: "user_alex",
+      });
+      expect(demandedPermissions.get("enrollMigrationCohort")).toBe(
+        "ops:manage",
+      );
+    });
+
+    /** @scenario "A cutover cohort takes the typed confirmation" */
+    it("enrolls a cutover cohort only behind its typed confirmation", async () => {
+      service.enrollCohort.mockResolvedValue({
+        enrolled: [],
+        eligibleCount: 0,
+      });
+      const caller = buildCaller();
+
+      await expect(
+        caller.enrollMigrationCohort({
+          migrationName: "authz-grants-cutover",
+          sampleSize: 10,
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(service.enrollCohort).not.toHaveBeenCalled();
+
+      await caller.enrollMigrationCohort({
+        migrationName: "authz-grants-cutover",
+        sampleSize: 10,
+        confirm: "ENROLL",
+      });
+      expect(service.enrollCohort).toHaveBeenCalledWith({
+        migrationName: "authz-grants-cutover",
+        sampleSize: 10,
+        actorUserId: "user_alex",
+      });
+    });
+  });
+
   describe("when an operator runs one migration for one organization", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("delegates to the service and demands ops:manage", async () => {
       service.runForOrganization.mockResolvedValue({
         status: "finalized",

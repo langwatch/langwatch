@@ -15,7 +15,12 @@ Feature: Settings shell in the new navigation modes
   be read first. Every settings page keeps its address, and every
   visibility gate keeps its current condition. The back entry and its
   rule sit above the scroll region, so a long settings menu never
-  scrolls the way out of the column.
+  scrolls the way out of the column, and the entries are cut at that
+  rule as they pass under it.
+
+  API Keys sits in the ORGANIZATION group, under General. In ACCESS it
+  came after four enterprise entries most readers cannot open, which put
+  a page they use often at the bottom of a group they have no use for.
 
   Devices on the legacy mode keep the current settings chrome
   unchanged.
@@ -58,6 +63,24 @@ Feature: Settings shell in the new navigation modes
     When the settings menu scrolls
     Then the way back entry stays where it is
     And only the pages under the rule move
+
+  @integration
+  Scenario: The pages are cut at the rule as they scroll under the way back
+    Given I open Settings in a new navigation mode
+    Then the part that scrolls starts at the rule under the way back
+    And the space under that rule scrolls with the pages
+
+  @integration
+  Scenario: API Keys sits under General
+    Given I open Settings in a new navigation mode
+    Then API Keys comes right after General in the ORGANIZATION group
+    And the ACCESS group does not hold it
+
+  @integration
+  Scenario: The menu marks the page that is open
+    Given I open the Email Suppressions settings page
+    Then the Email Suppressions entry is marked as the open one
+    And no other entry is marked
 
   @integration
   Scenario: A lite member sees no restricted settings entries

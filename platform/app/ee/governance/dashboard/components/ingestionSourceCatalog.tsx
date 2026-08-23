@@ -128,7 +128,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Anthropic Admin API (usage & cost)",
     mode: "pull",
     blurb:
-      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
     icon: <Anthropic />,
   },
   {
@@ -136,7 +136,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Databricks AI/BI Genie",
     mode: "pull",
     blurb:
-      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
     icon: <Databricks />,
   },
   {

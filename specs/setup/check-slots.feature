@@ -239,6 +239,20 @@ Feature: Machine-wide slots for whole-repo checks
     Then the wrapper counts the signal as one it forwarded
     And it reports no kill from outside
 
+  # A signal keeps its default disposition until the wrapper is listening for
+  # it, so the order of starting the command and listening decides what a
+  # Ctrl-C at that instant does. In the wrong order the machine kills the
+  # wrapper outright: the interrupt reaches nobody and the command keeps
+  # running with no parent. A slot is counted for as long as its wrapper
+  # lives, so the queue then makes that slot free and can start another check
+  # on top of a run that is still using the machine.
+
+  @unit
+  Scenario: An interrupt that arrives as the command starts is forwarded
+    Given a contributor interrupts a check in the instant its command starts
+    Then the interrupt reaches the command
+    And the check still reports how the command ended
+
   # --- The bin shims: the package scripts are not the only way in ---
 
   # Wrapping the scripts left every other route to the binary uncounted, and

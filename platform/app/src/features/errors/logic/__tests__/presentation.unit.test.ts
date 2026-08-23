@@ -431,6 +431,27 @@ describe("explainHandledError", () => {
       );
     });
 
+    it("names the model when the rejected field is the per-send modelOverride", () => {
+      // The Langy composer sends the picked model as `modelOverride`; the
+      // customer is looking at a model picker, so the card says "the model".
+      const { title, description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: {
+              modelOverride: [
+                "modelOverride must be in 'provider/model' shape",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("There's a problem with the model.");
+    });
+
     it("names them the way the screen does, not the way the schema does", () => {
       // `slug` is the wire key; the field the user is looking at is labelled
       // "URL slug". Quoting the key back reads as a different thing entirely.

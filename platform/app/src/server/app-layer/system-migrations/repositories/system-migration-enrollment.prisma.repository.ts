@@ -142,6 +142,88 @@ export class PrismaSystemMigrationEnrollmentRepository {
     });
   }
 
+  /**
+   * The cohort's eligible pool for one migration: organizations with no
+   * enrollment row for it, no active enterprise subscription, and not on the
+   * caller's exclusion list (the private-dataplane organizations, whose ids
+   * the composition reads from the environment). A later pipeline step
+   * passes `enrolledForMigrationName` and the pool narrows to organizations
+   * already enrolled for that predecessor. Ids and names only - the
+   * service samples from this in memory, so the pool never needs an order.
+   */
+  async findCohortEligibleOrganizations({
+    migrationName,
+    enrolledForMigrationName,
+    excludeOrganizationIds,
+  }: {
+    migrationName: string;
+    enrolledForMigrationName?: string;
+    excludeOrganizationIds: string[];
+  }): Promise<Array<{ id: string; name: string }>> {
+    // The enrollment table has no relation to Organization (a plain string
+    // column pair), so the enrolled ids are read first and excluded by id -
+    // the enrolled set is the small side of this join by construction.
+    const enrolled = await this.prisma.systemMigrationEnrollment.findMany({
+      where: { migrationName },
+      select: { organizationId: true },
+    });
+    const pool =
+      enrolledForMigrationName === undefined
+        ? undefined
+        : (
+            await this.prisma.systemMigrationEnrollment.findMany({
+              where: { migrationName: enrolledForMigrationName },
+              select: { organizationId: true },
+            })
+          ).map((row) => row.organizationId);
+    return this.prisma.organization.findMany({
+      where: {
+        id: {
+          ...(pool === undefined ? {} : { in: pool }),
+          notIn: [
+            ...excludeOrganizationIds,
+            ...enrolled.map((row) => row.organizationId),
+          ],
+        },
+        // PENDING rides along with ACTIVE: a just-signed enterprise whose
+        // subscription has not settled is exactly the organization the
+        // exclusion exists to keep out of an experimental cohort.
+        subscriptions: {
+          none: { status: { in: ["ACTIVE", "PENDING"] }, plan: "ENTERPRISE" },
+        },
+      },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * The cohort's write: every picked organization in one statement.
+   * `skipDuplicates` covers the race with a concurrent single enrollment -
+   * a row that appeared since the pool was read is simply not re-created,
+   * and the returned count is what actually landed, so the caller reports
+   * what happened rather than what it attempted.
+   */
+  async createMany({
+    organizationIds,
+    migrationName,
+    enrolledByUserId,
+  }: {
+    organizationIds: string[];
+    migrationName: string;
+    enrolledByUserId: string;
+  }): Promise<{ insertedCount: number }> {
+    if (organizationIds.length === 0) return { insertedCount: 0 };
+    const result = await this.prisma.systemMigrationEnrollment.createMany({
+      data: organizationIds.map((organizationId) => ({
+        organizationId,
+        migrationName,
+        enrolledByUserId,
+      })),
+      skipDuplicates: true,
+    });
+    return { insertedCount: result.count };
+  }
+
   async create({
     organizationId,
     migrationName,

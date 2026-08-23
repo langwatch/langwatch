@@ -39,7 +39,7 @@ function fakeBuffer() {
     appendMilestone: vi.fn(async () => {}),
     appendPlan: vi.fn(async () => {}),
     appendTool: vi.fn(async () => {}),
-    markEnd: vi.fn(async () => {}),
+    markEnd: vi.fn(async () => ({ backstopped: false })),
     markError: vi.fn(async () => {}),
     heartbeat: vi.fn(async () => {}),
     appendNavigate: vi.fn(async () => {}),
@@ -620,6 +620,48 @@ describe("LangyTurnRelay", () => {
       expect(conversations.recordToolCallCompleted).toHaveBeenCalled();
     });
 
+    /** @scenario "A chained lookup-and-open compound resolves through the platform fallback" */
+    it("resolves a CHAINED lookup-and-open through the platform fallback when the link store is empty", async () => {
+      // The reported failure: "take me to the prompt playground" made the
+      // model run ONE compound call (`langwatch prompt list --format json &&
+      // langwatch navigate open prompt_x`). Compound stdout never seeds the
+      // link store (stdout provenance), so the store is EMPTY, and the old
+      // fallback resolved only scenariorun_ ids, so the navigate silently
+      // dropped for every other resource. The fallback table must answer.
+      const resolveResourceUrl = vi.fn(
+        async () =>
+          "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+      );
+      const { relay, buffer } = makeRelay({ resolveResourceUrl });
+
+      const command =
+        "langwatch prompt list --format json && langwatch navigate open prompt_x";
+      for (const phase of [
+        { phase: "start" as const },
+        { phase: "end" as const, output: "ok" },
+      ]) {
+        await relay.handle(
+          frame({
+            type: "tool",
+            id: "call-prompt-chained",
+            name: "bash",
+            ...phase,
+            input: { command },
+          }),
+        );
+      }
+
+      expect(resolveResourceUrl).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        resourceId: "prompt_x",
+      });
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+      });
+    });
+
     it("falls back to the platform's own verified lookup when the conversation never remembered the id", async () => {
       // Legitimate flows miss the link cache: a chained lookup (compound
       // stdout is never trusted for remembering) or a surfacing payload with
@@ -895,9 +937,11 @@ describe("LangyTurnRelay", () => {
         }),
       );
       expect(out).toEqual({ status: "terminal" });
+      // The frame carries text, so there is nothing to backstop.
       expect(buffer.markEnd).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        backstopSilentTurn: false,
       });
       expect(conversations.ingestAgentTurnResult).toHaveBeenCalledWith(
         expect.objectContaining({ status: "completed", text: "the answer" }),
@@ -955,6 +999,9 @@ describe("LangyTurnRelay", () => {
         frame({ type: "handoff", resumeToken: "opaque-resume" }),
       );
       expect(out).toEqual({ status: "terminal" });
+      // A handoff ends the stream without the turn having finished, so it never
+      // asks for the fallback: the turn is re-driven on a fresh worker, and
+      // "I finished this turn without writing a reply" would be wrong twice.
       expect(buffer.markEnd).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",

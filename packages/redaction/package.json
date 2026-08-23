@@ -12,7 +12,8 @@
 	"scripts": {
 		"typecheck": "tsc --noEmit",
 		"test": "vitest",
-		"test:unit": "vitest run"
+		"test:unit": "vitest run",
+		"bench": "vitest bench --run"
 	},
 	"keywords": [
 		"langwatch",
