@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/agents-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agents services, private persistence, and transport-neutral API handlers.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./internal-api": {
+      "types": "./src/api/internal/agent.api.ts",
+      "default": "./src/api/internal/agent.api.ts"
+    },
+    "./legacy-rest": {
+      "types": "./src/api/legacy-rest/agent.api.ts",
+      "default": "./src/api/legacy-rest/agent.api.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/agents-contract": "workspace:*",
+    "nanoid": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}
