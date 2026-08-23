@@ -309,14 +309,25 @@ function roleDiffs({
  * legacy count is a budget that grew back, which nothing legitimate
  * produces, so that is the named diff.
  *
- * That last case is only VISIBLE while the counts also disagree. A usage row
- * on the wrong project but already at the right count reads as agreement here
- * and the organization finalizes over it, which is deliberate: the row is not
- * the seed's to move, the mismatch fails toward fewer views rather than more
- * (the consume fences on the same three columns, so it simply does not
- * match), and holding on it would be a hold no pass could ever clear — the
- * exact disease the rest of this file exists to cure. The budget VALUE, which
- * is what the proof is actually about, is correct either way.
+ * That last case is only VISIBLE while the counts also disagree, and it is a
+ * different column from the `projectId` compared below. Two projects are in
+ * play and only one of them is checked:
+ *
+ * - `head.projectId` is the GRANT row's, and the table below compares it, so
+ *   a share whose grant sits on the wrong project is a `resource_changed`
+ *   diff whatever its view count says.
+ * - `GrantUsage.projectId` is the BUDGET row's. `findResourceGrantRows`
+ *   selects only `grantId` and `viewCount` from that table, so it never
+ *   reaches this comparison at all.
+ *
+ * A budget row on the wrong project but already at the right count therefore
+ * reads as agreement here and the organization finalizes over it. That is
+ * deliberate: the row is not the seed's to move, the mismatch fails toward
+ * fewer views rather than more (the consume fences on the same three columns,
+ * so it simply does not match), and holding on it would be a hold no pass
+ * could ever clear — the exact disease the rest of this file exists to cure.
+ * The budget VALUE, which is what the proof is actually about, is correct
+ * either way.
  *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the

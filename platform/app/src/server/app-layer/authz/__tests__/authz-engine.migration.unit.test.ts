@@ -757,11 +757,18 @@ describe("given an organization with legacy access rows", () => {
 
     /** @scenario "A view budget is raised on a re-run, never lowered" */
     it("treats a budget the handover could not raise as lag, not disagreement", async () => {
-      // The one case the seed's guard refuses: a usage row that disagrees
-      // about which project it belongs to. Outstanding rather than a diff, so
-      // it heals the moment the row is corrected instead of latching.
+      // The one case the seed's guard refuses: a GRANTUSAGE row that
+      // disagrees about which project it belongs to. Outstanding rather than
+      // a diff, so it heals the moment the row is corrected instead of
+      // latching.
       //
-      // Only while the COUNTS also disagree, which is what this pins. Such a
+      // The grant below sits on the RIGHT project — `projectId: row.projectId`
+      // — so nothing here is a `resource_changed` diff. That comparison is
+      // over the grant's project, which is checked; the budget row's project
+      // is a different column that `findResourceGrantRows` does not select.
+      // What differs is the count alone, which is why this is lag.
+      //
+      // And only while the COUNTS disagree, which is what this pins. A budget
       // row already at the right count reads as agreement and the
       // organization finalizes over it — deliberately: the row is not the
       // seed's to move, the mismatch fails toward fewer views (the consume
