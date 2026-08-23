@@ -43,13 +43,12 @@ import { SystemMigrationsService } from "./system-migrations.service";
 
 const logger = createLogger("langwatch:system-migrations:runtime");
 
-/**
- * The cloud rollout's enrollment rows: what the ops enrollment actions write
- * and what every pass reads fresh (see `runSystemMigrationPass` and the
- * cutover's `cutoverCohort` below).
- */
 /** The runner and the ops service both write through this instance. */
 const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
+
+/** The cloud rollout's enrollment rows: what the ops enrollment actions
+ *  write and what every pass reads fresh (`migrationPassCohort`,
+ *  `userMigrationPassCohort`). */
 
 const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
   prisma,
@@ -61,16 +60,14 @@ const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
  */
 export const systemMigrationsService = new SystemMigrationsService({
   state: systemMigrationState,
-  migrations: () =>
-    [...registeredMigrations(), ...registeredUserMigrations()].map(
-      (migration) => ({
-        name: migration.name,
-        title: migration.title,
-        description: migration.description,
-        requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
-        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-      }),
+  migrations: () => [
+    ...registeredMigrations().map((migration) =>
+      declarationOf({ migration, tenant: "organization" }),
     ),
+    ...registeredUserMigrations().map((migration) =>
+      declarationOf({ migration, tenant: "user" }),
+    ),
+  ],
   isSaaS: () => env.IS_SAAS === true,
   enrollments: enrollmentRepository,
   // The environment's private ClickHouse routing table doubles as the list
@@ -92,6 +89,25 @@ export const systemMigrationsService = new SystemMigrationsService({
   // waiting stage to report, no rollback lever to register an effect for,
   // and so no dependency graph between migrations to guard.
 });
+
+/** What the ops service reads of a migration: its declaration plus the axis
+ *  the runner drives it over (ADR-101 §6). */
+function declarationOf({
+  migration,
+  tenant,
+}: {
+  migration: SystemMigration;
+  tenant: "organization" | "user";
+}) {
+  return {
+    name: migration.name,
+    title: migration.title,
+    description: migration.description,
+    requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
+    runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    tenant,
+  };
+}
 
 /**
  * Every registered in-place migration, in the order they run per tenant.
@@ -239,7 +255,8 @@ export async function migrationPassCohort(): Promise<
  * and a user is in a user-rooted migration's cohort when any organization
  * they belong to is enrolled for it. Self-hosted admits every user, as it
  * admits every organization. Enrollment and membership are read once, fresh,
- * at the start of each pass. A user outside every organization has nothing
+ * at the start of each pass; members of private-dataplane organizations are
+ * excluded exactly as those organizations are. A user outside every organization has nothing
  * to enroll them on cloud and stays on the legacy path until they join one;
  * their sign-in is unaffected (the write gate answers false; the D03 read
  * fork falls back to legacy routing).
@@ -251,17 +268,32 @@ export async function userMigrationPassCohort(): Promise<
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
   const membersByMigration = new Map<string, Set<string>>();
+  // The same exclusion the organization cohort applies: a private-dataplane
+  // organization is never swept up, and neither are its members - a user's
+  // identity events would otherwise land in the shared platform log while
+  // the organization's own data stays on its private instance.
+  const privateOrganizationIds = [...getPrivateClickHouseUrls().keys()];
+  const privateMembers = new Set<string>();
+  if (privateOrganizationIds.length > 0) {
+    const rows = await prisma.organizationUser.findMany({
+      where: { organizationId: { in: privateOrganizationIds } },
+      select: { userId: true },
+    });
+    for (const row of rows) privateMembers.add(row.userId);
+  }
   for (const migration of registeredUserMigrations()) {
     const organizationIds = [
       ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
-    ];
+    ].filter((id) => !privateOrganizationIds.includes(id));
     const members = new Set<string>();
     if (organizationIds.length > 0) {
       const rows = await prisma.organizationUser.findMany({
         where: { organizationId: { in: organizationIds } },
         select: { userId: true },
       });
-      for (const row of rows) members.add(row.userId);
+      for (const row of rows) {
+        if (!privateMembers.has(row.userId)) members.add(row.userId);
+      }
     }
     membersByMigration.set(migration.name, members);
   }
@@ -310,15 +342,6 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
   }
 }
 
-/**
- * One full pass over every cohort organization. Composed per call so the
- * lease token, the Redis handle and the enrollment read are all fresh - the
- * ops "run a pass now" action and the worker boot share this exact entry
- * point. Self-hosted runs only the migrations whose
- * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
- * are not driven for any tenant - never attempted, parked or reported -
- * until a later release flips the declaration.
- */
 /**
  * One migration for one organization, now - the ops page's targeted run.
  * The same per-organization claim as a full pass (so a targeted run can
@@ -378,6 +401,15 @@ export async function runSystemMigrationTargetedPass({
   return runner.runPass({ signal });
 }
 
+/**
+ * One full pass over every cohort organization, then over every cohort user.
+ * Composed per call so the lease token, the Redis handle and the enrollment
+ * read are all fresh - the ops "run a pass now" action and the worker boot
+ * share this exact entry point. Self-hosted runs only the migrations whose
+ * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
+ * are not driven for any tenant - never attempted, parked or reported -
+ * until a later release flips the declaration.
+ */
 export async function runSystemMigrationPass(args?: {
   signal?: AbortSignal;
   /**

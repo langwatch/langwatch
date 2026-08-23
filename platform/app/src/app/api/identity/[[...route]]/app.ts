@@ -7,8 +7,9 @@
  * verbs. Every argument travels in the JSON body; every operation is a POST.
  *
  * The magic-link LANDING page (GET renders, never verifies) is deliberately
- * not here — it is a browser page, not an API operation, and lives in
- * `~/server/routes/identity-verification.ts`. Completion is this family's
+ * not here — it is a browser page, not an API operation: the app route
+ * `/auth/verify-email` (`src/pages/auth/verify-email.tsx`, public, no
+ * session). Completion is this family's
  * `verification.complete`, which carries the real proofs: the emailed token
  * and the initiating context's PKCE verifier, checked by the ceremony
  * service against the id-pinned record.

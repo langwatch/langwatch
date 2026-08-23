@@ -18,11 +18,12 @@
  *     (D02 Security Concerns) and never silent.
  *
  * Behind `AUTH_REDIS_FAIL_OPEN` — off is exactly today's behavior, which is
- * the rollback (delivery plan PR 3 gate).
+ * the rollback (the D02 exit gate, dev/docs/identity-platform/delivery-plan.md).
  */
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { Counter, register } from "prom-client";
+import { withinBudget } from "~/server/app-layer/_shared/within-budget";
 
 const logger = createLogger("langwatch:better-auth:secondary-storage");
 
@@ -59,30 +60,6 @@ class SecondaryStorageTimeoutError extends Error {
   }
 }
 
-function withinBudget<T>(
-  operation: string,
-  work: Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new SecondaryStorageTimeoutError(operation)),
-      timeoutMs,
-    );
-    timer.unref?.();
-    work.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error as Error);
-      },
-    );
-  });
-}
-
 export function withRedisFailOpen(
   storage: BetterAuthOptions["secondaryStorage"],
   options?: {
@@ -108,11 +85,11 @@ export function withRedisFailOpen(
   return {
     get: async (key) => {
       try {
-        return await withinBudget(
-          "get",
-          Promise.resolve(storage.get(key)),
+        return await withinBudget({
+          work: Promise.resolve(storage.get(key)),
           timeoutMs,
-        );
+          onTimeout: () => new SecondaryStorageTimeoutError("get"),
+        });
       } catch (error) {
         // A miss, not a failure: better-auth falls through to the database.
         failOpen("get", error);
@@ -121,22 +98,22 @@ export function withRedisFailOpen(
     },
     set: async (key, value, ttl) => {
       try {
-        await withinBudget(
-          "set",
-          Promise.resolve(storage.set(key, value, ttl)),
+        await withinBudget({
+          work: Promise.resolve(storage.set(key, value, ttl)),
           timeoutMs,
-        );
+          onTimeout: () => new SecondaryStorageTimeoutError("set"),
+        });
       } catch (error) {
         failOpen("set", error);
       }
     },
     delete: async (key) => {
       try {
-        await withinBudget(
-          "delete",
-          Promise.resolve(storage.delete(key)),
+        await withinBudget({
+          work: Promise.resolve(storage.delete(key)),
           timeoutMs,
-        );
+          onTimeout: () => new SecondaryStorageTimeoutError("delete"),
+        });
       } catch (error) {
         failOpen("delete", error);
       }

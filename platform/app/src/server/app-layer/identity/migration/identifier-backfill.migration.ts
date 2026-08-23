@@ -1,5 +1,5 @@
 /**
- * D01 PR 2 — the identifier backfill: every sign-in method a user already
+ * D01 — the identifier backfill: every sign-in method a user already
  * holds becomes identity history (ADR-101 §6), the grants genesis-import
  * discipline re-tenanted to users.
  *

@@ -1618,8 +1618,26 @@ const presentations = {
   },
   identity_verification_expired: {
     title: "That verification link has expired",
+    describe: () => "Request a new verification email and use the newest link.",
+  },
+  identity_identifier_not_found: {
+    title: "That sign-in method is no longer on your account",
     describe: () =>
-      "Request a new verification email and use the newest link.",
+      "Refresh the page to see your current sign-in methods, then try again.",
+  },
+  identity_identifier_not_verifiable: {
+    title: "That sign-in method can't be verified right now",
+    describe: () =>
+      "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  identity_primary_must_demote_first: {
+    title: "Your primary sign-in method can't be removed",
+    describe: () =>
+      "Make another verified sign-in method primary first, then remove this one.",
+  },
+  identity_primary_requires_verified: {
+    title: "Only a verified sign-in method can be primary",
+    describe: () => "Verify this sign-in method first, then make it primary.",
   },
 
   // ---- governance ----

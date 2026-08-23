@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
 import {
@@ -73,20 +74,55 @@ export interface IdentityGuardReads {
 
 /**
  * A guard's refusal — thrown before any event exists, surfaced by the
- * dispatching ceremony (better-auth's own protocol flow once the adapter
- * lands). Assert on `code`, never the message.
+ * dispatching ceremony (better-auth's own protocol flow through the
+ * adapter). Handled (ADR-045): the cause is known and the caller can act on
+ * it, so each refusal is a literal-code subclass registered in the client
+ * presentation registry. Assert on `code`, never the message; the detail
+ * string is logged, never shown.
  */
-export class IdentityCommandRefusedError extends Error {
-  constructor(
-    readonly code:
-      | "identity_identifier_not_found"
-      | "identity_identifier_not_verifiable"
-      | "identity_primary_must_demote_first"
-      | "identity_primary_requires_verified",
-    message: string,
-  ) {
-    super(message);
-    this.name = "IdentityCommandRefusedError";
+export abstract class IdentityCommandRefusedError extends HandledError {}
+
+export class IdentityIdentifierNotFoundError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_identifier_not_found", "identity_identifier_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityIdentifierNotFoundError";
+  }
+}
+
+export class IdentityIdentifierNotVerifiableError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_identifier_not_verifiable",
+      "identity_identifier_not_verifiable",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityIdentifierNotVerifiableError";
+  }
+}
+
+export class IdentityPrimaryMustDemoteFirstError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_primary_must_demote_first",
+      "identity_primary_must_demote_first",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityPrimaryMustDemoteFirstError";
+  }
+}
+
+export class IdentityPrimaryRequiresVerifiedError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_primary_requires_verified",
+      "identity_primary_requires_verified",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityPrimaryRequiresVerifiedError";
   }
 }
 
@@ -131,6 +167,7 @@ export class AttachIdentifierCommand
       value,
       occurredAtMs,
       actor,
+      ceremony,
     } = command.data;
     const normalizedValue = normalizeIdentifierValue(value);
     const userHashKey = await this.reads.getUserHashKey({ userId });
@@ -163,7 +200,12 @@ export class AttachIdentifierCommand
           state: arrivalStateForProvider(provider),
           actor,
         },
-        metadata: {},
+        // The ceremony context the adapter stamped (ADR-101 §2: why the row
+        // was written) rides as metadata - never in the fact itself.
+        metadata: {
+          ceremonyFlow: ceremony.flow,
+          ...(ceremony.requestId ? { requestId: ceremony.requestId } : {}),
+        },
         occurredAt: occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
       }),
@@ -205,16 +247,14 @@ export class VerifyIdentifierCommand
     const state = await this.reads.loadIdentityState({ userId });
     const fact = state.identifiers[identifierId];
     if (!fact) {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_found",
+      throw new IdentityIdentifierNotFoundError(
         `verify_identifier: identifier ${identifierId} does not exist for this user`,
       );
     }
     // Already verified (or primary): nothing to record.
     if (fact.state === "VERIFIED" || fact.state === "PRIMARY") return [];
     if (fact.state !== "ATTACHED") {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_verifiable",
+      throw new IdentityIdentifierNotVerifiableError(
         `verify_identifier: identifier is ${fact.state}, only ATTACHED verifies`,
       );
     }
@@ -284,15 +324,13 @@ export class MarkPrimaryCommand
     const state = await this.reads.loadIdentityState({ userId });
     const fact = state.identifiers[identifierId];
     if (!fact) {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_found",
+      throw new IdentityIdentifierNotFoundError(
         `mark_primary: identifier ${identifierId} does not exist for this user`,
       );
     }
     if (fact.state === "PRIMARY") return [];
     if (fact.state !== "VERIFIED") {
-      throw new IdentityCommandRefusedError(
-        "identity_primary_requires_verified",
+      throw new IdentityPrimaryRequiresVerifiedError(
         `mark_primary: identifier is ${fact.state}, only VERIFIED takes PRIMARY`,
       );
     }
@@ -346,15 +384,13 @@ export class DetachIdentifierCommand
     const state = await this.reads.loadIdentityState({ userId });
     const fact = state.identifiers[identifierId];
     if (!fact) {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_found",
+      throw new IdentityIdentifierNotFoundError(
         `detach_identifier: identifier ${identifierId} does not exist for this user`,
       );
     }
     // PRIMARY never detaches directly — demote first (D01's state machine).
     if (fact.state === "PRIMARY") {
-      throw new IdentityCommandRefusedError(
-        "identity_primary_must_demote_first",
+      throw new IdentityPrimaryMustDemoteFirstError(
         "detach_identifier: the PRIMARY identifier must be demoted before it detaches",
       );
     }

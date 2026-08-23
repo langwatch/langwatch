@@ -70,7 +70,6 @@ import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
 import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
-import { app as identityVerificationApp } from "./routes/identity-verification";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
@@ -208,10 +207,7 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  // ORDERING: the magic-link landing page (GET /api/identity/verify) must
-  // register before the identity RPC family so its literal path matches
   // ahead of the family's version-namespace guards.
-  api.route("/", identityVerificationApp); // GET renders only (D01)
   api.route("/", identityApp); // /api/identity/verification.complete — RPC family (D01)
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.

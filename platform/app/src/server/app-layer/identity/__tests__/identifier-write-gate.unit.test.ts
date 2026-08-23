@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-  invalidateIdentityWriteGate,
+  IDENTITY_WRITE_GATE_TTL_MS,
   isUserOnIdentityWrites,
   resetIdentityWriteGateForTests,
 } from "../identifier-write-gate";
@@ -95,40 +95,58 @@ describe("identifier write gate", () => {
 
   describe("when the backfill finalizes and later an operator rolls back", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
-    it("the latch opens on finalized and the rollback pin closes it again", async () => {
-      await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
-          prisma: prismaWithStatus("finalized"),
-        }),
-      ).resolves.toBe(true);
-      // The runtime's witness invalidates the gate on every transition, so
-      // the operator's rolled_back pin takes effect without waiting the TTL.
-      invalidateIdentityWriteGate({ userId: USER });
-      await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
-          prisma: prismaWithStatus("rolled_back"),
-        }),
-      ).resolves.toBe(false);
+    it("the latch opens on finalized; the rollback pin closes it once the cache TTL elapses", async () => {
+      vi.useFakeTimers();
+      try {
+        await expect(
+          isUserOnIdentityWrites({
+            userId: USER,
+            prisma: prismaWithStatus("finalized"),
+          }),
+        ).resolves.toBe(true);
+        // No cross-pod invalidation exists (ADR-110: rollback applies within
+        // the status lookup's cache window). Inside the TTL the pin is not
+        // yet seen...
+        await expect(
+          isUserOnIdentityWrites({
+            userId: USER,
+            prisma: prismaWithStatus("rolled_back"),
+          }),
+        ).resolves.toBe(true);
+        // ...and the moment the TTL elapses, it is.
+        vi.advanceTimersByTime(IDENTITY_WRITE_GATE_TTL_MS + 1);
+        await expect(
+          isUserOnIdentityWrites({
+            userId: USER,
+            prisma: prismaWithStatus("rolled_back"),
+          }),
+        ).resolves.toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
   describe("when the backfill latches a cached-closed user", () => {
-    it("invalidation reopens the question immediately", async () => {
-      await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
-          prisma: prismaWithStatus(null),
-        }),
-      ).resolves.toBe(false);
-      invalidateIdentityWriteGate({ userId: USER });
-      await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
-          prisma: prismaWithStatus("finalized"),
-        }),
-      ).resolves.toBe(true);
+    it("the latch is seen once the cache TTL elapses", async () => {
+      vi.useFakeTimers();
+      try {
+        await expect(
+          isUserOnIdentityWrites({
+            userId: USER,
+            prisma: prismaWithStatus(null),
+          }),
+        ).resolves.toBe(false);
+        vi.advanceTimersByTime(IDENTITY_WRITE_GATE_TTL_MS + 1);
+        await expect(
+          isUserOnIdentityWrites({
+            userId: USER,
+            prisma: prismaWithStatus("finalized"),
+          }),
+        ).resolves.toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

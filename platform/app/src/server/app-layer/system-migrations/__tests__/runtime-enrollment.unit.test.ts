@@ -48,6 +48,9 @@ vi.mock("../../authz/epoch", () => ({
 }));
 vi.mock("../../authz/ledger", () => ({ authzGrantsCommands: vi.fn() }));
 vi.mock("../../authz/runtime", () => ({ authzCollector: {} }));
+vi.mock("../../../clickhouse/clickhouseClient", () => ({
+  getPrivateClickHouseUrls: () => new Map([["org_private", "http://private"]]),
+}));
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@langwatch/observability")>();
@@ -182,7 +185,7 @@ describe("userMigrationPassCohort on cloud", () => {
       stubs.enrollmentFindMany.mockResolvedValueOnce([
         { organizationId: "org_acme", migrationName: backfill },
       ]);
-      stubs.organizationUserFindMany.mockImplementationOnce(
+      stubs.organizationUserFindMany.mockImplementation(
         async ({ where }: { where: { organizationId: { in: string[] } } }) =>
           where.organizationId.in.includes("org_acme")
             ? [{ userId: "user_sam" }, { userId: "user_ann" }]
@@ -214,6 +217,31 @@ describe("userMigrationPassCohort on cloud", () => {
     });
   });
 
+  describe("when an enrolled organization's member also belongs to a private-dataplane organization", () => {
+    it("keeps that member out, exactly as the organization cohort keeps the organization out", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      stubs.enrollmentFindMany.mockResolvedValueOnce([
+        { organizationId: "org_acme", migrationName: backfill },
+        { organizationId: "org_private", migrationName: backfill },
+      ]);
+      stubs.organizationUserFindMany.mockImplementation(
+        async ({ where }: { where: { organizationId: { in: string[] } } }) =>
+          where.organizationId.in.includes("org_private")
+            ? [{ userId: "user_both" }]
+            : [{ userId: "user_sam" }, { userId: "user_both" }],
+      );
+
+      const cohort = await userMigrationPassCohort();
+
+      expect(cohort({ tenantId: "user_sam", migrationName: backfill })).toBe(
+        true,
+      );
+      expect(cohort({ tenantId: "user_both", migrationName: backfill })).toBe(
+        false,
+      );
+    });
+  });
+
   describe("when nothing is enrolled", () => {
     it("reads no membership and admits nobody", async () => {
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
@@ -226,7 +254,13 @@ describe("userMigrationPassCohort on cloud", () => {
           migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         }),
       ).toBe(false);
-      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+      // The only membership read is the private-dataplane exclusion's.
+      for (const call of stubs.organizationUserFindMany.mock.calls) {
+        expect(
+          (call[0] as { where: { organizationId: { in: string[] } } }).where
+            .organizationId.in,
+        ).toEqual(["org_private"]);
+      }
     });
   });
 });

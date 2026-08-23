@@ -26,12 +26,14 @@ export interface IdentityPipelineDeps {
 }
 
 /**
- * The identity pipeline (ADR-101, D01 PR 1). One aggregate per user;
- * commands append (waited) and the operational projection folds into the
- * Postgres `Identifier` head in per-user FIFO. Ships dark: registered so
- * the machinery is live and testable, but no production writer dispatches
- * these commands until the identity adapter lands with its per-user write
- * gate — which itself ships closed until a user's backfill (PR 2) latches.
+ * The identity pipeline (ADR-101, D01). One aggregate per user; commands
+ * append (waited) and the operational projection folds into the Postgres
+ * `Identifier` head in per-user FIFO. Its production writers are the
+ * identity adapter (better-auth/identityDatabase.ts) and the identifier
+ * backfill, and both sit behind the per-user write gate
+ * (app-layer/identity/identifier-write-gate.ts), which ships CLOSED and
+ * opens only when a user's backfill is finalized - so deploying this
+ * pipeline emits nothing on its own.
  */
 export function createIdentityPipeline(deps: IdentityPipelineDeps) {
   return definePipeline<IdentityEvent>()

@@ -24,6 +24,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { isUserOnIdentityWrites } from "./identifier-write-gate";
 import type { IdentityCeremonies } from "./identity-ceremonies";
 import { newIdentityCommandId } from "./identity-ceremonies";
 
@@ -122,14 +123,22 @@ export interface VerificationCeremonyDeps {
   store: IdentityVerificationStore;
   identifiers: VerifiableIdentifierReads;
   ceremonies: Pick<IdentityCeremonies, "verifyIdentifier">;
+  /** The per-user write gate (identifier-write-gate.ts). Completion emits a
+   *  verify command, and ADR-101 §2 holds that no user's live events precede
+   *  their history - so an unlatched user's completion is refused here, the
+   *  same way the adapter's domain writes are withheld. */
+  isLatched?: (params: { userId: string }) => Promise<boolean>;
   now?: () => number;
 }
 
 export class VerificationCeremonyService {
   private readonly now: () => number;
 
+  private readonly isLatched: (params: { userId: string }) => Promise<boolean>;
+
   constructor(private readonly deps: VerificationCeremonyDeps) {
     this.now = deps.now ?? Date.now;
+    this.isLatched = deps.isLatched ?? isUserOnIdentityWrites;
   }
 
   /**
@@ -193,6 +202,9 @@ export class VerificationCeremonyService {
       throw new IdentityVerificationInvalidError();
     };
 
+    if (!(await this.isLatched({ userId }))) {
+      refuse("user's identifier backfill is not finalized; no live events yet");
+    }
     const record = await this.deps.store.findByIdentifierId({ identifierId });
     if (!record) refuse("no ceremony in flight for this identifier");
     if (

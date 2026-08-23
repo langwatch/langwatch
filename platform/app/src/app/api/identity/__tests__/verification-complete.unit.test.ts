@@ -1,13 +1,11 @@
 /**
  * @vitest-environment node
  *
- * The GET-renders/POST-completes shape of the email verification ceremony
- * (D01): a fetched magic link must never verify anything — only the
+ * The completion half of the email verification ceremony (D01): only the
  * `verification.complete` RPC carrying the token AND the initiating
- * context's PKCE verifier can.
- *
- * Two apps meet at one surface: the landing page (this directory) renders,
- * the identity RPC family (src/app/api/identity) completes.
+ * context's PKCE verifier can verify anything. The magic link itself lands
+ * on the app page /auth/verify-email, which renders and makes no request
+ * (src/pages/auth/__tests__/verify-email.integration.test.tsx).
  *
  * See specs/identity/identifier-model.feature.
  */
@@ -23,8 +21,7 @@ import type { VerifyIdentifierCommandData } from "~/server/event-sourcing/pipeli
 import {
   app as identityFamilyApp,
   setVerificationCeremoniesForTests,
-} from "../../../app/api/identity/[[...route]]/app";
-import { app as landingApp } from "../identity-verification";
+} from "../[[...route]]/app";
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn(async () => null),
@@ -72,6 +69,7 @@ beforeEach(() => {
       findIdentifier: async () => ({ provider: "email", state: "ATTACHED" }),
     },
     ceremonies: { verifyIdentifier: verifyIdentifier as never },
+    isLatched: async () => true,
   });
   setVerificationCeremoniesForTests(service);
 });
@@ -90,10 +88,6 @@ async function mint(codeVerifier: string) {
   });
 }
 
-function magicLinkPath(minted: { verificationId: string; token: string }) {
-  return `/api/identity/verify?vid=${encodeURIComponent(minted.verificationId)}&token=${encodeURIComponent(minted.token)}`;
-}
-
 function completionRequest(body: Record<string, string>) {
   return identityFamilyApp.request(COMPLETE_PATH, {
     method: "POST",
@@ -102,15 +96,12 @@ function completionRequest(body: Record<string, string>) {
   });
 }
 
-describe("the verification route shape", () => {
-  describe("when the emailed magic link is opened with a GET request", () => {
+describe("the verification completion RPC", () => {
+  describe("when completion presents the token and the initiating context's verifier", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
-    it("renders only; completion needs the RPC with token and verifier", async () => {
+    it("verifies exactly once, and minting alone verified nothing", async () => {
       const codeVerifier = "held-by-the-initiating-context";
       const minted = await mint(codeVerifier);
-
-      const rendered = await landingApp.request(magicLinkPath(minted));
-      expect(rendered.status).toBe(200);
       expect(verifyIdentifier).not.toHaveBeenCalled();
       expect(store.records.has(IDENTIFIER)).toBe(true);
 
@@ -126,24 +117,6 @@ describe("the verification route shape", () => {
       expect(completed.status).toBe(200);
       expect(await completed.json()).toEqual({ verified: true });
       expect(verifyIdentifier).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("when a link-scanning gateway prefetches the magic link", () => {
-    /** @scenario "A mail scanner's prefetch cannot verify an identifier" */
-    it("leaves the identifier unverified and the token unconsumed", async () => {
-      const minted = await mint("verifier-the-scanner-never-had");
-
-      // Scanners follow GET and some retry; none of it may consume anything.
-      for (let fetchCount = 0; fetchCount < 3; fetchCount += 1) {
-        const response = await landingApp.request(magicLinkPath(minted));
-        expect(response.status).toBe(200);
-      }
-
-      expect(verifyIdentifier).not.toHaveBeenCalled();
-      expect(store.records.get(IDENTIFIER)?.verificationId).toBe(
-        minted.verificationId,
-      );
     });
   });
 

@@ -9,6 +9,7 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import { IdentityCeremonies } from "../identity-ceremonies";
+import { identityStagingDroppedTotal } from "../metrics";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -117,6 +118,13 @@ function attachData(overrides?: Record<string, unknown>) {
   };
 }
 
+async function counterValue(counter: {
+  get: () => Promise<{ values: Array<{ value: number }> }>;
+}): Promise<number> {
+  const metric = await counter.get();
+  return metric.values.reduce((sum, sample) => sum + sample.value, 0);
+}
+
 describe("identity ceremony dispatch", () => {
   describe("when a ceremony emits events", () => {
     it("appends durably, applies on the calling path, and stages last", async () => {
@@ -154,11 +162,12 @@ describe("identity ceremony dispatch", () => {
 
   describe("when GroupQueue staging hangs instead of failing fast", () => {
     /** @scenario "A hanging Redis cannot fail or stall an identity ceremony" */
-    it("the staging budget drops it; append and apply landed and the ceremony succeeds", async () => {
+    it("the staging budget drops it, counted; append and apply landed and the ceremony succeeds", async () => {
       const { ceremonies, appended, store, sender } = harness({
         stagingHangs: true,
         stagingTimeoutMs: 20,
       });
+      const droppedBefore = await counterValue(identityStagingDroppedTotal);
 
       const events = await ceremonies.attachIdentifier(attachData() as never);
 
@@ -166,6 +175,10 @@ describe("identity ceremony dispatch", () => {
       expect(appended).toHaveLength(1);
       expect(store.stored.size).toBe(1);
       expect(sender.send).toHaveBeenCalledTimes(1);
+      // The spec's "with the drop counted": the counter moved by exactly one.
+      expect(await counterValue(identityStagingDroppedTotal)).toBe(
+        droppedBefore + 1,
+      );
     });
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import { IdentityPrimaryMustDemoteFirstError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
 import {
   createIdentityDatabase,
   IdentityAdapterUnroutedWriteError,
@@ -18,8 +18,18 @@ const USER = "user_sam";
  * themselves, so the stub's keys are the canonical names — the facade's
  * behavior is under test here, not the stock adapter's field mapping.
  */
-function prismaStub() {
+function prismaStub(options?: {
+  /** What `identifier.findFirst` (the by-accountId read) answers. */
+  identifierByAccount?: { id: string } | null;
+  /** What `identifier.findMany` (the by-provider fallback) answers. */
+  identifiersByProvider?: Array<{ id: string }>;
+}) {
   const calls: { model: string; method: string; args: unknown }[] = [];
+  const identifierByAccount =
+    options?.identifierByAccount === undefined
+      ? { id: "idf_1" }
+      : options.identifierByAccount;
+  const identifiersByProvider = options?.identifiersByProvider ?? [];
   const modelDelegate = (model: string) =>
     new Proxy(
       {},
@@ -33,10 +43,11 @@ function prismaStub() {
             }
             if (method === "findFirst") {
               if (model === "user") return { id: USER, email: "sam@acme.com" };
-              if (model === "identifier") return { id: "idf_1" };
+              if (model === "identifier") return identifierByAccount;
               return null;
             }
             if (method === "findMany") {
+              if (model === "identifier") return identifiersByProvider;
               if (model === "account") {
                 return [
                   {
@@ -183,14 +194,169 @@ describe("identity adapter write gate", () => {
       );
     });
 
+    /** @scenario "Identifier ids are deterministic so backfill and live emission converge" */
+    it("derives the attach from the row's own id and createdAt, and writes the row with that id", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const createdAt = new Date(1_690_000_123_000);
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+        now: () => 1_700_000_000_000,
+      })({});
+
+      await adapter.create({
+        model: "account",
+        data: {
+          userId: USER,
+          providerId: "google",
+          accountId: "gid_1",
+          createdAt,
+        },
+      });
+
+      const attach = ceremonies.attachIdentifier.mock.calls[0]?.[0] as {
+        accountId: string | null;
+        occurredAtMs: number;
+      };
+      // Business time is the row's createdAt, not the wall clock - the
+      // backfill derives the identifier id from the same two values.
+      expect(attach.occurredAtMs).toBe(createdAt.getTime());
+      expect(attach.accountId).toMatch(/^[0-9a-f]{32}$/);
+      const rowWrite = calls.find(
+        (c) => c.model === "account" && c.method === "create",
+      )?.args as { data: { id: string } };
+      expect(rowWrite.data.id).toBe(attach.accountId);
+    });
+
+    it("detaches the identifier mirroring a deleted Account row, by accountId", async () => {
+      const { client, calls } = prismaStub({
+        identifierByAccount: { id: "idf_google" },
+      });
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+        now: () => 1_700_000_000_000,
+      })({});
+
+      await adapter.delete({
+        model: "account",
+        where: [{ field: "id", value: "acc_1" }],
+      });
+
+      expect(ceremonies.detachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: USER,
+          identifierId: "idf_google",
+          occurredAtMs: 1_700_000_000_000,
+        }),
+      );
+      expect(
+        calls.some((c) => c.model === "account" && c.method === "delete"),
+      ).toBe(true);
+    });
+
+    it("deleteMany detaches one identifier per row, then deletes", async () => {
+      const { client, calls } = prismaStub({
+        identifierByAccount: { id: "idf_google" },
+      });
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await adapter.deleteMany({
+        model: "account",
+        where: [{ field: "userId", value: USER }],
+      });
+
+      expect(ceremonies.detachIdentifier).toHaveBeenCalledTimes(1);
+      expect(
+        calls.some((c) => c.model === "account" && c.method === "deleteMany"),
+      ).toBe(true);
+    });
+
+    it("a row no single identifier mirrors is logged and skipped; the protocol delete still happens", async () => {
+      const { client, calls } = prismaStub({
+        identifierByAccount: null,
+        identifiersByProvider: [{ id: "idf_a" }, { id: "idf_b" }],
+      });
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await adapter.delete({
+        model: "account",
+        where: [{ field: "id", value: "acc_1" }],
+      });
+
+      expect(ceremonies.detachIdentifier).not.toHaveBeenCalled();
+      expect(
+        calls.some((c) => c.model === "account" && c.method === "delete"),
+      ).toBe(true);
+    });
+
+    it("falls back to the user's single live identifier on the provider", async () => {
+      const { client } = prismaStub({
+        identifierByAccount: null,
+        identifiersByProvider: [{ id: "idf_only" }],
+      });
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await adapter.delete({
+        model: "account",
+        where: [{ field: "id", value: "acc_1" }],
+      });
+
+      expect(ceremonies.detachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({ identifierId: "idf_only" }),
+      );
+    });
+
+    it("a domain write inside a transaction is routed but runs no ceremony", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await adapter.transaction(async (trx) => {
+        await trx.create({
+          model: "account",
+          data: { userId: USER, providerId: "google", accountId: "gid_1" },
+        });
+        // The routing guard refuses synchronously, before any promise exists.
+        expect(() => trx.create({ model: "unrouted-model", data: {} })).toThrow(
+          IdentityAdapterUnroutedWriteError,
+        );
+      });
+
+      expect(ceremonies.attachIdentifier).not.toHaveBeenCalled();
+      expect(
+        calls.some((c) => c.model === "account" && c.method === "create"),
+      ).toBe(true);
+    });
+
     it("a vetoed ceremony refuses the protocol write too", async () => {
       const { client, calls } = prismaStub();
       const ceremonies = ceremoniesStub();
       ceremonies.detachIdentifier.mockRejectedValue(
-        new IdentityCommandRefusedError(
-          "identity_primary_must_demote_first",
-          "refused",
-        ),
+        new IdentityPrimaryMustDemoteFirstError("refused"),
       );
       const adapter = createIdentityDatabase({
         prisma: client,
@@ -211,7 +377,7 @@ describe("identity adapter write gate", () => {
   });
 
   describe("when a user row is created", () => {
-    it("mints the userHashKey after the row exists", async () => {
+    it("mints the userHashKey after the row exists, guarded so an existing key is never overwritten", async () => {
       const { client, calls } = prismaStub();
       const adapter = createIdentityDatabase({
         prisma: client,
@@ -225,11 +391,15 @@ describe("identity adapter write gate", () => {
       });
 
       const mint = calls.find(
-        (c) => c.model === "user" && c.method === "update",
+        (c) => c.model === "user" && c.method === "updateMany",
       );
       expect(mint).toBeDefined();
-      const data = (mint!.args as { data: { userHashKey: string } }).data;
-      expect(data.userHashKey).toMatch(/^[0-9a-f]{64}$/);
+      const args = mint!.args as {
+        where: { id: string; userHashKey: null };
+        data: { userHashKey: string };
+      };
+      expect(args.where.userHashKey).toBeNull();
+      expect(args.data.userHashKey).toMatch(/^[0-9a-f]{64}$/);
     });
   });
 });

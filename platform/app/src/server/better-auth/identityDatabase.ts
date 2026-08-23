@@ -15,7 +15,7 @@
  *   - `domain` writes run the identity ceremony FIRST for latched users
  *     (guards veto before any row exists — a refused ceremony refuses the
  *     protocol write too), then perform the row write. For unlatched users
- *     the row write happens identically and no events are emitted; the PR 2
+ *     the row write happens identically and no events are emitted; the
  *     backfill adopts the rows on its next pass. The gate ships CLOSED for
  *     everyone (identifier-write-gate.ts).
  *   - READS delegate untouched.
@@ -36,6 +36,7 @@ import {
   IdentityCeremonies,
   newIdentityCommandId,
 } from "~/server/app-layer/identity/identity-ceremonies";
+import { mintUserHashKeyIfMissing } from "~/server/app-layer/identity/user-hash-key";
 import { prisma as appPrisma } from "~/server/db";
 import type { IdentifierProvider } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 
@@ -213,10 +214,7 @@ export function createIdentityDatabase(
 
     async function mintUserHashKey(userId: string): Promise<void> {
       try {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { userHashKey: randomBytes(32).toString("hex") },
-        });
+        await mintUserHashKeyIfMissing({ prisma, userId });
       } catch (error) {
         // The mint is additive bookkeeping; a sign-up must not fail on it.
         // A user without a key attaches identifiers with null hashes until
@@ -228,14 +226,32 @@ export function createIdentityDatabase(
       }
     }
 
+    /**
+     * The live attach must derive the SAME identifier id the backfill will
+     * derive from the row later (ADR-101 §3: backfill and live emission
+     * converge). The id derives from `(userId, provider, providerAccountId,
+     * value, occurredAt)`, and the backfill takes `occurredAt` from
+     * `Account.createdAt` and links the row by `Account.id` — so the ceremony
+     * reads `createdAt` off the row better-auth is about to write and mints
+     * the row's id up front (the adapter factory honours a caller-set id on
+     * `create`), then hands both to the attach. Returns the data the row
+     * write must use, id included.
+     */
     async function attachCeremonyForAccountCreate(
       data: Record<string, unknown>,
-    ): Promise<void> {
+    ): Promise<Record<string, unknown>> {
       const userId = data.userId;
       const providerId = data.providerId;
       const providerAccountId = data.accountId;
-      if (typeof userId !== "string" || typeof providerId !== "string") return;
-      if (!(await isLatched({ userId }))) return;
+      if (typeof userId !== "string" || typeof providerId !== "string") {
+        return data;
+      }
+      if (!(await isLatched({ userId }))) return data;
+      const accountId =
+        typeof data.id === "string" ? data.id : randomBytes(16).toString("hex");
+      const createdAt = data.createdAt;
+      const occurredAtMs =
+        createdAt instanceof Date ? createdAt.getTime() : now();
 
       const user = await base.findOne<{ email: string | null }>({
         model: "user",
@@ -247,7 +263,7 @@ export function createIdentityDatabase(
           { userId, providerId },
           "latched user's account ceremony carries no email value; no identifier attached",
         );
-        return;
+        return data;
       }
       // Guards veto HERE, before the Account row exists; the events land
       // durably (waited) and fold on the calling path before the row write.
@@ -255,15 +271,16 @@ export function createIdentityDatabase(
         tenantId: userId,
         userId,
         commandId: newIdentityCommandId(),
-        accountId: null,
+        accountId,
         provider: identifierProviderFor(providerId),
         providerAccountId:
           typeof providerAccountId === "string" ? providerAccountId : null,
         value,
-        occurredAtMs: now(),
+        occurredAtMs,
         ceremony: { flow: "better-auth" },
         actor: { type: "user", id: userId },
       });
+      return { ...data, id: accountId };
     }
 
     async function detachCeremoniesForAccountRows(
@@ -271,12 +288,28 @@ export function createIdentityDatabase(
     ): Promise<void> {
       for (const row of rows) {
         if (!(await isLatched({ userId: row.userId }))) continue;
+        const identifierId = await identifierIdForAccountRow({ prisma, row });
+        if (identifierId === null) {
+          // Nothing in the projection mirrors this row (adopted before the
+          // projection carried accountIds, or ambiguous). The protocol
+          // delete must still happen; the backfill's next pass detaches
+          // whatever the row's absence implies.
+          logger.warn(
+            {
+              userId: row.userId,
+              accountId: row.id,
+              providerId: row.providerId,
+            },
+            "no unambiguous Identifier mirrors the Account row being deleted; protocol delete proceeds, the backfill reconciles",
+          );
+          continue;
+        }
         const state = await resolveCeremonies();
         await state.detachIdentifier({
           tenantId: row.userId,
           userId: row.userId,
           commandId: newIdentityCommandId(),
-          identifierId: await identifierIdForAccountRow({ prisma, row }),
+          identifierId,
           occurredAtMs: now(),
           actor: { type: "user", id: row.userId },
         });
@@ -288,12 +321,14 @@ export function createIdentityDatabase(
 
       create: async (args) => {
         const route = routeWrite(args.model, "create");
+        let createArgs = args;
         if (route === "domain" && args.model === "account") {
-          await attachCeremonyForAccountCreate(
+          const data = await attachCeremonyForAccountCreate(
             args.data as Record<string, unknown>,
           );
+          createArgs = { ...args, data: data as never, forceAllowId: true };
         }
-        const created = await base.create(args);
+        const created = await base.create(createArgs);
         if (route === "domain" && args.model === "user") {
           const createdId = (created as { id?: unknown } | null)?.id;
           if (typeof createdId === "string") await mintUserHashKey(createdId);
@@ -353,8 +388,12 @@ export function createIdentityDatabase(
 
 /**
  * The identifier a protocol Account row mirrors: resolved from the user's
- * projection by accountId first, then by (provider, providerAccountId)
- * identity — the same key the deterministic id derives from.
+ * projection by accountId first. A row adopted before the projection
+ * carried accountIds falls back to the user's live identifiers on the same
+ * provider — used only when that names exactly ONE identifier; two or more
+ * is ambiguous and answers null rather than a guess; so does no match. The
+ * caller logs and lets the protocol delete proceed — the backfill's next
+ * pass reconciles the row.
  */
 async function identifierIdForAccountRow({
   prisma,
@@ -362,24 +401,22 @@ async function identifierIdForAccountRow({
 }: {
   prisma: PrismaClient;
   row: AccountRowShape;
-}): Promise<string> {
+}): Promise<string | null> {
   const byAccount = await prisma.identifier.findFirst({
     where: { userId: row.userId, accountId: row.id },
     select: { id: true },
   });
   if (byAccount) return byAccount.id;
-  const byIdentity = await prisma.identifier.findFirst({
+  const byProvider = await prisma.identifier.findMany({
     where: {
       userId: row.userId,
       provider: identifierProviderFor(row.providerId),
       detachedAt: null,
     },
     select: { id: true },
+    take: 2,
   });
-  if (byIdentity) return byIdentity.id;
-  throw new Error(
-    "identity adapter: no Identifier row mirrors the Account row being deleted for this latched user",
-  );
+  return byProvider.length === 1 ? (byProvider[0]?.id ?? null) : null;
 }
 
 /**

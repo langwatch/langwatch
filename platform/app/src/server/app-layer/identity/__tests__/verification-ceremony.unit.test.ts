@@ -39,7 +39,11 @@ class InMemoryVerificationStore implements IdentityVerificationStore {
   }
 }
 
-function harness(options?: { identifierState?: string; now?: () => number }) {
+function harness(options?: {
+  identifierState?: string;
+  now?: () => number;
+  latched?: boolean;
+}) {
   const store = new InMemoryVerificationStore();
   const verifyIdentifier = vi.fn(
     async (_data: VerifyIdentifierCommandData) => [],
@@ -56,6 +60,7 @@ function harness(options?: { identifierState?: string; now?: () => number }) {
           : null,
     },
     ceremonies: { verifyIdentifier: verifyIdentifier as never },
+    isLatched: async () => options?.latched ?? true,
     now: options?.now,
   });
   return { store, service, verifyIdentifier };
@@ -105,6 +110,30 @@ describe("the email verification ceremony", () => {
           verificationId: minted.verificationId,
           token: minted.token,
           codeVerifier: "a-forwarded-link-holder-guessing",
+        }),
+      ).rejects.toMatchObject({ code: "identity_verification_invalid" });
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user's identifier backfill is not finalized", () => {
+    /** @scenario "The adapter's write gate ships closed for every user" */
+    it("refuses completion before any command: no live event precedes the user's history", async () => {
+      const { service, verifyIdentifier } = harness({ latched: false });
+      const codeVerifier = "secret";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+
+      await expect(
+        service.completeEmailVerification({
+          userId: USER,
+          identifierId: WORK,
+          verificationId: minted.verificationId,
+          token: minted.token,
+          codeVerifier,
         }),
       ).rejects.toMatchObject({ code: "identity_verification_invalid" });
       expect(verifyIdentifier).not.toHaveBeenCalled();

@@ -100,9 +100,6 @@ import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
-import type { IdentityGuardReads } from "./pipelines/identity/commands/identityCommands";
-import { createIdentityPipeline } from "./pipelines/identity/pipeline";
-import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -151,6 +148,9 @@ import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-pro
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
+import type { IdentityGuardReads } from "./pipelines/identity/commands/identityCommands";
+import { createIdentityPipeline } from "./pipelines/identity/pipeline";
+import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";

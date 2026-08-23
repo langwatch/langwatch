@@ -65,6 +65,7 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import { prisma as appPrisma } from "../../db";
+import { withinBudget } from "../_shared/within-budget";
 import {
   identityCallingPathApplyDurationSeconds,
   identityCallingPathApplyFailuresTotal,
@@ -85,34 +86,6 @@ export const IDENTITY_APP_HANDLE_WAIT_MS = 5_000;
  * metric + warn, the cursor-guarded fold converges later.
  */
 export const IDENTITY_STAGING_TIMEOUT_MS = 2_000;
-
-function stagingWithinBudget(
-  work: Promise<unknown>,
-  timeoutMs: number,
-): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () =>
-        reject(
-          new Error(
-            `identity staging exceeded its ${timeoutMs}ms budget; dropped`,
-          ),
-        ),
-      timeoutMs,
-    );
-    timer.unref?.();
-    work.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error as Error);
-      },
-    );
-  });
-}
 
 /** Ceremony paths mint a random command id; retries reuse it. */
 export function newIdentityCommandId(): string {
@@ -304,7 +277,14 @@ export class IdentityCeremonies {
     try {
       const sender = this.stagedSender(verb.senderName);
       if (!sender) throw new Error("identity pipeline sender unavailable");
-      await stagingWithinBudget(sender.send(data), this.stagingTimeoutMs);
+      await withinBudget({
+        work: sender.send(data),
+        timeoutMs: this.stagingTimeoutMs,
+        onTimeout: () =>
+          new Error(
+            `identity staging exceeded its ${this.stagingTimeoutMs}ms budget; dropped`,
+          ),
+      });
     } catch (error) {
       identityStagingDroppedTotal.inc();
       logger.warn(

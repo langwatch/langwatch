@@ -1,6 +1,8 @@
--- The identity pipeline's projection tables (ADR-101, D01 PR 1 - see
+-- The identity pipeline's projection tables (ADR-101, D01 - see
 -- specs/identity/identifier-model.feature). Everything here is additive and
--- dark: Identifier is a pure event-truth projection nothing reads until D03,
+-- dark: Identifier is a pure event-truth projection no sign-in DECISION reads
+-- until D03 (the pipeline's own guards, the verification ceremony and the
+-- backfill's proof read it from the first release),
 -- IdentityProjectionCursor is its fold cursor, and User.userHashKey is the
 -- per-user HMAC key identity event hashes derive from (minted at user
 -- creation, shredded on erasure).

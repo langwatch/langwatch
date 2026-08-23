@@ -95,15 +95,6 @@ export async function isUserOnIdentityWrites({
   });
 }
 
-/** Drop one user's cached answer — the backfill calls this as it latches. */
-export function invalidateIdentityWriteGate({
-  userId,
-}: {
-  userId: string;
-}): void {
-  gate.invalidate({ subject: userId });
-}
-
 /** The cache, dropped — for tests that latch a user mid-suite. */
 export function resetIdentityWriteGateForTests(): void {
   gate.resetForTesting();

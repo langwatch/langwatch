@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import {
+  IdentityIdentifierNotFoundError,
+  IdentityIdentifierNotVerifiableError,
+  IdentityPrimaryMustDemoteFirstError,
+} from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
 import {
   arrivalStateForProvider,
   deriveIdentifierId,
@@ -87,15 +91,11 @@ function harness(options?: {
   const verifyIdentifier = vi.fn(async (data: VerifyIdentifierCommandData) => {
     const row = rows.get(data.identifierId);
     if (!row) {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_found",
-        "no such identifier",
-      );
+      throw new IdentityIdentifierNotFoundError("no such identifier");
     }
     if (row.state === "VERIFIED" || row.state === "PRIMARY") return [];
     if (row.state !== "ATTACHED") {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_verifiable",
+      throw new IdentityIdentifierNotVerifiableError(
         `identifier is ${row.state}`,
       );
     }
@@ -106,14 +106,10 @@ function harness(options?: {
   const detachIdentifier = vi.fn(async (data: DetachIdentifierCommandData) => {
     const row = rows.get(data.identifierId);
     if (!row) {
-      throw new IdentityCommandRefusedError(
-        "identity_identifier_not_found",
-        "no such identifier",
-      );
+      throw new IdentityIdentifierNotFoundError("no such identifier");
     }
     if (row.state === "PRIMARY") {
-      throw new IdentityCommandRefusedError(
-        "identity_primary_must_demote_first",
+      throw new IdentityPrimaryMustDemoteFirstError(
         "primary identifiers never detach directly",
       );
     }

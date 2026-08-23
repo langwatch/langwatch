@@ -75,14 +75,18 @@ export class PrismaIdentityVerificationRepository
     record: IdentityVerificationRecord,
   ): Promise<void> {
     const identifier = keyFor(record.identifierId);
-    await this.prisma.verificationToken.deleteMany({ where: { identifier } });
-    await this.prisma.verificationToken.create({
-      data: {
-        identifier,
-        token: serializePayload(record),
-        expires: new Date(record.expiresAtMs),
-      },
-    });
+    // One transaction: a concurrent mint must never leave two records for
+    // the identifier, which the two reads below could otherwise pick apart.
+    await this.prisma.$transaction([
+      this.prisma.verificationToken.deleteMany({ where: { identifier } }),
+      this.prisma.verificationToken.create({
+        data: {
+          identifier,
+          token: serializePayload(record),
+          expires: new Date(record.expiresAtMs),
+        },
+      }),
+    ]);
   }
 
   async findByIdentifierId(params: {
@@ -110,8 +114,11 @@ export class PrismaIdentityVerificationRepository
     verificationId: string;
   }): Promise<boolean> {
     const identifier = keyFor(params.identifierId);
+    // The same newest-row rule `findByIdentifierId` reads by, so completion
+    // consumes the record it was checked against.
     const row = await this.prisma.verificationToken.findFirst({
       where: { identifier },
+      orderBy: { createdAt: "desc" },
     });
     if (!row) return false;
     const payload = parsePayload(row.token);
