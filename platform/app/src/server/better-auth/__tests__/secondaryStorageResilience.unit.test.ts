@@ -117,6 +117,34 @@ describe("better-auth secondary storage fail-open (D02 seam b)", () => {
       await vi.advanceTimersByTimeAsync(DELETE_RETRY_INTERVAL_MS * 2);
       expect(storage.delete.mock.calls.length).toBe(attemptsSoFar);
     });
+
+    /** @scenario "A delete that never lands is abandoned after the retry window, counted" */
+    it("abandons the oldest key when the retry set overflows its cap, counted", async () => {
+      vi.useFakeTimers();
+      const storage = erroringStorage();
+      const wrapped = withRedisFailOpen(storage, {
+        timeoutMs: 20,
+        deleteRetryMaxKeys: 2,
+      });
+      const before = await failOpenCount("delete_retry_abandoned");
+
+      await wrapped?.delete("revoked-token-1");
+      await wrapped?.delete("revoked-token-2");
+      expect(await failOpenCount("delete_retry_abandoned")).toBe(before);
+
+      // The third key overflows the cap of two: the oldest is given up on.
+      await wrapped?.delete("revoked-token-3");
+      expect(await failOpenCount("delete_retry_abandoned")).toBe(before + 1);
+
+      // The survivors keep retrying; the abandoned key attempts nothing.
+      storage.delete.mockClear();
+      await vi.advanceTimersByTimeAsync(DELETE_RETRY_INTERVAL_MS);
+      const retriedKeys = storage.delete.mock.calls.map(([key]) => key);
+      expect(retriedKeys.sort()).toEqual([
+        "revoked-token-2",
+        "revoked-token-3",
+      ]);
+    });
   });
 
   describe("when Redis is healthy", () => {

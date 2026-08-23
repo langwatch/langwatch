@@ -820,8 +820,9 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
  * outcome wins (parked over held over finalized), because the operator is
  * deciding whether the organization needs attention, and null when no
  * member was in the cohort at all. Members already terminal before the run
- * (`alreadyTerminal`) answer "finalized" too - a re-run over an organization
- * whose members all finished earlier is done, not "nobody was in the
+ * keep their terminal color: rolled-back members answer "rolled_back" (an
+ * operator's pin is never a successful finalization), and a membership
+ * finished earlier answers "finalized" - done, not "nobody was in the
  * cohort".
  */
 function statusOfMemberSummary(
@@ -829,6 +830,9 @@ function statusOfMemberSummary(
 ): TenantMigrationStatus | null {
   if (summary.parked > 0) return "parked";
   if (summary.held > 0) return "migrated";
-  if (summary.finalized > 0 || summary.alreadyTerminal > 0) return "finalized";
+  if (summary.alreadyRolledBack > 0) return "rolled_back";
+  if (summary.finalized > 0 || summary.alreadyFinalized > 0) {
+    return "finalized";
+  }
   return null;
 }

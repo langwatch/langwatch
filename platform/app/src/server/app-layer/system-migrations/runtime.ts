@@ -325,7 +325,8 @@ function mergeSummaries(
     held: a.held + b.held,
     parked: a.parked + b.parked,
     skipped: a.skipped + b.skipped,
-    alreadyTerminal: a.alreadyTerminal + b.alreadyTerminal,
+    alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
+    alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
     claimed: a.claimed + b.claimed,
   };
 }

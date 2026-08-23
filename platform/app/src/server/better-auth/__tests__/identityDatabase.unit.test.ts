@@ -23,6 +23,8 @@ function prismaStub(options?: {
   identifierByAccount?: { id: string } | null;
   /** What `identifier.findMany` (the by-provider fallback) answers. */
   identifiersByProvider?: Array<{ id: string }>;
+  /** Observes every delegate call at invocation time, for ordering pins. */
+  onCall?: (call: { model: string; method: string }) => void;
 }) {
   const calls: { model: string; method: string; args: unknown }[] = [];
   const identifierByAccount =
@@ -37,6 +39,7 @@ function prismaStub(options?: {
         get: (_target, method: string) => {
           return async (args: unknown) => {
             calls.push({ model, method, args });
+            options?.onCall?.({ model, method });
             if (method === "create") {
               const data = (args as { data: Record<string, unknown> }).data;
               return { id: data.id ?? "row_1", ...data };
@@ -401,9 +404,17 @@ describe("identity adapter write gate", () => {
   describe("when better-auth deletes a user", () => {
     /** @scenario "Deleting a latched user runs the erase ceremony before the row delete" */
     it("runs the erase ceremony for a latched user before the row delete", async () => {
-      const { client, calls } = prismaStub();
-      const ceremonies = ceremoniesStub();
       const order: string[] = [];
+      const { client } = prismaStub({
+        // Recorded at invocation, so the pin fails if the protocol delete
+        // ever runs ahead of the ceremony.
+        onCall: (call) => {
+          if (call.model === "user" && call.method === "delete") {
+            order.push("row");
+          }
+        },
+      });
+      const ceremonies = ceremoniesStub();
       ceremonies.eraseUser.mockImplementation(async () => {
         order.push("ceremony");
         return [];
@@ -419,11 +430,6 @@ describe("identity adapter write gate", () => {
         model: "user",
         where: [{ field: "id", value: USER }],
       });
-      order.push(
-        ...calls
-          .filter((c) => c.model === "user" && c.method === "delete")
-          .map(() => "row"),
-      );
 
       expect(order).toEqual(["ceremony", "row"]);
       expect(ceremonies.eraseUser).toHaveBeenCalledWith(

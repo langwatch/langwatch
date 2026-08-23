@@ -35,7 +35,7 @@ Auth0 actually dies: provider config, Management API password service, federated
 
 # Exit gate / rollback
 
-- **Exit:** repository-wide `grep -ri auth0` (not just `platform/app` — the deletion scope spans agents-box, specifications, and env wiring too) → changelog and tombstoned history only; the `langwatch_secrets` blob verified to carry no `AUTH0_*` keys; deployment configuration (env wiring, `modules/agents-box/main.tf`) verified Auth0-free; deploy pipeline green; agents-box QA green. **This is the DONE signal.**
+- **Exit:** repository-wide `grep -ri auth0` (not just `platform/app` — the deletion scope spans agents-box, specifications, and env wiring too) → hits only in the allowlist: changelog, tombstoned history, and the retained planning documents under `dev/docs/` (this file and the delivery plan deliberately keep the word); the `langwatch_secrets` blob verified to carry no `AUTH0_*` keys; deployment configuration (env wiring, `modules/agents-box/main.tf`) verified Auth0-free; deploy pipeline green; agents-box QA green. **This is the DONE signal.**
 - **Rollback:** a tested restore artifact, not "nothing left". Before the deletion PR merges: tag the last Auth0-capable commit (`pre-auth0-deletion`), escrow the `AUTH0_*` secrets outside the blob (ops vault, dated), and prove the tag deploys green in staging. The last fallback (the shim, then the secrets) is deleted only after an observation window — zero shim hits for a sustained window (the shim's own metric, per Security), zero Auth0-attributed sign-in failures, no open customer thread naming a legacy connection. The escrow and tag are retired only once the exit grep has stayed green through a full release cycle after that window; billing cancellation comes last.
 
 # Security Concerns

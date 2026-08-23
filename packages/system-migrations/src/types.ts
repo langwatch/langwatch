@@ -67,12 +67,17 @@ export type MigrationPassSummary = {
   held: number;
   parked: number;
   /** Outside the cohort, or an operator's mid-pass pin discarded the
-   *  outcome. Never "already done" - that is `alreadyTerminal`. */
+   *  outcome. Never "already done" - that is `alreadyFinalized` /
+   *  `alreadyRolledBack`. */
   skipped: number;
-  /** Finalized or rolled back BEFORE this pass ever touched the tenant.
-   *  Split from `skipped` so a targeted run over tenants that are all
-   *  already done reads as done, not as "nothing was in the cohort". */
-  alreadyTerminal: number;
+  /** Finalized BEFORE this pass ever touched the tenant. Split from
+   *  `skipped` so a targeted run over tenants that are all already done
+   *  reads as done, not as "nothing was in the cohort". */
+  alreadyFinalized: number;
+  /** Rolled back (the operator's pin) BEFORE this pass ever touched the
+   *  tenant. Kept apart from `alreadyFinalized` so an organization whose
+   *  members were rolled back never reads as a successful finalization. */
+  alreadyRolledBack: number;
   /** Claimed by another process's pass, so left to that process. */
   claimed: number;
 };

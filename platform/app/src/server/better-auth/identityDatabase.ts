@@ -231,13 +231,25 @@ export function createIdentityDatabase(
       },
       delete: async (args) => {
         await detachBeforeAccountDelete(ctx, { operation: "delete", args });
-        await eraseBeforeUserDelete(ctx, { operation: "delete", args });
-        return base.delete(args);
+        const erasedIds = await eraseBeforeUserDelete(ctx, {
+          operation: "delete",
+          args,
+        });
+        if (erasedIds !== null && erasedIds.length === 0) return;
+        return base.delete(
+          erasedIds === null ? args : pinnedToIds(args, erasedIds),
+        );
       },
       deleteMany: async (args) => {
         await detachBeforeAccountDelete(ctx, { operation: "deleteMany", args });
-        await eraseBeforeUserDelete(ctx, { operation: "deleteMany", args });
-        return base.deleteMany(args);
+        const erasedIds = await eraseBeforeUserDelete(ctx, {
+          operation: "deleteMany",
+          args,
+        });
+        if (erasedIds !== null && erasedIds.length === 0) return 0;
+        return base.deleteMany(
+          erasedIds === null ? args : pinnedToIds(args, erasedIds),
+        );
       },
       consumeOne: async (args) => {
         routeWrite(args.model, "consumeOne");
@@ -325,9 +337,9 @@ async function eraseBeforeUserDelete(
     operation: "delete" | "deleteMany";
     args: Parameters<DbAdapter["delete"]>[0];
   },
-): Promise<void> {
+): Promise<string[] | null> {
   const route = routeWrite(args.model, operation);
-  if (route !== "domain" || args.model !== "user") return;
+  if (route !== "domain" || args.model !== "user") return null;
   const rows = await ctx.base.findMany<{ id: string }>({
     model: "user",
     where: args.where,
@@ -343,6 +355,28 @@ async function eraseBeforeUserDelete(
       actor: { type: "user", id: userId },
     });
   }
+  return rows.map((row) => row.id);
+}
+
+/**
+ * The rows the erasure pass saw are the rows the protocol write removes:
+ * re-evaluating the caller's `where` after the ceremonies ran could delete
+ * a row the erasure never covered (a row that started matching mid-flight)
+ * or leave an erased user's row standing under a changed predicate. Pinning
+ * the delete to the selected ids makes the two sets identical either way.
+ */
+function pinnedToIds(
+  args: Parameters<DbAdapter["delete"]>[0],
+  ids: string[],
+): Parameters<DbAdapter["delete"]>[0] {
+  return {
+    ...args,
+    where: [
+      ids.length === 1
+        ? { field: "id", value: ids[0] as string }
+        : { field: "id", operator: "in" as const, value: ids },
+    ],
+  };
 }
 
 async function mintUserHashKey(

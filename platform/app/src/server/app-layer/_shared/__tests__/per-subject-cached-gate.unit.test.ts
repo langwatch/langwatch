@@ -220,6 +220,26 @@ describe("perSubjectCachedFlag", () => {
       // The third subject crosses the cap: user-1, the oldest, is evicted.
       await flag.get({ subject: "user-3", read: readTrue });
 
+      // The survivors stayed cached - the cap evicted the oldest entry,
+      // not the whole map. Checked before touching user-1 again, because a
+      // re-read of the evicted subject would itself evict at the cap.
+      let cachedReads = 0;
+      await flag.get({
+        subject: "user-2",
+        read: () => {
+          cachedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      await flag.get({
+        subject: "user-3",
+        read: () => {
+          cachedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(cachedReads).toBe(0);
+
       let evictedReads = 0;
       await flag.get({
         subject: "user-1",
@@ -229,17 +249,6 @@ describe("perSubjectCachedFlag", () => {
         },
       });
       expect(evictedReads).toBe(1);
-
-      // The survivors stayed cached - the cap evicted, not the whole map.
-      let cachedReads = 0;
-      await flag.get({
-        subject: "user-3",
-        read: () => {
-          cachedReads += 1;
-          return Promise.resolve(true);
-        },
-      });
-      expect(cachedReads).toBe(0);
     });
   });
 

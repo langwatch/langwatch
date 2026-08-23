@@ -117,6 +117,9 @@ export function perSubjectCachedFlag({
     invalidate: ({ subject }) => invalidate({ state, subject }),
     resetForTesting: () => {
       state.cached.clear();
+      // Same reason `invalidate` marks: a read still in flight must not
+      // land in the map the reset just emptied.
+      for (const pending of state.inFlight.values()) pending.isStale = true;
       state.inFlight.clear();
     },
   };

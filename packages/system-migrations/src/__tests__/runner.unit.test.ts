@@ -317,7 +317,8 @@ describe("SystemMigrationRunnerService", () => {
       expect(migrate).not.toHaveBeenCalled();
       // Already done before this pass - counted apart from cohort skips, so
       // a run over only-finalized tenants still reads as done.
-      expect(summary?.alreadyTerminal).toBe(1);
+      expect(summary?.alreadyFinalized).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(0);
       expect(summary?.skipped).toBe(0);
     });
   });
@@ -346,7 +347,7 @@ describe("SystemMigrationRunnerService", () => {
       // The point of the status: without it the next pass would re-run a
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
-      expect(summary?.alreadyTerminal).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(1);
       expect(
         (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
           ?.status,
@@ -384,7 +385,7 @@ describe("SystemMigrationRunnerService", () => {
       // pins it exactly like a rolled-back finalized tenant, whatever state
       // it came from.
       expect(migrate).not.toHaveBeenCalled();
-      expect(summary?.alreadyTerminal).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(1);
       expect(
         (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
           ?.status,

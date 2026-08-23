@@ -90,7 +90,8 @@ function targetedPassStub() {
       held: 0,
       parked: 0,
       skipped: 0,
-      alreadyTerminal: 0,
+      alreadyFinalized: 0,
+      alreadyRolledBack: 0,
       claimed: 0,
     });
 }
@@ -868,7 +869,8 @@ describe("SystemMigrationsService.runForOrganization", () => {
           held: 0,
           parked: 0,
           skipped: 0,
-          alreadyTerminal: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
           claimed: 1,
         }),
       });
@@ -894,7 +896,8 @@ describe("SystemMigrationsService.runForOrganization", () => {
           held: 0,
           parked: 0,
           skipped: 0,
-          alreadyTerminal: 3,
+          alreadyFinalized: 3,
+          alreadyRolledBack: 0,
           claimed: 0,
         }),
       });
@@ -908,6 +911,31 @@ describe("SystemMigrationsService.runForOrganization", () => {
       expect(outcome).toEqual({ status: "finalized", waiting: false });
     });
 
+    it("answers rolled_back when the members were rolled back, never finalized", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 3,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 3,
+          claimed: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "rolled_back", waiting: false });
+    });
+
     it("still answers null for a run where no member was in the cohort at all", async () => {
       const { service } = serviceWith({
         record: null,
@@ -918,7 +946,8 @@ describe("SystemMigrationsService.runForOrganization", () => {
           held: 0,
           parked: 0,
           skipped: 0,
-          alreadyTerminal: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
           claimed: 0,
         }),
       });

@@ -158,7 +158,7 @@ describe("identity ceremony dispatch", () => {
       expect(store.storeContexts[0]?.tenantId).toBe(USER);
     });
 
-    it("a command whose tenantId diverges from its userId never reaches either leg", async () => {
+    it("rejects a command whose tenantId diverges from its userId before either leg", async () => {
       const { ceremonies, store, order } = harness();
 
       await expect(

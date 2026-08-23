@@ -86,11 +86,17 @@ class SecondaryStorageTimeoutError extends Error {
  */
 function createDeleteRetryQueue({
   deleteKey,
+  maxKeys = DELETE_RETRY_MAX_KEYS,
 }: {
   deleteKey: (key: string) => Promise<unknown>;
+  maxKeys?: number;
 }): { enqueue: (key: string) => void } {
   const pendingSince = new Map<string, number>();
   let timer: NodeJS.Timeout | undefined;
+  // A pass over a full queue of hanging deletes can outlast the interval;
+  // without this guard the timer stacks passes onto the Redis that is
+  // already down, multiplying concurrent calls per pending key.
+  let isPassRunning = false;
 
   const abandon = (key: string, reason: "window_elapsed" | "overflow") => {
     pendingSince.delete(key);
@@ -104,32 +110,38 @@ function createDeleteRetryQueue({
   };
 
   const retryPass = async () => {
-    const now = Date.now();
-    for (const [key, firstFailedAtMs] of pendingSince) {
-      if (now - firstFailedAtMs > DELETE_RETRY_WINDOW_MS) {
-        abandon(key, "window_elapsed");
-        continue;
+    if (isPassRunning) return;
+    isPassRunning = true;
+    try {
+      const now = Date.now();
+      for (const [key, firstFailedAtMs] of pendingSince) {
+        if (now - firstFailedAtMs > DELETE_RETRY_WINDOW_MS) {
+          abandon(key, "window_elapsed");
+          continue;
+        }
+        try {
+          await deleteKey(key);
+          pendingSince.delete(key);
+          logger.info(
+            "better-auth secondary storage recovered a dropped delete on retry",
+          );
+        } catch {
+          // Still down; the key stays pending until its window closes.
+        }
       }
-      try {
-        await deleteKey(key);
-        pendingSince.delete(key);
-        logger.info(
-          "better-auth secondary storage recovered a dropped delete on retry",
-        );
-      } catch {
-        // Still down; the key stays pending until its window closes.
+      if (pendingSince.size === 0 && timer !== undefined) {
+        clearInterval(timer);
+        timer = undefined;
       }
-    }
-    if (pendingSince.size === 0 && timer !== undefined) {
-      clearInterval(timer);
-      timer = undefined;
+    } finally {
+      isPassRunning = false;
     }
   };
 
   return {
     enqueue: (key: string) => {
       if (!pendingSince.has(key)) {
-        if (pendingSince.size >= DELETE_RETRY_MAX_KEYS) {
+        if (pendingSince.size >= maxKeys) {
           const oldestKey: string | undefined = pendingSince
             .keys()
             .next().value;
@@ -150,6 +162,8 @@ export function withRedisFailOpen(
   options?: {
     enabled?: boolean;
     timeoutMs?: number;
+    /** Retry-set cap override; tests shrink it to reach the overflow path. */
+    deleteRetryMaxKeys?: number;
   },
 ): BetterAuthOptions["secondaryStorage"] {
   if (!storage) return storage;
@@ -165,6 +179,7 @@ export function withRedisFailOpen(
     });
   const deleteRetries = createDeleteRetryQueue({
     deleteKey: deleteWithinBudget,
+    maxKeys: options?.deleteRetryMaxKeys,
   });
 
   const failOpen = (operation: "get" | "set" | "delete", error: unknown) => {
