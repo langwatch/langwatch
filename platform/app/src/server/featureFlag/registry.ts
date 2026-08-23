@@ -166,7 +166,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Records cost pulled from a provider's own usage/cost report as a priced record on the customer's usage screens (ADR-088). Off by default; enable per organization via the operator store or a PostHog rule. With it off the puller writes audit rows only. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_cost_enabled.",
+      "Records cost pulled from a provider's own usage/cost report as a priced record on the customer's usage screens (ADR-088). Off by default; enable per organization via the operator store (/ops/feature-flags), including its targeting rules. With it off the puller writes audit rows only. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_cost_enabled.",
     family: "Governance",
   },
 
@@ -183,7 +183,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
+      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via an operator-store row or targeting rule (/ops/feature-flags).",
   },
   {
     key: "release_ui_navigation_v2_enabled",
@@ -311,7 +311,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+      "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience with targeting rules in the internal flag store (/ops/feature-flags).",
   },
   {
     key: "release_ui_home_signal_focused_enabled",
