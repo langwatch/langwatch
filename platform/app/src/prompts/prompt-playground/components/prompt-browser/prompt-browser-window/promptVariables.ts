@@ -46,13 +46,16 @@ export function composerVariablesFor(
     }));
 }
 
-export function runtimeVariablesFor({
+// Generic over the declared type so the prompt's own union survives the round
+// trip. Fixing it as `string` here widened every variable, and the chat pane
+// that renders a field per type would not take the result.
+export function runtimeVariablesFor<TType extends string>({
   declarations,
   values,
 }: {
-  declarations: Array<{ identifier: string; type: string }>;
+  declarations: Array<{ identifier: string; type: TType }>;
   values: Record<string, string>;
-}): Array<{ identifier: string; type: string; value: string }> {
+}): Array<{ identifier: string; type: TType; value: string }> {
   return declarations.map((declaration) => ({
     identifier: declaration.identifier,
     type: declaration.type,

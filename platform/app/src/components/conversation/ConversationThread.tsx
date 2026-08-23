@@ -1,12 +1,13 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, type RefObject, useMemo, useRef } from "react";
 import type { AudioPlaybackProps } from "../simulations/useSequentialAudioPlayback";
-import { useSequentialAudioPlayback } from "../simulations/useSequentialAudioPlayback";
 import { groupIntoTurns } from "./flattenMessages";
 import { PendingReply } from "./PendingReply";
 import { ErrorPart, ImagePart, MediaRow, TextPart, ToolPart } from "./parts";
 import { TurnSeparator } from "./TurnSeparator";
 import type { DisplayPart } from "./types";
+import { useThreadAudioPlayback } from "./useThreadAudioPlayback";
+import { useThreadAutoScroll } from "./useThreadAutoScroll";
 
 /**
  * ConversationThread — renders flattened conversation parts.
@@ -139,6 +140,104 @@ function ConversationPart({
   }
 }
 
+/**
+ * The stack of turns itself, without the scroll box around it.
+ *
+ * Separate from `ConversationThread` because the two answer different
+ * questions — this one what the thread looks like, the other where it
+ * scrolls — and because between them they carry more branching than one
+ * function is allowed to.
+ */
+/**
+ * The box styles the thread's stack takes, which differ on two axes.
+ *
+ * `compact` is the grid cell: tighter type and spacing. `panel` decides where
+ * the scrolling happens — a panel's height comes from its content inside a
+ * scroll box that wraps it, while a section fills the box it was handed and
+ * scrolls inside itself. The drawer's section already pads; the grid cell does
+ * not; a panel pads itself, so neither the first message nor the avatars
+ * beside the messages sit flush against its edges.
+ */
+function threadBodyLayout({
+  compact,
+  panel,
+}: {
+  compact: boolean;
+  panel: ConversationThreadProps["panel"];
+}) {
+  return {
+    gap: compact ? 2 : 4,
+    padding: compact ? 2 : 0,
+    paddingX: panel ? 4 : undefined,
+    paddingY: panel ? 6 : undefined,
+    fontSize: compact ? "xs" : "sm",
+    maxWidth: panel?.contentMaxWidth,
+    marginX: panel ? "auto" : undefined,
+    height: panel ? undefined : "100%",
+    overflowY: panel ? undefined : ("auto" as const),
+  };
+}
+
+/** One turn: its separator, when it has a number, and its parts. */
+function ThreadTurn({
+  turn,
+  renderPart,
+}: {
+  turn: ReturnType<typeof groupIntoTurns>[number];
+  renderPart: (part: DisplayPart) => ReactNode;
+}) {
+  return (
+    <VStack align="stretch" gap={4} width="100%">
+      {turn.turnNumber != null && (
+        <TurnSeparator index={turn.turnNumber} traceId={turn.traceId} />
+      )}
+      {turn.parts.map(renderPart)}
+    </VStack>
+  );
+}
+
+/**
+ * The stack of turns itself, without the scroll box around it.
+ *
+ * Separate from `ConversationThread` because the two answer different
+ * questions — this one what the thread looks like, the other where it scrolls.
+ */
+function ThreadBody({
+  parts,
+  turns,
+  compact,
+  panel,
+  pendingReply,
+  roleMode,
+  scrollRef,
+  renderPart,
+}: {
+  parts: DisplayPart[];
+  turns: ReturnType<typeof groupIntoTurns>;
+  compact: boolean;
+  panel: ConversationThreadProps["panel"];
+  pendingReply: boolean;
+  roleMode: "chat" | "scenario";
+  scrollRef: RefObject<HTMLDivElement | null>;
+  renderPart: (part: DisplayPart) => ReactNode;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      width="100%"
+      {...threadBodyLayout({ compact, panel })}
+      ref={panel ? undefined : scrollRef}
+    >
+      {compact
+        ? parts.map(renderPart)
+        : turns.map((turn) => (
+            <ThreadTurn key={turn.key} turn={turn} renderPart={renderPart} />
+          ))}
+      {pendingReply && <PendingReply compact={compact} roleMode={roleMode} />}
+    </VStack>
+  );
+}
+
 export function ConversationThread({
   parts,
   variant = "regular",
@@ -157,38 +256,8 @@ export function ConversationThread({
 
   const turns = useMemo(() => groupIntoTurns(parts, { live }), [parts, live]);
 
-  useEffect(() => {
-    if (!autoScroll) return;
-    const container = scrollRef.current;
-    if (!container) return;
-    // The thread's own box is scrolled directly rather than asking the last
-    // element to bring itself into view. `scrollIntoView` walks up and scrolls
-    // EVERY ancestor scroll container it finds, so the thread re-mounting —
-    // switching away from this tab and back — dragged the whole editor beside
-    // it to the top and then back down again.
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    // `pendingReply` is a dependency because the waiting state is the newest
-    // thing in the thread the moment it appears, and it appears before any
-    // part of the reply does.
-  }, [parts, pendingReply, autoScroll]);
-
-  // Ordered audio ids drive sequential playback: one clip finishing starts the
-  // next. Filtered to audio so a sibling video or attachment cannot offset the
-  // hook's idea of "next".
-  const orderedAudioIds = useMemo(
-    () =>
-      parts
-        .filter(
-          (part): part is Extract<DisplayPart, { kind: "media" }> =>
-            part.kind === "media" && part.part.type === "audio",
-        )
-        .map((part) => part.id),
-    [parts],
-  );
-
-  const { getAudioProps } = useSequentialAudioPlayback({
-    orderedIds: orderedAudioIds,
-  });
+  useThreadAutoScroll({ scrollRef, parts, pendingReply, enabled: autoScroll });
+  const { audioPropsFor } = useThreadAudioPlayback(parts);
 
   const renderPart = (part: DisplayPart) => (
     <ConversationPart
@@ -200,47 +269,21 @@ export function ConversationThread({
       projectId={projectId}
       structuredOutput={structuredOutput}
       actions={renderPartActions?.(part)}
-      audioPlayback={
-        part.kind === "media" && part.part.type === "audio"
-          ? getAudioProps(part.id)
-          : undefined
-      }
+      audioPlayback={audioPropsFor(part)}
     />
   );
 
   const body = (
-    <VStack
-      align="stretch"
-      gap={compact ? 2 : 4}
-      // The drawer's section already pads; the grid cell does not. A panel
-      // pads itself, so neither the first message nor the avatars beside the
-      // messages sit flush against its edges — the horizontal room matches
-      // what a bubble sets inside itself.
-      padding={compact ? 2 : 0}
-      paddingX={panel ? 4 : undefined}
-      paddingY={panel ? 6 : undefined}
-      fontSize={compact ? "xs" : "sm"}
-      width="100%"
-      maxWidth={panel?.contentMaxWidth}
-      marginX={panel ? "auto" : undefined}
-      // A panel's height comes from its content inside the scroll box; a
-      // section fills the box it was handed and scrolls inside it.
-      height={panel ? undefined : "100%"}
-      overflowY={panel ? undefined : "auto"}
-      ref={panel ? undefined : scrollRef}
-    >
-      {compact
-        ? parts.map(renderPart)
-        : turns.map((turn) => (
-            <VStack key={turn.key} align="stretch" gap={4} width="100%">
-              {turn.turnNumber != null && (
-                <TurnSeparator index={turn.turnNumber} traceId={turn.traceId} />
-              )}
-              {turn.parts.map(renderPart)}
-            </VStack>
-          ))}
-      {pendingReply && <PendingReply compact={compact} roleMode={roleMode} />}
-    </VStack>
+    <ThreadBody
+      parts={parts}
+      turns={turns}
+      compact={compact}
+      panel={panel}
+      pendingReply={pendingReply}
+      roleMode={roleMode}
+      scrollRef={scrollRef}
+      renderPart={renderPart}
+    />
   );
 
   // The scroll box is the whole panel, not the centred column, so the

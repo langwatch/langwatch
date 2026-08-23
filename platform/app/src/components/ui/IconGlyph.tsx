@@ -14,13 +14,21 @@ export function IconGlyph({
   icon,
   monochrome = false,
   size = "16px",
+  testId,
 }: {
   icon: React.ReactNode;
   monochrome?: boolean;
   size?: string | number;
+  /**
+   * The mark is `aria-hidden`, so a test cannot reach it by role or name. A
+   * caller that needs one identified — which provider's mark is on the row —
+   * names it here.
+   */
+  testId?: string;
 }) {
   return (
     <Box
+      data-testid={testId}
       width={size}
       height={size}
       flexShrink={0}

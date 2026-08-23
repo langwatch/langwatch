@@ -1,11 +1,9 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
-import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
@@ -15,6 +13,7 @@ import type { LayoutMode } from "./PromptBrowserWindowContent";
 import { PANE_BAR_MIN_HEIGHT } from "./paneBar";
 import { composerVariablesFor, runtimeVariablesFor } from "./promptVariables";
 import { ResizableDivider } from "./ResizableDivider";
+import { useTabVariableValues } from "./useTabVariableValues";
 
 export type PromptConversationSectionProps = {
   /** Layout mode: "vertical" shows resizable divider, "horizontal" shows border-bottom */
@@ -50,57 +49,10 @@ export function PromptConversationSection({
   const inputs = form.watch("version.configData.inputs") ?? [];
   const formValues = form.watch();
 
-  // Variable values live per tab and survive a refresh.
-  const { storedVariableValues, updateTabData } = useDraggableTabsBrowserStore(
-    (state) => {
-      const tabData = state.getByTabId(tabId);
-      return {
-        storedVariableValues: tabData?.variableValues ?? {},
-        updateTabData: state.updateTabData,
-      };
-    },
-  );
-
   const chatRef = useRef<PromptPlaygroundChatRef>(null);
 
-  // Local state for variable values - allows fast typing without store re-renders
-  const [localVariableValues, setLocalVariableValues] =
-    useState<Record<string, string>>(storedVariableValues);
-
-  // Debounced persistence to store (300ms delay)
-  const debouncedPersistToStore = useDebounceCallback(
-    (values: Record<string, string>) => {
-      updateTabData({
-        tabId,
-        updater: (data) => ({
-          ...data,
-          variableValues: values,
-        }),
-      });
-    },
-    300,
-  );
-
-  // Flush any pending variable-value write before unmount. useDebounceCallback
-  // cancels on unmount, so without this a value typed just before switching
-  // prompt tabs (which unmounts this tab) would be lost.
-  useEffect(() => {
-    return () => {
-      debouncedPersistToStore.flush();
-    };
-  }, [debouncedPersistToStore]);
-
-  // Handle value changes - update local state immediately, persist to store with debounce
-  const handleValueChange = useCallback(
-    (identifier: string, value: string) => {
-      setLocalVariableValues((prev) => {
-        const updated = { ...prev, [identifier]: value };
-        debouncedPersistToStore(updated);
-        return updated;
-      });
-    },
-    [debouncedPersistToStore],
-  );
+  const { values: localVariableValues, onValueChange: handleValueChange } =
+    useTabVariableValues(tabId);
 
   const runtimeVariables = runtimeVariablesFor({
     declarations: inputs,

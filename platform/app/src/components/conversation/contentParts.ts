@@ -191,6 +191,10 @@ export function collapseAudioTranscript(parts: DisplayPart[]): DisplayPart[] {
 
   const only = media[0];
   if (only?.kind !== "media") return parts;
+  // Only audio carries a transcript. A message pairing text with an image, a
+  // video or a document is two things the reader wants both of, and folding
+  // the text into the media part drops its bubble at the filter below.
+  if (only.part.type !== "audio") return parts;
 
   only.transcript = texts
     .map((part) => (part.kind === "text" ? part.content : ""))

@@ -354,9 +354,16 @@ async function streamPromptExecution({
   // callback settles, dropping anything still queued.
   let pendingWrites: Promise<unknown> = Promise.resolve();
   const send = (event: PlaygroundStreamEvent) => {
-    pendingWrites = pendingWrites.then(() =>
-      stream.writeSSE({ data: JSON.stringify(event) }),
-    );
+    pendingWrites = pendingWrites
+      .then(() => stream.writeSSE({ data: JSON.stringify(event) }))
+      // A write rejects when the reader has gone. Terminating the chain here
+      // keeps it resolved, so `await pendingWrites` in the finally block below
+      // cannot re-throw after the catch has already handled the run — which
+      // would report a closed stream as an execution failure. It is the abort
+      // path, so it takes the abort flag with it and the engine stops too.
+      .catch(() => {
+        aborted = true;
+      });
   };
 
   let sentSoFar = "";
@@ -413,6 +420,17 @@ export const app = createService({
       "/prompt.execute",
       {
         docs: { hide: true },
+        // The check this endpoint needs is not the declarative one: it is
+        // `prompts:view` against the body's projectId AND a refusal of the
+        // demo project, whose blanket view grant must not buy provider credit.
+        // `requirePromptsViewOnProject` below does both, and the route policy
+        // registers the same pair as handler-managed.
+        noPermission: {
+          reason:
+            "prompts:view is checked against the body's projectId by " +
+            "endpoint middleware, which also refuses the demo project " +
+            "because execution spends provider credit",
+        },
         middleware: [requirePromptsViewOnProject],
         input: executeRequestSchema,
       },

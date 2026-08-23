@@ -21,6 +21,29 @@ export interface ChatSendButtonProps {
   onStop?: () => void;
 }
 
+/**
+ * Everything the button looks like, derived from its two states.
+ *
+ * Kept out of the component because the appearance is a table rather than
+ * logic, and reading it as one is easier than reading it spread across a
+ * dozen props.
+ */
+function sendButtonAppearance({
+  stopping,
+  inactive,
+}: {
+  stopping: boolean;
+  inactive: boolean;
+}) {
+  return {
+    "aria-label": stopping ? "Stop generating" : "Send message",
+    background: stopping ? "red.solid" : inactive ? "bg.muted" : "orange.solid",
+    color: stopping || !inactive ? "white" : "fg.muted",
+    cursor: inactive ? "default" : "pointer",
+    _hover: inactive ? undefined : { filter: "brightness(1.08)" },
+  };
+}
+
 export function ChatSendButton({
   inProgress = false,
   disabled = false,
@@ -33,7 +56,6 @@ export function ChatSendButton({
   return (
     <chakra.button
       type="button"
-      aria-label={stopping ? "Stop generating" : "Send message"}
       onClick={() => (stopping ? onStop?.() : onSend())}
       disabled={inactive}
       width="34px"
@@ -43,13 +65,8 @@ export function ChatSendButton({
       flexShrink={0}
       display="grid"
       placeItems="center"
-      background={
-        stopping ? "red.solid" : inactive ? "bg.muted" : "orange.solid"
-      }
-      color={stopping || !inactive ? "white" : "fg.muted"}
-      cursor={inactive ? "default" : "pointer"}
       transition="background 150ms ease"
-      _hover={inactive ? undefined : { filter: "brightness(1.08)" }}
+      {...sendButtonAppearance({ stopping, inactive })}
     >
       {/* The paper-plane's ink sits low-left of its own box, so centring the
           glyph geometrically leaves it looking low and left. The nudge is
