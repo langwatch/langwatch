@@ -3,12 +3,11 @@ Feature: The moderation evaluator answers every entry it was sent
   I want one verdict per row, scored from that row,
   So that a row is judged on its own text and no row is left without an answer.
 
-  # This evaluator does not call the provider once per entry. It sends the
-  # whole batch in two moderation calls, one for the inputs and one for the
-  # outputs, and then walks the two result lists together. That shape is a
-  # deliberate cost decision, and it makes the walk the only place an entry
-  # can be scored: an entry the walk misses gets no answer at all, and the
-  # caller has no way to tell which one it lost.
+  # An entry left without an answer is invisible to the caller. The results
+  # come back as a list, so a batch that answers fewer entries than it was
+  # sent gives no way to tell which rows were never judged. A safety check
+  # that reports rows as clean because a different row was is the wrong way
+  # for this evaluator to be wrong.
 
   Rule: One answer per entry, in the order they were sent
 
