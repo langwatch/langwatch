@@ -120,6 +120,13 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
     And on any disagreement the settled part's content wins
 
   @integration
+  Scenario: A settled turn's cards reach the reader who watched it stream
+    Given a turn this browser streamed whose reply carried card fences
+    When the turn settles and the panel keeps the copy it streamed
+    Then the fences draw as cards by the same scanner the relay stamps with
+    And the reader never has to reload the page to see them
+
+  @integration
   Scenario: A loosely written opening still draws a card
     Given a turn streaming a card whose opening fence carries a space before the tag
     When the fence validates

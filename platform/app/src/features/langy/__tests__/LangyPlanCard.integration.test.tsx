@@ -55,18 +55,30 @@ function plan(overrides: Partial<LangyPlan> = {}): LangyPlan {
 
 describe("LangyPlanCard", () => {
   describe("given a multi-step plan in flight", () => {
-    it("shows only the current step under a compact progress summary", () => {
+    /** @scenario The checklist is open while the turn works */
+    it("shows the whole checklist without a click", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
       expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
-      expect(screen.queryByText("Find the slow traces")).toBeNull();
+      expect(screen.getByText("Find the slow traces")).toBeDefined();
       expect(screen.getByText("Summarise them")).toBeDefined();
-      expect(screen.queryByText("Open a fix")).toBeNull();
+      expect(screen.getByText("Open a fix")).toBeDefined();
     });
 
-    it("nests the current step's work under it", () => {
+    /** @scenario The checklist is open while the turn works */
+    it("shows the work happening under the current step", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
       // The tool that ran while step 2 was current is shown by default.
       expect(screen.getByText("echo summarising")).toBeDefined();
+    });
+
+    /** @scenario The checklist is open while the turn works */
+    it("closes on the reader's click and stays closed", () => {
+      ui(<LangyPlanCard plan={plan()} isStreaming />);
+      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
+
+      expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
+      expect(screen.queryByText("Find the slow traces")).toBeNull();
+      expect(screen.getByText("Summarise them")).toBeDefined();
     });
 
     it("does not expand a completed step's work by default", () => {
@@ -83,11 +95,30 @@ describe("LangyPlanCard", () => {
     });
   });
 
+  describe("given a settled turn's plan", () => {
+    /** @scenario The checklist is open while the turn works */
+    it("folds back to the progress line and its current step", () => {
+      ui(<LangyPlanCard plan={plan()} isStreaming={false} />);
+      expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
+      expect(screen.queryByText("Find the slow traces")).toBeNull();
+      expect(screen.getByText("Summarise them")).toBeDefined();
+      expect(screen.queryByText("Open a fix")).toBeNull();
+    });
+
+    /** @scenario The checklist is open while the turn works */
+    it("opens on the reader's click", () => {
+      ui(<LangyPlanCard plan={plan()} isStreaming={false} />);
+      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
+
+      expect(screen.getByText("Find the slow traces")).toBeDefined();
+      expect(screen.getByText("Open a fix")).toBeDefined();
+    });
+  });
+
   describe("given finished, current, and not-yet-started steps", () => {
     /** @scenario Every step reads as a checkbox and the header counts what is checked */
     it("marks every step as a checkbox and counts done, never left", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
-      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
       const markers = [...document.querySelectorAll("[data-plan-marker]")].map(
         (el) => el.getAttribute("data-plan-marker"),
       );
@@ -99,7 +130,6 @@ describe("LangyPlanCard", () => {
     /** @scenario Every step reads as a checkbox and the header counts what is checked */
     it("names each step's status for a reader who gets no shape or colour", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
-      fireEvent.click(screen.getByRole("button", { name: /plan/i }));
 
       expect(
         [...document.querySelectorAll("[data-plan-marker]")].map((el) =>
@@ -126,7 +156,6 @@ describe("LangyPlanCard", () => {
         />,
       );
       expect(screen.getByText("Plan · 1 of 2 done")).toBeDefined();
-      screen.getByRole("button", { name: /plan/i }).click();
       const struck = screen.getByText("Abandoned");
       expect(getComputedStyle(struck).textDecoration).toContain("line-through");
     });

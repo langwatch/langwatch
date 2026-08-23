@@ -19,6 +19,7 @@ import {
   hasLangyBlockParts,
   type LangyAnswerSegment,
   langyAnswerSegments,
+  langyAnswerSegmentsFromText,
 } from "../logic/langyAnswerSegments";
 import {
   isSubstantiveLangyAnswer,
@@ -149,13 +150,21 @@ function MessageContentImpl({
   // preview is Phase 4's seam), so `isStreaming` rendering is unaffected.
   // Memoized: parts are replaced wholesale on settle/rehydrate, so identity
   // is a faithful cache key and history messages never re-split per render.
-  const blockSegments = useMemo(
-    () =>
-      !isUser && !isStreaming && hasLangyBlockParts(message.parts)
-        ? langyAnswerSegments(message.parts)
-        : null,
-    [isUser, isStreaming, message.parts],
-  );
+  //
+  // A settled turn the reader WATCHED holds the copy this browser streamed,
+  // fences and all, and it is never replaced by the durable one (that would
+  // drop the mid-turn narration the saved reply does not keep). Nothing stamped
+  // that copy, so its fences are read here — see `langyAnswerSegmentsFromText`.
+  // A RECORDED message is left alone: the relay already ruled on its fences.
+  const isRecorded =
+    (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
+  const blockSegments = useMemo(() => {
+    if (isUser || isStreaming) return null;
+    if (hasLangyBlockParts(message.parts)) {
+      return langyAnswerSegments(message.parts);
+    }
+    return isRecorded ? null : langyAnswerSegmentsFromText(rawText);
+  }, [isUser, isStreaming, isRecorded, message.parts, rawText]);
 
   // The agent's `question` TOOL call, mapped onto the choices contract
   // (langyQuestionTool.ts) and rendered through the same card path a stamped

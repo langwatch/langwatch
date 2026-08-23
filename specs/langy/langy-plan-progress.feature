@@ -74,6 +74,18 @@ Feature: Langy shows a live plan checklist for multi-step work
     And each box names its status for a reader who gets no shape or colour
     And the header says how many steps are done out of the total, never "left"
 
+  # A four-minute turn that ran twenty commands showed one line, "PLAN · 3 OF 3
+  # DONE", and a wall of narration with nothing between the paragraphs: the
+  # card was closed, so every command was behind it, and a finished plan has no
+  # current step left to show either.
+  @integration
+  Scenario: The checklist is open while the turn works
+    Given a turn maintaining a plan
+    When the turn is still running
+    Then the checklist and the work under each step are visible without a click
+    And it folds back to the progress line once the turn settles
+    And a reader who opens or closes it themselves keeps their choice
+
   @unit
   Scenario: No plan means today's rendering, unchanged
     Given a turn in which the agent never maintained a todo list

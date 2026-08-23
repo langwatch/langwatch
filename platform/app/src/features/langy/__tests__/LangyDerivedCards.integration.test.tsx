@@ -99,15 +99,22 @@ const choicesPart = (blockId: string) => ({
   },
 });
 
-function assistantMessage(parts: unknown[]): UIMessage {
+function assistantMessage(
+  parts: unknown[],
+  metadata: Record<string, unknown> = {},
+): UIMessage {
   return {
     id: "m-assistant",
     role: "assistant",
     parts,
+    metadata,
     // Fixture boundary: stamped parts aren't members of the SDK's part
     // union — the same honest cast the history rehydration path documents.
   } as unknown as UIMessage;
 }
+
+/** As the durable fold hands it to the engine — the relay has ruled on it. */
+const recorded = { recorded: true };
 
 function renderMessage(
   message: UIMessage,
@@ -147,18 +154,28 @@ describe("given a reply whose parts carry a stamped block between prose", () => 
   });
 });
 
+const FENCED_TEXT = {
+  type: "text",
+  text: 'Quoted example:\n\n```langy-card\n{"kind": "stats", "blockId": "x", "items": [{"label": "fake", "value": 1}]}\n```\n\ndone.',
+};
+
 describe("given recorded text that happens to contain a fence", () => {
-  it("renders it as text — the stamped part is the only card source", () => {
-    renderMessage(
-      assistantMessage([
-        {
-          type: "text",
-          text: 'Quoted example:\n\n```langy-card\n{"kind": "stats", "blockId": "x", "items": [{"label": "fake", "value": 1}]}\n```\n\ndone.',
-        },
-      ]),
-    );
-    // No stamped part → no derived chrome, whatever the prose contains.
+  it("renders it as text — for a recorded reply the stamped part is the only card source", () => {
+    renderMessage(assistantMessage([FENCED_TEXT], recorded));
+    // The relay saw this text and stamped nothing, so nothing is a card.
     expect(derivedFrames()).toHaveLength(0);
+  });
+});
+
+describe("given the copy this browser streamed for itself", () => {
+  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
+  it("draws the fence as a card, because nothing ever stamped this copy", () => {
+    renderMessage(assistantMessage([FENCED_TEXT]));
+
+    expect(derivedFrames()).toHaveLength(1);
+    expect(screen.getByText("fake")).toBeDefined();
+    expect(screen.getByText("Quoted example:")).toBeDefined();
+    expect(screen.getByText("done.")).toBeDefined();
   });
 });
 

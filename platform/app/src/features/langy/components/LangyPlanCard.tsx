@@ -12,8 +12,9 @@
  *   - pending → dimmed, no dot;
  *   - cancelled → struck through, dimmed, and NOT counted toward the total.
  *
- * The card is a compact live receipt by default: progress plus the current
- * step. Clicking it reveals the whole checklist and its historical work. A
+ * The card is open while the turn runs, so the work shows as it happens, and
+ * folds to a compact receipt — progress plus the current step — once the turn
+ * settles; clicking it either way pins the reader's choice. A
  * settled-but-incomplete turn (a failure/handoff) freezes honestly: nothing
  * pulses and no step is invented.
  *
@@ -63,9 +64,17 @@ export function LangyPlanCard({
   isStreaming?: boolean;
 }) {
   const reduce = useReducedMotion();
-  // A plan is a small status receipt first; the checklist is available on
-  // demand. This keeps a three-step task from becoming the whole conversation.
-  const [cardOpen, setCardOpen] = useState(false);
+  // While the turn runs, the card is OPEN: the reader is watching work happen,
+  // and every command the agent ran is nested in here. Closed, a turn that
+  // spent four minutes running twenty commands showed one line and a wall of
+  // narration with nothing between the paragraphs — and once the last step
+  // completed there was no current step left to show either. A settled turn in
+  // a scrolled-back transcript is a status receipt again, with the checklist
+  // one click away. Either way the reader's own click wins from then on.
+  const [cardOpenOverride, setCardOpenOverride] = useState<boolean | null>(
+    null,
+  );
+  const cardOpen = cardOpenOverride ?? isStreaming;
   const currentItem =
     plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
 
@@ -79,7 +88,7 @@ export function LangyPlanCard({
       <PlanOverline
         completed={plan.completedCount}
         total={plan.totalCount}
-        onToggle={() => setCardOpen((value) => !value)}
+        onToggle={() => setCardOpenOverride(!cardOpen)}
         expanded={cardOpen}
       />
 
