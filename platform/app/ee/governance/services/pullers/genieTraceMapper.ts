@@ -291,8 +291,13 @@ function frameOf(
       ? payload.auto_regenerate_count
       : 0;
   const spanSeed = `genie:${conversationId}:${messageId}:${regenCount}`;
+  // Both timestamp sources can be garbage (mapToOcsfRow guards the same
+  // field). NaN here would serialize as "NaN000000" and fail spanSchema,
+  // dropping the whole conversation — degrade to pull time instead.
+  const eventMs = Date.parse(event.event_timestamp);
   const startMs =
-    toMs(payload.created_timestamp) ?? Date.parse(event.event_timestamp);
+    toMs(payload.created_timestamp) ??
+    (Number.isFinite(eventMs) ? eventMs : Date.now());
   const status = (payload.status ?? extraString(event, "status") ?? "").trim();
   return {
     payload,

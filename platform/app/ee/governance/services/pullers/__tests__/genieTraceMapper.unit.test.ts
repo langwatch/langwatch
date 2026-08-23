@@ -292,6 +292,28 @@ describe("given a payload that does not parse", () => {
   });
 });
 
+describe("given a message with no usable timestamp anywhere", () => {
+  it("degrades to a finite clock time instead of NaN-poisoned spans", () => {
+    const timeless: NormalizedPullEvent = {
+      ...genieEvent(
+        completedMessage({
+          created_timestamp: undefined,
+          last_updated_timestamp: undefined,
+        }),
+      ),
+      event_timestamp: "not-a-timestamp",
+    };
+    const spans = spansOf([timeless]);
+    expect(spans).toHaveLength(2);
+    for (const span of spans) {
+      // NaN would serialize as "NaN000000" and fail the trace-door schema.
+      expect(Number(span.startTimeUnixNano)).toBeGreaterThan(0);
+      expect(Number(span.endTimeUnixNano)).toBeGreaterThan(0);
+      expect(spanSchema.safeParse(span).success).toBe(true);
+    }
+  });
+});
+
 describe("given events that are not conversations", () => {
   it("routes nothing for aggregate actions (Decision 8: aggregates never route)", () => {
     const aggregate: NormalizedPullEvent = {
