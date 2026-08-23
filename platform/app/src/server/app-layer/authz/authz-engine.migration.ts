@@ -58,10 +58,8 @@
  * taken after a delete, so its row stays for good; a read that dropped it
  * would make a buried head indistinguishable from one the fold has not
  * written yet, and the check would count a permanent tombstone as
- * `outstanding` on every pass — holding the organization on a condition no
- * later pass can clear, while the sweep re-sent that role's delete for as
- * long as the migration ran. One API key deleted between two passes was
- * enough to do it.
+ * `outstanding` on every pass. One API key deleted between two passes was
+ * enough to hold an organization forever.
  *
  * @see specs/migration/authz-grants-rollout.feature
  * @see dev/docs/adr/110-grant-aggregates-are-grants.md
@@ -256,20 +254,12 @@ export class AuthzEngineMigration implements SystemMigration {
     const inventory = await this.readInventory(organizationId);
     const expected = assembleFacts({ organizationId, inventory });
 
-    // The budget handover, and it runs BEFORE the read below on purpose. It
-    // rides every pass, monotonically upward: legacy keeps counting views
-    // while the organization is held, and the proof compares the two counts
-    // exactly, so re-seeding is what lets the count heal.
-    //
-    // This is not a fact and not an event — it is a direct write to the
-    // budget table, which the pass can therefore observe in the very read it
-    // is about to take. Seeding AFTER that read meant the check compared a
-    // PRE-seed count against legacy, so a link viewed at any point between
-    // one pass's seed and the next pass's read counted `outstanding` all over
-    // again — and an organization whose links are viewed at least once per
-    // pass interval could never finalize, however many passes it was given.
-    // Reading after the write costs nothing and leaves no window: the pass
-    // sees the budget it just handed over instead of waiting a pass for it.
+    // The budget handover, BEFORE the read below on purpose. It is a direct
+    // write, not a fact the pass states and waits on, so the read that
+    // follows simply sees it. Seeding after that read compared a PRE-seed
+    // count against legacy, so a link viewed between one pass's seed and the
+    // next pass's read counted `outstanding` again and an organization whose
+    // links are viewed at all could never finalize.
     await this.deps.store.seedResourceGrantUsage({
       organizationId,
       seeds: expected.shareLinks.map((link) => ({
