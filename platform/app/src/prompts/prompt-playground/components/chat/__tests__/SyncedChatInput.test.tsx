@@ -73,6 +73,7 @@ const renderSyncedChatInput = ({
 }: RenderOptions) => {
   const onSend = vi.fn().mockResolvedValue(undefined);
   const onStop = vi.fn();
+  const onVariableValueChange = vi.fn();
 
   return {
     ...render(
@@ -84,6 +85,7 @@ const renderSyncedChatInput = ({
               onSend={onSend}
               isVisible={true}
               onStop={onStop}
+              onVariableValueChange={onVariableValueChange}
             />
           </PromptPlaygroundChatProvider>
         </TabIdProvider>

@@ -21,7 +21,7 @@ describe("flattenMessages", () => {
       function: { name: "search", arguments: '{"q":"weather"}' },
     };
 
-    /** @scenario "Tool calls are recognised in both wire casings" */
+    /** @scenario "A reply's tool calls are shown whichever dialect the provider used" */
     it("reads both wire casings the same way", () => {
       const snake = flatten([
         { id: "m1", role: "assistant", content: "", tool_calls: [call] },
@@ -93,7 +93,7 @@ describe("flattenMessages", () => {
   });
 
   describe("given typed content blocks", () => {
-    /** @scenario "Typed content blocks are flattened into parts" */
+    /** @scenario "A reply mixing prose and a tool call shows both, in the order written" */
     it("produces a text part and a tool part in source order", () => {
       const parts = flatten([
         {
@@ -177,7 +177,7 @@ describe("flattenMessages", () => {
   });
 
   describe("given audio and its transcript in one message", () => {
-    /** @scenario "An audio part and its sibling text collapse into one part" */
+    /** @scenario "A spoken reply is shown once, with its transcript" */
     it("collapses them into a single media part", () => {
       const parts = flatten([
         {
@@ -202,7 +202,7 @@ describe("flattenMessages", () => {
   });
 
   describe("given a message with nothing to show", () => {
-    /** @scenario "A message with no usable content produces nothing" */
+    /** @scenario "A message the model left empty shows nothing" */
     it.each([["None"], [""], [null]])("produces no parts for %s", (content) => {
       expect(flatten([{ id: "m1", role: "assistant", content }])).toEqual([]);
     });
@@ -257,7 +257,7 @@ describe("groupIntoTurns", () => {
     traceId,
   });
 
-  /** @scenario "Consecutive parts sharing a trace are grouped into one turn" */
+  /** @scenario "Messages belonging to one exchange are numbered as one turn" */
   it("numbers each run of parts that share a trace", () => {
     const turns = groupIntoTurns([
       part("a", "trace-1"),

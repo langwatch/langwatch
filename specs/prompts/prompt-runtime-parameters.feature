@@ -86,11 +86,10 @@ Feature: Prompt runtime parameters
 
   # --- UI: Editable parameters in the prompt editor ---
   #
-  # Parameters are saved onto the prompt version and handed back to whatever
-  # fetches the prompt; nothing about a playground run reads them. So they are
-  # part of writing the prompt, and they sit in the editor beside the messages
-  # rather than behind a tab on the conversation, where they were both hidden
-  # and implied to affect the run.
+  # Parameters belong to the prompt the author is writing, not to the run they
+  # try it with. They sit in the editor beside the messages for that reason:
+  # behind a tab on the conversation they were both hard to find and made to
+  # look as though they changed the reply.
 
   @integration
   Scenario: The editor explains what parameters are, apart from variables

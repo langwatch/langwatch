@@ -171,38 +171,38 @@ Feature: Prompt Playground conversation
     When I reload the browser
     Then the conversation still shows the latest assistant reply in full
 
-  # ── The shared flattener ────────────────────────────────────────────
+  # ── What a reply shows ──────────────────────────────────────────────
 
   @unit
-  Scenario: Tool calls are recognised in both wire casings
-    Given a message carrying tool calls under "tool_calls"
-    And a message carrying the same tool calls under "toolCalls"
-    When each message is flattened
-    Then both produce the same tool call parts
+  Scenario: A reply's tool calls are shown whichever dialect the provider used
+    Given two providers that report the same tool call in different dialects
+    When I read either reply in the conversation
+    Then I see the same tool call
 
   @unit
-  Scenario: Typed content blocks are flattened into parts
-    Given an assistant message whose content is an array of text and tool-use blocks
-    When the message is flattened
-    Then a text part and a tool call part are produced in source order
+  Scenario: A reply mixing prose and a tool call shows both, in the order written
+    Given a reply that explains itself and then calls a tool
+    When I read it in the conversation
+    Then I see the explanation and the tool call, in that order
 
   @unit
-  Scenario: An audio part and its sibling text collapse into one part
-    Given a message carrying one audio part and one text part
-    When the message is flattened
-    Then a single media part is produced carrying the text as its transcript
+  Scenario: A spoken reply is shown once, with its transcript
+    Given a reply carrying spoken audio and the transcript of that audio
+    When I read it in the conversation
+    Then I see one reply, with the transcript on it
+    And the reply is not shown twice
 
   @unit
-  Scenario: A message with no usable content produces nothing
-    Given a message whose content is the string "None"
-    When the message is flattened
-    Then no parts are produced
+  Scenario: A message the model left empty shows nothing
+    Given a message the model returned with no content
+    When I read the conversation
+    Then nothing is shown for it
 
   @unit
-  Scenario: Consecutive parts sharing a trace are grouped into one turn
-    Given a sequence of parts where the first three share a trace and the next two share another
-    When the parts are grouped into turns
-    Then two turns are produced, numbered in order
+  Scenario: Messages belonging to one exchange are numbered as one turn
+    Given two exchanges in the conversation
+    When I read it
+    Then each exchange is numbered once, in order
 
   # -- Binding the live turn to the input placeholder -------------------
   #

@@ -30,11 +30,9 @@ Feature: Product sidebars in the new navigation modes
   near the start of the menu therefore opens with Quick Search and the
   first group heading still on screen.
 
-  On a small screen the column collapses to a narrow icon rail that
-  widens again while the pointer is over it. The content stays laid out
-  at the full width and the column clips it, so collapsing slides the
-  same content out of view rather than reflowing it, and nothing may
-  move that content sideways behind the user's back.
+  The collapsed column clips its content rather than reflowing it, so
+  nothing may move that content sideways behind the user's back — an
+  entry revealing itself must not shift the icons the user is aiming at.
 
   @integration
   Scenario: Quick Search sits first and opens the command bar
