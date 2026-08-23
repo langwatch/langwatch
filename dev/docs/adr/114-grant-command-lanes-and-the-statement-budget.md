@@ -111,16 +111,35 @@ grant commands are pure appends: validate, stamp identity, emit". Each handler
 derives its event from its own command alone and never reads back a same-batch
 append.
 
-### 2. The statement budget reserves capacity for foreground work
+### 2. The statement budget is shared per producer, not first-come
 
-`withStatementLimit` gains a priority class. Statements are `interactive` by
-default; a caller may declare itself `background`. Background statements may
-occupy at most a configured fraction of the budget (initially 50%), so a bulk
-producer can never take the last slot a customer write needs.
+**Deferred, with its design settled here.** Not implemented in the PR that
+carries this ADR.
 
-This is a separate change on a shared hot path — every ClickHouse caller in
-the app goes through that wrapper — and ships as its own PR, not alongside
-the lane change.
+The first shape considered was a two-class split: statements are
+`interactive` by default, a caller may declare itself `background`, and
+background work may hold at most a fraction of the budget. Writing it down
+killed it. `recordSpan` — the job whose 13.5-second latency is the reason
+this matters — is queue work too. Any rule that classes "queue work" as
+background starves customer ingestion alongside the migration and contains
+nothing that actually happened here.
+
+The axis that separates them is the **producer**, not the caller's
+interactivity. The correct shape is the one the dispatch path already has:
+a max-min fair share of the statement budget across the pipelines with
+demand, so a lone producer may use the whole budget and N producers converge
+on a fair share of it. A migration flooding `authz_grant` would then be
+bounded by its own share while `trace-processing` keeps drawing on its own.
+
+The seam exists. `groupQueue.ts` already runs every job body inside
+`runWithContext`, so a statement can learn which pipeline it is being issued
+for without a parameter on every call site.
+
+This is deferred rather than sketched-and-shipped because it is a piece of
+work on the scale of the dispatch water-fill itself, and it sits on a hot
+path every ClickHouse caller in the app crosses. Decision 1 removes the
+pressure that made it urgent; this removes the class of incident. They are
+not substitutes and the second one should not be rushed behind the first.
 
 ## Rationale / Trade-offs
 
@@ -151,8 +170,9 @@ statements and never was slots.
 
 - The migration's statement pressure falls by roughly the batch factor, so a
   bulk import stops being visible to unrelated pipelines.
-- Foreground ClickHouse work keeps a floor under load, so a background
-  producer degrades itself rather than customer ingestion.
+- Until decision 2 lands, one producer can still exhaust the statement
+  budget. Decision 1 makes that far harder for this pipeline and does
+  nothing for the next one; the containment gap stays open and named.
 - Grant commands for one organization serialize 32-ways rather than
   arbitrarily wide. Anything that assumed unbounded per-grant command
   parallelism would notice; nothing does today.
