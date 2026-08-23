@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// vitest runs from the app package root, so the repository root is one level up.
+// vitest runs from the app package root, so the repository root is two levels up.
 const REPO_ROOT = resolve(process.cwd(), "../..");
 
 type Scripts = Record<string, string | undefined>;
@@ -58,9 +58,9 @@ describe("given a fresh checkout without generated files", () => {
       );
       expect(setupBlock).toBeDefined();
 
-      const named = [...(setupBlock ?? "").matchAll(/pnpm ([a-z:.-]+)/g)].map(
-        (match) => match[1],
-      );
+      const named = [
+        ...(setupBlock ?? "").matchAll(/pnpm ([a-z:.-]+)/g),
+      ].flatMap((match) => (match[1] ? [match[1]] : []));
       expect(named.length).toBeGreaterThan(0);
       for (const name of named) {
         expect(root[name]).toBeDefined();
