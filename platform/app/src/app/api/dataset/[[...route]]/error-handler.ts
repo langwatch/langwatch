@@ -80,8 +80,10 @@ export const handleDatasetError = async (
     domain?.status ??
     (error instanceof HttpError ? error.status : (error.status ?? 500));
 
-  // Log the error with context (including status code)
-  logger.error(
+  // Log the error with context (including status code). A 4xx is the
+  // caller's mistake answered correctly — a missing dataset, a bad payload —
+  // so it logs at warn; only a 5xx is ours and stays at error.
+  logger[status >= 500 ? "error" : "warn"](
     {
       path,
       method,

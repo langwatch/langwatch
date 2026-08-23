@@ -120,7 +120,9 @@ export function createProjectMetadataHandler(
     try {
       await syncProjectMetadata(deps, tenantId, foldState);
     } catch (error) {
-      logger.error(
+      // Warn, as the message says: the metadata catches up on the next
+      // ingest, so nothing is lost and nobody needs paging.
+      logger.warn(
         {
           tenantId,
           error: error instanceof Error ? error.message : String(error),
