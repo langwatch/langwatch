@@ -90,8 +90,15 @@ EVALUATION_TIMEOUT_SECONDS = (
 # worker thread for 100 minutes. The batch deadline above already gives the
 # slot back at that point, but only this makes the abandoned thread die
 # instead of lingering with the socket.
+#
+# It sits below the batch deadline on purpose: a call that overruns then fails
+# as a provider timeout, which names the provider, rather than as an abandoned
+# evaluation, which only says the batch ran out of time. The default is far
+# above any judge call that is working (single figures of seconds, or a minute
+# for a reasoning model on a long context) so it only ever cuts off a call
+# that has stopped making progress.
 MODEL_TIMEOUT_SECONDS = (
-    positive_float_or_none(os.getenv("LANGEVALS_MODEL_TIMEOUT")) or 120.0
+    positive_float_or_none(os.getenv("LANGEVALS_MODEL_TIMEOUT")) or 180.0
 )
 litellm.request_timeout = MODEL_TIMEOUT_SECONDS
 # Spare threads for anything the framework runs off the event loop that is not

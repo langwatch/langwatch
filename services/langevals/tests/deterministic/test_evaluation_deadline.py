@@ -194,3 +194,17 @@ def test_the_deadline_is_shorter_than_the_queue_a_caller_waits_in():
     deadline would buy nothing.
     """
     assert server.EVALUATION_TIMEOUT_SECONDS <= server.EVALUATION_QUEUE_TIMEOUT_SECONDS
+
+
+# @scenario "A model call fails before the batch gives up on it"
+def test_a_model_call_is_bounded_below_the_batch_deadline():
+    """A provider timeout names the provider; an abandoned batch names nothing.
+
+    Both bounds return the slot, so this is about which error the customer
+    reads. The model call has to lose the race for the answer to be useful.
+    """
+    import litellm
+
+    assert server.MODEL_TIMEOUT_SECONDS < server.EVALUATION_TIMEOUT_SECONDS
+    # And the bound is actually applied, not just computed.
+    assert litellm.request_timeout == server.MODEL_TIMEOUT_SECONDS

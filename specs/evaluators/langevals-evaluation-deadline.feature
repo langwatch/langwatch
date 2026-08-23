@@ -43,6 +43,13 @@ Feature: A stuck evaluation cannot take the evaluation service down with it
       When they are compared
       Then a slot comes back before the callers queued behind it give up
 
+    @unit
+    Scenario: A model call fails before the batch gives up on it
+      Given a model call that stops making progress
+      When it runs past the model timeout
+      Then it fails as a provider timeout, which names the provider
+      And the batch deadline stays the backstop behind it
+
   Rule: One endpoint calls every evaluator
 
     An evaluator that batches differently may replace the batch method. A
