@@ -21,8 +21,12 @@ import { PrismaOrganizationRepository } from "../repositories/organization.prism
  */
 function recordingPrisma() {
   const calls: string[] = [];
+  // The argument is declared even though the recorder ignores it: without it
+  // the mock types as zero-arity, and reading `.mock.calls[0][0]` — which is
+  // how the report assertion below reaches what was written — is a type
+  // error on an empty tuple.
   const record = (name: string, result: unknown) =>
-    vi.fn(async () => {
+    vi.fn(async (_args: unknown) => {
       calls.push(name);
       return result;
     });
