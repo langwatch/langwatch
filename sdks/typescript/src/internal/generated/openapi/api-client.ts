@@ -848,6 +848,30 @@ export interface paths {
         patch: operations["patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Place a saved workbench chart on a dashboard
+         * @description Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.
+         */
+        put: operations["putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement"];
+        post?: never;
+        /**
+         * Remove a saved workbench chart from its dashboard
+         * @description Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -5117,6 +5141,7 @@ export interface operations {
                         start: string | number;
                         end: string | number;
                     };
+                    granularitySeconds?: number;
                 };
             };
         };
@@ -5143,6 +5168,9 @@ export interface operations {
                         };
                         truncated: boolean;
                         followsTimeWindow: boolean;
+                        followsGranularity: boolean;
+                        granularitySeconds?: number;
+                        coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
                             code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
@@ -5412,6 +5440,11 @@ export interface operations {
                             createdAt: string;
                             updatedAt: string;
                             platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
                         }[];
                     };
                 };
@@ -5538,6 +5571,11 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
             };
@@ -5657,6 +5695,11 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
             };
@@ -5924,8 +5967,288 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                    gridColumn?: number;
+                    gridRow?: number;
+                    colSpan?: number;
+                    rowSpan?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The chart, now placed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chart is no longer on any dashboard */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {
