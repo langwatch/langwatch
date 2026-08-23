@@ -125,6 +125,64 @@ describe("explainLangyError", () => {
     });
   });
 
+  describe("given an agent failure the model provider rate-limited", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario A rate-limited model reads as the provider being busy */
+      it("says the provider is rate-limiting and to wait, not that Langy broke", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "provider_error",
+                reasons: [{ kind: "upstream_rate_limited" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is rate-limiting these calls. Wait a moment and try again.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A provider outage reads as the provider being down */
+      it("names an outage as the provider's, and offers another model", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "upstream_unavailable" }],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider is temporarily unavailable. Try again shortly, or pick a different model.",
+        );
+      });
+
+      /** @scenario A dead codex session still wins over the upstream status */
+      it("leaves the more specific codex card alone", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              { kind: "upstream_unauthorized" },
+              { kind: "codex_session_expired" },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_codex_session_expired");
+      });
+    });
+  });
+
   describe("given an agent failure with unrelated reasons", () => {
     describe("when the failure is explained", () => {
       it("keeps the generic reply-failed card", () => {

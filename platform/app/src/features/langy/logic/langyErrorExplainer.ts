@@ -208,6 +208,58 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "billing_hard_limit_reached",
 ]);
 
+/**
+ * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`).
+ * They say the call to the MODEL PROVIDER failed and which way, which is a
+ * different fact from "Langy's reply failed" and carries a different next
+ * step: wait out a rate limit, fix a credential, pick another model.
+ *
+ * `llm_upstream_error` already writes one sentence per group, so promoting to
+ * it reuses that copy rather than restating it here.
+ */
+const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  "upstream_stream_error",
+  "upstream_bad_request",
+  "upstream_unauthorized",
+  "upstream_forbidden",
+  "upstream_not_found",
+  "upstream_timeout",
+  "upstream_conflict",
+  "upstream_unprocessable_entity",
+  "upstream_rate_limited",
+  "upstream_unavailable",
+  "upstream_http_error",
+]);
+
+/**
+ * A turn that died because the model provider refused the call reads as the
+ * provider failure it was, not as a nameless "Langy hit an error".
+ *
+ * Same rule as `promoteCodexAgentError`: promote by EXACT reason-code match,
+ * never by sniffing the provider's message. Runs after it, so the codex codes
+ * keep their more specific cards.
+ */
+export function promoteUpstreamProviderError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  return hasReasonKind(domain.reasons, UPSTREAM_PROVIDER_REASONS)
+    ? { ...domain, code: "llm_upstream_error" }
+    : domain;
+}
+
+/** Does any reason in the chain, at any depth, carry one of these kinds? */
+function hasReasonKind(
+  reasons: LangySerializedReason[] | undefined,
+  kinds: ReadonlySet<string>,
+): boolean {
+  for (const reason of reasons ?? []) {
+    if (kinds.has(reason.kind)) return true;
+    if (hasReasonKind(reason.reasons, kinds)) return true;
+  }
+  return false;
+}
+
 /*
  * `firstReasonMessage` used to live here: it walked the reason chain for the
  * first `meta.message` and the cards rendered it, on the grounds that the
@@ -364,6 +416,21 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
  * are dropped: the registry never reads them, and Langy's parsed form is its
  * own.
  */
+/**
+ * A Langy reason carries only `kind`; the registry matches on `code` OR
+ * `kind`, so the one name fills both. Nothing is read out of a reason except
+ * membership of an enumerated set, so no upstream prose can ride along.
+ */
+function toRegistryReasons(
+  reasons: LangySerializedReason[] | undefined,
+): HandledErrorShape["reasons"] {
+  return (reasons ?? []).map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    reasons: toRegistryReasons(reason.reasons),
+  }));
+}
+
 function registryCopy(domain: LangyDomainError) {
   return explainHandledError({
     code: REGISTRY_CODE_ALIASES[domain.code] ?? domain.code,
@@ -373,7 +440,11 @@ function registryCopy(domain: LangyDomainError) {
     tips: domain.tips ?? [],
     docsUrl: domain.docsUrl,
     traceId: domain.traceId,
-    reasons: [],
+    // The chain is passed on so an entry that varies its sentence on a reason
+    // discriminant can do it (`llm_upstream_error` says which way the provider
+    // failed). This is the sanctioned way for copy to vary on an upstream:
+    // matching an enumerated code, never reading its message.
+    reasons: toRegistryReasons(domain.reasons),
   });
 }
 
@@ -434,7 +505,7 @@ export function isStaleLangyHistoryRead({
 export function explainLangyError(
   received: LangyDomainError,
 ): LangyErrorPresentation {
-  const domain = promoteCodexAgentError(received);
+  const domain = promoteUpstreamProviderError(promoteCodexAgentError(received));
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,
