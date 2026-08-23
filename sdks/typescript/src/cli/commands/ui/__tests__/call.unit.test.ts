@@ -10,6 +10,18 @@ vi.mock("../../../utils/apiKey", () => ({
 
 import { uiCallCommand } from "../call";
 
+/**
+ * The dispatch body is always a JSON string. Reading it back is how these tests
+ * prove what the command sent, so a non-string body is a failure worth naming.
+ */
+const sentBody = (init?: RequestInit): { payload: unknown } => {
+  const body = init?.body;
+  if (typeof body !== "string") {
+    throw new Error(`expected a JSON string body, got ${typeof body}`);
+  }
+  return JSON.parse(body) as { payload: unknown };
+};
+
 describe("the ui call command", () => {
   let stderr: string[];
 
@@ -114,16 +126,16 @@ describe("the ui call command", () => {
 
       await uiCallCommand("workbench.setTargetPrompt", { payloadFile: file });
 
-      const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-      expect(sent.payload).toEqual(AWKWARD);
+      expect(sentBody(fetchMock.mock.calls[0]?.[1]).payload).toEqual(AWKWARD);
     });
 
     it("reads it from stdin when the file is a dash", async () => {
+      // Only the async-iterator half of stdin is read, so an async generator
+      // stands in for the whole stream.
       vi.spyOn(process, "stdin", "get").mockReturnValue(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (async function* () {
           yield Buffer.from(JSON.stringify(AWKWARD));
-        })() as any,
+        })() as unknown as typeof process.stdin,
       );
 
       const fetchMock = vi.fn(
@@ -134,8 +146,7 @@ describe("the ui call command", () => {
 
       await uiCallCommand("workbench.setTargetPrompt", { payloadFile: "-" });
 
-      const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-      expect(sent.payload).toEqual(AWKWARD);
+      expect(sentBody(fetchMock.mock.calls[0]?.[1]).payload).toEqual(AWKWARD);
     });
 
     /** @scenario "Naming both a payload and a payload file is refused" */
