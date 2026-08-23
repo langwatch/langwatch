@@ -67,11 +67,17 @@ type NavigateResolver = (a: {
   resourceId: string;
 }) => Promise<UrlForProjectSlug | null>;
 
-/** The prompts page (the playground) with that prompt's editor drawer open:
- * the same address the app's own UI produces via
- * `openDrawer("promptEditor", { promptId })` (see `drawerRegistry.ts`). */
+/**
+ * The playground with that prompt OPEN AS A TAB (`useUrlParamToOpenNewTab`).
+ *
+ * This used to open the editor drawer instead, which stacked a form over the
+ * playground's own "no prompts open" empty state: the page behind the drawer
+ * was blank, and the one place in the product built for reading a prompt and
+ * running it was the thing the drawer covered. A tab is the playground's own
+ * way to open a prompt, so the reader lands where they can try it.
+ */
 const promptPath = (promptId: string): string =>
-  `/prompts?drawer.open=promptEditor&drawer.promptId=${encodeURIComponent(promptId)}`;
+  `/prompts?promptId=${encodeURIComponent(promptId)}`;
 
 /** Same drawer address the monitors REST API hands out as `platformUrl`. */
 const monitorPath = (monitorId: string): string =>
