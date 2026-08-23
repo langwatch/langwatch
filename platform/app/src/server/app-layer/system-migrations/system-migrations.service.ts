@@ -92,6 +92,10 @@ export interface SystemMigrationEnrollmentStore {
      *  for this migration - a later step samples the step before it. */
     enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
+    /** Lift the enterprise-subscription exclusion for this draw. Defaults to
+     *  false at the repository, so a caller that says nothing gets the safe
+     *  pool rather than the wide one. */
+    includeEnterprise?: boolean;
   }): Promise<Array<{ id: string; name: string }>>;
   createMany(args: {
     organizationIds: string[];
@@ -431,15 +435,33 @@ export class SystemMigrationsService {
    * some fixed order every time - and the result names every organization
    * it picked, because an action over N organizations is only auditable if
    * it says which N.
+   *
+   * Both exclusions are DEFAULTS, not laws. They exist so an experimental
+   * cohort cannot sweep up the organizations we would least like to
+   * surprise; once a migration has proven itself across the long tail,
+   * finishing the rollout means taking those two classes over too, and an
+   * operator who has decided that should not have to enroll them one id at
+   * a time (the single-organization `enroll` never applied either
+   * exclusion). Each is lifted SEPARATELY and named in the audit trail:
+   * they carry different risks - an enterprise organization is a
+   * commercial one, a private-dataplane organization has its events in a
+   * ClickHouse instance of its own - and one checkbox for both would hide
+   * that.
    */
   async enrollCohort({
     migrationName,
     sampleSize,
     actorUserId,
+    includeEnterprise = false,
+    includePrivateDataplane = false,
   }: {
     migrationName: string;
     sampleSize: number;
     actorUserId: string;
+    /** Draw organizations with an active or pending ENTERPRISE subscription. */
+    includeEnterprise?: boolean;
+    /** Draw organizations whose events live in their own ClickHouse instance. */
+    includePrivateDataplane?: boolean;
   }): Promise<{
     enrolled: Array<{ id: string; name: string }>;
     eligibleCount: number;
@@ -466,7 +488,14 @@ export class SystemMigrationsService {
       await this.deps.enrollments.findCohortEligibleOrganizations({
         migrationName,
         enrolledForMigrationName: previous?.name,
-        excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+        // Lifting the private-dataplane exclusion is simply not naming the
+        // ids, so the environment stays the only place those organizations
+        // are listed - the same reason the exclusion reads them from the
+        // routing table rather than from a constant.
+        excludeOrganizationIds: includePrivateDataplane
+          ? []
+          : this.deps.privateDataplaneOrganizationIds(),
+        includeEnterprise,
       });
     const picked = sample({ pool: eligible, count: sampleSize });
     const { insertedCount } = await this.deps.enrollments.createMany({
@@ -484,6 +513,10 @@ export class SystemMigrationsService {
         pickedCount: picked.length,
         insertedCount,
         eligibleCount: eligible.length,
+        // Which exclusions this cohort lifted, so a widened pool is legible
+        // in the log rather than inferred from an unusually large sample.
+        includeEnterprise,
+        includePrivateDataplane,
         organizationIds: picked.map((organization) => organization.id),
       },
       "operator enrolled a cohort for the in-place migration rollout",
@@ -497,7 +530,17 @@ export class SystemMigrationsService {
         userId: actorUserId,
         organizationId: organization.id,
         action: "systemMigrations.enrollCohort",
-        args: { migrationName, sampleSize, cohortSize: picked.length },
+        args: {
+          migrationName,
+          sampleSize,
+          cohortSize: picked.length,
+          // On the row itself, not only in the log: "was this organization
+          // drawn because an operator lifted an exclusion?" is a question
+          // asked of one organization, and the audit trail is where it is
+          // answered.
+          includeEnterprise,
+          includePrivateDataplane,
+        },
       });
     }
     return { enrolled: picked, eligibleCount: eligible.length };

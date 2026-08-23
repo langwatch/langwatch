@@ -167,6 +167,22 @@ func skillsDir(workspaceRoot string) string {
 // and a session file still owned by the dead worker's UID would be unreadable,
 // silently breaking the resume it exists for.
 func provisionSessionDir(in ProvisionInput) error {
+	// The stash parent (`<sessionsRoot>/.pi-sessions`) is shared by every
+	// conversation and owned by the manager; a sandboxed worker only passes
+	// THROUGH it to its own chowned leaf. Mode 0711 grants exactly that
+	// traversal — without the execute bit a per-conversation UID gets EACCES
+	// opening its own session store and the wrapper dies before its ready
+	// handshake — while the absent read bit keeps sibling conversation ids
+	// unlistable. Chmod unconditionally: a stash an earlier build created
+	// 0700 (MkdirAll on the leaf used to mint the parent with the leaf's own
+	// mode) must be repaired, and deployed volumes still hold that mode.
+	stashParent := filepath.Dir(in.SessionDir)
+	if err := os.MkdirAll(stashParent, 0o711); err != nil {
+		return fmt.Errorf("mkdir session stash: %w", err)
+	}
+	if err := os.Chmod(stashParent, 0o711); err != nil {
+		return fmt.Errorf("chmod session stash: %w", err)
+	}
 	if err := os.MkdirAll(in.SessionDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir sessions: %w", err)
 	}
