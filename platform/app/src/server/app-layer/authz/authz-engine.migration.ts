@@ -256,8 +256,31 @@ export class AuthzEngineMigration implements SystemMigration {
     const inventory = await this.readInventory(organizationId);
     const expected = assembleFacts({ organizationId, inventory });
 
+    // The budget handover, and it runs BEFORE the read below on purpose. It
+    // rides every pass, monotonically upward: legacy keeps counting views
+    // while the organization is held, and the proof compares the two counts
+    // exactly, so re-seeding is what lets the count heal.
+    //
+    // This is not a fact and not an event — it is a direct write to the
+    // budget table, which the pass can therefore observe in the very read it
+    // is about to take. Seeding AFTER that read meant the check compared a
+    // PRE-seed count against legacy, so a link viewed at any point between
+    // one pass's seed and the next pass's read counted `outstanding` all over
+    // again — and an organization whose links are viewed at least once per
+    // pass interval could never finalize, however many passes it was given.
+    // Reading after the write costs nothing and leaves no window: the pass
+    // sees the budget it just handed over instead of waiting a pass for it.
+    await this.deps.store.seedResourceGrantUsage({
+      organizationId,
+      seeds: expected.shareLinks.map((link) => ({
+        grantId: link.row.id,
+        projectId: link.row.projectId,
+        viewCount: link.row.viewCount,
+      })),
+    });
+
     // The projection, read ONCE per pass (the spec's own words) — before
-    // anything is stated, so nothing here waits on a fold. Reconcile and the
+    // anything is STATED, so nothing here waits on a fold. Reconcile and the
     // check both walk this read: what this pass states is invisible to it by
     // construction, lands as `outstanding`, and the NEXT pass sees it folded
     // and finalizes. Holding a first pass to finalize a later one is the
@@ -267,17 +290,6 @@ export class AuthzEngineMigration implements SystemMigration {
     await this.state({ organizationId, expected, heads, signal });
     await this.reconcileStale({ organizationId, expected, heads, signal });
     await this.repairDrift({ organizationId, expected, heads, signal });
-    // The budget handover rides every pass, monotonically upward: legacy
-    // keeps counting views while the organization is held, and the proof
-    // compares counts exactly, so re-seeding is what lets it heal.
-    await this.deps.store.seedResourceGrantUsage({
-      organizationId,
-      seeds: expected.shareLinks.map((link) => ({
-        grantId: link.row.id,
-        projectId: link.row.projectId,
-        viewCount: link.row.viewCount,
-      })),
-    });
 
     const { outstanding, diffs } = this.check({
       organizationId,

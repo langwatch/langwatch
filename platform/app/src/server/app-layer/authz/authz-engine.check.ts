@@ -297,12 +297,17 @@ function roleDiffs({
  * said, mapped to that spelling.
  *
  * The view budget cuts both ways and the two directions mean different
- * things. A head BEHIND the legacy count is convergence lag — views land
- * legacy-side between passes and the monotonic seed raises the usage row
- * next pass — so it is `outstanding`, not a disagreement; reporting it as
- * one made an actively-viewed link re-hold the organization forever. A
- * head AHEAD of the legacy count is a budget that grew back, which nothing
- * legitimate produces, so that is the named diff.
+ * things. A head BEHIND the legacy count is convergence lag and never a
+ * disagreement: reporting it as one made an actively-viewed link re-hold the
+ * organization forever. The pass now hands the budget over BEFORE it takes
+ * the read this walks (see `migrateTenant`), so the lag is already repaired
+ * by the time the comparison runs and this should find nothing. It stays
+ * `outstanding` rather than becoming a diff for the one case the handover
+ * cannot cover — a usage row that disagrees about which project it belongs
+ * to, which the seed's guard deliberately will not move — because that heals
+ * the moment the row is corrected and must not latch. A head AHEAD of the
+ * legacy count is a budget that grew back, which nothing legitimate
+ * produces, so that is the named diff.
  *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the

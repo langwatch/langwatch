@@ -77,6 +77,8 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
         });
 
         expect(executeRaw).toHaveBeenCalledTimes(2);
+        // Both chunks, or a statement could drop rows and still count right.
+        expect(boundValues(executeRaw, 0)).toHaveLength(5_000 * 4);
         expect(boundValues(executeRaw, 1)).toHaveLength(1 * 4);
       });
 
@@ -89,6 +91,42 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
         });
 
         expect(executeRaw).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the seeded budgets are read back", () => {
+      /** @scenario "A pass is not limited by how many share links an organization has" */
+      it("reads them for the organization, never one parameter per link", async () => {
+        // Postgres binds at most 65535 parameters in a statement, so naming
+        // every grant fails outright at exactly the size where this migration
+        // is hardest - and only once the organization has heads to compare,
+        // never on the empty first pass that would have shown it.
+        const grantFindMany = vi.fn().mockResolvedValue(
+          Array.from({ length: 70_000 }, (_, index) => ({
+            id: `share_${index}`,
+            source: "migration",
+            token: null,
+            resourceKind: "trace",
+            scopeId: "trace_1",
+            projectId: "project_1",
+            principalType: "ANYONE",
+            principalId: null,
+            expiresAt: null,
+            maxViews: null,
+          })),
+        );
+        const usageFindMany = vi.fn().mockResolvedValue([]);
+        const repository = new PrismaAuthzMigrationRepository({
+          grant: { findMany: grantFindMany },
+          grantUsage: { findMany: usageFindMany },
+        } as never);
+
+        await repository.findResourceGrantRows({ organizationId: ORG });
+
+        expect(usageFindMany).toHaveBeenCalledWith({
+          where: { organizationId: ORG },
+          select: { grantId: true, viewCount: true },
+        });
       });
     });
 

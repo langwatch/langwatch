@@ -520,8 +520,18 @@ export class PrismaAuthzMigrationRepository
     // The view budget lives on its own table (decision 22), so the proof's
     // "field for field" needs a second read to see it. No usage row means no
     // view has been counted, which is exactly zero.
+    //
+    // Read BY ORGANIZATION rather than by naming every grant. `GrantUsage` is
+    // organization-indexed and scoped to one organization, so both spellings
+    // select the same budgets - but naming them binds a parameter per grant,
+    // and Postgres accepts at most 65535 of those in a statement. An
+    // organization with 428k share links has that many resource grants, so
+    // the named spelling failed outright at exactly the size where this
+    // migration is hardest, and only once the organization had heads to
+    // compare - never on the empty first pass that would have shown it. Any
+    // budget the rows do not claim is free: the lookup below is by id.
     const usages = await this.prisma.grantUsage.findMany({
-      where: { organizationId, grantId: { in: rows.map((row) => row.id) } },
+      where: { organizationId },
       select: { grantId: true, viewCount: true },
     });
     const viewCounts = new Map(
