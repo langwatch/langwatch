@@ -36,6 +36,7 @@
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createHash } from "crypto";
 import { PROVENANCE_ATTR_SOURCE } from "../ingestKeyProvenance.utils";
+import { TERMINAL_MESSAGE_STATUSES } from "./databricksGenie.puller";
 import type { NormalizedPullEvent } from "./pullerAdapter";
 
 /** Root span (the turn itself, `llm`-typed so the estimator runs). */
@@ -233,7 +234,7 @@ export function mapGenieEventsToTraceRequest(
 ): IExportTraceServiceRequest | null {
   const spans = events
     .filter((event) => event.action === GENIE_QUERY_ACTION)
-    .filter((event) => !isKnownInFlight(event))
+    .filter((event) => isSettledForRouting(event))
     .flatMap((event) => mapMessage(event, origin));
   if (spans.length === 0) return null;
   return {
@@ -274,34 +275,27 @@ interface GenieMessageFrame {
 }
 
 /**
- * Genie's non-terminal message lifecycle statuses — a message a sweep caught
- * mid-answer. These must NOT be routed: the trace pipeline dedups spans by
- * `tenant:traceId:spanId` and keeps the FIRST write, so routing a mid-flight
- * capture pins an answerless, errored trace that the completed re-send (same
- * deterministic ids, watermark re-read) can never repair. Skipping costs
- * nothing — the 5-minute watermark lag re-reads the message on the next sweep,
- * after it has settled. Observed live: a message swept during ASKING_AI stayed
- * "[Genie message ASKING_AI — no answer recorded]" forever while the audit row
- * updated to COMPLETED.
+ * Only settled messages are routed — a message a sweep caught mid-answer must
+ * NOT be: the trace pipeline dedups spans by `tenant:traceId:spanId` and keeps
+ * the FIRST write, so routing a mid-flight capture pins an answerless, errored
+ * trace that the completed re-send (same deterministic ids) can never repair.
+ * Observed live: a message swept during ASKING_AI stayed "[Genie message
+ * ASKING_AI — no answer recorded]" forever while the audit row updated.
  *
- * Unknown statuses are still routed with the failure marker (Decision 13's
- * defensive mapping): an unrecognised status is more likely a new terminal
- * state than a new in-flight one, and skipping it forever would silently drop
- * the message from the trace sink.
+ * "Settled" is the puller's call, not a second list here: it owns
+ * `TERMINAL_MESSAGE_STATUSES` and — for the same lose-the-record reason —
+ * holds the watermark on unsettled messages for up to an hour, so a skipped
+ * message keeps getting re-read until it settles. Its polarity applies too: an
+ * UNRECOGNISED non-empty status counts as in-flight, because being wrong that
+ * way costs a re-read where routing it costs a permanently wrong trace. A
+ * message with no status at all is routed as it stands (Decision 13's failure
+ * marker) — the puller likewise never holds the watermark for it, so a skip
+ * here would drop it from the trace sink outright.
  */
-const GENIE_IN_FLIGHT_STATUSES = new Set([
-  "SUBMITTED",
-  "FETCHING_METADATA",
-  "FILTERING_CONTEXT",
-  "ASKING_AI",
-  "PENDING_WAREHOUSE",
-  "EXECUTING_QUERY",
-]);
-
-function isKnownInFlight(event: NormalizedPullEvent): boolean {
+function isSettledForRouting(event: NormalizedPullEvent): boolean {
   const payload = parsePayload(event);
   const status = (payload.status ?? extraString(event, "status") ?? "").trim();
-  return GENIE_IN_FLIGHT_STATUSES.has(status);
+  return status === "" || TERMINAL_MESSAGE_STATUSES.has(status);
 }
 
 function frameOf(

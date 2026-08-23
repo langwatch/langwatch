@@ -343,11 +343,18 @@ describe("given a message a sweep caught mid-answer", () => {
     expect(request).not.toBeNull();
   });
 
-  it("still routes an unknown status with the failure marker (Decision 13) — more likely a new terminal state than a new in-flight one", () => {
+  it("treats an unrecognised status as still in flight — the puller's polarity: wrong that way costs a re-read, routing it costs a permanently wrong trace", () => {
     const unknown = genieEvent(
       completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
     );
-    const request = mapGenieEventsToTraceRequest([unknown], ORIGIN);
+    expect(mapGenieEventsToTraceRequest([unknown], ORIGIN)).toBeNull();
+  });
+
+  it("routes a message with no status as it stands — the puller never holds the watermark for it, so skipping would drop it outright", () => {
+    const statusless = genieEvent(
+      completedMessage({ status: undefined, attachments: [] }),
+    );
+    const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
     expect(request).not.toBeNull();
   });
 });
