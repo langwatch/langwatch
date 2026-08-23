@@ -25,6 +25,55 @@ export interface ConversationState {
   settle: (args: { assistantId: string | null; content: string }) => void;
 }
 
+/**
+ * The two ways the conversation is written, over one ref of what it holds.
+ *
+ * The ref is what makes them safe: each computes its next value from it and
+ * then sets state, rather than computing inside a `setMessages` updater. React
+ * requires updaters to be pure, and these writes persist — under React 19's
+ * Strict Mode the updater runs twice in development, and concurrent rendering
+ * may replay it, so the persist call fired more than once per change. It is
+ * idempotent today; this stops it depending on that.
+ */
+function useMessageWriters({
+  setMessages,
+  initialMessages,
+  onMessagesChange,
+}: {
+  setMessages: (messages: PlaygroundMessage[]) => void;
+  initialMessages: PlaygroundMessage[];
+  onMessagesChange: (messages: PlaygroundMessage[]) => void;
+}) {
+  const messagesRef = useRef<PlaygroundMessage[]>(initialMessages);
+
+  const write = useCallback(
+    (
+      next: PlaygroundMessage[],
+      { shouldPersist }: { shouldPersist: boolean },
+    ) => {
+      messagesRef.current = next;
+      setMessages(next);
+      if (shouldPersist) onMessagesChange(next);
+    },
+    [onMessagesChange, setMessages],
+  );
+
+  /** Replaces the conversation and persists it. */
+  const commit = useCallback(
+    (next: PlaygroundMessage[]) => write(next, { shouldPersist: true }),
+    [write],
+  );
+
+  /** Updates it without persisting — for a reply still arriving. */
+  const update = useCallback(
+    (updater: (current: PlaygroundMessage[]) => PlaygroundMessage[]) =>
+      write(updater(messagesRef.current), { shouldPersist: false }),
+    [write],
+  );
+
+  return { messagesRef, commit, update };
+}
+
 export function useConversationState({
   initialMessages,
   onMessagesChange,
@@ -36,37 +85,11 @@ export function useConversationState({
     useState<PlaygroundMessage[]>(initialMessages);
   const [errors, setErrors] = useState<Record<string, ParsedLLMError>>({});
 
-  /**
-   * The current conversation, readable from an event handler.
-   *
-   * Every write below computes its next value from this ref and then sets
-   * state, rather than computing inside a `setMessages` updater. React
-   * requires updaters to be pure, and these writes persist — under React 19's
-   * Strict Mode the updater is invoked twice in development, and concurrent
-   * rendering may replay it, so the persist call fired more than once per
-   * change. It is idempotent today; this stops it depending on that.
-   */
-  const messagesRef = useRef<PlaygroundMessage[]>(initialMessages);
-
-  const write = useCallback(
-    (next: PlaygroundMessage[], { persist }: { persist: boolean }) => {
-      messagesRef.current = next;
-      setMessages(next);
-      if (persist) onMessagesChange(next);
-    },
-    [onMessagesChange],
-  );
-
-  const commit = useCallback(
-    (next: PlaygroundMessage[]) => write(next, { persist: true }),
-    [write],
-  );
-
-  const update = useCallback(
-    (updater: (current: PlaygroundMessage[]) => PlaygroundMessage[]) =>
-      write(updater(messagesRef.current), { persist: false }),
-    [write],
-  );
+  const { messagesRef, commit, update } = useMessageWriters({
+    setMessages,
+    initialMessages,
+    onMessagesChange,
+  });
 
   const recordFailure = useCallback((id: string, error: ParsedLLMError) => {
     setErrors((current) => ({ ...current, [id]: error }));

@@ -34,6 +34,19 @@ export interface PromptRuntimeVariable {
   value?: unknown;
 }
 
+/**
+ * Whether a message is one of the model's instructions rather than part of the
+ * conversation.
+ *
+ * `developer` is OpenAI's Responses-dialect spelling of `system` and is treated
+ * as one everywhere else, so it has to be excluded here too: the instructions
+ * come from the prompt the author wrote, and a turn arriving in the request
+ * body must not be able to add to them.
+ */
+function isInstructionRole(role: ChatMessage["role"]): boolean {
+  return role === "system" || role === "developer";
+}
+
 /** A conversation turn as the playground holds it. */
 export interface PromptChatTurn {
   /**
@@ -89,7 +102,7 @@ export function resolvePromptInputs({
   variables: PromptRuntimeVariable[];
 }): { messagesHistory: ChatMessage[]; inputs: Record<string, unknown> } {
   const formMsgs = (formValues.version.configData.messages ?? []).filter(
-    (m) => m.role !== "system",
+    (m) => !isInstructionRole(m.role),
   );
 
   const lastLiveUserMsg = [...messages]
@@ -124,7 +137,7 @@ export function resolvePromptInputs({
       : [...formMsgs, ...liveMessagesForHistory]
   )
     .map((message) => ({ role: message.role, content: message.content }))
-    .filter((message) => message.role !== "system");
+    .filter((message) => !isInstructionRole(message.role));
 
   const inputs = (variables ?? []).reduce<Record<string, unknown>>((acc, v) => {
     if (v.value !== undefined) acc[v.identifier] = v.value;
@@ -180,7 +193,7 @@ function buildNodeData({
       {
         identifier: "messages",
         type: "chat_messages",
-        value: messagesHistory.filter((m) => m.role !== "system"),
+        value: messagesHistory.filter((m) => !isInstructionRole(m.role)),
       },
       {
         identifier: "demonstrations",
