@@ -23,7 +23,10 @@
  * hot trace cannot starve its neighbours (see specs/event-sourcing/tenant-soft-cap.feature).
  */
 
-import { clampShardCount, shardIndexFor } from "./commandShardKey";
+import {
+  clampShardCount,
+  shardIndexFor,
+} from "../../../pipeline/commandShardKey";
 
 /**
  * Upper bound on the shard count. A hot trace never needs more parallelism than

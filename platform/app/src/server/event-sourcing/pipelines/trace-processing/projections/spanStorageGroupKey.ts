@@ -29,7 +29,7 @@
  */
 
 import type { Event } from "../../../domain/types";
-import { shardIndexFor } from "../commands/commandShardKey";
+import { shardIndexFor } from "../../../pipeline/commandShardKey";
 
 /**
  * Lanes per tenant. Matches `MAX_SPAN_SHARD_COUNT` on the recordSpan command
