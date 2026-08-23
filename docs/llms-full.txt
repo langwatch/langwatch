@@ -26502,6 +26502,265 @@ results of your custom evaluator on the current trace or span by using the `.add
 
 ---
 
+# FILE: ./integration/typescript/integrations/tanstack-ai.mdx
+
+---
+title: TanStack AI
+description: Send TanStack AI's OpenTelemetry spans to LangWatch for traces, token counts, tool calls, and per-model timings on every chat() call.
+sidebarTitle: TanStack AI
+keywords: tanstack ai, tanstack, langwatch, opentelemetry, otel middleware, tracing, observability, typescript, gen_ai semantic conventions
+---
+
+<div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
+  <div>
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
+    <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
+  </a>
+  </div>
+
+  <div>
+  <a href="https://www.npmjs.com/package/langwatch" target="_blank">
+    <img src="https://img.shields.io/npm/v/langwatch?color=007EC6" noZoom alt="LangWatch TypeScript SDK version" />
+  </a>
+  </div>
+</div>
+
+The LangWatch library integrates your TypeScript application with LangWatch. The library syncs the messages in the background, so it doesn't intercept or block your LLM calls.
+
+<LLMsTxtProtip />
+
+<Prerequisites />
+
+## Basic Concepts
+
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
+  - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
+
+
+TanStack AI ships its own OpenTelemetry middleware,
+[`otelMiddleware`](https://tanstack.com/ai/latest/docs/advanced/otel), which emits spans that follow the
+[OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). LangWatch reads those
+conventions directly, so there is no TanStack-specific exporter to install: set up observability once, then hand the
+tracer to the middleware.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm i langwatch @tanstack/ai @tanstack/ai-openai @opentelemetry/api
+```
+
+```bash pnpm
+pnpm add langwatch @tanstack/ai @tanstack/ai-openai @opentelemetry/api
+```
+
+```bash yarn
+yarn add langwatch @tanstack/ai @tanstack/ai-openai @opentelemetry/api
+```
+
+```bash bun
+bun add langwatch @tanstack/ai @tanstack/ai-openai @opentelemetry/api
+```
+</CodeGroup>
+
+`@opentelemetry/api` is an optional peer dependency of `@tanstack/ai` — the middleware lives on the
+`@tanstack/ai/middlewares/otel` subpath, so importing `@tanstack/ai` on its own never requires it.
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+`setupObservability` starts the OpenTelemetry SDK and registers it globally, which is what makes
+`trace.getTracer(...)` return a tracer that exports to LangWatch. Call it before your first `chat()`:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { chat } from "@tanstack/ai";
+import { otelMiddleware } from "@tanstack/ai/middlewares/otel";
+import { openaiText } from "@tanstack/ai-openai";
+import { trace } from "@opentelemetry/api";
+
+setupObservability({ serviceName: "<project_name>" });
+
+const otel = otelMiddleware({
+  tracer: trace.getTracer("<project_name>"),
+  onSpanEnd: (info, span) => {
+    // The root span repeats the token counts of the model calls beneath it.
+    // Mark it so the trace total counts them once. See "Counting tokens once".
+    if (info.kind === "chat") {
+      span.setAttribute("langwatch.reserved.skip_token_accumulation", "true");
+    }
+  },
+});
+
+const answer = await chat({
+  adapter: openaiText("gpt-5-mini"),
+  messages: [{ role: "user", content: "Hey, tell me a joke" }],
+  middleware: [otel],
+  stream: false,
+});
+
+console.log(answer);
+```
+
+## What lands in LangWatch
+
+Every `chat()` call produces a root span, one child span per provider model call, and one grandchild span per tool
+call:
+
+```text
+chat gpt-5-mini              (root)
+├── chat gpt-5-mini #0       (model call)
+│   ├── execute_tool get_weather
+│   └── execute_tool get_time
+└── chat gpt-5-mini #1       (model call)
+```
+
+LangWatch reads the GenAI attributes off those spans, so each trace arrives with:
+
+| What you see | Where it comes from |
+|---|---|
+| Provider and model | `gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.model` |
+| Input and output tokens | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
+| Cached and reasoning tokens | `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.reasoning.output_tokens`, when the provider reports them |
+| Finish reason | `gen_ai.response.finish_reasons` |
+| Tool calls | `gen_ai.tool.name`, `gen_ai.tool.call.id`, one span each |
+| Cost | Calculated by LangWatch from the model and the token counts |
+
+The agent loop stays legible: model calls are numbered `#0`, `#1`, and so on in the order they were made, and each
+tool call sits under the model call that asked for it.
+
+## Counting tokens once
+
+TanStack AI reports token usage twice on purpose — once per model call, and once more on the root span as a rollup of
+the whole `chat()` call. LangWatch sums token usage across every span in a trace, so leaving both in place reports
+roughly double the tokens and double the cost.
+
+Marking the root span keeps the per-span detail intact while the trace total counts each token once:
+
+```typescript
+const otel = otelMiddleware({
+  tracer: trace.getTracer("<project_name>"),
+  onSpanEnd: (info, span) => {
+    if (info.kind === "chat") {
+      span.setAttribute("langwatch.reserved.skip_token_accumulation", "true");
+    }
+  },
+});
+```
+
+`info.kind` is `"chat"` for the root span, `"iteration"` for a model call, `"tool"` for a tool call, and
+`"generation"` for a media call, so the rollup is the only span this touches.
+
+## Capturing prompts and completions
+
+The middleware records only metadata by default. `captureContent: true` adds the prompts and completions, and
+`redact` runs over every string before anything is written — if it throws, the middleware writes
+`"[redaction_failed]"` rather than falling back to the raw text:
+
+```typescript
+otelMiddleware({
+  tracer: trace.getTracer("<project_name>"),
+  captureContent: true,
+  redact: (text) => text.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[redacted]"),
+});
+```
+
+TanStack AI writes that content as OpenTelemetry span *events*. LangWatch reads a span's input and output from span
+*attributes*, so to see the conversation in the message view, wrap the call in a LangWatch span and set them there:
+
+```typescript
+import { getLangWatchTracer } from "langwatch";
+import type { ModelMessage } from "@tanstack/ai";
+
+const tracer = getLangWatchTracer("<project_name>");
+
+async function ask(messages: ModelMessage[]) {
+  return await tracer.withActiveSpan("ask", async (span) => {
+    span.setType("llm");
+    span.setInput("chat_messages", messages);
+
+    const answer = await chat({
+      adapter: openaiText("gpt-5-mini"),
+      messages,
+      middleware: [otel],
+      stream: false,
+    });
+
+    span.setOutput("text", answer);
+    return answer;
+  });
+}
+```
+
+The TanStack spans nest underneath, so you keep the model calls, tool calls, and token counts alongside the
+conversation.
+
+## Metadata
+
+`attributeEnricher` runs once per span, which makes it the place to attach the identifiers LangWatch groups and
+filters on:
+
+```typescript
+otelMiddleware({
+  tracer: trace.getTracer("<project_name>"),
+  attributeEnricher: () => ({
+    "gen_ai.conversation.id": currentConversationId(),
+    "langwatch.user.id": currentUserId(),
+    "langwatch.customer.id": currentTenantId(),
+    "langwatch.labels": JSON.stringify(["checkout", "beta"]),
+  }),
+});
+```
+
+`gen_ai.conversation.id` is what groups traces into a conversation. See
+[Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata) for the full set of
+attribute names.
+
+## Metrics
+
+When you pass a `Meter` as well as a `Tracer`, the middleware records two GenAI histograms:
+`gen_ai.client.operation.duration`, once per `chat()` call, and `gen_ai.client.token.usage`, once per model call.
+
+`setupObservability` configures traces, not metrics, so these need a metric reader of your own. Point it at
+`https://app.langwatch.ai/api/otel/v1/metrics` to send them to LangWatch, or at whichever metrics backend you already
+run — the traces above are what drive the LangWatch dashboard either way.
+
+## Media generation
+
+The same middleware value works for `generateImage`, `generateVideo`, `generateAudio`, `generateSpeech`, and
+`generateTranscription`. Each of those is a single request, so it produces one span rather than a tree:
+
+```typescript
+import { generateImage } from "@tanstack/ai";
+import { openaiImage } from "@tanstack/ai-openai";
+
+const image = await generateImage({
+  adapter: openaiImage("gpt-image-2"),
+  prompt: "A serene mountain landscape at sunset",
+  middleware: [otel],
+});
+```
+
+The span carries the provider, the model, and the same usage attributes, tagged with the activity it ran —
+`image_generation`, `video_generation`, `audio_generation`, `text_to_speech`, or `transcription`.
+
+## Related
+
+- [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) - How LangWatch consumes OpenTelemetry traces from any language
+- [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations) - Group traces into threads
+- [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Capture retrieval data from tools and retrievers
+
+---
+
 # FILE: ./integration/typescript/integrations/vercel-ai-sdk.mdx
 
 ---

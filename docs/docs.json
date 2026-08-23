@@ -447,6 +447,7 @@
               "integration/python/integrations/open-ai-agents",
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
+              "integration/typescript/integrations/tanstack-ai",
               "integration/python/integrations/dspy",
               "integration/python/integrations/llamaindex",
               "integration/python/integrations/haystack",
