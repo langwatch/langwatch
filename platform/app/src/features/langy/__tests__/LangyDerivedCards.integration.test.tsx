@@ -229,6 +229,38 @@ describe("given an open question card", () => {
   });
 });
 
+describe("given a question the browser streamed and nothing stamped", () => {
+  const FENCED_QUESTION = {
+    type: "text",
+    text: 'One thing I need from you:\n\n```langy-card\n{"kind":"choices","blockId":"q1","question":"Which agent should this scenario run against?","options":[{"id":"staging","label":"Staging agent"},{"id":"prod","label":"Production agent"}]}\n```',
+  };
+
+  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
+  it("is answerable, because the timeline reads the same fences the panel draws", () => {
+    const message = assistantMessage([FENCED_QUESTION]);
+    const onChoiceSelect = vi.fn();
+    renderMessage(message, {
+      choicesTimeline: langyChoicesTimeline([message]),
+      onChoiceSelect,
+    });
+
+    fireEvent.click(screen.getByText("Staging agent"));
+    expect(onChoiceSelect.mock.calls[0]?.[0]).toMatchObject({
+      selection: { blockId: "q1", optionIds: ["staging"] },
+    });
+  });
+
+  it("stays closed once the message is the durable record's", () => {
+    const message = assistantMessage([FENCED_QUESTION], recorded);
+    renderMessage(message, {
+      choicesTimeline: langyChoicesTimeline([message]),
+      onChoiceSelect: vi.fn(),
+    });
+
+    expect(screen.queryByText("Staging agent")).toBeNull();
+  });
+});
+
 describe("given an answered question", () => {
   it("renders locked with the choice marked, options unclickable", () => {
     const message = assistantMessage([choicesPart("q1")]);
