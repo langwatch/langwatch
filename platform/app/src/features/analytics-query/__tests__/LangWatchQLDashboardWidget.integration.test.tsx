@@ -224,4 +224,86 @@ describe("the LangWatchQL dashboard widget", () => {
       expect(screen.getByTestId("widget-chart")).not.toHaveTextContent("stale");
     });
   });
+
+  describe("when the saved SQL fails with a failure the platform can name", () => {
+    /** @scenario "A widget names a run refusal instead of the generic card" */
+    it("renders the shared registry's copy for the error code", async () => {
+      mountWidget();
+
+      await waitFor(() => expect(mutateMock).toHaveBeenCalled());
+
+      // The tRPC envelope a handled error rides in (`data.error`), exactly as
+      // `handledErrorMiddleware` serialises it — the same payload the
+      // workbench's result pane reads. The widget must resolve it through the
+      // shared presentation registry, not a mapping of its own.
+      mutateMock.mock.calls[0]?.[1]?.onError?.({
+        message: "lwql_unparseable",
+        data: {
+          error: {
+            code: "lwql_unparseable",
+            httpStatus: 400,
+            fault: "customer",
+          },
+        },
+      });
+
+      const alert = await screen.findByRole("alert");
+      // The registry's copy for `lwql_unparseable` — the words the workbench
+      // shows for the same refusal.
+      expect(alert).toHaveTextContent("This query couldn't be read");
+      expect(alert).toHaveTextContent("Check the SQL syntax and try again.");
+      // The wire message is the code slug and must never be the copy shown.
+      expect(alert).not.toHaveTextContent(/^lwql_unparseable$/);
+    });
+  });
+
+  describe("when the run fails with an error nobody can name", () => {
+    /** @scenario "A widget falls back to the generic card only for unknown failures" */
+    it("renders the generic treatment under the widget's own headline", async () => {
+      mountWidget();
+
+      await waitFor(() => expect(mutateMock).toHaveBeenCalled());
+
+      // A plain error with no handled payload: the correct degraded outcome.
+      mutateMock.mock.calls[0]?.[1]?.onError?.(new Error("socket hang up"));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Couldn't run this chart's query");
+      // Nothing internal leaks into the card.
+      expect(alert).not.toHaveTextContent("socket hang up");
+    });
+  });
+
+  describe("when a stale request's failure resolves after a newer answer", () => {
+    it("keeps the newer answer rather than flipping to the stale error", async () => {
+      const { rerender } = mountWidget({ granularitySeconds: 1 });
+
+      await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <LangWatchQLDashboardWidget
+            chartId="chart_1"
+            projectId="project_1"
+            name="p95 latency"
+            granularitySeconds={3600}
+          />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(2));
+
+      mutateMock.mock.calls[1]?.[1]?.onSuccess?.(
+        answer({ rows: [{ value: "newer" }], granularitySeconds: 3600 }),
+      );
+      await screen.findByTestId("widget-chart");
+
+      // The abandoned request settles last, as a failure. The card must not
+      // replace a fresh answer with an error for a period it already left.
+      mutateMock.mock.calls[0]?.[1]?.onError?.(new Error("stale failure"));
+
+      expect(screen.getByTestId("widget-chart")).toHaveTextContent("newer");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
 });

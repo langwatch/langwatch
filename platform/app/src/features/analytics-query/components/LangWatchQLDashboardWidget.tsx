@@ -29,16 +29,18 @@
  * says what it got.
  *
  * @see ./LazyLangWatchQLWidgetChart — the Vega boundary this mounts
+ * @see ../hooks/useLangWatchQLWidgetRun — when to run, and which response wins
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 
+import { useLangWatchQLWidgetRun } from "../hooks/useLangWatchQLWidgetRun";
 import { widgetCoarsenedNotice } from "../logic/widgetCoarsenedNotice";
 import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
 
@@ -77,83 +79,18 @@ export function LangWatchQLDashboardWidget({
     { enabled: !!projectId && !!chartId },
   );
 
-  const run = api.analytics.savedWorkbenchCharts.run.useMutation();
-
   // Epoch milliseconds rather than the `Date` objects `usePeriodSelector`
   // hands back: two `Date`s for the same instant are never `Object.is`-equal,
   // so a dependency built on them would re-run the query on every render.
-  const start = period.startDate.getTime();
-  const end = period.endDate.getTime();
-
-  const step = granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS;
-
-  // `run` is a mutation because executing SQL is not a cacheable read, so the
-  // widget drives it from an effect rather than getting react-query's own
-  // fetch-on-change. The ref carries the last request actually issued so that
-  // a re-render with the same period and step does not re-execute.
-  const { mutate } = run;
-  const lastRequest = useRef<string | null>(null);
-  const requestKey = `${chartId}:${start}:${end}:${step}`;
-
-  // Which request the rendered answer belongs to.
-  //
-  // A period drag fires a run per intermediate window, and nothing orders the
-  // responses: a query over a narrow window can resolve after one over a wide
-  // window issued later, leaving the card showing an answer for a period the
-  // dashboard is no longer on — with no spinner and nothing on screen saying
-  // so. Each issued request takes the next sequence number, and a resolution
-  // is drawn only when it carries the latest one, so a straggler is dropped
-  // rather than winning by arriving last.
-  const issuedRequests = useRef(0);
-  const [answer, setAnswer] = useState<{
-    readonly sequence: number;
-    // Derived from the mutation rather than re-declared, so the widget cannot
-    // drift from the shape the procedure actually returns.
-    readonly result: NonNullable<typeof run.data>;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!chartQuery.data) return;
-    if (lastRequest.current === requestKey) return;
-    lastRequest.current = requestKey;
-
-    issuedRequests.current += 1;
-    const sequence = issuedRequests.current;
-
-    mutate(
-      {
-        id: chartId,
-        projectId,
-        timeWindow: { start, end },
-        granularitySeconds: step,
-        // The whole reason this surface differs from the workbench: see the
-        // module docblock.
-        onBudgetOverflow: "coarsen",
-      },
-      {
-        onSuccess: (data) => {
-          // Strictly-newer rather than equal, so an answer already on screen
-          // is never replaced by an older one that resolved late.
-          setAnswer((current) =>
-            current !== null && current.sequence > sequence
-              ? current
-              : { sequence, result: data },
-          );
-        },
-      },
-    );
-  }, [
-    chartQuery.data,
-    requestKey,
-    mutate,
+  const { result, error } = useLangWatchQLWidgetRun({
     chartId,
     projectId,
-    start,
-    end,
-    step,
-  ]);
-
-  const result = answer?.result;
+    chartLoaded: !!chartQuery.data,
+    start: period.startDate.getTime(),
+    end: period.endDate.getTime(),
+    granularitySeconds:
+      granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+  });
 
   const columns = useMemo(
     () => (result?.columns ?? []) as readonly LangWatchQLDatasetColumn[],
@@ -164,8 +101,18 @@ export function LangWatchQLDashboardWidget({
     return <HandledErrorAlert error={chartQuery.error} />;
   }
 
-  if (run.error) {
-    return <HandledErrorAlert error={run.error} />;
+  // A member's own SQL failing is a knowable failure: the run surfaces it as
+  // a handled error whose code the shared presentation registry turns into
+  // copy — the same words the workbench shows for the same refusal. Only a
+  // failure the platform genuinely cannot name falls back to the generic
+  // treatment, under a headline that at least says what the card was doing.
+  if (error) {
+    return (
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't run this chart's query"
+      />
+    );
   }
 
   if (!chartQuery.data || !result) {
@@ -177,6 +124,28 @@ export function LangWatchQLDashboardWidget({
     );
   }
 
+  return (
+    <WidgetBody
+      result={result}
+      columns={columns}
+      vegaLiteSpec={chartQuery.data.definition.vegaLiteSpec}
+      name={name}
+    />
+  );
+}
+
+/** The loaded card: the coarsening notice, then the chart itself. */
+function WidgetBody({
+  result,
+  columns,
+  vegaLiteSpec,
+  name,
+}: {
+  result: NonNullable<ReturnType<typeof useLangWatchQLWidgetRun>["result"]>;
+  columns: readonly LangWatchQLDatasetColumn[];
+  vegaLiteSpec: Record<string, unknown> | undefined;
+  name: string;
+}) {
   const coarsenedFrom = result.coarsenedFromSeconds;
 
   return (
@@ -200,9 +169,7 @@ export function LangWatchQLDashboardWidget({
         <LazyLangWatchQLWidgetChart
           columns={columns}
           rows={result.rows}
-          {...(chartQuery.data.definition.vegaLiteSpec
-            ? { vegaLiteSpec: chartQuery.data.definition.vegaLiteSpec }
-            : {})}
+          {...(vegaLiteSpec ? { vegaLiteSpec } : {})}
           ariaLabel={name}
         />
       </Box>

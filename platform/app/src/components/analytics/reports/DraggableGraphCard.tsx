@@ -76,9 +76,6 @@ export function DraggableGraphCard({
     gridRow: `span ${graph.rowSpan}`,
   };
 
-  // Calculate height based on rowSpan
-  const graphHeight = graph.rowSpan === 2 ? 600 : 300;
-
   const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
 
   return (
@@ -115,34 +112,53 @@ export function DraggableGraphCard({
           />
 
           <Box flex={1} minHeight={0}>
-            {isWorkbenchChart ? (
-              <LangWatchQLDashboardWidget
-                key={graph.id}
-                chartId={graph.id}
-                projectId={projectId}
-                {...(graph.granularitySeconds == null
-                  ? {}
-                  : { granularitySeconds: graph.granularitySeconds })}
-                name={graph.name}
-              />
-            ) : (
-              <CustomGraph
-                key={graph.id}
-                input={{
-                  ...(graph.graph as CustomGraphInput),
-                  height: graphHeight,
-                }}
-                filters={
-                  graph.filters as
-                    | Record<FilterField, string[] | Record<string, string[]>>
-                    | undefined
-                }
-              />
-            )}
+            <GraphCardChartArea graph={graph} projectId={projectId} />
           </Box>
         </Card.Body>
       </Card.Root>
     </Box>
+  );
+}
+
+/**
+ * The card's chart, routed by the row's kind: a placed workbench chart mounts
+ * the live LangWatchQL widget; every other row is a builder graph.
+ */
+function GraphCardChartArea({
+  graph,
+  projectId,
+}: {
+  graph: GraphData;
+  projectId: string;
+}) {
+  if (graph.kind === WORKBENCH_SQL_CHART_KIND) {
+    return (
+      <LangWatchQLDashboardWidget
+        key={graph.id}
+        chartId={graph.id}
+        projectId={projectId}
+        {...(graph.granularitySeconds == null
+          ? {}
+          : { granularitySeconds: graph.granularitySeconds })}
+        name={graph.name}
+      />
+    );
+  }
+
+  return (
+    <CustomGraph
+      key={graph.id}
+      input={{
+        ...(graph.graph as CustomGraphInput),
+        // Height follows the card's row span.
+        height: graph.rowSpan === 2 ? 600 : 300,
+      }}
+      filters={
+        graph.filters as
+          | Record<FilterField, string[] | Record<string, string[]>>
+          | undefined
+      }
+    />
   );
 }
 
