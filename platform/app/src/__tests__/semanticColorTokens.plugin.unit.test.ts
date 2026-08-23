@@ -50,17 +50,35 @@ function lint(source: string): Diagnostic[] {
         "--reporter=json",
         `src/__probe__/${name}`,
       ],
-      { cwd: APP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      { cwd: APP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
   } catch (error) {
     // Biome exits non-zero precisely when it finds violations, which is the
     // case most of these tests are asserting. The payload is still on stdout.
-    stdout = (error as { stdout?: string }).stdout ?? "";
+    const failure = error as { stdout?: string; stderr?: string };
+    stdout = failure.stdout ?? "";
+    // An empty stdout means Biome never got as far as reporting — a missing
+    // binary, an unparseable config, a plugin that failed to load. Falling back
+    // to "no diagnostics" there would make every negative assertion below pass
+    // without the rule having run at all, which is the one outcome these tests
+    // must never report as green.
+    if (!stdout.trim()) {
+      throw new Error(
+        `biome produced no report, so the rule was never evaluated: ${
+          failure.stderr?.trim() || String(error)
+        }`,
+      );
+    }
   }
 
-  const parsed = JSON.parse(stdout || '{"diagnostics":[]}') as {
-    diagnostics: Diagnostic[];
+  const parsed = JSON.parse(stdout) as {
+    diagnostics?: Diagnostic[];
   };
+  if (!Array.isArray(parsed.diagnostics)) {
+    throw new Error(
+      `biome's report carried no diagnostics array, so the rule was never evaluated: ${stdout.slice(0, 200)}`,
+    );
+  }
   return parsed.diagnostics.filter((d) => d.category === "plugin");
 }
 
@@ -70,121 +88,163 @@ afterAll(() => {
 
 describe("semantic-color-tokens plugin", () => {
   describe("given a raw palette shade in a color prop", () => {
-    /** @scenario "A raw shade in a color prop is reported" */
-    it("reports it, and names the token that carries the same light value", () => {
-      const found = lint(`export const a = <Text color="gray.500" />;\n`);
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade in a color prop is reported" */
+      it("reports it, and names the token that carries the same light value", () => {
+        const found = lint(`export const a = <Text color="gray.500" />;\n`);
 
-      expect(found).toHaveLength(1);
-      expect(JSON.stringify(found[0])).toContain("fg.subtle");
+        expect(found).toHaveLength(1);
+        expect(JSON.stringify(found[0])).toContain("fg.subtle");
+      });
     });
   });
 
   describe("given a raw shade inside a brace expression", () => {
-    /** @scenario "A raw shade inside an expression is reported" */
-    it("reports it — a ternary hides the shade from a literal-only match", () => {
-      const found = lint(
-        `export const a = <Box bg={on ? "blue.500" : "transparent"} />;\n`,
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade inside an expression is reported" */
+      it("reports it — a ternary hides the shade from a literal-only match", () => {
+        const found = lint(
+          `export const a = <Box bg={on ? "blue.500" : "transparent"} />;\n`,
+        );
 
-      expect(found).toHaveLength(1);
+        expect(found).toHaveLength(1);
+      });
     });
   });
 
   describe("given a raw shade in a pseudo-state object", () => {
-    /** @scenario "A raw shade in a pseudo-state object is reported" */
-    it("reports it — _hover is an object, not a color prop", () => {
-      const found = lint(
-        `export const a = <Box _hover={{ bg: "gray.50" }} />;\n`,
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade in a pseudo-state object is reported" */
+      it("reports it — _hover is an object, not a color prop", () => {
+        const found = lint(
+          `export const a = <Box _hover={{ bg: "gray.50" }} />;\n`,
+        );
 
-      expect(found).toHaveLength(1);
-      expect(JSON.stringify(found[0])).toContain("bg.subtle");
+        expect(found).toHaveLength(1);
+        expect(JSON.stringify(found[0])).toContain("bg.subtle");
+      });
     });
   });
 
   describe("given a per-mode object that still names a raw shade", () => {
-    /** @scenario "A raw shade in a per-mode object is reported" */
-    it("reports it, because the token already carries both modes", () => {
-      const found = lint(
-        `export const a = <Box borderColor={{ base: "gray.200", _dark: "border" }} />;\n`,
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade in a per-mode object is reported" */
+      it("reports it, because the token already carries both modes", () => {
+        const found = lint(
+          `export const a = <Box borderColor={{ base: "gray.200", _dark: "border" }} />;\n`,
+        );
 
-      expect(found).toHaveLength(1);
+        expect(found).toHaveLength(1);
+      });
     });
   });
 
   describe("given semantic tokens", () => {
-    /** @scenario "A semantic token passes" */
-    it("reports nothing", () => {
-      const found = lint(
-        `export const a = <Text color="fg.muted" bg="bg.panel" borderColor="border" />;\n`,
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A semantic token passes" */
+      it("reports nothing", () => {
+        const found = lint(
+          `export const a = <Text color="fg.muted" bg="bg.panel" borderColor="border" />;\n`,
+        );
 
-      expect(found).toEqual([]);
+        expect(found).toEqual([]);
+      });
     });
   });
 
   describe("given a raw shade that is not in a color prop", () => {
-    /** @scenario "A value that is not a color prop passes" */
-    it("reports nothing — the rule anchors on the prop, not on every string", () => {
-      const found = lint(
-        `export const cta = { legacyCtaColor: "orange.700" };\n`,
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A value that is not a color prop passes" */
+      it("reports nothing — the rule anchors on the prop, not on every string", () => {
+        const found = lint(
+          `export const cta = { legacyCtaColor: "orange.700" };\n`,
+        );
 
-      expect(found).toEqual([]);
+        expect(found).toEqual([]);
+      });
     });
   });
 
   describe("given a deliberate fixed-color surface", () => {
-    /** @scenario "A deliberate fixed-color surface opts out with a reason" */
-    it("is silenced by a line-level suppression carrying its reason", () => {
-      const found = lint(
-        [
-          "export const a = (",
-          "  <Text",
-          "    // biome-ignore lint/plugin: fixed-gradient hero",
-          '    color="orange.700"',
-          "  />",
-          ");",
-          "",
-        ].join("\n"),
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A deliberate fixed-color surface opts out with a reason" */
+      it("is silenced by a line-level suppression carrying its reason", () => {
+        const found = lint(
+          [
+            "export const a = (",
+            "  <Text",
+            "    // biome-ignore lint/plugin: fixed-gradient hero",
+            '    color="orange.700"',
+            "  />",
+            ");",
+            "",
+          ].join("\n"),
+        );
 
-      expect(found).toEqual([]);
+        expect(found).toEqual([]);
+      });
     });
   });
 
   describe("given a file that defines or owns a palette", () => {
-    /** @scenario "A file that defines or owns a palette opts out wholesale" */
-    it("is silenced by a file-level suppression carrying its reason", () => {
-      const found = lint(
-        [
-          "// biome-ignore-all lint/plugin: defines the palette",
-          "",
-          'export const a = <Text color="gray.500" />;',
-          'export const b = <Text color="red.700" />;',
-          "",
-        ].join("\n"),
-      );
+    describe("when the source is linted", () => {
+      /** @scenario "A file that defines or owns a palette opts out wholesale" */
+      it("is silenced by a file-level suppression carrying its reason", () => {
+        const found = lint(
+          [
+            "// biome-ignore-all lint/plugin: defines the palette",
+            "",
+            'export const a = <Text color="gray.500" />;',
+            'export const b = <Text color="red.700" />;',
+            "",
+          ].join("\n"),
+        );
 
-      expect(found).toEqual([]);
+        expect(found).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a raw shade held in a single-quoted value", () => {
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade is reported whichever quote holds it" */
+      it("reports it — the quote is not what makes a shade a shade", () => {
+        const found = lint(`export const a = <Text color='gray.500' />;\n`);
+
+        expect(found).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given a raw shade held in a template literal", () => {
+    describe("when the source is linted", () => {
+      /** @scenario "A raw shade is reported whichever quote holds it" */
+      it("reports it — an uninterpolated template is still a literal", () => {
+        const found = lint(
+          "export const a = <Box _hover={{ bg: `red.500` }} />;\n",
+        );
+
+        expect(found).toHaveLength(1);
+      });
     });
   });
 
   describe("given the rule's own fixtures file", () => {
-    /** @scenario "The rule must still match its own fixtures" */
-    it("still matches every deliberate violation in it", () => {
-      const fixtures = join(
-        APP_ROOT,
-        "biome-plugins",
-        "__tests__",
-        "semantic-color-tokens.fixtures.tsx",
-      );
-      const found = lint(readFileSync(fixtures, "utf8"));
+    describe("when the source is linted", () => {
+      /** @scenario "The rule must still match its own fixtures" */
+      it("still matches every deliberate violation in it", () => {
+        const fixtures = join(
+          APP_ROOT,
+          "biome-plugins",
+          "__tests__",
+          "semantic-color-tokens.fixtures.tsx",
+        );
+        const found = lint(readFileSync(fixtures, "utf8"));
 
-      // The floor, not the exact count: adding a violation to the fixtures
-      // should not have to come back here and bump a number.
-      expect(found.length).toBeGreaterThanOrEqual(11);
+        // The floor, not the exact count: adding a violation to the fixtures
+        // should not have to come back here and bump a number.
+        expect(found.length).toBeGreaterThanOrEqual(11);
+      });
     });
   });
 });

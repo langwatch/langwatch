@@ -739,9 +739,7 @@ export function HomePageBanners({
                       flexShrink={0}
                       fontSize="11px"
                       fontWeight="600"
-                      /* A step deeper than orange.fg on light: over the white
-                         bloom the default reads brownish; dark keeps it. */
-                      color={{ base: "orange.fg", _dark: "orange.fg" }}
+                      color="orange.fg"
                     >
                       {slide.badge}
                     </chakra.span>

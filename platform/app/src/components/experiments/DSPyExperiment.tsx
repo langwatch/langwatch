@@ -1193,7 +1193,7 @@ export function DSPyRunsScoresChart({
   const getColor = (runId: string) => {
     const [name, number] = getColorForString("colors", runId).color.split(".");
     if (!name || !number) {
-      return getRawColorValue("bg.emphasized");
+      return getRawColorValue("gray.300");
     }
 
     return getRawColorValue(`${name}.${number}`);
@@ -1315,7 +1315,8 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("fg.muted")}
+                // biome-ignore lint/plugin: getRawColorValue resolves a concrete palette entry to a CSS string for recharts; a semantic token is not in its table and would resolve to the "pink" fallback.
+                fill={getRawColorValue("gray.700")}
                 fontSize="12px"
               />
             </ReferenceDot>

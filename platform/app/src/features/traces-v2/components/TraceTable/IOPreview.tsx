@@ -524,7 +524,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
   // and the sidebar legend feel like the same palette. Dark mode keeps
   // `*.fg` because against the dark canvas the solid step over-pops.
   const accent = isInput
-    ? "blue.solid"
+    ? { base: "blue.solid", _dark: "blue.fg" }
     : { base: "green.solid", _dark: "green.fg" };
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 

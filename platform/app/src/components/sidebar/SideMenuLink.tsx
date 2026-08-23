@@ -68,7 +68,7 @@ export const SideMenuItem = ({
     badgeNumber && badgeNumber > 0 ? (
       <Badge
         backgroundColor="green.solid"
-        color="white"
+        color="green.contrast"
         borderRadius="full"
         paddingX={1.5}
         fontSize="xs"

@@ -418,36 +418,46 @@ describe("EVALUATION_STATUS_COLORS", () => {
   // A raw palette shade (gray.400, red.600) is one fixed value, so a status dot
   // written that way reads correctly in one colour mode and disappears in the
   // other. Every entry has to be a semantic token, which carries both.
-  // Enforced repo-wide by cmd/semantictokens.
-  it("gives every status a semantic token rather than a raw palette shade", () => {
-    for (const [status, color] of Object.entries(EVALUATION_STATUS_COLORS)) {
-      expect(color, `${status} should not be a raw shade`).not.toMatch(
-        /\.\d{2,3}$/,
-      );
-    }
+  // Enforced repo-wide by biome-plugins/semantic-color-tokens.grit.
+  describe("given the status colour map", () => {
+    describe("when an entry is read", () => {
+      it("names a semantic token rather than a raw palette shade", () => {
+        for (const [status, color] of Object.entries(
+          EVALUATION_STATUS_COLORS,
+        )) {
+          expect(color, `${status} should not be a raw shade`).not.toMatch(
+            /\.\d{2,3}$/,
+          );
+        }
+      });
+
+      it("keeps error visually distinct from fail, so a broken evaluator does not read as a verdict", () => {
+        expect(EVALUATION_STATUS_COLORS.error).not.toBe(
+          EVALUATION_STATUS_COLORS.failed,
+        );
+      });
+
+      it("keeps skipped distinct from pending — one is a setup state, the other is in flight", () => {
+        expect(EVALUATION_STATUS_COLORS.skipped).not.toBe(
+          EVALUATION_STATUS_COLORS.pending,
+        );
+      });
+    });
   });
 
-  it("keeps error visually distinct from fail, so a broken evaluator does not read as a verdict", () => {
-    expect(EVALUATION_STATUS_COLORS.error).not.toBe(
-      EVALUATION_STATUS_COLORS.failed,
-    );
-  });
-
-  it("keeps skipped distinct from pending — one is a setup state, the other is in flight", () => {
-    expect(EVALUATION_STATUS_COLORS.skipped).not.toBe(
-      EVALUATION_STATUS_COLORS.pending,
-    );
-  });
-
-  it("pairs each tone's foreground with a semantic token too", () => {
-    for (const [status, tone] of Object.entries(EVALUATION_STATUS_TONES)) {
-      expect(tone.fg, `${status} fg should not be a raw shade`).not.toMatch(
-        /\.\d{2,3}$/,
-      );
-      expect(tone.bg, `${status} bg should not be a raw shade`).not.toMatch(
-        /\.\d{2,3}$/,
-      );
-    }
+  describe("given the status tone map", () => {
+    describe("when a tone is read", () => {
+      it("pairs its foreground and background with semantic tokens too", () => {
+        for (const [status, tone] of Object.entries(EVALUATION_STATUS_TONES)) {
+          expect(tone.fg, `${status} fg should not be a raw shade`).not.toMatch(
+            /\.\d{2,3}$/,
+          );
+          expect(tone.bg, `${status} bg should not be a raw shade`).not.toMatch(
+            /\.\d{2,3}$/,
+          );
+        }
+      });
+    });
   });
 });
 

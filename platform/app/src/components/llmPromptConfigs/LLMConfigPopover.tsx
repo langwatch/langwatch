@@ -335,7 +335,9 @@ export function LLMConfigPopover({
                     width="16px"
                     height="16px"
                     borderRadius="full"
-                    // Switch thumb on a blue/grey track — white in both modes.
+                    // The track is blue when on and grey when off, in both color
+                    // modes, so the thumb cannot follow the mode without losing
+                    // contrast against one of them.
                     bg="white"
                     boxShadow="sm"
                     transition="all 0.2s"
