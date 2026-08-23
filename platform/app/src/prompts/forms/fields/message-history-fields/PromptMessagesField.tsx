@@ -269,7 +269,7 @@ export function PromptMessagesField({
 
   // Set when a message was just added or revealed, so the effect below can
   // bring it into view once it has actually rendered.
-  const [pendingReveal, setPendingReveal] = useState(false);
+  const [isRevealPending, setIsRevealPending] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Compute a signature from messages to detect changes
@@ -302,8 +302,8 @@ export function PromptMessagesField({
   // cursor in it. Adding a message you cannot see is the same as nothing
   // happening, and the list is often taller than the pane.
   useEffect(() => {
-    if (!pendingReveal || editingMode !== "messages") return;
-    setPendingReveal(false);
+    if (!isRevealPending || editingMode !== "messages") return;
+    setIsRevealPending(false);
 
     const container = containerRef.current;
     if (!container) return;
@@ -314,7 +314,7 @@ export function PromptMessagesField({
     // jsdom does not implement scrollIntoView, and this is presentation only.
     target.scrollIntoView?.({ block: "nearest" });
     target.querySelector("textarea")?.focus();
-  }, [pendingReveal, editingMode]);
+  }, [isRevealPending, editingMode]);
 
   // Access inputs field array to add new variables
   const inputsFieldArray = useFieldArray({
@@ -372,7 +372,7 @@ export function PromptMessagesField({
 
   const handleAdd = (role: "user" | "assistant") => {
     messageFields.append({ role, content: "" });
-    setPendingReveal(true);
+    setIsRevealPending(true);
   };
 
   /**
@@ -389,7 +389,7 @@ export function PromptMessagesField({
     }
     setEditingMode("messages");
     setHasUserChangedMode(true);
-    setPendingReveal(true);
+    setIsRevealPending(true);
   }, [messageFields]);
 
   // Ensure system message exists when switching to prompt mode

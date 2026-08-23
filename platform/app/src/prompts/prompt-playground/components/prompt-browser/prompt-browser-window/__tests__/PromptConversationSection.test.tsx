@@ -18,7 +18,6 @@ import {
 } from "../../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptConversationSection } from "../PromptConversationSection";
 
-// Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {

@@ -28,10 +28,6 @@ vi.mock("~/components/variables", () => ({
   ),
 }));
 
-/**
- * Helper to open the editing mode menu and click an option.
- * The menu is triggered by clicking the mode button (Instructions/Messages).
- */
 const switchEditingMode = async (
   user: ReturnType<typeof userEvent.setup>,
   targetMode: "prompt" | "messages",
