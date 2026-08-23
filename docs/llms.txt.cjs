@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 // Read the configuration from llms.txt.json
 const config = JSON.parse(fs.readFileSync('llms.txt.json', 'utf8'));
@@ -219,46 +218,66 @@ function processImports(content, filePath) {
   return modifiedContent;
 }
 
-// Expand every include path into find patterns. A `dir/**/*.mdx` pattern
-// never matches a file directly inside `dir/` (`**` requires the slash before
-// it), which silently dropped every top-level page of such sections. Patterns
-// with `**` therefore also match their own depth-zero level.
-const allPatterns = includePaths.flatMap(includePath =>
-  includePath.includes('/**/')
-    ? [includePath, includePath.replace('/**/', '/*')]
-    : [includePath],
-);
+// Compile a glob where `*` stays inside one path segment and `**` crosses
+// directories (shell find -path cannot make that distinction: its `*` matches
+// slashes too). Stars are swapped for placeholders first so the regex
+// escaping cannot touch them.
+function globToRegExp(glob) {
+  const STARS = {
+    doubleSlash: '\u0001', // **/  any directories, or none at all
+    slashDouble: '\u0002', // /**  this directory plus any children
+    double: '\u0003', // **   anything
+    single: '\u0004', // *    within one path segment
+  };
+  const tokenized = glob
+    .replace(/\*\*\//g, STARS.doubleSlash)
+    .replace(/\/\*\*/g, STARS.slashDouble)
+    .replace(/\*\*/g, STARS.double)
+    .replace(/\*/g, STARS.single);
+  const escaped = tokenized.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    '^' +
+      escaped
+        .replaceAll(STARS.doubleSlash, '(?:.*/)?')
+        .replaceAll(STARS.slashDouble, '(?:/.*)?')
+        .replaceAll(STARS.double, '.*')
+        .replaceAll(STARS.single, '[^/]*') +
+      '$',
+  );
+}
 
-// Collect matches across every pattern into one set, so overlapping include
-// paths produce a single FILE block per page, then sort once for a stable
-// output order.
-const found = new Set();
-allPatterns.forEach(pattern => {
-  try {
-    // Locate the files (sort for stable cross-platform ordering). Exclusions
-    // are applied in the filter below rather than a shell grep, so a failed
-    // find surfaces as an error instead of being swallowed by `|| true`.
-    const findOutput = execSync(
-      `find . -type f -path "./${pattern}" 2>/dev/null | sort`,
-    )
-      .toString()
-      .split('\n')
-      .filter(file => file); // Remove empty lines
-
-    // Add exclude patterns
-    if (excludePaths.length > 0) {
-      const kept = findOutput.filter(file =>
-        excludePaths.every(excludePath => !file.includes(excludePath)),
-      );
-      kept.forEach(file => found.add(file));
-    } else {
-      findOutput.forEach(file => found.add(file));
+// Walk the tree once and keep every file path, relative without the leading
+// "./". Doing the traversal here instead of piping through shell find means a
+// read failure surfaces as an error rather than being masked by an exit-status
+// override, and glob semantics are exactly ours.
+function walkFiles(dir, base = '') {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...walkFiles(`${dir}/${entry.name}`, rel));
+    } else if (entry.isFile()) {
+      out.push(rel);
     }
-  } catch (error) {
-    // If there's an error with the command, log and continue
-    console.log(`Error with pattern: ${pattern}: ${error.message}`);
   }
-});
+  return out;
+}
+
+const allFiles = walkFiles('.').sort();
+const includeRegexes = includePaths.map(path_ => ({
+  pattern: path_,
+  regex: globToRegExp(path_),
+}));
+const excludeRegexes = excludePaths.map(glob => globToRegExp(glob));
+
+// Collect matches across every include pattern into one set, so overlapping
+// paths produce a single FILE block per page; sorted above for a stable order.
+const found = new Set();
+for (const file of allFiles) {
+  if (!includeRegexes.some(({ regex }) => regex.test(file))) continue;
+  if (excludeRegexes.some(regex => regex.test(file))) continue;
+  found.add(`./${file}`);
+}
 
 const files = [...found].sort();
 
