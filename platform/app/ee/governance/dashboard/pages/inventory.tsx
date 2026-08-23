@@ -1047,66 +1047,20 @@ function SourceComposerDrawer({
 }
 
 /**
- * Edit a previously-created IngestionSource. Scoped to the fields that
- * are safe to mutate without affecting the upstream operator's pasted
- * env block - name, description, parserConfig (incl. ottlStatements).
+ * The edit form's local state, seeded from the row each time the drawer opens
+ * on a different source.
  *
- * Source type is immutable after create (changing it would invalidate
- * the upstream's running configuration); admins who need to change it
- * archive + recreate.
+ * Split out from the drawer because seeding is the half with the reasoning in
+ * it — which fields the row can answer, and which the DTO deliberately cannot
+ * — while the drawer below is chrome. Keeping them in one function meant every
+ * read of the markup scrolled past the seeding rules first.
  */
-/**
- * Shared by the source list and the source detail page, so the two cannot
- * drift into offering different edits of the same row.
- */
-export function SourceEditDrawer({
-  organizationId,
-  source,
-  onClose,
-  onSubmit,
-  isPending,
-}: {
-  organizationId: string;
-  source: Source | null;
-  onClose: () => void;
-  onSubmit: (input: {
-    organizationId: string;
-    id: string;
-    name: string;
-    description: string | null;
-    parserConfig: Record<string, unknown>;
-    pullSchedule?: string | null;
-  }) => void;
-  isPending: boolean;
-}) {
-  const isOpen = !!source;
+function useSourceEditForm(source: Source | null) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [statements, setStatements] = useState<string[]>([]);
   const [parserConfig, setParserConfig] = useState<Record<string, string>>({});
   const [pullSchedule, setPullSchedule] = useState("");
-
-  // The DTO carries `sourceType` as a bare string; every lookup below is keyed
-  // by `SourceType`, and an unknown value simply misses every table rather
-  // than throwing — which is the behaviour we want for a row written by a
-  // newer deploy than the one serving this page.
-  const sourceType = source?.sourceType as SourceType | undefined;
-  const pullAdapter = sourceType
-    ? PULL_ADAPTER_FOR_SOURCE[sourceType]
-    : undefined;
-  const isPullMode =
-    !!pullAdapter &&
-    !!sourceType &&
-    EDITABLE_PULL_CONFIG_SOURCE_TYPES.includes(sourceType);
-
-  // A source holding no cursor has its backfill start genuinely still in play.
-  // Once one exists the usage cursor never rewinds, so the setting would be
-  // accepted and then ignored — it is shown read-only rather than offered as a
-  // lie. This reads the row's own answer rather than inferring one from
-  // `status`, which is wrong in both directions: a pull that succeeded with
-  // zero events leaves the source `awaiting_first_event` holding a cursor, and
-  // a source disabled before its first run never minted one.
-  const hasPulled = source?.hasPollerCursor ?? false;
 
   // Sync local state when the drawer opens for a new source - drives
   // the form fields off whatever the row carries on the wire.
@@ -1134,6 +1088,148 @@ export function SourceEditDrawer({
     setPullSchedule(typeof parser.schedule === "string" ? parser.schedule : "");
   }, [source?.id]);
 
+  return {
+    name,
+    setName,
+    description,
+    setDescription,
+    statements,
+    setStatements,
+    parserConfig,
+    setParserConfig,
+    pullSchedule,
+    setPullSchedule,
+  };
+}
+
+/** The two fields every source has, whatever its type. */
+function SourceIdentityFields({
+  name,
+  onNameChange,
+  description,
+  onDescriptionChange,
+}: {
+  name: string;
+  onNameChange: (next: string) => void;
+  description: string;
+  onDescriptionChange: (next: string) => void;
+}) {
+  return (
+    <>
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Display name
+        </Text>
+        <Input
+          size="sm"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+        />
+      </VStack>
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Description (optional)
+        </Text>
+        <Textarea
+          size="sm"
+          rows={2}
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+        />
+      </VStack>
+    </>
+  );
+}
+
+/**
+ * The adapter half of the edit form: the pull config fields plus the cadence,
+ * rendered only for a source type the form knows how to rebuild.
+ */
+function PullConfigEditFields({
+  sourceType,
+  parserConfig,
+  onParserConfigChange,
+  pullSchedule,
+  onPullScheduleChange,
+  hasPulled,
+}: {
+  sourceType: SourceType;
+  parserConfig: Record<string, string>;
+  onParserConfigChange: (next: Record<string, string>) => void;
+  pullSchedule: string;
+  onPullScheduleChange: (next: string) => void;
+  /** Whether the source already holds a poller cursor. */
+  hasPulled: boolean;
+}) {
+  return (
+    <>
+      <ParserConfigFields
+        sourceType={sourceType}
+        values={parserConfig}
+        onChange={onParserConfigChange}
+        mode="edit"
+        readOnlyKeys={hasPulled ? ["startingAt"] : undefined}
+      />
+      {hasPulled && (
+        <Text fontSize="xs" color="fg.muted">
+          The backfill start is fixed once a source has pulled: the cursor has
+          already moved past it and never rewinds. To re-read older data,
+          archive this source and create a new one with an earlier start.
+        </Text>
+      )}
+      <PullCadenceField
+        sourceType={sourceType}
+        value={pullSchedule}
+        onChange={onPullScheduleChange}
+      />
+    </>
+  );
+}
+
+/**
+ * Edit a previously-created IngestionSource: name, description, OTTL, and —
+ * for a pull source the form knows how to rebuild — the adapter configuration
+ * and cadence the poller actually runs on.
+ *
+ * Shared by the source list and the source detail page, so the two cannot
+ * drift into offering different edits of the same row.
+ *
+ * Source type is immutable after create (changing it would invalidate the
+ * upstream's running configuration); admins who need to change it archive +
+ * recreate.
+ */
+export function SourceEditDrawer({
+  organizationId,
+  source,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  organizationId: string;
+  source: Source | null;
+  onClose: () => void;
+  onSubmit: (input: EditSubmission) => void;
+  isPending: boolean;
+}) {
+  const isOpen = !!source;
+  const form = useSourceEditForm(source);
+
+  // The DTO carries `sourceType` as a bare string; every lookup below is keyed
+  // by `SourceType`, and an unknown value simply misses every table rather
+  // than throwing — which is the behaviour we want for a row written by a
+  // newer deploy than the one serving this page.
+  const sourceType = source?.sourceType as SourceType | undefined;
+  const isPullMode = isEditablePullSource(sourceType);
+
+  // A source holding no cursor has its backfill start genuinely still in play.
+  // Once one exists the usage cursor never rewinds, so the setting would be
+  // accepted and then ignored — it is shown read-only rather than offered as a
+  // lie. This reads the row's own answer rather than inferring one from
+  // `status`, which is wrong in both directions: a pull that succeeded with
+  // zero events leaves the source `awaiting_first_event` holding a cursor, and
+  // a source disabled before its first run never minted one.
+  const hasPulled = source?.hasPollerCursor ?? false;
+
   if (!source) {
     return (
       <Drawer.Root open={false} placement="end" onOpenChange={() => onClose()}>
@@ -1143,45 +1239,19 @@ export function SourceEditDrawer({
   }
 
   const handleSubmit = () => {
-    if (!name.trim()) return;
-    let rebuilt: Record<string, unknown> | null = null;
-
-    if (isPullMode && sourceType) {
-      // Reuses the create path's dispatcher, and with it the toast that names
-      // which field is wrong — a second builder here is how the two forms
-      // would drift into disagreeing about what a valid bucket width is.
-      const resolved = resolvePullConfig(
-        {
-          sourceType,
-          name: name.trim(),
-          description: description.trim(),
-          parserConfig,
-          ottlStatements: statements,
-          pullSchedule,
-        },
-        { requireCredentials: false },
-      );
-      // null means a field the adapter cannot parse. Refusing here is the
-      // whole point of the builder: nothing validates this server-side, so a
-      // bad value saved now surfaces as a failing pull an hour later.
-      if (!resolved?.pullConfig) return;
-      rebuilt = resolved.pullConfig;
-    }
-
-    onSubmit({
+    const submission = buildEditSubmission({
       organizationId,
-      id: source.id,
-      name: name.trim(),
-      description: description.trim() || null,
-      parserConfig: buildEditedParserConfig({
-        sourceType: source.sourceType as SourceType,
-        storedParserConfig:
-          (source.parserConfig as Record<string, unknown>) ?? {},
-        rebuiltPullConfig: rebuilt,
-        ottlStatements: statements,
-      }),
-      ...(isPullMode ? { pullSchedule: pullSchedule.trim() || null } : {}),
+      source,
+      name: form.name,
+      description: form.description,
+      parserConfig: form.parserConfig,
+      ottlStatements: form.statements,
+      pullSchedule: form.pullSchedule,
     });
+    // null is a form that is not saveable — an empty name, or a pull field the
+    // adapter cannot parse, which has already told the admin which one.
+    if (!submission) return;
+    onSubmit(submission);
   };
 
   return (
@@ -1202,58 +1272,29 @@ export function SourceEditDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Display name
-              </Text>
-              <Input
-                size="sm"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </VStack>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Description (optional)
-              </Text>
-              <Textarea
-                size="sm"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </VStack>
+            <SourceIdentityFields
+              name={form.name}
+              onNameChange={form.setName}
+              description={form.description}
+              onDescriptionChange={form.setDescription}
+            />
 
             {isPullMode && (
-              <>
-                <ParserConfigFields
-                  sourceType={source.sourceType as SourceType}
-                  values={parserConfig}
-                  onChange={setParserConfig}
-                  mode="edit"
-                  readOnlyKeys={hasPulled ? ["startingAt"] : undefined}
-                />
-                {hasPulled && (
-                  <Text fontSize="xs" color="fg.muted">
-                    The backfill start is fixed once a source has pulled: the
-                    cursor has already moved past it and never rewinds. To
-                    re-read older data, archive this source and create a new one
-                    with an earlier start.
-                  </Text>
-                )}
-                <PullCadenceField
-                  sourceType={source.sourceType as SourceType}
-                  value={pullSchedule}
-                  onChange={setPullSchedule}
-                />
-              </>
+              <PullConfigEditFields
+                sourceType={sourceType}
+                parserConfig={form.parserConfig}
+                onParserConfigChange={form.setParserConfig}
+                pullSchedule={form.pullSchedule}
+                onPullScheduleChange={form.setPullSchedule}
+                hasPulled={hasPulled}
+              />
             )}
 
             <OttlEditor
               organizationId={organizationId}
               sourceType={source.sourceType}
-              statements={statements}
-              onChange={setStatements}
+              statements={form.statements}
+              onChange={form.setStatements}
               enabled={isOttlEnabledSourceType(source.sourceType)}
             />
 
@@ -1275,7 +1316,7 @@ export function SourceEditDrawer({
               colorPalette="blue"
               onClick={handleSubmit}
               loading={isPending}
-              disabled={!name.trim()}
+              disabled={!form.name.trim()}
             >
               Save changes
             </Button>
@@ -1863,6 +1904,53 @@ function genieCredentialsFrom(
   return Object.keys(credentials).length > 0 ? credentials : null;
 }
 
+/** How one parser-config field renders on the form it was handed to. */
+export interface ParserFieldPresentation {
+  isSecret: boolean;
+  isMultiline: boolean;
+  isRequired: boolean;
+  hint: string | undefined;
+  placeholder: string;
+}
+
+/**
+ * What a parser-config field looks like on the form it is being rendered on.
+ *
+ * Only a secret behaves differently between create and edit, and it differs in
+ * three ways at once: the hint, the required marker, and the placeholder.
+ * Deciding all three from one predicate is what stops them drifting apart — a
+ * field reading "leave blank to keep the current key" while still carrying a
+ * required marker is a form contradicting itself, and each ternary spelled out
+ * separately in the JSX is one edit away from that.
+ *
+ * `isSecretFieldKey` is the same predicate the masking and the storage routing
+ * use; this must not become a third, drifting answer to "is this a secret".
+ */
+export function parserFieldPresentation({
+  field,
+  mode,
+}: {
+  field: FieldDef;
+  mode: ParserConfigMode;
+}): ParserFieldPresentation {
+  const isSecret = isSecretFieldKey(field.key);
+  // On edit the stored secret is never sent to the client, so the field opens
+  // blank and stays blank unless the admin is deliberately replacing the key.
+  const keepsStoredSecret = isSecret && mode === "edit";
+  return {
+    isSecret,
+    isMultiline: field.key === "parserDsl" || field.key === "eventMappingDsl",
+    isRequired: !!field.required && !keepsStoredSecret,
+    // Create's hint tells them where to generate a key, which read on the edit
+    // form would suggest they have to — and re-typing a key they do not have
+    // to hand is how a working source gets archived and recreated instead.
+    hint: keepsStoredSecret
+      ? "Leave blank to keep the current key. Enter a new one only to replace it."
+      : field.hint,
+    placeholder: keepsStoredSecret ? "Unchanged" : field.placeholder,
+  };
+}
+
 function ParserConfigField({
   field,
   values,
@@ -1876,17 +1964,11 @@ function ParserConfigField({
   mode?: ParserConfigMode;
   readOnly?: boolean;
 }) {
-  const isSecret = isSecretFieldKey(field.key);
-  // On edit the stored secret is never sent to the client, so the field opens
-  // blank and stays blank unless the admin is deliberately replacing the key.
-  // Create's hint tells them where to generate one, which read on the edit
-  // form would suggest they have to — and re-typing a key they do not have to
-  // hand is how a working source gets archived and recreated instead.
-  const hint =
-    isSecret && mode === "edit"
-      ? "Leave blank to keep the current key. Enter a new one only to replace it."
-      : field.hint;
-  const isRequired = field.required && !(isSecret && mode === "edit");
+  const { isSecret, isMultiline, isRequired, hint, placeholder } =
+    parserFieldPresentation({ field, mode });
+  const value = values[field.key] ?? "";
+  const handleChange = (next: string) =>
+    onChange({ ...values, [field.key]: next });
 
   return (
     <VStack align="stretch" gap={1}>
@@ -1898,13 +1980,13 @@ function ParserConfigField({
           </Text>
         )}
       </Text>
-      {field.key === "parserDsl" || field.key === "eventMappingDsl" ? (
+      {isMultiline ? (
         <Textarea
           size="sm"
           rows={6}
-          value={values[field.key] ?? ""}
-          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
-          placeholder={field.placeholder}
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder}
           fontFamily="mono"
           readOnly={readOnly}
         />
@@ -1912,11 +1994,9 @@ function ParserConfigField({
         <Input
           size="sm"
           type={isSecret ? "password" : "text"}
-          value={values[field.key] ?? ""}
-          onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
-          placeholder={
-            isSecret && mode === "edit" ? "Unchanged" : field.placeholder
-          }
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder}
           readOnly={readOnly}
           disabled={readOnly}
         />
@@ -2187,6 +2267,111 @@ export function buildEditedParserConfig({
   }
 
   return next;
+}
+
+/**
+ * Whether the edit form may rebuild this source type's adapter configuration.
+ *
+ * Both halves matter: the type has to actually pull, so there is a pull config
+ * to rebuild at all, and it has to be on the allowlist, so the form knows what
+ * a blank secret means for it. The predicate narrows, so a caller that passes
+ * the DTO's bare `sourceType` string gets a `SourceType` inside the guard
+ * without a second cast.
+ */
+export function isEditablePullSource(
+  sourceType: SourceType | undefined,
+): sourceType is SourceType {
+  return (
+    !!sourceType &&
+    !!PULL_ADAPTER_FOR_SOURCE[sourceType] &&
+    EDITABLE_PULL_CONFIG_SOURCE_TYPES.includes(sourceType)
+  );
+}
+
+/** What the edit drawer sends to `ingestionSources.update`. */
+export interface EditSubmission {
+  organizationId: string;
+  id: string;
+  name: string;
+  description: string | null;
+  parserConfig: Record<string, unknown>;
+  pullSchedule?: string | null;
+}
+
+/**
+ * The edit form's submission, assembled from the form state and the row it
+ * opened on. `null` means the form is not in a saveable state and the caller
+ * does nothing: either the name is empty, or a pull field is one the adapter
+ * cannot parse — in which case `resolvePullConfig` has already toasted which.
+ *
+ * Module-level rather than a closure inside the drawer because this is where
+ * the decisions that matter live — whether the pull config is rebuilt at all,
+ * and whether `pullSchedule` rides along — and no test renders the drawer.
+ * Leaving them inline made the whole edit path reachable only through a React
+ * surface nothing exercises.
+ */
+export function buildEditSubmission({
+  organizationId,
+  source,
+  name,
+  description,
+  parserConfig,
+  ottlStatements,
+  pullSchedule,
+}: {
+  organizationId: string;
+  source: { id: string; sourceType: string; parserConfig: unknown };
+  name: string;
+  description: string;
+  parserConfig: Record<string, string>;
+  ottlStatements: string[];
+  pullSchedule: string;
+}): EditSubmission | null {
+  const trimmedName = name.trim();
+  if (!trimmedName) return null;
+
+  const sourceType = source.sourceType as SourceType;
+  const isPullMode = isEditablePullSource(sourceType);
+
+  let rebuiltPullConfig: Record<string, unknown> | null = null;
+  if (isPullMode) {
+    // Reuses the create path's dispatcher, and with it the toast that names
+    // which field is wrong — a second builder here is how the two forms would
+    // drift into disagreeing about what a valid bucket width is.
+    const resolved = resolvePullConfig(
+      {
+        sourceType,
+        name: trimmedName,
+        description: description.trim(),
+        parserConfig,
+        ottlStatements,
+        pullSchedule,
+      },
+      { requireCredentials: false },
+    );
+    // Refusing here is the whole point of the builder: nothing validates this
+    // server-side, so a bad value saved now surfaces as a failing pull an hour
+    // later.
+    if (!resolved?.pullConfig) return null;
+    rebuiltPullConfig = resolved.pullConfig;
+  }
+
+  return {
+    organizationId,
+    id: source.id,
+    name: trimmedName,
+    description: description.trim() || null,
+    parserConfig: buildEditedParserConfig({
+      sourceType,
+      storedParserConfig:
+        (source.parserConfig as Record<string, unknown>) ?? {},
+      rebuiltPullConfig,
+      ottlStatements,
+    }),
+    // Only sent for a type whose cadence the form actually renders. Including
+    // it for a push source would send `null` for a column no one edited.
+    ...(isPullMode ? { pullSchedule: pullSchedule.trim() || null } : {}),
+  };
 }
 
 /**

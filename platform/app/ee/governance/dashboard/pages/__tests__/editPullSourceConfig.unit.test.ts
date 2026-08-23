@@ -17,15 +17,25 @@
  * back into the form must not carry `credentials` with it.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { anthropicAdminPullConfigSchema } from "../../../services/pullers/anthropicAdmin.puller";
 import {
   buildAnthropicAdminPullConfig,
   buildEditedParserConfig,
+  buildEditSubmission,
   type ComposerState,
+  isEditablePullSource,
+  parserFieldPresentation,
   seedComposerParserConfig,
 } from "../ingestion-sources";
+
+// `resolvePullConfig` toasts the offending field when a pull config will not
+// build. That is the behaviour under test's own reporting channel, not a
+// dependency of it, and Chakra's toaster has no store outside a rendered app.
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { create: vi.fn() },
+}));
 
 function composer(
   parserConfig: Record<string, string>,
@@ -210,6 +220,205 @@ describe("buildEditedParserConfig", () => {
     });
 
     expect(next).not.toHaveProperty("ottlStatements");
+  });
+});
+
+describe("isEditablePullSource", () => {
+  it("accepts a pull type the form knows how to rebuild", () => {
+    expect(isEditablePullSource("anthropic_admin")).toBe(true);
+  });
+
+  it("refuses a pull type whose blank-secret meaning is ambiguous", () => {
+    // Genie takes either a workspace token or a service-principal pair, so a
+    // blank form there could mean "keep what is stored" or "switch auth
+    // modes". Guessing locks an admin out of their own source.
+    expect(isEditablePullSource("databricks_genie")).toBe(false);
+  });
+
+  it("refuses a push type, which has no pull config to rebuild", () => {
+    expect(isEditablePullSource("otel_generic")).toBe(false);
+  });
+
+  it("refuses an absent type rather than throwing", () => {
+    // A row written by a newer deploy reaches this page as a string that misses
+    // every table; it must read as "not editable", not crash the drawer.
+    expect(isEditablePullSource(undefined)).toBe(false);
+  });
+});
+
+describe("buildEditSubmission", () => {
+  const pullSource = {
+    id: "src_1",
+    sourceType: "anthropic_admin",
+    parserConfig: {
+      adapter: "anthropic_admin",
+      report: "usage",
+      bucketWidth: "1h",
+      schedule: "0 * * * *",
+      workspaceId: "ws_kept",
+    },
+  };
+
+  function submit(
+    overrides: Partial<Parameters<typeof buildEditSubmission>[0]>,
+  ) {
+    return buildEditSubmission({
+      organizationId: "org_1",
+      source: pullSource,
+      name: "Anthropic org spend",
+      description: "",
+      parserConfig: {
+        credentialsToken: "",
+        report: "usage",
+        bucketWidth: "1h",
+      },
+      ottlStatements: [],
+      pullSchedule: "0 * * * *",
+      ...overrides,
+    });
+  }
+
+  it("given a blank name, refuses the save", () => {
+    expect(submit({ name: "   " })).toBeNull();
+  });
+
+  it("given a pull field the adapter cannot parse, refuses the save", () => {
+    // Nothing validates pullConfig server-side, so a bad bucket width saved
+    // here would sit in the row looking fine and fail on every pull.
+    expect(
+      submit({
+        parserConfig: {
+          credentialsToken: "",
+          report: "usage",
+          bucketWidth: "5m",
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("sends the cadence for a pull source", () => {
+    expect(submit({ pullSchedule: " 0 */2 * * * " })?.pullSchedule).toBe(
+      "0 */2 * * *",
+    );
+  });
+
+  it("sends a cleared cadence as null rather than an empty string", () => {
+    expect(submit({ pullSchedule: "   " })?.pullSchedule).toBeNull();
+  });
+
+  it("omits the cadence key entirely for a push source", () => {
+    // Not `null`: a push source has no cadence column anyone edited, and
+    // sending one would write over a field this form does not own.
+    const next = submit({
+      source: {
+        id: "src_2",
+        sourceType: "otel_generic",
+        parserConfig: { sharedSecretLastFour: "9931" },
+      },
+    });
+
+    expect(next).not.toBeNull();
+    expect(next).not.toHaveProperty("pullSchedule");
+  });
+
+  it("leaves a push source's adapter config untouched", () => {
+    const next = submit({
+      source: {
+        id: "src_2",
+        sourceType: "otel_generic",
+        parserConfig: { sharedSecretLastFour: "9931" },
+      },
+    });
+
+    expect(next?.parserConfig.sharedSecretLastFour).toBe("9931");
+  });
+
+  it("trims the name and nulls an emptied description", () => {
+    const next = submit({ name: "  Renamed  ", description: "   " });
+
+    expect(next?.name).toBe("Renamed");
+    expect(next?.description).toBeNull();
+  });
+
+  it("carries no credentials key when the secret was left blank", () => {
+    // The whole risk of the edit path: `updateSource` keeps the stored
+    // envelope only for a key that is genuinely absent.
+    expect(submit({})?.parserConfig).not.toHaveProperty("credentials");
+  });
+
+  it("carries a freshly typed secret so the stored one is replaced", () => {
+    const next = submit({
+      parserConfig: {
+        credentialsToken: "sk-ant-admin-new",
+        report: "usage",
+        bucketWidth: "1h",
+      },
+    });
+
+    expect(next?.parserConfig.credentials).toEqual({
+      token: "sk-ant-admin-new",
+    });
+  });
+});
+
+describe("parserFieldPresentation", () => {
+  const secretField = {
+    key: "credentialsToken",
+    label: "Admin API key",
+    placeholder: "sk-ant-admin-...",
+    hint: "Generate one in the Anthropic console.",
+    required: true,
+  };
+  const plainField = {
+    key: "report",
+    label: "Report",
+    placeholder: "usage",
+    hint: "usage or cost",
+    required: true,
+  };
+
+  it("on edit, tells the admin a blank secret keeps the current key", () => {
+    const p = parserFieldPresentation({ field: secretField, mode: "edit" });
+
+    expect(p.hint).toContain("Leave blank to keep the current key");
+    expect(p.placeholder).toBe("Unchanged");
+  });
+
+  it("on edit, drops the required marker from a secret", () => {
+    // A field that says "leave blank to keep the current key" while still
+    // carrying a required marker is a form contradicting itself.
+    expect(
+      parserFieldPresentation({ field: secretField, mode: "edit" }).isRequired,
+    ).toBe(false);
+  });
+
+  it("on create, keeps the secret mandatory and its own hint", () => {
+    const p = parserFieldPresentation({ field: secretField, mode: "create" });
+
+    expect(p.isRequired).toBe(true);
+    expect(p.hint).toBe(secretField.hint);
+    expect(p.placeholder).toBe(secretField.placeholder);
+  });
+
+  it("leaves a non-secret field identical in both modes", () => {
+    expect(
+      parserFieldPresentation({ field: plainField, mode: "edit" }),
+    ).toEqual(parserFieldPresentation({ field: plainField, mode: "create" }));
+  });
+
+  it("marks the DSL fields as multiline", () => {
+    for (const key of ["parserDsl", "eventMappingDsl"]) {
+      expect(
+        parserFieldPresentation({
+          field: { ...plainField, key },
+          mode: "create",
+        }).isMultiline,
+      ).toBe(true);
+    }
+    expect(
+      parserFieldPresentation({ field: plainField, mode: "create" })
+        .isMultiline,
+    ).toBe(false);
   });
 });
 

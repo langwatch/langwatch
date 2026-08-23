@@ -545,6 +545,65 @@ function IngestionSourceDetailPage() {
   }
 
   return (
+    <LoadedSourceDetail
+      pageTitle={pageTitle}
+      source={source}
+      orgId={orgId}
+      canManage={canManage}
+      canReadActivity={canReadActivity}
+      healthQuery={healthQuery}
+      eventsPager={eventsPager}
+      secretReveal={secretReveal}
+      setSecretReveal={setSecretReveal}
+      rotateMutation={rotateMutation}
+      archiveMutation={archiveMutation}
+      updateMutation={updateMutation}
+      isEditing={isEditing}
+      setIsEditing={setIsEditing}
+    />
+  );
+}
+
+/**
+ * The page once the source has actually loaded. Split from the function above
+ * so that one reads as the scene chooser it is — not found, denied, errored,
+ * loading, loaded — without the whole loaded layout inlined at the bottom of
+ * the same chain.
+ */
+function LoadedSourceDetail({
+  pageTitle,
+  source,
+  orgId,
+  canManage,
+  canReadActivity,
+  healthQuery,
+  eventsPager,
+  secretReveal,
+  setSecretReveal,
+  rotateMutation,
+  archiveMutation,
+  updateMutation,
+  isEditing,
+  setIsEditing,
+}: {
+  pageTitle: string;
+  source: Source;
+  orgId: string;
+} & Pick<
+  ReturnType<typeof useIngestionSourceDetailPage>,
+  | "canManage"
+  | "canReadActivity"
+  | "healthQuery"
+  | "eventsPager"
+  | "secretReveal"
+  | "setSecretReveal"
+  | "rotateMutation"
+  | "archiveMutation"
+  | "updateMutation"
+  | "isEditing"
+  | "setIsEditing"
+>) {
+  return (
     <SourceDetailShell pageTitle={pageTitle}>
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <SourceDetailHeader
