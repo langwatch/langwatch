@@ -11,6 +11,7 @@
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   ESpanKind,
@@ -25,6 +26,35 @@ import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 
 const logger = createLogger("langwatch:health-checks");
+
+/**
+ * A probe's canary work did not complete. `fault` is explicitly `platform`:
+ * this endpoint exists for external monitors, and its 500 is a page about US,
+ * never something the caller can remediate. The failing transport and any
+ * upstream status ride in `meta` so the alert names the broken half without
+ * anyone re-running the probe by hand.
+ */
+class HealthCheckFailedError extends HandledError {
+  declare readonly code: "health_check_failed";
+
+  constructor(
+    check: string,
+    details: { upstreamStatus?: number; reasons?: readonly Error[] } = {},
+  ) {
+    super("health_check_failed", "The health check could not complete.", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: {
+        check,
+        ...(details.upstreamStatus !== undefined
+          ? { upstreamStatus: details.upstreamStatus }
+          : {}),
+      },
+      ...(details.reasons ? { reasons: details.reasons } : {}),
+    });
+    this.name = "HealthCheckFailedError";
+  }
+}
 
 const secured = createServiceApp({ basePath: "/api/health" });
 
@@ -60,6 +90,47 @@ async function authenticateProject(c: {
   }
 
   return { project, authToken };
+}
+
+/**
+ * One canary POST back through our own public boundary — that round trip is
+ * what the probe checks. A network-level failure (connection refused, DNS)
+ * used to escape as an anonymous 500 with no cause attached; both it and a
+ * non-ok response are the same handled outcome: the collector did not take
+ * the canary, and that is ours.
+ */
+async function sendCanary({
+  transport,
+  url,
+  authToken,
+  body,
+}: {
+  transport: "rest" | "otlp";
+  url: string;
+  authToken: string;
+  body: unknown;
+}): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": authToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new HealthCheckFailedError(transport, {
+      reasons: [error instanceof Error ? error : new Error(String(error))],
+    });
+  }
+  if (!response.ok) {
+    throw new HealthCheckFailedError(transport, {
+      upstreamStatus: response.status,
+    });
+  }
+  return response;
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
@@ -138,38 +209,20 @@ secured
       ],
     };
 
-    const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
+    const [, otelCollectorResponse] = await Promise.all([
+      sendCanary({
+        transport: "rest",
+        url: `${env.BASE_HOST}/api/collector`,
+        authToken,
+        body: restParams,
       }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
+      sendCanary({
+        transport: "otlp",
+        url: `${env.BASE_HOST}/api/otel/v1/traces`,
+        authToken,
+        body: otelParams,
       }),
     ]);
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
 
     const otelBody = await otelCollectorResponse.json();
     return c.json({
