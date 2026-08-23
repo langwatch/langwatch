@@ -2,13 +2,15 @@
 
 **Date:** 2026-08-21
 
-**Status:** Accepted
+**Status:** Accepted; physical application extraction superseded by
+[ADR-111](./111-physical-application-workspaces.md)
 
 **Behavioural contract:**
 [App and worker runtime encapsulation](../../../platform/app/specs/runtime-composition.feature)
 
 **Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
+[ADR-111: physical application workspaces](./111-physical-application-workspaces.md),
 [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
 [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md),
 and [Group Queue framework boundary](../../../packages/group-queue/adrs/20260820-group-queue-framework-boundary.md).
@@ -263,6 +265,10 @@ It applies to feature-specific compatibility surfaces that have an identified
 RPC successor, beginning with Agents.
 
 ### Physical application extraction is deferred
+
+> Superseded by [ADR-111](./111-physical-application-workspaces.md). The
+> runtime-graph and lifecycle decisions in this ADR remain accepted; only the
+> decision to keep them in one physical workspace package is superseded.
 
 No new `apps/app`, `apps/server`, `apps/api` or `apps/worker` workspace packages
 are created by this decision. Once the two compositions have closed graphs and

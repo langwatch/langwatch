@@ -63,11 +63,12 @@ Reusable framework decisions live with their packages:
 | [092](./092-unified-authorization-engine.md)                           | Unified authorization engine — one registry, one resolver, every principal                                                 | Proposed                  |
 | [094](./094-simulation-execution-on-process-manager-substrate.md)      | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs     | Accepted                  |
 | [101](./101-feature-package-surfaces.md)                               | Feature ownership roots contain physical contract, server, and optional web packages                                       | Accepted                  |
-| [102](./102-runtime-composition-roots.md)                              | One application package contains separate app and worker runtimes                                                          | Accepted                  |
+| [102](./102-runtime-composition-roots.md)                              | One application package contains separate app and worker runtimes                                                          | Superseded in part by 111 |
 | [103](./103-standard-schema-api-boundary.md)                           | Feature contracts use Zod 4 behind Standard Schema                                                                         | Accepted                  |
 | [104](./104-runtime-environment-configuration.md)                      | Runtime roots validate environment and inject semantic configuration                                                       | Accepted                  |
 | [105](./105-mcp-access-via-discover-catalogues.md)                     | RPC services are MCP-accessible through one adapter over the rpc.discover catalogues                                       | Proposed                  |
-| [110](./110-grant-aggregates-are-grants.md)                             | A grant aggregate is a grant, not an organization                                                                          | Proposed                  |
+| [110](./110-grant-aggregates-are-grants.md)                            | A grant aggregate is a grant, not an organization                                                                          | Proposed                  |
+| [111](./111-physical-application-workspaces.md)                        | Physical application workspaces preserve the current deployment topology                                                   | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
