@@ -65,7 +65,7 @@ makes the permission a mandatory, compile-time-checked argument:
 | `POST /api/analytics/timeseries` | `analytics:view` |
 | `GET /api/experiments` | `experiments:view` |
 | `GET /api/model-defaults` | `project:view` |
-| `POST /api/prompt-playground/execute` | `prompts:view` |
+| `POST /api/prompt-playground/2026-08-20/prompt.execute` | `prompts:view` |
 
 Permissions mirror the equivalent tRPC procedure where one exists (the
 authoritative, type-checked surface) rather than a heuristic guess.

@@ -6,9 +6,9 @@ Classified: 93
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
 | specs/home/welcome-header.feature | "Displays greeting with user's first name" | UPDATE | `WelcomeHeader.tsx` renders "Good morning/afternoon/evening, John" via `getGreeting`, never the literal "Hello, John" the spec asserts |
-| specs/home/welcome-header.feature | "Extracts first name from full name" | KEEP | `getGreetingName` in `platform/app/src/components/home/WelcomeHeader.tsx` returns "Jane" from "Jane Maria Smith"; covered by unit test but not @scenario-bound |
+| specs/home/welcome-header.feature | "Extracts first name from full name" | KEEP | `displayFirstName` in `platform/app/src/utils/displayName.ts` returns "Jane" from "Jane Maria Smith"; covered by unit test but not @scenario-bound |
 | specs/home/welcome-header.feature | "Displays friendly fallback when name unavailable" | UPDATE | Implementation falls back to "Good morning"/"Good afternoon"/"Good evening" via `getGreeting` (anonymous branch) — not the literal "Hello 👋" the spec asserts |
-| specs/home/welcome-header.feature | "Displays friendly fallback when name is just email" | UPDATE | `getGreetingName` returns null for emails so the anonymous greeting "Good morning" renders, not "Hello 👋" |
+| specs/home/welcome-header.feature | "Displays friendly fallback when name is just email" | UPDATE | `displayFirstName` returns null for emails so the anonymous greeting "Good morning" renders, not "Hello 👋" |
 | specs/home/learning-resources.feature | "Displays documentation link" | KEEP | `platform/app/src/components/home/LearningResources.tsx` renders a "View documentation" CTA in the resources list; no test bound |
 | specs/home/learning-resources.feature | "Displays video link" | KEEP | `LearningResources.tsx` renders a "Watch videos" CTA pointing at YouTube; no test bound |
 | specs/home/learning-resources.feature | "Documentation link points to docs site" | KEEP | `resources[0].href` in `LearningResources.tsx` is "https://docs.langwatch.ai" — contains "docs.langwatch.ai"; no test bound |

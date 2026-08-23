@@ -165,6 +165,10 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the project is the demo project", () => {
     it("refuses even though the demo grants prompts:view to everyone", async () => {
+      // Restored rather than deleted: an instance that configures a demo
+      // project has this set before the suite runs, and deleting it would
+      // change what every later test sees.
+      const previousDemoProjectId = process.env.DEMO_PROJECT_ID;
       process.env.DEMO_PROJECT_ID = "project_demo";
       try {
         const response = await execute({ projectId: "project_demo" });
@@ -175,7 +179,11 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
         });
         expect(studioBackendPostEvent).not.toHaveBeenCalled();
       } finally {
-        delete process.env.DEMO_PROJECT_ID;
+        if (previousDemoProjectId === undefined) {
+          delete process.env.DEMO_PROJECT_ID;
+        } else {
+          process.env.DEMO_PROJECT_ID = previousDemoProjectId;
+        }
       }
     });
   });

@@ -170,18 +170,35 @@ describe("usePromptExecution", () => {
           capturedSignal = signal;
           onEvent({ type: "start", messageId: "trace-1", traceId: "trace-1" });
           onEvent({ type: "delta", content: "partial" });
+          // Stay open until the caller aborts, the way a real stream does.
+          // Resolving here let `send` finish and clear the abort ref before
+          // `stop` ever ran, so the previous version of this test asserted
+          // only that a signal had been passed — cancellation itself went
+          // unobserved and a `stop` that did nothing would have passed.
+          await new Promise<void>((resolve) => {
+            if (signal?.aborted) return resolve();
+            signal?.addEventListener("abort", () => resolve(), { once: true });
+          });
         },
       );
 
       const { result } = setup();
-      const running = act(async () => {
-        await result.current.send("hi");
+
+      let sending: Promise<unknown> | undefined;
+      await act(async () => {
+        sending = result.current.send("hi");
+        // Let the two events above land while the stream is still open.
+        await Promise.resolve();
       });
-      await running;
 
-      act(() => result.current.stop());
+      expect(capturedSignal?.aborted).toBe(false);
 
-      expect(capturedSignal).toBeDefined();
+      await act(async () => {
+        result.current.stop();
+        await sending;
+      });
+
+      expect(capturedSignal?.aborted).toBe(true);
       expect(result.current.messages.at(-1)).toMatchObject({
         content: "partial",
       });
