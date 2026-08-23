@@ -180,7 +180,8 @@ const registry = {
   lwql_unknown_identifier: {
     tips: [
       "Read `meta.identifiers` — it lists every column the query names that no dataset defines",
-      "Check the spelling against the columns the schema endpoint lists for the dataset, then edit and run again",
+      "List the available columns with `langwatch chart schema`, or open the workbench schema sidebar",
+      "Saving cannot check column existence, so a misspelled or renamed column is only refused when the query runs",
     ],
   },
   page_too_deep: {

@@ -50,6 +50,7 @@ import { formatNumber } from "~/utils/formatNumber";
 import {
   type LangWatchQLFailure,
   LWQL_TIMEOUT_CODE,
+  LWQL_UNKNOWN_IDENTIFIER_CODE,
   LWQL_UNPARSEABLE_CODE,
   readLangWatchQLFailure,
 } from "../logic/lwqlFailure";
@@ -94,6 +95,43 @@ interface ResultChip {
   readonly title: string;
 }
 
+/** The pill for a failed submission, honest about where the failure happened. */
+function errorChip(failure: LangWatchQLFailure): ResultChip {
+  if (failure.code === LWQL_TIMEOUT_CODE) {
+    return {
+      label: "Timed out",
+      palette: "orange",
+      title: "The database stopped the read at its time ceiling",
+    };
+  }
+  // An unhandled failure named nothing, so the chip must not dress it as a
+  // refusal — the pane beside it is saying "we've been notified", and the
+  // two surfaces have to agree about whose failure this is.
+  if (failure.code === undefined) {
+    return {
+      label: "Failed",
+      palette: "red",
+      title: "The query failed for a reason the server did not name",
+    };
+  }
+  // The unknown-column refusal happens while the server resolves the
+  // statement's names — after the query has started — so its chip must not
+  // claim it happened before reading.
+  if (failure.code === LWQL_UNKNOWN_IDENTIFIER_CODE) {
+    return {
+      label: "Refused",
+      palette: "red",
+      title:
+        "The server refused this statement while resolving its column names",
+    };
+  }
+  return {
+    label: "Refused",
+    palette: "red",
+    title: "The server refused this statement before reading any data",
+  };
+}
+
 function resultChip({
   state,
   failure,
@@ -104,17 +142,7 @@ function resultChip({
   isStale: boolean;
 }): ResultChip | undefined {
   if (state.outcome?.kind === "error" && failure) {
-    return failure.code === LWQL_TIMEOUT_CODE
-      ? {
-          label: "Timed out",
-          palette: "orange",
-          title: "The database stopped the read at its time ceiling",
-        }
-      : {
-          label: "Refused",
-          palette: "red",
-          title: "The server refused this statement before reading any data",
-        };
+    return errorChip(failure);
   }
   if (state.outcome?.kind !== "result") return undefined;
   if (isStale) {

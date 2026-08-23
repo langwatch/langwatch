@@ -68,9 +68,18 @@ const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
 // this one CAN be the caller's SQL — member-authored LangWatchQL statements
 // are checked against the catalog at save time, but nothing there proves the
 // columns they select exist.
+// The two shapes of "the statement names a column that is not there": the
+// analyzer's UNKNOWN_IDENTIFIER (47) and the older interpreter path's
+// NO_SUCH_COLUMN_IN_TABLE (16). Grouped because they are the same fact to a
+// caller — a column name the datasets do not expose — differing only in which
+// stage of the server noticed.
 const UNKNOWN_IDENTIFIER: ServerError = {
   code: "47",
   name: "UNKNOWN_IDENTIFIER",
+};
+const NO_SUCH_COLUMN_IN_TABLE: ServerError = {
+  code: "16",
+  name: "NO_SUCH_COLUMN_IN_TABLE",
 };
 
 /**
@@ -132,7 +141,10 @@ export function isClickHouseObjectUnavailableError(error: unknown): boolean {
  */
 export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+  return raisedServerError({
+    error,
+    variants: [UNKNOWN_IDENTIFIER, NO_SUCH_COLUMN_IN_TABLE],
+  });
 }
 
 /**
@@ -152,19 +164,25 @@ export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
 export function clickHouseMissingIdentifiers(error: unknown): string[] {
   if (!(error instanceof Error)) return [];
 
+  const shapes: readonly RegExp[] = [
+    // Analyzer: Unknown expression identifier `x` in scope SELECT ...
+    /Unknown expression(?: or function)? identifier [`'"]([^`'"\s]{1,128})[`'"]/,
+    // Legacy analyzer: Missing columns: 'a', 'b' while processing query: ...
+    /Missing columns:\s*(.+?)(?:\s+while processing|\.|$)/s,
+    // Interpreter paths over a table's own columns.
+    /There is no column with name [`']?([\w.]{1,128})/,
+    /No such column ([\w.]{1,128}) in table/,
+  ];
+
   const names: string[] = [];
-
-  const scoped =
-    /Unknown expression(?: or function)? identifier `([^`]+)`/.exec(
-      error.message,
-    )?.[1];
-  if (scoped) names.push(scoped);
-
-  const listed = /Missing columns:\s*(.+?)(?:\s+while processing|\.|$)/s.exec(
-    error.message,
-  )?.[1];
-  if (listed) {
-    names.push(...[...listed.matchAll(/'([^']*)'/g)].map((match) => match[1] ?? ""));
+  for (const shape of shapes) {
+    const clause = shape.exec(error.message)?.[1];
+    if (!clause) continue;
+    if (shape.source.startsWith("Missing columns")) {
+      names.push(...[...clause.matchAll(/'([^']*)'/g)].map((m) => m[1] ?? ""));
+    } else {
+      names.push(clause);
+    }
   }
 
   return [...new Set(names)].sort();

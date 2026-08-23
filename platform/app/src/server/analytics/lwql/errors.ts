@@ -366,8 +366,12 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
   declare readonly code: "lwql_unknown_identifier";
 
   constructor(
-    /** The column names the server reported as missing. Sorted, deduplicated. */
-    identifiers: readonly string[],
+    options: {
+      /** The column names the server reported as missing. Sorted, deduplicated. */
+      readonly identifiers?: readonly string[];
+      /** The raw driver error, for the operator's logs. Never the response. */
+      readonly reasons?: readonly Error[];
+    } = {},
   ) {
     super(
       "lwql_unknown_identifier",
@@ -377,8 +381,9 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
         fault: "customer",
         // Named consumers: the workbench's error card, the dashboard widget,
         // and `langwatch chart run` output, which print code plus these names.
-        meta: { identifiers },
+        meta: options.identifiers ? { identifiers: options.identifiers } : {},
         ...remediation("lwql_unknown_identifier"),
+        ...(options.reasons ? { reasons: options.reasons } : {}),
       },
     );
     this.name = "LangWatchQLUnknownIdentifierError";

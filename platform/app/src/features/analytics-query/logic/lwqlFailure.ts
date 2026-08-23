@@ -28,6 +28,7 @@ export const LWQL_RESERVED_PARAMETER_SUPPLIED_CODE =
 export const LWQL_UNAVAILABLE_CODE = "lwql_unavailable";
 export const LWQL_NOT_ENABLED_CODE = "lwql_not_enabled";
 export const LWQL_TIMEOUT_CODE = "query_timeout";
+export const LWQL_UNKNOWN_IDENTIFIER_CODE = "lwql_unknown_identifier";
 
 /** Where in the submitted statement a refusal points. */
 export interface LangWatchQLSourcePosition {
