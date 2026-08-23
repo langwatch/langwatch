@@ -1,0 +1,93 @@
+---
+name: lwql-charts
+user-prompt: "Build a chart from a question and put it on my dashboard"
+description: Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.
+license: MIT
+compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
+metadata:
+  category: recipe
+---
+
+# Author a Chart and Place It on a Dashboard
+
+Turn a question ("how many traces per day?", "cost by model this week") into a saved chart that keeps updating on a dashboard. The loop is: **discover the schema → write and test-run the SQL → save the chart → place it**.
+
+## Prerequisites
+
+LangWatchQL analytics is switched per project. If any chart command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
+
+## Step 1: Discover the schema before writing any SQL
+
+Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+
+```bash
+langwatch chart schema --format json
+```
+
+Read the datasets, their grain, their time column, and which columns are `available` to you. A column your permissions withhold is refused by the validator at save time — writing SQL against the schema you just read is what keeps saves from bouncing.
+
+## Step 2: Write the SQL, using the reserved period parameters
+
+A chart that should follow the dashboard's period selector declares the reserved bound parameters instead of hardcoding dates:
+
+- `{period_start:DateTime}` / `{period_end:DateTime}` — the surface's period, half-open `[start, end)`
+- `{period_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
+
+```sql
+SELECT
+  toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+  count() AS traces
+FROM analytics.traces
+WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+GROUP BY bucket
+ORDER BY bucket
+```
+
+Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `period_*` names.
+
+## Step 3: Save the chart, then prove it runs
+
+```bash
+langwatch chart create \
+  --name "Traces per day" \
+  --sql-file query.sql \
+  --spec-file spec.json \
+  --format json
+```
+
+`spec.json` is a Vega-Lite specification reading from `{"data": {"name": "query_result"}}`, with fields named exactly after the SQL's output columns. The save validates both the SQL (against your permissions) and the specification before writing anything — a refusal means fix the input, not retry.
+
+See the numbers before placing it:
+
+```bash
+langwatch chart run <chart-id> \
+  --start 2026-08-01T00:00:00Z --end 2026-08-08T00:00:00Z \
+  --granularity 86400 --format json
+```
+
+`--start`/`--end` fill the reserved period parameters; `--granularity` the datapoint step. A chart whose SQL declares none of them runs without the flags.
+
+## Step 4: Place it on a dashboard
+
+```bash
+langwatch dashboard list --format json          # find or create the target
+langwatch chart place <chart-id> --dashboard-id <dashboard-id> --format json
+```
+
+With no `--grid-row`, the platform allocates the next free row, so it never lands on top of an existing chart. `langwatch chart unplace <chart-id>` takes it off again without deleting it.
+
+## Managing saved charts
+
+```bash
+langwatch chart list --format json
+langwatch chart get <chart-id> --format json    # SQL, parameters, spec, placement
+langwatch chart update <chart-id> --sql-file query.sql
+langwatch chart delete <chart-id>
+```
+
+## Failure modes worth knowing
+
+- `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- A validator refusal naming a column — re-read the schema (Step 1); the column is misspelled or your permissions withhold it.
+- `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
+- `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.
