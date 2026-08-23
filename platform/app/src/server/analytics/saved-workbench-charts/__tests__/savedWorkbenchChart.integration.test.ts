@@ -494,7 +494,10 @@ describe("saved workbench charts (integration)", () => {
         expect(placed.gridRow).toBe(2);
 
         const stillAtTheirRows = await prisma.customGraph.findMany({
-          where: { id: { in: [builderRow0.id, builderRow1.id] } },
+          where: {
+            id: { in: [builderRow0.id, builderRow1.id] },
+            projectId: project.id,
+          },
         });
         expect(
           stillAtTheirRows.find(({ id }) => id === builderRow0.id)?.gridRow,
