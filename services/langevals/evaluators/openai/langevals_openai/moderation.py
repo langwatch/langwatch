@@ -1,6 +1,7 @@
+import time
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -10,8 +11,28 @@ from langevals_core.base_evaluator import (
     BatchEvaluationResult,
     EvaluatorEntry,
     EvaluationResultSkipped,
+    evaluation_timed_out_result,
 )
 from tqdm.auto import tqdm
+
+
+class _DeadlinePassed(Exception):
+    """The batch ran out of time before this call could be made."""
+
+
+def _moderate(client: OpenAI, contents: list[str], deadline: Optional[float]):
+    """One moderation call, bounded by whatever is left of the batch deadline.
+
+    Both calls this evaluator makes cover the whole batch, so the budget is
+    read again before each one rather than split in half up front: the second
+    call gets whatever the first did not spend.
+    """
+    if deadline is None:
+        return client.moderations.create(input=contents)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise _DeadlinePassed()
+    return client.with_options(timeout=remaining).moderations.create(input=contents)
 
 
 class OpenAIModerationEntry(EvaluatorEntry):
@@ -84,14 +105,28 @@ class OpenAIModerationEvaluator(
         max_seconds=None,
         _executor_ref=None,
     ) -> BatchEvaluationResult:
-        client = OpenAI(api_key=self.get_env("OPENAI_API_KEY"))
+        # `max_seconds` bounds the whole batch, and this override has to keep
+        # that promise itself: it never reaches the base class, which is where
+        # the deadline usually lives. A moderation call over the network can
+        # stall for as long as the socket stays open, and the caller holds a
+        # gate slot the whole time, so an unbounded call here is the wedge the
+        # deadline exists to stop.
+        deadline = None if max_seconds is None else time.monotonic() + max_seconds
+        # No SDK retries: each attempt gets the full timeout, so the default of
+        # two would let one call run for three times the budget.
+        client = OpenAI(api_key=self.get_env("OPENAI_API_KEY"), max_retries=0)
 
         results: list[SingleEvaluationResult] = []
 
         contents_input = [entry.input or "" for entry in data]
         contents_output = [entry.output or "" for entry in data]
-        response_input = client.moderations.create(input=contents_input)
-        response_output = client.moderations.create(input=contents_output)
+        try:
+            response_input = _moderate(client, contents_input, deadline)
+            response_output = _moderate(client, contents_output, deadline)
+        except (APITimeoutError, _DeadlinePassed):
+            # Both calls cover the whole batch, so when either runs out of
+            # time no entry has an answer.
+            return [evaluation_timed_out_result(max_seconds)] * len(data)
 
         for i, (input_result, output_result) in enumerate(
             zip(response_input.results, response_output.results)

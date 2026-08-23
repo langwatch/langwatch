@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from contextlib import asynccontextmanager, contextmanager
 import asyncio
+import math
 import os
 import signal
 import sys
@@ -85,21 +86,41 @@ MAX_CONCURRENT_EVALUATIONS = (
 EVALUATION_TIMEOUT_SECONDS = (
     positive_float_or_none(os.getenv("LANGEVALS_EVALUATION_TIMEOUT")) or 300.0
 )
+# What one entry spends before it gives up on the provider. `evaluate_batch`
+# retries a failed model call this many times and waits between attempts, and
+# the server does not override either, so a stalled provider is dialled
+# MODEL_CALL_ATTEMPTS times and not once.
+MODEL_CALL_ATTEMPTS = 3
+MODEL_CALL_MAX_WAIT_SECONDS = 10.0
+
+
+def model_timeout_fitting_the_batch_deadline(batch_deadline: float) -> float:
+    """The longest one model call may run and still lose the race.
+
+    The batch deadline names nothing but the batch, so a call that stalls
+    should fail first, as a provider timeout that names the provider. That
+    only holds if EVERY attempt fits: one call under the deadline still ends
+    as an abandoned batch when the retry after it is cut off. So the budget is
+    all the attempts plus the waits between them, not one call.
+
+    Capped at three minutes, which is far above any judge call that is working
+    (single figures of seconds, or a minute for a reasoning model on a long
+    context), so the bound only ever cuts off a call that stopped making
+    progress.
+    """
+    waits = (MODEL_CALL_ATTEMPTS - 1) * MODEL_CALL_MAX_WAIT_SECONDS
+    fits = math.floor((batch_deadline - waits) / MODEL_CALL_ATTEMPTS)
+    return float(min(180, max(1, fits)))
+
+
 # How long ONE model call may take, which is the usual reason an evaluation
 # overruns. litellm ships a 6000 second default, so a stalled provider parks a
 # worker thread for 100 minutes. The batch deadline above already gives the
 # slot back at that point, but only this makes the abandoned thread die
 # instead of lingering with the socket.
-#
-# It sits below the batch deadline on purpose: a call that overruns then fails
-# as a provider timeout, which names the provider, rather than as an abandoned
-# evaluation, which only says the batch ran out of time. The default is far
-# above any judge call that is working (single figures of seconds, or a minute
-# for a reasoning model on a long context) so it only ever cuts off a call
-# that has stopped making progress.
-MODEL_TIMEOUT_SECONDS = (
-    positive_float_or_none(os.getenv("LANGEVALS_MODEL_TIMEOUT")) or 180.0
-)
+MODEL_TIMEOUT_SECONDS = positive_float_or_none(
+    os.getenv("LANGEVALS_MODEL_TIMEOUT")
+) or model_timeout_fitting_the_batch_deadline(EVALUATION_TIMEOUT_SECONDS)
 litellm.request_timeout = MODEL_TIMEOUT_SECONDS
 # Spare threads for anything the framework runs off the event loop that is not
 # an evaluation. The pool is sized from the knob plus this, never below it.

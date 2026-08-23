@@ -182,8 +182,14 @@ class EvaluationResultError(BaseModel):
     traceback: List[str] = Field(description="Traceback information for debugging")
 
 
-def _timed_out_result(max_seconds: Optional[float]) -> EvaluationResultError:
-    """The answer for an entry the batch stopped waiting for."""
+def evaluation_timed_out_result(
+    max_seconds: Optional[float],
+) -> EvaluationResultError:
+    """The answer for an entry the batch stopped waiting for.
+
+    Shared, so an evaluator that overrides `evaluate_batch` and enforces the
+    deadline itself reports the same `EvaluationTimeout` the base class does.
+    """
     return EvaluationResultError(
         error_type="EvaluationTimeout",
         details=(
@@ -388,7 +394,7 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 results[idx] = (
                     future.result()
                     if future.done() and not future.cancelled()
-                    else _timed_out_result(max_seconds)
+                    else evaluation_timed_out_result(max_seconds)
                 )
         finally:
             # Never wait: the entries still running are the ones that

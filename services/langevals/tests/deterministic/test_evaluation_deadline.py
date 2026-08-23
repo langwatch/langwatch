@@ -18,12 +18,15 @@ the evaluator's `evaluate` blocks on an Event the test controls, which is what
 a hung socket looks like from here.
 """
 
+import asyncio
 import os
 import sys
 import threading
+import time
 
 import httpx
 import pytest
+from openai import APITimeoutError
 
 # Same import guard as the other server tests (see test_server_concurrency):
 # `langevals.server` reads sys.argv and DISABLE_EVALUATORS_PRELOAD at import
@@ -43,6 +46,9 @@ finally:
     else:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
+# The server captured original_env while the temporary preload flag was set,
+# and the drift tripwire compares against that snapshot. Rebase it on the
+# clean environment so the flag cannot read as drift.
 server.original_env = os.environ.copy()
 
 
@@ -63,11 +69,15 @@ def hanging_exact_match(monkeypatch):
 
     release = threading.Event()
     entered = threading.Semaphore(0)
+    # Bound before the patch. Reading the attribute inside the double would
+    # read the double itself, and the released thread would recurse into it
+    # until it ran out of stack instead of scoring the entry.
+    real_evaluate = ExactMatchEvaluator.evaluate
 
     def hanging_evaluate(self, entry):
         entered.release()
         release.wait()
-        return ExactMatchEvaluator.evaluate(self, entry)
+        return real_evaluate(self, entry)
 
     monkeypatch.setattr(ExactMatchEvaluator, "evaluate", hanging_evaluate)
     try:
@@ -90,9 +100,10 @@ async def test_a_stuck_evaluation_gives_its_gate_slot_back(
 ):
     """The whole point: a hung evaluation must not wedge the process.
 
-    One slot, one stuck request. Without a deadline the second request waits
-    out the queue timeout and 503s, and every request after it does too. With
-    one, the stuck batch gives up, and the queue moves again.
+    One slot, one stuck request, and a second request already queued behind
+    it. Without a deadline the second waits out the queue timeout and 503s,
+    and every request after it does too. With one, the stuck batch gives up
+    and the caller in the queue is admitted.
     """
     monkeypatch.setattr(server, "EVALUATION_TIMEOUT_SECONDS", 0.5)
     gate = server.EvaluationGate(max_concurrent=1, timeout_seconds=5)
@@ -100,14 +111,23 @@ async def test_a_stuck_evaluation_gives_its_gate_slot_back(
 
     transport = httpx.ASGITransport(app=server.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        stuck = await client.post(EXACT_MATCH_URL, json=evaluation_request())
-        assert stuck.status_code == 200
+        stuck = asyncio.ensure_future(
+            client.post(EXACT_MATCH_URL, json=evaluation_request())
+        )
+        # Queue the follow-up only once the stuck evaluation really holds the
+        # only slot. Sending it first would let it take the slot itself and
+        # the 200 below would prove nothing about the queue.
+        await asyncio.to_thread(hanging_exact_match.acquire)
+        assert gate.active_evaluations == 1
 
-        # The slot is free again, so a later request runs rather than queueing
-        # behind work that will never finish.
-        assert gate.active_evaluations == 0
         follow_up = await client.post(EXACT_MATCH_URL, json=evaluation_request())
-        assert follow_up.status_code == 200
+        stuck_response = await stuck
+
+    # 503 here is the wedge: the queue timeout ran out while the stuck request
+    # still held the slot.
+    assert follow_up.status_code == 200
+    assert stuck_response.status_code == 200
+    assert gate.active_evaluations == 0
 
 
 # @scenario "An entry that ran out of time is reported as an error"
@@ -187,7 +207,60 @@ def test_every_evaluator_accepts_the_arguments_the_server_calls_it_with():
         )
 
 
-# @scenario "The evaluation deadline is shorter than the queue a caller waits in"
+# @scenario "An evaluator that batches its own way still stops at the deadline"
+def test_an_evaluator_that_batches_its_own_way_stops_at_the_deadline(monkeypatch):
+    """Accepting `max_seconds` is not the same as honoring it.
+
+    The moderation evaluator sends the whole batch in two calls of its own
+    rather than one per entry, so the base class deadline never runs for it.
+    A call that stalls holds the gate slot for as long as the socket stays
+    open unless this override bounds it itself.
+    """
+    from langevals_openai.moderation import OpenAIModerationEntry, OpenAIModerationEvaluator
+
+    calls: list[float | None] = []
+
+    class StallingModerations:
+        def create(self, input):
+            time.sleep(5)
+            raise AssertionError("the deadline should have cut this call off")
+
+    class StallingClient:
+        moderations = StallingModerations()
+
+        def with_options(self, timeout):
+            calls.append(timeout)
+            # What the SDK does with the bound: give up once it is spent.
+            raise APITimeoutError(request=httpx.Request("POST", "http://test"))
+
+    monkeypatch.setattr(
+        "langevals_openai.moderation.OpenAI", lambda **kwargs: StallingClient()
+    )
+
+    evaluator = OpenAIModerationEvaluator(env={"OPENAI_API_KEY": "sk-test"})
+    started = time.monotonic()
+    results = evaluator.evaluate_batch(
+        [
+            OpenAIModerationEntry(input="hello", output="hi"),
+            OpenAIModerationEntry(input="bye", output="see you"),
+        ],
+        max_seconds=0.5,
+    )
+    elapsed = time.monotonic() - started
+
+    # One answer per entry, every one of them the timeout error.
+    assert len(results) == 2
+    assert [result.error_type for result in results] == [
+        "EvaluationTimeout",
+        "EvaluationTimeout",
+    ]
+    # The bound really was handed to the call rather than only computed.
+    assert calls and all(0 < timeout <= 0.5 for timeout in calls)
+    # And the batch gave up rather than waiting the call out.
+    assert elapsed < 2
+
+
+# @scenario "A slot comes back before the caller queued behind it gives up"
 def test_the_deadline_is_shorter_than_the_queue_a_caller_waits_in():
     """A slot has to come back before the queue behind it times out.
 
@@ -198,15 +271,64 @@ def test_the_deadline_is_shorter_than_the_queue_a_caller_waits_in():
     assert server.EVALUATION_TIMEOUT_SECONDS <= server.EVALUATION_QUEUE_TIMEOUT_SECONDS
 
 
-# @scenario "A model call fails before the batch gives up on it"
-def test_a_model_call_is_bounded_below_the_batch_deadline():
+# @scenario "A stalled model call is answered as a provider timeout"
+def test_a_stalled_model_call_is_answered_as_a_provider_timeout(monkeypatch):
     """A provider timeout names the provider; an abandoned batch names nothing.
 
-    Both bounds return the slot, so this is about which error the customer
-    reads. The model call has to lose the race for the answer to be useful.
+    Both bounds return the slot, so this is about which error the caller
+    reads. Only the model call losing the race makes the answer useful.
+
+    Driven through the batch rather than the endpoint, with one attempt: the
+    waits between retries are real seconds, and how many attempts fit is what
+    the next test measures instead.
+    """
+    import litellm
+    from langevals_langevals.exact_match import (
+        ExactMatchEntry,
+        ExactMatchEvaluator,
+    )
+
+    def stalled_call(self, entry):
+        raise litellm.Timeout(
+            message=(
+                f"Connection timed out after {server.MODEL_TIMEOUT_SECONDS} seconds."
+            ),
+            model="gpt-5-mini",
+            llm_provider="openai",
+        )
+
+    monkeypatch.setattr(ExactMatchEvaluator, "evaluate", stalled_call)
+
+    [result] = ExactMatchEvaluator().evaluate_batch(
+        [ExactMatchEntry(output="42", expected_output="42")],
+        retries=1,
+        # Well above anything this test spends, so the batch deadline cannot
+        # be what produces the answer below.
+        max_seconds=30,
+    )
+
+    assert result.status == "error"
+    # Named after the model call, not after the batch giving up. The two are
+    # different answers and this is the one that says where to look.
+    assert result.error_type == "Timeout"
+    assert result.error_type != "EvaluationTimeout"
+    assert "litellm.Timeout" in result.details
+
+
+# @scenario "A stalled model call runs out of attempts before the batch gives up"
+def test_every_model_call_attempt_fits_inside_the_batch_deadline():
+    """One call under the deadline is not enough: the retries have to fit too.
+
+    An entry dials a stalled provider MODEL_CALL_ATTEMPTS times with waits in
+    between. If that whole budget runs past the batch deadline, the batch is
+    what gives up and the caller reads an abandoned evaluation after all.
     """
     import litellm
 
-    assert server.MODEL_TIMEOUT_SECONDS < server.EVALUATION_TIMEOUT_SECONDS
+    budget = (
+        server.MODEL_CALL_ATTEMPTS * server.MODEL_TIMEOUT_SECONDS
+        + (server.MODEL_CALL_ATTEMPTS - 1) * server.MODEL_CALL_MAX_WAIT_SECONDS
+    )
+    assert budget <= server.EVALUATION_TIMEOUT_SECONDS
     # And the bound is actually applied, not just computed.
     assert litellm.request_timeout == server.MODEL_TIMEOUT_SECONDS

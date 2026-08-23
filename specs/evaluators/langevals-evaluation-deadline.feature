@@ -38,26 +38,48 @@ Feature: A stuck evaluation cannot take the evaluation service down with it
       Then the entry carries its real result
 
     @unit
-    Scenario: The evaluation deadline is shorter than the queue a caller waits in
-      Given the two timeouts the service is configured with
-      When they are compared
-      Then a slot comes back before the callers queued behind it give up
+    Scenario: A slot comes back before the caller queued behind it gives up
+      Given an evaluation holding the only slot for as long as the deadline allows
+      When a caller queues for that slot
+      Then the slot comes back while the caller is still waiting
+
+  Rule: An answer says where to look
+
+    A stalled model call and an abandoned batch both return the slot, so the
+    difference the caller sees is which one is named. The model call has to
+    give up first for the answer to point at the provider.
 
     @unit
-    Scenario: A model call fails before the batch gives up on it
+    Scenario: A stalled model call is answered as a provider timeout
       Given a model call that stops making progress
       When it runs past the model timeout
-      Then it fails as a provider timeout, which names the provider
-      And the batch deadline stays the backstop behind it
+      Then the entry is answered as a model-call timeout
+      And the answer is not the batch reporting that it gave up
+
+    @unit
+    Scenario: A stalled model call runs out of attempts before the batch gives up
+      Given a model call that stops making progress on every attempt
+      When the entry retries it as many times as it is allowed
+      Then every attempt and every wait between them fits inside the evaluation timeout
 
   Rule: One endpoint calls every evaluator
 
     An evaluator that batches differently may replace the batch method. A
     replacement that accepts fewer arguments still imports and still loads,
-    and fails only when a customer calls that one evaluator.
+    and fails only when a customer calls that one evaluator. A replacement
+    that accepts the deadline and ignores it loads and runs, and holds its
+    slot past the deadline the same way an unbounded call always did.
 
     @unit
     Scenario: Every evaluator accepts the arguments the server calls it with
       Given every evaluator the server loaded
       When the server's own call is bound against each batch method
       Then every evaluator accepts it
+
+    @unit
+    Scenario: An evaluator that batches its own way still stops at the deadline
+      Given the moderation evaluator, which sends the whole batch in one call
+      And that call stops making progress
+      When the batch runs past the evaluation timeout
+      Then every entry is answered as an error naming the timeout
+      And the call is given up on rather than waited out
