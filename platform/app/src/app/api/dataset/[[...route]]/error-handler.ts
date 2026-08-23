@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { getLogLevelForRequest } from "@langwatch/observability/request";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handleError } from "../../middleware/error-handler";
@@ -61,6 +62,21 @@ const DOMAIN_ERROR_HTTP: Record<
 };
 
 /**
+ * The status this handler will actually answer with, in the order the response
+ * branches below resolve it: the domain mapping, then `HttpError.status`, then
+ * a handled error's own `httpStatus`, then the 500 fallback.
+ */
+function resolveStatus(
+  error: Error & { status?: ContentfulStatusCode },
+  domainStatus: ContentfulStatusCode | undefined,
+): number {
+  if (domainStatus !== undefined) return domainStatus;
+  if (error instanceof HttpError) return error.status;
+  if (HandledError.isHandled(error)) return error.httpStatus;
+  return error.status ?? 500;
+}
+
+/**
  * Error handler for dataset API routes.
  * Converts thrown errors to proper error responses matching the errorSchema.
  */
@@ -74,16 +90,18 @@ export const handleDatasetError = async (
   // Resolve the domain mapping first so the logged status matches the response
   // status: domain errors are plain `Error`s with no `.status`, so computing
   // status from `HttpError`/`.status` alone would log [500] while actually
-  // returning 404/409/422.
+  // returning 404/409/422. A handled error names its status `httpStatus` and
+  // is answered by `handleError` below, so read that too — otherwise a handled
+  // 404 logs as a 500 incident while the caller is correctly told 404.
   const domain = DOMAIN_ERROR_HTTP[error.name];
-  const status =
-    domain?.status ??
-    (error instanceof HttpError ? error.status : (error.status ?? 500));
+  const status = resolveStatus(error, domain?.status);
 
-  // Log the error with context (including status code). A 4xx is the
-  // caller's mistake answered correctly — a missing dataset, a bad payload —
-  // so it logs at warn; only a 5xx is ours and stays at error.
-  logger[status >= 500 ? "error" : "warn"](
+  // Level with the shared rule rather than a local one, so this boundary
+  // agrees with tRPC and the request middleware: a handled error levels by
+  // its own fault attribution, anything else by the status we are about to
+  // answer with. A 4xx here is the caller's mistake answered correctly — a
+  // missing dataset, a bad payload — and only a 5xx is ours.
+  logger[getLogLevelForRequest(error, status)](
     {
       path,
       method,
