@@ -13,13 +13,11 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ON_ENGINE_STATUS } from "~/server/app-layer/authz/engine-gate";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -208,53 +206,6 @@ async function createProvisionedOrganization(
     }
     throw error;
   }
-}
-
-/**
- * Put a brand-new organization on the authorization engine at birth, in the
- * SAME transaction that creates it.
- *
- * ADR-110's migration exists to carry an organization's EXISTING access
- * across: it states the legacy rows as events and proves the projection
- * agrees. An organization created after the migration has no legacy access
- * to carry — it has no roles, no bindings, no share links, nothing. There is
- * no proof to run because there is nothing to prove, so the migration would
- * be an empty pass whose only product is the status row this writes directly.
- *
- * Written INSIDE the transaction, and therefore before anything else the
- * creation does, because the gate is what every later write forks on: the
- * founder's two ADMIN grants are attached moments later through
- * `attachBindings`, and they must take the engine path. An organization whose
- * first grants went down the legacy path would be a legacy organization that
- * merely claims to be on the engine.
- *
- * There is no window where the founder lacks access: on the engine path
- * `attachBindings` appends the events and then AWAITS the projection before
- * it returns, so the bindings are readable by the time creation completes.
- *
- * No enrollment row accompanies this. Enrollment means an operator paced this
- * organization into a rollout; nobody paced this one, and writing a row that
- * named the founder as its enroller would put a fiction in a table the ops
- * page attributes by name. Finalized-without-enrolled is the honest reading,
- * and the two counters were never a join in the first place.
- */
-async function putNewOrganizationOnAuthzEngine({
-  tx,
-  organizationId,
-}: {
-  tx: Prisma.TransactionClient;
-  organizationId: string;
-}): Promise<void> {
-  await tx.systemMigrationTenantState.create({
-    data: {
-      migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-      tenantId: organizationId,
-      status: ON_ENGINE_STATUS,
-      // Its own kind, not the migration's: an operator reading this report
-      // must not be told a parity proof ran over facts that never existed.
-      report: { kind: "authz_engine_new_organization" },
-    },
-  });
 }
 
 /**
@@ -599,13 +550,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       });
 
-      // Before the membership row and before the founder's grants: every
-      // later write forks on this.
-      await putNewOrganizationOnAuthzEngine({
-        tx,
-        organizationId: organization.id,
-      });
-
       await tx.organizationUser.create({
         data: {
           userId: input.userId,
@@ -678,14 +622,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }
 
       const organization = await createProvisionedOrganization(tx, input);
-
-      // A provisioned organization is as new as a signed-up one: no legacy
-      // access to carry, and whoever is assigned to it later must be granted
-      // through the engine.
-      await putNewOrganizationOnAuthzEngine({
-        tx,
-        organizationId: organization.id,
-      });
 
       const team = await tx.team.create({
         data: {

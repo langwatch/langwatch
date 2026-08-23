@@ -195,46 +195,6 @@ Feature: Moving an organization onto the grants projection
     Then it runs automatically on a self-hosted installation
     And every organization there migrates without anyone enrolling it
 
-  # ═══ Organizations born after the migration ═══════════════════════════
-  #
-  # The migration carries EXISTING access across. An organization created
-  # after it has none to carry — no roles, no bindings, no share links — so
-  # there is no proof to run and nothing for a pass to do. It is put on the
-  # engine when it is created instead, and never migrates at all.
-
-  @unit
-  Scenario: A new organization is created on the engine
-    When an organization is created
-    Then it is recorded as being on the engine
-    And no migration pass is needed to put it there
-
-  # The gate is what every authorization write forks on, so the moment it
-  # answers "on the engine" has to precede the organization's first grants.
-  @unit
-  Scenario: A new organization is on the engine before its first grants
-    When an organization is created
-    Then it is recorded as being on the engine before its founder's grants are attached
-    And those grants are appended as events rather than written as legacy rows
-
-  @unit
-  Scenario: A provisioned organization is created on the engine too
-    When an organization is provisioned
-    Then it is recorded as being on the engine
-
-  # Enrollment means an operator paced an organization into a rollout.
-  # Nobody paced this one, and naming its founder as the enroller would put a
-  # fiction in the table the ops page attributes by name.
-  @unit
-  Scenario: A new organization is not enrolled in the migration
-    When an organization is created
-    Then no enrollment row is written for it
-
-  @unit
-  Scenario: A new organization's state says it was never migrated
-    When an organization is created
-    Then its recorded report says it was created on the engine
-    And the report does not claim a parity proof ran
-
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-
   # specific: rolling back within the gate's cache window is specced in
