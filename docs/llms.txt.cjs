@@ -235,23 +235,25 @@ const allPatterns = includePaths.flatMap(includePath =>
 const found = new Set();
 allPatterns.forEach(pattern => {
   try {
-    // Create a find command to locate the files (sort for stable cross-platform ordering).
-    // `|| true` keeps a pattern that matches nothing from failing the run:
-    // grep exits 1 on zero selected lines.
-    let findCmd = `find . -type f -path "./${pattern}" 2>/dev/null | sort`;
-
-    // Add exclude patterns if any
-    if (excludePaths.length > 0) {
-      excludePaths.forEach(excludePath => {
-        findCmd += ` | grep -Fv "${excludePath}"`;
-      });
-    }
-
-    execSync(`${findCmd} || true`)
+    // Locate the files (sort for stable cross-platform ordering). Exclusions
+    // are applied in the filter below rather than a shell grep, so a failed
+    // find surfaces as an error instead of being swallowed by `|| true`.
+    const findOutput = execSync(
+      `find . -type f -path "./${pattern}" 2>/dev/null | sort`,
+    )
       .toString()
       .split('\n')
-      .filter(file => file) // Remove empty lines
-      .forEach(file => found.add(file));
+      .filter(file => file); // Remove empty lines
+
+    // Add exclude patterns
+    if (excludePaths.length > 0) {
+      const kept = findOutput.filter(file =>
+        excludePaths.every(excludePath => !file.includes(excludePath)),
+      );
+      kept.forEach(file => found.add(file));
+    } else {
+      findOutput.forEach(file => found.add(file));
+    }
   } catch (error) {
     // If there's an error with the command, log and continue
     console.log(`Error with pattern: ${pattern}: ${error.message}`);
