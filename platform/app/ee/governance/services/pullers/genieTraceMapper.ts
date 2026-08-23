@@ -292,14 +292,16 @@ function mapMessage(
   const attachments = payload.attachments ?? [];
 
   // The ANSWER text attachment (35/35 in the capture, refusals included).
-  // Purpose is matched when present; a lone text attachment without one
-  // still counts — presence of an answer beats strictness on a label.
+  // The wire value is the enum-prefixed "TEXT_ATTACHMENT_PURPOSE_ANSWER"
+  // (verified against the raw capture); bare "ANSWER" is tolerated. A lone
+  // text attachment without a purpose still counts — presence of an answer
+  // beats strictness on a label.
   const textAttachments = attachments.filter(
     (attachment) => typeof attachment.text?.content === "string",
   );
   const answerAttachment =
-    textAttachments.find(
-      (attachment) => attachment.text?.purpose === "ANSWER",
+    textAttachments.find((attachment) =>
+      (attachment.text?.purpose ?? "").endsWith("ANSWER"),
     ) ?? textAttachments[0];
   const answerText = answerAttachment?.text?.content ?? "";
 

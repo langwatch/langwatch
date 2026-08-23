@@ -95,7 +95,10 @@ function completedMessage(overrides: Record<string, unknown> = {}) {
       },
       {
         attachment_id: "att-a1",
-        text: { content: "EMEA sold the most in Q2.", purpose: "ANSWER" },
+        text: {
+          content: "EMEA sold the most in Q2.",
+          purpose: "TEXT_ATTACHMENT_PURPOSE_ANSWER",
+        },
       },
       {
         attachment_id: "att-s1",
@@ -159,6 +162,30 @@ describe("given a completed Genie message from the capture shape", () => {
       "User wants regional totals\n\nUse the sales table\n\nGroup by region, sum amount",
     );
     expect(reasoning).not.toContain("Total sales by region");
+  });
+
+  it("picks the ANSWER-purposed text over an earlier non-answer text", () => {
+    const twoTexts = completedMessage({
+      attachments: [
+        {
+          attachment_id: "att-note",
+          text: {
+            content: "A caveat note.",
+            purpose: "TEXT_ATTACHMENT_PURPOSE_OTHER",
+          },
+        },
+        {
+          attachment_id: "att-answer",
+          text: {
+            content: "The real answer.",
+            purpose: "TEXT_ATTACHMENT_PURPOSE_ANSWER",
+          },
+        },
+      ],
+    });
+    const [only] = spansOf([genieEvent(twoTexts)]);
+    const output = JSON.parse(attrsOf(only!)["langwatch.output"] as string);
+    expect(output.value[0].content).toBe("The real answer.");
   });
 
   it("never leaks suggested_questions into any mapped payload", () => {
