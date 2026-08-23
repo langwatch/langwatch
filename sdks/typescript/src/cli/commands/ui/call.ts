@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
+import { handledErrorFrom } from "@/internal/api/errors";
 import { resolveCredentials } from "../../utils/apiKey";
+import { reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -52,7 +54,13 @@ const readPayloadFile = async (file: string): Promise<string> => {
  */
 export const uiCallCommand = async (
   kind: string,
-  options: { payload?: string; payloadFile?: string; experiment?: string },
+  options: {
+    payload?: string;
+    payloadFile?: string;
+    experiment?: string;
+    /** The caller's `--format`, so a refusal answers in the shape they asked for. */
+    format?: string;
+  },
 ): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();
 
@@ -136,9 +144,28 @@ export const uiCallCommand = async (
 
   const text = await response.text();
   if (!response.ok) {
-    // The body is the canonical handled-error envelope: code, meta, tips.
-    // Print it whole so the agent can read the code and act on the tips.
-    process.stderr.write(`${text}\n`);
+    // Through the shared reporter, not straight to stderr. The body is the
+    // platform's REST envelope (`{error: {...}}`), and the reader on the other
+    // end — the panel's tool card — parses the CLI's own failure document
+    // (`{ok: false, error: {...}}`). Written raw, the card could not read it
+    // and showed the customer the wire envelope: a wall of escaped JSON under
+    // "This step couldn't be completed", with the sentence explaining the
+    // failure buried in the middle of it.
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+    reportCommandError({
+      error:
+        handledErrorFrom({
+          operation: `ui call ${kind}`,
+          body,
+          status: response.status,
+        }) ?? new Error(text),
+      ...(options.format ? { format: options.format } : {}),
+    });
     process.exitCode = 1;
     return;
   }

@@ -147,6 +147,17 @@ Feature: Langy drives the open page through typed UI actions
     When the caller passes an inline payload and a payload file together
     Then the command refuses rather than picking one
 
+  # The refusal is written for two readers: the agent, which acts on the code,
+  # and the customer watching the panel, whose card parses the CLI's own failure
+  # document. Writing the platform's REST envelope straight to stderr served
+  # neither: the card could not read it, so it printed the whole thing, and the
+  # customer got a wall of escaped JSON with the sentence buried in it.
+  @unit
+  Scenario: A refused action reaches the reader as a sentence, not the wire envelope
+    Given the platform refuses an action and names the reason
+    When the command reports the refusal
+    Then it emits the CLI failure document carrying the platform's code and sentence
+
   @unit
   Scenario: Only the claiming user's session may complete an action
     Given one user's session claimed the action

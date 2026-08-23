@@ -11,7 +11,6 @@ import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
 } from "~/server/app-layer/langy/errors";
-import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type {
   ConversationDetail,
   ConversationListItem,
@@ -29,7 +28,15 @@ import {
   type LangyStreamEntry,
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import type {
+  SettlementOutcome,
+  TurnHealth,
+} from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import {
+  advanceSettlement,
+  decideSyntheticTerminal,
+  NO_SETTLEMENT_STREAKS,
+} from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import {
   LangyUiActionService,
   type UiActionRedis,
@@ -268,13 +275,57 @@ const SETTLEMENT_POLL_MS = 5_000;
 const SETTLEMENT_CONFIRM_POLLS = 2;
 
 /**
+ * Read the durable fold and the per-turn heartbeat once, or null when either
+ * read failed — which says nothing about the turn and must not count either way.
+ */
+async function readTurnHealth({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  buffer,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  buffer: LivenessSource;
+}): Promise<TurnHealth | null> {
+  const [conversation, liveness] = await Promise.all([
+    getApp()
+      .langy.conversations.getById({ id: conversationId, projectId, userId })
+      .catch(() => null),
+    buffer.liveness({ conversationId, turnId }).catch(() => null),
+  ]);
+  if (!conversation || !liveness) return null;
+  return {
+    stale: liveness.stale,
+    terminal: decideSyntheticTerminal({
+      status: conversation.status,
+      lastError: conversation.lastError,
+      heartbeatStale: liveness.stale,
+    }),
+  };
+}
+
+/** The one thing this watcher needs of the token buffer. */
+interface LivenessSource {
+  liveness(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ stale: boolean }>;
+}
+
+/**
  * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
- * tailed, and resolve to the terminal entry the buffer never received — or null
- * if the stream ended first (aborted) or the turn never settled.
+ * tailed, and resolve to what should end the tail — or null if the stream ended
+ * first (aborted) or the turn is still going.
  *
  * Split out of `onTurnStream` so the subscription body stays at the orchestration
- * level and this confirmation loop is independently testable. The safety gate
- * itself lives in {@link decideSyntheticTerminal}.
+ * level and this confirmation loop is independently testable. The two gates
+ * themselves live in {@link decideSyntheticTerminal} and
+ * {@link shouldAbandonWedgedTurn}; both want the same reading confirmed over
+ * several polls, so a single blip can never end a live stream.
  */
 async function watchForMissedTerminal({
   projectId,
@@ -288,38 +339,32 @@ async function watchForMissedTerminal({
   conversationId: string;
   turnId: string;
   userId: string;
-  buffer: {
-    liveness(a: {
-      conversationId: string;
-      turnId: string;
-    }): Promise<{ stale: boolean }>;
-  };
+  buffer: LivenessSource;
   signal: AbortSignal;
-}): Promise<LangyStreamEntry | null> {
-  let settledStreak = 0;
+}): Promise<SettlementOutcome | null> {
+  let streaks = NO_SETTLEMENT_STREAKS;
   while (!signal.aborted) {
     if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
-    const [conversation, liveness] = await Promise.all([
-      getApp()
-        .langy.conversations.getById({ id: conversationId, projectId, userId })
-        .catch(() => null),
-      buffer.liveness({ conversationId, turnId }).catch(() => null),
-    ]);
-    if (!conversation || !liveness) {
-      settledStreak = 0;
-      continue;
-    }
-    const decision = decideSyntheticTerminal({
-      status: conversation.status,
-      lastError: conversation.lastError,
-      heartbeatStale: liveness.stale,
+    const next = advanceSettlement({
+      health: await readTurnHealth({
+        projectId,
+        conversationId,
+        turnId,
+        userId,
+        buffer,
+      }),
+      streaks,
+      pollMs: SETTLEMENT_POLL_MS,
+      confirmPolls: SETTLEMENT_CONFIRM_POLLS,
     });
-    if (!decision) {
-      settledStreak = 0;
-      continue;
+    streaks = next.streaks;
+    if (next.outcome?.kind === "abandoned") {
+      logger.warn(
+        { projectId, conversationId, turnId, stalePolls: streaks.stale },
+        "giving up a turn stream whose turn neither settled nor beat",
+      );
     }
-    settledStreak += 1;
-    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
+    if (next.outcome) return next.outcome;
   }
   return null;
 }
@@ -1122,13 +1167,17 @@ export const langyRouter = createTRPCRouter({
         redis: connection,
         blockingRedis: blocking,
       });
-      // Tear down on client disconnect OR the hard per-turn deadline, whichever
-      // comes first — a wedged turn must not hold a blocking connection forever.
-      const signals: AbortSignal[] = [
-        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-      ];
-      if (opts.signal) signals.push(opts.signal);
-      const signal = AbortSignal.any(signals);
+      // Tear down when the client goes away. There is no deadline on the turn
+      // itself: this used to also carry `AbortSignal.timeout` on the manager's
+      // request budget, which capped every live stream at two minutes. A turn
+      // that ran longer went deaf half-way through — the panel kept the last
+      // thing it had heard on screen while the agent worked on, and every UI
+      // action after the cap found nobody listening and ran on the backend, so
+      // the whole second half of a loop arrived as one refetch at the end. The
+      // wedged turn that deadline protected against is handled where it can be
+      // recognised: the settlement watcher below gives the tail up when the
+      // turn stops beating, which is the real symptom.
+      const signal = opts.signal ?? new AbortController().signal;
 
       try {
         // Drain the buffered prefix, then tail the live edge from where it ended.
@@ -1160,9 +1209,12 @@ export const langyRouter = createTRPCRouter({
             buffer,
             signal: followSignal,
           })
-            .then((entry) => {
-              if (!entry) return;
-              synthesized = entry;
+            .then((outcome) => {
+              if (!outcome) return;
+              // An abandoned turn yields nothing: we do not know how it ended,
+              // and inventing a terminal for a turn that may still be alive
+              // would tell the reader it finished when it did not.
+              if (outcome.kind === "terminal") synthesized = outcome.entry;
               settle.abort(); // unblock the follow() below
             })
             // Attached HERE, not in the finally below: follow() can block for

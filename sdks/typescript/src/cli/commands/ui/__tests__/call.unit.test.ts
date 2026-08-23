@@ -8,6 +8,7 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
 import { uiCallCommand } from "../call";
 
 /**
@@ -162,6 +163,55 @@ describe("the ui call command", () => {
       expect(process.exitCode).toBe(1);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(stderr.join("")).toContain("--payload-file");
+    });
+  });
+
+  /**
+   * The failure used to be written to stderr as the platform's REST envelope,
+   * which is not the document this CLI's readers parse. The panel's tool card
+   * therefore fell back to printing the whole thing, so a customer watching
+   * Langy work saw a wall of escaped JSON with the one useful sentence buried
+   * in the middle of it.
+   */
+  describe("given the platform refuses the action", () => {
+    /** @scenario "A refused action reaches the reader as a sentence, not the wire envelope" */
+    it("reports it as the CLI's own failure document", async () => {
+      const stdout: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+        stdout.push(String(line));
+      });
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                error: {
+                  type: "bad_request",
+                  code: "langy_ui_payload_invalid",
+                  message:
+                    'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
+                  meta: { kind: "workbench.setTargetPrompt" },
+                },
+              }),
+              { status: 400 },
+            ),
+        ),
+      );
+
+      await uiCallCommand("workbench.setTargetPrompt", {
+        payload: "{}",
+        format: "json",
+      });
+
+      expect(process.exitCode).toBe(1);
+      const document = readCliErrorDocument(stdout.join("\n"));
+      expect(document).toMatchObject({
+        code: "langy_ui_payload_invalid",
+        message:
+          'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
+      });
     });
   });
 });
