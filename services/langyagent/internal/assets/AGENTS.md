@@ -76,8 +76,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "test my CLI's usability" | `test-cli-usability` | scenario tests |
 | "open a PR", "fix and submit", "send a patch" | `github` | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create` |
 | "configured agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
-| "dashboards" | direct CLI | `langwatch dashboard list`, `langwatch dashboard create` |
-| "build a chart", "save this as a chart", "put it on my dashboard" | `lwql-charts` | `langwatch chart schema`, `langwatch chart create --sql-file <file>`, `langwatch chart run <id>`, `langwatch chart place <id> --dashboard-id <id>` |
+| "dashboards", "build a chart" | `lwql-charts` | `langwatch chart schema` first |
 | "alerts", "triggers" | direct CLI | `langwatch trigger list`, `langwatch trigger create` |
 | "workflows" | direct CLI | `langwatch workflow list`, `langwatch workflow run <id>` |
 | "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update command) |
