@@ -95,6 +95,22 @@ Feature: Moving an organization onto the grants projection
     Then every restated fact carries the id it carried before
     And no second copy of any fact is appended
 
+  # A restated fact dedupes at the event store, but the queue has already paid
+  # to carry it. A grant is its own aggregate, so a held organization restaged
+  # one group per grant on every worker boot: one organization carries 428,720
+  # share links and converged on nothing while it repeated them.
+  @unit
+  Scenario: A pass states only the facts the heads do not carry
+    Given an organization whose projection already holds some of its facts
+    When a pass runs
+    Then a fact the heads carry unchanged is not stated again
+    And a fact the heads do not carry is stated
+    And a fact whose head is revoked is stated again
+    And a fact whose head disagrees on a field is stated again
+    And a share link whose head only lags on views is not stated again
+    And the first pass over an organization still states everything
+    And the held report is unchanged by what the pass skipped
+
   @unit
   Scenario: A pass that failed partway is safe to repeat
     Given a pass that failed after stating some facts
