@@ -256,12 +256,27 @@ export function mapGenieEventsToTraceRequest(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OtlpJsonSpan = any;
 
-function mapMessage(
+/** Identity, timing, status, and origin derived once per message. */
+interface GenieMessageFrame {
+  payload: GenieMessagePayload;
+  origin: GenieRoutingOrigin;
+  conversationId: string;
+  messageId: string;
+  regenCount: number;
+  traceId: string;
+  spanSeed: string;
+  rootSpanId: string;
+  startMs: number;
+  endMs: number;
+  status: string;
+  completed: boolean;
+}
+
+function frameOf(
   event: NormalizedPullEvent,
   origin: GenieRoutingOrigin,
-): OtlpJsonSpan[] {
+): GenieMessageFrame {
   const payload = parsePayload(event);
-
   const conversationId =
     payload.conversation_id ??
     extraString(event, "conversationId") ??
@@ -275,27 +290,37 @@ function mapMessage(
     payload.auto_regenerate_count > 0
       ? payload.auto_regenerate_count
       : 0;
-
-  const traceId = hashId(`genie:${conversationId}:${messageId}`, 32);
   const spanSeed = `genie:${conversationId}:${messageId}:${regenCount}`;
-  const rootSpanId = hashId(`${spanSeed}:root`, 16);
-
   const startMs =
     toMs(payload.created_timestamp) ?? Date.parse(event.event_timestamp);
-  const endMs = Math.max(
-    toMs(payload.last_updated_timestamp) ?? startMs,
-    startMs,
-  );
-
-  const question = payload.content ?? extraString(event, "question") ?? "";
   const status = (payload.status ?? extraString(event, "status") ?? "").trim();
-  const attachments = payload.attachments ?? [];
+  return {
+    payload,
+    origin,
+    conversationId,
+    messageId,
+    regenCount,
+    traceId: hashId(`genie:${conversationId}:${messageId}`, 32),
+    spanSeed,
+    rootSpanId: hashId(`${spanSeed}:root`, 16),
+    startMs,
+    endMs: Math.max(toMs(payload.last_updated_timestamp) ?? startMs, startMs),
+    status,
+    completed: status === "COMPLETED",
+  };
+}
 
-  // The ANSWER text attachment (35/35 in the capture, refusals included).
-  // The wire value is the enum-prefixed "TEXT_ATTACHMENT_PURPOSE_ANSWER"
-  // (verified against the raw capture); bare "ANSWER" is tolerated. A lone
-  // text attachment without a purpose still counts — presence of an answer
-  // beats strictness on a label.
+/**
+ * The assistant bubble's text. The ANSWER text attachment (35/35 in the
+ * capture, refusals included) — the wire value is the enum-prefixed
+ * "TEXT_ATTACHMENT_PURPOSE_ANSWER" (verified against the raw capture); bare
+ * "ANSWER" is tolerated. A lone text attachment without a purpose still
+ * counts — presence of an answer beats strictness on a label.
+ */
+function assistantContentOf(
+  frame: GenieMessageFrame,
+  attachments: GenieAttachment[],
+): string {
   const textAttachments = attachments.filter(
     (attachment) => typeof attachment.text?.content === "string",
   );
@@ -304,37 +329,30 @@ function mapMessage(
       (attachment.text?.purpose ?? "").endsWith("ANSWER"),
     ) ?? textAttachments[0];
   const answerText = answerAttachment?.text?.content ?? "";
-
-  const completed = status === "COMPLETED";
   // Defensive failure marker (Decision 13): never a false success. A
   // non-COMPLETED status or a completed message with no answer text both
   // degrade to a marked failure that still shows the question.
-  const assistantContent =
-    completed && answerText
-      ? answerText
-      : `[Genie message ${status || "UNKNOWN_STATUS"} — no answer recorded]`;
+  return frame.completed && answerText
+    ? answerText
+    : `[Genie message ${frame.status || "UNKNOWN_STATUS"} — no answer recorded]`;
+}
 
-  const reasoning = flattenThoughts(attachments);
-
-  const queryAttachments = attachments.filter(
-    (attachment) => typeof attachment.query?.query === "string",
-  );
-  const statementIds = queryAttachments
-    .map((attachment) => attachment.query?.statement_id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-  const vizPointers = attachments
-    .map((attachment) => attachment.viz?.query_attachment_id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-
+function rootAttributesOf(
+  event: NormalizedPullEvent,
+  frame: GenieMessageFrame,
+): OtlpJsonAttr[] {
+  const attachments = frame.payload.attachments ?? [];
+  const question =
+    frame.payload.content ?? extraString(event, "question") ?? "";
   const assistantMessage: Record<string, string> = {
     role: "assistant",
-    content: assistantContent,
+    content: assistantContentOf(frame, attachments),
   };
+  const reasoning = flattenThoughts(attachments);
   if (reasoning) assistantMessage.reasoning_content = reasoning;
-
-  const rootAttributes = [
+  return [
     stringAttr("langwatch.span.type", "llm"),
-    stringAttr("langwatch.thread.id", conversationId),
+    stringAttr("langwatch.thread.id", frame.conversationId),
     stringAttr(
       "langwatch.input",
       JSON.stringify({
@@ -348,41 +366,57 @@ function mapMessage(
     ),
     // Agent identity, not a priced model (Decision 14(d) pins no price match).
     stringAttr("gen_ai.request.model", GENIE_AGENT_MODEL),
-    stringAttr("databricks.genie.message_id", messageId),
-    stringAttr("databricks.genie.conversation_id", conversationId),
-    ...originAttrs(origin),
+    stringAttr("databricks.genie.message_id", frame.messageId),
+    stringAttr("databricks.genie.conversation_id", frame.conversationId),
+    ...originAttrs(frame.origin),
+    ...optionalRootAttributes(event, frame),
   ];
+}
+
+function optionalRootAttributes(
+  event: NormalizedPullEvent,
+  frame: GenieMessageFrame,
+): OtlpJsonAttr[] {
+  const attachments = frame.payload.attachments ?? [];
+  const attributes: OtlpJsonAttr[] = [];
   // The author as the provider's raw numeric id (Decision 13): resolved to a
   // person at READ time by the identity stack (ADR-094), never at pull time.
   const rawUserId =
-    payload.user_id != null
-      ? String(payload.user_id)
+    frame.payload.user_id != null
+      ? String(frame.payload.user_id)
       : extraString(event, "actorUserId");
-  if (rawUserId)
-    rootAttributes.push(stringAttr("langwatch.user.id", rawUserId));
-  if (status)
-    rootAttributes.push(stringAttr("databricks.genie.status", status));
-  if (regenCount > 0) {
-    rootAttributes.push(
-      intAttr("databricks.genie.auto_regenerate_count", regenCount),
+  if (rawUserId) attributes.push(stringAttr("langwatch.user.id", rawUserId));
+  if (frame.status) {
+    attributes.push(stringAttr("databricks.genie.status", frame.status));
+  }
+  if (frame.regenCount > 0) {
+    attributes.push(
+      intAttr("databricks.genie.auto_regenerate_count", frame.regenCount),
     );
   }
   const spaceId = extraString(event, "spaceId");
-  if (spaceId)
-    rootAttributes.push(stringAttr("databricks.genie.space_id", spaceId));
+  if (spaceId) {
+    attributes.push(stringAttr("databricks.genie.space_id", spaceId));
+  }
+  const statementIds = queryAttachmentsOf(attachments)
+    .map((attachment) => attachment.query?.statement_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
   if (statementIds.length > 0) {
     // ALL statement ids (Decision 12): the display-time join key to the
     // warehouse spend ledger — a multi-statement answer never undercounts.
-    rootAttributes.push(
+    attributes.push(
       stringAttr(
         "databricks.genie.statement_ids",
         JSON.stringify(statementIds),
       ),
     );
   }
+  const vizPointers = attachments
+    .map((attachment) => attachment.viz?.query_attachment_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
   if (vizPointers.length > 0) {
     // A pointer, not chart data — stored, never rendered (Decision 12).
-    rootAttributes.push(
+    attributes.push(
       stringAttr(
         "databricks.genie.viz_query_attachment_ids",
         JSON.stringify(vizPointers),
@@ -394,45 +428,67 @@ function mapMessage(
   // Token counts are deliberately never copied from the puller's literal
   // zeros: the `llm` span type makes the estimator count the text and stamp
   // `langwatch.tokens.estimated = true` (Decision 12).
+  return attributes;
+}
 
+function queryAttachmentsOf(attachments: GenieAttachment[]): GenieAttachment[] {
+  return attachments.filter(
+    (attachment) => typeof attachment.query?.query === "string",
+  );
+}
+
+function queryStepSpan(
+  attachment: GenieAttachment,
+  index: number,
+  frame: GenieMessageFrame,
+): OtlpJsonSpan {
+  const stepKey = attachment.attachment_id ?? `index:${index}`;
+  const rowCount = attachment.query?.query_result_metadata?.row_count;
+  const params: Record<string, unknown> = {
+    tool_name: attachment.query?.description || "SQL query",
+    full_command: attachment.query?.query ?? "",
+  };
+  if (attachment.query?.statement_id) {
+    params.statement_id = attachment.query.statement_id;
+  }
+  if (typeof rowCount === "number") params.row_count = rowCount;
+  return {
+    traceId: frame.traceId,
+    spanId: hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
+    parentSpanId: frame.rootSpanId,
+    name: GENIE_QUERY_SPAN_NAME,
+    kind: "SPAN_KIND_INTERNAL",
+    startTimeUnixNano: msToNano(frame.startMs),
+    endTimeUnixNano: msToNano(frame.endMs),
+    attributes: [
+      stringAttr("langwatch.span.type", "tool"),
+      stringAttr("langwatch.params", JSON.stringify(params)),
+      ...originAttrs(frame.origin),
+    ],
+    status: { code: frame.completed ? 1 : 2 },
+  } satisfies OtlpJsonSpan;
+}
+
+function mapMessage(
+  event: NormalizedPullEvent,
+  origin: GenieRoutingOrigin,
+): OtlpJsonSpan[] {
+  const frame = frameOf(event, origin);
+  const attachments = frame.payload.attachments ?? [];
   const rootSpan: OtlpJsonSpan = {
-    traceId,
-    spanId: rootSpanId,
+    traceId: frame.traceId,
+    spanId: frame.rootSpanId,
     name: GENIE_MESSAGE_SPAN_NAME,
     kind: "SPAN_KIND_INTERNAL",
-    startTimeUnixNano: msToNano(startMs),
-    endTimeUnixNano: msToNano(endMs),
-    attributes: rootAttributes,
-    status: completed ? { code: 1 } : { code: 2, message: status || "unknown" },
+    startTimeUnixNano: msToNano(frame.startMs),
+    endTimeUnixNano: msToNano(frame.endMs),
+    attributes: rootAttributesOf(event, frame),
+    status: frame.completed
+      ? { code: 1 }
+      : { code: 2, message: frame.status || "unknown" },
   };
-
-  const stepSpans = queryAttachments.map((attachment, index) => {
-    const stepKey = attachment.attachment_id ?? `index:${index}`;
-    const rowCount = attachment.query?.query_result_metadata?.row_count;
-    const params: Record<string, unknown> = {
-      tool_name: attachment.query?.description || "SQL query",
-      full_command: attachment.query?.query ?? "",
-    };
-    if (attachment.query?.statement_id) {
-      params.statement_id = attachment.query.statement_id;
-    }
-    if (typeof rowCount === "number") params.row_count = rowCount;
-    return {
-      traceId,
-      spanId: hashId(`${spanSeed}:query:${stepKey}`, 16),
-      parentSpanId: rootSpanId,
-      name: GENIE_QUERY_SPAN_NAME,
-      kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: msToNano(startMs),
-      endTimeUnixNano: msToNano(endMs),
-      attributes: [
-        stringAttr("langwatch.span.type", "tool"),
-        stringAttr("langwatch.params", JSON.stringify(params)),
-        ...originAttrs(origin),
-      ],
-      status: { code: completed ? 1 : 2 },
-    } satisfies OtlpJsonSpan;
-  });
-
+  const stepSpans = queryAttachmentsOf(attachments).map((attachment, index) =>
+    queryStepSpan(attachment, index, frame),
+  );
   return [rootSpan, ...stepSpans];
 }
