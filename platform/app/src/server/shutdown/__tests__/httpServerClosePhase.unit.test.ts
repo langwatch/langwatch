@@ -172,7 +172,9 @@ describe("createHttpServerClosePhase", () => {
           graceMs: 20,
         });
 
-        const run = phase.run().then(() => {
+        // ShutdownPhase.run is typed `void | Promise<void>`, so it is wrapped
+        // rather than chained directly.
+        const run = Promise.resolve(phase.run()).then(() => {
           settled = true;
         });
         // Nothing can reap the socket, so the phase stays pending until the
