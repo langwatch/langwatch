@@ -296,38 +296,19 @@ function roleDiffs({
  * the database's uppercase), so the comparison is against what the import
  * said, mapped to that spelling.
  *
- * The view budget cuts both ways and the two directions mean different
- * things. A head BEHIND the legacy count is convergence lag and never a
- * disagreement: reporting it as one made an actively-viewed link re-hold the
- * organization forever. The pass now hands the budget over BEFORE it takes
- * the read this walks (see `migrateTenant`), so the lag is already repaired
- * by the time the comparison runs and this should find nothing. It stays
- * `outstanding` rather than becoming a diff for the one case the handover
- * cannot cover — a usage row that disagrees about which project it belongs
- * to, which the seed's guard deliberately will not move — because that heals
- * the moment the row is corrected and must not latch. A head AHEAD of the
- * legacy count is a budget that grew back, which nothing legitimate
- * produces, so that is the named diff.
+ * The view budget cuts both ways. A head BEHIND the legacy count is lag, not
+ * a disagreement — reporting it as one made an actively-viewed link re-hold
+ * the organization forever — and `migrateTenant` hands the budget over before
+ * taking this read, so it should find nothing. A head AHEAD is a budget that
+ * grew back, which nothing legitimate produces, so that is a named diff.
  *
- * That last case is only VISIBLE while the counts also disagree, and it is a
- * different column from the `projectId` compared below. Two projects are in
- * play and only one of them is checked:
- *
- * - `head.projectId` is the GRANT row's, and the table below compares it, so
- *   a share whose grant sits on the wrong project is a `resource_changed`
- *   diff whatever its view count says.
- * - `GrantUsage.projectId` is the BUDGET row's. `findResourceGrantRows`
- *   selects only `grantId` and `viewCount` from that table, so it never
- *   reaches this comparison at all.
- *
- * A budget row on the wrong project but already at the right count therefore
- * reads as agreement here and the organization finalizes over it. That is
- * deliberate: the row is not the seed's to move, the mismatch fails toward
- * fewer views rather than more (the consume fences on the same three columns,
- * so it simply does not match), and holding on it would be a hold no pass
- * could ever clear — the exact disease the rest of this file exists to cure.
- * The budget VALUE, which is what the proof is actually about, is correct
- * either way.
+ * Two `projectId`s are in play and only one is checked: `head.projectId` is
+ * the GRANT row's and the table below compares it; `GrantUsage.projectId` is
+ * the budget row's, which `findResourceGrantRows` does not select. So a
+ * budget row on the wrong project but at the right count reads as agreement.
+ * Deliberate: the seed will not move that row, it fails toward fewer views
+ * (the consume fences on the same columns and misses), and holding on it
+ * would be a hold no pass could clear.
  *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the

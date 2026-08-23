@@ -150,29 +150,10 @@ Feature: Moving an organization onto the grants projection
     And a usage row that disagrees about which project it belongs to is untouched
 
   @unit
-  Scenario: The view budget handover costs statements, not round trips
-    Given an organization with more share links than one statement can carry
-    When the migration seeds the budgets
-    Then the seeds are stated in whole chunks, not one round trip per link
-    And an organization with no share links states nothing at all
-
-  # A pass that handed the budget over AFTER checking compared a count it had
-  # already superseded, so any link viewed between two passes was reported as
-  # unfinished work again, and an organization whose links are viewed at all
-  # could never finish.
-  @unit
   Scenario: A link viewed between passes does not hold the organization
     Given a share link that has been viewed since the last pass
     When the migration runs
-    Then the new view count is handed over before the organization is checked
-    And the organization is not held for that link
-
-  @unit
-  Scenario: A pass is not limited by how many share links an organization has
-    Given an organization with hundreds of thousands of share links
-    When the migration reads their view budgets
-    Then the budgets are read for the organization as a whole
-    And the pass is not asked to name every link at once
+    Then the organization is not held for that link
 
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is

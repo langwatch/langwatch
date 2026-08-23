@@ -22,13 +22,8 @@ import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
-/**
- * Seeds per budget statement. Four binds a row, so this sits well under
- * Postgres' 65535-parameter ceiling and keeps one statement's memory modest.
- * The seed rides EVERY pass, so what matters is that its cost scales with
- * statements, not with rows: an organization with 428k share links was
- * spending 17k sequential round trips per pass here and never finishing one.
- */
+/** Seeds per budget statement. Four binds a row, so this sits well under
+ *  Postgres' 65535-parameter ceiling. */
 const BUDGET_SEED_CHUNK = 5_000;
 
 /**
@@ -196,12 +191,11 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<RoleHeadRow[]> {
-    // Deleted heads included, and flagged: this read serves the proof, which
-    // has to tell a role the fold has never seen from one it has already
-    // buried. `liveRoles` is the fence for every read that DECIDES access;
-    // dropping the tombstones here would make each one read as a role still
-    // waiting to fold, and hold the organization on a condition no later pass
-    // can clear.
+    // Deleted heads included, and flagged: the proof has to tell a role the
+    // fold has never seen from one it has already buried. `liveRoles` is the
+    // fence for reads that DECIDE access; dropping tombstones here would make
+    // each read as a role still waiting to fold, holding the organization on
+    // a condition no later pass can clear.
     const rows = await this.prisma.role.findMany({
       where: { organizationId },
       select: {
@@ -395,29 +389,19 @@ export class PrismaAuthzMigrationRepository
    * The view budgets, handed over rather than restarted - and RAISED on a
    * re-run, never lowered (the port's own contract; decision 22).
    *
-   * ONE guarded upsert per chunk, which is create-or-raise stated once: a
-   * missing row is inserted at the seeded count, and an existing row is
-   * updated only where the seeded count is strictly higher. That guard is
-   * the refund guard - a row already at or above the seed (a view consumed
-   * since) is left exactly as it is - and it lives in the UPDATE statement
-   * itself, so a consume landing mid-flight cannot be walked back by a
-   * filter resolved in an earlier SELECT.
+   * ONE guarded upsert per chunk: a missing row is inserted at the seeded
+   * count, an existing one raised only where the seed is strictly higher.
+   * That refund guard lives in the UPDATE itself, so a consume landing
+   * mid-flight cannot be walked back by a filter resolved in an earlier
+   * SELECT.
    *
-   * It is one statement per chunk rather than one per row because this seed
-   * rides every pass, unfiltered, for as long as an organization is held:
-   * while it is, views keep landing on `ShareLink.viewCount`, and a usage
-   * row seeded on an earlier pass would otherwise sit permanently below it,
-   * wedging the proof, which compares the two counts exactly. The previous
-   * shape paid a round trip per share link - and on a converged organization
-   * every one of them matched nothing, so the pass spent hundreds of
-   * thousands of round trips, and the exceptions they raised, to change
-   * nothing. The organization that found it never finished a pass at all,
-   * and so never recorded a status of any kind.
+   * One statement per chunk rather than one per row because this rides every
+   * pass: the previous shape paid a round trip per share link, and on a
+   * converged organization every one matched nothing. The organization that
+   * found it never finished a pass at all, so never recorded a status.
    *
-   * `organizationId` and `projectId` are matched in the guard rather than
-   * overwritten: a usage row that disagrees with the seed about where it
-   * lives is not this seed's to move, exactly as the per-row update's
-   * three-column WHERE had it.
+   * `organizationId` and `projectId` are matched rather than overwritten: a
+   * row that disagrees about where it lives is not this seed's to move.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -521,15 +505,11 @@ export class PrismaAuthzMigrationRepository
     // "field for field" needs a second read to see it. No usage row means no
     // view has been counted, which is exactly zero.
     //
-    // Read BY ORGANIZATION rather than by naming every grant. `GrantUsage` is
-    // organization-indexed and scoped to one organization, so both spellings
-    // select the same budgets - but naming them binds a parameter per grant,
-    // and Postgres accepts at most 65535 of those in a statement. An
-    // organization with 428k share links has that many resource grants, so
-    // the named spelling failed outright at exactly the size where this
-    // migration is hardest, and only once the organization had heads to
-    // compare - never on the empty first pass that would have shown it. Any
-    // budget the rows do not claim is free: the lookup below is by id.
+    // Read BY ORGANIZATION, not by naming every grant: `GrantUsage` is
+    // organization-indexed and organization-scoped, so both spellings select
+    // the same budgets, but naming them binds a parameter per grant against
+    // Postgres' 65535 ceiling - which an organization with 428k share links
+    // clears on its own. The lookup below is by id, so extra rows are free.
     const usages = await this.prisma.grantUsage.findMany({
       where: { organizationId },
       select: { grantId: true, viewCount: true },

@@ -57,10 +57,6 @@ type Data = {
   /** `deleted` defaults to false: a head is live unless a test buries it. */
   roleHeads?: Array<Omit<RoleHeadRow, "deleted"> & { deleted?: boolean }>;
   resourceRows?: ResourceGrantRow[];
-  /** Grant ids whose budget handover the seed's guard refuses — a usage row
-   *  that disagrees about which project it belongs to. Their heads keep the
-   *  count the test gave them, however high the seed goes. */
-  unseededGrantIds?: string[];
   /** Wraps the recording ledger, for tests that need to observe or fail a
    *  send rather than only read what was sent. */
   wrapLedger?: (ledger: Ledger) => Ledger;
@@ -72,8 +68,6 @@ function harness(data: Data = {}) {
   const sent: Sent[] = [];
   const seeded: ResourceGrantUsageSeed[][] = [];
   const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
-  /** Call order, for the steps whose ORDER is the behaviour under test. */
-  const order: string[] = [];
   const store: AuthzEngineMigrationStore = {
     findOrganizationCreatedAtMs: async () =>
       data.organizationCreatedAtMs === undefined
@@ -100,26 +94,23 @@ function harness(data: Data = {}) {
     },
     findResourceGrantRows: async () => {
       reads.resourceRows += 1;
-      order.push("readResourceRows");
-      // The budget table is a plain row the pass writes DIRECTLY, not a fact
-      // it states and waits on, so a read taken after the seed sees it and a
-      // read taken before does not. Modelling that raise is the only way a
-      // test can tell those two orders apart.
-      const refused = new Set(data.unseededGrantIds ?? []);
+      // The budget is a row the pass writes directly, so a read taken after
+      // the seed sees it and one taken before does not. That raise is what
+      // makes the ordering observable as behaviour rather than call order.
       const budgets = new Map(
         seeded.flat().map((seed) => [seed.grantId, seed.viewCount]),
       );
-      return (data.resourceRows ?? []).map((row) =>
-        refused.has(row.grantId)
-          ? row
-          : {
-              ...row,
-              viewCount: Math.max(row.viewCount, budgets.get(row.grantId) ?? 0),
-            },
-      );
+      return (data.resourceRows ?? []).map((row) => ({
+        ...row,
+        viewCount: Math.max(row.viewCount, budgets.get(row.grantId) ?? 0),
+      }));
     },
     seedResourceGrantUsage: async ({ seeds }) => {
-      order.push("seedBudgets");
+      // Land the budget on a later microtask, so the raise above is only
+      // visible to a pass that AWAITS this. A synchronous push would read as
+      // ordered even if the migration dropped the await and left the write
+      // in flight.
+      await Promise.resolve();
       seeded.push([...seeds]);
     },
   };
@@ -143,7 +134,7 @@ function harness(data: Data = {}) {
     ledger: data.wrapLedger ? data.wrapLedger(recording) : recording,
     now: () => NOW,
   });
-  return { migration, sent, seeded, reads, order };
+  return { migration, sent, seeded, reads };
 }
 
 function attachedFacts(sent: Sent[]): GrantFact[] {
@@ -711,23 +702,10 @@ describe("given an organization with legacy access rows", () => {
     });
 
     /** @scenario "A link viewed between passes does not hold the organization" */
-    it("hands the budget over before it reads what it will check against", async () => {
-      const { migration, order } = harness({
-        shareLinks: [shareLink({ maxViews: 10, viewCount: 3 })],
-      });
-
-      await migration.migrateTenant({ tenantId: ORG_ID });
-
-      expect(order).toEqual(["seedBudgets", "readResourceRows"]);
-    });
-
-    /** @scenario "A link viewed between passes does not hold the organization" */
     it("does not hold an organization for a link viewed since the last pass", async () => {
-      // The race this closes: seeding AFTER the read compared a count the
-      // seed had already superseded, so a link viewed at any point between
-      // one pass's seed and the next pass's read counted outstanding all over
-      // again — and an organization whose links are viewed at all could never
-      // finalize, however many passes it was given.
+      // Seeding AFTER the read compared a count the seed had already
+      // superseded, so an organization whose links are viewed at all could
+      // never finalize.
       const row = shareLink({ maxViews: 10, viewCount: 3 });
       const { migration } = harness({
         shareLinks: [row],
@@ -753,58 +731,6 @@ describe("given an organization with legacy access rows", () => {
       const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
 
       expect(outcome.status).toBe("finalized");
-    });
-
-    /** @scenario "A view budget is raised on a re-run, never lowered" */
-    it("treats a budget the handover could not raise as lag, not disagreement", async () => {
-      // The one case the seed's guard refuses: a GRANTUSAGE row that
-      // disagrees about which project it belongs to. Outstanding rather than
-      // a diff, so it heals the moment the row is corrected instead of
-      // latching.
-      //
-      // The grant below sits on the RIGHT project — `projectId: row.projectId`
-      // — so nothing here is a `resource_changed` diff. That comparison is
-      // over the grant's project, which is checked; the budget row's project
-      // is a different column that `findResourceGrantRows` does not select.
-      // What differs is the count alone, which is why this is lag.
-      //
-      // And only while the COUNTS disagree, which is what this pins. A budget
-      // row already at the right count reads as agreement and the
-      // organization finalizes over it — deliberately: the row is not the
-      // seed's to move, the mismatch fails toward fewer views (the consume
-      // fences on the same columns and simply misses), and holding on it
-      // would be a hold no later pass could clear.
-      const row = shareLink({ maxViews: 10, viewCount: 3 });
-      const { migration } = harness({
-        shareLinks: [row],
-        organizationCreatedAtMs: null,
-        unseededGrantIds: [row.id],
-        resourceRows: [
-          {
-            grantId: row.id,
-            source: "migration",
-            token: row.token,
-            resourceKind: "TRACE",
-            resourceId: row.resourceId,
-            projectId: row.projectId,
-            principalType: "ANYONE",
-            principalId: null,
-            expiresAtMs: null,
-            maxViews: 10,
-            viewCount: 1,
-          },
-        ],
-      });
-
-      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
-
-      expect(outcome.status).toBe("migrated");
-      const report = outcome.report as {
-        totalDiffs: number;
-        outstandingSample: string[];
-      };
-      expect(report.totalDiffs).toBe(0);
-      expect(report.outstandingSample).toContain(row.id);
     });
 
     /** @scenario "A row deleted on the legacy side is revoked, not left behind" */

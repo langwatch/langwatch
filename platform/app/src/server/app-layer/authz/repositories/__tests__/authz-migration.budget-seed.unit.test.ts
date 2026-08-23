@@ -1,18 +1,13 @@
 /** @vitest-environment node */
 
 /**
- * The view-budget handover the authz-engine migration runs on every pass.
+ * The view-budget handover the authz-engine migration runs on every pass, and
+ * the read that pairs with it. Both scale with an organization's share links,
+ * which is what made a 428k-link organization unable to finish a pass at all.
  *
- * It is the one step no head filter covers — while an organization is held,
- * views keep landing on `ShareLink.viewCount`, so the seed has to ride each
- * pass to let the count heal. That makes its COST per pass a correctness
- * concern of its own: an organization with 428k share links spent a round
- * trip per link here, matched nothing on almost all of them, and never
- * finished a single pass — so it never recorded a status at all.
- *
- * A unit test, and named one: Prisma is a stub, so nothing here opens a
- * socket. The guard is asserted as SQL because that is what it is; whether
- * Postgres honours it is the integration lane's question.
+ * Prisma is a stub, so nothing here opens a socket. The guard is asserted as
+ * SQL because that is what it is; whether Postgres honours it is the
+ * integration lane's question.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
@@ -54,7 +49,6 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
 
   describe("given an organization's share links", () => {
     describe("when the budgets are seeded", () => {
-      /** @scenario "The view budget handover costs statements, not round trips" */
       it("states every seed in one statement, not one statement per seed", async () => {
         const { repository, executeRaw } = build();
 
@@ -67,7 +61,6 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
         expect(boundValues(executeRaw)).toHaveLength(400 * 4);
       });
 
-      /** @scenario "The view budget handover costs statements, not round trips" */
       it("chunks past the parameter ceiling instead of growing one statement", async () => {
         const { repository, executeRaw } = build();
 
@@ -95,7 +88,6 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
     });
 
     describe("when the seeded budgets are read back", () => {
-      /** @scenario "A pass is not limited by how many share links an organization has" */
       it("reads them for the organization, never one parameter per link", async () => {
         // Postgres binds at most 65535 parameters in a statement, so naming
         // every grant fails outright at exactly the size where this migration
