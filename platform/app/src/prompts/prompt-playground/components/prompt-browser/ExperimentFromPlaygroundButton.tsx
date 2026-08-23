@@ -320,13 +320,17 @@ export function ExperimentFromPlaygroundButton({
     <>
       <Tooltip content="Experiment" disabled={!iconOnly}>
         <PageLayout.HeaderButton
-          onClick={() => setIsDialogOpen(true)}
-          disabled={isDisabled}
           title={
             isDisabled ? "Open a prompt to create an experiment" : undefined
           }
           aria-label="Experiment"
           {...buttonProps}
+          // After the spread. A caller passing `disabled={false}` would
+          // otherwise re-enable the button for a user without
+          // `evaluations:manage`, and a caller passing `onClick` would replace
+          // the handler that opens the dialog.
+          disabled={isDisabled || buttonProps.disabled}
+          onClick={() => setIsDialogOpen(true)}
         >
           <FlaskConical size={14} />
           {!iconOnly && "Experiment"}

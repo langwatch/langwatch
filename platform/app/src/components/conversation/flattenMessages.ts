@@ -77,9 +77,13 @@ function readToolCalls(
 function flattenTypedParts(
   content: unknown[],
   msg: FlattenableMessage,
+  messageIndex: number,
 ): DisplayPart[] {
   const base: Omit<PartContext, "index"> = {
-    id: String(msg.id ?? ""),
+    // The message's position when it has no id of its own, for the same reason
+    // the untyped branch below uses it: `""` made two id-less messages emit the
+    // same part ids, and those ids are the React keys.
+    id: msg.id ?? `message-${messageIndex}`,
     role: msg.role ?? "assistant",
     traceId: msg.trace_id,
   };
@@ -96,7 +100,7 @@ function flattenContent(
   messageIndex: number,
 ): DisplayPart[] {
   const coerced = coerceContentToArray(msg.content);
-  if (coerced) return flattenTypedParts(coerced, msg);
+  if (coerced) return flattenTypedParts(coerced, msg, messageIndex);
 
   if (!msg.content || msg.content === NO_CONTENT_SENTINEL) return [];
 

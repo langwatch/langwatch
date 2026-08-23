@@ -28,5 +28,8 @@ export const displayFirstName = (
   // surface calls them.
   if (trimmed.includes("@")) return null;
 
-  return trimmed.split(" ")[0] ?? null;
+  // Any whitespace, not just an ASCII space: a name arriving from a provider
+  // can carry a tab or a newline between its parts, and splitting on " " alone
+  // returned the whole string as the "first" name.
+  return trimmed.split(/\s+/)[0] ?? null;
 };

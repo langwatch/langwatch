@@ -8,7 +8,7 @@ import { z } from "zod";
 // schemas above) stay as inferred-type derivations.
 // ---------------------------------------------------------------------------
 
-const chatRoleSchema = z.union([
+export const chatRoleSchema = z.union([
   z.literal("system"),
   /**
    * OpenAI Responses-dialect spelling of the system role. Accepted wherever

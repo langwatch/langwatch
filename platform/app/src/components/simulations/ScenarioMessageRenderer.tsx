@@ -38,6 +38,10 @@ export function ScenarioMessageRenderer({
       variant={variant === "grid" ? "compact" : "regular"}
       roleMode="scenario"
       projectId={projectId}
+      // A grid card is a preview the reader scans, not a thread they follow.
+      // Every card smooth-scrolling itself on each batch of incoming messages
+      // made the whole grid twitch.
+      autoScroll={variant !== "grid"}
     />
   );
 }

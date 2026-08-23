@@ -36,7 +36,12 @@ export interface PromptRuntimeVariable {
 
 /** A conversation turn as the playground holds it. */
 export interface PromptChatTurn {
-  role: string;
+  /**
+   * The same union `ChatMessage` uses, so a turn read off the wire IS a chat
+   * message rather than something that has to be asserted into one on the way
+   * to the engine.
+   */
+  role: ChatMessage["role"];
   content: string;
 }
 
@@ -119,7 +124,7 @@ export function resolvePromptInputs({
       : [...formMsgs, ...liveMessagesForHistory]
   )
     .map((message) => ({ role: message.role, content: message.content }))
-    .filter((message) => message.role !== "system") as ChatMessage[];
+    .filter((message) => message.role !== "system");
 
   const inputs = (variables ?? []).reduce<Record<string, unknown>>((acc, v) => {
     if (v.value !== undefined) acc[v.identifier] = v.value;
@@ -249,7 +254,10 @@ export function buildPromptExecutionEvent({
   return {
     type: "execute_component",
     payload: {
-      enable_tracing: true,
+      // No `enable_tracing` here: it is a property of the workflow, which
+      // `buildWorkflow` already sets, and the `execute_component` payload has
+      // no such field. It sat here unread until dropping the assertion on this
+      // return made the contract check it.
       trace_id: traceId,
       thread_id: threadId,
       workflow: buildWorkflow({
@@ -261,7 +269,7 @@ export function buildPromptExecutionEvent({
       inputs: { ...inputs, messages: messagesHistory },
       origin: "playground",
     },
-  } as StudioClientEvent;
+  };
 }
 
 /** The output fields a run streams, defaulting to the single `output` field. */

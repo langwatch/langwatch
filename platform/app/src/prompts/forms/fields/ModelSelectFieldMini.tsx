@@ -1,7 +1,7 @@
 import {
   Box,
   Popover as ChakraPopover,
-  HStack,
+  chakra,
   Skeleton,
 } from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";
@@ -147,7 +147,17 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 thing in the editor. `minHeight` keeps it on the same baseline
                 as the action buttons beside it.
               */}
-              <HStack
+              <chakra.button
+                // A real button, not a clickable box. As an `HStack` the model
+                // selector took no focus and answered neither Enter nor Space,
+                // so the only way to change the model was with a pointer. The
+                // popover's anchor confers no keyboard behaviour of its own —
+                // it positions, it does not trigger.
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={popoverOpen}
+                display="flex"
+                alignItems="center"
                 gap={1.5}
                 minHeight="24px"
                 paddingY={0.5}
@@ -171,7 +181,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 <Box color="fg.subtle" flexShrink={0} display="flex">
                   <ChevronDown size={14} />
                 </Box>
-              </HStack>
+              </chakra.button>
             </ChakraPopover.Anchor>
             <LLMConfigPopover
               values={field.value}

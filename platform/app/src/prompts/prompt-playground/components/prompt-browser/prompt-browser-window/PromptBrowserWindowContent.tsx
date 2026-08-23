@@ -412,7 +412,10 @@ function PromptBrowserWindowInner(props: {
           >
             <Box
               paddingTop={2}
-              paddingBottom={2}
+              // At least the mask's own 14px fade, so the last authoring
+              // section is not still under the transparent end of it once the
+              // area is scrolled to the bottom.
+              paddingBottom="16px"
               width="full"
               maxWidth="768px"
               margin="0 auto"

@@ -106,6 +106,9 @@ async function streamExecution({
       }
     },
     shouldStopProcessing: (event) => event.type === "done",
+    // The protocol ends with `done`. A stream cut after a delta would
+    // otherwise settle the partial reply as if the model had finished it.
+    requireCompletion: true,
   });
 }
 
@@ -252,6 +255,10 @@ function useRunPrompt({
           },
         });
       } catch (error) {
+        // Stopping a run is not a failure of it. The `finally` below still
+        // settles, so the part of the reply that had already arrived is kept —
+        // which is the contract the spec states for cancellation.
+        if (signal.aborted) return;
         // The stream never opened, or died mid-flight. `parseLLMError` never
         // ran on this path, so it is unknown and the error registry writes the
         // sentence. A run that failed before `start` has no turn to attach to,

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ParsedLLMError } from "~/utils/formatLLMError";
 import type { PlaygroundMessage } from "./usePromptExecution";
 
@@ -36,12 +36,36 @@ export function useConversationState({
     useState<PlaygroundMessage[]>(initialMessages);
   const [errors, setErrors] = useState<Record<string, ParsedLLMError>>({});
 
-  const commit = useCallback(
-    (next: PlaygroundMessage[]) => {
+  /**
+   * The current conversation, readable from an event handler.
+   *
+   * Every write below computes its next value from this ref and then sets
+   * state, rather than computing inside a `setMessages` updater. React
+   * requires updaters to be pure, and these writes persist — under React 19's
+   * Strict Mode the updater is invoked twice in development, and concurrent
+   * rendering may replay it, so the persist call fired more than once per
+   * change. It is idempotent today; this stops it depending on that.
+   */
+  const messagesRef = useRef<PlaygroundMessage[]>(initialMessages);
+
+  const write = useCallback(
+    (next: PlaygroundMessage[], { persist }: { persist: boolean }) => {
+      messagesRef.current = next;
       setMessages(next);
-      onMessagesChange(next);
+      if (persist) onMessagesChange(next);
     },
     [onMessagesChange],
+  );
+
+  const commit = useCallback(
+    (next: PlaygroundMessage[]) => write(next, { persist: true }),
+    [write],
+  );
+
+  const update = useCallback(
+    (updater: (current: PlaygroundMessage[]) => PlaygroundMessage[]) =>
+      write(updater(messagesRef.current), { persist: false }),
+    [write],
   );
 
   const recordFailure = useCallback((id: string, error: ParsedLLMError) => {
@@ -55,13 +79,9 @@ export function useConversationState({
         const { [id]: _removed, ...rest } = current;
         return rest;
       });
-      setMessages((current) => {
-        const next = current.filter((message) => message.id !== id);
-        onMessagesChange(next);
-        return next;
-      });
+      commit(messagesRef.current.filter((message) => message.id !== id));
     },
-    [onMessagesChange],
+    [commit],
   );
 
   const clear = useCallback(() => {
@@ -77,24 +97,23 @@ export function useConversationState({
       assistantId: string | null;
       content: string;
     }) => {
-      setMessages((current) => {
-        const settled = assistantId
+      const current = messagesRef.current;
+      commit(
+        assistantId
           ? current.map((message) =>
               message.id === assistantId ? { ...message, content } : message,
             )
-          : current;
-        onMessagesChange(settled);
-        return settled;
-      });
+          : current,
+      );
     },
-    [onMessagesChange],
+    [commit],
   );
 
   return {
     messages,
     errors,
     commit,
-    update: setMessages,
+    update,
     recordFailure,
     deleteMessage,
     clear,

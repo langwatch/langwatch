@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { explainSerializedError } from "~/features/errors/logic/presentation";
 import { toError } from "~/utils/posthogErrorCapture";
-import { FetchSSETimeoutError } from "./errors";
+import { FetchSSEIncompleteStreamError, FetchSSETimeoutError } from "./errors";
 
 const logger = createLogger("sseClient");
 const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
@@ -19,6 +19,17 @@ export interface FetchSSEOptions<T> {
 
   /** Function to determine if processing should stop */
   shouldStopProcessing?: (event: T) => boolean;
+
+  /**
+   * Treats a stream that ends without `shouldStopProcessing` ever matching as
+   * a failure rather than a completed run.
+   *
+   * Off by default, because for most callers the close IS the end. Turn it on
+   * where the protocol has an explicit terminator: without it, a server that
+   * dies after a delta looks identical to one that finished, and the caller
+   * persists a truncated reply as a successful one.
+   */
+  requireCompletion?: boolean;
 
   /** Timeout in milliseconds (default: 10_000) */
   timeout?: number;
@@ -84,6 +95,7 @@ export async function fetchSSE<T>({
   headers = {},
   onError,
   signal,
+  requireCompletion = false,
 }: FetchSSEOptions<T>): Promise<void> {
   // Wrap in a Promise so timeout errors can properly reject
   // instead of becoming unhandled exceptions
@@ -91,6 +103,9 @@ export async function fetchSSE<T>({
     const controller = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
+    // Whether `shouldStopProcessing` ever matched, i.e. whether the stream
+    // reached its own terminator rather than merely stopping.
+    let completed = false;
 
     if (signal?.aborted) {
       resolve();
@@ -107,6 +122,12 @@ export async function fetchSSE<T>({
       if (isSettled) return;
       isSettled = true;
       cleanup();
+      // A caller that aborted got what it asked for. Reporting the resulting
+      // AbortError as a failure made "stop" look like the run had broken.
+      if (signal?.aborted) {
+        resolve();
+        return;
+      }
       if (onError) {
         onError(error);
         resolve();
@@ -125,6 +146,11 @@ export async function fetchSSE<T>({
         handleError(error);
       }, timeoutMs);
     };
+
+    // Armed before the request, not in `onopen`. An endpoint that accepts the
+    // connection and never sends response headers left no timer running at
+    // all, so the caller waited for as long as the user let it.
+    setResetableTimeout(timeout);
 
     fetchEventSource(endpoint, {
       openWhenHidden: true,
@@ -158,6 +184,7 @@ export async function fetchSSE<T>({
         onEvent(event);
 
         if (shouldStopProcessing?.(event)) {
+          completed = true;
           if (!isSettled) {
             isSettled = true;
             cleanup();
@@ -167,11 +194,18 @@ export async function fetchSSE<T>({
       },
 
       onclose() {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
+        if (isSettled) return;
+        if (requireCompletion && !completed && !signal?.aborted) {
+          handleError(
+            new FetchSSEIncompleteStreamError(
+              "The stream closed before the run completed",
+            ),
+          );
+          return;
         }
+        isSettled = true;
+        cleanup();
+        resolve();
       },
 
       onerror(error) {
@@ -179,11 +213,18 @@ export async function fetchSSE<T>({
       },
     })
       .then(() => {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
+        if (isSettled) return;
+        if (requireCompletion && !completed && !signal?.aborted) {
+          handleError(
+            new FetchSSEIncompleteStreamError(
+              "The stream closed before the run completed",
+            ),
+          );
+          return;
         }
+        isSettled = true;
+        cleanup();
+        resolve();
       })
       .catch((error) => {
         handleError(toError(error));

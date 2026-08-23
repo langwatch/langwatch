@@ -203,7 +203,7 @@ describe("given an agent emitting messages in the OpenAI dialect", () => {
   describe("when a message carries no identifier", () => {
     /** @scenario "A message with no identifier is accepted" */
     it("accepts the snapshot", () => {
-      const parsed = parseOneMessage({ role: "user", content: "hello" });
+      const parsed = parseOneMessage({ role: "assistant", content: "hello" });
 
       expect(parsed.content).toBe("hello");
     });

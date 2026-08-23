@@ -85,11 +85,12 @@ const PromptPlaygroundChat = forwardRef<
     [session?.user?.name, model],
   );
 
-  const { getTabById, updateTabData } = useDraggableTabsBrowserStore(
-    (state) => ({
-      getTabById: state.getByTabId,
-      updateTabData: state.updateTabData,
-    }),
+  // Selected one at a time. A selector returning a fresh object is a new
+  // reference on every store write, so this component re-rendered whenever any
+  // tab anywhere changed.
+  const getTabById = useDraggableTabsBrowserStore((state) => state.getByTabId);
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
   );
 
   // Read once per tab: the store is where a refresh restores from, and the hook
@@ -220,13 +221,25 @@ function MessageActions({
     if (!container) return;
     const show = () => containerRef.current?.style.setProperty("opacity", "1");
     const hide = () => containerRef.current?.style.setProperty("opacity", "0");
+    // `focusout` as well as `focusin`, or a keyboard user who tabbed into a
+    // message left its action row at full opacity for the rest of the session:
+    // no pointer ever entered, so no `mouseleave` was coming to hide it.
+    // Focus moving between the row's own buttons stays inside the message, so
+    // that is not a departure.
+    const hideOnFocusLeaving = (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (next instanceof Node && container.contains(next)) return;
+      hide();
+    };
     container.addEventListener("mouseenter", show);
     container.addEventListener("mouseleave", hide);
     container.addEventListener("focusin", show);
+    container.addEventListener("focusout", hideOnFocusLeaving);
     return () => {
       container.removeEventListener("mouseenter", show);
       container.removeEventListener("mouseleave", hide);
       container.removeEventListener("focusin", show);
+      container.removeEventListener("focusout", hideOnFocusLeaving);
     };
   }, []);
 

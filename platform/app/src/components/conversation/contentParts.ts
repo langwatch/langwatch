@@ -93,10 +93,15 @@ function audioPart(
   // Only mp3 was named, so ogg, flac, opus and the rest were all labelled
   // audio/wav and the player was handed a type the bytes are not. A format we
   // do not have a mapping for still says what it is rather than claiming wav.
+  // Lowercased before the lookup: `visitContentPart` passes `input_audio.format`
+  // through exactly as the provider spelled it, so a provider sending "MP3"
+  // missed the table and landed on `audio/MP3` — the very thing the table is
+  // here to prevent.
+  const format = audio.format?.toLowerCase();
   const mimeType =
     audio.mimeType ??
-    (audio.format
-      ? (AUDIO_MIME_BY_FORMAT[audio.format] ?? `audio/${audio.format}`)
+    (format
+      ? (AUDIO_MIME_BY_FORMAT[format] ?? `audio/${format}`)
       : "audio/wav");
   const partId = `${id}-audio${index}`;
 

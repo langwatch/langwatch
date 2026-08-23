@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import { formSchema } from "~/prompts/schemas";
 import { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
+import { chatRoleSchema } from "~/server/tracer/types";
 import type { parseLLMError } from "~/utils/formatLLMError";
 
 export const PLAYGROUND_API_VERSION = "2026-08-20";
@@ -28,8 +29,12 @@ export const executeRequestSchema = z
     projectId: z.string().min(1).max(64),
     formValues: formSchema,
     variables: runtimeInputsSchema.default([]),
+    // The same role union the rest of the pipeline is typed against, rather
+    // than a bare string. An open `role` accepted anything and then needed an
+    // assertion downstream to become a `ChatMessage`, which is the assertion
+    // agreeing to whatever arrived instead of validating it.
     messages: z
-      .array(z.object({ role: z.string(), content: z.string() }))
+      .array(z.object({ role: chatRoleSchema, content: z.string() }))
       .default([]),
     threadId: z.string().optional(),
   })
