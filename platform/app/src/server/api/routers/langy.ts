@@ -22,21 +22,11 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import {
-  createLangyTokenBuffer,
-  type LangyStreamEntry,
-} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import type {
-  SettlementOutcome,
-  TurnHealth,
-} from "~/server/app-layer/langy/streaming/langyTurnSettlement";
-import {
-  advanceSettlement,
-  decideSyntheticTerminal,
-  NO_SETTLEMENT_STREAKS,
-} from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import type { TurnHealth } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import { streamTurnEntries } from "~/server/app-layer/langy/streaming/langyTurnTail";
 import {
   LangyUiActionService,
   type UiActionRedis,
@@ -266,14 +256,6 @@ function createUiActionService(): LangyUiActionService {
   });
 }
 
-/** How often the settlement watcher consults the durable fold + heartbeat. */
-const SETTLEMENT_POLL_MS = 5_000;
-/**
- * Consecutive settled reads required before synthesizing a terminal, so a single
- * projection blip can never end a live stream.
- */
-const SETTLEMENT_CONFIRM_POLLS = 2;
-
 /**
  * Read the durable fold and the per-turn heartbeat once, or null when either
  * read failed — which says nothing about the turn and must not count either way.
@@ -314,59 +296,6 @@ interface LivenessSource {
     conversationId: string;
     turnId: string;
   }): Promise<{ stale: boolean }>;
-}
-
-/**
- * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
- * tailed, and resolve to what should end the tail — or null if the stream ended
- * first (aborted) or the turn is still going.
- *
- * Split out of `onTurnStream` so the subscription body stays at the orchestration
- * level and this confirmation loop is independently testable. The two gates
- * themselves live in {@link decideSyntheticTerminal} and
- * {@link shouldAbandonWedgedTurn}; both want the same reading confirmed over
- * several polls, so a single blip can never end a live stream.
- */
-async function watchForMissedTerminal({
-  projectId,
-  conversationId,
-  turnId,
-  userId,
-  buffer,
-  signal,
-}: {
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  userId: string;
-  buffer: LivenessSource;
-  signal: AbortSignal;
-}): Promise<SettlementOutcome | null> {
-  let streaks = NO_SETTLEMENT_STREAKS;
-  while (!signal.aborted) {
-    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
-    const next = advanceSettlement({
-      health: await readTurnHealth({
-        projectId,
-        conversationId,
-        turnId,
-        userId,
-        buffer,
-      }),
-      streaks,
-      pollMs: SETTLEMENT_POLL_MS,
-      confirmPolls: SETTLEMENT_CONFIRM_POLLS,
-    });
-    streaks = next.streaks;
-    if (next.outcome?.kind === "abandoned") {
-      logger.warn(
-        { projectId, conversationId, turnId, stalePolls: streaks.stale },
-        "giving up a turn stream whose turn neither settled nor beat",
-      );
-    }
-    if (next.outcome) return next.outcome;
-  }
-  return null;
 }
 
 /**
@@ -1167,89 +1096,23 @@ export const langyRouter = createTRPCRouter({
         redis: connection,
         blockingRedis: blocking,
       });
-      // Tear down when the client goes away. There is no deadline on the turn
-      // itself: this used to also carry `AbortSignal.timeout` on the manager's
-      // request budget, which capped every live stream at two minutes. A turn
-      // that ran longer went deaf half-way through — the panel kept the last
-      // thing it had heard on screen while the agent worked on, and every UI
-      // action after the cap found nobody listening and ran on the backend, so
-      // the whole second half of a loop arrived as one refetch at the end. The
-      // wedged turn that deadline protected against is handled where it can be
-      // recognised: the settlement watcher below gives the tail up when the
-      // turn stops beating, which is the real symptom.
+      // Tear down when the client goes away. The tail carries no deadline of
+      // its own; `streamTurnEntries` says why.
       const signal = opts.signal ?? new AbortController().signal;
 
-      try {
-        // Drain the buffered prefix, then tail the live edge from where it ended.
-        const { reads, lastId } = await buffer.readTail({
-          conversationId,
-          turnId,
-        });
-        let terminal = false;
-        for (const { entry } of reads) {
-          yield entry;
-          if (entry.type === "end" || entry.type === "error") terminal = true;
-        }
-        if (!terminal) {
-          // A refresh mid-turn can miss the worker's terminal frame (its relay
-          // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on the startup status for minutes
-          // though the turn already finished. While we tail the live edge, watch
-          // the durable fold + per-turn heartbeat; if the turn has settled with
-          // no terminal in the buffer, synthesize one so the client resolves.
-          const settle = new AbortController();
-          const followSignal = AbortSignal.any([signal, settle.signal]);
-          let synthesized: LangyStreamEntry | null = null;
-
-          const watcher = watchForMissedTerminal({
-            projectId,
-            conversationId,
-            turnId,
-            userId,
-            buffer,
-            signal: followSignal,
-          })
-            .then((outcome) => {
-              if (!outcome) return;
-              // An abandoned turn yields nothing: we do not know how it ended,
-              // and inventing a terminal for a turn that may still be alive
-              // would tell the reader it finished when it did not.
-              if (outcome.kind === "terminal") synthesized = outcome.entry;
-              settle.abort(); // unblock the follow() below
-            })
-            // Attached HERE, not in the finally below: follow() can block for
-            // minutes, so a rejection would sit unhandled until then — and Node's
-            // default --unhandled-rejections=throw would take the process down
-            // first. A failed watcher just means no synthesized terminal.
-            .catch(() => undefined);
-
-          try {
-            for await (const { entry } of buffer.follow({
-              conversationId,
-              turnId,
-              fromId: lastId,
-              signal: followSignal,
-            })) {
-              yield entry;
-              if (entry.type === "end" || entry.type === "error") {
-                // A real terminal reached the buffer — never override it.
-                synthesized = null;
-                return;
-              }
-            }
-          } finally {
-            settle.abort();
-            await watcher; // already has its own .catch()
-          }
-
-          // follow() ended with no buffered terminal. If the watcher proved the
-          // turn settled, deliver the synthesized terminal so the UI resolves
-          // instead of hanging; the client reconciles the transcript via
-          // langy.messages.
-          if (synthesized) yield synthesized;
-        }
-      } finally {
-        blocking.disconnect();
-      }
+      yield* streamTurnEntries({
+        conversationId,
+        turnId,
+        buffer,
+        readHealth: () =>
+          readTurnHealth({ projectId, conversationId, turnId, userId, buffer }),
+        signal,
+        release: () => blocking.disconnect(),
+        onAbandoned: ({ stalePolls }) =>
+          logger.warn(
+            { projectId, conversationId, turnId, stalePolls },
+            "giving up a turn stream whose turn neither settled nor beat",
+          ),
+      });
     }),
 });
