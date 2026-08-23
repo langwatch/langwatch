@@ -3144,7 +3144,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option(
         "--experiment <slug>",
         "Experiment for the backend fallback to apply the action to when no page answers",
-      ),
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (kind: string, options: { payload?: string; experiment?: string }) => {
       const { uiCallCommand: impl } = await import("./commands/ui/call.js");
       return impl(kind, options);
@@ -3154,7 +3155,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     uiCmd
       .command("actions")
-      .description("List the UI actions pages accept, with their schemas"),
+      .description("List the UI actions pages accept, with their schemas")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
       const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
       return impl();
@@ -3171,7 +3173,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description(
         "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
       )
-      .option("--no-include-results", "Leave the results summary out"),
+      .option("--no-include-results", "Leave the results summary out")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       experiment: string | undefined,
       options: { includeResults?: boolean },
