@@ -280,6 +280,43 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     };
   }
 
+  // Dialect 4: THE CANONICAL ONE, from the shared REST envelope
+  // (`app/api/shared/schemas.ts`) that the analytics-sql families and every
+  // new canonical-envelope route answer with:
+  // `{ error: { type, code, message, meta?, trace_id?, span_id? } }` — the
+  // whole failure NESTED under `error` as an object, so none of the flat
+  // readings below can see it. `code` is the discriminant, `type` the
+  // status-class alias the Go plane also emits; reasons ride inside
+  // `meta.reasons` and are lifted out. The Go plane's 402 additionally
+  // carries `tips` / `docs_url` at the same level.
+  const canonical = asRecord(record.error);
+  if (
+    canonical &&
+    !isSystemError(canonical) &&
+    (typeof canonical.code === "string" || typeof canonical.type === "string")
+  ) {
+    const code =
+      typeof canonical.code === "string"
+        ? canonical.code
+        : (canonical.type as string);
+    const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+    return {
+      code,
+      message:
+        typeof canonical.message === "string" && canonical.message !== code
+          ? canonical.message
+          : undefined,
+      meta,
+      traceId:
+        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+      reasons: asReasons(metaReasons),
+      suggestions:
+        asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+      docUrl:
+        typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
+    };
+  }
+
   // Dialects 1 and 3 (and the deprecated `kind`-only variant). One of them must
   // name the failure; without any, this is not the platform's shape at all.
   //

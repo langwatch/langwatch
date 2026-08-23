@@ -230,6 +230,60 @@ describe("runChartCommand()", () => {
       expect(mocks.runQuery).not.toHaveBeenCalled();
     });
   });
+
+  describe("when --granularity is not one of the offered steps", () => {
+    it("refuses locally, naming the offered steps, without calling the API", async () => {
+      const errorSpy = vi.mocked(console.error);
+
+      await expect(
+        runChartCommand("chart-1", { granularity: "86400" }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mocks.get).not.toHaveBeenCalled();
+      expect(mocks.runQuery).not.toHaveBeenCalled();
+      const message = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      // The refusal names every offered step, so the caller does not have to
+      // guess which values the API accepts.
+      expect(message).toContain("1 (1 second)");
+      expect(message).toContain("60 (1 minute)");
+      expect(message).toContain("3600 (1 hour)");
+    });
+  });
+
+  describe("when --granularity is an offered step", () => {
+    it("passes it through to the query", async () => {
+      mocks.get.mockResolvedValue(CHART);
+      mocks.runQuery.mockResolvedValue({
+        columns: [],
+        rows: [],
+        statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+        truncated: false,
+        followsTimeWindow: false,
+        followsGranularity: true,
+        diagnostics: [],
+      });
+
+      await runChartCommand("chart-1", { granularity: "60" });
+
+      expect(mocks.runQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ granularitySeconds: 60 }),
+      );
+    });
+  });
+});
+
+describe("deleteChartCommand()", () => {
+  describe("when the platform answers 204 with no body", () => {
+    it("confirms via the id the caller passed instead of reading a body", async () => {
+      mocks.delete.mockResolvedValue(undefined);
+
+      const result = await deleteChartCommand("chart-1");
+
+      expect(mocks.delete).toHaveBeenCalledWith("chart-1");
+      expect(result).toBeTruthy();
+      expect(result!.data).toEqual({ id: "chart-1", deleted: true });
+    });
+  });
 });
 
 describe("placeChartCommand()", () => {
@@ -267,7 +321,7 @@ describe("the chart family's machine output", () => {
       mocks.get.mockResolvedValue(CHART);
       mocks.create.mockResolvedValue(CHART);
       mocks.update.mockResolvedValue(CHART);
-      mocks.delete.mockResolvedValue({ id: CHART.id, name: CHART.name });
+      mocks.delete.mockResolvedValue(undefined);
       mocks.place.mockResolvedValue({ ...CHART, dashboardId: "dashboard-1" });
       mocks.unplace.mockResolvedValue(undefined);
       mocks.runQuery.mockResolvedValue({

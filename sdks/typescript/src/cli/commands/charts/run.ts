@@ -17,6 +17,16 @@ import type { CommandResult } from "../../utils/output";
  * `period_start`/`period_end` parameters for statements that declare them,
  * and `--granularity` the reserved datapoint step, in seconds.
  */
+/**
+ * The datapoint steps the platform offers, in seconds. The API is the source
+ * of truth (`LWQL_GRANULARITY_STEPS`, restricted in the route schema); this
+ * local copy only exists to refuse an off-list value before a request is made,
+ * with a message that names the steps instead of a schema rejection.
+ */
+const OFFERED_GRANULARITY_STEPS = [1, 60, 3600] as const;
+
+const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
+
 export const runChartCommand = async (
   id: string,
   options: {
@@ -37,9 +47,15 @@ export const runChartCommand = async (
   let granularitySeconds: number | undefined;
   if (options.granularity !== undefined) {
     granularitySeconds = Number(options.granularity);
-    if (!Number.isInteger(granularitySeconds) || granularitySeconds <= 0) {
+    if (
+      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(
+        granularitySeconds,
+      )
+    ) {
       console.error(
-        chalk.red("Error: --granularity must be a positive whole number of seconds"),
+        chalk.red(
+          `Error: --granularity must be one of the offered steps: ${OFFERED_GRANULARITY_STEP_NAMES}`,
+        ),
       );
       process.exit(1);
     }
