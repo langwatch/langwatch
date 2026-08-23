@@ -32724,9 +32724,11 @@ The same rule decides what a long-lived session reports. A session resumed acros
 
 ```bash
 git -C <repo> fetch origin <branch>
-git -C <repo> worktree add <repo>/.claude/worktrees/<name> <branch>
+git -C <repo> worktree add -B <branch> <repo>/.claude/worktrees/<name> origin/<branch>
 cd <repo>/.claude/worktrees/<name> && codex
 ```
+
+`-B` points the local branch at the ref the fetch just updated, so an old local copy of the branch does not decide what the agent reviews. Git refuses the `worktree add` if the branch is already checked out somewhere else: start `codex` in that worktree instead of making a second one. A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
 
 Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
 
