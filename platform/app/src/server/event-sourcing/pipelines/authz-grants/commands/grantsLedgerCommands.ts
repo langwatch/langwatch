@@ -18,7 +18,6 @@ import {
   ATTACH_GRANT_COMMAND_TYPE,
   AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-  AUTHZ_ROLE_AGGREGATE_TYPE,
   CHANGE_GRANT_ROLE_COMMAND_TYPE,
   CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
   DEFINE_ROLE_COMMAND_TYPE,
@@ -194,7 +193,7 @@ export class DefineRoleCommand
     const { occurredAtMs, ...data } = role;
     return [
       EventUtils.createEvent<RoleDefinedEvent>({
-        aggregateType: AUTHZ_ROLE_AGGREGATE_TYPE,
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
         aggregateId: role.roleId,
         tenantId: createTenantId(command.tenantId),
         type: ROLE_DEFINED_EVENT_TYPE,
@@ -232,7 +231,7 @@ export class ChangeRolePermissionsCommand
       command.data;
     return [
       EventUtils.createEvent<RolePermissionsChangedEvent>({
-        aggregateType: AUTHZ_ROLE_AGGREGATE_TYPE,
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
         aggregateId: roleId,
         tenantId: createTenantId(command.tenantId),
         type: ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -265,7 +264,7 @@ export class DeleteRoleCommand
     const { commandId, roleId, actor, occurredAtMs } = command.data;
     return [
       EventUtils.createEvent<RoleDeletedEvent>({
-        aggregateType: AUTHZ_ROLE_AGGREGATE_TYPE,
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
         aggregateId: roleId,
         tenantId: createTenantId(command.tenantId),
         type: ROLE_DELETED_EVENT_TYPE,

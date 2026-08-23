@@ -37,9 +37,11 @@ export interface AuthzGrantsPipelineDeps {
  * entity and its events apply independently of every other. The organization
  * is the tenant of all of them and the aggregate of none.
  *
- * The declared aggregate type is a label: it names the killswitch keys, and
- * nothing routes on it. Both families ride this one pipeline; what places an
- * event is the aggregate id its command stamped.
+ * Both families ride this one pipeline, so both stamp its aggregate TYPE —
+ * that is not a label. It is the storage partition key, and the event store
+ * refuses at append any event whose type differs from the one declared here.
+ * What separates one entity's fold from another's is the aggregate ID its
+ * command stamped: a grant id, or a role id.
  */
 export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
   return definePipeline<AuthzGrantsEvent>()
