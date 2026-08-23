@@ -327,9 +327,22 @@ export async function executeScenarioRun(
     }
 
     if (!prefetchResult.success) {
-      jobLogger.error(
-        { error: prefetchResult.error, phase: "prefetch" },
-        "Failed to prefetch scenario data",
+      // A reason other than preparation_error means the customer's own
+      // configuration blocked the run (provider disabled, model format,
+      // missing credentials) — their run fails with the remediation message,
+      // and it logs at warn because there is nothing for us to fix.
+      const customerActionable =
+        prefetchResult.reason !== undefined &&
+        prefetchResult.reason !== "preparation_error";
+      jobLogger[customerActionable ? "warn" : "error"](
+        {
+          error: prefetchResult.error,
+          reason: prefetchResult.reason,
+          phase: "prefetch",
+        },
+        customerActionable
+          ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
+          : "Failed to prefetch scenario data",
       );
       await handleFailedJobResult(jobData, prefetchResult.error, deps);
       return;
