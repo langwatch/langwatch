@@ -182,6 +182,18 @@ class EvaluationResultError(BaseModel):
     traceback: List[str] = Field(description="Traceback information for debugging")
 
 
+# The retry shape one entry spends on its model call.
+#
+# A caller that has to size a deadline around the retryer reads these rather
+# than restating them: `evaluate_batch` dials a failing provider
+# DEFAULT_RETRIES times and waits up to RETRY_MAX_WAIT_SECONDS between the
+# attempts, so the wall time of one entry is bounded by
+# `attempts * per_call_timeout + (attempts - 1) * RETRY_MAX_WAIT_SECONDS`.
+DEFAULT_RETRIES = 3
+RETRY_MIN_WAIT_SECONDS = 4
+RETRY_MAX_WAIT_SECONDS = 10
+
+
 def evaluation_timed_out_result(
     max_seconds: Optional[float],
 ) -> EvaluationResultError:
@@ -311,7 +323,11 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 # real error instead.
                 retry=retry_if_not_exception_type(litellm.BadRequestError),
                 stop=stop_after_attempt(retries),
-                wait=wait_random_exponential(multiplier=1, min=4, max=10),
+                wait=wait_random_exponential(
+                    multiplier=1,
+                    min=RETRY_MIN_WAIT_SECONDS,
+                    max=RETRY_MAX_WAIT_SECONDS,
+                ),
                 reraise=True,
             )
             return retryer(self.evaluate, entry)
@@ -332,7 +348,7 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         data: List[TEntry],
         index=0,
         max_evaluations_in_parallel=50,
-        retries=3,
+        retries=DEFAULT_RETRIES,
         max_seconds: Optional[float] = None,
         _executor_ref: Optional[Callable[[ThreadPoolExecutor], None]] = None,
     ) -> BatchEvaluationResult:

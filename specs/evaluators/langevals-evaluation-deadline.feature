@@ -78,8 +78,8 @@ Feature: A stuck evaluation cannot take the evaluation service down with it
 
     @unit
     Scenario: An evaluator that batches its own way still stops at the deadline
-      Given the moderation evaluator, which sends the whole batch in one call
-      And that call stops making progress
+      Given the moderation evaluator, which sends the whole batch in calls of its own
+      And those calls stop making progress
       When the batch runs past the evaluation timeout
       Then every entry is answered as an error naming the timeout
       And the call is given up on rather than waited out

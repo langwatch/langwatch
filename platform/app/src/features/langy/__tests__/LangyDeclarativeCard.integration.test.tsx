@@ -154,7 +154,7 @@ describe("LangyDeclarativeCard", () => {
     });
 
     describe("when the card renders", () => {
-      /** @scenario The listed actions read as their kinds */
+      /** @scenario The listed actions read as what they do */
       it("names each row by its kind", () => {
         renderCard({ name: "langwatch.ui.actions", output });
 
@@ -163,7 +163,7 @@ describe("LangyDeclarativeCard", () => {
         expect(screen.queryByText("UI action 1")).toBeNull();
       });
 
-      /** @scenario A row that has a real name keeps it */
+      /** @scenario A listed action with a display name keeps it */
       it("still prefers a real name when the row has one", () => {
         renderCard({
           name: "langwatch.ui.actions",

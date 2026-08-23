@@ -27,6 +27,8 @@ dotenv.load_dotenv()
 from fastapi import FastAPI, HTTPException, Request
 from typing import Callable, List, Optional
 from langevals_core.base_evaluator import (
+    DEFAULT_RETRIES,
+    RETRY_MAX_WAIT_SECONDS,
     EvaluationResultSkipped,
     EvaluationResultError,
 )
@@ -86,31 +88,58 @@ MAX_CONCURRENT_EVALUATIONS = (
 EVALUATION_TIMEOUT_SECONDS = (
     positive_float_or_none(os.getenv("LANGEVALS_EVALUATION_TIMEOUT")) or 300.0
 )
-# What one entry spends before it gives up on the provider. `evaluate_batch`
-# retries a failed model call this many times and waits between attempts, and
-# the server does not override either, so a stalled provider is dialled
-# MODEL_CALL_ATTEMPTS times and not once.
-MODEL_CALL_ATTEMPTS = 3
-MODEL_CALL_MAX_WAIT_SECONDS = 10.0
+# Three minutes is far above any judge call that is working (single figures of
+# seconds, or a minute for a reasoning model on a long context), so a bound at
+# or below it only ever cuts off a call that stopped making progress.
+MODEL_TIMEOUT_CEILING_SECONDS = 180
 
 
-def model_timeout_fitting_the_batch_deadline(batch_deadline: float) -> float:
-    """The longest one model call may run and still lose the race.
+def model_call_budget_seconds(*, attempts: int, model_timeout: float) -> float:
+    """The wall time one entry can spend dialling a provider that never answers."""
+    return attempts * model_timeout + (attempts - 1) * RETRY_MAX_WAIT_SECONDS
+
+
+def resolve_model_call_bounds(
+    *, batch_deadline: float, model_timeout: Optional[float] = None
+) -> tuple[int, float]:
+    """The attempts and per-call timeout that fit inside the batch deadline.
 
     The batch deadline names nothing but the batch, so a call that stalls
     should fail first, as a provider timeout that names the provider. That
-    only holds if EVERY attempt fits: one call under the deadline still ends
-    as an abandoned batch when the retry after it is cut off. So the budget is
-    all the attempts plus the waits between them, not one call.
+    only holds if the WHOLE retry budget fits: one call under the deadline
+    still ends as an abandoned batch when the retry after it is cut off.
 
-    Capped at three minutes, which is far above any judge call that is working
-    (single figures of seconds, or a minute for a reasoning model on a long
-    context), so the bound only ever cuts off a call that stopped making
-    progress.
+    Attempts come down before the timeout goes below a second, and a single
+    attempt always fits because it waits for nothing. So a deadline too small
+    for the full retry budget buys fewer tries rather than the wrong error,
+    and no configuration can make the budget overrun.
+
+    `model_timeout` is the `LANGEVALS_MODEL_TIMEOUT` override. The attempts are
+    fitted around it, and it is honored up to the deadline itself: an override
+    longer than the whole batch is allowed to run has asked for the error the
+    two bounds exist to tell apart.
     """
-    waits = (MODEL_CALL_ATTEMPTS - 1) * MODEL_CALL_MAX_WAIT_SECONDS
-    fits = math.floor((batch_deadline - waits) / MODEL_CALL_ATTEMPTS)
-    return float(min(180, max(1, fits)))
+    for attempts in range(DEFAULT_RETRIES, 1, -1):
+        waits = (attempts - 1) * RETRY_MAX_WAIT_SECONDS
+        timeout = (
+            model_timeout
+            if model_timeout is not None
+            else float(
+                min(
+                    MODEL_TIMEOUT_CEILING_SECONDS,
+                    math.floor((batch_deadline - waits) / attempts),
+                )
+            )
+        )
+        if timeout >= 1 and (
+            model_call_budget_seconds(attempts=attempts, model_timeout=timeout)
+            <= batch_deadline
+        ):
+            return attempts, timeout
+    only_attempt = min(model_timeout or batch_deadline, batch_deadline)
+    return 1, float(
+        min(MODEL_TIMEOUT_CEILING_SECONDS, max(1, math.floor(only_attempt)))
+    )
 
 
 # How long ONE model call may take, which is the usual reason an evaluation
@@ -118,9 +147,10 @@ def model_timeout_fitting_the_batch_deadline(batch_deadline: float) -> float:
 # worker thread for 100 minutes. The batch deadline above already gives the
 # slot back at that point, but only this makes the abandoned thread die
 # instead of lingering with the socket.
-MODEL_TIMEOUT_SECONDS = positive_float_or_none(
-    os.getenv("LANGEVALS_MODEL_TIMEOUT")
-) or model_timeout_fitting_the_batch_deadline(EVALUATION_TIMEOUT_SECONDS)
+MODEL_CALL_ATTEMPTS, MODEL_TIMEOUT_SECONDS = resolve_model_call_bounds(
+    batch_deadline=EVALUATION_TIMEOUT_SECONDS,
+    model_timeout=positive_float_or_none(os.getenv("LANGEVALS_MODEL_TIMEOUT")),
+)
 litellm.request_timeout = MODEL_TIMEOUT_SECONDS
 # Spare threads for anything the framework runs off the event loop that is not
 # an evaluation. The pool is sized from the knob plus this, never below it.
@@ -336,6 +366,7 @@ def create_evaluator_routes(evaluator_cls):
                 return evaluator.evaluate_batch(
                     req.data,
                     max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,
+                    retries=MODEL_CALL_ATTEMPTS,
                     max_seconds=EVALUATION_TIMEOUT_SECONDS,
                 )
         except EvaluationQueueTimeout:

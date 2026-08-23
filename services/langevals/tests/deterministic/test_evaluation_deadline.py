@@ -23,6 +23,7 @@ import os
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -216,22 +217,38 @@ def test_an_evaluator_that_batches_its_own_way_stops_at_the_deadline(monkeypatch
     A call that stalls holds the gate slot for as long as the socket stays
     open unless this override bounds it itself.
     """
-    from langevals_openai.moderation import OpenAIModerationEntry, OpenAIModerationEvaluator
+    from langevals_openai.moderation import (
+        OpenAIModerationEntry,
+        OpenAIModerationEvaluator,
+    )
 
-    calls: list[float | None] = []
+    # What an unbounded call against a dead provider costs. Far enough above
+    # the deadline below that `elapsed` can tell the two apart.
+    UNBOUNDED_STALL_SECONDS = 5.0
+    bounds: list[float | None] = []
 
     class StallingModerations:
+        """Answers no sooner than the bound it was given, then gives up.
+
+        A real socket read returns nothing until the timeout expires, so the
+        wait has to be here for the elapsed assertion to measure anything. A
+        call made with no bound at all stalls for the full five seconds, which
+        is what makes that assertion fail if the deadline stops being passed.
+        """
+
+        def __init__(self, bound: float | None):
+            self._bound = bound
+
         def create(self, input):
-            time.sleep(5)
-            raise AssertionError("the deadline should have cut this call off")
+            time.sleep(self._bound if self._bound is not None else UNBOUNDED_STALL_SECONDS)
+            raise APITimeoutError(request=httpx.Request("POST", "http://test"))
 
     class StallingClient:
-        moderations = StallingModerations()
+        moderations = StallingModerations(bound=None)
 
         def with_options(self, timeout):
-            calls.append(timeout)
-            # What the SDK does with the bound: give up once it is spent.
-            raise APITimeoutError(request=httpx.Request("POST", "http://test"))
+            bounds.append(timeout)
+            return SimpleNamespace(moderations=StallingModerations(bound=timeout))
 
     monkeypatch.setattr(
         "langevals_openai.moderation.OpenAI", lambda **kwargs: StallingClient()
@@ -255,9 +272,9 @@ def test_an_evaluator_that_batches_its_own_way_stops_at_the_deadline(monkeypatch
         "EvaluationTimeout",
     ]
     # The bound really was handed to the call rather than only computed.
-    assert calls and all(0 < timeout <= 0.5 for timeout in calls)
-    # And the batch gave up rather than waiting the call out.
-    assert elapsed < 2
+    assert bounds and all(0 < bound <= 0.5 for bound in bounds)
+    # And the stalling call was cut off at the bound rather than waited out.
+    assert elapsed < UNBOUNDED_STALL_SECONDS / 2
 
 
 # @scenario "A slot comes back before the caller queued behind it gives up"
@@ -316,19 +333,40 @@ def test_a_stalled_model_call_is_answered_as_a_provider_timeout(monkeypatch):
 
 
 # @scenario "A stalled model call runs out of attempts before the batch gives up"
-def test_every_model_call_attempt_fits_inside_the_batch_deadline():
+@pytest.mark.parametrize("deadline", [1, 5, 10, 21, 30, 60, 120, 300, 600, 5000])
+@pytest.mark.parametrize("override", [None, 1.0, 5.0, 90.0, 180.0, 600.0])
+def test_every_model_call_attempt_fits_inside_the_batch_deadline(deadline, override):
     """One call under the deadline is not enough: the retries have to fit too.
 
-    An entry dials a stalled provider MODEL_CALL_ATTEMPTS times with waits in
-    between. If that whole budget runs past the batch deadline, the batch is
-    what gives up and the caller reads an abandoned evaluation after all.
+    An entry dials a stalled provider once per attempt with waits in between.
+    If that whole budget runs past the batch deadline, the batch is what gives
+    up and the caller reads an abandoned evaluation after all.
+
+    Swept over the deadline and the `LANGEVALS_MODEL_TIMEOUT` override rather
+    than read off the live module, so the invariant is the function's and not
+    an accident of the default configuration.
     """
+    attempts, timeout = server.resolve_model_call_bounds(
+        batch_deadline=float(deadline), model_timeout=override
+    )
+
+    assert attempts >= 1
+    assert timeout >= 1
+    assert (
+        server.model_call_budget_seconds(attempts=attempts, model_timeout=timeout)
+        <= deadline
+    )
+
+
+def test_the_resolved_model_timeout_is_the_one_litellm_applies():
+    """A bound that is computed and not applied stops nothing."""
     import litellm
 
-    budget = (
-        server.MODEL_CALL_ATTEMPTS * server.MODEL_TIMEOUT_SECONDS
-        + (server.MODEL_CALL_ATTEMPTS - 1) * server.MODEL_CALL_MAX_WAIT_SECONDS
-    )
-    assert budget <= server.EVALUATION_TIMEOUT_SECONDS
-    # And the bound is actually applied, not just computed.
     assert litellm.request_timeout == server.MODEL_TIMEOUT_SECONDS
+    assert (
+        server.model_call_budget_seconds(
+            attempts=server.MODEL_CALL_ATTEMPTS,
+            model_timeout=server.MODEL_TIMEOUT_SECONDS,
+        )
+        <= server.EVALUATION_TIMEOUT_SECONDS
+    )
