@@ -245,7 +245,6 @@ describe("given the prompt messages field", () => {
 
       await switchEditingMode(user, "messages");
 
-      // Should now show all messages (2 textareas)
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(2);
     });
@@ -262,7 +261,6 @@ describe("given the prompt messages field", () => {
 
       await switchEditingMode(user, "prompt");
 
-      // Should now show only system message (1 textarea)
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(1);
     });
@@ -272,7 +270,6 @@ describe("given the prompt messages field", () => {
     it("shows only the system message textarea", () => {
       renderComponent();
 
-      // Should have exactly one textarea (system prompt)
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(1);
     });
@@ -332,7 +329,6 @@ describe("given the prompt messages field", () => {
     it("shows all messages", () => {
       renderComponent({ defaultMessages: messagesForMessagesMode });
 
-      // Should have two textareas (system + user)
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(2);
     });
@@ -376,7 +372,6 @@ describe("given the prompt messages field", () => {
       // Switch to Messages mode
       await switchEditingMode(user, "messages");
 
-      // Should still have 2 messages
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(2);
     });
@@ -394,7 +389,6 @@ describe("given the prompt messages field", () => {
       // Switch to Prompt mode
       await switchEditingMode(user, "prompt");
 
-      // Should only show 1 textarea (system)
       const textareas = screen.getAllByTestId("prompt-textarea");
       expect(textareas).toHaveLength(1);
 
@@ -440,7 +434,6 @@ describe("given the prompt messages field", () => {
       // Switch to Prompt mode - should create system message
       await switchEditingMode(user, "prompt");
 
-      // Should have a textarea for the new system message
       expect(screen.getByTestId("prompt-textarea")).toBeInTheDocument();
     });
   });
@@ -461,7 +454,6 @@ describe("given the prompt messages field", () => {
         />,
       );
 
-      // Initially should show "Instructions" (default messages are system + user with {{input}})
       expect(screen.getByText("Instructions")).toBeInTheDocument();
 
       // After form reset, should switch to "Messages" mode
@@ -483,13 +475,10 @@ describe("given the prompt messages field", () => {
         />,
       );
 
-      // Should show "Instructions" mode
       expect(screen.getByText("Instructions")).toBeInTheDocument();
 
-      // After form reset, should still be in "Instructions" mode
       await waitFor(
         () => {
-          // Check that we still have Instructions and do not have Messages
           expect(screen.getByText("Instructions")).toBeInTheDocument();
         },
         { timeout: 500 },
@@ -502,12 +491,11 @@ describe("given the prompt messages field", () => {
           messagesAfterReset={[
             { role: "system", content: "System" },
             { role: "user", content: "{{input}}" },
-            { role: "assistant", content: "Response" }, // Has assistant -> Messages mode
+            { role: "assistant", content: "Response" },
           ]}
         />,
       );
 
-      // Initially "Instructions"
       expect(screen.getByText("Instructions")).toBeInTheDocument();
 
       // After reset with assistant message, should be "Messages"
