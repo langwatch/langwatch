@@ -25,7 +25,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
           >
             ✓ Met Criteria ({results.metCriteria.length}):
           </Text>
-          <VStack align="start" gap={1} pl={2}>
+          <VStack align="start" gap={1} pl={2} w="full">
             {results.metCriteria.map((criterion, idx) => (
               <Text
                 key={idx}
@@ -50,7 +50,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
           >
             ✗ Unmet Criteria ({results.unmetCriteria.length}):
           </Text>
-          <VStack align="start" gap={1} pl={2}>
+          <VStack align="start" gap={1} pl={2} w="full">
             {results.unmetCriteria.map((criterion, idx) => (
               <Text
                 key={idx}

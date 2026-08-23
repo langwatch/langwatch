@@ -170,6 +170,7 @@ export function CriteriaInput({
               fontSize="sm"
               whiteSpace="pre-wrap"
               wordBreak="break-word"
+              minWidth={0}
             >
               {criterion}
             </Text>

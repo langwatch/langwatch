@@ -57,7 +57,7 @@ function CriteriaSection({
       {criteria.length > 0 ? (
         <VStack alignItems="flex-start" gap={2} pl={2}>
           {criteria.map((criterion: string, idx: number) => (
-            <HStack key={idx} align="flex-start" gap={3}>
+            <HStack key={idx} align="flex-start" gap={3} w="full">
               <Box
                 w={2}
                 h={2}
@@ -71,6 +71,8 @@ function CriteriaSection({
                 fontSize="sm"
                 lineHeight="tall"
                 wordBreak="break-word"
+                flex={1}
+                minWidth={0}
               >
                 {criterion}
               </Text>

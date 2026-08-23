@@ -31,14 +31,14 @@ afterEach(cleanup);
 describe("given a markdown message body", () => {
   describe("when it holds one unbreakable token", () => {
     /** @scenario "A message body carries the wrap rule to every prose element" */
-    it("the Prose root carries overflow-wrap anywhere so every prose element inherits it", () => {
+    it("applies overflow-wrap anywhere on the Prose root so every prose element inherits it", () => {
       expect(PROSE_BASE.overflowWrap).toBe("anywhere");
     });
   });
 
   describe("when it contains a fenced code block", () => {
     /** @scenario "Fenced code blocks scroll instead of breaking mid-token" */
-    it("the pre rule keeps horizontal scrolling and resets the inherited wrap", () => {
+    it("keeps the pre rule scrolling horizontally and resets the inherited wrap", () => {
       const preKey = Object.keys(PROSE_BASE).find((key) =>
         key.includes(":where(pre)"),
       );
@@ -51,7 +51,7 @@ describe("given a markdown message body", () => {
       expect(preStyle.overflowWrap).toBe("normal");
     });
 
-    it("renders markdown with a fenced block without crashing", () => {
+    it("renders a fenced code block without crashing", () => {
       const fenced = `\`\`\`\n${UNBREAKABLE}\n\`\`\``;
       withProviders(<Markdown>{fenced}</Markdown>);
       expect(
@@ -63,7 +63,7 @@ describe("given a markdown message body", () => {
 
 describe("given a raw tool input or output string outside the JSON viewer", () => {
   /** @scenario "Raw tool input and output strings wrap instead of painting wide" */
-  it("the mono fallback carries word-break break-word", () => {
+  it("applies word-break break-word to the raw mono fallback", () => {
     withProviders(
       <RenderInputOutput value={`https://host.example/${UNBREAKABLE}`} />,
     );

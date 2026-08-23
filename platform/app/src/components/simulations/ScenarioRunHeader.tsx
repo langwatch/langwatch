@@ -33,12 +33,15 @@ export function ScenarioRunHeader({
             </HStack>
             <VStack align="start" gap={0} ml={0}>
               {copyableIds.map((id) => (
-                <HStack key={id.label} gap={1}>
+                <HStack key={id.label} gap={1} w="full">
+                  {/* lineHeight 0 would collide wrapped lines now that long
+                      ids break, so the text uses the normal leading. */}
                   <Text
                     fontSize="xs"
                     color="fg.muted"
-                    lineHeight="0"
                     wordBreak="break-word"
+                    flex={1}
+                    minWidth={0}
                   >
                     {id.label}: {id.value}
                   </Text>
@@ -47,6 +50,7 @@ export function ScenarioRunHeader({
                     label={id.label}
                     height="auto"
                     display="inline-block"
+                    flexShrink={0}
                   />
                 </HStack>
               ))}

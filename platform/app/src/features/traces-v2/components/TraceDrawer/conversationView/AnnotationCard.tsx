@@ -343,10 +343,13 @@ function SuggestedCorrection({
         paddingY={1.5}
         fontSize="xs"
         whiteSpace="pre-wrap"
+        wordBreak="break-word"
         maxHeight="160px"
         overflowY="auto"
         // Explicit, so an overflowing unbreakable token clips here instead of
         // computing overflow-x to auto and growing a horizontal scrollbar.
+        // The wrap rule above keeps that clip from ever cutting content away:
+        // pre-wrap alone does not break whitespace-free tokens.
         overflowX="hidden"
       >
         {expectedOutput}

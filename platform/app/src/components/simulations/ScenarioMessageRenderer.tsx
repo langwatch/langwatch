@@ -197,7 +197,7 @@ export function ScenarioMessageRenderer({
       case "tool_call":
         return (
           <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
-            <HStack gap={1.5} color="orange.fg">
+            <HStack gap={1.5} color="orange.fg" w="full">
               <Settings size={12} />
               <Text
                 textStyle="2xs"
@@ -205,6 +205,8 @@ export function ScenarioMessageRenderer({
                 textTransform="uppercase"
                 letterSpacing="0.06em"
                 wordBreak="break-word"
+                flex={1}
+                minWidth={0}
               >
                 {item.name}
               </Text>

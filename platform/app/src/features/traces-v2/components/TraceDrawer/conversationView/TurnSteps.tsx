@@ -166,7 +166,15 @@ function StepRow({ step }: { step: Step }) {
       >
         {isTool ? "⏺" : "◆"}
       </Text>
-      <Text {...CELL} color="fg" flexShrink={0} wordBreak="break-word">
+      {/* Shrinkable + minWidth 0 so a whitespace-free label wraps inside its
+          box instead of pushing the row wide; flexShrink 0 would make the
+          word-break rule inert. */}
+      <Text
+        {...CELL}
+        color="fg"
+        wordBreak="break-word"
+        minWidth={0}
+      >
         {step.label}
       </Text>
       {step.arg && (
