@@ -1,0 +1,125 @@
+{
+  "name": "@langwatch/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangWatch design tokens, Chakra system, accessible primitives, and shared UI components.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./system": {
+      "types": "./src/system/index.ts",
+      "default": "./src/system/index.ts"
+    },
+    "./provider": {
+      "types": "./src/provider/index.tsx",
+      "default": "./src/provider/index.tsx"
+    },
+    "./color-mode": {
+      "types": "./src/color-mode/index.tsx",
+      "default": "./src/color-mode/index.tsx"
+    },
+    "./testing": {
+      "types": "./src/testing/index.tsx",
+      "default": "./src/testing/index.tsx"
+    },
+    "./checkbox": {
+      "types": "./src/components/checkbox.tsx",
+      "default": "./src/components/checkbox.tsx"
+    },
+    "./close-button": {
+      "types": "./src/components/close-button.tsx",
+      "default": "./src/components/close-button.tsx"
+    },
+    "./dialog": {
+      "types": "./src/components/dialog.tsx",
+      "default": "./src/components/dialog.tsx"
+    },
+    "./drawer": {
+      "types": "./src/components/drawer.tsx",
+      "default": "./src/components/drawer.tsx"
+    },
+    "./input-group": {
+      "types": "./src/components/input-group.tsx",
+      "default": "./src/components/input-group.tsx"
+    },
+    "./menu": {
+      "types": "./src/components/menu.tsx",
+      "default": "./src/components/menu.tsx"
+    },
+    "./popover": {
+      "types": "./src/components/popover.tsx",
+      "default": "./src/components/popover.tsx"
+    },
+    "./radio": {
+      "types": "./src/components/radio.tsx",
+      "default": "./src/components/radio.tsx"
+    },
+    "./search-input": {
+      "types": "./src/components/search-input.tsx",
+      "default": "./src/components/search-input.tsx"
+    },
+    "./segmented-control": {
+      "types": "./src/components/segmented-control.tsx",
+      "default": "./src/components/segmented-control.tsx"
+    },
+    "./select": {
+      "types": "./src/components/select.tsx",
+      "default": "./src/components/select.tsx"
+    },
+    "./slider": {
+      "types": "./src/components/slider.tsx",
+      "default": "./src/components/slider.tsx"
+    },
+    "./switch": {
+      "types": "./src/components/switch.tsx",
+      "default": "./src/components/switch.tsx"
+    },
+    "./tooltip": {
+      "types": "./src/components/tooltip.tsx",
+      "default": "./src/components/tooltip.tsx"
+    },
+    "./toaster": {
+      "types": "./src/components/toaster.tsx",
+      "default": "./src/components/toaster.tsx"
+    },
+    "./trigger-anchor": {
+      "types": "./src/components/trigger-anchor.tsx",
+      "default": "./src/components/trigger-anchor.tsx"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "lucide-react": "^1.22.0",
+    "next-themes": "^0.4.6"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}
