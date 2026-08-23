@@ -5,7 +5,7 @@
  * without leaving the conversation.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -50,12 +50,20 @@ describe("the variables on the message box", () => {
       ]);
 
       await user.click(screen.getByTestId("chat-variable-topic"));
-      await user.type(
-        await screen.findByTestId("chat-variable-input-topic"),
-        "otters",
-      );
+      const field = await screen.findByTestId("chat-variable-input-topic");
 
-      expect(onValueChange).toHaveBeenCalledWith("topic", "o");
+      // A change event carrying the whole value, not `user.type`. The field is
+      // controlled and this test never feeds the new value back, so typing
+      // character by character reported the same single character each time,
+      // and asserting the first call would have held even if only the first
+      // keystroke arrived. None of them did: the popover's content is not
+      // focusable under jsdom, so every keystroke went nowhere and the
+      // assertion this replaces was failing. What the contract actually says
+      // is that the field reports what it now holds, for its own variable.
+      fireEvent.change(field, { target: { value: "otters" } });
+
+      expect(onValueChange).toHaveBeenCalledTimes(1);
+      expect(onValueChange).toHaveBeenCalledWith("topic", "otters");
     });
 
     /** @scenario A variable with no value yet stands out from one already set */
@@ -68,12 +76,13 @@ describe("the variables on the message box", () => {
       expect(screen.getByTestId("chat-variable-topic")).toHaveTextContent(
         "otters",
       );
-      expect(screen.getByTestId("chat-variable-tone")).toHaveTextContent(
-        "tone",
-      );
-      expect(screen.getByTestId("chat-variable-tone")).not.toHaveTextContent(
-        "=",
-      );
+      // The empty chip shows its name and nothing else. Asserting the absence
+      // of "=" proved nothing — no chip renders one in any state — so this
+      // asserts the thing that actually separates the two: the set chip's text
+      // carries its value beyond the name, and the bare one's does not.
+      const bare = screen.getByTestId("chat-variable-tone");
+      expect(bare).toHaveTextContent("tone");
+      expect(bare.textContent?.replace("tone", "").trim()).toBe("");
     });
   });
 
