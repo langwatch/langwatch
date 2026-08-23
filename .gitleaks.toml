@@ -154,6 +154,18 @@ paths = [
   '''docs/llms-full\.txt''',
 ]
 
+# Every curl example across the docs authenticates with a visible placeholder:
+# `Bearer sk-lw-...`, `Bearer vk-lw-<ULID>`, `Bearer $LANGWATCH_API_KEY`. None
+# names a real credential. `llms-full.txt` is the generated concatenation of
+# those same pages, so a regeneration re-adds every example line at once and
+# the range-scoped scan sees all of them as new. Provider-specific rules still
+# apply to this path, so a real OpenAI, AWS, GitHub or Stripe token pasted into
+# the docs is still caught here.
+[[allowlists]]
+description = "curl auth-header examples in the docs use placeholder keys, not credentials"
+targetRules = ["curl-auth-header"]
+paths = ['''docs/llms-full\.txt''']
+
 # `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
 # `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
 # before it reaches a log. To prove that, the fixture has to be shaped exactly
