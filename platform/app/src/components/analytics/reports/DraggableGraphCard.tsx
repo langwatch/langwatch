@@ -5,6 +5,8 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
+import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
 import type { SizeOption } from "./GraphCardMenu";
@@ -18,6 +20,17 @@ interface GraphData {
   gridRow: number;
   colSpan: number;
   rowSpan: number;
+  /**
+   * Which kind of chart this row is. Absent on rows read by a caller that does
+   * not select it, which reads as a builder graph — the kind every row was
+   * before the discriminator existed.
+   */
+  kind?: string | null;
+  /**
+   * The datapoint step a placed workbench chart was given, in seconds. Only
+   * meaningful for `workbench_sql` rows.
+   */
+  granularitySeconds?: number | null;
   trigger?: {
     id: string;
     active: boolean;
@@ -28,18 +41,22 @@ interface GraphData {
 interface DraggableGraphCardProps {
   graph: GraphData;
   projectSlug: string;
+  projectId: string;
   dashboardId?: string;
   onDelete: () => void;
   onSizeChange: (size: SizeOption) => void;
+  onGranularityChange?: (granularitySeconds: number) => void;
   isDeleting: boolean;
 }
 
 export function DraggableGraphCard({
   graph,
   projectSlug,
+  projectId,
   dashboardId,
   onDelete,
   onSizeChange,
+  onGranularityChange,
   isDeleting,
 }: DraggableGraphCardProps) {
   const {
@@ -62,6 +79,8 @@ export function DraggableGraphCard({
   // Calculate height based on rowSpan
   const graphHeight = graph.rowSpan === 2 ? 600 : 300;
 
+  const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
+
   return (
     <Box ref={setNodeRef} style={style} minWidth={0}>
       <Card.Root height="full" minWidth={0}>
@@ -82,27 +101,44 @@ export function DraggableGraphCard({
             rowSpan={graph.rowSpan}
             filters={graph.filters}
             trigger={graph.trigger}
+            isWorkbenchChart={isWorkbenchChart}
+            {...(graph.granularitySeconds == null
+              ? {}
+              : { granularitySeconds: graph.granularitySeconds })}
             isDragging={isDragging}
             dragAttributes={attributes}
             dragListeners={listeners}
             onSizeChange={onSizeChange}
+            {...(onGranularityChange ? { onGranularityChange } : {})}
             onDelete={onDelete}
             isDeleting={isDeleting}
           />
 
           <Box flex={1} minHeight={0}>
-            <CustomGraph
-              key={graph.id}
-              input={{
-                ...(graph.graph as CustomGraphInput),
-                height: graphHeight,
-              }}
-              filters={
-                graph.filters as
-                  | Record<FilterField, string[] | Record<string, string[]>>
-                  | undefined
-              }
-            />
+            {isWorkbenchChart ? (
+              <LangWatchQLDashboardWidget
+                key={graph.id}
+                chartId={graph.id}
+                projectId={projectId}
+                {...(graph.granularitySeconds == null
+                  ? {}
+                  : { granularitySeconds: graph.granularitySeconds })}
+                name={graph.name}
+              />
+            ) : (
+              <CustomGraph
+                key={graph.id}
+                input={{
+                  ...(graph.graph as CustomGraphInput),
+                  height: graphHeight,
+                }}
+                filters={
+                  graph.filters as
+                    | Record<FilterField, string[] | Record<string, string[]>>
+                    | undefined
+                }
+              />
+            )}
           </Box>
         </Card.Body>
       </Card.Root>

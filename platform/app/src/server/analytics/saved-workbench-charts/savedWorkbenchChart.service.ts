@@ -48,6 +48,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLService,
 } from "../lwql/lwql.service";
+import type { LangWatchQLBudgetOverflowMode } from "../lwql/resolveTimeWindow";
 import type { LangWatchQLTimeWindow } from "../lwql/timeWindow";
 import {
   SavedWorkbenchChartAlreadyExistsError,
@@ -288,8 +289,10 @@ export class SavedWorkbenchChartService {
    *   reserved name the request supplies no value for (a declared granularity
    *   with no step among them), and
    *   {@link LangWatchQLGranularityTooFineError} when the period at the
-   *   supplied step overflows the bucket ceiling — a direct chart run is
-   *   caller-owned, so it refuses where the dashboard will coarsen.
+   *   supplied step overflows the bucket ceiling and the caller asked to
+   *   refuse, which is the default: a direct chart run is caller-owned, so it
+   *   refuses where a dashboard widget passes `onBudgetOverflow: "coarsen"`
+   *   and reads `coarsenedFromSeconds` off the result instead.
    */
   async runChart({
     id,
@@ -309,6 +312,12 @@ export class SavedWorkbenchChartService {
       timeWindow?: LangWatchQLTimeWindow;
       /** The step the surface chose, for a statement that declares the parameter. */
       granularitySeconds?: number;
+      /**
+       * What an overflowing period does to that step. Defaults to refusing;
+       * only a surface whose period moves independently of the saved step
+       * asks to coarsen.
+       */
+      onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
     };
   }): Promise<LangWatchQLQueryResult> {
     const chart = await this.getById({ id, projectId });
@@ -321,6 +330,9 @@ export class SavedWorkbenchChartService {
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
       ...(input.granularitySeconds !== undefined
         ? { granularitySeconds: input.granularitySeconds }
+        : {}),
+      ...(input.onBudgetOverflow
+        ? { onBudgetOverflow: input.onBudgetOverflow }
         : {}),
     });
   }

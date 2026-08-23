@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { useState } from "react";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -173,7 +174,33 @@ function ReportsContent() {
     );
   };
 
-  const graphs = graphsQuery.data ?? [];
+  // The datapoint step each workbench widget runs at, keyed by chart id.
+  //
+  // Session state rather than a stored column: `CustomGraph` has no
+  // `granularitySeconds` field, and adding one is a migration this slice does
+  // not own. A member's pick therefore holds while they are on the page and
+  // resets to the widget's default on reload — visible, reversible, and not a
+  // silent wrong answer. Persisting it is the follow-up that adds the column.
+  const [granularityByGraphId, setGranularityByGraphId] = useState<
+    Readonly<Record<string, number>>
+  >({});
+
+  const handleGraphGranularityChange = (
+    graphId: string,
+    granularitySeconds: number,
+  ) => {
+    setGranularityByGraphId((current) => ({
+      ...current,
+      [graphId]: granularitySeconds,
+    }));
+  };
+
+  const graphs = (graphsQuery.data ?? []).map((graph) => {
+    const picked = granularityByGraphId[graph.id];
+    return picked === undefined
+      ? graph
+      : { ...graph, granularitySeconds: picked };
+  });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
   // Build add chart URL with current dashboard
@@ -228,9 +255,11 @@ function ReportsContent() {
             <ReportGrid
               graphs={graphs}
               projectSlug={project?.slug ?? ""}
+              projectId={projectId}
               dashboardId={activeDashboardId ?? undefined}
               onGraphDelete={handleGraphDelete}
               onGraphSizeChange={handleGraphSizeChange}
+              onGraphGranularityChange={handleGraphGranularityChange}
               onGraphsReorder={handleGraphsReorder}
               deletingGraphId={
                 deleteGraph.isPending

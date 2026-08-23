@@ -133,6 +133,19 @@ export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
 export type LangWatchQLGranularityStep =
   (typeof LWQL_GRANULARITY_STEPS)[number];
 
+/**
+ * The ceiling on datapoint buckets one governed run may produce through the
+ * granularity contract.
+ *
+ * Vocabulary rather than policy, and so it lives here: the dashboard widget
+ * cites this number in the notice it shows when a period forced its step
+ * coarser, and that notice renders in the browser. The arithmetic that enforces
+ * the ceiling stays in `./resolveTimeWindow.ts`, which the browser never loads
+ * — importing that module for the constant alone would ship the handled-error
+ * registry and everything it reaches to every page.
+ */
+export const LWQL_GRANULARITY_MAX_BUCKETS = 10_000;
+
 /** Whether a parameter name is one the surface owns. */
 export function isLangWatchQLTimeWindowParameter(
   name: string,

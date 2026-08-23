@@ -43,6 +43,7 @@ import {
   isLangWatchQLTimeWindowParameter,
   type LangWatchQLTimeWindow,
   type LangWatchQLTimeWindowParameter,
+  LWQL_GRANULARITY_MAX_BUCKETS,
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
@@ -184,14 +185,24 @@ function bucketCount(windowSeconds: number, stepSeconds: number): number {
 }
 
 /**
- * The ceiling on datapoint buckets one governed run may produce through the
- * granularity contract. Named so the dashboard clamp notice can cite it and
- * the budget arithmetic has one home.
- *
- * A run producing exactly this many buckets is admitted; overflow is strictly
- * greater than.
+ * Re-exported so every existing importer of the budget arithmetic keeps
+ * reaching the ceiling from here. It is defined in `./timeWindow.ts` because
+ * the dashboard's coarsening notice cites it in the browser, and this module
+ * is server-only.
  */
-export const LWQL_GRANULARITY_MAX_BUCKETS = 10_000;
+export { LWQL_GRANULARITY_MAX_BUCKETS };
+
+/**
+ * What an overflowing period does to the step that overflowed it.
+ *
+ * `"refuse"` for a surface whose caller picked the step for the question they
+ * are asking; `"coarsen"` for one whose period moves independently of the step
+ * — a dashboard widget, whose saved step meets whatever period the dashboard's
+ * control is currently set to. Named rather than repeated inline because the
+ * choice travels from a tRPC input schema down to {@link resolveAgainstBudget},
+ * and a widened copy at any hop would let a door coarsen that meant to refuse.
+ */
+export type LangWatchQLBudgetOverflowMode = "refuse" | "coarsen";
 
 /** What a statement's granularity declaration means for one request. */
 export interface LangWatchQLGranularityResolution {
@@ -228,26 +239,14 @@ function finestFittingStep(windowSeconds: number): number | undefined {
   return undefined;
 }
 
-/** Whether a step is one the surface offers. */
-function isOfferedStep(stepSeconds: number): boolean {
-  return (LWQL_GRANULARITY_STEPS as readonly number[]).includes(stepSeconds);
-}
-
 /**
  * The declaration- and value-level refusals, extracted from
  * {@link resolveLangWatchQLGranularity} so that function reads as the
  * decision it makes rather than the gauntlet it runs.
  *
- * The step is checked by *membership* in {@link LWQL_GRANULARITY_STEPS}, not
- * merely for being a positive integer. Coarsening picks its answer from that
- * same list, so an off-list step admitted here — 7,200 seconds, say — could be
- * "coarsened" to the 3,600-second hour: a finer step than the one requested,
- * reported as a coarsening. Refusing the off-list step is what keeps the
- * requested and effective values on one scale.
- *
  * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
- *   declared as anything but `UInt32`, or when the surface's step is not one
- *   of the offered steps.
+ *   declared as anything but `UInt32`, or when the surface's step is not a
+ *   positive whole number of seconds.
  * @throws {LangWatchQLReservedParameterSuppliedError} when the request
  *   carries a value for the reserved name.
  */
@@ -266,25 +265,20 @@ function assertSurfaceStepIsClean({
     throw new LangWatchQLReservedGranularityTypeError([declaredName]);
   }
 
-  // Only this resolver's own reserved name: the window sweep owns the other
-  // two, and refusing them here would answer a window question from the
-  // granularity path.
   const supplied = Object.keys(parameters ?? {}).filter(
-    (name) =>
-      isLangWatchQLSurfaceParameter(name) &&
-      name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+    (name) => name === LWQL_PERIOD_GRANULARITY_PARAMETER,
   );
   if (supplied.length > 0) {
     throw new LangWatchQLReservedParameterSuppliedError(supplied);
   }
 
-  if (granularitySeconds !== undefined && !isOfferedStep(granularitySeconds)) {
-    // A zero, fractional or off-list step is a malformed surface value, not a
-    // caller choice -- the input schemas refuse it first; this is the backstop.
-    throw new LangWatchQLReservedGranularityTypeError(
-      [declaredName],
-      "step-value",
-    );
+  if (
+    granularitySeconds !== undefined &&
+    (!Number.isInteger(granularitySeconds) || granularitySeconds <= 0)
+  ) {
+    // A zero or fractional step is a malformed surface value, not a caller
+    // choice -- the input schemas refuse it first; this is the backstop.
+    throw new LangWatchQLReservedGranularityTypeError([declaredName]);
   }
 }
 
@@ -308,7 +302,7 @@ function resolveAgainstBudget({
   readonly declaredName: string;
   readonly granularitySeconds: number;
   readonly timeWindow: LangWatchQLTimeWindow;
-  readonly onBudgetOverflow: "refuse" | "coarsen";
+  readonly onBudgetOverflow: LangWatchQLBudgetOverflowMode;
 }): LangWatchQLGranularityResolution {
   const windowSeconds = Math.max(
     0,
@@ -341,11 +335,7 @@ function resolveAgainstBudget({
   return {
     followsGranularity: true,
     granularitySeconds: effective,
-    // Strictly greater, never merely different: a step equal to or finer than
-    // the requested one did not coarsen anything, and labelling it as such
-    // would have the dashboard tell a member their step was widened when it
-    // was not.
-    ...(effective > granularitySeconds
+    ...(effective !== granularitySeconds
       ? { coarsenedFromSeconds: granularitySeconds }
       : {}),
   };
@@ -364,10 +354,7 @@ function resolveAgainstBudget({
  * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
  *   declared as anything but `UInt32`.
  * @throws {LangWatchQLGranularityRequiresTimeWindowError} when it is declared
- *   but either period bound is missing, or is declared as something other
- *   than a date-time. The two are told apart in the copy: an author whose
- *   `period_start` is right there but spelled `String` is not helped by being
- *   told to declare it.
+ *   but either period bound is missing.
  */
 export function assertLangWatchQLGranularityDeclaration(
   declared: readonly LangWatchQLParameter[],
@@ -384,23 +371,15 @@ export function assertLangWatchQLGranularityDeclaration(
   }
 
   const periodNames = [LWQL_PERIOD_START_PARAMETER, LWQL_PERIOD_END_PARAMETER];
-  const absent = periodNames.filter(
-    (name) => !declared.some((parameter) => parameter.name === name),
-  );
-  const mistyped = periodNames.filter(
+  const missing = periodNames.filter(
     (name) =>
-      !absent.includes(name) &&
-      !declared.some(
-        (parameter) =>
-          parameter.name === name &&
-          isLangWatchQLDateTimeParameterType(parameter.type),
-      ),
+      !declared.some((parameter) => {
+        if (parameter.name !== name) return false;
+        return isLangWatchQLDateTimeParameterType(parameter.type);
+      }),
   );
-  if (absent.length > 0 || mistyped.length > 0) {
-    throw new LangWatchQLGranularityRequiresTimeWindowError({
-      absent,
-      mistyped,
-    });
+  if (missing.length > 0) {
+    throw new LangWatchQLGranularityRequiresTimeWindowError();
   }
 }
 
@@ -446,7 +425,7 @@ export function resolveLangWatchQLGranularity({
   /** The period this run is windowed to; the budget is computed against it. */
   readonly timeWindow?: LangWatchQLTimeWindow;
   /** Refuse (caller-owned surfaces) or coarsen (the dashboard) on overflow. */
-  readonly onBudgetOverflow?: "refuse" | "coarsen";
+  readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
 }): LangWatchQLGranularityResolution {
   const declaredGranularity = declared.find(
     (parameter) => parameter.name === LWQL_PERIOD_GRANULARITY_PARAMETER,

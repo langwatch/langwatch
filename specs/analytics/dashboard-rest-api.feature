@@ -48,3 +48,15 @@ Feature: Dashboard REST API
   Scenario: Unauthenticated request
     When I call GET /api/dashboards without an API key
     Then I receive 401 Unauthorized
+
+  # The `kind` discriminator promises that neither chart shape sees the other's
+  # rows. This is that promise on the way out: the reader serialises each graph
+  # row wholesale, and a saved workbench chart's payload is the member's own
+  # SQL. Tagged because it is a real exposure rather than a shape preference —
+  # the rest of this file predates the binding convention.
+  @integration
+  Scenario: A saved workbench chart is not exposed through the dashboard REST API
+    Given the project has a dashboard carrying both a builder graph and a saved workbench chart
+    When I call GET /api/dashboards/:id
+    Then I receive only the builder graph
+    And the workbench chart's stored SQL appears nowhere in the response

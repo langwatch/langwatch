@@ -147,6 +147,12 @@ const deleteChart = protectedProcedure
  * propagate untouched, like on `create`: the boundary serialises their code plus
  * `meta`, and the workbench renders registry copy keyed by that code — including
  * `lwql_granularity_too_fine`'s bucket arithmetic.
+ *
+ * `onBudgetOverflow` defaults to refusing, so every existing caller keeps the
+ * behaviour it had. A dashboard widget passes `"coarsen"` because its saved
+ * step meets whatever period the dashboard's control is set to: refusing there
+ * would blank a card whose owner changed nothing. The substitution is reported
+ * back as `coarsenedFromSeconds` rather than applied silently.
  */
 const run = protectedProcedure
   .input(
@@ -164,6 +170,7 @@ const run = protectedProcedure
           z.literal(LWQL_GRANULARITY_STEPS[2]),
         ])
         .optional(),
+      onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
     }),
   )
   .permission("analytics:view")
@@ -184,6 +191,9 @@ const run = protectedProcedure
         ...(input.granularitySeconds === undefined
           ? {}
           : { granularitySeconds: input.granularitySeconds }),
+        ...(input.onBudgetOverflow
+          ? { onBudgetOverflow: input.onBudgetOverflow }
+          : {}),
       },
     });
   });
