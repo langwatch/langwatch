@@ -140,8 +140,13 @@ function resolveRunGranularityOrRefuseUnfilled({
     onBudgetOverflow: "refuse",
   });
 
+  // Validate lists a declared granularity as awaiting alongside the window
+  // pair; whether it is actually unfilled is this resolver's answer, so the
+  // name is re-derived from the resolution rather than carried over.
   const unfilledReserved = [
-    ...awaitingTimeWindow,
+    ...awaitingTimeWindow.filter(
+      (name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER,
+    ),
     ...(granularity.followsGranularity &&
     granularity.granularitySeconds === undefined
       ? [LWQL_PERIOD_GRANULARITY_PARAMETER]

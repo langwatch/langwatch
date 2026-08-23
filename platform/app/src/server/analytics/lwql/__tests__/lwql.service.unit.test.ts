@@ -771,6 +771,7 @@ describe("given the LangWatchQL service", () => {
       });
       expect(validated.awaitingTimeWindow).toEqual([
         "period_end",
+        "period_granularity_seconds",
         "period_start",
       ]);
     });
