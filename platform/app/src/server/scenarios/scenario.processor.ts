@@ -35,6 +35,7 @@ import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
   createDataPrefetcherDependencies,
+  type PrefetchResult,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type {
@@ -287,6 +288,34 @@ function prefetchContext(jobData: ExecutionJobData) {
 }
 
 /**
+ * A prefetch reason other than preparation_error means the customer's own
+ * configuration blocked the run (provider disabled, model format, missing
+ * credentials): their run fails with the remediation message, and it logs at
+ * warn because there is nothing for us to fix.
+ */
+function logPrefetchFailure({
+  jobLogger,
+  prefetchResult,
+}: {
+  jobLogger: ReturnType<typeof createScenarioLogger>;
+  prefetchResult: Extract<PrefetchResult, { success: false }>;
+}): void {
+  const customerActionable =
+    prefetchResult.reason !== undefined &&
+    prefetchResult.reason !== "preparation_error";
+  jobLogger[customerActionable ? "warn" : "error"](
+    {
+      error: prefetchResult.error,
+      reason: prefetchResult.reason,
+      phase: "prefetch",
+    },
+    customerActionable
+      ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
+      : "Failed to prefetch scenario data",
+  );
+}
+
+/**
  * Execute a scenario run by spawning an isolated child process.
  *
  * Called by the ScenarioExecutionPool when a slot is available.
@@ -327,23 +356,7 @@ export async function executeScenarioRun(
     }
 
     if (!prefetchResult.success) {
-      // A reason other than preparation_error means the customer's own
-      // configuration blocked the run (provider disabled, model format,
-      // missing credentials) — their run fails with the remediation message,
-      // and it logs at warn because there is nothing for us to fix.
-      const customerActionable =
-        prefetchResult.reason !== undefined &&
-        prefetchResult.reason !== "preparation_error";
-      jobLogger[customerActionable ? "warn" : "error"](
-        {
-          error: prefetchResult.error,
-          reason: prefetchResult.reason,
-          phase: "prefetch",
-        },
-        customerActionable
-          ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
-          : "Failed to prefetch scenario data",
-      );
+      logPrefetchFailure({ jobLogger, prefetchResult });
       await handleFailedJobResult(jobData, prefetchResult.error, deps);
       return;
     }
