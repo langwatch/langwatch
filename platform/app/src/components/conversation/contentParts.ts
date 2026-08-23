@@ -69,12 +69,35 @@ export function readToolBlock(
  * on `source.type` — a shared object literal over a union of sources matches
  * neither arm.
  */
+/**
+ * The media type each audio format the providers send actually is.
+ *
+ * `pcm16` is OpenAI Realtime's raw-sample format, which browsers play as wav.
+ */
+const AUDIO_MIME_BY_FORMAT: Record<string, string> = {
+  aac: "audio/aac",
+  flac: "audio/flac",
+  m4a: "audio/mp4",
+  mp3: "audio/mpeg",
+  ogg: "audio/ogg",
+  opus: "audio/opus",
+  pcm16: "audio/wav",
+  wav: "audio/wav",
+  webm: "audio/webm",
+};
+
 function audioPart(
   audio: { data?: string; url?: string; format?: string; mimeType?: string },
   { id, role, traceId, index }: PartContext,
 ): DisplayPart | undefined {
+  // Only mp3 was named, so ogg, flac, opus and the rest were all labelled
+  // audio/wav and the player was handed a type the bytes are not. A format we
+  // do not have a mapping for still says what it is rather than claiming wav.
   const mimeType =
-    audio.mimeType ?? (audio.format === "mp3" ? "audio/mpeg" : "audio/wav");
+    audio.mimeType ??
+    (audio.format
+      ? (AUDIO_MIME_BY_FORMAT[audio.format] ?? `audio/${audio.format}`)
+      : "audio/wav");
   const partId = `${id}-audio${index}`;
 
   if (audio.url) {

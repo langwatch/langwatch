@@ -91,7 +91,10 @@ function flattenTypedParts(
   return collapseAudioTranscript(parts);
 }
 
-function flattenContent(msg: FlattenableMessage): DisplayPart[] {
+function flattenContent(
+  msg: FlattenableMessage,
+  messageIndex: number,
+): DisplayPart[] {
   const coerced = coerceContentToArray(msg.content);
   if (coerced) return flattenTypedParts(coerced, msg);
 
@@ -105,7 +108,11 @@ function flattenContent(msg: FlattenableMessage): DisplayPart[] {
   return [
     {
       kind: "text",
-      id: msg.id ?? crypto.randomUUID(),
+      // The message's position, not a fresh uuid. A uuid changed on every
+      // render, so the React key changed with it and the bubble remounted —
+      // losing selection and scroll — and `crypto.randomUUID` is not available
+      // at all on an insecure origin.
+      id: msg.id ?? `message-${messageIndex}`,
       role: msg.role ?? "assistant",
       content: text,
       reasoning: readReasoning(msg),
@@ -115,7 +122,10 @@ function flattenContent(msg: FlattenableMessage): DisplayPart[] {
 }
 
 /** A whole message that is one tool's answer (OpenAI's `role: "tool"`). */
-function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
+function toolResultMessagePart(
+  msg: FlattenableMessage,
+  messageIndex: number,
+): DisplayPart {
   const raw = msg as Record<string, unknown>;
   const body =
     typeof msg.content === "string"
@@ -124,7 +134,7 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 
   return {
     kind: "tool",
-    id: msg.id ?? crypto.randomUUID(),
+    id: msg.id ?? `message-${messageIndex}`,
     name: typeof raw.name === "string" ? raw.name : "Tool result",
     arguments: undefined,
     toolCallId:
@@ -135,7 +145,10 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 }
 
 /** The calls a message requested, in the order it requested them. */
-function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
+function toolCallParts(
+  msg: FlattenableMessage,
+  messageIndex: number,
+): DisplayPart[] {
   return readToolCalls(msg).map((call, index) => ({
     kind: "tool",
     // The index disambiguates, as it does in `contentParts`. Parallel calls to
@@ -143,7 +156,7 @@ function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
     // name alone gave them the same id. That id is the React key and the turn
     // key, so React could reuse the wrong node and a card show the other call's
     // arguments.
-    id: `${msg.id ?? ""}-tool-${index}-${call.function?.name ?? "unknown"}`,
+    id: `${msg.id ?? `message-${messageIndex}`}-tool-${index}-${call.function?.name ?? "unknown"}`,
     name: call.function?.name ?? "unknown",
     arguments: safeJsonParseOrStringFallback(call.function?.arguments ?? "{}"),
     toolCallId: call.id,
@@ -152,12 +165,18 @@ function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
 }
 
 /** The parts a single message contributes, tool calls first. */
-function partsForMessage(msg: FlattenableMessage): DisplayPart[] {
+function partsForMessage(
+  msg: FlattenableMessage,
+  messageIndex: number,
+): DisplayPart[] {
   if (msg.role === "user" || msg.role === "assistant") {
-    return [...toolCallParts(msg), ...flattenContent(msg)];
+    return [
+      ...toolCallParts(msg, messageIndex),
+      ...flattenContent(msg, messageIndex),
+    ];
   }
   if (msg.role === "tool") {
-    return [toolResultMessagePart(msg)];
+    return [toolResultMessagePart(msg, messageIndex)];
   }
   return [];
 }
@@ -219,14 +238,14 @@ export function flattenMessages({
    */
   errors?: Record<string, ParsedLLMError>;
 }): DisplayPart[] {
-  const parts = messages.flatMap<DisplayPart>((msg) => {
+  const parts = messages.flatMap<DisplayPart>((msg, messageIndex) => {
     const failure = msg.id ? errors?.[msg.id] : undefined;
     if (failure) {
       return [
         { kind: "error", id: msg.id!, error: failure, traceId: msg.trace_id },
       ];
     }
-    return partsForMessage(msg);
+    return partsForMessage(msg, messageIndex);
   });
 
   return [

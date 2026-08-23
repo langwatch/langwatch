@@ -37,9 +37,12 @@ export function AddPromptButton({
   return (
     <Tooltip content="New prompt" disabled={!iconOnly}>
       <PageLayout.HeaderButton
-        onClick={handleClick}
         aria-label="New prompt"
         {...buttonProps}
+        // After the spread, not before it: a caller passing `onClick` would
+        // otherwise replace this one, and with it the `prompts:create` check
+        // and the draft creation that are the whole of what this button does.
+        onClick={handleClick}
       >
         <LuPlus size={14} />
         {!iconOnly && "New Prompt"}
