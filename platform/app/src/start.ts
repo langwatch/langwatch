@@ -429,12 +429,8 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // rather than a literal here: this handler used to force-exit after 5s,
   // which is inside the GroupQueue's own drain budget, so under the `all`
   // role (this process hosting the worker stack) a drain could never finish
-  // however long the queue was told it had.
-  // In-flight requests get this long after the listener stops accepting
-  // before the leftovers are destroyed. Must sit inside the phase's own
-  // 10s ceiling, or the runner gives up before the destroy runs and the
-  // sockets survive to the process deadline.
-  const HTTP_DRAIN_GRACE_MS = 8_000;
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
 
   installShutdownHandlers((signal) => ({
     signal,
@@ -454,7 +450,6 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         server,
         closeSessions: () => mcpHandler.closeAllSessions(),
         logger,
-        graceMs: HTTP_DRAIN_GRACE_MS,
       }),
       // Drain in-process workers (if any) before closing the shared App below,
       // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go

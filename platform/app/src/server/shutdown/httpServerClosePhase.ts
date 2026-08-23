@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+import { SHUTDOWN_BUDGET } from "./budget";
 import type { ShutdownLogger, ShutdownPhase } from "./runGracefulShutdown";
 
 /**
@@ -31,32 +33,50 @@ export function createHttpServerClosePhase({
   server,
   closeSessions,
   logger,
-  graceMs,
+  graceMs = SHUTDOWN_BUDGET.httpDrainGraceMs,
+  timeoutMs = SHUTDOWN_BUDGET.httpClosePhaseMs,
 }: {
   server: CloseableHttpServer;
   /** Extra teardown that must run once the listener stops accepting. */
   closeSessions?: () => Promise<void>;
   logger: ShutdownLogger;
   /**
-   * How long in-flight requests get before the leftovers are destroyed.
-   * Must sit inside the phase timeout, or the runner gives up first and the
-   * destroy is unreachable again.
+   * How long in-flight requests get before the leftovers are destroyed, and
+   * the phase's own ceiling around it. Both come from the shutdown budget,
+   * which is what keeps the grace inside the ceiling — the two agreeing only
+   * by comment is the failure mode budget.ts exists to prevent.
    */
-  graceMs: number;
+  graceMs?: number;
+  timeoutMs?: number;
 }): ShutdownPhase {
   return {
     name: "http-server",
+    timeoutMs,
     run: async () => {
       const closed = new Promise<void>((resolve) => {
         server.close(() => resolve());
       });
       server.closeIdleConnections?.();
-      await closeSessions?.();
+      // The grace starts here, not after the teardown below: it measures how
+      // long in-flight requests have been given, and anything awaited before
+      // it would silently eat into that budget. Unreffed, so a drain that
+      // finishes early never holds the process open waiting for the timer.
+      const graceExpired = delay(graceMs, false as const, { ref: false });
+      // Session teardown must not decide whether sockets get reaped. It runs
+      // for its own sake, and a failure is reported and stepped over — the
+      // listener is already closed, and leaving the sockets alive until the
+      // process deadline is the worse of the two outcomes.
+      try {
+        await closeSessions?.();
+      } catch (error) {
+        logger.error(
+          { error },
+          "session teardown failed during shutdown, draining connections anyway",
+        );
+      }
       const drained = await Promise.race([
         closed.then(() => true),
-        new Promise<boolean>((resolve) => {
-          setTimeout(() => resolve(false), graceMs).unref();
-        }),
+        graceExpired,
       ]);
       if (!drained) {
         logger.info(
