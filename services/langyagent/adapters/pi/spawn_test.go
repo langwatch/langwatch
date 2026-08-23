@@ -255,6 +255,67 @@ func TestProvision_ChownsLeftoverSessionFiles(t *testing.T) {
 	}
 }
 
+// The stash parent (`<sessionsRoot>/.pi-sessions`) is shared by every
+// conversation and owned by the manager; a sandboxed worker only passes
+// through it to its own chowned leaf. Mode 0711 grants exactly that: the
+// execute bit is what lets a per-conversation UID traverse (without it the
+// wrapper dies on EACCES before its ready handshake, which took down every
+// prod pi spawn), and the absent read bit keeps sibling conversation ids
+// unlistable. The chmod must also repair a stash an earlier build created
+// 0700 — deployed volumes already hold that mode.
+// @scenario "A sandboxed worker can enter the shared session stash"
+func TestProvision_StashParentIsTraversable(t *testing.T) {
+	t.Run("given no stash exists yet", func(t *testing.T) {
+		stash := filepath.Join(t.TempDir(), ".pi-sessions")
+		provisionIntoStash(t, stash)
+		assertMode(t, stash, 0o711)
+	})
+
+	t.Run("given a stash created 0700 by an earlier build", func(t *testing.T) {
+		stash := filepath.Join(t.TempDir(), ".pi-sessions")
+		if err := os.MkdirAll(stash, 0o700); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		provisionIntoStash(t, stash)
+		assertMode(t, stash, 0o711)
+	})
+
+	t.Run("the conversation's own store stays private", func(t *testing.T) {
+		stash := filepath.Join(t.TempDir(), ".pi-sessions")
+		sessionDir := provisionIntoStash(t, stash)
+		assertMode(t, sessionDir, 0o700)
+	})
+}
+
+func provisionIntoStash(t *testing.T, stash string) string {
+	t.Helper()
+	sessionDir := filepath.Join(stash, "conv-1")
+	agent := NewAgent(0)
+	if err := agent.Provision(ProvisionInput{
+		Home:           t.TempDir(),
+		WorkspaceRoot:  t.TempDir(),
+		SessionDir:     sessionDir,
+		Creds:          testCreds(),
+		UID:            4242,
+		AgentsTemplate: "contract ${LANGWATCH_ENDPOINT}",
+		Runner:         testRunner{},
+	}); err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	return sessionDir
+}
+
+func assertMode(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("%s mode = %o, want %o", path, got, want)
+	}
+}
+
 func envMap(t *testing.T, env []string) map[string]string {
 	t.Helper()
 	out := map[string]string{}

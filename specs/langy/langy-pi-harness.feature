@@ -133,6 +133,23 @@ Feature: Langy can run a conversation on the pi harness
     When a fresh worker is provisioned for the conversation
     Then every session file is owned by the fresh worker's identity
 
+  # The stash parent is shared by every conversation and stays owned by the
+  # manager. A sandboxed worker runs under its own per-conversation identity
+  # and must pass through the stash to reach its own store. A stash without
+  # that traversal permission killed every pi worker at boot in production:
+  # the wrapper died on a permission error before its ready handshake, every
+  # first message failed with worker_spawn_failed, and the panel hung on
+  # "Thinking" and then "Reconnecting to the agent". The local runner (one
+  # identity for manager and worker) can never see this, which is why it
+  # shipped: the traversal bit is the sandbox-only contract this pins.
+  @unit
+  Scenario: A sandboxed worker can enter the shared session stash
+    Given workers run under per-conversation identities
+    When a worker's session store is provisioned
+    Then the shared stash directory lets a worker pass through it
+    And the stash stays unlistable, so sibling conversation ids stay hidden
+    And a stash created earlier with a stricter mode is repaired on provision
+
   # Conversation content must not sit on the manager's disk indefinitely
   # after the user moved on; a day covers every cache tier the store serves.
   @unit
