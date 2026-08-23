@@ -401,6 +401,18 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
     When the older run resolves after the newer one
     Then the card keeps the newer answer, rather than settling on the period it has left
 
+  @integration
+  Scenario: A widget names a run refusal instead of the generic card
+    Given a placed workbench chart whose run answers with a handled LangWatchQL error
+    When the widget settles on that failure
+    Then the card shows the registry copy for that code, not the generic error treatment
+
+  @integration
+  Scenario: A widget falls back to the generic card only for unknown failures
+    Given a placed workbench chart whose run fails with an error no registry names
+    When the widget settles on that failure
+    Then the card shows the generic treatment under a headline naming the action, and leaks no internal message
+
 # --- AC Coverage Map ---
 # Issue #6582, slice 1 ("Schema + repository + service — model decision,
 # validation choke point, unit/integration tests").
