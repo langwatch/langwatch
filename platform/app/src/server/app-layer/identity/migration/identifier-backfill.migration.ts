@@ -24,17 +24,22 @@
  * departs from ADR-110's queue-only rule, on purpose (ADR-101 §2).
  *
  * Idempotent by construction, not by bookkeeping (the ADR-110 migration
- * shape): each pass re-reads the legacy rows, restates every fact (a
- * restated fact dedupes at the event store), detaches the identifiers whose
- * `Account` row is gone, and proves the heads against the rows it just read.
- * Nothing here consults `previous`; there is no partial state a failed pass
- * could leave behind that the next full pass does not simply redo. A held
- * user's report names the identifiers outstanding, not a count.
+ * shape): each pass re-reads the legacy rows, states every fact, detaches
+ * the identifiers whose `Account` row is gone, and proves the heads against
+ * the rows it just read. A pass states only what the heads do not carry
+ * (PR #7429): every command's guards read the projection first and emit
+ * nothing for a fact already folded, so a pass after the first writes no
+ * event_log row for a user whose history has not changed — a restated row
+ * would otherwise be a row written, deduped only on read. Nothing here
+ * consults `previous`; there is no partial state a failed pass could leave
+ * behind that the next full pass does not simply redo. A held user's report
+ * names the identifiers outstanding, not a count.
  *
  * One disagreement is named rather than repaired, deliberately: an account
  * removed and re-linked between passes re-derives the id of the detached
- * identifier, and its restated attach dedupes against the original, so the
- * head stays DETACHED and the check reports `state_mismatch` each pass
+ * identifier, and its restated attach emits nothing against the head that
+ * already carries it, so the head stays DETACHED and the check reports
+ * `state_mismatch` each pass
  * (toward LESS sign-in history, never more). Remediation is the operator's.
  *
  * Spec: specs/identity/identifier-model.feature ("The backfill adopts

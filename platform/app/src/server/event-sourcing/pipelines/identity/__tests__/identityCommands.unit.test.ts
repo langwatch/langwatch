@@ -203,6 +203,46 @@ describe("attachIdentifier command", () => {
       expect(retry[0]!.idempotencyKey).toBe("idcmd_1:0");
     });
   });
+
+  describe("when the heads already carry the identifier", () => {
+    /**
+     * The store's dedupe is read-side, so a restated fact is still a row
+     * written. The staged re-run of a ceremony and every backfill pass after
+     * the first arrive here with the identifier already folded; the handler
+     * must say nothing rather than append a duplicate (PR #7429).
+     */
+    /** @scenario "A fact the heads already carry is not stated again" */
+    it("emits nothing, whatever the command id", async () => {
+      const reads = new InMemoryGuardReads();
+      const first = await new AttachIdentifierCommand(reads).handle(
+        command(attachData()),
+      );
+      reads.states.set(USER, foldAll(first));
+
+      const restated = await new AttachIdentifierCommand(reads).handle(
+        command(attachData({ commandId: "backfill:acc_1" })),
+      );
+      expect(restated).toEqual([]);
+    });
+
+    it("still states an identifier the heads lack", async () => {
+      const reads = new InMemoryGuardReads();
+      const first = await new AttachIdentifierCommand(reads).handle(
+        command(attachData()),
+      );
+      reads.states.set(USER, foldAll(first));
+
+      const another = await new AttachIdentifierCommand(reads).handle(
+        command(
+          attachData({ commandId: "idcmd_2", providerAccountId: "gid_2" }),
+        ),
+      );
+      expect(another).toHaveLength(1);
+      expect(another[0]!.data.identifierId).not.toBe(
+        first[0]!.data.identifierId,
+      );
+    });
+  });
 });
 
 describe("verifyIdentifier command", () => {

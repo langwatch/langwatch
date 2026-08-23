@@ -8,12 +8,15 @@
  * revocation path (#7329): nothing between the caller and the durable fact
  * depends on Redis.
  *
- * Idempotency is what makes the redundancy safe: the staged re-run of the
- * same command re-derives the same deterministic ids and idempotency keys
- * (the event store dedupes), and the cursor-guarded fold re-applies as a
- * no-op. A calling-path apply that fails after the append leaves the fact
- * durable; staging, the aggregate's next event, or replay repairs the
- * projection.
+ * Idempotency is what makes the redundancy safe, and the heads are what
+ * make it cheap: the staged re-run of the same command runs its guards
+ * against a projection the calling path already folded, sees the fact it
+ * would state, and emits nothing — no second event_log row (the store's
+ * dedupe is read-side; a restated row is still a row written). Only when
+ * the calling-path apply failed after the append is the projection behind,
+ * and then the re-run restates the fact — same deterministic ids, same
+ * idempotency keys, deduped on read — and the cursor-guarded fold repairs
+ * the projection. Failing that, the aggregate's next event or replay does.
  */
 
 import { generate } from "@langwatch/ksuid";

@@ -226,20 +226,49 @@ describe("identity ceremony dispatch", () => {
     });
   });
 
-  describe("when the staged re-run re-applies the same events", () => {
-    it("the cursor guard makes the re-apply a no-op", async () => {
-      const { ceremonies, store } = harness();
+  describe("when the same command runs again after its fact was folded", () => {
+    /**
+     * This is the staged re-run, and a backfill pass after the first. The
+     * guards read the projection the calling path already wrote, so nothing
+     * is appended a second time (the store dedupes on read — a restated row
+     * is still a row written), nothing is re-applied, nothing is re-staged.
+     */
+    /** @scenario "A fact the heads already carry is not stated again" */
+    it("appends, applies and stages nothing; the projection and cursor stand", async () => {
+      const { ceremonies, store, appended, staged, order } = harness();
 
       const events = await ceremonies.attachIdentifier(attachData());
       const after = store.stored.get(USER)!;
-
-      // Re-running the identical command emits the same deterministic fact;
-      // the projection converges on one row and the cursor never rewinds.
-      await ceremonies.attachIdentifier(attachData());
-      const reapplied = store.stored.get(USER)!;
-      expect(Object.keys(reapplied.state.identifiers)).toHaveLength(1);
-      expect(reapplied.cursor.acceptedAt >= after.cursor.acceptedAt).toBe(true);
       expect(events).toHaveLength(1);
+      expect(appended).toHaveLength(1);
+      order.length = 0;
+
+      const rerun = await ceremonies.attachIdentifier(attachData());
+      expect(rerun).toEqual([]);
+      expect(appended).toHaveLength(1);
+      expect(staged).toHaveLength(1);
+      expect(order).toEqual([]);
+      expect(store.stored.get(USER)).toEqual(after);
+    });
+  });
+
+  describe("when the projection is behind the durable append", () => {
+    it("the re-run restates the fact and the cursor-guarded fold repairs the row", async () => {
+      const { ceremonies, store, appended } = harness();
+      store.failNextStore = true;
+
+      await ceremonies.attachIdentifier(attachData());
+      expect(store.stored.get(USER)).toBeUndefined();
+
+      // The heads lack the fact, so the re-run states it again: the same
+      // deterministic id and idempotency key, deduped on read.
+      const restated = await ceremonies.attachIdentifier(attachData());
+      expect(restated).toHaveLength(1);
+      expect(restated[0]!.idempotencyKey).toBe(appended[0]![0]!.idempotencyKey);
+      expect(appended).toHaveLength(2);
+      expect(
+        Object.keys(store.stored.get(USER)!.state.identifiers),
+      ).toHaveLength(1);
     });
   });
 });

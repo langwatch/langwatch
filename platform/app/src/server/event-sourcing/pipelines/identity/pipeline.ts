@@ -34,6 +34,13 @@ export interface IdentityPipelineDeps {
  * (app-layer/identity/identifier-write-gate.ts), which ships CLOSED and
  * opens only when a user's backfill is finalized - so deploying this
  * pipeline emits nothing on its own.
+ *
+ * Lanes: the commands keep the default per-aggregate group key. The queue
+ * composes `${tenantId}/${jobPath}/${aggregateType}:${aggregateId}` and here
+ * the tenant IS the user, so the default lane is already one per user and
+ * there is nothing narrower to shard by (ADR-114's sharded per-organization
+ * lane exists because many grants share one tenant). A user holds a handful
+ * of identifiers, so a lane never has a batch to coalesce either.
  */
 export function createIdentityPipeline(deps: IdentityPipelineDeps) {
   return definePipeline<IdentityEvent>()

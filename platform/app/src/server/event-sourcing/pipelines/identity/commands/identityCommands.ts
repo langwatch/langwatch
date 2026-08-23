@@ -50,7 +50,10 @@ import type {
  * event exists — the veto-before-write half of the adapter contract — and
  * events are accepted facts the reducer folds without refusing. Every
  * emitted event's `idempotencyKey` is `<commandId>:<index>`, so a retried
- * command dedupes at the event store.
+ * command dedupes at the event store on read; and every handler emits
+ * nothing when the heads already carry the fact it would state, so a
+ * retry, a staged re-run or a restating backfill pass normally writes no
+ * row at all (PR #7429: a pass states only what the heads do not carry).
  *
  * The read ports below are how guards see current state. On the calling-path
  * dispatch the adapter uses (D01's pinned order: append waited → fold apply
@@ -170,7 +173,6 @@ export class AttachIdentifierCommand
       ceremony,
     } = command.data;
     const normalizedValue = normalizeIdentifierValue(value);
-    const userHashKey = await this.reads.getUserHashKey({ userId });
     const identifierId = deriveIdentifierId({
       userId,
       provider,
@@ -178,6 +180,14 @@ export class AttachIdentifierCommand
       normalizedValue,
       occurredAtMs,
     });
+    // A fact the heads already carry is not stated again (the #7429 rule,
+    // applied where the fact is made): the staged re-run of a ceremony and
+    // every backfill pass after the first both arrive here with the
+    // identifier already folded, and must cost no event_log row. Dedupe at
+    // the store is read-side — a restated row is still a row written.
+    const state = await this.reads.loadIdentityState({ userId });
+    if (state.identifiers[identifierId]) return [];
+    const userHashKey = await this.reads.getUserHashKey({ userId });
     return [
       EventUtils.createEvent<IdentifierAttachedEvent>({
         aggregateType: USER_IDENTITY_AGGREGATE_TYPE,

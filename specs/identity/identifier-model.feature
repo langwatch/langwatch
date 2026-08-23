@@ -60,6 +60,18 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then both emissions carry the idempotency key "idcmd_1:0"
 
   @unit
+  Scenario: A fact the heads already carry is not stated again
+    Given "sam"'s Google identifier is already folded into the projection
+    When the same attach is handled again, from a staged re-run or a later backfill pass
+    Then no event is emitted and nothing is appended, applied, or staged
+    And an attach for an identifier the projection lacks is still emitted
+
+  @unit
+  Scenario: Every identity event rides the pipeline's declared aggregate type
+    When each identity command emits its event
+    Then the event store's own aggregate-type check accepts every one against the pipeline
+
+  @unit
   Scenario: Exactly one PRIMARY identifier per user
     Given "sam" holds a VERIFIED identifier "work" and a PRIMARY identifier "personal"
     When a mark_primary command is handled for "work"
