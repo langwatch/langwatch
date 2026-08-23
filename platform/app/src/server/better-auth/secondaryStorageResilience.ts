@@ -11,11 +11,17 @@
  *     better-auth recovers from Postgres (sessions dual-write there,
  *     `storeSessionInDatabase`, ADR-049's "a Redis outage cannot erase a
  *     committed Postgres projection").
- *   - a `set`/`delete` that errors or times out is dropped and REPORTED —
- *     one of secondary storage's tenants is the credential sign-in rate
- *     limit, which lives only here, so a dropped write is a rate limit
- *     failing open. That degradation is accepted for the outage window
- *     (D02 Security Concerns) and never silent.
+ *   - a `set` that errors or times out is dropped and REPORTED — one of
+ *     secondary storage's tenants is the credential sign-in rate limit,
+ *     which lives only here, so a dropped write is a rate limit failing
+ *     open. That degradation is accepted for the outage window (D02
+ *     Security Concerns) and never silent.
+ *   - a `delete` that errors or times out fails open the same way, but is
+ *     also RETRIED out of band: a dropped delete is a revoked session Redis
+ *     keeps serving until its TTL, so the key goes into a bounded retry set
+ *     and the underlying delete is re-attempted on an interval until it
+ *     lands, the retry window closes, or the set overflows — abandonment is
+ *     counted and warned, recovery logged.
  *
  * Behind `AUTH_REDIS_FAIL_OPEN` — off is exactly today's behavior, which is
  * the rollback (the D02 exit gate, dev/docs/identity-platform/delivery-plan.md).
@@ -49,6 +55,20 @@ export const betterAuthSecondaryStorageFailOpenTotal = new Counter({
   labelNames: ["operation"] as const,
 });
 
+/** How often the out-of-band pass re-attempts dropped deletes. */
+export const DELETE_RETRY_INTERVAL_MS = 30_000;
+
+/**
+ * How long a dropped delete keeps retrying before it is abandoned. Bounded
+ * because the underlying key carries its own Redis TTL — past this window
+ * the retry is racing an expiry that will win anyway, and an unbounded set
+ * is a leak during a long outage.
+ */
+export const DELETE_RETRY_WINDOW_MS = 15 * 60_000;
+
+/** Hard cap on keys awaiting retry; overflow abandons the oldest. */
+export const DELETE_RETRY_MAX_KEYS = 1_000;
+
 class SecondaryStorageTimeoutError extends Error {
   constructor(operation: string) {
     super(
@@ -56,6 +76,73 @@ class SecondaryStorageTimeoutError extends Error {
     );
     this.name = "SecondaryStorageTimeoutError";
   }
+}
+
+/**
+ * The out-of-band retry behind a dropped `delete`. One queue per wrapped
+ * storage. The timer starts lazily on the first failure, is unref()'d so it
+ * never holds a short-lived process (or a test) open, and stops the moment
+ * the set empties. Keys are never logged — they are session tokens.
+ */
+function createDeleteRetryQueue({
+  deleteKey,
+}: {
+  deleteKey: (key: string) => Promise<unknown>;
+}): { enqueue: (key: string) => void } {
+  const pendingSince = new Map<string, number>();
+  let timer: NodeJS.Timeout | undefined;
+
+  const abandon = (key: string, reason: "window_elapsed" | "overflow") => {
+    pendingSince.delete(key);
+    betterAuthSecondaryStorageFailOpenTotal.inc({
+      operation: "delete_retry_abandoned",
+    });
+    logger.warn(
+      { reason },
+      "better-auth secondary storage abandoned a dropped delete after retrying; the key stays servable from Redis until its own TTL",
+    );
+  };
+
+  const retryPass = async () => {
+    const now = Date.now();
+    for (const [key, firstFailedAtMs] of pendingSince) {
+      if (now - firstFailedAtMs > DELETE_RETRY_WINDOW_MS) {
+        abandon(key, "window_elapsed");
+        continue;
+      }
+      try {
+        await deleteKey(key);
+        pendingSince.delete(key);
+        logger.info(
+          "better-auth secondary storage recovered a dropped delete on retry",
+        );
+      } catch {
+        // Still down; the key stays pending until its window closes.
+      }
+    }
+    if (pendingSince.size === 0 && timer !== undefined) {
+      clearInterval(timer);
+      timer = undefined;
+    }
+  };
+
+  return {
+    enqueue: (key: string) => {
+      if (!pendingSince.has(key)) {
+        if (pendingSince.size >= DELETE_RETRY_MAX_KEYS) {
+          const oldestKey: string | undefined = pendingSince
+            .keys()
+            .next().value;
+          if (oldestKey !== undefined) abandon(oldestKey, "overflow");
+        }
+        pendingSince.set(key, Date.now());
+      }
+      if (timer === undefined) {
+        timer = setInterval(() => void retryPass(), DELETE_RETRY_INTERVAL_MS);
+        timer.unref?.();
+      }
+    },
+  };
 }
 
 export function withRedisFailOpen(
@@ -69,6 +156,16 @@ export function withRedisFailOpen(
   const enabled = options?.enabled ?? true;
   if (!enabled) return storage;
   const timeoutMs = options?.timeoutMs ?? SECONDARY_STORAGE_TIMEOUT_MS;
+
+  const deleteWithinBudget = (key: string) =>
+    withinBudget({
+      work: Promise.resolve(storage.delete(key)),
+      timeoutMs,
+      onTimeout: () => new SecondaryStorageTimeoutError("delete"),
+    });
+  const deleteRetries = createDeleteRetryQueue({
+    deleteKey: deleteWithinBudget,
+  });
 
   const failOpen = (operation: "get" | "set" | "delete", error: unknown) => {
     betterAuthSecondaryStorageFailOpenTotal.inc({ operation });
@@ -107,13 +204,12 @@ export function withRedisFailOpen(
     },
     delete: async (key) => {
       try {
-        await withinBudget({
-          work: Promise.resolve(storage.delete(key)),
-          timeoutMs,
-          onTimeout: () => new SecondaryStorageTimeoutError("delete"),
-        });
+        await deleteWithinBudget(key);
       } catch (error) {
+        // A dropped delete is a revoked session Redis keeps serving, so it
+        // is retried out of band rather than only counted.
         failOpen("delete", error);
+        deleteRetries.enqueue(key);
       }
     },
   };

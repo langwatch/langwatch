@@ -10,9 +10,8 @@
  * See specs/identity/identifier-model.feature.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { InMemoryVerificationStore } from "~/server/app-layer/identity/__tests__/inMemoryVerificationStore";
 import {
-  type IdentityVerificationRecord,
-  type IdentityVerificationStore,
   s256Challenge,
   VerificationCeremonyService,
 } from "~/server/app-layer/identity/verification-ceremony";
@@ -30,31 +29,6 @@ vi.mock("~/server/auth", () => ({
 const USER = "user_sam";
 const IDENTIFIER = "idf_work";
 const COMPLETE_PATH = "/api/identity/verification.complete";
-
-class InMemoryVerificationStore implements IdentityVerificationStore {
-  records = new Map<string, IdentityVerificationRecord>();
-
-  async replaceForIdentifier(record: IdentityVerificationRecord) {
-    this.records.set(record.identifierId, record);
-  }
-
-  async findByIdentifierId({ identifierId }: { identifierId: string }) {
-    return this.records.get(identifierId) ?? null;
-  }
-
-  async consume({
-    identifierId,
-    verificationId,
-  }: {
-    identifierId: string;
-    verificationId: string;
-  }) {
-    const record = this.records.get(identifierId);
-    if (!record || record.verificationId !== verificationId) return false;
-    this.records.delete(identifierId);
-    return true;
-  }
-}
 
 let store: InMemoryVerificationStore;
 let service: VerificationCeremonyService;
@@ -100,7 +74,8 @@ describe("the verification completion RPC", () => {
   describe("when completion presents the token and the initiating context's verifier", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
     it("verifies exactly once, and minting alone verified nothing", async () => {
-      const codeVerifier = "held-by-the-initiating-context";
+      // RFC 7636 shaped: 43-128 characters from the unreserved set.
+      const codeVerifier = "held-by-the-initiating-context-0123456789abcdef";
       const minted = await mint(codeVerifier);
       expect(verifyIdentifier).not.toHaveBeenCalled();
       expect(store.records.has(IDENTIFIER)).toBe(true);
@@ -122,21 +97,28 @@ describe("the verification completion RPC", () => {
 
   describe("when completion is posted without a session", () => {
     it("answers 401 before touching the ceremony", async () => {
-      const minted = await mint("verifier");
+      const codeVerifier = "held-by-the-sessionless-caller-0123456789abcdef";
+      const minted = await mint(codeVerifier);
       const response = await completionRequest({
         identifierId: IDENTIFIER,
         verificationId: minted.verificationId,
         token: minted.token,
-        codeVerifier: "verifier",
+        codeVerifier,
       });
       expect(response.status).toBe(401);
       expect(verifyIdentifier).not.toHaveBeenCalled();
+      // The minted record survives, unconsumed, for an authenticated retry.
+      expect(store.records.get(IDENTIFIER)?.verificationId).toBe(
+        minted.verificationId,
+      );
     });
   });
 
   describe("when completion presents a refusable proof", () => {
     it("answers the handled code, never a generic failure", async () => {
-      const minted = await mint("the-real-verifier");
+      const minted = await mint(
+        "the-real-verifier-of-the-context-0123456789abcdef",
+      );
       vi.mocked(getServerAuthSession).mockResolvedValue({
         user: { id: USER },
       } as never);
@@ -144,7 +126,7 @@ describe("the verification completion RPC", () => {
         identifierId: IDENTIFIER,
         verificationId: minted.verificationId,
         token: minted.token,
-        codeVerifier: "a-wrong-verifier",
+        codeVerifier: "a-wrong-verifier-a-forwarded-link-holder-guessing",
       });
       expect(response.status).toBe(400);
       const body = (await response.json()) as { error?: { code?: string } } & {

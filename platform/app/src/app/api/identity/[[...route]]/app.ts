@@ -41,6 +41,7 @@ import {
 import { VerificationCeremonyService } from "~/server/app-layer/identity/verification-ceremony";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import type { NextRequest } from "~/types/next-stubs";
 
 export const IDENTITY_API_VERSION = "2026-08-20";
 
@@ -59,7 +60,7 @@ class IdentitySessionRequiredError extends HandledError {
 
 /** The signed-in user, or a 401 refusal — the whole family's credential. */
 const sessionAuth: MiddlewareHandler = async (c, next) => {
-  const session = await getServerAuthSession({ req: c.req.raw as never });
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
   const userId = session?.user?.id;
   if (!userId) throw new IdentitySessionRequiredError();
   c.set("sessionUserId", userId);
@@ -104,7 +105,8 @@ const completeVerificationSchema = z.object({
   identifierId: z.string().min(1),
   verificationId: z.string().min(1),
   token: z.string().min(1),
-  codeVerifier: z.string().min(1),
+  // RFC 7636 §4.1: 43-128 characters from the unreserved set.
+  codeVerifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
 });
 
 const registerEndpoints = (v: IdentityVersion): void => {

@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   betterAuthSecondaryStorageFailOpenTotal,
+  DELETE_RETRY_INTERVAL_MS,
+  DELETE_RETRY_WINDOW_MS,
   withRedisFailOpen,
 } from "../secondaryStorageResilience";
 
@@ -63,6 +65,57 @@ describe("better-auth secondary storage fail-open (D02 seam b)", () => {
       expect(storage.get).toHaveBeenCalledTimes(1);
       expect(storage.set).toHaveBeenCalledTimes(1);
       expect(storage.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a delete drops while Redis is down", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A dropped delete is retried out of band until Redis recovers" */
+    it("retries the underlying delete on the interval and lands it once Redis recovers", async () => {
+      vi.useFakeTimers();
+      let redisIsDown = true;
+      const storage = {
+        get: vi.fn(async () => null),
+        set: vi.fn(async () => {}),
+        delete: vi.fn(async () => {
+          if (redisIsDown) throw new Error("connection refused");
+        }),
+      };
+      const wrapped = withRedisFailOpen(storage, { timeoutMs: 20 });
+
+      await wrapped?.delete("revoked-session-token");
+      expect(storage.delete).toHaveBeenCalledTimes(1);
+
+      redisIsDown = false;
+      await vi.advanceTimersByTimeAsync(DELETE_RETRY_INTERVAL_MS);
+      expect(storage.delete).toHaveBeenCalledTimes(2);
+
+      // The set emptied, so the timer stopped: no further attempts run.
+      await vi.advanceTimersByTimeAsync(DELETE_RETRY_INTERVAL_MS * 3);
+      expect(storage.delete).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "A delete that never lands is abandoned after the retry window, counted" */
+    it("abandons the key after the retry window with the abandonment counted", async () => {
+      vi.useFakeTimers();
+      const storage = erroringStorage();
+      const wrapped = withRedisFailOpen(storage, { timeoutMs: 20 });
+      const before = await failOpenCount("delete_retry_abandoned");
+
+      await wrapped?.delete("revoked-session-token");
+      await vi.advanceTimersByTimeAsync(
+        DELETE_RETRY_WINDOW_MS + DELETE_RETRY_INTERVAL_MS,
+      );
+
+      expect(await failOpenCount("delete_retry_abandoned")).toBe(before + 1);
+
+      // Abandoned means gone: further intervals attempt nothing.
+      const attemptsSoFar = storage.delete.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(DELETE_RETRY_INTERVAL_MS * 2);
+      expect(storage.delete.mock.calls.length).toBe(attemptsSoFar);
     });
   });
 

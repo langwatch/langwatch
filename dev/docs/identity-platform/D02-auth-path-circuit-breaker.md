@@ -4,7 +4,7 @@ Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 �
 
 # Overview
 
-Today, Redis down ⇒ nobody can sign in ⇒ nobody can even open the app to see what's wrong. This deliverable applies **ADR-007's Redis-loss amendment** ("Redis-loss circuit breaker for named pipelines", 2026-08-17) to the auth path. The amendment is **doctrine, not a primitive**: the ledger program deliberately shipped no breaker code, no state machine, no probes, and — pinned in its delivery plan — *no fold runs inline anywhere, ever; no in-memory processor*. What a named pipeline gets is a discipline: durable appends still land (ClickHouse, waited), operations that cannot wait apply their sanctioned write on the calling path, and everything else stalls and drains on recovery.
+Today, Redis down ⇒ nobody can sign in ⇒ nobody can even open the app to see what's wrong. This deliverable applies **ADR-007's Redis-loss amendment** ("Redis-loss circuit breaker for named pipelines", 2026-08-17) to the auth path. The amendment is **doctrine, not a primitive**: the ledger program deliberately shipped no breaker code, no state machine, no probes, and — pinned in its delivery plan — *no in-memory processor; no fold runs inline for queued work, ever*. What a named pipeline gets is a discipline: durable appends still land (ClickHouse, waited), operations that cannot wait apply their sanctioned write on the calling path — for identity that sanctioned write is the ceremony's calling-path fold apply, the divergence recorded in ADR-101 (§Revision 2026-08-23) — and everything else stalls and drains on recovery.
 
 Identity fits that doctrine better than grants does, by construction: the sign-in hot path emits no commands at all (R12 — sessions and tokens are repository rows), and D01's pinned dispatch order (append waited → fold apply on the calling path → GroupQueue staging last, best-effort) means every identity ceremony already completes without Redis. D02 is the deliverable that makes those properties hold under a *real* outage — where Redis is configured but erroring or hanging, not absent — and proves it with a Redis-kill test. Pulled ahead of the router cutover (D03) deliberately — the cutover should not be the moment we learn Redis-loss kills sign-in.
 
@@ -14,7 +14,7 @@ Identity fits that doctrine better than grants does, by construction: the sign-i
 - **Seam (b) — better-auth Redis secondary storage:** today's implementation already returns null / reports a dropped write when the handle is *absent*; D02 covers *configured-but-down*: every secondary-storage call gets a bounded timeout and fails open to PG (PG is already the dual-write source of truth for sessions), with a `betterauth_secondary_storage_fail_open_total` metric. Sessions read/write PG-only for the window.
 - **Rate limiting** degrades to fail-open-with-logging for the window (accepted; flagged in Security).
 - **Metrics**, not breaker state (there is no breaker state): staging drops, secondary-storage fail-opens, calling-path apply latency histogram.
-- **ADR-2** adds `identity` to ADR-007's Redis-loss amendment with identity's own analysis: volume (hundreds of commands/day — calling-path applies are safe at that scale), the pinned dispatch order, and the timeout budgets for seams (a) and (b). The amendment's boundary — named pipelines only, never a fleet-wide default — stands.
+- **ADR-007's identity entry** adds `identity` to the Redis-loss amendment with identity's own analysis: volume (hundreds of commands/day — calling-path applies are safe at that scale), the pinned dispatch order, and the timeout budgets for seams (a) and (b). The amendment's boundary — named pipelines only, never a fleet-wide default — stands.
 
 # Out of Scope
 
@@ -35,7 +35,7 @@ Identity fits that doctrine better than grants does, by construction: the sign-i
 2. Timeout-bounded, best-effort staging for identity command dispatch (seam a) — the failure path is metric + log, never a thrown ceremony error.
 3. Rate-limit fail-open for the window, logged.
 4. Metrics: `identity_staging_dropped_total`, `betterauth_secondary_storage_fail_open_total`, calling-path apply latency.
-5. ADR-2: identity joins ADR-007's Redis-loss amendment (volume analysis, dispatch order, timeout budgets).
+5. ADR-007 amendment: identity joins its Redis-loss amendment (volume analysis, dispatch order, timeout budgets).
 6. Tests: unit (both seams' timeout/failure paths), integration (dev-compose Redis kill mid-flow).
 
 # Exit gate / rollback
@@ -46,7 +46,7 @@ Identity fits that doctrine better than grants does, by construction: the sign-i
 # Security Concerns
 
 - Rate limiting fails open while Redis is down (logged, bounded to outage windows).
-- The seam timeouts are the guard against a *slow* (not dead) Redis holding sign-in requests hostage — budgets recorded in ADR-2.
+- The seam timeouts are the guard against a *slow* (not dead) Redis holding sign-in requests hostage — budgets recorded in ADR-007's identity amendment.
 
 # Open Questions
 

@@ -282,7 +282,7 @@ Thirteen deliverables, each independently shippable and flag-gated. Normative de
 
 | # | Deliverable spec | One-liner |
 |---|---|---|
-| D01 | `identity-platform/D01-identity-pipeline-and-identifiers.md` | ES pipeline skeleton + `Account` adaptation + backfill + lifecycle events |
+| D01 | `identity-platform/D01-identity-pipeline-and-identifiers.md` | ES pipeline skeleton + `Identifier` projection (`Account` stays row-truth) + backfill + lifecycle events |
 | D02 | `identity-platform/D02-auth-path-circuit-breaker.md` | Redis-loss resilience for the auth path |
 | D03 | `identity-platform/D03-identifier-first-signin-router.md` | Router, uniform picker, self-hosted auto-redirect, cutover |
 | D04 | `identity-platform/D04-sso-connection-aggregate.md` | SsoConnection aggregate + grandfathering + routing parity |

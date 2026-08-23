@@ -207,7 +207,9 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  // ahead of the family's version-namespace guards.
+  // The identity family owns /api/identity outright, so no sibling namespace
+  // competes for the prefix and this mount position carries no ordering
+  // constraint.
   api.route("/", identityApp); // /api/identity/verification.complete — RPC family (D01)
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.

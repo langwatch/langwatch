@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityGuardReads } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import type { IdentityGuardReads } from "~/server/event-sourcing/pipelines/identity/commands/identityGuardReads";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -17,7 +17,8 @@ const T0 = 1_690_000_000_000;
 
 class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
-  failNextStore = false;
+  readonly storeContexts: ProjectionStoreContext[] = [];
+  shouldFailNextStore = false;
 
   async load(key: string, _context: ProjectionStoreContext) {
     return this.stored.get(key) ?? null;
@@ -27,10 +28,11 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
     projection: StoredProjection<IdentityFoldState>,
     context: ProjectionStoreContext,
   ) {
-    if (this.failNextStore) {
-      this.failNextStore = false;
+    if (this.shouldFailNextStore) {
+      this.shouldFailNextStore = false;
       throw new Error("postgres unavailable");
     }
+    this.storeContexts.push(context);
     this.stored.set(context.aggregateId, projection);
   }
 }
@@ -52,9 +54,9 @@ class InMemoryGuardReads implements IdentityGuardReads {
 }
 
 function harness(overrides?: {
-  appendFails?: boolean;
-  stagingFails?: boolean;
-  stagingHangs?: boolean;
+  shouldAppendFail?: boolean;
+  shouldStagingFail?: boolean;
+  shouldStagingHang?: boolean;
   stagingTimeoutMs?: number;
 }) {
   const store = new InMemoryStateStore();
@@ -65,7 +67,8 @@ function harness(overrides?: {
   const eventStore = {
     storeEvents: vi.fn(async (events: readonly IdentityEvent[]) => {
       order.push("append");
-      if (overrides?.appendFails) throw new Error("clickhouse unavailable");
+      if (overrides?.shouldAppendFail)
+        throw new Error("clickhouse unavailable");
       appended.push([...events]);
     }),
   } as unknown as EventStore<IdentityEvent>;
@@ -73,8 +76,8 @@ function harness(overrides?: {
   const sender = {
     send: vi.fn((data: unknown) => {
       order.push("stage");
-      if (overrides?.stagingHangs) return new Promise<unknown>(() => {});
-      if (overrides?.stagingFails)
+      if (overrides?.shouldStagingHang) return new Promise<unknown>(() => {});
+      if (overrides?.shouldStagingFail)
         return Promise.reject(new Error("redis unavailable"));
       staged.push(data);
       return Promise.resolve(undefined as unknown);
@@ -145,10 +148,31 @@ describe("identity ceremony dispatch", () => {
     });
   });
 
+  describe("when the calling-path fold builds its projection context", () => {
+    it("reads the command's tenantId — the same field the append leg keys on", async () => {
+      const { ceremonies, store } = harness();
+
+      await ceremonies.attachIdentifier(attachData());
+
+      expect(store.storeContexts).toHaveLength(1);
+      expect(store.storeContexts[0]?.tenantId).toBe(USER);
+    });
+
+    it("a command whose tenantId diverges from its userId never reaches either leg", async () => {
+      const { ceremonies, store, order } = harness();
+
+      await expect(
+        ceremonies.attachIdentifier(attachData({ tenantId: "tenant_acme" })),
+      ).rejects.toThrow("tenantId must equal userId");
+      expect(order).toEqual([]);
+      expect(store.storeContexts).toHaveLength(0);
+    });
+  });
+
   describe("when GroupQueue staging fails after the durable append", () => {
     it("the ceremony still succeeds; the drop is absorbed", async () => {
       const { ceremonies, store, appended, order } = harness({
-        stagingFails: true,
+        shouldStagingFail: true,
       });
 
       const events = await ceremonies.attachIdentifier(attachData());
@@ -164,7 +188,7 @@ describe("identity ceremony dispatch", () => {
     /** @scenario "A hanging Redis cannot fail or stall an identity ceremony" */
     it("the staging budget drops it, counted; append and apply landed and the ceremony succeeds", async () => {
       const { ceremonies, appended, store, sender } = harness({
-        stagingHangs: true,
+        shouldStagingHang: true,
         stagingTimeoutMs: 20,
       });
       const droppedBefore = await counterValue(identityStagingDroppedTotal);
@@ -185,7 +209,7 @@ describe("identity ceremony dispatch", () => {
   describe("when the calling-path apply fails after the durable append", () => {
     it("the ceremony still succeeds and staging still runs", async () => {
       const { ceremonies, store, appended, order } = harness();
-      store.failNextStore = true;
+      store.shouldFailNextStore = true;
 
       const events = await ceremonies.attachIdentifier(attachData());
 
@@ -198,7 +222,7 @@ describe("identity ceremony dispatch", () => {
 
   describe("when the durable append itself fails", () => {
     it("the ceremony fails: no apply, no staging, no phantom state", async () => {
-      const { ceremonies, store, order } = harness({ appendFails: true });
+      const { ceremonies, store, order } = harness({ shouldAppendFail: true });
 
       await expect(ceremonies.attachIdentifier(attachData())).rejects.toThrow(
         "clickhouse unavailable",
@@ -238,7 +262,7 @@ describe("identity ceremony dispatch", () => {
       const { ceremonies, store, appended, staged, order } = harness();
 
       const events = await ceremonies.attachIdentifier(attachData());
-      const after = store.stored.get(USER)!;
+      const after = structuredClone(store.stored.get(USER)!);
       expect(events).toHaveLength(1);
       expect(appended).toHaveLength(1);
       order.length = 0;
@@ -255,7 +279,7 @@ describe("identity ceremony dispatch", () => {
   describe("when the projection is behind the durable append", () => {
     it("the re-run restates the fact and the cursor-guarded fold repairs the row", async () => {
       const { ceremonies, store, appended } = harness();
-      store.failNextStore = true;
+      store.shouldFailNextStore = true;
 
       await ceremonies.attachIdentifier(attachData());
       expect(store.stored.get(USER)).toBeUndefined();

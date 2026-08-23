@@ -1,6 +1,6 @@
 # D01 — Identity pipeline skeleton + identifiers
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: nothing (authz not needed)
+Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: the landed authz program — ADR-110's migration state, `@langwatch/system-migrations`, and the shared `_shared/per-subject-cached-gate.ts` are all reused here (the authz *engine* itself is never consulted on an identity write)
 
 # Overview
 

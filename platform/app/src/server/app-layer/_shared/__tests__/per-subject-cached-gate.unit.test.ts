@@ -210,6 +210,39 @@ describe("perSubjectCachedFlag", () => {
     });
   });
 
+  describe("when a gate is sized with its own maxEntries", () => {
+    it("evicts the oldest subject at its own cap, not the default one", async () => {
+      const flag = gate({ maxEntries: 2 });
+      const readTrue = () => Promise.resolve(true);
+
+      await flag.get({ subject: "user-1", read: readTrue });
+      await flag.get({ subject: "user-2", read: readTrue });
+      // The third subject crosses the cap: user-1, the oldest, is evicted.
+      await flag.get({ subject: "user-3", read: readTrue });
+
+      let evictedReads = 0;
+      await flag.get({
+        subject: "user-1",
+        read: () => {
+          evictedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(evictedReads).toBe(1);
+
+      // The survivors stayed cached - the cap evicted, not the whole map.
+      let cachedReads = 0;
+      await flag.get({
+        subject: "user-3",
+        read: () => {
+          cachedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(cachedReads).toBe(0);
+    });
+  });
+
   describe("when resetForTesting runs", () => {
     it("drops both the cache and any in-flight bookkeeping", async () => {
       const flag = gate();

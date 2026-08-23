@@ -1,5 +1,8 @@
+import type {
+  SystemMigrationStateRepository,
+  TenantMigrationStatus,
+} from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
 import {
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
   IDENTITY_WRITE_GATE_TTL_MS,
@@ -9,12 +12,25 @@ import {
 
 const USER = "user_sam";
 
-function prismaWithStatus(status: string | null) {
+function stateWithStatus(
+  status: TenantMigrationStatus | null,
+): SystemMigrationStateRepository {
   return {
-    systemMigrationTenantState: {
-      findUnique: vi.fn(async () => (status === null ? null : { status })),
-    },
-  } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
+    findRecord: vi.fn(
+      async ({
+        migrationName,
+        tenantId,
+      }: {
+        migrationName: string;
+        tenantId: string;
+      }) =>
+        status === null
+          ? null
+          : { migrationName, tenantId, status, report: null },
+    ),
+    upsertRecord: vi.fn(async () => undefined),
+    upsertRecordUnlessRolledBack: vi.fn(async () => true),
+  };
 }
 
 afterEach(() => {
@@ -24,20 +40,14 @@ afterEach(() => {
 describe("identifier write gate", () => {
   describe("when no backfill row exists for the user", () => {
     it("answers closed — the gate ships closed for everyone", async () => {
-      const prisma = prismaWithStatus(null);
+      const state = stateWithStatus(null);
       await expect(
-        isUserOnIdentityWrites({ userId: USER, prisma }),
+        isUserOnIdentityWrites({ userId: USER, state }),
       ).resolves.toBe(false);
-      expect(prisma.systemMigrationTenantState.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            migrationName_tenantId: {
-              migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-              tenantId: USER,
-            },
-          },
-        }),
-      );
+      expect(state.findRecord).toHaveBeenCalledWith({
+        migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+        tenantId: USER,
+      });
     });
   });
 
@@ -47,7 +57,7 @@ describe("identifier write gate", () => {
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
-          prisma: prismaWithStatus("finalized"),
+          state: stateWithStatus("finalized"),
         }),
       ).resolves.toBe(true);
       resetIdentityWriteGateForTests();
@@ -56,7 +66,7 @@ describe("identifier write gate", () => {
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
-          prisma: prismaWithStatus("migrated"),
+          state: stateWithStatus("migrated"),
         }),
       ).resolves.toBe(false);
     });
@@ -65,14 +75,14 @@ describe("identifier write gate", () => {
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
-          prisma: prismaWithStatus("parked"),
+          state: stateWithStatus("parked"),
         }),
       ).resolves.toBe(false);
       resetIdentityWriteGateForTests();
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
-          prisma: prismaWithStatus("rolled_back"),
+          state: stateWithStatus("rolled_back"),
         }),
       ).resolves.toBe(false);
     });
@@ -80,15 +90,15 @@ describe("identifier write gate", () => {
 
   describe("when the state table is unreadable", () => {
     it("fails safe to closed", async () => {
-      const prisma = {
-        systemMigrationTenantState: {
-          findUnique: vi.fn(async () => {
-            throw new Error("postgres unavailable");
-          }),
-        },
-      } as unknown as Pick<PrismaClient, "systemMigrationTenantState">;
+      const state: SystemMigrationStateRepository = {
+        findRecord: vi.fn(async () => {
+          throw new Error("postgres unavailable");
+        }),
+        upsertRecord: vi.fn(async () => undefined),
+        upsertRecordUnlessRolledBack: vi.fn(async () => true),
+      };
       await expect(
-        isUserOnIdentityWrites({ userId: USER, prisma }),
+        isUserOnIdentityWrites({ userId: USER, state }),
       ).resolves.toBe(false);
     });
   });
@@ -101,7 +111,7 @@ describe("identifier write gate", () => {
         await expect(
           isUserOnIdentityWrites({
             userId: USER,
-            prisma: prismaWithStatus("finalized"),
+            state: stateWithStatus("finalized"),
           }),
         ).resolves.toBe(true);
         // No cross-pod invalidation exists (ADR-110: rollback applies within
@@ -110,7 +120,7 @@ describe("identifier write gate", () => {
         await expect(
           isUserOnIdentityWrites({
             userId: USER,
-            prisma: prismaWithStatus("rolled_back"),
+            state: stateWithStatus("rolled_back"),
           }),
         ).resolves.toBe(true);
         // ...and the moment the TTL elapses, it is.
@@ -118,7 +128,7 @@ describe("identifier write gate", () => {
         await expect(
           isUserOnIdentityWrites({
             userId: USER,
-            prisma: prismaWithStatus("rolled_back"),
+            state: stateWithStatus("rolled_back"),
           }),
         ).resolves.toBe(false);
       } finally {
@@ -134,14 +144,14 @@ describe("identifier write gate", () => {
         await expect(
           isUserOnIdentityWrites({
             userId: USER,
-            prisma: prismaWithStatus(null),
+            state: stateWithStatus(null),
           }),
         ).resolves.toBe(false);
         vi.advanceTimersByTime(IDENTITY_WRITE_GATE_TTL_MS + 1);
         await expect(
           isUserOnIdentityWrites({
             userId: USER,
-            prisma: prismaWithStatus("finalized"),
+            state: stateWithStatus("finalized"),
           }),
         ).resolves.toBe(true);
       } finally {

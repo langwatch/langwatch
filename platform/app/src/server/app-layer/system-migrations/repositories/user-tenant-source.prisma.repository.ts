@@ -33,10 +33,19 @@ export class PrismaUserTenantSource implements TenantSource {
  * org-driven) and the pass drives its members.
  */
 export class PrismaOrganizationMemberTenantSource implements TenantSource {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly organizationId: string,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly organizationId: string;
+
+  constructor({
+    prisma,
+    organizationId,
+  }: {
+    prisma: PrismaClient;
+    organizationId: string;
+  }) {
+    this.prisma = prisma;
+    this.organizationId = organizationId;
+  }
 
   async findTenantIdsAfter({
     cursor,

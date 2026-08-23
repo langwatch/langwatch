@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type {
   IdentityVerificationRecord,
@@ -26,14 +27,15 @@ function keyFor(identifierId: string): string {
   return `${IDENTITY_VERIFY_KEY_PREFIX}${identifierId}`;
 }
 
-interface StoredPayload {
-  v: 1;
-  verificationId: string;
-  userId: string;
-  identifierId: string;
-  tokenHash: string;
-  codeChallenge: string;
-}
+const storedPayloadSchema = z.object({
+  v: z.literal(1),
+  verificationId: z.string().min(1),
+  userId: z.string().min(1),
+  identifierId: z.string().min(1),
+  tokenHash: z.string().min(1),
+  codeChallenge: z.string().min(1),
+});
+type StoredPayload = z.infer<typeof storedPayloadSchema>;
 
 function serializePayload(record: IdentityVerificationRecord): string {
   const payload: StoredPayload = {
@@ -49,18 +51,8 @@ function serializePayload(record: IdentityVerificationRecord): string {
 
 function parsePayload(raw: string): StoredPayload | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<StoredPayload>;
-    if (
-      parsed.v !== 1 ||
-      typeof parsed.verificationId !== "string" ||
-      typeof parsed.userId !== "string" ||
-      typeof parsed.identifierId !== "string" ||
-      typeof parsed.tokenHash !== "string" ||
-      typeof parsed.codeChallenge !== "string"
-    ) {
-      return null;
-    }
-    return parsed as StoredPayload;
+    const result = storedPayloadSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : null;
   } catch {
     return null;
   }

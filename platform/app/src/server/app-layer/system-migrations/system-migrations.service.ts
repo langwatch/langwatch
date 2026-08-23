@@ -819,13 +819,16 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
  * One status for a targeted run over an organization's members: the WORST
  * outcome wins (parked over held over finalized), because the operator is
  * deciding whether the organization needs attention, and null when no
- * member was in the cohort at all.
+ * member was in the cohort at all. Members already terminal before the run
+ * (`alreadyTerminal`) answer "finalized" too - a re-run over an organization
+ * whose members all finished earlier is done, not "nobody was in the
+ * cohort".
  */
 function statusOfMemberSummary(
   summary: MigrationPassSummary,
 ): TenantMigrationStatus | null {
   if (summary.parked > 0) return "parked";
   if (summary.held > 0) return "migrated";
-  if (summary.finalized > 0) return "finalized";
+  if (summary.finalized > 0 || summary.alreadyTerminal > 0) return "finalized";
   return null;
 }

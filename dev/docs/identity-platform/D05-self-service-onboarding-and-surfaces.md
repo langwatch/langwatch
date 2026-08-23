@@ -25,6 +25,7 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 **Surface 1 — platform-ops identity lookup** (route tree under `ee/admin/`, platform-ops-gated):
 
 - Cross-org: input any email → routing decision (with reason codes from D03), identifiers per user (all states, all users owning fragments), last N identity events, pending `LinkProposed`s, outstanding invites with expiry, pending join-requests.
+- The lookup **read** is itself guarded: every query passes the platform-ops authorization check and writes an audit-log entry (who resolved which email, when) — a cross-org read is never unaudited, command or not.
 - Every action a guarded command: `confirmLink`/`rejectLink`, `detachIdentifier` (guarded), `resendInvite`/`extendInvite`, `revokeSessions(userId | identifierId)`, `approveDomainClaim`/`rejectDomainClaim`.
 - Ships here as the safety net for self-serve onboarding — this is what kills DB surgery.
 
@@ -53,7 +54,7 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 3. Break-glass binding issuance/expiry via `grants.attach` + PM wakes.
 4. Ops lookup: read models over the identity projections + event log queries (last-N events per user/identifier); action buttons dispatch the guarded commands.
 5. Org-admin surface: org-scoped queries only; shared command handlers with the ops surface, nothing else shared.
-6. SCIM token issuance scoped to `connectionId` (new column; backfill maps org's first connection — consumed in D08).
+6. SCIM token issuance scoped to `connectionId` (new column; newly issued tokens are connection-scoped, legacy tokens keep their organization scope until rotated or reissued — no backfill assigns them a connection — consumed in D08).
 7. New Gherkin specs for both surfaces + onboarding lifecycle.
 
 # Exit gate / rollback

@@ -65,7 +65,7 @@ export type PerSubjectCachedFlag = {
 };
 
 /**
- * Hard cap on distinct subjects one gate holds at once.
+ * Default hard cap on distinct subjects one gate holds at once.
  *
  * A subject that is only ever read once (a stale customer, a
  * decommissioned tenant, a user who never returns) would otherwise leave its entry in the map for the
@@ -76,117 +76,151 @@ export type PerSubjectCachedFlag = {
  */
 export const MAX_CACHE_ENTRIES = 5_000;
 
+/** One gate's closed-over state - the maps plus what settles/evicts them. */
+type GateState = {
+  name: string;
+  ttlMs: number;
+  maxEntries: number;
+  cached: Map<string, CacheEntry>;
+  inFlight: Map<string, InFlightEntry>;
+};
+
 /** One cached boolean per subject (an organization for authz, a user for
  *  identity), both directions on one bound. */
 export function perSubjectCachedFlag({
   name,
   ttlMs,
+  maxEntries = MAX_CACHE_ENTRIES,
 }: {
   /** Identifies the gate in the warn log - never used to key the cache
    *  (each gate gets its own map by having its own closure over this call). */
   name: string;
   ttlMs: number;
-}): PerSubjectCachedFlag {
-  const cached = new Map<string, CacheEntry>();
-  const inFlight = new Map<string, InFlightEntry>();
-
-  async function get({
-    subject,
-    read,
-  }: {
-    subject: string;
-    read: () => Promise<boolean>;
-  }): Promise<boolean> {
-    const entry = cached.get(subject);
-    if (entry !== undefined) {
-      if (Date.now() < entry.expiresAt) return entry.isOn;
-      cached.delete(subject);
-    }
-
-    const pending = inFlight.get(subject);
-    if (pending !== undefined) return pending.promise;
-
-    const flight: InFlightEntry = {
-      isStale: false,
-      promise: Promise.resolve(false),
-    };
-    flight.promise = settle({ subject, read, flight });
-    inFlight.set(subject, flight);
-    try {
-      return await flight.promise;
-    } finally {
-      // An invalidation may already have removed this flight and a NEWER one
-      // may have taken the slot - deleting unconditionally would tear that
-      // newer read's coalescing down.
-      if (inFlight.get(subject) === flight) {
-        inFlight.delete(subject);
-      }
-    }
-  }
-
-  async function settle({
-    subject,
-    read,
-    flight,
-  }: {
-    subject: string;
-    read: () => Promise<boolean>;
-    flight: InFlightEntry;
-  }): Promise<boolean> {
-    let isOn = false;
-    try {
-      isOn = await read();
-    } catch (error) {
-      // Fail safe: the caller's `read` already means "false is the safe
-      // direction" for its own gate (legacy stays on, not cut over yet), so
-      // the fallback here is the same value either gate wants - only the
-      // silence is new, and it is gone.
-      logger.warn(
-        { subject, gate: name, error },
-        "could not read the per-subject gate; caching the failure briefly and answering false",
-      );
-      isOn = false;
-    }
-    // Invalidated while this read was in flight: the value predates the
-    // write that invalidated it, so hand it to the callers already waiting
-    // (they coalesced before the invalidation) but never cache it - the next
-    // `get` re-reads the source.
-    if (flight.isStale) return isOn;
-    if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
-    cached.set(subject, { isOn, expiresAt: Date.now() + ttlMs });
-    return isOn;
-  }
-
   /**
-   * Amortized-sweep expired entries, then fall back to evicting the oldest
-   * (by insertion order) until the map is back under the cap - see
-   * `MAX_CACHE_ENTRIES` for why the map is bounded at all.
+   * Hard cap on distinct subjects this gate holds at once (default
+   * `MAX_CACHE_ENTRIES`). Size it to the subject's cardinality: a
+   * high-cardinality subject (a user) warrants a larger cap than a
+   * low-cardinality one (an organization), or hot subjects evict each
+   * other and every check re-reads the source.
    */
-  function evictUntilUnderCap(): void {
-    const now = Date.now();
-    for (const [key, entry] of cached) {
-      if (entry.expiresAt <= now) cached.delete(key);
-    }
-    while (cached.size >= MAX_CACHE_ENTRIES) {
-      const oldestKey: string | undefined = cached.keys().next().value;
-      if (oldestKey === undefined) break;
-      cached.delete(oldestKey);
-    }
+  maxEntries?: number;
+}): PerSubjectCachedFlag {
+  const state: GateState = {
+    name,
+    ttlMs,
+    maxEntries,
+    cached: new Map(),
+    inFlight: new Map(),
+  };
+  return {
+    get: (args) => get({ state, ...args }),
+    invalidate: ({ subject }) => invalidate({ state, subject }),
+    resetForTesting: () => {
+      state.cached.clear();
+      state.inFlight.clear();
+    },
+  };
+}
+
+async function get({
+  state,
+  subject,
+  read,
+}: {
+  state: GateState;
+  subject: string;
+  read: () => Promise<boolean>;
+}): Promise<boolean> {
+  const entry = state.cached.get(subject);
+  if (entry !== undefined) {
+    if (Date.now() < entry.expiresAt) return entry.isOn;
+    state.cached.delete(subject);
   }
 
-  function invalidate({ subject }: { subject: string }): void {
-    cached.delete(subject);
-    const pending = inFlight.get(subject);
-    if (pending !== undefined) {
-      pending.isStale = true;
-      inFlight.delete(subject);
+  const pending = state.inFlight.get(subject);
+  if (pending !== undefined) return pending.promise;
+
+  const flight: InFlightEntry = {
+    isStale: false,
+    promise: Promise.resolve(false),
+  };
+  flight.promise = settle({ state, subject, read, flight });
+  state.inFlight.set(subject, flight);
+  try {
+    return await flight.promise;
+  } finally {
+    // An invalidation may already have removed this flight and a NEWER one
+    // may have taken the slot - deleting unconditionally would tear that
+    // newer read's coalescing down.
+    if (state.inFlight.get(subject) === flight) {
+      state.inFlight.delete(subject);
     }
   }
+}
 
-  function resetForTesting(): void {
-    cached.clear();
-    inFlight.clear();
+async function settle({
+  state,
+  subject,
+  read,
+  flight,
+}: {
+  state: GateState;
+  subject: string;
+  read: () => Promise<boolean>;
+  flight: InFlightEntry;
+}): Promise<boolean> {
+  let isOn = false;
+  try {
+    isOn = await read();
+  } catch (error) {
+    // Fail safe: the caller's `read` already means "false is the safe
+    // direction" for its own gate (legacy stays on, not cut over yet), so
+    // the fallback here is the same value either gate wants - only the
+    // silence is new, and it is gone.
+    logger.warn(
+      { subject, gate: state.name, error },
+      "could not read the per-subject gate; caching the failure briefly and answering false",
+    );
+    isOn = false;
   }
+  // Invalidated while this read was in flight: the value predates the
+  // write that invalidated it, so hand it to the callers already waiting
+  // (they coalesced before the invalidation) but never cache it - the next
+  // `get` re-reads the source.
+  if (flight.isStale) return isOn;
+  if (state.cached.size >= state.maxEntries) evictUntilUnderCap({ state });
+  state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
+  return isOn;
+}
 
-  return { get, invalidate, resetForTesting };
+/**
+ * Amortized-sweep expired entries, then fall back to evicting the oldest
+ * (by insertion order) until the map is back under the cap - see
+ * `MAX_CACHE_ENTRIES` for why the map is bounded at all.
+ */
+function evictUntilUnderCap({ state }: { state: GateState }): void {
+  const now = Date.now();
+  for (const [key, entry] of state.cached) {
+    if (entry.expiresAt <= now) state.cached.delete(key);
+  }
+  while (state.cached.size >= state.maxEntries) {
+    const oldestKey: string | undefined = state.cached.keys().next().value;
+    if (oldestKey === undefined) break;
+    state.cached.delete(oldestKey);
+  }
+}
+
+function invalidate({
+  state,
+  subject,
+}: {
+  state: GateState;
+  subject: string;
+}): void {
+  state.cached.delete(subject);
+  const pending = state.inFlight.get(subject);
+  if (pending !== undefined) {
+    pending.isStale = true;
+    state.inFlight.delete(subject);
+  }
 }

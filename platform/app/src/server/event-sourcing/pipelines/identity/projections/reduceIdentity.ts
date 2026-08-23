@@ -13,12 +13,15 @@ import type { IdentifierProvider, IdentityEvent } from "../schemas/events";
  * partial replay window) is folded conservatively rather than dropped.
  */
 
+export const IDENTIFIER_LIFECYCLE_STATES = [
+  "ATTACHED",
+  "VERIFIED",
+  "PRIMARY",
+  "DEAD_END",
+  "DETACHED",
+] as const;
 export type IdentifierLifecycleState =
-  | "ATTACHED"
-  | "VERIFIED"
-  | "PRIMARY"
-  | "DEAD_END"
-  | "DETACHED";
+  (typeof IDENTIFIER_LIFECYCLE_STATES)[number];
 
 export interface IdentifierFact {
   identifierId: string;
@@ -78,7 +81,7 @@ function applyAttached(
     identifierId: data.identifierId,
     userId: data.userId,
     provider: data.provider,
-    value: data.email,
+    value: data.value,
     domain: data.domain,
     identifierHash: data.identifierHash,
     accountId: data.accountId,

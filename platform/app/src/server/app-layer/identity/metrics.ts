@@ -30,11 +30,15 @@ export const identityWriteGateReadFailuresTotal = new Counter({
  * and the calling-path apply both landed (ADR-101 §2's pinned order —
  * staging is convergence, not the primary apply). Each drop is a re-apply
  * the queue never runs; the cursor-guarded fold converges on the aggregate's
- * next event or on replay. Expected to move only while Redis is down (D02).
+ * next event or on replay. The `reason` label separates the expected kind
+ * from the defective one: `redis_drop` moves only while Redis is down (D02);
+ * `sender_unavailable` is a wiring defect — the pipeline exposed no sender —
+ * and should never move in a healthy deployment.
  */
 export const identityStagingDroppedTotal = new Counter({
   name: "identity_staging_dropped_total",
   help: "Identity command stagings dropped after the durable append; convergence re-apply deferred to the next event or replay.",
+  labelNames: ["reason"] as const,
 });
 
 /**

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { IdentityGuardReads } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import type { IdentityGuardReads } from "~/server/event-sourcing/pipelines/identity/commands/identityGuardReads";
 import type { IdentityLedgerState } from "~/server/event-sourcing/pipelines/identity/projections/reduceIdentity";
 import { identifierProviderSchema } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 

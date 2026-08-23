@@ -179,9 +179,13 @@ export class VerificationCeremonyService {
 
   /**
    * Complete the ceremony — the POST half of GET-renders/POST-completes.
-   * Every check must pass against the ONE record the identifier pins;
-   * consumption is transactional single-use and happens before the verify
-   * command dispatches, so a replay of the same completion finds no record.
+   * Every check must pass against the ONE record the identifier pins; only
+   * then does the verify command dispatch, and consumption follows it — a
+   * persistence failure must leave the proof intact so a retry of the same
+   * valid link can still complete. Concurrent duplicates are absorbed by the
+   * command's own idempotency (an already-VERIFIED identifier emits nothing),
+   * so a consume that reports the record already gone is success, not a
+   * refusal; a later replay of the completion then finds no record at all.
    */
   async completeEmailVerification(params: {
     userId: string;
@@ -229,12 +233,9 @@ export class VerificationCeremonyService {
     if (!safeEqualHex(s256Challenge(codeVerifier), record.codeChallenge)) {
       refuse("PKCE verifier does not match the bound challenge");
     }
-    const consumed = await this.deps.store.consume({
-      identifierId,
-      verificationId,
-    });
-    if (!consumed) refuse("record already consumed");
-
+    // Dispatch BEFORE consuming: if persistence rejects, the record survives
+    // and the same valid link retries. The command is idempotent, so a
+    // concurrent identical completion cannot double-verify.
     await this.deps.ceremonies.verifyIdentifier({
       tenantId: userId,
       userId,
@@ -245,5 +246,19 @@ export class VerificationCeremonyService {
       occurredAtMs: this.now(),
       actor: { type: "user", id: userId },
     });
+
+    const consumed = await this.deps.store.consume({
+      identifierId,
+      verificationId,
+    });
+    if (!consumed) {
+      // A concurrent identical completion won the consume, or a newer mint
+      // superseded mid-flight — the verification itself landed, so this is
+      // success, not a refusal.
+      logger.info(
+        { userId, identifierId, verificationId },
+        "verification record already consumed after the verify command landed",
+      );
+    }
   }
 }

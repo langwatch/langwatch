@@ -3,7 +3,7 @@ import {
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityPrimaryMustDemoteFirstError,
-} from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+} from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
 import {
   arrivalStateForProvider,
   deriveIdentifierId,
@@ -18,6 +18,7 @@ import {
   type BackfillAccountRow,
   type BackfillIdentifierRow,
   type BackfillUserRow,
+  type IdentifierBackfillMigrationDeps,
   IdentityIdentifierBackfillMigration,
 } from "../migration/identifier-backfill.migration";
 
@@ -130,7 +131,7 @@ function harness(options?: {
       attachIdentifier,
       verifyIdentifier,
       detachIdentifier,
-    } as never,
+    } satisfies IdentifierBackfillMigrationDeps["ceremonies"],
     now: () => 1_800_000_000_000,
   });
 
@@ -284,6 +285,69 @@ describe("the identifier backfill migration", () => {
     });
   });
 
+  describe("when the projection carries a live row nothing implies", () => {
+    const staleId = deriveIdentifierId({
+      userId: USER,
+      provider: "email",
+      providerAccountId: null,
+      normalizedValue: normalizeIdentifierValue("old.address@acme.com"),
+      occurredAtMs: USER_CREATED_AT,
+    });
+
+    it("holds the user with a surplus_row diff for a stale VERIFIED identifier", async () => {
+      // The reachable case: the user changed their email, so the old value's
+      // identifier is not in `expected` (the id derives from the value), has
+      // no account row to orphan-detach, and would otherwise finalize while
+      // still blocking the old address for every other user.
+      const { migration } = harness({
+        presetRows: [
+          {
+            id: staleId,
+            provider: "email",
+            value: normalizeIdentifierValue("old.address@acme.com"),
+            accountId: null,
+            state: "VERIFIED",
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: USER });
+
+      expect(outcome.status).toBe("migrated");
+      expect(outcome.report).toMatchObject({ kind: "parity" });
+      const diffs = (
+        outcome.report as {
+          diffs: Array<{ kind: string; identifierId: string }>;
+        }
+      ).diffs;
+      expect(diffs).toContainEqual(
+        expect.objectContaining({
+          kind: "surplus_row",
+          identifierId: staleId,
+          actualState: "VERIFIED",
+        }),
+      );
+    });
+
+    it("ignores a surplus DETACHED tombstone and finalizes", async () => {
+      const { migration } = harness({
+        presetRows: [
+          {
+            id: staleId,
+            provider: "email",
+            value: normalizeIdentifierValue("old.address@acme.com"),
+            accountId: null,
+            state: "DETACHED",
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: USER });
+
+      expect(outcome.status).toBe("finalized");
+    });
+  });
+
   describe("when the user has no hash key yet", () => {
     it("mints one before adopting, so hashes are real from the first event", async () => {
       const { migration, minted } = harness({
@@ -294,13 +358,17 @@ describe("the identifier backfill migration", () => {
     });
   });
 
-  describe("when the user cannot be adopted yet", () => {
-    it("holds a user without an email, with the reason in the report", async () => {
+  describe("when the user has nothing to adopt", () => {
+    it("finalizes a user without an email, with the reason in the report", async () => {
       const { migration, attachIdentifier } = harness({
         user: samUser({ email: null }),
       });
       const outcome = await migration.migrateTenant({ tenantId: USER });
-      expect(outcome.status).toBe("migrated");
+      // Terminal, not held: an erased or email-less user has no identifiers
+      // to backfill, and a held row would be retried every pass forever. The
+      // write gate opening on finalized is correct - future ceremonies
+      // attach fresh identifiers live.
+      expect(outcome.status).toBe("finalized");
       expect(outcome.report).toMatchObject({ kind: "no_email" });
       expect(attachIdentifier).not.toHaveBeenCalled();
     });

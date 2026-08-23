@@ -3,44 +3,18 @@ import type { VerifyIdentifierCommandData } from "~/server/event-sourcing/pipeli
 import {
   IDENTITY_VERIFICATION_TTL_MS,
   IdentityVerificationInvalidError,
-  type IdentityVerificationRecord,
-  type IdentityVerificationStore,
   s256Challenge,
   VerificationCeremonyService,
 } from "../verification-ceremony";
+import { InMemoryVerificationStore } from "./inMemoryVerificationStore";
 
 const USER = "user_sam";
 const WORK = "idf_work";
 const PERSONAL = "idf_personal";
 
-/** In-memory mirror of the Prisma repository's replace/find/consume shape. */
-class InMemoryVerificationStore implements IdentityVerificationStore {
-  records = new Map<string, IdentityVerificationRecord>();
-
-  async replaceForIdentifier(record: IdentityVerificationRecord) {
-    this.records.set(record.identifierId, record);
-  }
-
-  async findByIdentifierId({ identifierId }: { identifierId: string }) {
-    return this.records.get(identifierId) ?? null;
-  }
-
-  async consume({
-    identifierId,
-    verificationId,
-  }: {
-    identifierId: string;
-    verificationId: string;
-  }) {
-    const record = this.records.get(identifierId);
-    if (!record || record.verificationId !== verificationId) return false;
-    this.records.delete(identifierId);
-    return true;
-  }
-}
-
 function harness(options?: {
   identifierState?: string;
+  identifierProvider?: string;
   now?: () => number;
   latched?: boolean;
 }) {
@@ -54,7 +28,7 @@ function harness(options?: {
       findIdentifier: async ({ identifierId }) =>
         identifierId === WORK || identifierId === PERSONAL
           ? {
-              provider: "email",
+              provider: options?.identifierProvider ?? "email",
               state: options?.identifierState ?? "ATTACHED",
             }
           : null,
@@ -168,6 +142,66 @@ describe("the email verification ceremony", () => {
     });
   });
 
+  describe("when completion presents another user's session", () => {
+    it("refuses, verifies nothing, and keeps the record for the pinned user", async () => {
+      const { service, store, verifyIdentifier } = harness();
+      const codeVerifier = "verifier";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+
+      await expect(
+        service.completeEmailVerification({
+          userId: "user_intruder",
+          identifierId: WORK,
+          verificationId: minted.verificationId,
+          token: minted.token,
+          codeVerifier,
+        }),
+      ).rejects.toMatchObject({ code: "identity_verification_invalid" });
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect(store.records.get(WORK)?.verificationId).toBe(
+        minted.verificationId,
+      );
+    });
+  });
+
+  describe("when the verify command's persistence rejects", () => {
+    it("leaves the record unconsumed so a retry of the same valid link succeeds", async () => {
+      const { service, store, verifyIdentifier } = harness();
+      const codeVerifier = "verifier";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+      const completion = {
+        userId: USER,
+        identifierId: WORK,
+        verificationId: minted.verificationId,
+        token: minted.token,
+        codeVerifier,
+      };
+      verifyIdentifier.mockRejectedValueOnce(
+        new Error("clickhouse unavailable"),
+      );
+
+      await expect(
+        service.completeEmailVerification(completion),
+      ).rejects.toThrow("clickhouse unavailable");
+      // The proof survives the persistence failure: nothing was consumed.
+      expect(store.records.get(WORK)?.verificationId).toBe(
+        minted.verificationId,
+      );
+
+      await service.completeEmailVerification(completion);
+      expect(verifyIdentifier).toHaveBeenCalledTimes(2);
+      expect(store.records.has(WORK)).toBe(false);
+    });
+  });
+
   describe("when the same completion is replayed", () => {
     it("finds no record the second time: single-use", async () => {
       const { service } = harness();
@@ -246,6 +280,19 @@ describe("the email verification ceremony", () => {
   describe("when the identifier is not an ATTACHED email identifier of this user", () => {
     it("refuses the mint itself", async () => {
       const { service } = harness({ identifierState: "VERIFIED" });
+      await expect(
+        service.mintEmailVerification({
+          userId: USER,
+          identifierId: WORK,
+          codeChallenge: s256Challenge("verifier"),
+        }),
+      ).rejects.toBeInstanceOf(IdentityVerificationInvalidError);
+    });
+  });
+
+  describe("when the identifier is not an email identifier", () => {
+    it("refuses the mint whatever the identifier's state", async () => {
+      const { service } = harness({ identifierProvider: "google" });
       await expect(
         service.mintEmailVerification({
           userId: USER,

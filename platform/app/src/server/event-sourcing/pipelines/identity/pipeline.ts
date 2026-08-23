@@ -1,13 +1,11 @@
 import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
-import {
-  AttachIdentifierCommand,
-  DetachIdentifierCommand,
-  EraseUserCommand,
-  type IdentityGuardReads,
-  MarkPrimaryCommand,
-  VerifyIdentifierCommand,
-} from "./commands/identityCommands";
+import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
+import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
+import { EraseUserCommand } from "./commands/eraseUser.command";
+import type { IdentityGuardReads } from "./commands/identityGuardReads";
+import { MarkPrimaryCommand } from "./commands/markPrimary.command";
+import { VerifyIdentifierCommand } from "./commands/verifyIdentifier.command";
 import {
   type IdentityFoldState,
   IdentityStateFoldProjection,

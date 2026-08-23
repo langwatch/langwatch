@@ -3,7 +3,9 @@
  *
  * The /auth/verify-email landing page renders under Chakra; only the URL
  * search-params hook is mocked. The page must never complete a verification
- * on its own — a scanner following the link sees exactly what a person does.
+ * on its own — a scanner following the link sees exactly what a person does —
+ * and it must never copy the link's proof into the DOM, where session-replay
+ * and RUM collectors scrape attributes.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -44,13 +46,18 @@ describe("the /auth/verify-email landing page", () => {
 
   describe("when the emailed magic link is opened", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
-    it("renders the guidance and carries the link's proof for the initiating window, making no request", () => {
+    it("renders the guidance, keeps the link's proof out of the DOM, and makes no request", () => {
       renderPage();
 
       expect(screen.getByText("Almost there")).toBeDefined();
+      expect(
+        screen.getByText(
+          "Return to the window where you requested this verification to finish confirming your email address.",
+        ),
+      ).toBeDefined();
       const landing = screen.getByTestId("verify-email-landing");
-      expect(landing.getAttribute("data-verification-id")).toBe("ver_123");
-      expect(landing.getAttribute("data-token")).toBe("tok_abc");
+      expect(landing.outerHTML).not.toContain("tok_abc");
+      expect(landing.outerHTML).not.toContain("ver_123");
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
@@ -68,14 +75,17 @@ describe("the /auth/verify-email landing page", () => {
   });
 
   describe("when the link carries no proof at all", () => {
-    it("still renders, with empty proof attributes", () => {
+    it("still renders the guidance", () => {
       searchParamsRef.current = new URLSearchParams("");
 
       renderPage();
 
-      const landing = screen.getByTestId("verify-email-landing");
-      expect(landing.getAttribute("data-verification-id")).toBe("");
-      expect(landing.getAttribute("data-token")).toBe("");
+      expect(screen.getByTestId("verify-email-landing")).toBeDefined();
+      expect(
+        screen.getByText(
+          "Opening this link on its own does not confirm anything.",
+        ),
+      ).toBeDefined();
     });
   });
 });

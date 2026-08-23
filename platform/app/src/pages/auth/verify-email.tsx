@@ -1,5 +1,4 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { useSearchParams } from "~/utils/compat/next-navigation";
 import { AuthCard } from "../../components/auth/AuthCard";
 
 /**
@@ -8,8 +7,10 @@ import { AuthCard } from "../../components/auth/AuthCard";
  * follows the link consumes nothing and verifies nothing. Completion is the
  * identity RPC `POST /api/identity/verification.complete`, which needs the
  * signed-in user, the emailed token AND the PKCE code verifier the initiating
- * window kept — so the page carries the link's proof in the DOM for that
- * window and makes no request of its own.
+ * window kept — so this page only sends the person back to that window and
+ * makes no request of its own. The link's proof stays in the URL: nothing is
+ * copied into the DOM, where session-replay and RUM collectors scrape
+ * attributes.
  *
  * Public route (no session): the person may open the link on a device that
  * holds no session at all.
@@ -17,19 +18,9 @@ import { AuthCard } from "../../components/auth/AuthCard";
  * Spec: specs/identity/identifier-model.feature (verification scenarios).
  */
 export default function VerifyEmail() {
-  const query = useSearchParams();
-  const verificationId = query?.get("vid") ?? "";
-  const token = query?.get("token") ?? "";
-
   return (
     <AuthCard title="Almost there">
-      <VStack
-        align="stretch"
-        gap={3}
-        data-testid="verify-email-landing"
-        data-verification-id={verificationId}
-        data-token={token}
-      >
+      <VStack align="stretch" gap={3} data-testid="verify-email-landing">
         <Text>
           Return to the window where you requested this verification to finish
           confirming your email address.

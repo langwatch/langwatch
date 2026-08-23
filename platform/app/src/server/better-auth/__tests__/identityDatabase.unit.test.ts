@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { IdentityPrimaryMustDemoteFirstError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import { IdentityPrimaryMustDemoteFirstError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
 import {
   createIdentityDatabase,
   IdentityAdapterUnroutedWriteError,
@@ -48,6 +48,9 @@ function prismaStub(options?: {
             }
             if (method === "findMany") {
               if (model === "identifier") return identifiersByProvider;
+              if (model === "user") {
+                return [{ id: USER, email: "sam@acme.com" }];
+              }
               if (model === "account") {
                 return [
                   {
@@ -89,6 +92,7 @@ function ceremoniesStub() {
   return {
     attachIdentifier: vi.fn().mockResolvedValue([]),
     detachIdentifier: vi.fn().mockResolvedValue([]),
+    eraseUser: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -100,9 +104,25 @@ describe("identity adapter routing table", () => {
           expect(() => routeWrite(model, operation)).not.toThrow();
         }
       }
-      expect(ROUTED_MODELS).toEqual(
-        expect.arrayContaining(["user", "session", "account", "verification"]),
-      );
+      // Exact sets, not subsets: a new better-auth model or operation must
+      // land HERE (and in the routing table) in the same change, or the
+      // unrouted-write throw plus this pin fail the build.
+      expect([...ROUTED_MODELS].sort()).toEqual([
+        "account",
+        "ratelimit",
+        "session",
+        "user",
+        "verification",
+      ]);
+      expect(WRITE_OPERATIONS).toEqual([
+        "create",
+        "update",
+        "updateMany",
+        "delete",
+        "deleteMany",
+        "consumeOne",
+        "incrementOne",
+      ]);
     });
   });
 
@@ -223,7 +243,9 @@ describe("identity adapter write gate", () => {
       // Business time is the row's createdAt, not the wall clock - the
       // backfill derives the identifier id from the same two values.
       expect(attach.occurredAtMs).toBe(createdAt.getTime());
-      expect(attach.accountId).toMatch(/^[0-9a-f]{32}$/);
+      // The adapter mints the id the way the schema's `@default(nanoid())`
+      // would - a default-length nanoid, not a hex string.
+      expect(attach.accountId).toMatch(/^[\w-]{21}$/);
       const rowWrite = calls.find(
         (c) => c.model === "account" && c.method === "create",
       )?.args as { data: { id: string } };
@@ -373,6 +395,86 @@ describe("identity adapter write gate", () => {
       expect(
         calls.some((c) => c.model === "account" && c.method === "delete"),
       ).toBe(false);
+    });
+  });
+
+  describe("when better-auth deletes a user", () => {
+    /** @scenario "Deleting a latched user runs the erase ceremony before the row delete" */
+    it("runs the erase ceremony for a latched user before the row delete", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const order: string[] = [];
+      ceremonies.eraseUser.mockImplementation(async () => {
+        order.push("ceremony");
+        return [];
+      });
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async ({ userId }) => userId === USER,
+        now: () => 1_700_000_000_000,
+      })({});
+
+      await adapter.delete({
+        model: "user",
+        where: [{ field: "id", value: USER }],
+      });
+      order.push(
+        ...calls
+          .filter((c) => c.model === "user" && c.method === "delete")
+          .map(() => "row"),
+      );
+
+      expect(order).toEqual(["ceremony", "row"]);
+      expect(ceremonies.eraseUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: USER,
+          userId: USER,
+          occurredAtMs: 1_700_000_000_000,
+          actor: { type: "user", id: USER },
+        }),
+      );
+    });
+
+    it("deleteMany erases each latched user before the rows go", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => true,
+      })({});
+
+      await adapter.deleteMany({
+        model: "user",
+        where: [{ field: "id", value: USER }],
+      });
+
+      expect(ceremonies.eraseUser).toHaveBeenCalledTimes(1);
+      expect(
+        calls.some((c) => c.model === "user" && c.method === "deleteMany"),
+      ).toBe(true);
+    });
+
+    /** @scenario "Deleting an unlatched user runs no ceremony; the erasure service reconciles" */
+    it("runs no ceremony for an unlatched user; the row delete still happens", async () => {
+      const { client, calls } = prismaStub();
+      const ceremonies = ceremoniesStub();
+      const adapter = createIdentityDatabase({
+        prisma: client,
+        ceremonies,
+        isLatched: async () => false,
+      })({});
+
+      await adapter.delete({
+        model: "user",
+        where: [{ field: "id", value: USER }],
+      });
+
+      expect(ceremonies.eraseUser).not.toHaveBeenCalled();
+      expect(
+        calls.some((c) => c.model === "user" && c.method === "delete"),
+      ).toBe(true);
     });
   });
 

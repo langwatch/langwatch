@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../..";
 import type { Command } from "../../../commands/command";
-import {
-  AttachIdentifierCommand,
-  DetachIdentifierCommand,
-  type IdentityGuardReads,
-  MarkPrimaryCommand,
-  VerifyIdentifierCommand,
-} from "../commands/identityCommands";
+import { AttachIdentifierCommand } from "../commands/attachIdentifier.command";
+import { DetachIdentifierCommand } from "../commands/detachIdentifier.command";
+import type { IdentityGuardReads } from "../commands/identityGuardReads";
+import { MarkPrimaryCommand } from "../commands/markPrimary.command";
+import { VerifyIdentifierCommand } from "../commands/verifyIdentifier.command";
 import {
   type IdentityFoldState,
   IdentityStateFoldProjection,
@@ -166,7 +164,7 @@ describe("identity replay determinism", () => {
       expect(secondRun.map((e) => e.data)).toEqual(firstRun.map((e) => e.data));
 
       const live = reducerSurface(fold(firstRun));
-      const replayed = reducerSurface(fold(firstRun));
+      const replayed = reducerSurface(fold(secondRun));
       expect(replayed).toEqual(live);
 
       const facts = Object.values(live.identifiers);

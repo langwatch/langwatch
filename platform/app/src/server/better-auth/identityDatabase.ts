@@ -26,10 +26,10 @@
  * the backfill will adopt. Today no domain-significant flow is
  * transactional — the guard exists so one appearing is visible.
  */
-import { randomBytes } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isUserOnIdentityWrites } from "~/server/app-layer/identity/identifier-write-gate";
 import {
@@ -76,7 +76,9 @@ type Route = "protocol" | "domain";
  *
  * `domain` today means exactly the D01 ceremonies: an account created inside
  * a sign-up/link ceremony is an identifier attach; an account deleted is a
- * detach. `user.create` is domain for the userHashKey mint (ADR-101 §4) —
+ * detach; a user deleted is an erasure (the ceremony that wipes
+ * `Identifier.value`/`identifierHash` — a protocol row delete alone would
+ * leave them populated). `user.create` is domain for the userHashKey mint (ADR-101 §4) —
  * its attach ceremony is unreachable by construction (a brand-new user has
  * no migration row, so the gate answers false) and their email identifier is
  * adopted by the backfill instead.
@@ -86,8 +88,8 @@ const ROUTING: Record<string, Record<WriteOperation, Route>> = {
     create: "domain",
     update: "protocol",
     updateMany: "protocol",
-    delete: "protocol",
-    deleteMany: "protocol",
+    delete: "domain",
+    deleteMany: "domain",
     consumeOne: "protocol",
     incrementOne: "protocol",
   },
@@ -188,7 +190,7 @@ export interface IdentityDatabaseDeps {
   prisma?: PrismaClient;
   ceremonies?: Pick<
     IdentityCeremonies,
-    "attachIdentifier" | "detachIdentifier"
+    "attachIdentifier" | "detachIdentifier" | "eraseUser"
   >;
   isLatched?: (params: { userId: string }) => Promise<boolean>;
   now?: () => number;
@@ -229,10 +231,12 @@ export function createIdentityDatabase(
       },
       delete: async (args) => {
         await detachBeforeAccountDelete(ctx, { operation: "delete", args });
+        await eraseBeforeUserDelete(ctx, { operation: "delete", args });
         return base.delete(args);
       },
       deleteMany: async (args) => {
         await detachBeforeAccountDelete(ctx, { operation: "deleteMany", args });
+        await eraseBeforeUserDelete(ctx, { operation: "deleteMany", args });
         return base.deleteMany(args);
       },
       consumeOne: async (args) => {
@@ -256,7 +260,7 @@ interface AdapterContext {
   now: () => number;
   resolveCeremonies: () => Pick<
     IdentityCeremonies,
-    "attachIdentifier" | "detachIdentifier"
+    "attachIdentifier" | "detachIdentifier" | "eraseUser"
   >;
 }
 
@@ -303,6 +307,44 @@ async function detachBeforeAccountDelete(
   await detachCeremoniesForAccountRows(ctx, rows);
 }
 
+/**
+ * A user delete is domain-significant: erasure is what wipes
+ * `Identifier.value` and `identifierHash`, so a bare protocol row delete
+ * would leave a deleted user's PII sitting in the projection forever
+ * (the backfill finalizes a missing user without cleanup). Latched users
+ * run the erase ceremony BEFORE the row delete — a vetoed ceremony refuses
+ * the protocol write too. Unlatched users skip; the backfill/erasure
+ * service reconciles their rows, exactly as the detach path does.
+ */
+async function eraseBeforeUserDelete(
+  ctx: AdapterContext,
+  {
+    operation,
+    args,
+  }: {
+    operation: "delete" | "deleteMany";
+    args: Parameters<DbAdapter["delete"]>[0];
+  },
+): Promise<void> {
+  const route = routeWrite(args.model, operation);
+  if (route !== "domain" || args.model !== "user") return;
+  const rows = await ctx.base.findMany<{ id: string }>({
+    model: "user",
+    where: args.where,
+  });
+  for (const row of rows) {
+    const userId = row.id;
+    if (!(await ctx.isLatched({ userId }))) continue;
+    await ctx.resolveCeremonies().eraseUser({
+      tenantId: userId,
+      userId,
+      commandId: newIdentityCommandId(),
+      occurredAtMs: ctx.now(),
+      actor: { type: "user", id: userId },
+    });
+  }
+}
+
 async function mintUserHashKey(
   ctx: AdapterContext,
   userId: string,
@@ -339,7 +381,9 @@ function accountCreateIntent(
     userId,
     providerId,
     providerAccountId: typeof accountId === "string" ? accountId : null,
-    accountId: typeof id === "string" ? id : randomBytes(16).toString("hex"),
+    // Minted the same way the schema's own `@default(nanoid())` would mint
+    // it — this id is persisted via `forceAllowId`, so it must match.
+    accountId: typeof id === "string" ? id : nanoid(),
     occurredAtMs: createdAt instanceof Date ? createdAt.getTime() : now(),
   };
 }

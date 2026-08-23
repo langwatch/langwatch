@@ -22,9 +22,10 @@
  * event history, never break sign-in.
  */
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { SystemMigrationStateRepository } from "@langwatch/system-migrations";
 import { prisma as appPrisma } from "../../db";
 import { perSubjectCachedFlag } from "../_shared/per-subject-cached-gate";
+import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { identityWriteGateReadFailuresTotal } from "./metrics";
 
 const logger = createLogger("langwatch:identity:identifier-write-gate");
@@ -35,38 +36,41 @@ const logger = createLogger("langwatch:identity:identifier-write-gate");
 export const IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME =
   "identity-d01-identifier-backfill" as const;
 
-/** Only `finalized` opens the gate; `migrated` is held (see above). The D03
- *  READ fork will ask the same question of the same row. */
-const IDENTITY_WRITE_STATUSES = ["finalized"] as const;
-
 export const IDENTITY_WRITE_GATE_TTL_MS = 60_000;
 
 const gate = perSubjectCachedFlag({
   name: "identity-identifier-write-gate",
   ttlMs: IDENTITY_WRITE_GATE_TTL_MS,
+  // The gate keys by USER, not organization — cardinality is the fleet's
+  // active users, so the cap is sized well above the default.
+  maxEntries: 50_000,
 });
+
+/** Composed lazily so importing the module never touches Prisma. */
+let defaultStateRepository: SystemMigrationStateRepository | null = null;
+
+function defaultState(): SystemMigrationStateRepository {
+  defaultStateRepository ??= new PrismaSystemMigrationStateRepository(
+    appPrisma,
+  );
+  return defaultStateRepository;
+}
 
 async function readUserOnIdentityWrites({
   userId,
-  prisma,
+  state,
 }: {
   userId: string;
-  prisma: Pick<PrismaClient, "systemMigrationTenantState">;
+  state: SystemMigrationStateRepository;
 }): Promise<boolean> {
   try {
-    const record = await prisma.systemMigrationTenantState.findUnique({
-      where: {
-        migrationName_tenantId: {
-          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-          tenantId: userId,
-        },
-      },
-      select: { status: true },
+    const record = await state.findRecord({
+      migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+      tenantId: userId,
     });
-    return (
-      record !== null &&
-      (IDENTITY_WRITE_STATUSES as readonly string[]).includes(record.status)
-    );
+    // Only `finalized` opens the gate; `migrated` is held (see above). The
+    // D03 READ fork will ask the same question of the same row.
+    return record?.status === "finalized";
   } catch (error) {
     // Fail safe: an unreadable state table keeps the user's ceremonies on
     // the protocol-only path, which always works; the missing events are
@@ -84,14 +88,14 @@ async function readUserOnIdentityWrites({
 /** Whether THIS user's domain-significant ceremonies emit identity events. */
 export async function isUserOnIdentityWrites({
   userId,
-  prisma = appPrisma,
+  state = defaultState(),
 }: {
   userId: string;
-  prisma?: Pick<PrismaClient, "systemMigrationTenantState">;
+  state?: SystemMigrationStateRepository;
 }): Promise<boolean> {
   return gate.get({
     subject: userId,
-    read: () => readUserOnIdentityWrites({ userId, prisma }),
+    read: () => readUserOnIdentityWrites({ userId, state }),
   });
 }
 

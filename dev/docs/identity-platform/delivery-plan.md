@@ -30,7 +30,7 @@ Critical path: **D01 → D02 → D03+D13 → D04 → D05 → D08 → D09 → D10
 
 The chart shows the wave structure; the exact per-deliverable dependencies live in the **Needs** column of the tables below (drawing every edge made the graph unreadable).
 
-```
+```text
  WAVE 1                      WAVE 2                         WAVE 3                           WAVE 4
  foundations —               the new front door             self-service + factors           Auth0 dies —
  nothing a user can see      + the invite fix               (parallel tracks)                customer-paced
@@ -108,7 +108,7 @@ Parallel tracks; staff in any order capacity allows.
 | D07 | `PASSKEYS_ENABLED` | Register / sign-in / no-email sign-in / delete round-trips, platform + cross-platform authenticators | Flag off | Low |
 | D08 | `SCIM_V2_GRANTS` | Push/group/deactivate round-trip; token scoping enforced; offboard postcondition asserted in integration test | Legacy write path behind flag | Medium |
 | D09 | per-customer | Per customer: all active users linked, quiet grace, shim hits at zero, teardown event. Program: zero ACTIVE legacy connections | Both-connections-active grace IS the rollback | Customer-facing |
-| D10 (program exit criterion — customer-paced) | — | `grep -ri auth0 platform/app` → changelog only; deploy pipeline green | None needed (nothing left to break) | Low |
+| D10 (program exit criterion — customer-paced) | — | Repository-wide `grep -ri auth0` → changelog only; secrets blob + deployment config verified Auth0-free; deploy pipeline green | Tagged restore point + secret escrow, retired only after the observation window (see D10) | Low |
 | D11 | invite changes additive | Round-trips: invite → wrong-method → accepted; expiry → resend → accepted; Slack invite cases replay green | Additive; old flow flag-restorable during bake | Low |
 | D12 | `JOIN_REQUESTS` | request → approve → member round-trip; domain auto-join round-trip (org opt-in, never public email domains); reminder/expiry wakes verified; matching/privacy specs green; orphaned-org creation rate visibly down | `JOIN_REQUESTS` off | Low |
 | D13 | `IDENTITY_ROUTER_V2` (with D03) | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | Flag off — legacy screens intact until bake end | Medium (rides the D03 flip) |
@@ -130,7 +130,7 @@ The program starts here. Same shape as the authz program's plan (`dev/docs/plans
  replay discovery from day one
                                            PR 3  D02 — auth-path Redis-loss
                                            identity joins ADR-007's Redis-loss
-                                           amendment (volume analysis in ADR-2)
+                                           amendment (volume analysis in ADR-007)
                                            sessions PG-only (fail-open seam) ·
                                            best-effort staging hardened ·
                                            flag AUTH_REDIS_FAIL_OPEN · Redis-kill test
@@ -197,7 +197,7 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 | New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
 | Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
 | Replay touches protocol secrets | D01 | Structurally impossible: `Account` is not a projection and never enters replay; `Identifier` carries no secrets and replays whole-row (ADR-101 §3); replay-parity test in exit gate |
-| Calling-path applies overload web role during Redis outage | D02 | Identity volume is hundreds/day; seam timeouts bound latency; drop/fail-open metrics; ADR-2 records the analysis |
+| Calling-path applies overload web role during Redis outage | D02 | Identity volume is hundreds/day; seam timeouts bound latency; drop/fail-open metrics; ADR-007's amendment records the analysis |
 | Session revoke-all strands users mid-work | D06 | Comms + precedent (better-auth cutover); schedule low-traffic window |
 | Customer IdP apps pin legacy Auth0 callback URI | D09 | Resolved (R9): temporary shim with per-org usage metric through grace; removed at D10 |
 | Auth0 retirement stalls on stragglers | D09/D10 | By design: per-tenant, no deadline; D10 is an exit criterion, not a milestone; nudge/escalation ladder in the wizard |

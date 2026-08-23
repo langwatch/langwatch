@@ -30,14 +30,12 @@ import type {
   CommandHandler,
 } from "~/server/event-sourcing/commands/command";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
-import {
-  AttachIdentifierCommand,
-  DetachIdentifierCommand,
-  EraseUserCommand,
-  type IdentityGuardReads,
-  MarkPrimaryCommand,
-  VerifyIdentifierCommand,
-} from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import { AttachIdentifierCommand } from "~/server/event-sourcing/pipelines/identity/commands/attachIdentifier.command";
+import { DetachIdentifierCommand } from "~/server/event-sourcing/pipelines/identity/commands/detachIdentifier.command";
+import { EraseUserCommand } from "~/server/event-sourcing/pipelines/identity/commands/eraseUser.command";
+import type { IdentityGuardReads } from "~/server/event-sourcing/pipelines/identity/commands/identityGuardReads";
+import { MarkPrimaryCommand } from "~/server/event-sourcing/pipelines/identity/commands/markPrimary.command";
+import { VerifyIdentifierCommand } from "~/server/event-sourcing/pipelines/identity/commands/verifyIdentifier.command";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import { IdentityStateFoldProjection } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import {
@@ -263,7 +261,11 @@ export class IdentityCeremonies {
     // 3. The calling-path fold apply — read-your-writes for the ceremony.
     const applyTimer = identityCallingPathApplyDurationSeconds.startTimer();
     try {
-      await this.applyOnCallingPath({ userId: data.userId, events });
+      await this.applyOnCallingPath({
+        userId: data.userId,
+        tenantId: data.tenantId,
+        events,
+      });
     } catch (error) {
       identityCallingPathApplyFailuresTotal.inc();
       logger.warn(
@@ -277,9 +279,22 @@ export class IdentityCeremonies {
     // 4. Staging LAST, best-effort — the convergence re-apply. Bounded (D02
     // seam a): a hung Redis may cost the caller at most the staging budget,
     // never an unbounded wait, and an overrun is a drop like any error here.
+    // A missing sender is NOT a Redis drop — it is a wiring defect, counted
+    // under its own reason so the two cannot masquerade as one another.
+    const sender = this.stagedSender(verb.senderName);
+    if (!sender) {
+      identityStagingDroppedTotal.inc({ reason: "sender_unavailable" });
+      logger.error(
+        {
+          userId: data.userId,
+          commandType: verb.commandType,
+          senderName: verb.senderName,
+        },
+        "identity pipeline sender unavailable: staging skipped — a wiring defect, not a Redis drop",
+      );
+      return events;
+    }
     try {
-      const sender = this.stagedSender(verb.senderName);
-      if (!sender) throw new Error("identity pipeline sender unavailable");
       await withinBudget({
         work: sender.send(data),
         timeoutMs: this.stagingTimeoutMs,
@@ -289,7 +304,7 @@ export class IdentityCeremonies {
           ),
       });
     } catch (error) {
-      identityStagingDroppedTotal.inc();
+      identityStagingDroppedTotal.inc({ reason: "redis_drop" });
       logger.warn(
         { userId: data.userId, commandType: verb.commandType, error },
         "identity command staging dropped after the durable append; convergence deferred to the next event or replay",
@@ -301,14 +316,18 @@ export class IdentityCeremonies {
 
   private async applyOnCallingPath({
     userId,
+    tenantId,
     events,
   }: {
     userId: string;
+    tenantId: string;
     events: IdentityEvent[];
   }): Promise<void> {
+    // The same field the append leg keys on — the pipeline defines
+    // tenantId = userId by design, and both legs must read the same source.
     const context = {
       aggregateId: userId,
-      tenantId: createTenantId(userId),
+      tenantId: createTenantId(tenantId),
     };
     const stored = await this.projectionStore.load(userId, context);
 

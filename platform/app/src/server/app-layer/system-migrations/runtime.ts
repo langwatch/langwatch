@@ -31,6 +31,7 @@ import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./cohort";
+import { MigrationNotAvailableOnInstallationError } from "./errors";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -254,17 +255,20 @@ export async function migrationPassCohort(): Promise<
  * (ADR-110: a switch, not a programme): the ops page enrolls ORGANIZATIONS,
  * and a user is in a user-rooted migration's cohort when any organization
  * they belong to is enrolled for it. Self-hosted admits every user, as it
- * admits every organization. Enrollment and membership are read once, fresh,
- * at the start of each pass; members of private-dataplane organizations are
- * excluded exactly as those organizations are. A user outside every organization has nothing
+ * admits every organization. Enrollment is read once, fresh, at the start of
+ * each pass; membership is answered per candidate user with two cheap
+ * indexed reads rather than materializing every enrolled organization's
+ * member list into memory (the runner visits each user once per pass).
+ * Members of private-dataplane organizations are excluded exactly as those
+ * organizations are. A user outside every organization has nothing
  * to enroll them on cloud and stays on the legacy path until they join one;
  * their sign-in is unaffected (the write gate answers false; the D03 read
  * fork falls back to legacy routing).
  */
 export async function userMigrationPassCohort(): Promise<
-  (args: { tenantId: string; migrationName: string }) => boolean
+  (args: { tenantId: string; migrationName: string }) => Promise<boolean>
 > {
-  if (env.IS_SAAS !== true) return () => true;
+  if (env.IS_SAAS !== true) return async () => true;
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
   // The same exclusion the organization cohort applies: a private-dataplane
@@ -272,35 +276,34 @@ export async function userMigrationPassCohort(): Promise<
   // identity events would otherwise land in the shared platform log while
   // the organization's own data stays on its private instance.
   const privateOrganizationIds = [...getPrivateClickHouseUrls().keys()];
-  const privateMembers = await memberUserIds({
-    organizationIds: privateOrganizationIds,
-  });
-  const membersByMigration = new Map<string, Set<string>>();
+  const enrolledPublicByMigration = new Map<string, string[]>();
   for (const migration of registeredUserMigrations()) {
-    const organizationIds = [
-      ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
-    ].filter((id) => !privateOrganizationIds.includes(id));
-    const members = await memberUserIds({ organizationIds });
-    membersByMigration.set(
+    enrolledPublicByMigration.set(
       migration.name,
-      new Set([...members].filter((userId) => !privateMembers.has(userId))),
+      [
+        ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
+      ].filter((id) => !privateOrganizationIds.includes(id)),
     );
   }
-  return ({ tenantId, migrationName }) =>
-    membersByMigration.get(migrationName)?.has(tenantId) ?? false;
-}
-
-async function memberUserIds({
-  organizationIds,
-}: {
-  organizationIds: string[];
-}): Promise<Set<string>> {
-  if (organizationIds.length === 0) return new Set();
-  const rows = await prisma.organizationUser.findMany({
-    where: { organizationId: { in: organizationIds } },
-    select: { userId: true },
-  });
-  return new Set(rows.map((row) => row.userId));
+  return async ({ tenantId, migrationName }) => {
+    const organizationIds = enrolledPublicByMigration.get(migrationName) ?? [];
+    if (organizationIds.length === 0) return false;
+    if (privateOrganizationIds.length > 0) {
+      const privateMembership = await prisma.organizationUser.findFirst({
+        where: {
+          userId: tenantId,
+          organizationId: { in: privateOrganizationIds },
+        },
+        select: { userId: true },
+      });
+      if (privateMembership !== null) return false;
+    }
+    const enrolledMembership = await prisma.organizationUser.findFirst({
+      where: { userId: tenantId, organizationId: { in: organizationIds } },
+      select: { userId: true },
+    });
+    return enrolledMembership !== null;
+  };
 }
 
 function userMigrationsForThisInstallation(): SystemMigration[] {
@@ -322,6 +325,7 @@ function mergeSummaries(
     held: a.held + b.held,
     parked: a.parked + b.parked,
     skipped: a.skipped + b.skipped,
+    alreadyTerminal: a.alreadyTerminal + b.alreadyTerminal,
     claimed: a.claimed + b.claimed,
   };
 }
@@ -373,10 +377,24 @@ export async function runSystemMigrationTargetedPass({
     (migration) => migration.name === migrationName,
   );
   if (userMigration) {
+    // The same exclusion `userMigrationPassCohort` applies: a
+    // private-dataplane organization's members are never swept up - their
+    // identity events would land in the shared platform log while the
+    // organization's own data stays on its private instance - and enrollment
+    // alone does not carry that rule, so the targeted run refuses outright.
+    if (
+      env.IS_SAAS === true &&
+      getPrivateClickHouseUrls().has(organizationId)
+    ) {
+      throw new MigrationNotAvailableOnInstallationError();
+    }
     const runner = new SystemMigrationRunnerService({
       state: systemMigrationState,
       lease: new RedisMigrationLeaseRepository(redis),
-      tenants: new PrismaOrganizationMemberTenantSource(prisma, organizationId),
+      tenants: new PrismaOrganizationMemberTenantSource({
+        prisma,
+        organizationId,
+      }),
       cohort: () => true,
       migrations: [userMigration],
     });
@@ -436,18 +454,21 @@ export async function runSystemMigrationPass(args?: {
       }),
     ),
   });
-  const organizationSummary = await runner.runPass({ signal: args?.signal });
-
   // The USER-rooted leg (ADR-101 §6): the same lease, state table and
-  // enrollment rows, driven over users. Runs after the organization pass so
-  // both legs read enrollment at the same moment.
+  // enrollment rows, driven over users. Both legs' cohorts resolve BEFORE
+  // either pass starts, so the two legs read enrollment at the same moment -
+  // an operator enrolling mid-pass moves both legs on the next pass, never
+  // one leg now and the other later.
   const userMigrations = userMigrationsForThisInstallation();
-  if (userMigrations.length === 0) return organizationSummary;
+  const userCohort =
+    userMigrations.length === 0 ? null : await userMigrationPassCohort();
+  const organizationSummary = await runner.runPass({ signal: args?.signal });
+  if (userCohort === null) return organizationSummary;
   const userRunner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaUserTenantSource(prisma),
-    cohort: await userMigrationPassCohort(),
+    cohort: userCohort,
     migrations: userMigrations,
   });
   return mergeSummaries(

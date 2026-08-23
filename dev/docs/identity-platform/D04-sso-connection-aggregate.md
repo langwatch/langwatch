@@ -10,7 +10,7 @@ Enterprise SSO stops being two hand-set strings on `Organization` and becomes a 
 
 - Projection table (Prisma model `SsoConnection`):
 
-```
+```text
 id              string PK
 organizationId  string FK → Organization
 type            enum   oidc | saml

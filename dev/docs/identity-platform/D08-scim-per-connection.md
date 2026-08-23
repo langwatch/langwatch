@@ -4,12 +4,12 @@ Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 �
 
 # Overview
 
-SCIM stops writing membership tables directly. Tokens become scoped per SSO connection, `User.externalId` gives IdP-stable identity, and every membership consequence flows through `grants.*` — SCIM becomes a command/event producer in the identity pipeline. De-enroll is a replayable event with a proven postcondition: no effective permissions remain.
+SCIM stops writing membership tables directly. Tokens become scoped per SSO connection, a `(connectionId, externalId) → userId` mapping gives IdP-stable identity per connection, and every membership consequence flows through `grants.*` — SCIM becomes a command/event producer in the identity pipeline. De-enroll is a replayable event with a proven postcondition: no effective permissions remain.
 
 # Requirements
 
 - `ScimToken.connectionId` (issued in D05); tokens are per-connection — a token for connection A cannot write org B.
-- `User.externalId` for IdP-stable identity (survives email changes).
+- IdP-stable identity is **per connection**: a `(connectionId, externalId) → userId` mapping with a composite uniqueness constraint on `(connectionId, externalId)` (survives email changes; one user may carry different `externalId`s across connections). Every SCIM lookup and write keys on both — never on `externalId` alone.
 - `ScimSync` aggregate + `scim_sync_state` projection:
 
 ```mermaid
@@ -23,7 +23,7 @@ stateDiagram-v2
 ```
 
 - All membership writes via `grants.attach` / `grants.offboard` — no direct `OrganizationUser`/`RoleBinding` writes. De-enroll calls `grants.offboard`; the empty-proof postcondition is asserted in an integration test.
-- Failed applies are visible dead-letters (process-manager outbox, `retryable: false` retires visibly), never silent drift.
+- Failed applies are visible dead-letters via the pipeline's existing process-manager mechanism (handlers zod-parse, retry idempotently, `retryable: false` retires visibly — nothing new is introduced; the pipeline itself has no outbox, ADR-101/R13), never silent drift.
 - Group → role-binding mapping UI stays; its writes also go through `grants.attach`. SCIM-managed group provenance guards (no rename/member edits outside SCIM) survive.
 - Connection teardown revokes its SCIM tokens (lifecycle event → PM intent).
 
@@ -32,8 +32,11 @@ stateDiagram-v2
 ```text
 ScimToken
   + connectionId  string  FK → sso_connections; the token's entire write authority
-User
-  + externalId    string? IdP-stable identity (survives email changes)
+ScimExternalId           new mapping table: (connectionId, externalId) → userId
+  connectionId    string  FK → sso_connections
+  externalId      string  the IdP's stable identifier (survives email changes)
+  userId          string  FK → User
+  @@unique([connectionId, externalId])
 ```
 
 `ScimSync` events (`tenantId = organizationId`, `aggregateId = scimSyncId`; SCIM payload PII stays out per the D01 rule — user references are `userId`/`externalId`):
@@ -60,7 +63,7 @@ Membership consequences are grants-ledger events, not SCIM events: the reconcile
 # Technical Plan
 
 1. `ScimToken.connectionId` migration + backfill (org's first connection; D05 issues new tokens scoped).
-2. `User.externalId` migration + SCIM payload mapping.
+2. `ScimExternalId` mapping migration (composite-unique on `(connectionId, externalId)`) + SCIM payload mapping keyed on both.
 3. ScimSync aggregate, events, projection; SCIM endpoints become command producers (same external API).
 4. Process manager: de-enroll → `grants.offboard` with postcondition check; retry with backoff; dead-letter visibility in the ops surface.
 5. Group mapping UI write path repointed to `grants.attach`.

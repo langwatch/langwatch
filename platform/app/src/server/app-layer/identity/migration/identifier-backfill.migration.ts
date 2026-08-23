@@ -10,9 +10,11 @@
  * and live emission of the same fact converges on the same projection row.
  *
  * Self-proving: `finalized` only when the fold-built `Identifier` rows match
- * what the live `Account`/`User` rows imply — a disagreement holds the user
- * at `migrated` with a bounded diff report on the ops migrations page, and a
- * later pass retries the proof. Finalization is the LATCH: the adapter's
+ * what the live `Account`/`User` rows imply — in BOTH directions: every
+ * implied identifier is present in its expected state, and no live
+ * (ATTACHED/VERIFIED/PRIMARY) row exists that the live rows do not imply. A
+ * disagreement holds the user at `migrated` with a bounded diff report on
+ * the ops migrations page, and a later pass retries the proof. Finalization is the LATCH: the adapter's
  * per-user write gate (identifier-write-gate.ts) reads exactly this record,
  * so the moment this migration finalizes a user, their domain-significant
  * better-auth writes start emitting identity events structurally.
@@ -50,7 +52,7 @@ import type {
   TenantMigrationOutcome,
 } from "@langwatch/system-migrations";
 import { identifierProviderFor } from "~/server/better-auth/identityDatabase";
-import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommands";
+import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
 import {
   arrivalStateForProvider,
   deriveIdentifierId,
@@ -106,7 +108,11 @@ export interface IdentityBackfillReads {
 }
 
 export type BackfillDiff = {
-  kind: "identifier_missing" | "state_mismatch" | "value_mismatch";
+  kind:
+    | "identifier_missing"
+    | "state_mismatch"
+    | "value_mismatch"
+    | "surplus_row";
   identifierId: string;
   provider: string;
   expectedState?: string;
@@ -170,10 +176,13 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
     }
     if (!user.email) {
       // Identifier values derive from the user's email; a user without one
-      // (mid-erasure, or an import artifact) cannot be adopted yet. Held,
-      // not parked: the report says why, and a later pass retries.
+      // (erased, or an import artifact) has no identifiers to backfill, so
+      // like a vanished user this is terminal - `migrated` would be retried
+      // every pass forever with nothing to do. Finalizing opens the write
+      // gate, which is right: any future ceremonies attach fresh identifiers
+      // live, with no history left behind to adopt. The report says why.
       return {
-        status: "migrated",
+        status: "finalized",
         report: { kind: "no_email", userId },
       };
     }
@@ -307,7 +316,15 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
     }
   }
 
-  /** The D01 exit gate: the fold-built rows against what the live rows imply. */
+  /**
+   * The D01 exit gate: the fold-built rows against what the live rows imply,
+   * in both directions. Forward: every expected identifier is present in its
+   * expected state. Backward: any LIVE row nothing implies (say, the stale
+   * VERIFIED identifier of an email the user has since changed - accountId
+   * null, so never orphan-detachable) is a `surplus_row` diff, because such
+   * a row keeps blocking its value for every other user; DETACHED and
+   * DEAD_END surpluses are inert tombstones and fine.
+   */
   private async proveParity({
     userId,
     expected,
@@ -346,8 +363,31 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
         });
       }
     }
+    diffs.push(...surplusRowDiffs({ rows, expected }));
     return diffs;
   }
+}
+
+/** The backward direction of the parity proof: every LIVE row nothing
+ *  implies becomes a diff; DETACHED and DEAD_END surpluses are inert. */
+function surplusRowDiffs({
+  rows,
+  expected,
+}: {
+  rows: BackfillIdentifierRow[];
+  expected: ExpectedIdentifier[];
+}): BackfillDiff[] {
+  const expectedIds = new Set(
+    expected.map((expectation) => expectation.identifierId),
+  );
+  return rows
+    .filter((row) => !expectedIds.has(row.id) && isLiveState(row.state))
+    .map((row) => ({
+      kind: "surplus_row" as const,
+      identifierId: row.id,
+      provider: row.provider,
+      actualState: row.state,
+    }));
 }
 
 /** A command the pipeline refused is a parity fact, never a park. */

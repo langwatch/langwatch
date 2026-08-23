@@ -7,7 +7,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "../../../projections/stateProjection.types";
-import type { IdentityGuardReads } from "../commands/identityCommands";
+import type { IdentityGuardReads } from "../commands/identityGuardReads";
 import { createIdentityPipeline } from "../pipeline";
 import type { IdentityFoldState } from "../projections/identityState.foldProjection";
 import type { IdentityLedgerState } from "../projections/reduceIdentity";

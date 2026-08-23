@@ -24,10 +24,12 @@ function migrationOf({
   name,
   runsAutomaticallyOnSelfHosted = true,
   requiresOperatorConfirmation = false,
+  tenant,
 }: {
   name: string;
   runsAutomaticallyOnSelfHosted?: boolean;
   requiresOperatorConfirmation?: boolean;
+  tenant?: "organization" | "user";
 }) {
   return {
     name,
@@ -35,6 +37,7 @@ function migrationOf({
     description: name,
     requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted,
+    ...(tenant ? { tenant } : {}),
   };
 }
 
@@ -87,6 +90,7 @@ function targetedPassStub() {
       held: 0,
       parked: 0,
       skipped: 0,
+      alreadyTerminal: 0,
       claimed: 0,
     });
 }
@@ -864,6 +868,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           held: 0,
           parked: 0,
           skipped: 0,
+          alreadyTerminal: 0,
           claimed: 1,
         }),
       });
@@ -875,6 +880,56 @@ describe("SystemMigrationsService.runForOrganization", () => {
           actorUserId: "user_alex",
         }),
       ).rejects.toThrow(MigrationPassAlreadyRunningError);
+    });
+  });
+
+  describe("given a user-rooted migration whose members are all already terminal", () => {
+    it("answers finalized rather than pretending no member was in the cohort", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 3,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyTerminal: 3,
+          claimed: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "finalized", waiting: false });
+    });
+
+    it("still answers null for a run where no member was in the cohort at all", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 0,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyTerminal: 0,
+          claimed: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: null, waiting: false });
     });
   });
 

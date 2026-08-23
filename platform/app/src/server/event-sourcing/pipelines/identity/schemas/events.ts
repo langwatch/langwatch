@@ -16,7 +16,7 @@ import {
  * never appear in any event: protocol values ride only on commands and land
  * through repositories as row-truth on `Account`.
  *
- * Erasure (R11) is the one sanctioned log mutation: it wipes `email` and
+ * Erasure (R11) is the one sanctioned log mutation: it wipes `value` and
  * `identifierHash` out of the user's prior events, which is why both are
  * nullable here — a schema that required them would refuse the user's own
  * erased history on replay. `domain` is an org-level fact and survives.
@@ -76,9 +76,9 @@ export const identifierAttachedEventSchema = EventSchema.extend({
      *  exists (an email alias attached for routing has none). */
     accountId: z.string().min(1).nullable(),
     provider: identifierProviderSchema,
-    /** Normalized value; the fact where the fact is about an email.
-     *  Wiped by erasure. */
-    email: z.string().nullable(),
+    /** Normalized identifier value (the email for `email` and OAuth
+     *  providers, the provider subject otherwise). Wiped by erasure. */
+    value: z.string().nullable(),
     /** HMAC-SHA256(userHashKey, normalized value); unlinkable noise once
      *  erasure shreds the key. Null when the user's hash key was not yet
      *  minted. Wiped by erasure. */

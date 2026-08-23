@@ -15,7 +15,7 @@ The direct fix for the invitation dead-end support load — pulled ahead of the 
 
 # Data structures
 
-`OrganizationInvite` stays a plain Prisma model (no aggregate — invites are org-admin CRUD with an expiry, not a lifecycle worth a fold); the columns that matter:
+`OrganizationInvite` stays a plain Prisma model (no aggregate — invites are org-admin CRUD with an expiry, not a lifecycle worth a fold). Plain row, guarded transitions: resend and acceptance each **claim** the row with a conditional update on the expected `(status, inviteCode)` pair, so two racers on the same PENDING invite cannot both win — the loser sees a stale-code refusal. The columns that matter:
 
 ```text
 OrganizationInvite
@@ -26,7 +26,7 @@ OrganizationInvite
   invitedById · acceptedByUserId? · acceptedViaAccountId?   which VERIFIED identifier matched
 ```
 
-Acceptance lookup: invite.email → normalize → all VERIFIED identifiers matching that value across providers → the holder signs in with any of them → `grants.attach` (ledger event `grant_attached` with `source: "invite"`) → status ACCEPTED. The authorization fact lives in the grants ledger; the invite row records only its own outcome.
+Acceptance lookup: invite.email → normalize → all VERIFIED identifiers matching that value across providers → the holder signs in with any of them → the acceptance claims the row (conditional update on PENDING + the presented `inviteCode`) → `grants.attach` (ledger event `grant_attached` with `source: "invite"`, idempotency-keyed by the invitation id — a retry after a landed attach re-applies nothing) → status ACCEPTED. The authorization fact lives in the grants ledger; the invite row records only its own outcome.
 
 # Out of Scope
 

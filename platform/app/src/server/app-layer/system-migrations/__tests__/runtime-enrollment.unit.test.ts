@@ -12,10 +12,12 @@ const stubs = vi.hoisted(() => {
   const enrollmentFindUnique = vi.fn();
   const warnings: Array<[string, unknown, unknown]> = [];
   const organizationUserFindMany = vi.fn().mockResolvedValue([]);
+  const organizationUserFindFirst = vi.fn().mockResolvedValue(null);
   return {
     enrollmentFindMany,
     enrollmentFindUnique,
     organizationUserFindMany,
+    organizationUserFindFirst,
     warnings,
     prisma: {
       systemMigrationEnrollment: {
@@ -33,10 +35,29 @@ const stubs = vi.hoisted(() => {
       },
       organizationUser: {
         findMany: organizationUserFindMany,
+        findFirst: organizationUserFindFirst,
       },
     },
   };
 });
+
+/** Answers the cohort's per-user membership probes from a plain map. */
+function stubMemberships(memberships: Record<string, string[]>): void {
+  stubs.organizationUserFindFirst.mockImplementation(
+    async ({
+      where,
+    }: {
+      where: { userId: string; organizationId: { in: string[] } };
+    }) => {
+      const organizations = memberships[where.userId] ?? [];
+      return organizations.some((organizationId) =>
+        where.organizationId.in.includes(organizationId),
+      )
+        ? { userId: where.userId }
+        : null;
+    },
+  );
+}
 
 vi.mock("~/server/db", () => ({ prisma: stubs.prisma }));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
@@ -77,6 +98,7 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/iden
 import {
   migrationPassCohort,
   runSystemMigrationPass,
+  runSystemMigrationTargetedPass,
   userMigrationPassCohort,
 } from "../runtime";
 
@@ -185,35 +207,39 @@ describe("userMigrationPassCohort on cloud", () => {
       stubs.enrollmentFindMany.mockResolvedValueOnce([
         { organizationId: "org_acme", migrationName: backfill },
       ]);
-      stubs.organizationUserFindMany.mockImplementation(
-        async ({ where }: { where: { organizationId: { in: string[] } } }) =>
-          where.organizationId.in.includes("org_acme")
-            ? [{ userId: "user_sam" }, { userId: "user_ann" }]
-            : [],
-      );
+      stubMemberships({
+        user_sam: ["org_acme"],
+        user_ann: ["org_acme"],
+        user_gil: ["org_globex"],
+      });
 
       const cohort = await userMigrationPassCohort();
 
-      expect(cohort({ tenantId: "user_sam", migrationName: backfill })).toBe(
-        true,
-      );
-      expect(cohort({ tenantId: "user_ann", migrationName: backfill })).toBe(
-        true,
-      );
+      await expect(
+        cohort({ tenantId: "user_sam", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_ann", migrationName: backfill }),
+      ).resolves.toBe(true);
       // Only a member of globex, which nobody enrolled.
-      expect(cohort({ tenantId: "user_gil", migrationName: backfill })).toBe(
-        false,
-      );
+      await expect(
+        cohort({ tenantId: "user_gil", migrationName: backfill }),
+      ).resolves.toBe(false);
       // Outside every organization: nothing enrolls them on cloud.
-      expect(cohort({ tenantId: "user_solo", migrationName: backfill })).toBe(
-        false,
-      );
-      // Membership was read for the enrolled organizations only.
-      expect(stubs.organizationUserFindMany).toHaveBeenCalledWith(
+      await expect(
+        cohort({ tenantId: "user_solo", migrationName: backfill }),
+      ).resolves.toBe(false);
+      // Membership is probed per user against the enrolled organizations
+      // only - never materialized fleet-wide.
+      expect(stubs.organizationUserFindFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId: { in: ["org_acme"] } },
+          where: expect.objectContaining({
+            userId: "user_sam",
+            organizationId: { in: ["org_acme"] },
+          }),
         }),
       );
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
     });
   });
 
@@ -224,21 +250,19 @@ describe("userMigrationPassCohort on cloud", () => {
         { organizationId: "org_acme", migrationName: backfill },
         { organizationId: "org_private", migrationName: backfill },
       ]);
-      stubs.organizationUserFindMany.mockImplementation(
-        async ({ where }: { where: { organizationId: { in: string[] } } }) =>
-          where.organizationId.in.includes("org_private")
-            ? [{ userId: "user_both" }]
-            : [{ userId: "user_sam" }, { userId: "user_both" }],
-      );
+      stubMemberships({
+        user_sam: ["org_acme"],
+        user_both: ["org_private", "org_acme"],
+      });
 
       const cohort = await userMigrationPassCohort();
 
-      expect(cohort({ tenantId: "user_sam", migrationName: backfill })).toBe(
-        true,
-      );
-      expect(cohort({ tenantId: "user_both", migrationName: backfill })).toBe(
-        false,
-      );
+      await expect(
+        cohort({ tenantId: "user_sam", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_both", migrationName: backfill }),
+      ).resolves.toBe(false);
     });
   });
 
@@ -248,19 +272,39 @@ describe("userMigrationPassCohort on cloud", () => {
 
       const cohort = await userMigrationPassCohort();
 
-      expect(
+      await expect(
         cohort({
           tenantId: "user_sam",
           migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         }),
-      ).toBe(false);
-      // The only membership read is the private-dataplane exclusion's.
-      for (const call of stubs.organizationUserFindMany.mock.calls) {
-        expect(
-          (call[0] as { where: { organizationId: { in: string[] } } }).where
-            .organizationId.in,
-        ).toEqual(["org_private"]);
-      }
+      ).resolves.toBe(false);
+      // An empty enrolled set answers false before any membership probe.
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("runSystemMigrationTargetedPass for a user-rooted migration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when the named organization runs a private dataplane", () => {
+    it("refuses with migration_not_available_on_installation before touching any member", async () => {
+      // The same rule userMigrationPassCohort applies on a full pass: a
+      // private-dataplane organization's members' identity events must never
+      // land in the shared platform log, and enrollment alone does not
+      // enforce that.
+      await expect(
+        runSystemMigrationTargetedPass({
+          organizationId: "org_private",
+          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+        }),
+      ).rejects.toMatchObject({
+        code: "migration_not_available_on_installation",
+      });
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
     });
   });
 });

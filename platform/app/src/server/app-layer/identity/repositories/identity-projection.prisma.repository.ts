@@ -1,8 +1,9 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import type {
-  IdentifierFact,
-  IdentifierLifecycleState,
+import {
+  IDENTIFIER_LIFECYCLE_STATES,
+  type IdentifierFact,
+  type IdentifierLifecycleState,
 } from "~/server/event-sourcing/pipelines/identity/projections/reduceIdentity";
 import { identifierProviderSchema } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -11,16 +12,10 @@ import type {
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
 
-const LIFECYCLE_STATES: readonly IdentifierLifecycleState[] = [
-  "ATTACHED",
-  "VERIFIED",
-  "PRIMARY",
-  "DEAD_END",
-  "DETACHED",
-];
-
 function parseLifecycleState(raw: string): IdentifierLifecycleState {
-  const state = LIFECYCLE_STATES.find((candidate) => candidate === raw);
+  const state = IDENTIFIER_LIFECYCLE_STATES.find(
+    (candidate) => candidate === raw,
+  );
   if (!state) {
     throw new Error(`Identifier row carries unknown state "${raw}"`);
   }
