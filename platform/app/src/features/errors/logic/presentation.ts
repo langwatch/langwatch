@@ -422,6 +422,16 @@ const presentations = {
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
+  lwql_unknown_identifier: {
+    title: "This query names a column that doesn't exist",
+    describe: (error) => {
+      const identifiers = error.meta.identifiers;
+      if (Array.isArray(identifiers) && identifiers.length > 0) {
+        return `No dataset defines ${identifiers.map((name) => `"${String(name)}"`).join(", ")}. Check the spelling against the columns the schema lists and run again.`;
+      }
+      return "Check every column name against the columns the schema lists and run again.";
+    },
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {

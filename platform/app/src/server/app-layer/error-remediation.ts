@@ -177,6 +177,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  lwql_unknown_identifier: {
+    tips: [
+      "Read `meta.identifiers` — it lists every column the query names that no dataset defines",
+      "Check the spelling against the columns the schema endpoint lists for the dataset, then edit and run again",
+    ],
+  },
   page_too_deep: {
     tips: [
       "Narrow the time range or filters so the page falls inside the window",

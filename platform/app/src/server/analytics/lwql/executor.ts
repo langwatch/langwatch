@@ -34,12 +34,17 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
 import {
+  clickHouseMissingIdentifiers,
   isClickHouseObjectUnavailableError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
 
-import { LangWatchQLUnavailableError } from "./errors";
+import {
+  LangWatchQLUnavailableError,
+  LangWatchQLUnknownIdentifierError,
+} from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
@@ -264,6 +269,16 @@ export function createLangWatchQLExecutor(
         // `reasons` for the operator's logs and never in the response.
         if (isClickHouseObjectUnavailableError(error)) {
           throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+        }
+        // Unlike the objects above, a missing column CAN be the caller's SQL:
+        // save-time validation proves tables and syntax, but nothing proves
+        // every selected column exists. The member-authored statement gets a
+        // coded refusal naming what to fix; only the missing names travel,
+        // never the database's message, which echoes the submitted query.
+        if (isClickHouseUnknownIdentifierError(error)) {
+          throw new LangWatchQLUnknownIdentifierError(
+            clickHouseMissingIdentifiers(error),
+          );
         }
         // Reuses the read path's translation, so the two resource ceilings a
         // caller can act on arrive as the platform's existing codes rather than

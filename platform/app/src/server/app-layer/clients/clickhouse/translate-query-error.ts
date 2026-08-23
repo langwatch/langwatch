@@ -64,6 +64,15 @@ const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
 
+// The query names a column no table involved defines. Unlike the three above,
+// this one CAN be the caller's SQL — member-authored LangWatchQL statements
+// are checked against the catalog at save time, but nothing there proves the
+// columns they select exist.
+const UNKNOWN_IDENTIFIER: ServerError = {
+  code: "47",
+  name: "UNKNOWN_IDENTIFIER",
+};
+
 /**
  * Whether `error` is one of `variants`, by any of the three forms a server
  * error arrives in: the driver's `code` property, its `type` property, or the
@@ -109,6 +118,56 @@ export function isClickHouseObjectUnavailableError(error: unknown): boolean {
     error,
     variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
   });
+}
+
+/**
+ * True when the server refused because the query names a column that does not
+ * exist (UNKNOWN_IDENTIFIER, 47).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError} for the same reason
+ * its neighbours are not: on the application's own connection a missing column
+ * is a shipped bug and must degrade to "unknown" (ADR-045). Exported for the
+ * LangWatchQL executor, where the SQL is member-authored and the missing name
+ * is exactly what the caller needs to fix their statement.
+ */
+export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+}
+
+/**
+ * The column names ClickHouse reported as missing, read out of the refusal by
+ * the two wordings the engine uses:
+ *
+ * - modern analysis failures name one identifier per error, backquoted, ahead
+ *   of the echoed statement: ``Unknown expression identifier `x` in scope
+ *   SELECT …``
+ * - some paths instead list them: `Missing columns: 'a', 'b' while processing …`
+ *
+ * The rest of the message echoes the submitted query, so only the names inside
+ * those markers travel — never the message body itself, which must not reach a
+ * response. Answers an empty list when the wording does not parse; the caller
+ * still gets the coded error either way.
+ */
+export function clickHouseMissingIdentifiers(error: unknown): string[] {
+  if (!(error instanceof Error)) return [];
+
+  const names: string[] = [];
+
+  const scoped =
+    /Unknown expression(?: or function)? identifier `([^`]+)`/.exec(
+      error.message,
+    )?.[1];
+  if (scoped) names.push(scoped);
+
+  const listed = /Missing columns:\s*(.+?)(?:\s+while processing|\.|$)/s.exec(
+    error.message,
+  )?.[1];
+  if (listed) {
+    names.push(...[...listed.matchAll(/'([^']*)'/g)].map((match) => match[1] ?? ""));
+  }
+
+  return [...new Set(names)].sort();
 }
 
 /**

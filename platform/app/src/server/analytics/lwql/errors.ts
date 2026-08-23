@@ -351,3 +351,36 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     this.name = "LangWatchQLGranularityRequiresTimeWindowError";
   }
 }
+
+/**
+ * The statement selects or filters on a column no dataset defines.
+ *
+ * The validator can refuse unknown tables and syntax at save time, but column
+ * existence only the database knows, so this surfaces at run time instead —
+ * and before it was mapped, it reached the workbench, dashboard widgets and
+ * CLI as an unknown 500 for something one edit fixes. The missing names ride
+ * in `meta.identifiers`, read out of ClickHouse's own refusal; nothing else
+ * from that refusal (which echoes the submitted SQL) travels.
+ */
+export class LangWatchQLUnknownIdentifierError extends HandledError {
+  declare readonly code: "lwql_unknown_identifier";
+
+  constructor(
+    /** The column names the server reported as missing. Sorted, deduplicated. */
+    identifiers: readonly string[],
+  ) {
+    super(
+      "lwql_unknown_identifier",
+      "The query names columns no dataset defines.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumers: the workbench's error card, the dashboard widget,
+        // and `langwatch chart run` output, which print code plus these names.
+        meta: { identifiers },
+        ...remediation("lwql_unknown_identifier"),
+      },
+    );
+    this.name = "LangWatchQLUnknownIdentifierError";
+  }
+}

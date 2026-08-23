@@ -793,6 +793,26 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the table-function and SSRF policy is looked up
     Then a dedicated ADR documents why user-supplied table functions remain blocked via AST and grants
 
+  # ---------------------------------------------------------------------------
+  # Member-authored SQL naming something the schema does not have (#7447).
+  # Column existence cannot be checked at save time, so run time is the only
+  # place this failure can be named.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: A query naming a column no dataset has fails with a coded, member-actionable error
+    Given an authenticated API client whose statement names a column no dataset defines
+    When the client runs the query
+    Then the failure carries error code lwql_unknown_identifier at HTTP 400, a caller fault
+    And a query naming only columns that exist runs normally
+
+  @unit
+  Scenario: Only the missing column names travel in the error meta
+    Given a ClickHouse refusal for unknown identifiers over a statement that also contains quoted text
+    When the identifiers are read out of the refusal for the error's meta
+    Then exactly the missing column names come back
+    And no other part of the echoed statement, and none of the database's own wording, does
+
 # --- AC Coverage Map ---
 # Issue #6480 ACs → scenarios (grouped as in the issue body).
 #
