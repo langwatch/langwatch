@@ -51,7 +51,8 @@ const asTab = (id: string): Tab => ({ id }) as unknown as Tab;
 
 function renderStrip(ids: string[]) {
   const tabs = ids.map(asTab);
-  return render(
+  const onSelectTab = vi.fn();
+  const result = render(
     <ChakraProvider value={defaultSystem}>
       <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
         <DraggableTabsBrowser.Window windowId="w1" activeTabId={ids[0]}>
@@ -60,7 +61,7 @@ function renderStrip(ids: string[]) {
               tabs={tabs}
               activeTabId={ids[0]}
               isActiveWindow
-              onSelectTab={vi.fn()}
+              onSelectTab={onSelectTab}
             />
           </DraggableTabsBrowser.TabBar>
           <DraggableTabsBrowser.Panel />
@@ -68,6 +69,7 @@ function renderStrip(ids: string[]) {
       </DraggableTabsBrowser.Root>
     </ChakraProvider>,
   );
+  return { ...result, onSelectTab };
 }
 
 describe("the prompt tab strip", () => {
@@ -103,10 +105,22 @@ describe("the prompt tab strip", () => {
       expect(tabList?.parentElement).toHaveStyle({ marginBottom: "-1px" });
     });
 
-    it("keeps every tab selectable", () => {
+    it("names each open prompt and marks the one on screen", () => {
       renderStrip(["tab-1", "tab-2"]);
 
-      expect(screen.getAllByRole("tab")).toHaveLength(2);
+      // Counting the tabs said only that two were drawn — it held whatever
+      // they were called and whichever was open. The strip's own job is to
+      // name each prompt and mark the one whose card is showing. (Selecting is
+      // not this callback's: `onSelectTab` belongs to the overflow switcher,
+      // and a click on a tab is handled inside the tabs primitive.)
+      expect(screen.getByRole("tab", { name: /search-agent/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByRole("tab", { name: /summariser/ })).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
     });
   });
 });

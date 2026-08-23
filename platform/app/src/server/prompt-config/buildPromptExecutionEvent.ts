@@ -46,6 +46,34 @@ export interface PromptChatTurn {
  * Exported separately from the event so the heuristics can be tested without
  * building a workflow around them.
  */
+/**
+ * The latest live user message, when it is what `input` should carry.
+ *
+ * Empty counts as "not set", not merely undefined: a saved prompt declares
+ * `input` in its inputs list, so the form always carries an `input` key,
+ * defaulting to "". A strict-undefined check left it empty, `{{input}}`
+ * rendered to nothing, AND the absorb step dropped the live turn — the
+ * 2026-05-17 prod regression. An explicit value from the Variables panel still
+ * wins.
+ *
+ * Only the empty string, though. A plain falsy check also swallowed `0` and
+ * `false`, so a prompt declaring `input` as a float or a bool had the panel's
+ * deliberate 0 quietly overwritten by the chat text.
+ */
+function liveTurnBoundToInput({
+  inputs,
+  lastLiveUserMsg,
+}: {
+  inputs: Record<string, unknown>;
+  lastLiveUserMsg: PromptChatTurn | undefined;
+}): string | undefined {
+  const inputIsUnset = inputs.input === undefined || inputs.input === "";
+  if (!inputIsUnset) return undefined;
+  return typeof lastLiveUserMsg?.content === "string"
+    ? lastLiveUserMsg.content
+    : undefined;
+}
+
 export function resolvePromptInputs({
   formValues,
   messages,
@@ -98,24 +126,8 @@ export function resolvePromptInputs({
     return acc;
   }, {});
 
-  // Empty counts as "not set", not merely undefined: a saved prompt declares
-  // `input` in its inputs list, so the form always carries an `input` key,
-  // defaulting to "". A strict-undefined check left it empty, `{{input}}`
-  // rendered to nothing, AND the absorb step above dropped the live turn — the
-  // 2026-05-17 prod regression. An explicit value from the Variables panel
-  // still wins.
-  //
-  // Only the empty string, though. A plain falsy check also swallowed `0` and
-  // `false`, so a prompt declaring `input` as a float or a bool had the panel's
-  // deliberate 0 quietly overwritten by the chat text.
-  const inputIsUnset = inputs.input === undefined || inputs.input === "";
-  const lastLiveUserContent =
-    typeof lastLiveUserMsg?.content === "string"
-      ? lastLiveUserMsg.content
-      : undefined;
-  if (lastLiveUserContent !== undefined && inputIsUnset) {
-    inputs.input = lastLiveUserContent;
-  }
+  const bound = liveTurnBoundToInput({ inputs, lastLiveUserMsg });
+  if (bound !== undefined) inputs.input = bound;
 
   return { messagesHistory, inputs };
 }
