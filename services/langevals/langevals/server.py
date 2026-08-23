@@ -112,7 +112,9 @@ def resolve_model_call_bounds(
     Attempts come down before the timeout goes below a second, and a single
     attempt always fits because it waits for nothing. So a deadline too small
     for the full retry budget buys fewer tries rather than the wrong error,
-    and no configuration can make the budget overrun.
+    and no configuration can make the budget overrun. A sub-second deadline
+    keeps its fraction rather than the one-second floor, for the same reason:
+    the floor would be the overrun.
 
     `model_timeout` is the `LANGEVALS_MODEL_TIMEOUT` override. The attempts are
     fitted around it, and it is honored up to the deadline itself: an override
@@ -137,8 +139,15 @@ def resolve_model_call_bounds(
         ):
             return attempts, timeout
     only_attempt = min(model_timeout or batch_deadline, batch_deadline)
+    # Whole seconds while there is a whole second to take. Below one there is
+    # nothing left to floor to, and rounding up to a second would put the model
+    # timeout past the deadline it has to fit inside, which is the one thing
+    # this function promises never happens.
     return 1, float(
-        min(MODEL_TIMEOUT_CEILING_SECONDS, max(1, math.floor(only_attempt)))
+        min(
+            MODEL_TIMEOUT_CEILING_SECONDS,
+            math.floor(only_attempt) if only_attempt >= 1 else only_attempt,
+        )
     )
 
 

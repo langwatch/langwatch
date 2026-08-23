@@ -333,8 +333,10 @@ def test_a_stalled_model_call_is_answered_as_a_provider_timeout(monkeypatch):
 
 
 # @scenario "A stalled model call runs out of attempts before the batch gives up"
-@pytest.mark.parametrize("deadline", [1, 5, 10, 21, 30, 60, 120, 300, 600, 5000])
-@pytest.mark.parametrize("override", [None, 1.0, 5.0, 90.0, 180.0, 600.0])
+@pytest.mark.parametrize(
+    "deadline", [0.1, 0.5, 0.99, 1, 1.5, 5, 10, 21, 30, 60, 120, 300, 600, 5000]
+)
+@pytest.mark.parametrize("override", [None, 0.25, 1.0, 5.0, 90.0, 180.0, 600.0])
 def test_every_model_call_attempt_fits_inside_the_batch_deadline(deadline, override):
     """One call under the deadline is not enough: the retries have to fit too.
 
@@ -344,14 +346,16 @@ def test_every_model_call_attempt_fits_inside_the_batch_deadline(deadline, overr
 
     Swept over the deadline and the `LANGEVALS_MODEL_TIMEOUT` override rather
     than read off the live module, so the invariant is the function's and not
-    an accident of the default configuration.
+    an accident of the default configuration. Both knobs take fractions, so
+    the sweep carries deadlines under a second: those have no whole second to
+    round the model timeout to, and rounding up to one overran the deadline.
     """
     attempts, timeout = server.resolve_model_call_bounds(
         batch_deadline=float(deadline), model_timeout=override
     )
 
     assert attempts >= 1
-    assert timeout >= 1
+    assert timeout > 0
     assert (
         server.model_call_budget_seconds(attempts=attempts, model_timeout=timeout)
         <= deadline
