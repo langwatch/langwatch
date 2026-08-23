@@ -165,10 +165,15 @@ Feature: Coding-agent sessions
     When the turn is folded
     Then the session's tokens are counted and its cost stays at zero
 
-  Scenario: an agent that states its own price keeps it
+  Scenario: an agent that states its own price keeps it beside the computed one
     Given a session whose telemetry reports what it was billed
     When its model calls are folded
-    Then the session's cost is the reported one, never a second estimate
+    Then the session's cost is worked out from the call tokens
+    And the reported figure is kept apart from it, as a drift signal
+    # One session, two figures with two homes. The computed one is the same
+    # formula the trace pipeline applies to the same spans, so a session and
+    # its traces cannot disagree; the reported one tells us when either our
+    # price registry or the agent's own pricing went stale.
 
   Scenario: a codex shell command counts once despite its sandbox outcome event
     When a codex session runs one shell command that reports a tool result and a sandbox outcome

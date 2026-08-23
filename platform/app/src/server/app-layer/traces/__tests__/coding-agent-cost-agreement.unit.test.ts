@@ -247,8 +247,27 @@ describe("the cost of one claude code model call", () => {
     });
   });
 
+  describe("given a main-thread call known only by its query source", () => {
+    /** @scenario "A main-thread call known only by its query source prices the same way" */
+    it("prices the call at the charged amount, on every surface", () => {
+      // Claude names the main thread twice: `llm_request.context` on the span
+      // and `query_source` on the log side. The session fold reads both, so
+      // the trace surfaces must too, or one span reads hour-long in the Usage
+      // tab and five-minute in the trace header.
+      for (const [surface, cost] of Object.entries(
+        allSurfaces({ query_source: "repl_main_thread" }),
+      )) {
+        expect(cost, `${surface} priced the call differently`).toBeCloseTo(
+          CHARGED_USD,
+          CENTS_OF_A_CENT,
+        );
+      }
+    });
+  });
+
   describe("given a call whose cache writes carry no stated lifetime", () => {
     /** @scenario "A call with no stated context prices its writes conservatively" */
+    /** @scenario "Every surface prices one call at one number" */
     it("prices it short-lived, the same on every surface a customer can read", () => {
       for (const [surface, cost] of Object.entries(allSurfaces())) {
         expect(cost, `${surface} priced the call differently`).toBeCloseTo(

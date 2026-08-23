@@ -262,6 +262,25 @@ describe("CodingAgentSessionFoldProjection", () => {
     it("prices a call with no stated context conservatively", () => {
       expect(pricedCall(undefined).costUsd).toBeCloseTo(17_854 * 0.00000375, 6);
     });
+
+    /** @scenario "A main-thread call known only by its query source prices the same way" */
+    it("prices a call named main-thread by its query source at the hour-long rate", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-ttl-query-source",
+          facts: {
+            model: "claude-sonnet-4-5",
+            cache_creation_tokens: 17_854,
+            query_source: "repl_main_thread",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(17_854 * 0.000006, 6);
+    });
   });
 
   describe("when a tool span FAILED", () => {
@@ -361,6 +380,7 @@ describe("CodingAgentSessionFoldProjection", () => {
 
   describe("when the agent reports its own bill on a log", () => {
     /** @scenario "The agent-reported figure is kept as a drift signal" */
+    /** @scenario "an agent that states its own price keeps it beside the computed one" */
     it("sums it beside the computed cost, never into it", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);

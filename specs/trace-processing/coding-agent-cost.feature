@@ -31,6 +31,14 @@ Feature: Coding-agent cost, one formula on every surface
     And the call prices its writes at the five-minute rate
 
   @unit
+  Scenario: A main-thread call known only by its query source prices the same way
+    Given a claude_code.llm_request span with no llm_request.context attribute
+    And the span states a main-thread query source
+    When the span is canonicalised
+    Then its cache writes carry the hour-long count
+    And the trace surfaces and the session fold state one figure for the call
+
+  @unit
   Scenario: A call with no stated context prices its writes conservatively
     Given a claude_code.llm_request span with no llm_request.context attribute
     When the span is canonicalised

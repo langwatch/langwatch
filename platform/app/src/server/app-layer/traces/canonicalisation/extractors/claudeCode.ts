@@ -176,6 +176,7 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       cacheWriteTokens > 0 &&
       claudeCacheWritesLongLived({
         llmRequestContext: asString(attrs.get("llm_request.context")),
+        querySource: asString(attrs.get("query_source")),
       })
     ) {
       ctx.setAttrIfAbsent(
