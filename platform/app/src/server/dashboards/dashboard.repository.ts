@@ -3,6 +3,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 
 /**
  * Input types for dashboard operations
@@ -29,6 +30,10 @@ export class DashboardRepository {
 
   /**
    * Finds all dashboards for a project, ordered by order field.
+   *
+   * The graph count answers for the charts a dashboard shows, which is the
+   * same set the reports grid renders ({@link BUILDER_CHART_KIND}); a chart
+   * saved from another surface sharing the table must not inflate it.
    */
   async findAll(input: { projectId: string }): Promise<
     Array<
@@ -42,7 +47,9 @@ export class DashboardRepository {
       orderBy: { order: "asc" },
       include: {
         _count: {
-          select: { graphs: true },
+          select: {
+            graphs: { where: { kind: BUILDER_CHART_KIND } },
+          },
         },
       },
     });
@@ -50,6 +57,9 @@ export class DashboardRepository {
 
   /**
    * Finds a dashboard by id within a project, including its graphs.
+   *
+   * Reads the same kind the list's graph count counts and the grid renders,
+   * so no endpoint of this resource can promise a chart another one omits.
    */
   async findById(input: { id: string; projectId: string }) {
     return await this.prisma.dashboard.findFirst({
@@ -59,6 +69,7 @@ export class DashboardRepository {
       },
       include: {
         graphs: {
+          where: { kind: BUILDER_CHART_KIND },
           orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
         },
       },

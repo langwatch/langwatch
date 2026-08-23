@@ -154,6 +154,25 @@ describe("Feature: Dashboard REST API", () => {
     });
   }
 
+  /**
+   * A chart saved from the custom-query workbench, planted directly onto a
+   * dashboard. No product write path attaches one yet, so this is the row a
+   * bug or a future placement slice would produce; the reads must not count
+   * it as a card either way.
+   */
+  async function createWorkbenchGraph(dashboardId: string) {
+    return await prisma.customGraph.create({
+      data: {
+        id: nanoid(),
+        projectId: testProjectId,
+        dashboardId,
+        name: `Saved query ${nanoid(6)}`,
+        graph: { sql: "SELECT 1", v: 1 },
+        kind: "workbench_sql",
+      },
+    });
+  }
+
   // ── Authentication ─────────────────────────────────────────────
 
   describe("Authentication", () => {
@@ -207,6 +226,20 @@ describe("Feature: Dashboard REST API", () => {
           expect(dashboard).toHaveProperty("updatedAt");
         }
       });
+
+      // @scenario "The graph count agrees with the charts inside the dashboard"
+      it("reports a count per dashboard that matches its detail read", async () => {
+        const listRes = await helpers.api.get("/api/dashboards");
+        const listBody = await listRes.json();
+
+        for (const listed of listBody.data) {
+          const detailRes = await helpers.api.get(`/api/dashboards/${listed.id}`);
+          expect(detailRes.status).toBe(200);
+
+          const detailBody = await detailRes.json();
+          expect(listed.graphCount).toBe(detailBody.graphs.length);
+        }
+      });
     });
 
     describe("when the project has no dashboards", () => {
@@ -216,6 +249,32 @@ describe("Feature: Dashboard REST API", () => {
 
         const body = await res.json();
         expect(body.data).toHaveLength(0);
+      });
+    });
+
+    describe("when a dashboard also holds a chart saved from the custom-query workbench", () => {
+      let dashboard: Awaited<ReturnType<typeof createDashboard>>;
+
+      beforeEach(async () => {
+        dashboard = await createDashboard({ name: "Mixed Dashboard" });
+        await createGraph(dashboard.id);
+        await createWorkbenchGraph(dashboard.id);
+      });
+
+      // @scenario "A saved custom-query chart on a dashboard is not counted as a card"
+      it("excludes the saved query from the graph count and from the charts list", async () => {
+        const listRes = await helpers.api.get("/api/dashboards");
+        expect(listRes.status).toBe(200);
+
+        const listBody = await listRes.json();
+        expect(listBody.data[0].graphCount).toBe(1);
+
+        const detailRes = await helpers.api.get(`/api/dashboards/${dashboard.id}`);
+        expect(detailRes.status).toBe(200);
+
+        const detailBody = await detailRes.json();
+        expect(detailBody.graphs).toHaveLength(1);
+        expect(detailBody.graphs[0].kind).toBe("builder");
       });
     });
   });
