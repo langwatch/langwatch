@@ -3,8 +3,10 @@
  * across parallel GroupQueue lanes.
  *
  * `spanCommandGroupKey` (recordSpan) fans a hot trace's spans across
- * `traceId:<shard>` lanes; `grantCommandGroupKey` (ADR-114) fans an
- * organization's grant commands across `<organizationId>:<shard>` lanes.
+ * `traceId:<shard>` lanes; `grantCommandLane` (ADR-114) buckets an
+ * organization's grant commands, returning the shard ALONE — the tenant that
+ * makes those lanes per-organization is prepended by `buildGroupKey`, not by
+ * the `getGroupKey` callback.
  * Holding the shard math in one module keeps a record's bucket byte-stable —
  * deterministic across processes and restarts, the property a record's
  * retries and its dedup squash window depend on. Each caller keeps its own

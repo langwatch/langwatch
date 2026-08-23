@@ -40,7 +40,7 @@ Measured in production, 14:29 → 16:03 UTC+2:
 
 Every number follows from the first row:
 
-```
+```text
 200-statement budget, ~1 s per statement
    -> ~195 statements/s drained
       -> 1,090 queued / 195 = 5.6 s wait
@@ -60,7 +60,7 @@ no free slots and a saturated limiter. It would have made this worse.
 **The blast radius was the whole platform, not the migration.** Mean job
 duration during the window, by job type:
 
-```
+```text
 executeEvaluation    ████████████████████ 20.7 s
 metricTimeRollup     ███████████████ 15.5 s
 canonicalLogStorage  ██████████████ 14.9 s
@@ -79,19 +79,31 @@ statement is *for*. A bulk backfill and a customer's trace write are peers.
 ### 1. Grant commands ride a sharded per-organization lane
 
 `attachGrant`, `revokeGrant` and `changeGrantRole` take a `getGroupKey` that
-returns `<organizationId>:<shard>`, where `shard = hash(aggregateId) % 32`,
-and a `coalesceMaxBatch` so that a lane's queued commands fold into one
-multi-row append.
+returns `hash(aggregateId) % 32` — the shard ALONE — plus a
+`coalesceMaxBatch` so that a lane's queued commands fold into one multi-row
+append.
 
+The callback's result is not the queue key. `buildGroupKey`
+(`queueManager.ts`) composes `${tenantId}/${jobPath}/${aggregateType}:${key}`,
+so the organization is already in every key and the callback would only
+repeat it. That is what makes these lanes per-organization without the
+callback ever naming one:
+
+```text
+                    callback returns   final queue key
+BEFORE (aggregate)  "grant_7Hk2mQ"     <org>/command/attachGrant/authz_grant:grant_7Hk2mQ
+AFTER  (shard)      "14"               <org>/command/attachGrant/authz_grant:14
 ```
-BEFORE                              AFTER
-authz_grant:g1  -> 1 insert         org:HXE...:0  -> [g1 g33 g65 ...] 1 insert
-authz_grant:g2  -> 1 insert         org:HXE...:1  -> [g2 g34 g66 ...] 1 insert
-authz_grant:g3  -> 1 insert         ...
-   x 428,720                        org:HXE...:31 -> [...]           1 insert
 
-428,720 statements                  ~8,500 statements at batch 50
-1,270-way parallelism               32-way parallelism per organization
+```text
+BEFORE                          AFTER
+one lane per grant              32 lanes per organization
+  grant_7Hk2mQ -> 1 insert        lane 14 -> [grant_7Hk2mQ, ...] 1 insert
+  grant_9Fs4tR -> 1 insert        lane 12 -> [grant_9Fs4tR, ...] 1 insert
+     x 428,720                    ...
+
+428,720 statements              ~8,500 statements at batch 50
+1,270-way parallelism           32-way parallelism per organization
 ```
 
 The shard count is the trade: lanes buy parallelism, batches buy statement

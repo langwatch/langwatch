@@ -49,15 +49,15 @@ describe("given grant commands to place on a queue lane", () => {
 
   describe("when the same id is placed twice", () => {
     /** @scenario "A lane is stable across processes and restarts" */
-    it("derives the same lane both times", () => {
-      // A literal, not a round-trip: this pins the bucket against an accidental
-      // change to the hash, which would silently re-lane every in-flight retry.
+    it("derives the bucket this input has always had", () => {
+      // A LITERAL, deliberately. Comparing two calls to each other would pass
+      // through any rewrite of the hash — and a changed hash silently re-lanes
+      // every in-flight retry, which is the one thing this must catch. If this
+      // assertion fails, the bucket moved: that is a migration, not a nit.
       expect(
         grantCommandLane({ aggregateId: "grant_abc", shardCount: 4 }),
-      ).toBe(grantCommandLane({ aggregateId: "grant_abc", shardCount: 4 }));
-      expect(
-        grantCommandLane({ aggregateId: "grant_abc", shardCount: 4 }),
-      ).toMatch(/^[0-3]$/);
+      ).toBe("2");
+      expect(grantCommandLane({ aggregateId: "grant_abc" })).toBe("2");
     });
   });
 
