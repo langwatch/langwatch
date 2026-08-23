@@ -124,6 +124,12 @@ export function LangyChoicesCard({
             <chakra.button
               key={option.id}
               type="button"
+              // The one stable hook on a card whose every other attribute is a
+              // style. A question Langy asks is the one place the loop hands a
+              // decision back, so a test that drives the loop has to be able to
+              // answer it the way a reader does.
+              data-testid="langy-choice-option"
+              data-option-id={option.id}
               disabled={!selectable}
               onClick={() => toggle(option.id)}
               display="flex"

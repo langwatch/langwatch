@@ -347,14 +347,15 @@ describe("Feature: Langy drives the open page through typed UI actions", () => {
         });
 
         await waitFor(() => expect(claimUiAction).toHaveBeenCalledTimes(1));
-        expect(claimUiAction).toHaveBeenCalledWith(
-          expect.objectContaining({
-            projectId: "project-demo",
-            conversationId: "conv-1",
-            turnId: "turn-1",
-            actionId: "action-1",
-          }),
-        );
+        // The turn is not part of the claim: the page and the dispatch read the
+        // conversation's current turn from records that settle at different
+        // moments, and a claim refused on that difference sent live work to the
+        // backend with the page open.
+        expect(claimUiAction).toHaveBeenCalledWith({
+          projectId: "project-demo",
+          conversationId: "conv-1",
+          actionId: "action-1",
+        });
         await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
       });
     });

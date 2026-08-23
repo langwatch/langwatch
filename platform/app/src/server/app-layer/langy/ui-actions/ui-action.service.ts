@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { LangyTokenBuffer } from "../streaming/langyTokenBuffer";
 import {
@@ -49,6 +50,8 @@ const MAX_RESULT_BYTES = 64 * 1024;
  * backend. It is not a user id, so a page can never complete against it.
  */
 const BACKEND_CLAIMANT = "langy:backend";
+
+const logger = createLogger("langwatch:langy:ui-actions");
 
 export const uiActionKeys = {
   pending: (actionId: string) => `langy:ui:pending:${actionId}`,
@@ -298,6 +301,15 @@ export class LangyUiActionService {
           "NX",
         )) === "OK";
       if (isClaimedForBackend) {
+        // Which path an action took decides what the user sees: the page runs
+        // it in front of them, the backend runs it out of sight and the page
+        // catches up at the end. That difference was invisible in the logs, so
+        // a channel silently falling back for every write read as a design
+        // choice rather than the fault it was.
+        logger.info(
+          { actionId, kind, claimWindowMs: UI_ACTION_CLAIM_WINDOW_MS },
+          "no page claimed the ui action, running it on the backend",
+        );
         // Nothing is listening, and no page can claim now. Drop the pending
         // record so a zombie tab finds nothing left to validate either.
         await this.redis.del(uiActionKeys.pending(actionId));
@@ -363,30 +375,35 @@ export class LangyUiActionService {
    * other tab, every stream replay, and a tab racing the dispatch's own
    * handover to the backend gets `claimed: false` and drops. The pending
    * record is the authority on WHERE the action belongs: a claim naming a
-   * different turn, conversation, or project than the dispatch pinned is
-   * refused exactly like an unknown action, so this cannot be used to probe or
-   * hijack another dispatch. The claim value records the executing user for
+   * different conversation or project than the dispatch pinned is refused
+   * exactly like an unknown action, so this cannot be used to probe or hijack
+   * another dispatch. The claim value records the executing user for
    * `complete`.
+   *
+   * WHICH TURN is deliberately not part of that test. The dispatch takes the
+   * turn from a projection the event log writes after the fact, while the page
+   * holds the id its own send returned; for as long as those disagree, a page
+   * open in front of the user could not claim anything and every action went to
+   * the backend instead, which is how a live-driven workbench turned into a
+   * page that only caught up at the end. The project, the conversation and the
+   * caller's session already answer every question a turn id would.
    */
   async claim({
     projectId,
     userId,
     conversationId,
-    turnId,
     actionId,
   }: {
     projectId: string;
     userId: string;
     conversationId: string;
-    turnId: string;
     actionId: string;
   }): Promise<{ claimed: boolean }> {
     const pending = await this.readPending(actionId);
     if (
       !pending ||
       pending.projectId !== projectId ||
-      pending.conversationId !== conversationId ||
-      pending.turnId !== turnId
+      pending.conversationId !== conversationId
     ) {
       return { claimed: false };
     }
@@ -402,22 +419,21 @@ export class LangyUiActionService {
 
   /**
    * The page reporting the claimed action's outcome. Only the claiming user's
-   * session may complete, and only while the pending record still pins the
-   * same turn; anything else is dropped as `accepted: false` (the dispatch
-   * side has its own timeout, so a dropped completion cannot wedge it).
+   * session may complete, and only while the pending record still names the
+   * same project and conversation; anything else is dropped as
+   * `accepted: false` (the dispatch side has its own timeout, so a dropped
+   * completion cannot wedge it).
    */
   async complete({
     projectId,
     userId,
     conversationId,
-    turnId,
     actionId,
     completion,
   }: {
     projectId: string;
     userId: string;
     conversationId: string;
-    turnId: string;
     actionId: string;
     completion: UiActionCompletion;
   }): Promise<{ accepted: boolean }> {
@@ -425,8 +441,7 @@ export class LangyUiActionService {
     if (
       !pending ||
       pending.projectId !== projectId ||
-      pending.conversationId !== conversationId ||
-      pending.turnId !== turnId
+      pending.conversationId !== conversationId
     ) {
       return { accepted: false };
     }

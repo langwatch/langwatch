@@ -247,7 +247,6 @@ describe("LangyUiActionService", () => {
         projectId: "project-1",
         userId: "user-1",
         conversationId: "conv-1",
-        turnId: "turn-1",
         actionId,
       });
       expect(late).toEqual({ claimed: false });
@@ -378,7 +377,6 @@ describe("LangyUiActionService", () => {
         const args = {
           projectId: "project-1",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: "a1",
         };
         expect(await service.claim({ ...args, userId: "user-1" })).toEqual({
@@ -390,29 +388,16 @@ describe("LangyUiActionService", () => {
       });
     });
 
-    describe("when a claim names another project, conversation or turn", () => {
-      /** @scenario A claim naming a different turn than the dispatch pinned is refused */
+    describe("when a claim names another project or conversation", () => {
+      /** @scenario A claim naming another project or conversation is refused */
       it("refuses a claim whose pin does not match", async () => {
         const { redis, store } = makeRedis();
         const service = makeService({ redis });
         seedPending(store);
 
         for (const mismatch of [
-          {
-            projectId: "project-2",
-            conversationId: "conv-1",
-            turnId: "turn-1",
-          },
-          {
-            projectId: "project-1",
-            conversationId: "conv-2",
-            turnId: "turn-1",
-          },
-          {
-            projectId: "project-1",
-            conversationId: "conv-1",
-            turnId: "turn-2",
-          },
+          { projectId: "project-2", conversationId: "conv-1" },
+          { projectId: "project-1", conversationId: "conv-2" },
         ]) {
           expect(
             await service.claim({
@@ -422,6 +407,24 @@ describe("LangyUiActionService", () => {
             }),
           ).toEqual({ claimed: false });
         }
+      });
+    });
+
+    describe("when the page is a turn ahead of the record the dispatch read", () => {
+      /** @scenario The page claims while the conversation's recorded turn still lags */
+      it("still claims, because the turn is not what makes a claim legitimate", async () => {
+        const { redis, store } = makeRedis();
+        const service = makeService({ redis });
+        seedPending(store);
+
+        expect(
+          await service.claim({
+            projectId: "project-1",
+            conversationId: "conv-1",
+            userId: "user-1",
+            actionId: "a1",
+          }),
+        ).toEqual({ claimed: true });
       });
     });
   });
@@ -451,7 +454,6 @@ describe("LangyUiActionService", () => {
           projectId: "project-1",
           userId: "user-2",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: "a1",
           completion: { ok: true },
         });
@@ -462,7 +464,6 @@ describe("LangyUiActionService", () => {
           projectId: "project-1",
           userId: "user-1",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: "a1",
           completion: { ok: true, result: { targetId: "t2" } },
         });
@@ -482,7 +483,6 @@ describe("LangyUiActionService", () => {
           projectId: "project-1",
           userId: "user-1",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: "a1",
           completion: { ok: true, result: "x".repeat(70 * 1024) },
         });
@@ -505,7 +505,6 @@ describe("LangyUiActionService", () => {
           projectId: "project-1",
           userId: "user-1",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: "a1",
           completion: { ok: true, result: "あ".repeat(30 * 1024) },
         });
@@ -657,7 +656,6 @@ describe("LangyUiActionService", () => {
           projectId: "project-1",
           userId: "user-1",
           conversationId: "conv-1",
-          turnId: "turn-1",
           actionId: appended[0]!.actionId,
         });
         return await del(...keys);

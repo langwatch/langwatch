@@ -116,9 +116,22 @@ Feature: Langy drives the open page through typed UI actions
     Then the agent gets result_too_large instead of the payload
 
   @unit
-  Scenario: A claim naming a different turn than the dispatch pinned is refused
-    When a claim arrives for another project, conversation or turn
+  Scenario: A claim naming another project or conversation is refused
+    When a claim arrives for a project or conversation the dispatch did not name
     Then it is refused exactly like a claim for an unknown action
+
+  # The conversation is asked for the current turn through a projection the
+  # event log writes after the fact, while the page holds the turn id the send
+  # returned to it. The two disagree for as long as the projection lags, and
+  # while they do, every action the agent dispatched went to the backend with
+  # the page open in front of the user. Which turn it is answers no security
+  # question the project, the conversation and the session have not answered
+  # already, so the claim no longer asks.
+  @unit
+  Scenario: The page claims while the conversation's recorded turn still lags
+    Given the dispatch pinned the turn the conversation projection was showing
+    When the page claims naming the turn its own send returned
+    Then the claim succeeds and the page executes the action
 
   @unit
   Scenario: Only the claiming user's session may complete an action

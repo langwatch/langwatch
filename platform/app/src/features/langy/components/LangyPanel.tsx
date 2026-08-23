@@ -324,8 +324,11 @@ function dispatchUiActionToPage({
 }): void {
   const store = useLangyStore.getState();
   const conversationId = store.activeConversationId;
+  // The turn is local bookkeeping only: it keys the replay dedup below. The
+  // server does not ask for it, because the page and the dispatch learn the
+  // current turn from two records that settle at different moments.
   const turnId = store.activeTurnId;
-  if (!projectId || !conversationId || !turnId) return;
+  if (!projectId || !conversationId) return;
 
   void executeUiAction({
     entry,
@@ -336,14 +339,12 @@ function dispatchUiActionToPage({
       trpcClient.langy.claimUiAction.mutate({
         projectId,
         conversationId,
-        turnId,
         actionId,
       }),
     complete: ({ actionId, ok, result, errorCode }) =>
       trpcClient.langy.completeUiAction.mutate({
         projectId,
         conversationId,
-        turnId,
         actionId,
         ok,
         ...(result !== undefined ? { result } : {}),

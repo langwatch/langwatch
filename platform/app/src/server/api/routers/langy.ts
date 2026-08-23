@@ -768,33 +768,30 @@ export const langyRouter = createTRPCRouter({
    * session on their own page, and the dispatch already enforced the action's
    * real permission against the agent's session key. The pending record the
    * dispatch pinned in Redis is what this claim is verified against, so a
-   * claim can never attach to another project's or another turn's action.
+   * claim can never attach to another project's or another conversation's
+   * action. The turn is not asked for: the page and the dispatch read it from
+   * two places that settle at different times, and refusing on the difference
+   * pushed live work to the backend behind the user's back.
    */
   claimUiAction: langyReadProcedure
     .input(
       z.object({
         conversationId: z.string(),
-        turnId: z.string(),
         actionId: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }): Promise<{ claimed: boolean }> => {
       const userId = ctx.session.user.id;
-      if (
-        !(await canWatchTurn({
-          projectId: input.projectId,
-          conversationId: input.conversationId,
-          turnId: input.turnId,
-          userId,
-        }))
-      ) {
-        return { claimed: false };
-      }
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId,
+      });
+      if (!conversation) return { claimed: false };
       return await createUiActionService().claim({
         projectId: input.projectId,
         userId,
         conversationId: input.conversationId,
-        turnId: input.turnId,
         actionId: input.actionId,
       });
     }),
@@ -808,7 +805,6 @@ export const langyRouter = createTRPCRouter({
     .input(
       z.object({
         conversationId: z.string(),
-        turnId: z.string(),
         actionId: z.string(),
         ok: z.boolean(),
         result: z.unknown().optional(),
@@ -820,7 +816,6 @@ export const langyRouter = createTRPCRouter({
         projectId: input.projectId,
         userId: ctx.session.user.id,
         conversationId: input.conversationId,
-        turnId: input.turnId,
         actionId: input.actionId,
         completion: {
           ok: input.ok,

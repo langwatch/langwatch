@@ -96,7 +96,13 @@ vi.mock("~/experiments-v3/hooks/useAutosaveEvaluationsV3", () => ({
 }));
 
 vi.mock("~/experiments-v3/hooks/useExecuteEvaluation", () => ({
-  useExecuteEvaluation: () => ({ execute: executeEvaluation }),
+  useExecuteEvaluation: () => ({
+    execute: executeEvaluation,
+    // The page reports the run's progress to the Langy panel, so the mock
+    // has to answer the same shape the real hook does.
+    status: "idle",
+    progress: { completed: 0, total: 0 },
+  }),
 }));
 
 vi.mock("~/experiments-v3/hooks/useSavedDatasetLoader", () => ({

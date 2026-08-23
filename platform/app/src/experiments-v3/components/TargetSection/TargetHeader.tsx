@@ -453,6 +453,12 @@ export const TargetHeader = memo(function TargetHeader({
             flexShrink={1}
             className="group"
             data-testid="target-header-button"
+            // The name the reader sees, published for anything that has to
+            // refer to this column in words. Every candidate here carries the
+            // same prompt handle, so only the disambiguated form tells them
+            // apart, and deriving it a second time elsewhere is how the panel
+            // ends up naming a different column than the header does.
+            data-target-name={headerName}
           >
             <ColorfulBlockIcon
               color={getTargetColor()}
