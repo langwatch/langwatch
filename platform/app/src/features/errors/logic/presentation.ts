@@ -376,6 +376,14 @@ const presentations = {
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
   },
+  // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
+  // either `"declared-type"` or `"step-value"`, but the three doors that can
+  // reach this code (REST, the ad-hoc tRPC query, run-by-chart-id) now reject
+  // an off-list `granularitySeconds` at their own zod schema before a request
+  // ever reaches the service's `"step-value"` backstop, so this code is only
+  // ever live for the declaration-type fault today. One message, not a
+  // `meta`-branched pair, for a discriminator whose other branch is
+  // unreachable from every current caller.
   lwql_granularity_parameter_type: {
     title: "The granularity has to be declared as UInt32",
     describe: () =>

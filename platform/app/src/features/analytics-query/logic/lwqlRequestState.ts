@@ -16,6 +16,7 @@
  */
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
 /**
  * A bound parameter's value. Scalars only, matching what the API accepts — a
@@ -60,7 +61,7 @@ export interface LangWatchQLSnapshot {
    * question asked by the second, and only a snapshot that carries the step can
    * say the one on screen has gone stale.
    */
-  readonly granularitySeconds?: number;
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
 /**
@@ -131,7 +132,7 @@ export type LangWatchQLRequestAction =
     }
   | {
       readonly type: "granularityChanged";
-      readonly granularitySeconds: number | undefined;
+      readonly granularitySeconds: LangWatchQLGranularityStep | undefined;
     }
   | { readonly type: "submitted"; readonly snapshot: LangWatchQLSnapshot }
   | {
@@ -254,7 +255,7 @@ function withTimeWindow(
 
 function withGranularity(
   state: LangWatchQLRequestState,
-  granularitySeconds: number | undefined,
+  granularitySeconds: LangWatchQLGranularityStep | undefined,
 ): LangWatchQLRequestState {
   if (granularitySeconds === state.draft.granularitySeconds) return state;
   // Dropped rather than set to `undefined`, matching the window above: the

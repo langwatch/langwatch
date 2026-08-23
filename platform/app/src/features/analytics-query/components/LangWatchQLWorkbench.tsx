@@ -29,6 +29,7 @@ import { usePeriodSelector } from "~/components/PeriodSelector";
 // The leaf module, never the barrel — see LangWatchQLTimeWindowEditor.
 import {
   isLangWatchQLSurfaceParameter,
+  type LangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 } from "~/server/analytics/lwql/timeWindow";
@@ -222,13 +223,16 @@ function granularityDeclaredBy(
  * run of a granularity statement answers instead of being refused for asking a
  * finer question than the member ever asked for.
  *
- * That shown step is NOT written into the draft until the member picks one, and
- * the distinction is load-bearing. The picker appears in response to a refusal;
- * writing to the draft as it appeared would move the draft away from the
- * snapshot that refusal belongs to, marking it stale — and a stale refusal has
- * its annotations withdrawn, so the very act of offering the step would erase
- * the rest of the refusal that prompted it, including the member's own missing
- * parameters.
+ * That shown step is NOT written into the draft until the member picks one or
+ * runs, and the distinction is load-bearing. The picker appears in response to
+ * a refusal; writing to the draft as it appeared would move the draft away from
+ * the snapshot that refusal belongs to, marking it stale — and a stale refusal
+ * has its annotations withdrawn, so the very act of offering the step would
+ * erase the rest of the refusal that prompted it, including the member's own
+ * missing parameters. What the picker renders as pressed and what a submission
+ * carries must still be the same number, so `armForRun` writes the shown step
+ * — chosen or default — into the draft at the moment Run is pressed, when
+ * staling the refusal is exactly what running does anyway.
  */
 function useWorkbenchGranularity({
   query,
@@ -245,8 +249,13 @@ function useWorkbenchGranularity({
     LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1] ?? 3600;
   // `null` until the member picks: the shown step is what the control reads,
   // the chosen step is what the request carries, and only the second is a
-  // change to the draft.
-  const [chosen, setChosen] = useState<number | null>(null);
+  // change to the draft. Keyed to the opened revision the way the window
+  // override is: a step picked while chart A was open must not become the step
+  // chart B renders — or sends — the moment it is opened.
+  const [chosen, setChosen] = useState<{
+    revision: number;
+    step: LangWatchQLGranularityStep;
+  } | null>(null);
   // Held rather than derived per render, and this is load-bearing. Sending the
   // step puts it in the draft, which makes the visible result stale; deriving
   // "does it declare one" from that same result would flip the answer back,
@@ -257,25 +266,59 @@ function useWorkbenchGranularity({
     revision: openedRevision,
     on: false,
   });
+  // The revision the last submission ran under. `declared` is read off the
+  // live outcome, and the outcome does not know which chart earned it: open a
+  // chart whose statement is byte-identical to a refused one and the old
+  // refusal stops being stale — its answer would resurrect the picker for a
+  // chart that has never run. Only an answer produced by this revision's own
+  // run may flip the picker.
+  const [ranRevision, setRanRevision] = useState<number | null>(null);
 
   // Opening a saved chart replaces the statement, so what the previous one
   // declared says nothing about this one.
   const on = shown.revision === openedRevision && shown.on;
-  if (declared !== undefined && declared !== on) {
+  if (
+    declared !== undefined &&
+    ranRevision === openedRevision &&
+    declared !== on
+  ) {
     setShown({ revision: openedRevision, on: declared });
   } else if (shown.revision !== openedRevision) {
     setShown({ revision: openedRevision, on: false });
   }
+
+  const chosenStep =
+    chosen !== null && chosen.revision === openedRevision ? chosen.step : null;
+  const value = chosenStep ?? coarsest;
 
   const { setGranularity } = query;
   // Cleared while the statement does not declare the parameter: sending a step
   // for a statement that never asked for one makes it a reserved value the
   // backend refuses.
   useEffect(() => {
-    setGranularity(on && chosen !== null ? chosen : undefined);
-  }, [setGranularity, on, chosen]);
+    setGranularity(on && chosenStep !== null ? chosenStep : undefined);
+  }, [setGranularity, on, chosenStep]);
 
-  return { value: chosen ?? coarsest, onChange: setChosen, shown: on };
+  const onChange = useCallback(
+    (step: LangWatchQLGranularityStep) =>
+      setChosen({ revision: openedRevision, step }),
+    [openedRevision],
+  );
+
+  // Every submission goes through this rather than `query.runQuery`: while
+  // the picker is on screen, the request must carry the very step it shows as
+  // pressed — a picker that renders a pressed default but sends nothing earns
+  // the missing-parameter refusal for a value the member is looking at. The
+  // controller is synchronous, so arming writes the draft before the same
+  // tick snapshots it.
+  const { runQuery } = query;
+  const run = useCallback(() => {
+    setRanRevision(openedRevision);
+    setGranularity(on ? value : undefined);
+    runQuery();
+  }, [setGranularity, on, value, openedRevision, runQuery]);
+
+  return { value, onChange, shown: on, run };
 }
 
 /**
@@ -511,12 +554,15 @@ function useSpecDraft(wiring: ReturnType<typeof useSavedChartWiring>) {
 /** The result card: every pixel the query card leaves, behind one border. */
 function ResultCard({
   query,
+  onRun,
   insertExample,
   wiring,
   shownSpecText,
   setEditedSpecText,
 }: {
   query: ReturnType<typeof useLangWatchQLQuery>;
+  /** Submits the draft with the shown granularity step armed. */
+  onRun: () => void;
   insertExample: (() => void) | undefined;
   wiring: ReturnType<typeof useSavedChartWiring>;
   shownSpecText: string | null;
@@ -537,7 +583,7 @@ function ResultCard({
     >
       <LangWatchQLResultPane
         state={query.state}
-        onRun={query.runQuery}
+        onRun={onRun}
         {...(insertExample ? { onInsertExample: insertExample } : {})}
         renderChartArea={chartArea({
           state: query.state,
@@ -604,6 +650,7 @@ export function LangWatchQLWorkbench({ projectId }: LangWatchQLWorkbenchProps) {
             it is what buries a result under an empty editor. */}
         <QueryCard
           query={query}
+          onRun={granularity.run}
           schemaModel={schema.model}
           failure={failure}
           registerInsert={registerInsert}
@@ -618,6 +665,7 @@ export function LangWatchQLWorkbench({ projectId }: LangWatchQLWorkbenchProps) {
 
         <ResultCard
           query={query}
+          onRun={granularity.run}
           insertExample={insertExample}
           wiring={wiring}
           shownSpecText={shownSpecText}
@@ -693,6 +741,7 @@ function useParameterState({
 
 function QueryCard({
   query,
+  onRun,
   schemaModel,
   failure,
   registerInsert,
@@ -705,6 +754,8 @@ function QueryCard({
   parametersSendable,
 }: {
   query: ReturnType<typeof useLangWatchQLQuery>;
+  /** Submits the draft with the shown granularity step armed. */
+  onRun: () => void;
   schemaModel: ReturnType<typeof useLangWatchQLSchema>["model"];
   failure: FailureView;
   registerInsert: (insert: ((text: string) => void) | null) => void;
@@ -744,7 +795,7 @@ function QueryCard({
         // result, so this IS a reload — and unlike `reload()` it can never
         // re-send a superseded submission the member is no longer looking
         // at.
-        onRun={query.runQuery}
+        onRun={onRun}
         onCancel={query.cancelQuery}
         savedCharts={
           <BoundSavedCharts
@@ -760,7 +811,7 @@ function QueryCard({
         schema={schemaModel}
         markers={failure.markers}
         registerInsert={registerInsert}
-        onRun={query.runQuery}
+        onRun={onRun}
       />
 
       <Box

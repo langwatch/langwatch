@@ -129,6 +129,10 @@ export function isLangWatchQLGranularityParameterType(type: string): boolean {
  */
 export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
+/** One of the offered steps — the only values any door accepts. */
+export type LangWatchQLGranularityStep =
+  (typeof LWQL_GRANULARITY_STEPS)[number];
+
 /** Whether a parameter name is one the surface owns. */
 export function isLangWatchQLTimeWindowParameter(
   name: string,

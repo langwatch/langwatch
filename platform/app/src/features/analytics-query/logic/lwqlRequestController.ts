@@ -16,6 +16,7 @@
  */
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
 import {
   initialLangWatchQLRequestState,
@@ -45,7 +46,7 @@ export interface LangWatchQLExecuteRequest {
    * parameter, because a chart pinning its own step would ignore the one the
    * surface showing it chose.
    */
-  readonly granularitySeconds?: number;
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
 /** How a submission reaches the server. */
@@ -77,7 +78,9 @@ export interface LangWatchQLRequestController {
    * same reason the window is: the surface supplies it, and the backend refuses
    * a caller that sends it as a parameter of its own.
    */
-  setGranularity(granularitySeconds: number | undefined): void;
+  setGranularity(
+    granularitySeconds: LangWatchQLGranularityStep | undefined,
+  ): void;
   /** Submits the current draft. No-op while a request is in flight. */
   runQuery(): void;
   /**

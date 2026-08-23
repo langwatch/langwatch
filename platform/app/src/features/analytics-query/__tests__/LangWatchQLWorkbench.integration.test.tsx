@@ -568,6 +568,35 @@ describe("the LangWatchQL workbench", () => {
         );
       });
 
+      /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
+      it("sends the step shown as pressed when the member runs without picking", async () => {
+        await revealPicker();
+
+        // The default renders as pressed the moment the picker appears...
+        expect(screen.getByRole("button", { name: "1 hour" })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+
+        // ...so running without a click must send that very step. A picker
+        // that shows a pressed default but sends nothing earns the
+        // missing-parameter refusal again — for the reserved name, which the
+        // prompt filter cannot show — leaving a prompt with nothing to name.
+        harness.mutation.mockResolvedValue(
+          lwqlResult({ followsGranularity: true, granularitySeconds: 3600 }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await waitFor(() => {
+          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          expect(input).toMatchObject({ granularitySeconds: 3600 });
+        });
+        // And nothing prompts for a value: the alert that would have named
+        // the reserved step names nothing at all, so it must not render.
+        const parameters = screen.getByTestId("lwql-parameters");
+        expect(within(parameters).queryByRole("alert")).toBeNull();
+      });
+
       /** @scenario "A step too fine for the window is refused where the member chose it" */
       it("shows the too-fine refusal when the chosen step overflows the budget", async () => {
         await revealPicker();
@@ -611,6 +640,151 @@ describe("the LangWatchQL workbench", () => {
         // A step sent for an undeclared statement is a reserved value the
         // backend refuses.
         expect(input).not.toHaveProperty("granularitySeconds");
+      });
+
+      // The two cases below pin `useWorkbenchGranularity`'s own state, held
+      // across renders and keyed on `openedRevision` rather than derived from
+      // the live result. Deriving "does this statement declare the step" from
+      // the result it feeds `setGranularity` fed back into staleness and
+      // looped the render; writing the shown default into the draft on
+      // appearance marked the refusal snapshot stale and withdrew every other
+      // annotation the refusal carried, including the member's own missing
+      // parameters. Neither failure is visible from a single chart — both
+      // need the multi-run, multi-chart sequence these reproduce.
+      describe("when a saved chart is opened after the picker was showing", () => {
+        /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+        it("hides the picker for a statement that does not declare the step, and never sends the previous chart's chosen step", async () => {
+          harness.charts = [
+            { id: "chart-a", name: "Chart A" },
+            { id: "chart-b", name: "Chart B" },
+          ];
+          harness.openableChart = {
+            id: "chart-a",
+            name: "Chart A",
+            definition: { sql: SQL, parameters: {} },
+          };
+
+          const editor = await renderWorkbench();
+          await userEvent.click(screen.getByTestId("open-saved-chart"));
+          await userEvent.click(await screen.findByText("Chart A"));
+
+          // Chart A's first run is refused for the unfilled step: the picker
+          // appears and the member picks something other than the default.
+          harness.mutation.mockRejectedValue(awaitingStep());
+          fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+          await screen.findByTestId("lwql-granularity");
+          fireEvent.click(screen.getByRole("button", { name: "1 second" }));
+          expect(
+            screen.getByRole("button", { name: "1 second" }),
+          ).toHaveAttribute("aria-pressed", "true");
+
+          // Opening Chart B replaces the statement with one that never
+          // declares the parameter — nothing has run for it yet, so there is
+          // no refusal to derive "declared" from either way.
+          harness.openableChart = {
+            id: "chart-b",
+            name: "Chart B",
+            definition: { sql: "SELECT 1", parameters: {} },
+          };
+          await userEvent.click(screen.getByTestId("open-saved-chart"));
+          await userEvent.click(await screen.findByText("Chart B"));
+
+          // No leftover picker, and no leftover pick: the workbench must not
+          // go on sending Chart A's `1 second` for a statement that never
+          // asked for a step, which the backend refuses as a reserved value.
+          expect(screen.queryByTestId("lwql-granularity")).toBeNull();
+          harness.mutation.mockResolvedValue(lwqlResult());
+          typeSql(editor, "SELECT 1");
+          fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+          await waitFor(() => expect(harness.mutation).toHaveBeenCalled());
+          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          expect(input).not.toHaveProperty("granularitySeconds");
+        });
+
+        /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+        it("shows the picker at its default step for a chart that declares it fresh, not the previous chart's pick", async () => {
+          harness.charts = [
+            { id: "chart-a", name: "Chart A" },
+            { id: "chart-b", name: "Chart B" },
+          ];
+          harness.openableChart = {
+            id: "chart-a",
+            name: "Chart A",
+            definition: { sql: SQL, parameters: {} },
+          };
+
+          await renderWorkbench();
+          await userEvent.click(screen.getByTestId("open-saved-chart"));
+          await userEvent.click(await screen.findByText("Chart A"));
+
+          harness.mutation.mockRejectedValue(awaitingStep());
+          fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+          await screen.findByTestId("lwql-granularity");
+          fireEvent.click(screen.getByRole("button", { name: "1 second" }));
+
+          // Chart B declares the step too, but has never been run — its own
+          // first refusal is what reveals its picker.
+          harness.openableChart = {
+            id: "chart-b",
+            name: "Chart B",
+            definition: { sql: SQL, parameters: {} },
+          };
+          await userEvent.click(screen.getByTestId("open-saved-chart"));
+          await userEvent.click(await screen.findByText("Chart B"));
+          expect(screen.queryByTestId("lwql-granularity")).toBeNull();
+
+          fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+          await screen.findByTestId("lwql-granularity");
+
+          // The coarsest offered step is the default shown before anyone has
+          // picked for THIS chart — never Chart A's leftover `1 second`.
+          expect(
+            screen.getByRole("button", { name: "1 hour" }),
+          ).toHaveAttribute("aria-pressed", "true");
+          expect(
+            screen.getByRole("button", { name: "1 second" }),
+          ).toHaveAttribute("aria-pressed", "false");
+        });
+      });
+
+      describe("when a saved chart declaring the step is opened and the member has not picked", () => {
+        /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+        it("still shows the window prompt for a statement missing both the window and the step", async () => {
+          harness.charts = [{ id: "chart-1", name: "Traces per day" }];
+          harness.openableChart = {
+            id: "chart-1",
+            name: "Traces per day",
+            definition: { sql: SQL, parameters: {} },
+          };
+
+          await renderWorkbench();
+          await userEvent.click(screen.getByTestId("open-saved-chart"));
+          await userEvent.click(await screen.findByText("Traces per day"));
+
+          // The refusal names the reserved step alongside a name the member
+          // owns — the exact shape a statement missing both a window
+          // parameter and the step earns on its first run.
+          harness.mutation.mockRejectedValue(
+            handledErrorEnvelope({
+              code: "lwql_parameter_missing",
+              meta: { parameters: ["period_granularity_seconds", "since"] },
+            }),
+          );
+          fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+          // The picker appears, and appearing must not by itself dirty the
+          // draft: if showing the default step marked the refusal snapshot
+          // stale, `failureView` would withdraw every annotation the refusal
+          // carried, including the prompt below for the member's own missing
+          // name — silently, with nothing on screen to explain why.
+          await screen.findByTestId("lwql-granularity");
+          const parameters = await screen.findByTestId("lwql-parameters");
+          const alert = await within(parameters).findByRole("alert");
+          expect(alert).toHaveTextContent("Give these parameters a value");
+          expect(alert).toHaveTextContent("since");
+          expect(alert).not.toHaveTextContent("period_granularity_seconds");
+        });
       });
     });
 

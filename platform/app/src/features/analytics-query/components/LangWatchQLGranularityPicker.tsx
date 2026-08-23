@@ -22,6 +22,7 @@ import { Button, HStack, Stack, Text } from "@chakra-ui/react";
 // it: `timeWindow.ts` is import-free so the browser can share the contract's
 // names and steps without dragging the executor in behind them.
 import {
+  type LangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 } from "~/server/analytics/lwql/timeWindow";
@@ -43,7 +44,7 @@ const STEP_SHORT_LABELS: Readonly<Record<number, string>> = {
 export interface LangWatchQLGranularityPickerProps {
   /** The step the next submission carries. */
   value: number;
-  onChange: (granularitySeconds: number) => void;
+  onChange: (granularitySeconds: LangWatchQLGranularityStep) => void;
   /**
    * The step the visible answer was actually bucketed at, when it reports one.
    * `undefined` before anything has run, or when the statement does not declare

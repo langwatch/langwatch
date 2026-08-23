@@ -23,15 +23,16 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
+import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
 import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
+import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -151,29 +152,33 @@ const run = protectedProcedure
   .input(
     chartScopeSchema.extend({
       timeWindow: lwqlTimeWindowSchema.optional(),
-      granularitySeconds: z.number().int().positive().optional(),
+      /**
+       * The datapoint step, in seconds — restricted to the offered steps
+       * ({@link LWQL_GRANULARITY_STEPS}) so an off-list value is a schema
+       * rejection here rather than reaching the service's backstop.
+       */
+      granularitySeconds: z
+        .union([
+          z.literal(LWQL_GRANULARITY_STEPS[0]),
+          z.literal(LWQL_GRANULARITY_STEPS[1]),
+          z.literal(LWQL_GRANULARITY_STEPS[2]),
+        ])
+        .optional(),
     }),
   )
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    // The project's LangWatchQL secret is hashed into the tenant capability the
-    // query runs under; it is read server-side and never leaves this function.
-    const project = await ctx.prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { id: true, lwqlKey: true },
-    });
-    if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
-    }
+    const { project, protections } = await resolveLangWatchQLCaller(
+      ctx,
+      input.projectId,
+    );
 
     return SavedWorkbenchChartService.create(ctx.prisma).runChart({
       id: input.id,
       projectId: input.projectId,
       project,
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      }),
+      protections,
       input: {
         ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
         ...(input.granularitySeconds === undefined

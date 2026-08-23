@@ -20,7 +20,6 @@
  * @see specs/analytics/lwql-workbench.feature
  */
 
-import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
@@ -28,11 +27,13 @@ import {
   MAX_LWQL_LENGTH,
 } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
 import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
+import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 /**
@@ -130,31 +131,31 @@ const query = protectedProcedure
       timeWindow: lwqlTimeWindowSchema.optional(),
       /**
        * The datapoint step for a statement that declares
-       * `{period_granularity_seconds:UInt32}`, in seconds. Shape only — the
-       * bucket-budget arithmetic and its refusal are the service's.
+       * `{period_granularity_seconds:UInt32}`, in seconds — restricted to the
+       * offered steps ({@link LWQL_GRANULARITY_STEPS}) so an off-list value is
+       * a schema rejection here rather than reaching the service's backstop.
+       * The bucket-budget arithmetic and its refusal are still the service's.
        */
-      granularitySeconds: z.number().int().positive().optional(),
+      granularitySeconds: z
+        .union([
+          z.literal(LWQL_GRANULARITY_STEPS[0]),
+          z.literal(LWQL_GRANULARITY_STEPS[1]),
+          z.literal(LWQL_GRANULARITY_STEPS[2]),
+        ])
+        .optional(),
     }),
   )
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    // The project's LangWatchQL secret is hashed into the tenant capability
-    // the query runs under. It is read server-side and never leaves this
-    // function — no field of it appears in the response.
-    const project = await ctx.prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { id: true, lwqlKey: true },
-    });
-    if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
-    }
+    const { project, protections } = await resolveLangWatchQLCaller(
+      ctx,
+      input.projectId,
+    );
 
     return getLangWatchQLService().execute({
       project,
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: project.id,
-      }),
+      protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
