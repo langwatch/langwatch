@@ -56,10 +56,12 @@ describe("given a fresh checkout without generated files", () => {
       const setupBlock = fenced.find((block) =>
         block.includes("prepare:files"),
       );
-      expect(setupBlock).toBeDefined();
+      if (!setupBlock) {
+        expect.fail("CONTRIBUTING.md lost its bash block naming the command");
+      }
 
       const named = [
-        ...(setupBlock ?? "").matchAll(/pnpm ([a-z:.-]+)/g),
+        ...setupBlock.matchAll(/pnpm ([a-z:.-]+)/g),
       ].flatMap((match) => (match[1] ? [match[1]] : []));
       expect(named.length).toBeGreaterThan(0);
       for (const name of named) {
