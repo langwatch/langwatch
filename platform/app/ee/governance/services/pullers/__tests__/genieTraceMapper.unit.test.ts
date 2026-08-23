@@ -329,6 +329,29 @@ describe("given events that are not conversations", () => {
   });
 });
 
+describe("given a message a sweep caught mid-answer", () => {
+  it("routes nothing while a known in-flight status stands — the trace door keeps the FIRST write per span id, and a pinned mid-flight capture can never be repaired", () => {
+    const inFlight = genieEvent(
+      completedMessage({ status: "ASKING_AI", attachments: [] }),
+    );
+    expect(mapGenieEventsToTraceRequest([inFlight], ORIGIN)).toBeNull();
+  });
+
+  it("routes the message once the re-read finds it settled", () => {
+    const settled = genieEvent(completedMessage());
+    const request = mapGenieEventsToTraceRequest([settled], ORIGIN);
+    expect(request).not.toBeNull();
+  });
+
+  it("still routes an unknown status with the failure marker (Decision 13) — more likely a new terminal state than a new in-flight one", () => {
+    const unknown = genieEvent(
+      completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
+    );
+    const request = mapGenieEventsToTraceRequest([unknown], ORIGIN);
+    expect(request).not.toBeNull();
+  });
+});
+
 describe("given the pricing table (Decision 14(d) pin)", () => {
   it("the Genie agent label resolves to no price — cost enrichment yields zero", () => {
     const cost = computeSpanCost({

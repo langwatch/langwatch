@@ -233,6 +233,7 @@ export function mapGenieEventsToTraceRequest(
 ): IExportTraceServiceRequest | null {
   const spans = events
     .filter((event) => event.action === GENIE_QUERY_ACTION)
+    .filter((event) => !isKnownInFlight(event))
     .flatMap((event) => mapMessage(event, origin));
   if (spans.length === 0) return null;
   return {
@@ -270,6 +271,37 @@ interface GenieMessageFrame {
   endMs: number;
   status: string;
   isCompleted: boolean;
+}
+
+/**
+ * Genie's non-terminal message lifecycle statuses — a message a sweep caught
+ * mid-answer. These must NOT be routed: the trace pipeline dedups spans by
+ * `tenant:traceId:spanId` and keeps the FIRST write, so routing a mid-flight
+ * capture pins an answerless, errored trace that the completed re-send (same
+ * deterministic ids, watermark re-read) can never repair. Skipping costs
+ * nothing — the 5-minute watermark lag re-reads the message on the next sweep,
+ * after it has settled. Observed live: a message swept during ASKING_AI stayed
+ * "[Genie message ASKING_AI — no answer recorded]" forever while the audit row
+ * updated to COMPLETED.
+ *
+ * Unknown statuses are still routed with the failure marker (Decision 13's
+ * defensive mapping): an unrecognised status is more likely a new terminal
+ * state than a new in-flight one, and skipping it forever would silently drop
+ * the message from the trace sink.
+ */
+const GENIE_IN_FLIGHT_STATUSES = new Set([
+  "SUBMITTED",
+  "FETCHING_METADATA",
+  "FILTERING_CONTEXT",
+  "ASKING_AI",
+  "PENDING_WAREHOUSE",
+  "EXECUTING_QUERY",
+]);
+
+function isKnownInFlight(event: NormalizedPullEvent): boolean {
+  const payload = parsePayload(event);
+  const status = (payload.status ?? extraString(event, "status") ?? "").trim();
+  return GENIE_IN_FLIGHT_STATUSES.has(status);
 }
 
 function frameOf(
