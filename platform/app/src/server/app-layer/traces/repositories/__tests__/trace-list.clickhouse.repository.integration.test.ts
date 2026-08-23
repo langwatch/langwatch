@@ -671,25 +671,27 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       });
     });
 
-    /** @scenario "Filtering by a legacy-key conversation id returns the trace from ClickHouse" */
-    it("finds the trace when filtering by its conversation id", async () => {
-      const page = await listWith('conversation:"thread-legacy-1"');
+    describe("when the list is filtered by that trace's conversation id", () => {
+      /** @scenario "Filtering by a legacy-key conversation id returns the trace from ClickHouse" */
+      it("finds the trace when filtering by its conversation id", async () => {
+        const page = await listWith('conversation:"thread-legacy-1"');
 
-      expect(page.rows.map((row) => row.traceId)).toEqual([legacyTraceId]);
-      expect(page.totalHits).toBe(1);
-    });
-
-    /** @scenario "has:conversation counts a legacy-key trace as having a conversation" */
-    it("counts the trace under has:conversation and lists its id in the facet values", async () => {
-      const withConversation = await listWith("has:conversation");
-      expect(withConversation.totalHits).toBe(1);
-
-      const counts = await repo.findFacetCounts({
-        tenantId: legacyTenant,
-        timeRange: legacyTimeRange,
-        facetExpression: conversationFacetExpression,
+        expect(page.rows.map((row) => row.traceId)).toEqual([legacyTraceId]);
+        expect(page.totalHits).toBe(1);
       });
-      expect(counts.values).toEqual({ "thread-legacy-1": 1 });
+
+      /** @scenario "has:conversation counts a legacy-key trace as having a conversation" */
+      it("counts the trace under has:conversation and lists its id in the facet values", async () => {
+        const withConversation = await listWith("has:conversation");
+        expect(withConversation.totalHits).toBe(1);
+
+        const counts = await repo.findFacetCounts({
+          tenantId: legacyTenant,
+          timeRange: legacyTimeRange,
+          facetExpression: conversationFacetExpression,
+        });
+        expect(counts.values).toEqual({ "thread-legacy-1": 1 });
+      });
     });
   });
 });

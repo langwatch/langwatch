@@ -230,6 +230,11 @@ Rule: A pill's filter queries the same value the pill displays
     And an empty string under an earlier key falls through to the next key
 
   @unit
+  Scenario: User pill display and filter agree on one source
+    Given summaries carrying a user id under "langwatch.user_id", or none at all
+    Then the user facet's in-memory read and the drawer header resolution return the same value
+
+  @unit
   Scenario: has:conversation counts a legacy-key trace as having a conversation
     Given a trace summary whose conversation id is set under "langgraph.thread_id" only
     When the query "has:conversation" is evaluated
