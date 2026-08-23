@@ -71,11 +71,25 @@ function completedMessage(overrides: Record<string, unknown> = {}) {
           description: "Total sales by region",
           statement_id: "stmt-1",
           query_result_metadata: { row_count: 4 },
+          // The real wire shape: `thought_type` key, enum-prefixed values,
+          // text under `content` (verified against the raw capture).
           thoughts: [
-            { type: "DESCRIPTION", text: "Total sales by region" },
-            { type: "STEPS", text: "Group by region, sum amount" },
-            { type: "UNDERSTANDING", text: "User wants regional totals" },
-            { type: "DATA_SOURCING", text: "Use the sales table" },
+            {
+              thought_type: "THOUGHT_TYPE_DESCRIPTION",
+              content: "Total sales by region",
+            },
+            {
+              thought_type: "THOUGHT_TYPE_STEPS",
+              content: "Group by region, sum amount",
+            },
+            {
+              thought_type: "THOUGHT_TYPE_UNDERSTANDING",
+              content: "User wants regional totals",
+            },
+            {
+              thought_type: "THOUGHT_TYPE_DATA_SOURCING",
+              content: "Use the sales table",
+            },
           ],
         },
       },

@@ -54,7 +54,14 @@ export const GENIE_AGENT_MODEL = "databricks/genie" as const;
 /** The puller action this mapper understands. Aggregate pulls never route. */
 export const GENIE_QUERY_ACTION = "genie_query" as const;
 
+/**
+ * The wire shape (verified against the 35-message capture,
+ * 30_genie_messages.raw.jsonl) keys thoughts by `thought_type` with
+ * enum-prefixed values ("THOUGHT_TYPE_UNDERSTANDING"); `type`/bare values
+ * are tolerated in case the API ever drops the prefix.
+ */
 interface GenieThought {
+  thought_type?: string;
   type?: string;
   text?: string;
   content?: string;
@@ -92,6 +99,15 @@ interface GenieMessagePayload {
 /** Thought order the capture showed; DESCRIPTION is dropped (duplicate). */
 const THOUGHT_ORDER = ["UNDERSTANDING", "DATA_SOURCING", "STEPS"] as const;
 const DROPPED_THOUGHT_TYPE = "DESCRIPTION";
+const THOUGHT_TYPE_PREFIX = "THOUGHT_TYPE_";
+
+/** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */
+function thoughtTypeOf(thought: GenieThought): string {
+  const raw = thought.thought_type ?? thought.type ?? "";
+  return raw.startsWith(THOUGHT_TYPE_PREFIX)
+    ? raw.slice(THOUGHT_TYPE_PREFIX.length)
+    : raw;
+}
 
 const MS_THRESHOLD = 1_000_000_000_000;
 
@@ -145,20 +161,20 @@ export function flattenThoughts(
   const known: string[] = [];
   for (const wanted of THOUGHT_ORDER) {
     for (const thought of thoughts) {
-      if (thought.type === wanted && textOf(thought)) {
+      if (thoughtTypeOf(thought) === wanted && textOf(thought)) {
         known.push(textOf(thought));
       }
     }
   }
   const unknown = thoughts
-    .filter(
-      (thought) =>
-        thought.type !== DROPPED_THOUGHT_TYPE &&
-        !THOUGHT_ORDER.includes(
-          thought.type as (typeof THOUGHT_ORDER)[number],
-        ) &&
-        textOf(thought),
-    )
+    .filter((thought) => {
+      const type = thoughtTypeOf(thought);
+      return (
+        type !== DROPPED_THOUGHT_TYPE &&
+        !THOUGHT_ORDER.includes(type as (typeof THOUGHT_ORDER)[number]) &&
+        textOf(thought)
+      );
+    })
     .map(textOf);
   return [...known, ...unknown].join("\n\n");
 }
