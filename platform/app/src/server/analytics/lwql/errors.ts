@@ -192,30 +192,29 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
  * the surface supplied a step that is not a positive whole number of
  * seconds.
  *
- * A sibling of {@link LangWatchQLReservedParameterTypeError} sharing its code
- * -- from the caller's side both read as "you declared a surface-owned
- * parameter with the wrong type" -- because one presentation entry covers
- * them. The messages differ where it matters: this one names the exact
- * spelling to declare.
+ * A sibling of {@link LangWatchQLReservedParameterTypeError} -- from the
+ * caller's side both read as "you declared a surface-owned parameter with the
+ * wrong type" -- but it carries its own code, so the copy can name what this
+ * declaration must be (`UInt32`) instead of the window's date-time advice.
  *
  * Raised while validating rather than while running, so a chart is refused
  * at *save* for the same reason it would be refused at render.
  */
 export class LangWatchQLReservedGranularityTypeError extends HandledError {
-  declare readonly code: "lwql_reserved_parameter_type";
+  declare readonly code: "lwql_granularity_parameter_type";
 
   constructor(
     /** The reserved names declared (or valued) wrongly. Sorted. */
     mistyped: readonly string[],
   ) {
     super(
-      "lwql_reserved_parameter_type",
+      "lwql_granularity_parameter_type",
       "The query declares period_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
         fault: "customer",
         meta: { parameters: mistyped },
-        ...remediation("lwql_reserved_parameter_type"),
+        ...remediation("lwql_granularity_parameter_type"),
       },
     );
     this.name = "LangWatchQLReservedGranularityTypeError";

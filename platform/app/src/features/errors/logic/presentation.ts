@@ -365,6 +365,11 @@ const presentations = {
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
   },
+  lwql_granularity_parameter_type: {
+    title: "The granularity has to be declared as UInt32",
+    describe: () =>
+      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+  },
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
     describe: () =>

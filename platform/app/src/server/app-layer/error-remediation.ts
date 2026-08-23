@@ -114,6 +114,13 @@ const registry = {
       "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
     ],
   },
+  lwql_granularity_parameter_type: {
+    tips: [
+      "Read `meta.parameters` — it lists the parameter whose declaration was refused",
+      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "When the surface supplies the step itself, it must be a positive whole number of seconds",
+    ],
+  },
   lwql_granularity_too_fine: {
     tips: [
       "The requested bucket size would produce more datapoints than one query may return for this period",

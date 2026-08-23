@@ -308,28 +308,6 @@ function resolveAgainstBudget({
 }
 
 /**
- * Decides what the granularity declaration means for one request, and
- * refuses the ways it can be misused -- the granularity counterpart of
- * {@link resolveLangWatchQLTimeWindow}, kept separate because its failure
- * modes differ: where the window is injected only when declared and merely
- * reported otherwise, a granularity declaration binds the run to a *budget*,
- * and the budget's overflow has two designed outcomes. Surfaces the caller
- * owns -- the workbench, the REST route -- refuse with
- * {@link LangWatchQLGranularityTooFineError}; the dashboard owns the range
- * and auto-coarsens instead, naming what happened.
- *
- * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
- *   declared as anything but `UInt32`. Raised before any value check so an
- *   author gets the same answer about their statement whether or not the
- *   request also carried a value for it.
- * @throws {LangWatchQLReservedParameterSuppliedError} when the request
- *   carries a value for it. Asserted here as well as in the window sweep so
- *   this function stays safe when called on its own.
- * @throws {LangWatchQLGranularityTooFineError} when the declared window at
- *   the supplied step exceeds {@link LWQL_GRANULARITY_MAX_BUCKETS} buckets
- *   and the surface asked to refuse rather than coarsen.
- */
-/**
  * The save-time half of the granularity contract, shared by every door that
  * persists a statement: a granularity declaration is only meaningful when
  * both period bounds are declared too -- without them the bucket budget the
@@ -371,6 +349,28 @@ export function assertLangWatchQLGranularityDeclaration(
   }
 }
 
+/**
+ * Decides what the granularity declaration means for one request, and
+ * refuses the ways it can be misused -- the granularity counterpart of
+ * {@link resolveLangWatchQLTimeWindow}, kept separate because its failure
+ * modes differ: where the window is injected only when declared and merely
+ * reported otherwise, a granularity declaration binds the run to a *budget*,
+ * and the budget's overflow has two designed outcomes. Surfaces the caller
+ * owns -- the workbench, the REST route -- refuse with
+ * {@link LangWatchQLGranularityTooFineError}; the dashboard owns the range
+ * and auto-coarsens instead, naming what happened.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
+ *   declared as anything but `UInt32`. Raised before any value check so an
+ *   author gets the same answer about their statement whether or not the
+ *   request also carried a value for it.
+ * @throws {LangWatchQLReservedParameterSuppliedError} when the request
+ *   carries a value for it. Asserted here as well as in the window sweep so
+ *   this function stays safe when called on its own.
+ * @throws {LangWatchQLGranularityTooFineError} when the declared window at
+ *   the supplied step exceeds {@link LWQL_GRANULARITY_MAX_BUCKETS} buckets
+ *   and the surface asked to refuse rather than coarsen.
+ */
 export function resolveLangWatchQLGranularity({
   declared,
   parameters,

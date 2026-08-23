@@ -21,6 +21,7 @@ import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   resolveLangWatchQLGranularity,
 } from "../resolveTimeWindow";
+import { LWQL_GRANULARITY_STEPS } from "../timeWindow";
 import type { LangWatchQLParameter } from "../validation/validate";
 
 const GRANULARITY: LangWatchQLParameter[] = [
@@ -294,5 +295,14 @@ describe("resolveLangWatchQLGranularity", () => {
         granularitySeconds: 60,
       });
     });
+  });
+});
+
+describe("the offered granularity steps", () => {
+  // A day-scale step must not join these until a timezone-aware mechanism
+  // exists: a fixed 86,400-second bucket drifts off local midnight on DST
+  // transition days (see the note on LWQL_GRANULARITY_STEPS in timeWindow.ts).
+  it("offers exactly one second, one minute and one hour", () => {
+    expect([...LWQL_GRANULARITY_STEPS]).toEqual([1, 60, 3600]);
   });
 });
