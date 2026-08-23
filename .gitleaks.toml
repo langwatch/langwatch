@@ -170,11 +170,16 @@ paths = [
 [[allowlists]]
 description = "Placeholder bearer keys in the docs' curl examples, not credentials"
 targetRules = ["curl-auth-header"]
+# `condition` has to say AND: the default is OR, and under OR the path alone
+# would allowlist every curl-auth-header finding in this file, placeholder
+# or not.
+condition = "AND"
 paths = ['''docs/llms-full\.txt''']
 regexes = [
   '''^\$[A-Za-z][A-Za-z0-9_]*$''',
   '''^.*<[^<>]*>.*$''',
   '''^(?:.*\.\.\.|.*…)$''',
+  '''^your[-_]api[-_]key$''',
 ]
 
 # `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
