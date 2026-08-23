@@ -18,13 +18,15 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-
 import { anthropicAdminPullConfigSchema } from "../../../services/pullers/anthropicAdmin.puller";
+import { syncIngestionPullSource } from "../../../services/pullers/ingestionPullLifecycle";
+import { recommendedPullSchedule } from "../../logic/pullCadence";
 import {
   buildAnthropicAdminPullConfig,
   buildEditedParserConfig,
   buildEditSubmission,
   type ComposerState,
+  isBackfillStartLocked,
   isEditablePullSource,
   parserFieldPresentation,
   seedComposerParserConfig,
@@ -35,6 +37,13 @@ import {
 // dependency of it, and Chakra's toaster has no store outside a rendered app.
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
+}));
+
+// The lifecycle looks up the hidden governance project to address the process
+// manager. Which project it lands on is not what these tests are about.
+vi.mock("../../../services/governanceProject.service", () => ({
+  ensureHiddenGovernanceProject: vi.fn().mockResolvedValue({ id: "proj_gov" }),
+  PROJECT_KIND: { INTERNAL_GOVERNANCE: "internal_governance" },
 }));
 
 function composer(
@@ -302,8 +311,22 @@ describe("buildEditSubmission", () => {
     );
   });
 
-  it("sends a cleared cadence as null rather than an empty string", () => {
-    expect(submit({ pullSchedule: "   " })?.pullSchedule).toBeNull();
+  it("resolves a cleared cadence to the recommended schedule, never null", () => {
+    // Blank is the cadence field's way of saying "the recommended schedule".
+    // Saving null instead would disable the source — see the lifecycle
+    // regression below, which is what makes this more than a shape assertion.
+    expect(submit({ pullSchedule: "   " })?.pullSchedule).toBe(
+      recommendedPullSchedule("anthropic_admin"),
+    );
+  });
+
+  it("keeps the saved cadence and the rebuilt config agreeing on the default", () => {
+    // The drawer reads the cadence back out of parserConfig. If the column
+    // said null while the config said "0 * * * *", the source would show a
+    // schedule it was no longer running on.
+    const next = submit({ pullSchedule: "" });
+
+    expect(next?.pullSchedule).toBe(next?.parserConfig.schedule);
   });
 
   it("omits the cadence key entirely for a push source", () => {
@@ -358,6 +381,123 @@ describe("buildEditSubmission", () => {
     expect(next?.parserConfig.credentials).toEqual({
       token: "sk-ant-admin-new",
     });
+  });
+});
+
+/**
+ * Reaches across into the poller lifecycle on purpose. The cadence bug was
+ * never visible inside either half: the drawer emitted a defensible `null`
+ * and the lifecycle correctly read `null` as "disable". Only a test that runs
+ * the edit path's output through the thing that consumes it can fail.
+ */
+describe("a saved edit reaching the pull lifecycle", () => {
+  function sourceRowFrom(submission: { pullSchedule?: string | null }) {
+    return {
+      id: "src_1",
+      organizationId: "org_1",
+      status: "active",
+      archivedAt: null,
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+      pollerCursor: null,
+      pullSchedule: submission.pullSchedule ?? null,
+    } as unknown as Parameters<typeof syncIngestionPullSource>[0]["source"];
+  }
+
+  async function syncAfterEdit(pullSchedule: string) {
+    const submission = buildEditSubmission({
+      organizationId: "org_1",
+      source: {
+        id: "src_1",
+        sourceType: "anthropic_admin",
+        parserConfig: {
+          adapter: "anthropic_admin",
+          report: "usage",
+          bucketWidth: "1h",
+          schedule: "0 * * * *",
+        },
+      },
+      name: "Anthropic org spend",
+      description: "",
+      parserConfig: {
+        credentialsToken: "",
+        report: "usage",
+        bucketWidth: "1h",
+      },
+      ottlStatements: [],
+      pullSchedule,
+    });
+    const commands = { configure: vi.fn(), disable: vi.fn() };
+
+    await syncIngestionPullSource({
+      prisma: {} as never,
+      source: sourceRowFrom(submission ?? {}),
+      commands,
+    });
+
+    return { submission, commands };
+  }
+
+  it("keeps pulling after an admin clears the cadence field", async () => {
+    const { submission, commands } = await syncAfterEdit("   ");
+
+    // The lifecycle outcome first: this is the assertion that fails when the
+    // edit path goes back to saving null, and the one that says what the
+    // admin actually loses — a source that has stopped pulling.
+    expect(commands.disable).not.toHaveBeenCalled();
+    expect(commands.configure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceId: "src_1",
+        cron: recommendedPullSchedule("anthropic_admin"),
+      }),
+    );
+    expect(submission?.pullSchedule).toBe(
+      recommendedPullSchedule("anthropic_admin"),
+    );
+  });
+
+  it("still runs on an explicitly typed cadence", async () => {
+    const { commands } = await syncAfterEdit("0 */2 * * *");
+
+    expect(commands.disable).not.toHaveBeenCalled();
+    expect(commands.configure).toHaveBeenCalledWith(
+      expect.objectContaining({ cron: "0 */2 * * *" }),
+    );
+  });
+});
+
+describe("isBackfillStartLocked", () => {
+  it("locks the start for a usage source that has already pulled", () => {
+    // The usage cursor never rewinds, so an edit here would silently do
+    // nothing.
+    expect(isBackfillStartLocked({ hasPulled: true, report: "usage" })).toBe(
+      true,
+    );
+  });
+
+  it("leaves the start editable for a cost source that has already pulled", () => {
+    // The cost cursor binds `startingAt` into its identity: moving the start
+    // discards the cursor and re-reads the widened window. That is the repair
+    // lever for wrong early figures, and locking it would remove it.
+    expect(isBackfillStartLocked({ hasPulled: true, report: "cost" })).toBe(
+      false,
+    );
+  });
+
+  it("leaves the start editable before the first pull, whatever the report", () => {
+    expect(isBackfillStartLocked({ hasPulled: false, report: "usage" })).toBe(
+      false,
+    );
+    expect(isBackfillStartLocked({ hasPulled: false, report: "cost" })).toBe(
+      false,
+    );
+  });
+
+  it("does not lock a source whose config carries no report", () => {
+    // Claiming immutability we cannot justify is the worse error: it sends an
+    // admin to archive-and-recreate over a field that may well be editable.
+    expect(isBackfillStartLocked({ hasPulled: true, report: undefined })).toBe(
+      false,
+    );
   });
 });
 

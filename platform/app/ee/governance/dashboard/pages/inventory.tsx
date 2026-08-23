@@ -32,6 +32,7 @@ import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
   PULL_SCHEDULE_DEFAULTS,
+  recommendedPullSchedule,
 } from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
@@ -1142,6 +1143,29 @@ function SourceIdentityFields({
 }
 
 /**
+ * Whether the backfill start has stopped being editable for this source.
+ *
+ * Only the USAGE cursor is one-way. The cost cursor binds `startingAt` into
+ * its own identity, so moving the start mints a new identity, discards the
+ * cursor and re-reads from the configured date — the deliberate repair lever
+ * for a source whose early history is wrong (see `queryIdentity` and
+ * `staleCursorRestart` in anthropicAdmin.puller.ts). Locking it for cost would
+ * hide the one control that fixes those figures behind archive + recreate.
+ *
+ * A source that has never pulled holds no cursor to contradict, so nothing is
+ * locked yet whatever the report.
+ */
+export function isBackfillStartLocked({
+  hasPulled,
+  report,
+}: {
+  hasPulled: boolean;
+  report: string | undefined;
+}): boolean {
+  return hasPulled && report === "usage";
+}
+
+/**
  * The adapter half of the edit form: the pull config fields plus the cadence,
  * rendered only for a source type the form knows how to rebuild.
  */
@@ -1161,6 +1185,10 @@ function PullConfigEditFields({
   /** Whether the source already holds a poller cursor. */
   hasPulled: boolean;
 }) {
+  const isStartLocked = isBackfillStartLocked({
+    hasPulled,
+    report: parserConfig.report,
+  });
   return (
     <>
       <ParserConfigFields
@@ -1168,13 +1196,19 @@ function PullConfigEditFields({
         values={parserConfig}
         onChange={onParserConfigChange}
         mode="edit"
-        readOnlyKeys={hasPulled ? ["startingAt"] : undefined}
+        readOnlyKeys={isStartLocked ? ["startingAt"] : undefined}
       />
-      {hasPulled && (
+      {isStartLocked && (
         <Text fontSize="xs" color="fg.muted">
           The backfill start is fixed once a source has pulled: the cursor has
           already moved past it and never rewinds. To re-read older data,
           archive this source and create a new one with an earlier start.
+        </Text>
+      )}
+      {hasPulled && parserConfig.report === "cost" && (
+        <Text fontSize="xs" color="fg.muted">
+          Moving the backfill start re-reads cost history from the new date and
+          restates the figures already recorded for that window.
         </Text>
       )}
       <PullCadenceField
@@ -2370,7 +2404,19 @@ export function buildEditSubmission({
     }),
     // Only sent for a type whose cadence the form actually renders. Including
     // it for a push source would send `null` for a column no one edited.
-    ...(isPullMode ? { pullSchedule: pullSchedule.trim() || null } : {}),
+    //
+    // Blank is the cadence field's way of saying "the recommended schedule",
+    // not "never run" — so it resolves here, exactly as create resolves it.
+    // Sending null would write a null column, and the lifecycle reads a null
+    // schedule as `disable` (see `ingestionPullLifecycle`), so clearing the
+    // field would quietly stop the source while the drawer, reading the
+    // rebuilt parser config, still showed it running on the default.
+    ...(isPullMode
+      ? {
+          pullSchedule:
+            pullSchedule.trim() || recommendedPullSchedule(sourceType),
+        }
+      : {}),
   };
 }
 
