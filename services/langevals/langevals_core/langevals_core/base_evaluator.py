@@ -182,6 +182,19 @@ class EvaluationResultError(BaseModel):
     traceback: List[str] = Field(description="Traceback information for debugging")
 
 
+def _timed_out_result(max_seconds: Optional[float]) -> EvaluationResultError:
+    """The answer for an entry the batch stopped waiting for."""
+    return EvaluationResultError(
+        error_type="EvaluationTimeout",
+        details=(
+            f"The evaluation did not finish within {max_seconds} seconds and "
+            "was abandoned. The model call it waits on is unreachable or "
+            "slower than the evaluation timeout allows."
+        ),
+        traceback=[],
+    )
+
+
 TResult = TypeVar("TResult", bound=EvaluationResult)
 
 SingleEvaluationResult = Union[
@@ -314,13 +327,29 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         index=0,
         max_evaluations_in_parallel=50,
         retries=3,
+        max_seconds: Optional[float] = None,
         _executor_ref: Optional[Callable[[ThreadPoolExecutor], None]] = None,
     ) -> BatchEvaluationResult:
+        """Evaluate every entry, and give up on the ones that overrun.
+
+        `max_seconds` bounds the whole batch. An entry waits on a model call
+        over the network, and that call can stall for as long as the socket
+        stays open, so without a bound this method can wait forever. On a
+        long-lived server the caller of this method holds a concurrency slot
+        while it waits, and slots lost this way never come back.
+
+        A batch that runs out of time keeps the results it has, reports the
+        rest as `EvaluationTimeout` errors, and returns. The overrunning work
+        is abandoned rather than waited on: a thread parked in a socket read
+        cannot be interrupted, and waiting for it is the hang itself.
+        """
         _restore_tqdm()
         results: list[SingleEvaluationResult] = [
             EvaluationResultSkipped(details="not processed")
         ] * len(data)
-        with ThreadPoolExecutor(max_workers=max_evaluations_in_parallel) as executor:
+        deadline = None if max_seconds is None else time.monotonic() + max_seconds
+        executor = ThreadPoolExecutor(max_workers=max_evaluations_in_parallel)
+        try:
             future_to_index = {
                 executor.submit(
                     self._evaluate_entry, entry, retries, restore_tqdm=False
@@ -339,6 +368,8 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                             executor, "interrupted"
                         ) and executor.__getattribute__("interrupted"):
                             raise KeyboardInterrupt()
+                        if deadline is not None and time.monotonic() >= deadline:
+                            break
                         done, not_done = wait(
                             not_done, timeout=0.1, return_when=FIRST_COMPLETED
                         )
@@ -349,6 +380,21 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 except KeyboardInterrupt:
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise
+
+            for future in not_done:
+                idx = future_to_index[future]
+                # A future can land between the deadline check and here. Its
+                # answer is real work already paid for, so keep it.
+                results[idx] = (
+                    future.result()
+                    if future.done() and not future.cancelled()
+                    else _timed_out_result(max_seconds)
+                )
+        finally:
+            # Never wait: the entries still running are the ones that
+            # overran, and blocking on them here would hold the slot this
+            # deadline exists to give back.
+            executor.shutdown(wait=False, cancel_futures=True)
 
         _restore_tqdm()
         return results

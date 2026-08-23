@@ -72,7 +72,17 @@ class OpenAIModerationEvaluator(
     is_guardrail = True
 
     def evaluate_batch(
-        self, data: list[OpenAIModerationEntry], index=0
+        self,
+        data: list[OpenAIModerationEntry],
+        index=0,
+        # The server calls every evaluator through the base signature. This
+        # one sends the whole batch in two moderation calls rather than one
+        # call per entry, so the per-entry knobs have nothing to act on here:
+        # they are accepted so the call works, and ignored.
+        max_evaluations_in_parallel=50,
+        retries=3,
+        max_seconds=None,
+        _executor_ref=None,
     ) -> BatchEvaluationResult:
         client = OpenAI(api_key=self.get_env("OPENAI_API_KEY"))
 

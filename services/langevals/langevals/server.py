@@ -8,6 +8,7 @@ import threading
 import time
 import anyio.to_thread
 import dotenv
+import litellm
 from fastapi.responses import RedirectResponse
 
 from langevals.staged_payload import StagedPayloadMiddleware
@@ -75,6 +76,24 @@ MAX_EVALUATIONS_IN_PARALLEL = (
 MAX_CONCURRENT_EVALUATIONS = (
     positive_int_or_none(os.getenv("MAX_CONCURRENT_EVALUATIONS")) or 64
 )
+# How long one request may hold its gate ticket. An evaluation waits on a
+# model call, and a stalled call keeps its socket open for as long as the
+# provider leaves it open, so without this bound a request can hold a slot for
+# the life of the process. Enough stuck requests and the gate never admits
+# anyone again: every caller waits out the queue timeout and gets
+# "Evaluation queue is full", and only a restart clears it.
+EVALUATION_TIMEOUT_SECONDS = (
+    positive_float_or_none(os.getenv("LANGEVALS_EVALUATION_TIMEOUT")) or 300.0
+)
+# How long ONE model call may take, which is the usual reason an evaluation
+# overruns. litellm ships a 6000 second default, so a stalled provider parks a
+# worker thread for 100 minutes. The batch deadline above already gives the
+# slot back at that point, but only this makes the abandoned thread die
+# instead of lingering with the socket.
+MODEL_TIMEOUT_SECONDS = (
+    positive_float_or_none(os.getenv("LANGEVALS_MODEL_TIMEOUT")) or 120.0
+)
+litellm.request_timeout = MODEL_TIMEOUT_SECONDS
 # Spare threads for anything the framework runs off the event loop that is not
 # an evaluation. The pool is sized from the knob plus this, never below it.
 THREAD_POOL_HEADROOM = 8
@@ -289,6 +308,7 @@ def create_evaluator_routes(evaluator_cls):
                 return evaluator.evaluate_batch(
                     req.data,
                     max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,
+                    max_seconds=EVALUATION_TIMEOUT_SECONDS,
                 )
         except EvaluationQueueTimeout:
             raise HTTPException(
