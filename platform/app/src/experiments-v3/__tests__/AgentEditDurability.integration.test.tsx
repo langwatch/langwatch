@@ -73,7 +73,10 @@ vi.mock("../../utils/posthogErrorCapture", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
+import {
+  type AutosaveOutcome,
+  useAutosaveEvaluationsV3,
+} from "../hooks/useAutosaveEvaluationsV3";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -194,8 +197,8 @@ describe("an agent edit reaching the server", () => {
       render(<TestComponent />, { wrapper: Wrapper });
       applyAgentEdit();
 
-      let first: Promise<void> | undefined;
-      let second: Promise<void> | undefined;
+      let first: Promise<AutosaveOutcome> | undefined;
+      let second: Promise<AutosaveOutcome> | undefined;
       // A chained save starts on a microtask, so the queue is drained before
       // asserting that the first one is the only one out.
       await act(async () => {

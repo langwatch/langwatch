@@ -31,7 +31,10 @@ import {
   useRegisterLangyActions,
   useRegisterLangyHandlers,
 } from "~/features/langy/LangyContext";
-import { LangyUiPageOutOfDateError } from "~/features/langy/uiActions/errors";
+import {
+  LangyUiPageOutOfDateError,
+  LangyUiSaveFailedError,
+} from "~/features/langy/uiActions/errors";
 import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -364,6 +367,28 @@ export default function ExperimentsWorkbenchPage() {
         throw new LangyUiPageOutOfDateError();
       }
     };
+    /**
+     * Persist, and answer only if the write landed.
+     *
+     * `saveNow` reports its outcome rather than throwing, because the debounced
+     * path treats a failure as a status change on the badge. A dropped network
+     * or a rejected document therefore left it resolving normally, and the
+     * handler read that as a save: the agent was told the change was on the
+     * server when only this tab had it, which is the same false success a
+     * stale page used to give.
+     */
+    const saveOrRefuse = async () => {
+      const outcome = await saveNow();
+      if (outcome === "failed") {
+        throw new LangyUiSaveFailedError();
+      }
+      // Covers the refusal this save was given, and any staleness a broadcast
+      // raised while it was in flight. Both are the same answer to the agent.
+      assertPageIsCurrent();
+      if (outcome === "refused") {
+        throw new LangyUiPageOutOfDateError();
+      }
+    };
     const handlers: LangyUiActionHandlers = {};
     for (const kind of WORKBENCH_ACTION_KINDS) {
       const definition = WORKBENCH_ACTIONS[kind];
@@ -383,8 +408,7 @@ export default function ExperimentsWorkbenchPage() {
           const result = useEvaluationsV3Store
             .getState()
             .applyWorkbenchAction({ kind, payload });
-          await saveNow();
-          assertPageIsCurrent();
+          await saveOrRefuse();
           return result;
         },
       };
@@ -403,8 +427,7 @@ export default function ExperimentsWorkbenchPage() {
         // the run would not compute, so it refuses rather than running the
         // wrong document.
         assertPageIsCurrent();
-        await saveNow();
-        assertPageIsCurrent();
+        await saveOrRefuse();
         // Fire-and-forget like the run proposal: the run streams into the
         // table the user is watching, and the agent polls the runs API for
         // completion. The payload-to-scope mapping is shared with the backend

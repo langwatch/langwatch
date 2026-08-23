@@ -35,6 +35,7 @@ const saveNow = vi.hoisted(() =>
     // awaited look correct.
     await new Promise((resolve) => setTimeout(resolve, 0));
     calls.push("save");
+    return "saved" as const;
   }),
 );
 

@@ -24,3 +24,19 @@ export class LangyUiPageOutOfDateError extends Error {
     this.name = "LangyUiPageOutOfDateError";
   }
 }
+
+/**
+ * The change was applied to the page but the write to the server did not land,
+ * for a reason that is not a newer version: the network dropped, or the server
+ * rejected the document. The page keeps the edit and autosave retries it, but
+ * the agent must not be told the save happened, because its next step reads
+ * the saved document and would read one without the change.
+ */
+export class LangyUiSaveFailedError extends Error {
+  readonly code = "langy_ui_save_failed";
+
+  constructor() {
+    super("The open page could not save the change to the server.");
+    this.name = "LangyUiSaveFailedError";
+  }
+}

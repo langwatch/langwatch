@@ -415,6 +415,11 @@ const registry = {
       "The open page holds an older version and cannot save. Pass --experiment <slug> so the change is applied to the saved evaluation instead, and tell the user their page needs a reload",
     ],
   },
+  langy_ui_save_failed: {
+    tips: [
+      "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
   langy_ui_timeout: {
     tips: [
       "The page may have applied part of the action — read the current state (for example `langwatch workbench get-state`) before retrying",

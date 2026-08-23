@@ -87,6 +87,18 @@ const readPersistedSnapshot = (): string =>
   JSON.stringify(buildPersistedState(useEvaluationsV3Store.getState()));
 
 /**
+ * What one `saveNow` did, for a caller that must not answer before the write
+ * landed.
+ *
+ * An agent's UI action is that caller: it reports back "the document now says
+ * this", and its next step reads the SAVED document. `"unchanged"` covers the
+ * early returns, where nothing was sent because nothing needed sending, which
+ * for that caller is as good as saved. `"refused"` is a newer version on the
+ * server, which has its own answer. `"failed"` is everything else.
+ */
+export type AutosaveOutcome = "saved" | "unchanged" | "refused" | "failed";
+
+/**
  * Manages syncing the evaluations v3 state with the database.
  * Uses workbenchState field in the Experiment model for persistence.
  *
@@ -310,8 +322,20 @@ export const useAutosaveEvaluationsV3 = () => {
    * A refusal for a newer server version is not a failure to report: nothing
    * was lost, so autosave stands down and the banner offers the reload.
    * Everything else is a real error and is reported as one.
+   *
+   * Reads the store rather than the render scope. `saveNow` is memoized on the
+   * project alone, so it keeps the first render's copy of this function for the
+   * life of the hook, and a version or a count taken from that scope describes
+   * the mount instead of the save that just failed.
    */
-  const handleAutosaveFailure = (error: unknown) => {
+  const handleAutosaveFailure = ({
+    error,
+    snapshot,
+  }: {
+    error: unknown;
+    snapshot: string;
+  }): AutosaveOutcome => {
+    const state = useEvaluationsV3Store.getState();
     const handled = readHandledError(error);
     if (handled?.code === "experiment_stale_workbench_state") {
       // Someone else (another tab, Langy, the API) wrote a newer version. The
@@ -319,10 +343,10 @@ export const useAutosaveEvaluationsV3 = () => {
       const serverVersion =
         typeof handled.meta?.currentVersion === "number"
           ? handled.meta.currentVersion
-          : (workbenchVersion ?? 0) + 1;
+          : (state.workbenchVersion ?? 0) + 1;
       setStaleWorkbench({ serverVersion });
       setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
-      return;
+      return "refused";
     }
     console.error("Failed to autosave evaluations v3:", error);
     setAutosaveStatus(
@@ -341,14 +365,15 @@ export const useAutosaveEvaluationsV3 = () => {
       extra: {
         context: "Failed to autosave evaluations v3",
         projectId: project?.id,
-        experimentId,
-        workbenchVersion,
-        stateByteSize: stringifiedState.length,
-        datasetCount: datasets.length,
-        targetCount: targets.length,
-        evaluatorCount: evaluators.length,
+        experimentId: state.experimentId,
+        workbenchVersion: state.workbenchVersion,
+        stateByteSize: snapshot.length,
+        datasetCount: state.datasets.length,
+        targetCount: state.targets.length,
+        evaluatorCount: state.evaluators.length,
       },
     });
+    return "failed";
   };
 
   /**
@@ -364,21 +389,23 @@ export const useAutosaveEvaluationsV3 = () => {
    * had just created, and the workbench reads as out of date against its own
    * write.
    */
-  const inFlightRef = useRef<Promise<void>>(Promise.resolve());
-  const saveNow = useCallback((): Promise<void> => {
+  const inFlightRef = useRef<Promise<AutosaveOutcome>>(
+    Promise.resolve("unchanged"),
+  );
+  const saveNow = useCallback((): Promise<AutosaveOutcome> => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
     inFlightRef.current = inFlightRef.current.then(async () => {
       const state = useEvaluationsV3Store.getState();
-      if (!project || !state.experimentId || !state.name) return;
+      if (!project || !state.experimentId || !state.name) return "unchanged";
       // Out of date against the server: saving now would clobber the newer
       // version, so this waits for the reload like the debounced path does.
-      if (state.staleWorkbench) return;
+      if (state.staleWorkbench) return "refused";
 
       const snapshot = JSON.stringify(buildPersistedState(state));
-      if (snapshot === lastSavedRef.current) return;
+      if (snapshot === lastSavedRef.current) return "unchanged";
 
       setAutosaveStatus("evaluation", "saving");
       try {
@@ -407,8 +434,9 @@ export const useAutosaveEvaluationsV3 = () => {
           setName(updatedExperiment.name);
         }
         markSaved();
+        return "saved";
       } catch (error) {
-        handleAutosaveFailure(error);
+        return handleAutosaveFailure({ error, snapshot });
       }
     });
     return inFlightRef.current;

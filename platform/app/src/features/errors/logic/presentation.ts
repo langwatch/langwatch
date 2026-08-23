@@ -1937,6 +1937,11 @@ const presentations = {
     describe: () =>
       "The evaluation changed elsewhere, so this page could not save Langy's change. Reload the page and ask again.",
   },
+  langy_ui_save_failed: {
+    title: "Langy's change was not saved",
+    describe: () =>
+      "The change is on this page but could not be saved. Check your connection, then ask Langy again.",
+  },
   langy_ui_no_browser: {
     title: "No page was open to make the change",
     describe: () =>

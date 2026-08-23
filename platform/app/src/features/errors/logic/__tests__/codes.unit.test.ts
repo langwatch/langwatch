@@ -96,6 +96,9 @@ const CLIENT_MINTED_CODES = new Set([
   // agent inside `langy_ui_handler_failed`. A customer sees it too, in the
   // toast the page raises for a failed action.
   "langy_ui_page_out_of_date",
+  // The sibling refusal from the same page, for a write that did not land for
+  // any other reason. Also thrown in the browser, and relayed the same way.
+  "langy_ui_save_failed",
   // Same shape, from `promoteModelUnavailableError`: the gateway's
   // `model_provider_not_bound` tells whoever configures a virtual key to bind
   // a provider to it or drop the prefix from the model name. In the panel the
