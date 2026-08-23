@@ -32720,6 +32720,16 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 LangWatch joins a session to a pull request through the repository and branch the session reports. Codex records the directory once, when the session starts, so the attribution follows the directory `codex` was started in. A `cd` inside the session does not change it. To get a session attributed to the pull request it works on, start `codex` inside a checkout of that branch. A session started outside any checkout, for example a home directory, attaches to no repository and no pull request. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
 
+The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it. So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
+
+```bash
+git -C <repo> fetch origin <branch>
+git -C <repo> worktree add <repo>/.claude/worktrees/<name> <branch>
+cd <repo>/.claude/worktrees/<name> && codex
+```
+
+Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
+
 ## Content and privacy
 
 Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.
