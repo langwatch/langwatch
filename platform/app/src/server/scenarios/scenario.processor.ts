@@ -35,6 +35,7 @@ import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
   createDataPrefetcherDependencies,
+  type ModelParamsFailureReason,
   type PrefetchResult,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
@@ -288,12 +289,25 @@ function prefetchContext(jobData: ExecutionJobData) {
 }
 
 /**
- * A prefetch reason other than preparation_error means the customer's own
- * configuration blocked the run (provider disabled, model format, missing
- * credentials): their run fails with the remediation message, and it logs at
- * warn because there is nothing for us to fix.
+ * The prefetch failures the customer's own configuration caused: a disabled or
+ * missing provider, a malformed model name, absent credentials, no model set
+ * for scenarios at all. Their run fails with the remediation message, and the
+ * record logs at warn because there is nothing here for us to fix.
+ *
+ * An allowlist and not `!== "preparation_error"`, so a reason added later is
+ * treated as ours until someone decides otherwise. The sibling clustering
+ * classifier makes the same argument: we do not tell someone their
+ * configuration is broken on the strength of not recognising an error.
  */
-function logPrefetchFailure({
+const CUSTOMER_ACTIONABLE_PREFETCH_REASONS = new Set<ModelParamsFailureReason>([
+  "invalid_model_format",
+  "provider_not_found",
+  "provider_not_enabled",
+  "missing_params",
+  "model_not_configured",
+]);
+
+export function logPrefetchFailure({
   jobLogger,
   prefetchResult,
 }: {
@@ -302,7 +316,7 @@ function logPrefetchFailure({
 }): void {
   const customerActionable =
     prefetchResult.reason !== undefined &&
-    prefetchResult.reason !== "preparation_error";
+    CUSTOMER_ACTIONABLE_PREFETCH_REASONS.has(prefetchResult.reason);
   jobLogger[customerActionable ? "warn" : "error"](
     {
       error: prefetchResult.error,
