@@ -138,6 +138,39 @@ Feature: Langy drives the open page through typed UI actions
     Then only that target's cells for those rows execute
     And neither filter is silently dropped in favor of the other
 
+  Rule: An action the browser ran is saved before the agent is told it worked
+
+    The agent reads a successful action as "the document now says this", and
+    its next step is almost always a server-side one: start a run, read the
+    state over REST, take a version. All of those read the SAVED document.
+
+    Left on the ordinary autosave debounce, an agent's edit lived only in the
+    tab that ran it. The run that followed computed from a document without
+    that edit, wrote its results as a newer version, and the tab's pending save
+    was then refused as out of date. From there the edit could never be saved
+    at all, so the agent went on working against a page nothing else could see,
+    and the customer read "Failed to save" over work they had just watched
+    Langy do.
+
+    @integration
+    Scenario: An agent edit is on the server before the action reports success
+      Given the agent dispatches a workbench action the browser handles
+      When the handler has applied it to the page
+      Then the action does not report success until the save is acknowledged
+      And the version the page holds is the one the save returned
+
+    @integration
+    Scenario: A run waits for the page's own edits to be saved first
+      Given the page holds an edit the agent has just made
+      When the agent dispatches workbench.run
+      Then the edit is saved before the run starts
+
+    @integration
+    Scenario: Two saves never overlap
+      Given a save is already in flight
+      When another save is asked for
+      Then it waits for the first, so neither is refused for the other's version
+
   Rule: The customer can read what the agent asked the page to do
 
     The actions a page accepts are told apart by what they do, and most carry

@@ -350,6 +350,70 @@ export const useAutosaveEvaluationsV3 = () => {
     });
   };
 
+  /**
+   * Save what the store holds RIGHT NOW, and answer when the server has it.
+   *
+   * Reads the store rather than the render-scope projection, because its two
+   * callers both run before React has re-rendered: the debounce timer fires
+   * from a commit that may already be a change behind, and an agent's UI
+   * action calls it in the same tick as the mutation it just applied.
+   *
+   * Saves are chained rather than concurrent. Two overlapping saves send the
+   * same `expectedVersion`, so the second is refused for a version the first
+   * had just created, and the workbench reads as out of date against its own
+   * write.
+   */
+  const inFlightRef = useRef<Promise<void>>(Promise.resolve());
+  const saveNow = useCallback((): Promise<void> => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+    inFlightRef.current = inFlightRef.current.then(async () => {
+      const state = useEvaluationsV3Store.getState();
+      if (!project || !state.experimentId || !state.name) return;
+      // Out of date against the server: saving now would clobber the newer
+      // version, so this waits for the reload like the debounced path does.
+      if (state.staleWorkbench) return;
+
+      const snapshot = JSON.stringify(buildPersistedState(state));
+      if (snapshot === lastSavedRef.current) return;
+
+      setAutosaveStatus("evaluation", "saving");
+      try {
+        const updatedExperiment = await saveExperiment.mutateAsync({
+          projectId: project.id,
+          experimentId: state.experimentId,
+          expectedVersion: state.workbenchVersion,
+          // Cast to any since the actual types are more complex than the schema
+          // The schema is designed to be lenient for storage
+          state: buildPersistedState(state) as Parameters<
+            typeof saveExperiment.mutateAsync
+          >[0]["state"],
+        });
+
+        setExperimentId(updatedExperiment.id);
+        setExperimentSlug(updatedExperiment.slug);
+        setWorkbenchVersion(updatedExperiment.version);
+        lastSavedRef.current = snapshot;
+        // Our own save's broadcast can outrun this response; a staleness it
+        // raised for a version this ack covers is not staleness.
+        const staleNow = useEvaluationsV3Store.getState().staleWorkbench;
+        if (staleNow && staleNow.serverVersion <= updatedExperiment.version) {
+          setStaleWorkbench(undefined);
+        }
+        if (updatedExperiment.name && updatedExperiment.name !== state.name) {
+          setName(updatedExperiment.name);
+        }
+        markSaved();
+      } catch (error) {
+        handleAutosaveFailure(error);
+      }
+    });
+    return inFlightRef.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
   // Autosave effect with debounce
   useEffect(() => {
     // The pass that runs in the same commit as a load still sees the
@@ -387,39 +451,7 @@ export const useAutosaveEvaluationsV3 = () => {
 
     // Set debounced save - waits until user stops making changes
     debounceTimeoutRef.current = setTimeout(() => {
-      setAutosaveStatus("evaluation", "saving");
-
-      void (async () => {
-        try {
-          const updatedExperiment = await saveExperiment.mutateAsync({
-            projectId: project.id,
-            experimentId: experimentId,
-            expectedVersion: workbenchVersion,
-            // Cast to any since the actual types are more complex than the schema
-            // The schema is designed to be lenient for storage
-            state: persistedState as Parameters<
-              typeof saveExperiment.mutateAsync
-            >[0]["state"],
-          });
-
-          setExperimentId(updatedExperiment.id);
-          setExperimentSlug(updatedExperiment.slug);
-          setWorkbenchVersion(updatedExperiment.version);
-          lastSavedRef.current = stringifiedState;
-          // Our own save's broadcast can outrun this response; a staleness it
-          // raised for a version this ack covers is not staleness.
-          const staleNow = useEvaluationsV3Store.getState().staleWorkbench;
-          if (staleNow && staleNow.serverVersion <= updatedExperiment.version) {
-            setStaleWorkbench(undefined);
-          }
-          if (updatedExperiment.name && updatedExperiment.name !== name) {
-            setName(updatedExperiment.name);
-          }
-          markSaved();
-        } catch (error) {
-          handleAutosaveFailure(error);
-        }
-      })();
+      void saveNow();
     }, AUTOSAVE_DEBOUNCE_MS);
 
     // Cleanup on dependency change
@@ -508,5 +540,12 @@ export const useAutosaveEvaluationsV3 = () => {
       lastSavedRef.current !== null &&
       stringifiedState !== lastSavedRef.current,
     reloadFromServer,
+    /**
+     * Persist the current store immediately instead of waiting out the
+     * debounce. An agent's edit has to be durable before the agent is told it
+     * worked, because the agent's next move is usually a server-side one that
+     * reads or writes the same document.
+     */
+    saveNow,
   };
 };

@@ -125,6 +125,7 @@ export default function ExperimentsWorkbenchPage() {
     reset: resetAutosave,
     isDirty,
     reloadFromServer,
+    saveNow,
   } = useAutosaveEvaluationsV3();
 
   // A save that lands elsewhere (Langy's backend fallback, the API, another
@@ -358,10 +359,21 @@ export default function ExperimentsWorkbenchPage() {
       if (definition.backend !== "transform") continue;
       handlers[kind] = {
         payloadSchema: definition.payloadSchema,
-        run: (payload: unknown) =>
-          useEvaluationsV3Store
+        // Apply, then persist before answering. The agent reads a successful
+        // action as "the document now says this", and its next step is usually
+        // a server-side one — a run, a REST read, a version. Left on the 1.5s
+        // autosave debounce, the duplicate column existed only in this tab:
+        // the run that followed wrote results from the state without it, the
+        // broadcast came back with a newer version, and the pending save was
+        // then refused as out of date. The column could never be saved after
+        // that, so the loop worked on a page nothing else could see.
+        run: async (payload: unknown) => {
+          const result = useEvaluationsV3Store
             .getState()
-            .applyWorkbenchAction({ kind, payload }),
+            .applyWorkbenchAction({ kind, payload });
+          await saveNow();
+          return result;
+        },
       };
     }
     handlers["workbench.getState"] = {
@@ -371,7 +383,11 @@ export default function ExperimentsWorkbenchPage() {
     };
     handlers["workbench.run"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
-      run: (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
+      run: async (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
+        // Persist first: a run writes its results back as a new version, so
+        // any edit still sitting in this tab would be a version behind before
+        // the first cell lands.
+        await saveNow();
         // Fire-and-forget like the run proposal: the run streams into the
         // table the user is watching, and the agent polls the runs API for
         // completion. The payload-to-scope mapping is shared with the backend
@@ -381,7 +397,7 @@ export default function ExperimentsWorkbenchPage() {
       },
     };
     return handlers;
-  }, [executeEvaluation]);
+  }, [executeEvaluation, saveNow]);
 
   useRegisterLangyActions(uiActionHandlers);
 
