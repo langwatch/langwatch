@@ -1,4 +1,10 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type {
+  AuthzGrantsService,
+  AuthzLedgerBindingAttach,
+  AuthzLedgerBindingPrincipal,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import {
@@ -11,14 +17,7 @@ import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
 } from "~/server/api/rbac";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-  type LedgerBindingAttach,
-  ledgerPrincipal,
-} from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
@@ -36,6 +35,21 @@ import {
 } from "./errors";
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
+function bindingPrincipal({
+  userId,
+  groupId,
+  apiKeyId,
+}: {
+  userId?: string | null;
+  groupId?: string | null;
+  apiKeyId?: string | null;
+}): AuthzLedgerBindingPrincipal {
+  if (userId) return { userId };
+  if (groupId) return { groupId };
+  if (apiKeyId) return { apiKeyId };
+  throw new Error("a binding write names no principal");
+}
+
 /**
  * The ledger reports an identical declaration as `DuplicateBindingError` (the
  * writer checks binding identity before it emits, so there is no P2002 to
@@ -43,7 +57,7 @@ import { assertNoPersonalTeamScope } from "./personal-team-scope";
  * a provisioning tool can treat as "already done".
  *
  * Matched by CODE, never `instanceof`: the class arrives from
- * `@langwatch/authz-server`, and identity stops being reliable the moment
+ * `@langwatch/authz-contract`, and identity stops being reliable the moment
  * that package is bundled or serialised separately (the rule
  * `grant-validation.ts` states on the declaration itself).
  */
@@ -104,31 +118,39 @@ export class RoleBindingService {
   private readonly roleService: RoleService;
   // Every binding write on this service is a grants-ledger command; the
   // RoleBinding table is a projection fed by the fold, never written here.
-  private readonly writer: GrantsLedgerWriter;
+  private readonly writerOverride: AuthzGrantsService | undefined;
   // Listing reads go through the per-organization fork: a cut-over
   // organization's Access pages are served from the ledger's own head, so
   // what people see and what the engine decides from can never be different
   // heads (ADR-092, delivery-plan PR 3 follow-up).
-  private readonly accessListing: AccessListingRepository;
+  private readonly accessListingOverride: AuthzService | undefined;
 
   constructor({
     prisma,
     repo,
     roleService,
-    writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    writer,
+    accessListing,
   }: {
     prisma: PrismaClient;
     repo: RoleBindingRepository;
     roleService: RoleService;
-    writer?: GrantsLedgerWriter;
-    accessListing?: AccessListingRepository;
+    writer?: AuthzGrantsService;
+    accessListing?: AuthzService;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleService = roleService;
-    this.writer = writer;
-    this.accessListing = accessListing;
+    this.writerOverride = writer;
+    this.accessListingOverride = accessListing;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
   }
 
   /**
@@ -409,7 +431,7 @@ export class RoleBindingService {
     organizationId: string;
     userId: string;
   }) {
-    const bindings = await this.accessListing.findUserBindings({
+    const bindings = await this.accessListing.listUserBindings({
       organizationId,
       userId,
     });
@@ -435,7 +457,7 @@ export class RoleBindingService {
   }
 
   async listForOrg({ organizationId }: { organizationId: string }) {
-    const bindings = await this.accessListing.findOrganizationBindings({
+    const bindings = await this.accessListing.listOrganizationBindings({
       organizationId,
     });
 
@@ -517,7 +539,7 @@ export class RoleBindingService {
 
     const groupIds = groupMemberships.map((gm) => gm.groupId);
 
-    const allBindings = await this.accessListing.findUserAndGroupBindings({
+    const allBindings = await this.accessListing.listUserAndGroupBindings({
       organizationId,
       userId,
       groupIds,
@@ -692,7 +714,7 @@ export class RoleBindingService {
         bindings: [
           {
             bindingId,
-            principal: ledgerPrincipal({ userId, groupId, apiKeyId }),
+            principal: bindingPrincipal({ userId, groupId, apiKeyId }),
             role,
             customRoleId:
               role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
@@ -1036,7 +1058,7 @@ export class RoleBindingService {
       await this.writer.attachBindings({
         organizationId,
         bindings: bindingsToCreate.map(
-          (b): LedgerBindingAttach => ({
+          (b): AuthzLedgerBindingAttach => ({
             bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             principal: { groupId },
             role: b.role,

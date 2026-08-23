@@ -9,14 +9,24 @@
  * — and where both would answer alike (the downgraded-owner deny) by
  * asserting the read only the engine issues.
  */
+
+import type { AuthzService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 
 import {
   checkRoleBindingPermission,
   resolveApiKeyPermission,
   type ScopeRef,
 } from "../role-binding-resolver";
+
+const authzRuntime = vi.hoisted(() => ({
+  permissions: null as unknown as AuthzService,
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => authzRuntime,
+  tryGetApp: () => authzRuntime,
+}));
 
 const ORGANIZATION_ID = "organization_fork_2";
 const TEAM_ID = "team_fork_2";
@@ -91,6 +101,7 @@ function buildPrisma({
     grant: { findMany: grantFindMany },
     role: { findMany: vi.fn().mockResolvedValue([]) },
   };
+  authzRuntime.permissions = appPermissionsService(prisma);
   return {
     prisma: prisma as never,
     grantFindMany,
@@ -100,7 +111,6 @@ function buildPrisma({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAuthzEngineGateForTesting();
 });
 
 describe("the fork at the api-key seams", () => {

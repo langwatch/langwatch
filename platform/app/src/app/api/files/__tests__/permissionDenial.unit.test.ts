@@ -16,7 +16,7 @@
  * The "outage" half matters just as much: masking a dropped connection as a 403
  * would tell the caller they lack access to a file they own.
  */
-import { PermissionDeniedError } from "@langwatch/authz";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import {

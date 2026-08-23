@@ -2,7 +2,7 @@ import {
   ALL_PERMISSIONS,
   isRegistryPermission,
   type AuthzPermission,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { z } from "zod";
 
 type RegisteredDeliveryAudience = Extract<AuthzPermission, `${string}:view`>;

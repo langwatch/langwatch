@@ -1,6 +1,6 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { ApiKeyWithBindings } from "../api-key.repository";
 import {
   genesisImportMoment,
@@ -21,7 +21,7 @@ import {
 } from "./legacy-grant-mint.fixtures";
 
 /** The suite's default mint: an org past genesis, a key from before it. */
-const mintDefault = (writer: GrantsLedgerWriter) =>
+const mintDefault = (writer: AuthzGrantsService) =>
   mintLegacyKeyGrant({
     apiKey: serviceKey(),
     writer,
@@ -296,7 +296,7 @@ describe("legacy API key read-through mint", () => {
         .fn()
         .mockRejectedValueOnce(new Error("queue down"))
         .mockResolvedValue({ attached: [], duplicates: [] });
-      const writer = { attachBindings } as unknown as GrantsLedgerWriter;
+      const writer = { attachBindings } as unknown as AuthzGrantsService;
 
       expect(() => mintDefault(writer)).not.toThrow();
       await settle();
@@ -311,7 +311,7 @@ describe("legacy API key read-through mint", () => {
       const attachBindings = vi.fn().mockImplementation(() => {
         throw new Error("no event-sourcing stack");
       });
-      const writer = { attachBindings } as unknown as GrantsLedgerWriter;
+      const writer = { attachBindings } as unknown as AuthzGrantsService;
 
       expect(() => mintDefault(writer)).not.toThrow();
     });

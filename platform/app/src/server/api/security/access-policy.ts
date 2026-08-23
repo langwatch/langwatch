@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 
 /**
  * The access decision for a single HTTP route. Every route mounted through the

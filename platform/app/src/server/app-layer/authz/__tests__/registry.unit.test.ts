@@ -2,7 +2,7 @@ import {
   ALL_PERMISSIONS,
   isRegistryPermission,
   permissionIndex,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {

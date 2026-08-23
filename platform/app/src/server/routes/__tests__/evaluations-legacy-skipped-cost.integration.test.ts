@@ -57,12 +57,12 @@ vi.mock("~/server/app-layer/app", async () => {
   // The app-context middleware reads tryGetApp, and the credential
   // middleware decides through the App's permissions (ADR-092), so the fake
   // carries both — permissions composed over this file's ~/server/db.
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   const fakeApp = () => ({
-    permissions: permissionsServiceFor(dbForPermissions),
+    permissions: appPermissionsService(dbForPermissions),
     evaluations: { reportEvaluation: mockReportEvaluation },
   });
   return { getApp: vi.fn(fakeApp), tryGetApp: vi.fn(fakeApp) };

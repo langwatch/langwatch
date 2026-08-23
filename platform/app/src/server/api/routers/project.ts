@@ -1,5 +1,5 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";

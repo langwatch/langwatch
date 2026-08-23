@@ -100,15 +100,15 @@ const { mocks } = vi.hoisted(() => ({
 // `.permission()` procedures decide through getApp().permissions (ADR-092),
 // so the fake carries the real composition over the real test database.
 vi.mock("~/server/app-layer/app", async () => {
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
-      permissions: permissionsServiceFor(dbForPermissions),
+      permissions: appPermissionsService(dbForPermissions),
       traces: {
         spans: {
           getSpanById: mocks.getSpanById,

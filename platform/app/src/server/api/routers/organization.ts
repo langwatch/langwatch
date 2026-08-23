@@ -1,5 +1,5 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";

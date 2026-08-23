@@ -1,9 +1,9 @@
+import type { AuthzService } from "@langwatch/authz-contract";
 import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {
   RoleBindingForSynthesis,
@@ -12,16 +12,22 @@ import type {
 } from "./role-binding.repository";
 
 export class PrismaRoleBindingRepository implements RoleBindingRepository {
+  private readonly accessListingOverride: AuthzService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
     // The listing reads go through the per-organization fork (ADR-092,
     // delivery-plan PR 3 follow-up): a cut-over organization's member lists
     // are served from the ledger's own head, everyone else's from the legacy
     // tables, behind the same gate the decision fork reads.
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
-      prisma,
-    ),
-  ) {}
+    accessListing?: AuthzService,
+  ) {
+    this.accessListingOverride = accessListing;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
+  }
 
   async listForOrganizationsAndUser({
     orgIds,
@@ -30,7 +36,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     orgIds: string[];
     userId: string;
   }): Promise<RoleBindingForSynthesis[]> {
-    return this.accessListing.findBindingsForSynthesis({ orgIds, userId });
+    return this.accessListing.listBindingsForSynthesis({ orgIds, userId });
   }
 
   async listTeamScopedUserBindingsByTeamIds({
@@ -40,7 +46,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     organizationId: string;
     teamIds: string[];
   }): Promise<Map<string, TeamScopedMemberBinding[]>> {
-    return this.accessListing.findTeamMemberBindings({
+    return this.accessListing.listTeamMemberBindings({
       organizationId,
       teamIds,
     });

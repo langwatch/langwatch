@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Context, MiddlewareHandler } from "hono";
 import {

@@ -1,5 +1,5 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { vi } from "vitest";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { ApiKeyWithBindings } from "../api-key.repository";
 
 export const ORG_ID = "org_1";
@@ -30,7 +30,7 @@ export function writerSpy() {
     .mockResolvedValue({ attached: [], duplicates: [] });
   return {
     attachBindings,
-    writer: { attachBindings } as unknown as GrantsLedgerWriter,
+    writer: { attachBindings } as unknown as AuthzGrantsService,
   };
 }
 

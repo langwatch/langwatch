@@ -57,8 +57,9 @@ const ledger = vi.hoisted(() => ({
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ authzGrants: ledger }),
+  tryGetApp: () => null,
 }));
 
 vi.mock("@langwatch/observability", () => ({

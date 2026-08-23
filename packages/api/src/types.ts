@@ -1,4 +1,7 @@
-import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz";
+import type {
+  AccessDeclaration,
+  AuthzPermission,
+} from "@langwatch/authz-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";

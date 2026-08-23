@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type * as AppLayerApp from "~/server/app-layer/app";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
@@ -27,7 +28,7 @@ const ERROR_DESCRIPTION = "Project not found or you don't have access";
 // (the top-level `import { app } from "../misc"` triggers those factories).
 // Prisma enums are string-valued at runtime, so string literals stand in for
 // TeamUserRole.ADMIN / RoleBindingScopeType.TEAM here.
-const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
+const { mockPrisma, mockRedis, runtime, SESSION } = vi.hoisted(() => {
   return {
     SESSION: { user: { id: "member_rolebinding_only" }, expires: "1" },
     // get() stands in for the OAuth client registry lookup: client_1 is
@@ -40,6 +41,9 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
           clientName: "Test client",
         }),
       ),
+    },
+    runtime: {
+      current: null as unknown as Record<string, unknown>,
     },
     mockPrisma: {
       // resolveProjectPermission fails closed on current org membership before
@@ -55,11 +59,14 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       // … but has a TEAM-scoped ADMIN RoleBinding (project:view is granted).
       roleBinding: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-          ]),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          },
+        ]),
       },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       // Legacy fallback must find nothing — the whole point is the user has no
@@ -96,22 +103,10 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // connection the handler writes the auth code to.
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
-  );
-  const { prisma } = await import("~/server/db");
-  // misc.ts reads its connection through tryGetApp; getApp is overridden too
-  // so both accessors agree on the fake. The permission check runs the REAL
-  // walk over this file's prisma fixtures, exactly as it did before the App
-  // owned the service.
-  const app = {
-    redis: mockRedis,
-    permissions: permissionsServiceFor(prisma),
-  };
   return {
     ...actual,
-    getApp: () => app,
-    tryGetApp: () => app,
+    getApp: () => runtime.current,
+    tryGetApp: () => runtime.current,
   };
 });
 vi.mock("~/utils/encryption", () => ({
@@ -119,6 +114,14 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (text: string) =>
     text.startsWith("encrypted:") ? text.slice(10) : text,
 }));
+
+// misc.ts reads its connection through tryGetApp; both accessors above point
+// at this one composed test runtime. Initializing it outside the mock factory
+// avoids a circular module load through the permission adapter.
+runtime.current = {
+  redis: mockRedis,
+  permissions: appPermissionsService(mockPrisma),
+};
 
 const validBody = {
   projectId: PROJECT_ID,
@@ -183,7 +186,9 @@ describe("POST /mcp/authorize", () => {
     it("returns 403 (proves the RoleBinding permission gate actually runs)", async () => {
       // No bindings at all → checkPermissionFromBindings falls back to TeamUser,
       // which is also absent → access denied.
-      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+      mockPrisma.roleBinding.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       await expectAccessDenied(await authorize());
     });

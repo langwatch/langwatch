@@ -13,7 +13,7 @@
  * and left the client rendering "unknown error" for a denial it could have
  * named.
  */
-import { PermissionDeniedError } from "@langwatch/authz";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -49,7 +49,7 @@ const {
   declaredNoPermission,
   declaredServiceAuthorization,
 } = await import("../trpc-middleware");
-const { authzDeclarationOf } = await import("@langwatch/authz");
+const { authzDeclarationOf } = await import("@langwatch/authz-contract");
 
 const session = { user: { id: "alice" } };
 
@@ -157,6 +157,7 @@ describe("checkDeclaredPermission", () => {
   });
 
   describe("given the request context carries an App", () => {
+    /** @scenario "Application tRPC remains a separate adapter" */
     /** @scenario "Every grant check decides through the App the request context carries" */
     it("decides through the injected App, never composing its own", async () => {
       const getDecision = vi

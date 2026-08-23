@@ -6,14 +6,14 @@
  * binding.
  */
 
-import { DuplicateBindingError } from "@langwatch/authz-server";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";
@@ -76,7 +76,7 @@ const writer = {
   attachBindings,
   changeBindingRole,
   revokeBindings,
-} as unknown as GrantsLedgerWriter;
+} as unknown as AuthzGrantsService;
 
 const repository = {
   validateScopeInOrg,

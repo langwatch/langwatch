@@ -25,13 +25,18 @@ const REACHED_ADMIN_CHECK = "REACHED_ADMIN_CHECK";
 
 // The key's grants are ledger commands now; only its own row is a table
 // write, and reaching that write is what says the guard let the caller past.
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ({
-    attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
-    revokeBindings: vi.fn(),
-    revokeBindingsWhere: vi.fn().mockResolvedValue(0),
-    defineRole: vi.fn(),
-    deleteRole: vi.fn(),
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
+  getApp: () => ({
+    authzGrants: {
+      attachBindings: vi
+        .fn()
+        .mockResolvedValue({ attached: [], duplicates: [] }),
+      revokeBindings: vi.fn(),
+      revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+      defineRole: vi.fn(),
+      deleteRole: vi.fn(),
+    },
   }),
 }));
 

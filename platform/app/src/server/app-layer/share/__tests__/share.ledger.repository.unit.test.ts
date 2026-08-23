@@ -1,7 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
+import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
-import type { GrantsLedgerWriter } from "../../authz/ledger";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import type { ShareRepository } from "../repositories/share.repository";
 
@@ -122,7 +124,10 @@ function buildRepository({
   const writer = {
     attachResourceGrant: vi.fn().mockResolvedValue(undefined),
     revokeResourceGrants: vi.fn().mockResolvedValue(undefined),
-  } as unknown as GrantsLedgerWriter;
+  } as unknown as AuthzGrantsService;
+  const authz = {
+    isOnEngine: vi.fn().mockResolvedValue(onEngine),
+  } as unknown as AuthzService;
 
   return {
     legacy,
@@ -138,6 +143,7 @@ function buildRepository({
       legacy,
       prisma,
       writer: () => writer,
+      authz,
     }),
   };
 }
@@ -150,15 +156,8 @@ const createParams = {
 };
 
 describe("LedgerShareRepository", () => {
-  beforeEach(() => {
-    resetAuthzEngineGateForTesting();
-  });
-  afterEach(() => {
-    resetAuthzEngineGateForTesting();
-  });
-
   describe("given the organization has not been cut over", () => {
-    it("writes every mutation through the Prisma repository, telling the ledger nothing", async () => {
+    it("keeps legacy writes while routing revocations through the AuthZ capability", async () => {
       const { repository, legacy, writer } = buildRepository({
         onEngine: false,
         grantIds: ["share_1"],
@@ -184,7 +183,9 @@ describe("LedgerShareRepository", () => {
       expect(legacy.deleteAllTraceShares).toHaveBeenCalledTimes(1);
       expect(legacy.consumeView).toHaveBeenCalledTimes(1);
       expect(writer.attachResourceGrant).not.toHaveBeenCalled();
-      expect(writer.revokeResourceGrants).not.toHaveBeenCalled();
+      // The service owns the per-organization cutover decision. Calling it is
+      // harmless on the legacy path and keeps that routing out of this adapter.
+      expect(writer.revokeResourceGrants).toHaveBeenCalledTimes(3);
     });
 
     it("reads through the Prisma repository, as it does for every organization", async () => {

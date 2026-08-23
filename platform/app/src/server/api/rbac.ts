@@ -1,5 +1,9 @@
-import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz";
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import type {
+  AuthzPermission,
+  AuthzService,
+  EnforcedScopeFields,
+} from "@langwatch/authz-contract";
+import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import {
@@ -8,8 +12,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { authzChecksFor } from "~/server/app-layer/authz/checks";
-import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
+import { getApp } from "~/server/app-layer/app";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
@@ -29,6 +32,16 @@ import { CUSTOM_ROLE_KIND } from "../role/role-kind";
  * legacy custom-role strings do so as plain strings, never as Permission.
  */
 export type Permission = AuthzPermission;
+
+type PermissionServiceContext = {
+  app?: { permissions: AuthzService };
+  prisma?: unknown;
+  session?: unknown;
+};
+
+function permissionsFor(ctx: PermissionServiceContext): AuthzService {
+  return ctx.app?.permissions ?? getApp().permissions;
+}
 
 /**
  * Resources that only exist at the organization tier — there is no team- or
@@ -991,12 +1004,11 @@ export async function resolveProjectPermission(
   // finished is decided by the engine; one that has not is decided by the
   // legacy walk.
   if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
+    await permissionsFor(ctx).isOnEngine({
       organizationId: context.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
+    const decision = await permissionsFor(ctx).checkByIds({
       principal: { type: "user", id: context.userId },
       permission,
       projectId,
@@ -1050,12 +1062,11 @@ export async function resolveProjectPermissionAny(
   // in the same order, stopping at the same first allow the legacy loop
   // below would have stopped at.
   if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
+    await permissionsFor(ctx).isOnEngine({
       organizationId: context.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).canAnyByIds({
+    const decision = await permissionsFor(ctx).canAnyByIds({
       principal: { type: "user", id: context.userId },
       permissions,
       projectId,
@@ -1158,12 +1169,11 @@ export async function resolveTeamPermission(
 
   // The organization is the one the team read above already resolved.
   if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
+    await permissionsFor(ctx).isOnEngine({
       organizationId: team.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
+    const decision = await permissionsFor(ctx).checkByIds({
       principal: { type: "user", id: userId },
       permission,
       teamId,
@@ -1206,11 +1216,8 @@ export async function hasOrganizationPermission(
 ): Promise<boolean> {
   const userId = ctx.session?.user?.id;
 
-  if (
-    userId &&
-    (await organizationOnAuthzEngine({ prisma: ctx.prisma, organizationId }))
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
+  if (userId && (await permissionsFor(ctx).isOnEngine({ organizationId }))) {
+    const decision = await permissionsFor(ctx).checkByIds({
       principal: { type: "user", id: userId },
       permission,
       organizationId,
@@ -1832,12 +1839,11 @@ export async function batchScopePermissions(
   // scope — the pool-starving fan-out api-key.service.ts documents.
   if (
     userId &&
-    (await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
+    (await permissionsFor(ctx).isOnEngine({
       organizationId: args.organizationId,
     }))
   ) {
-    const decision = await authzChecksFor(ctx.prisma).canBatchByIds({
+    const decision = await permissionsFor(ctx).canBatchByIds({
       principal: { type: "user", id: userId },
       permission: args.permission,
       organizationId: args.organizationId,

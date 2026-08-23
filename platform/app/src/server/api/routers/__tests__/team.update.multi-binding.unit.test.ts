@@ -5,7 +5,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext } from "../../trpc";
 import { teamRouter } from "../team";
 
@@ -23,8 +23,9 @@ const ledger = vi.hoisted(() => ({
   changeBindingRole: vi.fn(),
   revokeBindings: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ authzGrants: ledger }),
+  tryGetApp: () => null,
 }));
 
 // A user can hold MORE THAN ONE TEAM binding on a team — a built-in role plus
@@ -82,6 +83,7 @@ describe("team.update", () => {
         role: TeamUserRole.ADMIN,
         customRoleId: null,
         scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: ORG_ID,
       },
     ];
 
@@ -130,9 +132,13 @@ describe("team.update", () => {
       res: undefined,
       permissionChecked: true,
       publiclyShared: false,
+      app: {
+        agents: {} as never,
+        permissions: appPermissionsService(prisma),
+        authzGrants: ledger as never,
+      },
     });
     ctx.prisma = prisma;
-    ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
     caller = teamRouter.createCaller(ctx);
   });
 

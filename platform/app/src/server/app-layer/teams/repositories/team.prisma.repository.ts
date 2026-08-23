@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   type PrismaClient,
@@ -6,10 +7,7 @@ import {
   type Team,
   type TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   CreateTeamInput,
@@ -19,13 +17,21 @@ import type {
 } from "./team.repository";
 
 export class PrismaTeamRepository implements TeamRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
     // Team memberships are grants, and the ledger is their only writer since
     // ADR-092 delivery-plan PR 2. Injectable so a test can watch the commands
     // rather than the tables they end up in.
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+    writer?: AuthzGrantsService,
+  ) {
+    this.writerOverride = writer;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
 
   async findById(id: string): Promise<Team | null> {
     return this.prisma.team.findUnique({ where: { id } });

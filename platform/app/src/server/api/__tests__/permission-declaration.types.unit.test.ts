@@ -11,7 +11,7 @@
  * contract these pin.
  */
 import type { EndpointConfig } from "@langwatch/api";
-import type { Authorized } from "@langwatch/authz/witness";
+import type { Authorized } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
@@ -241,7 +241,7 @@ describe("typed permission declarations", () => {
     /**
      * The framework side of the same contract: an endpoint config carries
      * exactly one of a registry permission or a written opt-out
-     * (AccessDeclaration, @langwatch/authz). `build()` re-checks at boot.
+     * (AccessDeclaration, @langwatch/authz-contract). `build()` re-checks at boot.
      */
     /** @scenario "A service endpoint that declares no access fails to compile" */
     it("cannot be configured without an access declaration", () => {

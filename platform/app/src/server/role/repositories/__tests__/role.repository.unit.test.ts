@@ -9,9 +9,9 @@
  * front of the append, and these are its semantics.
  */
 import type { LedgerActor } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { RoleRepository } from "../role.repository";
 
 const ORG_ID = "org_acme";
@@ -29,7 +29,7 @@ function harness() {
   };
   const repository = new RoleRepository(
     db as unknown as PrismaClient,
-    writer as unknown as GrantsLedgerWriter,
+    writer as unknown as AuthzGrantsService,
   );
   return { db, writer, repository };
 }
@@ -223,7 +223,7 @@ describe("given an api key's exclusive roles being retired", () => {
     };
     const repository = new RoleRepository(
       db as unknown as PrismaClient,
-      writer as unknown as GrantsLedgerWriter,
+      writer as unknown as AuthzGrantsService,
     );
     return { db, writer, repository };
   }

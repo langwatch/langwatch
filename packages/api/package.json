@@ -22,7 +22,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@langwatch/authz": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

@@ -10,8 +10,12 @@ const ledger = vi.hoisted(() => ({
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
+const authz = vi.hoisted(() => ({
+  listUserCreatedRoles: vi.fn(),
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ authzGrants: ledger, permissions: authz }),
+  tryGetApp: () => null,
 }));
 
 // No `create`/`update`/`delete` here on purpose: since ADR-092 PR 2 a role
@@ -48,14 +52,13 @@ describe("RoleService", () => {
   });
 
   describe("getAllRoles()", () => {
-    it("queries with kind: custom", async () => {
-      prisma.customRole.findMany.mockResolvedValue([]);
+    it("lists user-created roles through the AuthZ capability", async () => {
+      authz.listUserCreatedRoles.mockResolvedValue([]);
 
       await service.getAllRoles("org_1");
 
-      expect(prisma.customRole.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org_1", kind: "custom" },
-        orderBy: { createdAt: "desc" },
+      expect(authz.listUserCreatedRoles).toHaveBeenCalledWith({
+        organizationId: "org_1",
       });
     });
   });

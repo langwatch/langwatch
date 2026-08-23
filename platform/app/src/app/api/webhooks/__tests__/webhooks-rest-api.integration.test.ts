@@ -38,11 +38,11 @@ vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
   // composition over the real test database so requests reach the routes.
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
-  const permissions = permissionsServiceFor(dbForPermissions);
+  const permissions = appPermissionsService(dbForPermissions);
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,

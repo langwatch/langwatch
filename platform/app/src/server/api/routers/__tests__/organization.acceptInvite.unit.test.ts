@@ -60,14 +60,11 @@ const ledger = vi.hoisted(() => ({
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
-}));
-
 vi.mock("../../../app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
+    authzGrants: ledger,
     notifications: {
       sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
     },

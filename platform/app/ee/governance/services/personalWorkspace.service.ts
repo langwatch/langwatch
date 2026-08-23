@@ -24,6 +24,7 @@
  */
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -34,10 +35,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:governance:personal-workspace");
@@ -63,13 +61,13 @@ export interface PersonalWorkspace {
 }
 
 export class PersonalWorkspaceService {
-  private readonly writer: GrantsLedgerWriter;
+  private readonly writer: AuthzGrantsService;
 
   constructor(
     private readonly prisma: PrismaClient,
-    deps: { writer?: GrantsLedgerWriter } = {},
+    deps: { writer?: AuthzGrantsService } = {},
   ) {
-    this.writer = deps.writer ?? grantsLedgerWriter();
+    this.writer = deps.writer ?? getApp().authzGrants;
   }
 
   /**

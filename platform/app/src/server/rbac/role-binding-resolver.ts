@@ -13,8 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
-import { authzChecksFor } from "../app-layer/authz/checks";
-import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
+import { getApp } from "../app-layer/app";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -307,8 +306,8 @@ export async function checkRoleBindingPermission({
   // The NAMED principal only, with no owner ceiling: this function reports
   // one principal's own grants and nothing else, which is its contract and
   // its suite's subject.
-  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
-    const decision = await authzChecksFor(prisma).checkByIds({
+  if (await getApp().permissions.isOnEngine({ organizationId })) {
+    const decision = await getApp().permissions.checkByIds({
       principal: resolvedPrincipal,
       permission,
       ceiling: false,
@@ -641,8 +640,8 @@ export async function resolveApiKeyPermission({
   // The engine states the same ceiling as algebra — effective(key) =
   // grants(key) ∩ grants(owner) — rather than as the four steps above. The
   // key's owner is resolved by the collector, so it is not passed here.
-  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
-    const decision = await authzChecksFor(prisma).checkByIds({
+  if (await getApp().permissions.isOnEngine({ organizationId })) {
+    const decision = await getApp().permissions.checkByIds({
       principal: { type: "apiKey", id: apiKeyId },
       permission,
       ...scopeRefToIds(scope, organizationId),

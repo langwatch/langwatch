@@ -1,13 +1,11 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   type PrismaClient,
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -24,10 +22,18 @@ import type {
 } from "./project.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+    writer?: AuthzGrantsService,
+  ) {
+    this.writerOverride = writer;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
 
   async getById(id: string): Promise<Project | null> {
     return this.prisma.project.findUnique({ where: { id } });

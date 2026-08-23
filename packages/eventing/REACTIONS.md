@@ -50,8 +50,13 @@ The subscriber is staged only after the projection repository and required
 cache commit. A failed projection write never exposes a partial document.
 
 Both subscriber forms are at-least-once after staging. Subscriber work is
-appropriate only when the handler is idempotent and the domain can tolerate
-the pre-staging loss window.
+appropriate only when the handler is idempotent for the source event and the
+domain can tolerate the pre-staging loss window. Every externally visible
+subscriber action must use a stable action identity derived from the
+subscriber action and source event identity, or atomically deduplicate and
+apply the action in one database transaction. Queue deduplication alone is not
+the idempotency boundary. Each product subscriber must have a redelivery test
+that handles the same source event twice and observes one result.
 
 ## Process managers
 

@@ -5,7 +5,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 
@@ -52,6 +52,7 @@ const prisma = {
         role: TeamUserRole.ADMIN,
         customRoleId: null,
         scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: "org_1",
       },
     ]),
   },
@@ -61,9 +62,13 @@ const createCaller = () => {
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_1" }, expires: "1" },
     permissionChecked: true,
+    app: {
+      agents: {} as never,
+      permissions: appPermissionsService(prisma),
+      authzGrants: {} as never,
+    },
   });
   ctx.prisma = prisma;
-  ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
   return evaluatorsRouter.createCaller(ctx);
 };
 

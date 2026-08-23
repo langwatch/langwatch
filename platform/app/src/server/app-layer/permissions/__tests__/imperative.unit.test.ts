@@ -10,7 +10,10 @@
  * specs/rbac/typed-permission-declarations.feature is the behavioural
  * contract these pin.
  */
-import type { Authorized } from "@langwatch/authz/witness";
+import {
+  type Authorized,
+  PermissionDeniedError,
+} from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { App } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
@@ -28,6 +31,39 @@ function appDeciding(permitted: boolean): App {
       getDecision: vi.fn().mockResolvedValue({
         permitted,
         organizationRole: null,
+      }),
+      resolveScope: vi.fn().mockImplementation((ids) => {
+        if (ids.projectId) {
+          return {
+            type: "project",
+            id: ids.projectId,
+            teamId: "team_1",
+            organizationId: "org_1",
+          };
+        }
+        if (ids.teamId) {
+          return {
+            type: "team",
+            id: ids.teamId,
+            organizationId: "org_1",
+          };
+        }
+        return ids.organizationId
+          ? { type: "organization", id: ids.organizationId }
+          : null;
+      }),
+      authorize: vi.fn().mockImplementation(({ permission, scope }) => {
+        if (!permitted) {
+          throw new PermissionDeniedError({
+            permission,
+            scope,
+            denialReason: "no-binding",
+          });
+        }
+        return {
+          permission,
+          scope: { tier: scope.type, id: scope.id },
+        };
       }),
     },
   } as unknown as App;

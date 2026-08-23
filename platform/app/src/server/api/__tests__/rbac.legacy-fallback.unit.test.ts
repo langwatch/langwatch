@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { type Permission, resolveTeamPermission } from "../rbac";
 
 const mockPrisma = {
@@ -33,13 +33,18 @@ const mockSession = {
   user: { id: "user-123", email: "sam@example.com" },
 } as any;
 
+const context = () => ({
+  prisma: mockPrisma,
+  session: mockSession,
+  app: { permissions: appPermissionsService(mockPrisma) },
+});
+
 describe("legacy TeamUser fallback at the resolver seam", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // A cold, explicit "not on the engine" answer: the gate cache is reset so
     // no other test's cached read leaks in, and the projection stub is what
     // keeps this suite on the legacy resolver path it exists to pin.
-    resetAuthzEngineGateForTesting();
     mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     mockPrisma.team.findUnique.mockResolvedValue({
       id: "team-1",
@@ -75,7 +80,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
       );
 
       const result = await resolveTeamPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "team-1",
         "team:manage" as Permission,
       );
@@ -96,7 +101,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
       });
 
       await resolveTeamPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "team-1",
         "team:manage" as Permission,
       );

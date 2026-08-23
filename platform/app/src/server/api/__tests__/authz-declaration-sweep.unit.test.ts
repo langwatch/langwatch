@@ -28,7 +28,7 @@ import {
   permissionGrantTiers,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { authorizeInResolver } from "../rbac";

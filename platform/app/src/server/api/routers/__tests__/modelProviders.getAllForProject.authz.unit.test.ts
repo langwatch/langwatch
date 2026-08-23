@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
 import { modelProviderRouter } from "../modelProviders";
@@ -116,18 +116,15 @@ function fixturePrisma(): PrismaClient {
         Promise.resolve(
           roleBindings.filter(
             (b) =>
+              typeof where.userId === "string" &&
+              b.userId === where.userId &&
               b.organizationId === where.organizationId &&
-              where.scopeId.in.includes(b.scopeId) &&
               // Mirrors the direct-binding predicate: the bound user must
               // currently be a member of the queried organization.
-              where.OR.some(
-                (clause: any) =>
-                  clause.userId === b.userId &&
-                  organizationUsers.some(
-                    (m) =>
-                      m.userId === b.userId &&
-                      m.organizationId === where.organizationId,
-                  ),
+              organizationUsers.some(
+                (m) =>
+                  m.userId === b.userId &&
+                  m.organizationId === where.organizationId,
               ),
           ),
         ),
@@ -140,13 +137,18 @@ function fixturePrisma(): PrismaClient {
 }
 
 function callerForUser(userId: string) {
+  const database = fixturePrisma();
   const ctx = createInnerTRPCContext({
     session: { user: { id: userId }, expires: "1" },
     req: undefined,
     res: undefined,
+    app: {
+      agents: {} as never,
+      permissions: appPermissionsService(database),
+      authzGrants: {} as never,
+    },
   });
-  ctx.prisma = fixturePrisma();
-  ctx.app = { permissions: permissionsServiceFor(fixturePrisma()) } as never;
+  ctx.prisma = database;
   return modelProviderRouter.createCaller(ctx);
 }
 

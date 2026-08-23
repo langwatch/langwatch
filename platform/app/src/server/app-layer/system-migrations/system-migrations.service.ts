@@ -18,7 +18,7 @@ import {
 
 /**
  * The statuses a tenant may be rolled back from. The same pair as
- * `ON_ENGINE_STATUSES` in ../authz/engine-gate.ts, but the premise
+ * the AuthZ package's cutover adapter, but the premise
  * is weaker than "already on the ledger": what `migrated` MEANS is each
  * migration's own business (the cutover parks tenants in `migrated` while
  * they merely WAIT on prerequisites or a cohort, and those never touched
@@ -646,7 +646,10 @@ export class SystemMigrationsService {
     minimumWriterGeneration: string;
     actorUserId: string;
   }): Promise<void> {
-    const record = await this.deps.state.findRecord({ migrationName, tenantId });
+    const record = await this.deps.state.findRecord({
+      migrationName,
+      tenantId,
+    });
     if (!record) throw new MigrationStateNotFoundError();
     if (record.status !== "migrated") {
       throw new MigrationDrainProofRequiresMigratedError({

@@ -1,4 +1,8 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,
@@ -7,12 +11,7 @@ import type {
   RoleBinding,
 } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
@@ -37,6 +36,9 @@ export type ApiKeyWithBindings = ApiKey & {
 export type ApiKeyPrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
 export class ApiKeyRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+  private readonly accessListingOverride: AuthzService | undefined;
+
   constructor(
     private readonly prisma: ApiKeyPrismaDelegate,
     /**
@@ -44,11 +46,20 @@ export class ApiKeyRepository {
      * the caller's transaction, so it is composed over the app's own client
      * rather than `prisma` above, which may be one.
      */
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
-      prisma,
-    ),
-  ) {}
+    writer?: AuthzGrantsService,
+    accessListing?: AuthzService,
+  ) {
+    this.writerOverride = writer;
+    this.accessListingOverride = accessListing;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
+  }
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);
@@ -498,7 +509,7 @@ export class ApiKeyRepository {
     // Through the per-organization fork (ADR-092, delivery-plan PR 3
     // follow-up): a cut-over organization's key drawer is served from the
     // ledger's own head.
-    const rows = await this.accessListing.findUserBindings({
+    const rows = await this.accessListing.listUserBindings({
       organizationId,
       userId,
     });

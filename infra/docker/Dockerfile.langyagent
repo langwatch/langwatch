@@ -124,8 +124,8 @@ COPY services/langyworker/scripts ./services/langyworker/scripts
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
 COPY packages/api/package.json ./packages/api/
-COPY packages/authz/package.json ./packages/authz/
-COPY packages/authz-server/package.json ./packages/authz-server/
+COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
+COPY packages/features/authz/server/package.json ./packages/features/authz/server/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/

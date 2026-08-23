@@ -33,12 +33,6 @@ vi.mock("~/server/db", () => ({ prisma: stubs.prisma }));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
 vi.mock("../../app", () => ({ tryGetApp: () => null }));
-vi.mock("../../authz/epoch", () => ({
-  bumpAuthzEpoch: vi.fn(),
-  getAuthzEpoch: vi.fn(),
-}));
-vi.mock("../../authz/ledger", () => ({ authzGrantsCommands: vi.fn() }));
-vi.mock("../../authz/runtime", () => ({ authzCollector: {} }));
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@langwatch/observability")>();

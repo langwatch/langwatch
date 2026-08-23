@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -27,14 +26,14 @@ export const authzRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const scope = await authzCollector.resolveScopeRef({
+      const scope = await ctx.app.permissions.resolveScope({
         projectId: input.projectId,
         organizationId: input.projectId ? undefined : input.organizationId,
       });
       if (!scope) {
         return { scope: null, permissions: [] as string[] };
       }
-      const permissions = await authz.effectivePermissions({
+      const permissions = await ctx.app.permissions.effectivePermissions({
         principal: { type: "user", id: ctx.session.user.id },
         scope,
       });

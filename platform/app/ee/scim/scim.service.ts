@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
@@ -9,10 +10,7 @@ import {
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -32,16 +30,16 @@ import { reconcileScimGrants } from "./scim-grants.reconciler";
  */
 export class ScimService {
   private readonly prisma: PrismaClient;
-  private readonly writer: GrantsLedgerWriter;
+  private readonly writer: AuthzGrantsService;
   private readonly userService: UserService;
   private readonly departmentService: DepartmentService;
 
   constructor({
     prisma,
-    writer = grantsLedgerWriter(),
+    writer = getApp().authzGrants,
   }: {
     prisma: PrismaClient;
-    writer?: GrantsLedgerWriter;
+    writer?: AuthzGrantsService;
   }) {
     this.prisma = prisma;
     this.writer = writer;
@@ -95,7 +93,7 @@ export class ScimService {
 
   static create(options: {
     prisma: PrismaClient;
-    writer?: GrantsLedgerWriter;
+    writer?: AuthzGrantsService;
   }): ScimService {
     return new ScimService(options);
   }

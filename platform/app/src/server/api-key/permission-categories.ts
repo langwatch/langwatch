@@ -4,7 +4,7 @@ import {
   type AuthzResource,
   permissionResource,
   permissionSatisfiedBy,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import type { Permission } from "../api/rbac";
 
 export type AccessLevel = "read" | "write";

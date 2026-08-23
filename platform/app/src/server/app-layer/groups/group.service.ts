@@ -410,7 +410,7 @@ export class GroupRestService {
       // The repository rejects duplicate identities rather than skipping
       // them: a skipped duplicate would return a binding id for a row that
       // was never created. Matched by CODE, never `instanceof`: the ledger's
-      // `DuplicateBindingError` arrives from `@langwatch/authz-server`, and
+      // `DuplicateBindingError` arrives from `@langwatch/authz-contract`, and
       // identity stops being reliable the moment that package is bundled or
       // serialised separately (the rule its declaration states).
       if (

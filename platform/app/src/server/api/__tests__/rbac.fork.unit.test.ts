@@ -17,10 +17,9 @@
  * stage-A4 shadow comparison, untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 
 // The stage-A4 shadow is stubbed rather than silenced: "the legacy path still
 // shadows" is half of what these tests assert, and a sample rate of zero
@@ -86,7 +85,11 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
   };
 
   return {
-    ctx: { prisma, session } as never,
+    ctx: {
+      prisma,
+      session,
+      app: { permissions: appPermissionsService(prisma as never) },
+    } as never,
     grantFindMany,
     roleBindingFindMany,
   };
@@ -94,7 +97,6 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAuthzEngineGateForTesting();
 });
 
 describe("the fork at the permission seams", () => {
@@ -132,7 +134,7 @@ describe("the fork at the permission seams", () => {
             ...(ctx as Record<string, unknown>),
             permissionChecked: false,
             app: {
-              permissions: permissionsServiceFor(
+              permissions: appPermissionsService(
                 (ctx as { prisma: never }).prisma,
               ),
             },

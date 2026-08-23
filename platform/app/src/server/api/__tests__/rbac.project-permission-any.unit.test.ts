@@ -10,7 +10,7 @@
  * once.
  */
 
-import { PermissionDeniedError } from "@langwatch/authz";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
@@ -18,8 +18,8 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { checkDeclaredPermissionAny } from "~/server/app-layer/authz/trpc-middleware";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import type { Session } from "~/server/auth";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import type { Permission } from "../rbac";
 
 const ORGANIZATION_ID = "organization_1";
@@ -50,7 +50,10 @@ const buildPrisma = (teamRole: TeamUserRole) => {
         },
       ]),
     },
-    teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
+    teamUser: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     systemMigrationTenantState: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
@@ -75,7 +78,7 @@ const runGate = ({
           prisma,
           session,
           permissionChecked: false,
-          app: { permissions: permissionsServiceFor(prisma as never) },
+          app: { permissions: appPermissionsService(prisma as never) },
         } as never,
         input: { projectId: PROJECT_ID },
         next,

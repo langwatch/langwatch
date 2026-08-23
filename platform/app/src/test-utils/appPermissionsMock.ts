@@ -1,54 +1,105 @@
-import { ForkAwarePermissionDecisionRepository } from "~/server/app-layer/permissions/permission-decision.repository";
-import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import type {
+  AuthzGetDecisionInput,
+  AuthzGetProjectAnyDecisionInput,
+  AuthzService,
+  PermissionDecision,
+} from "@langwatch/authz-contract";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { AuthzFeature } from "~/runtime/app/features/authz";
+import {
+  hasOrganizationPermission,
+  resolveProjectPermission,
+  resolveProjectPermissionAny,
+  resolveTeamPermission,
+} from "~/server/api/rbac";
 
-/**
- * Factory body for `vi.mock("~/server/app-layer/app", ...)` in tests that
- * drive a declared permission check (`.permission()` / `.permissionAny()` /
- * the REST credential middlewares) without initializing a real App.
- *
- * The returned App exposes the REAL `PermissionsService` over the REAL
- * `ForkAwarePermissionDecisionRepository`, so a test's existing
- * `vi.mock("~/server/api/rbac")` resolver stubs keep deciding every check —
- * only the App lookup is faked. The client handed to the repository is inert:
- * the fork-aware resolvers receive it as an argument and the stubs never
- * touch it.
- *
- * Usage:
- * ```ts
- * vi.mock("~/server/app-layer/app", async () => {
- *   const { appPermissionsMock } = await import(
- *     "~/test-utils/appPermissionsMock"
- *   );
- *   return appPermissionsMock();
- * });
- * ```
- */
-/**
- * Just the service, for tests whose own `vi.mock("~/server/app-layer/app")`
- * fake carries other groups — merge this in as `permissions`.
- */
-export function appPermissionsService(): PermissionsService {
-  return new PermissionsService({
-    decisions: new ForkAwarePermissionDecisionRepository({} as never),
-    // Credential (API-key) checks are a different seam with a heavier module
-    // graph; a test that needs them mocks the credential path itself.
-    credentials: {
-      findApiKeyDecision: () => {
-        throw new Error(
-          "credential checks are not stubbed by appPermissionsMock",
-        );
+class TestAuthzDatabaseAdapter {
+  static create(database: unknown): PrismaClient {
+    const root = (database ?? {}) as Record<PropertyKey, unknown>;
+    return new Proxy(root, {
+      get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (value !== undefined) {
+          return TestAuthzDatabaseAdapter.delegate(value);
+        }
+        return TestAuthzDatabaseAdapter.delegate({});
       },
-      findProjectScope: () => {
-        throw new Error(
-          "credential checks are not stubbed by appPermissionsMock",
-        );
+    }) as unknown as PrismaClient;
+  }
+
+  private static delegate(value: unknown): unknown {
+    if (typeof value !== "object" || value === null) return value;
+    return new Proxy(value as Record<PropertyKey, unknown>, {
+      get(target, property, receiver) {
+        const member = Reflect.get(target, property, receiver);
+        if (member !== undefined) return member;
+        if (property === "findMany") return async () => [];
+        if (property === "count") return async () => 0;
+        return async () => null;
       },
-    },
-  });
+    });
+  }
+}
+
+/** Test adapter that keeps legacy resolver mocks behind the contract service. */
+class ResolverBackedTestAuthzService {
+  constructor(private readonly prisma: unknown = {}) {}
+
+  async getDecision({
+    userId,
+    permission,
+    scope,
+  }: AuthzGetDecisionInput): Promise<PermissionDecision> {
+    const context = {
+      prisma: this.prisma as never,
+      session: { user: { id: userId }, expires: "" },
+    };
+    switch (scope.tier) {
+      case "project":
+        return resolveProjectPermission(context, scope.id, permission);
+      case "team":
+        return resolveTeamPermission(context, scope.id, permission);
+      case "organization":
+        return {
+          permitted: await hasOrganizationPermission(
+            context,
+            scope.id,
+            permission,
+          ),
+          organizationRole: null,
+        };
+    }
+  }
+
+  getProjectAnyDecision({
+    userId,
+    projectId,
+    permissions,
+  }: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision> {
+    return resolveProjectPermissionAny(
+      {
+        prisma: this.prisma as never,
+        session: { user: { id: userId }, expires: "" },
+      },
+      projectId,
+      permissions,
+    );
+  }
+}
+
+export function appPermissionsService(prisma?: unknown): AuthzService {
+  return AuthzFeature.create({
+    database: TestAuthzDatabaseAdapter.create(prisma),
+    redis: null,
+    newBindingId: () => "authz-test-binding",
+    cacheEnabled: () => false,
+    demoProjectId: () => undefined,
+  }).permissions;
 }
 
 export function appPermissionsMock() {
-  const permissions = appPermissionsService();
+  const permissions =
+    new ResolverBackedTestAuthzService() as unknown as AuthzService;
   return {
     getApp: () => ({ permissions }),
     tryGetApp: () => null,

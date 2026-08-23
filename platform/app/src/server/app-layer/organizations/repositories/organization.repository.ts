@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
+import type { AuthzCustomRole } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   Organization,
@@ -32,8 +33,8 @@ export type FullyLoadedOrganization = Organization & {
 };
 
 export type TeamMemberWithUser = TeamUser & {
-  user: User;
-  assignedRole?: CustomRole | null;
+  user: Pick<User, "id" | "name" | "email" | "image">;
+  assignedRole?: AuthzCustomRole | null;
 };
 
 export type TeamMemberWithTeam = TeamUser & {

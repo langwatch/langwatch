@@ -1,43 +1,19 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
 import type {
-  CustomRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-  User,
-} from "~/generated/prisma/client";
+  AuthzBindingForSynthesis,
+  AuthzTeamMemberBinding,
+} from "@langwatch/authz-contract";
+import type { RoleBindingScopeType } from "~/generated/prisma/client";
 
 // A direct (user, not group) TEAM-scoped binding, shaped to populate the
 // team-settings members list. Mirrors a legacy `TeamUser` row joined with its
 // user and assigned custom role, so callers can render members the same way
 // regardless of whether the membership predates the RoleBinding migration.
-export type TeamScopedMemberBinding = {
-  userId: string;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  user: User;
-  customRole: CustomRole | null;
-};
+export type TeamScopedMemberBinding = AuthzTeamMemberBinding;
 
 // Shared shape used by the org synthesis step
-export type RoleBindingForSynthesis = {
-  organizationId: string;
-  scopeType: RoleBindingScopeType;
-  scopeId: string;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  customRole: {
-    id: string;
-    name: string;
-    description: string | null;
-    permissions: unknown;
-    organizationId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  } | null;
-};
+export type RoleBindingForSynthesis = AuthzBindingForSynthesis;
 
 export interface RoleBindingRepository {
   listForOrganizationsAndUser(params: {

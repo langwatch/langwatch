@@ -102,9 +102,6 @@ import type { TraceSummaryData } from "../../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import { publishCancellation } from "../../scenarios/cancellation-channel";
 import type { ScenarioExecutionPool } from "../../scenarios/execution/execution-pool";
-import { createAuthzGrantsPipeline } from "../pipelines/authz-grants/pipeline";
-import type { GrantProjectionWriteStore } from "../pipelines/authz-grants/projections/authzGrantsWrite.projection";
-import type { AuthzAuditTrailStore } from "../pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import type { AutomationDispatchPorts } from "../pipelines/automations/automationDispatch.wiring";
 import { createAutomationsPipeline } from "../pipelines/automations/pipeline";
 import { createEvaluationAlertTriggerMatchHandler } from "../pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
@@ -349,14 +346,15 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
-  /** Where the grants pipeline's write instructions land (ADR-110). */
-  authzGrantsWrite: GrantProjectionWriteStore;
-  /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
-  authzAuditTrail: AuthzAuditTrailStore;
 }
 
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
+  /** Package-owned AuthZ definition; this registry only installs and binds it. */
+  authz: {
+    pipeline: StaticPipelineDefinition<any, any, any>;
+    connect(commands: unknown): void;
+  };
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
@@ -636,12 +634,10 @@ export class PipelineRegistry {
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.
-    this.deps.eventSourcing.register(
-      createAuthzGrantsPipeline({
-        authzGrantsWriteStore: this.deps.repositories.authzGrantsWrite,
-        authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
-      }),
+    const authzPipeline = this.deps.eventSourcing.register(
+      this.deps.authz.pipeline,
     );
+    this.deps.authz.connect(authzPipeline.commands);
 
     logger.info("All pipelines registered");
 

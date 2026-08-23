@@ -1,11 +1,13 @@
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import type { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";
@@ -15,18 +17,15 @@ const validateRolesAssignable = vi.fn();
 const organizationUserFindFirst = vi.fn();
 const groupFindFirst = vi.fn();
 const attachBindings = vi.fn();
-const bindingFindMany = vi.fn();
-const groupMembershipFindMany = vi.fn();
+const listOrganizationBindings = vi.fn();
 
 const prisma = {
   organizationUser: { findFirst: organizationUserFindFirst },
   group: { findFirst: groupFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
-  roleBinding: {
-    findMany: bindingFindMany,
-  },
-  groupMembership: { findMany: groupMembershipFindMany },
+  roleBinding: { findMany: vi.fn() },
+  groupMembership: { findMany: vi.fn() },
   // The listing reads go through the per-organization fork, which asks the
   // gate first. Answering it keeps these tests on the legacy head by choice;
   // without it the gate's read throws and they pass on the fail-safe.
@@ -40,7 +39,7 @@ const prisma = {
 const writer = {
   attachBindings,
   revokeBindings: vi.fn(),
-} as unknown as GrantsLedgerWriter;
+} as unknown as AuthzGrantsService;
 
 const repository = {
   validateScopeInOrg,
@@ -50,23 +49,26 @@ const roleService = {
   validateRolesAssignable,
 } as unknown as RoleService;
 
+const accessListing = {
+  listOrganizationBindings,
+} as unknown as AuthzService;
+
 let service: RoleBindingService;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAuthzEngineGateForTesting();
   validateScopeInOrg.mockResolvedValue(undefined);
   validateRolesAssignable.mockResolvedValue(undefined);
   organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });
   groupFindFirst.mockResolvedValue({ id: "group_1" });
   attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
-  bindingFindMany.mockResolvedValue([]);
-  groupMembershipFindMany.mockResolvedValue([]);
+  listOrganizationBindings.mockResolvedValue([]);
   service = new RoleBindingService({
     prisma,
     repo: repository,
     roleService,
     writer,
+    accessListing,
   });
 });
 
@@ -115,31 +117,11 @@ describe("RoleBindingService tenant references", () => {
     ).rejects.toMatchObject({ code: "user_not_in_organization" });
   });
 
-  it("filters stale foreign principals from organization reads", async () => {
+  it("routes organization reads through the AuthZ capability", async () => {
     await service.listForOrg({ organizationId: "org_1" });
 
-    expect(bindingFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          organizationId: "org_1",
-          OR: [
-            {
-              userId: { not: null },
-              user: {
-                orgMemberships: { some: { organizationId: "org_1" } },
-              },
-            },
-            {
-              groupId: { not: null },
-              group: { organizationId: "org_1" },
-            },
-            {
-              apiKeyId: { not: null },
-              apiKey: { organizationId: "org_1" },
-            },
-          ],
-        },
-      }),
-    );
+    expect(listOrganizationBindings).toHaveBeenCalledWith({
+      organizationId: "org_1",
+    });
   });
 });

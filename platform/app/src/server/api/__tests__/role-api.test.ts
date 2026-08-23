@@ -18,8 +18,12 @@ const ledger = vi.hoisted(() => ({
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
+const authz = vi.hoisted(() => ({
+  listUserCreatedRoles: vi.fn(),
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ authzGrants: ledger, permissions: authz }),
+  tryGetApp: () => null,
 }));
 
 // Mock Prisma client
@@ -98,7 +102,7 @@ describe("RoleService Tests", () => {
         },
       ];
 
-      mockPrisma.customRole.findMany.mockResolvedValue(mockRoles);
+      authz.listUserCreatedRoles.mockResolvedValue(mockRoles);
 
       const result = await roleService.getAllRoles("org-123");
 
@@ -122,12 +126,8 @@ describe("RoleService Tests", () => {
           updatedAt: expect.any(Date),
         },
       ]);
-      expect(mockPrisma.customRole.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-123",
-          kind: "custom",
-        },
-        orderBy: { createdAt: "desc" },
+      expect(authz.listUserCreatedRoles).toHaveBeenCalledWith({
+        organizationId: "org-123",
       });
     });
   });

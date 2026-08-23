@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
 import { declaredNoPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import {
@@ -64,7 +63,6 @@ describe("RBAC Integration Tests", () => {
     // A cold, explicit "not on the engine" answer, so the resolvers stay on
     // the legacy path these tests pin instead of the gate caching a failed
     // read of a missing delegate.
-    resetAuthzEngineGateForTesting();
     mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
     // Default: the caller IS a current member of the owning org — scoped
     // resolution fails closed on membership, so every test that exercises a

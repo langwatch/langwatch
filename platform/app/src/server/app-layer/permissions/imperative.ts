@@ -19,9 +19,8 @@
  * process singleton, never by handing a database client around. An
  * unauthenticated context is refused before any id is read.
  */
-import type { AuthzPermission } from "@langwatch/authz";
-import { PermissionDeniedError } from "@langwatch/authz";
-import { type Authorized, mintWitness } from "@langwatch/authz/witness";
+import type { Authorized, AuthzPermission } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { Session } from "~/server/auth";
 import { type App, getApp } from "../app";
 
@@ -89,14 +88,33 @@ async function requireAtTier<Tier extends "project" | "team" | "organization">({
   id: string;
   permission: AuthzPermission;
 }): Promise<Authorized<Tier>> {
-  if (await decide({ ctx, tier, id, permission })) {
-    return mintWitness({ tier, id, permission });
+  if (!ctx.session?.user) {
+    throw new PermissionDeniedError({
+      permission,
+      scope: { type: tier, id },
+      denialReason: "no-binding",
+    });
   }
-  throw new PermissionDeniedError({
-    permission,
-    scope: { type: tier, id },
-    denialReason: "no-binding",
+  const permissions = (ctx.app ?? getApp()).permissions;
+  const scope = await permissions.resolveScope({
+    ...(tier === "project"
+      ? { projectId: id }
+      : tier === "team"
+        ? { teamId: id }
+        : { organizationId: id }),
   });
+  if (!scope || scope.type !== tier) {
+    throw new PermissionDeniedError({
+      permission,
+      scope: { type: tier, id },
+      denialReason: "no-binding",
+    });
+  }
+  return permissions.authorize({
+    principal: { type: "user", id: ctx.session.user.id },
+    permission,
+    scope,
+  }) as Promise<Authorized<Tier>>;
 }
 
 /** Assert `permission` on the project; returns the witness or throws. */

@@ -9,13 +9,13 @@
  * disagree in the direction of more access.
  */
 
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
 } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
 
 const memberFindUnique = vi.fn();
@@ -60,7 +60,7 @@ const writer = {
   changeBindingRole,
   revokeBindings,
   revokeBindingsWhere,
-} as unknown as GrantsLedgerWriter;
+} as unknown as AuthzGrantsService;
 
 let repository: PrismaOrganizationRepository;
 

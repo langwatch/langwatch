@@ -21,7 +21,10 @@
  *
  * @see specs/traces-v2/sharing.feature
  */
-import { AuthzCollectorService } from "@langwatch/authz-server";
+import {
+  AUTHZ_ENGINE_MIGRATION_NAME,
+  type AuthzGrantsService,
+} from "@langwatch/authz-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -33,12 +36,9 @@ import {
   ShareVisibility,
   type Team,
 } from "~/generated/prisma/client";
+import { AuthzFeature } from "~/runtime/app/features/authz";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
-import type { GrantsLedgerWriter } from "../../authz/ledger";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
-import { GrantsAuthzReadRepository } from "../../authz/repositories/authz-read.grants.repository";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import { PrismaShareRepository } from "../repositories/share.prisma.repository";
 
@@ -66,13 +66,22 @@ describe("given a cut-over organization's capped share link", () => {
     revokeResourceGrants: async () => {
       throw new Error("this suite revokes nothing");
     },
-  } as unknown as GrantsLedgerWriter;
+  } as unknown as AuthzGrantsService;
+
+  const authz = AuthzFeature.create({
+    database: prisma,
+    redis: null,
+    newBindingId: () => nanoid(),
+    cacheEnabled: () => false,
+    demoProjectId: () => undefined,
+  }).permissions;
 
   const repository = () =>
     new LedgerShareRepository({
       legacy: new PrismaShareRepository(prisma),
       prisma,
       writer: () => writer,
+      authz,
     });
 
   const usage = () =>
@@ -158,7 +167,6 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   beforeEach(async () => {
-    resetAuthzEngineGateForTesting();
     // Every case starts from the handed-over budget, whatever the last one
     // spent.
     await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
@@ -177,7 +185,6 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   afterAll(async () => {
-    resetAuthzEngineGateForTesting();
     if (!organization?.id) return;
     await cleanupTestRows(prisma, [
       ["grantUsage", { organizationId: organization.id }],
@@ -265,50 +272,55 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   describe("when the engine reads the link back", () => {
-    const engineReader = () => new GrantsAuthzReadRepository(prisma);
+    const resourceScope = () => ({
+      type: "resource" as const,
+      kind: "trace" as const,
+      id: traceId,
+      projectId: project.id,
+      teamId: team.id,
+      organizationId: organization.id,
+      shareTokens: [token],
+    });
 
     /** @scenario "A cut-over organization's share link consumes its remaining budget" */
     it("reports the views this repository counted", async () => {
       await consume();
 
-      const links = await engineReader().findShareLinks({
-        projectId: project.id,
-        tokens: [token],
-        links: [{ kind: "trace", id: traceId }],
+      const decision = await authz.check({
+        principal: { type: "anonymous" },
+        permission: "traces:view",
+        scope: resourceScope(),
       });
 
-      expect(links).toEqual([
-        expect.objectContaining({
-          resourceId: traceId,
-          maxViews: MAX_VIEWS,
-          viewCount: SEEDED_VIEWS + 1,
-        }),
-      ]);
+      expect(decision.allowed).toBe(true);
     });
 
     /** @scenario "An exhausted share link stays exhausted after cutover" */
     it("grants nothing once the budget is spent", async () => {
-      const collector = new AuthzCollectorService(engineReader());
-      const scope = await collector.resolveResourceScopeRef({
-        projectId: project.id,
-        kind: "trace",
-        id: traceId,
-        shareTokens: [token],
-      });
-      expect(scope).not.toBeNull();
-
       // While a view remains, possession of the token is a grant.
-      expect(await collector.collectResourceGrants({ scope: scope! })).toEqual([
-        expect.objectContaining({ id: traceId, permission: "traces:view" }),
-      ]);
+      expect(
+        (
+          await authz.check({
+            principal: { type: "anonymous" },
+            permission: "traces:view",
+            scope: resourceScope(),
+          })
+        ).allowed,
+      ).toBe(true);
 
       await consume();
 
       // Spent: the row is still there and the token is still presented, and
       // the link confers nothing at all.
-      expect(await collector.collectResourceGrants({ scope: scope! })).toEqual(
-        [],
-      );
+      expect(
+        (
+          await authz.check({
+            principal: { type: "anonymous" },
+            permission: "traces:view",
+            scope: resourceScope(),
+          })
+        ).allowed,
+      ).toBe(false);
     });
   });
 });

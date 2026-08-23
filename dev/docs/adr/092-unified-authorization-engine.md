@@ -13,15 +13,22 @@ aggregate of nothing; there is no cutover flag (ADR-110 deletes it and the
 aggregates entirely onto `SystemMigrationTenantState`. Everything else here
 stands.
 
+The package names and implementation placement in this ADR are also
+superseded by the
+[AuthZ feature boundary](../../../packages/features/authz/adrs/001-package-boundary.md).
+The portable contract is now `@langwatch/authz-contract`; concrete services,
+Prisma-compatible repositories, Redis and Eventing adapters, projections and
+the domain migration live in `@langwatch/authz-server`; the application
+runtime root and process-role-aware preset retain composition and transport
+ownership. Authorization semantics in this ADR are unchanged.
+
 ## Decision, in one paragraph
 
-We will collapse LangWatch authorization into one three-layer module in the
-app-layer service/repository idiom: `@langwatch/authz` (the vocabulary and
-the pure `AuthzEngine`, browser-safe), `@langwatch/authz-server` (the service
-classes - collector, checking, grants, shadow - over two repository
-interfaces, storage-engine-free), and the app's `server/app-layer/authz/` (the Prisma
-repository implementations, the redis epoch store, the tRPC adapter, and the
-composition root). Built from three nouns - **permission** (a verb on a
+We will collapse LangWatch authorization into one feature: the browser-safe
+`@langwatch/authz-contract` vocabulary and pure `AuthzEngine`, concrete
+services and private infrastructure in `@langwatch/authz-server`, and a thin
+application runtime or transport adapter. Built from three nouns -
+**permission** (a verb on a
 resource), **role** (a named set of permissions), **role binding** (who holds
 which role, where) -
 resolved by **one engine** that every surface (tRPC, Hono, services, workers,
@@ -130,7 +137,7 @@ This is the part of the ADR where the receipts live - skip to the Decision if
 you already believe us. The current system is ADR-001's RBAC after years of
 accretion, plus a strangler migration to scoped role bindings that stopped
 halfway. Both generations are live and load-bearing. The same question -
-*"can alice update this prompt?"* - is answered by different code depending
+_"can alice update this prompt?"_ - is answered by different code depending
 on which door the request came through:
 
 ```
@@ -168,7 +175,7 @@ Concretely, all verified in-tree, July 2026:
    **client-side** copy in `useOrganizationTeamProject.hasPermission`
    (`hooks/useOrganizationTeamProject.ts:397`), which re-derives decisions
    from the server's role bags bundled into the browser. Two of them carry a
-   literal *"must stay in sync with…"* comment (`rbac.ts:832`,
+   literal _"must stay in sync with…"_ comment (`rbac.ts:832`,
    `role-binding-resolver.ts:239`). They have already diverged: the tRPC
    resolver caps org-scoped bindings for EXTERNAL users (`rbac.ts:807`), the
    API-key resolver applies no such cap
@@ -179,7 +186,7 @@ Concretely, all verified in-tree, July 2026:
 
 2. **The spec and the code disagree on the core semantic.**
    `specs/rbac/scoped-role-bindings.feature` specifies
-   *most-specific-scope-wins* ("Project-level binding **overrides**
+   _most-specific-scope-wins_ ("Project-level binding **overrides**
    team-level binding": org Admin + project Viewer means effective Viewer).
    Every implementation does an **additive union** ("permitted if ANY binding
    grants"). `role-binding-resolver.ts` disagrees with itself, even - the
@@ -192,7 +199,7 @@ Concretely, all verified in-tree, July 2026:
    `${Resource}:${Action}` (`rbac.ts:113`), so `traces:rotate` and
    `cost:attach` typecheck, and the custom-role validator
    (`server/rbac/custom-role-permissions.ts:6`) accepts them into the
-   database. Which actions a resource *actually* supports lives in four
+   database. Which actions a resource _actually_ supports lives in four
    disconnected places: the role bags (`rbac.ts:168-437`, roughly 200
    hand-ordered lines where ADMIN and MEMBER are near-duplicate lists
    maintained by eye), a roles-UI if-chain (`utils/permissionsConfig.ts:40`)
@@ -201,7 +208,7 @@ Concretely, all verified in-tree, July 2026:
    quietly includes `project:delete`), and the permission-picker's own
    client-side hierarchy rules (`PermissionSelector.tsx:60-110`) which differ
    from the server's (`rbac.ts:484-492`). The drift is measurable. A custom
-   role can *store* `virtualKeys:manage` but the UI can neither author nor
+   role can _store_ `virtualKeys:manage` but the UI can neither author nor
    display it (`PermissionViewer` silently hides grants outside its
    catalogue). An **empty** custom role locks the entire UI while the server
    falls through to a viewer-level bag
@@ -215,7 +222,7 @@ Concretely, all verified in-tree, July 2026:
    dual-write `OrganizationUser` plus an ORGANIZATION-scoped `RoleBinding`
    (`server/better-auth/hooks.ts:137-152`). Old users still resolve through
    `TeamUser` fallbacks inside every resolver. `OrganizationUser.role` is
-   authoritative for EXTERNAL restrictions but explicitly *not* for ADMIN
+   authoritative for EXTERNAL restrictions but explicitly _not_ for ADMIN
    power (`rbac.ts:1050-1057`) - the same column means different things
    depending on its value. Meanwhile six `where: { role: "ADMIN" }` queries
    (usage-limit notifications, langy attribution, `resolveOrgAdminEmail`,
@@ -225,7 +232,7 @@ Concretely, all verified in-tree, July 2026:
 
 5. **One enum, scope-dependent meaning.** `RoleBinding.role` reuses
    `TeamUserRole`. At team scope ADMIN means the team bag. At org scope ADMIN
-   means *everything* and MEMBER means *the org bag only* - special-cased at
+   means _everything_ and MEMBER means _the org bag only_ - special-cased at
    `rbac.ts:797-814` and again at `role-binding-resolver.ts:249-257`. A
    role's meaning should come from the role, not from where the binding
    sits.
@@ -310,7 +317,7 @@ since January** - every feature family (governance, gateway, ops, API keys,
 model providers, sharing) has had to modify the core authz file to ship. PR
 #4283's audit of the Hono surface found **26 routes with no authorization
 gate, 31 with a wrong or too-weak permission, 2 cross-tenant exposures, and
-189 routes without a permission regression test**. Those gaps exist *because*
+189 routes without a permission regression test**. Those gaps exist _because_
 enforcement is per-surface. Issues #1247 (consolidate the permission
 modules), #4008 (type-level permission enforcement for Hono), #3685
 (governance granularisation), #3429 and #3388 all ask for pieces of the same
@@ -322,10 +329,10 @@ fix. ADR-001 itself now cites a helper (`checkPermissionOrThrow`) and a file
 This ADR is a consolidation, not a rewrite of the data model. Five things in
 today's design are genuinely good and survive intact:
 
-- the `resource:action` vocabulary and the tuple *model* behind `RoleBinding`
-  - it *is* a Zanzibar-style tuple store, groups and API keys included. (The
-  model survives; the storage is reborn as the event-sourced `Grant` table in
-  §13, with `RoleBinding` continuing as a derived compat view until contract);
+- the `resource:action` vocabulary and the tuple _model_ behind `RoleBinding`
+  - it _is_ a Zanzibar-style tuple store, groups and API keys included. (The
+    model survives; the storage is reborn as the event-sourced `Grant` table in
+    §13, with `RoleBinding` continuing as a derived compat view until contract);
 - the tRPC builder that makes a permission middleware impossible to skip
   (`permissionProcedureBuilder` exposes only `.input`/`.use`, then splices in
   `enforcePermissionCheck` - `trpc.ts:721,238`);
@@ -348,7 +355,7 @@ A single `as const` registry declares every resource, the actions it supports, t
 it, and its presentation metadata. Everything else is **derived** from it:
 
 ```
- packages/authz/src/registry.ts
+ packages/features/authz/contract/src/registry.ts
  ┌─────────────────────────────────────────────────────────────────┐
  │ traces:       actions: view · share · create · update           │
  │               scopes:  project · team · org                     │
@@ -375,8 +382,8 @@ permission") stops being a special case and becomes data the engine reads. A
 `platform` scope makes `ops:*` grantable by exactly one source (§4) instead
 of being vocabulary no role can hold.
 
-Built-in roles are declared in the same module *as differences, not
-duplicates*:
+Built-in roles are declared in the same module _as differences, not
+duplicates_:
 
 ```
  viewer      = every registry resource's `view` (where scope fits)
@@ -392,7 +399,7 @@ and hoping.
 ### 2. One resolver, one decision shape
 
 The six-step walk pictured above is implemented **once**, in
-`packages/authz/src/engine.ts`, and every caller uses it:
+`packages/features/authz/contract/src/engine.ts`, and every caller uses it:
 
 - The batch case (`batchScopePermissions`, the model-defaults page) is the
   same function taking N scopes. Collect once, decide N times in memory.
@@ -406,17 +413,18 @@ The six-step walk pictured above is implemented **once**, in
   deleted.
 
 `AuthzDecision` is the only output shape. `PermissionResult.organizationRole`
+
 - today's way of smuggling "was this a lite member?" to error-message code -
-is replaced by `denialReason: "lite-member-restricted" | "no-binding" | …`,
-and a denial maps to a `PermissionDeniedError extends HandledError`
-(ADR-045). That fixes today's plain-`Error` throw in `PermissionsService` and
-the `TRPCError`s thrown from supposedly framework-free modules. Step 6
-(RECORD) gives us, for free, the structured authz audit trail that today
-exists only for tRPC error paths.
+  is replaced by `denialReason: "lite-member-restricted" | "no-binding" | …`,
+  and a denial maps to a `PermissionDeniedError extends HandledError`
+  (ADR-045). That fixes today's plain-`Error` throw in `PermissionsService` and
+  the `TRPCError`s thrown from supposedly framework-free modules. Step 6
+  (RECORD) gives us, for free, the structured authz audit trail that today
+  exists only for tRPC error paths.
 
 ### 3. Grant semantics: additive union, settled
 
-We keep - and now *specify* - what the code has always done:
+We keep - and now _specify_ - what the code has always done:
 
 ```
  UNION (chosen)                          MOST-SPECIFIC-WINS (rejected, was spec'd)
@@ -576,7 +584,7 @@ list gets a "why?":
 Because the engine is a pure function over collected bindings, edits get an
 impact preview for free: run it twice (current vs draft bindings) and diff
 the effective sets - "this change removes `datasets:manage` from 3 people in
-2 projects" *before* save. Registry metadata (per-permission labels and
+2 projects" _before_ save. Registry metadata (per-permission labels and
 descriptions) supplies the copy. The matrix codegen (§1) supplies the docs.
 
 ### 7. Fail-closed, four layers deep
@@ -720,7 +728,7 @@ registry makes ownership a declared fact:
  path shows up in explain() like any other grant
 ```
 
-Restricted API keys keep today's genuinely good *model* - their permission
+Restricted API keys keep today's genuinely good _model_ - their permission
 set is a role (`kind: "system_api_key"`, a `Role` row post-ledger, projected
 back into `CustomRole` for the compat view) bound through the same tuple
 table - and keep the owner ceiling, `effective(key) = grants(key) ∩
@@ -752,8 +760,9 @@ choice instead of implying it.
 
 Two of today's escapes close as a consequence: service keys with zero
 bindings silently defaulting to org-wide ADMIN (`api-key.service.ts:151-161`
+
 - becomes: zero bindings, zero access, creation must bind explicitly), and
-the API-key resolver ignoring lite-member status (Context #10).
+  the API-key resolver ignoring lite-member status (Context #10).
 
 ### 10. Offboarding: one verb, with proof
 
@@ -784,7 +793,7 @@ one transaction with a postcondition:
              reassign or archive, never silently kept)
 ```
 
-The proof step is the point. *"Is dave fully out?"* becomes an engine query,
+The proof step is the point. _"Is dave fully out?"_ becomes an engine query,
 not an audit project - and the same query powers a standing "what can dave
 touch?" view in the Access surface at any time, not just at departure. The
 registry's `ownerImplicit` declarations double as the sweep's checklist: the
@@ -797,9 +806,9 @@ reassignment (this is what `virtualKeys:viewOtherPersonal` was invented for;
 the sweep generalises it). SCIM deprovisioning calls the same verb instead of
 its own deletion path (`scim.service.ts:452` today). And history survives:
 bindings are deleted, but the audit stream keeps who held what, when, and
-which binding decided each access - "every grant they've *ever* had" stays
+which binding decided each access - "every grant they've _ever_ had" stays
 answerable for SOC 2 review even after revocation. Because there is no
-default access anywhere (§3), a hypothetically missed row is a *visible*
+default access anywhere (§3), a hypothetically missed row is a _visible_
 binding that an access review or the dormant-binding detector will surface.
 Never invisible ambient access.
 
@@ -904,11 +913,11 @@ per-check query tax.
 
 **2026-08-17: the version integer is the projection cursor, not a bumped
 epoch.** The original design hand-bumped a per-org epoch on every write and
-therefore carried a precondition ("holds only once *every* write path bumps
+therefore carried a precondition ("holds only once _every_ write path bumps
 it" - the old delivery-plan gate M7) and a flag to hold it closed until then.
 The grants ledger (§13) dissolves the precondition: the per-org version is
 `AuthzProjectionCursor`, advanced by the projection writer itself - the write
-*is* the bump, so no write path can skip it and no runbook gate is needed.
+_is_ the bump, so no write path can skip it and no runbook gate is needed.
 The Redis epoch store that stage B shipped keeps being bumped unchanged until
 the contract PR retires it in favour of the cursor (delivery-plan decision
 19). The coarseness is deliberate either way: one version per org means any
@@ -917,12 +926,13 @@ are rare, and a re-collect is the same 1-2 queries the engine already does.
 
 ### 13. Storage and rollout: the grants ledger (rewritten in place, 2026-08-17)
 
-*This section replaces the original "six shippable stages" (A-F) plan. The
+\*This section replaces the original "six shippable stages" (A-F) plan. The
 stage names survive only as labels for work already merged: A = the engine
 (#6894), B = the self-migration (#7079). The full delivery detail - shapes,
 event vocabulary, PR bills of materials, pre-flight facts, testing doctrine
+
 - lives in `dev/docs/adr/110-grant-aggregates-are-grants.md` (21 dated
-decisions); what follows is the decision itself.*
+  decisions); what follows is the decision itself.\*
 
 **Grants are event-sourced.** The ClickHouse `event_log` is the single
 source of truth for every access fact (aggregate `authz_grants`,
@@ -976,7 +986,7 @@ order — the append order — and one thing that applies it.
 
 **Revocation is instant anyway — as enforcement, not as a fold.** For
 `grants.revoke`, `member_offboarded`, and `cutover_rolled_back`, after the
-append is accepted the service synchronously applies the *deny effect* on
+append is accepted the service synchronously applies the _deny effect_ on
 the calling path: it deletes the affected `Grant` projection rows right
 there, without waiting for the queue. The fold later applies the same event
 in its FIFO position; deleting an absent row is a no-op, so early
@@ -985,7 +995,7 @@ revocation: with the queue down, the append and the enforcement still
 happen and the fold catches up when the queue returns. This is the **one
 sanctioned direct projection write** by application code — the "one writer"
 doctrine's single named exception — and it is shaped so it can only make
-*deny* true early, never grant. Known edge, accepted: revoking a grant
+_deny_ true early, never grant. Known edge, accepted: revoking a grant
 whose attach event is still queued deletes nothing (no row yet); the attach
 then the revoke apply in order and the state converges to revoked.
 
@@ -1081,7 +1091,7 @@ one-liner:
 - **Linked / secondary accounts** - one human, several identities: COLLECT
   already unions `{user} ∪ groups`, linked ids are one more set (§4).
 - **Access reviews / SOC 2 evidence** - the matrix codegen plus a bindings
-  dump *is* the quarterly review artefact; "who can see PII in project X" is
+  dump _is_ the quarterly review artefact; "who can see PII in project X" is
   one engine query.
 - **Authz anomaly detection** - the AuthzDecision stream (step 6, RECORD)
   feeds the existing governance activity monitor: denial spikes, dormant
@@ -1098,7 +1108,7 @@ one-liner:
 Oso)?** LangWatch ships self-hosted. A mandatory stateful authz sidecar is a
 real adoption tax, and every check becomes a network hop. Our scope graph is
 a fixed three-level tree with group expansion - the part of Zanzibar we need
-is the *tuple model*, which `RoleBinding` already is. We take the ideas
+is the _tuple model_, which `RoleBinding` already is. We take the ideas
 (tuples, union semantics, one decision API) without the infrastructure. If we
 ever need cross-org relation graphs, the engine's `can()` seam is where an
 external system would slot in.
@@ -1114,8 +1124,8 @@ crossed with RLS policies are notoriously hard to test and reason about.
 Tenancy-by-ID guards (ADR-021) stay the SQL-layer defence. Authz stays
 application logic.
 
-**Why settle union vs override now?** Because it is currently *unsettled in
-writing* while settled in behaviour - the worst of both. Choosing union
+**Why settle union vs override now?** Because it is currently _unsettled in
+writing_ while settled in behaviour - the worst of both. Choosing union
 matches the entire production history of role bindings, keeps grants monotone
 (auditable), and costs us only spec scenarios nobody has ever exercised.
 
@@ -1149,7 +1159,7 @@ deliberately out of scope.
   the teaching aid); shadow mode is temporary complexity; no behaviour
   change needs customer comms (both candidates closed 2026-08-17 - no key
   sunset, and empty-role-deny measured at zero blast radius); an in-repo
-  engine means *we* own performance (mitigated: the engine's
+  engine means _we_ own performance (mitigated: the engine's
   collect-once/decide-many shape is strictly fewer queries than today's
   per-check fan-out, and §12's version cache - new machinery we must
   observe - ships shadow-compared before it is trusted).
@@ -1176,8 +1186,8 @@ deliberately out of scope.
   possession-not-existence invariant is preserved by the collector either way.
 - The ledger's lineage (all §13): [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
   (the pipeline architecture; its web-role rule holds unchanged — the
-  instant-enforcement write is a service write, not inline processing), [ADR-022](./022-event-log-source-of-truth.md) (*event_log
-  as single source of truth* - cite by title, two files share the number;
+  instant-enforcement write is a service write, not inline processing), [ADR-022](./022-event-log-source-of-truth.md) (_event_log
+  as single source of truth_ - cite by title, two files share the number;
   the waited `async_insert` append is its pattern; `leanForProjection`
   conformance is a no-op here, no heavy fields),
   [ADR-015](../../../packages/eventing/adrs/015-projection-replay-coordination.md) (the replay protocol
@@ -1189,13 +1199,13 @@ deliberately out of scope.
   [ADR-049](./049-langy-projection-independent-reactions.md)
   (store-before-dispatch, preserved verbatim by waiting the append).
 - Related: [ADR-070](./070-modular-package-architecture.md) (bounded-context
-  packages). The engine ships as two of them: `@langwatch/authz` is the pure
-  vocabulary and decision core - Prisma-free, env-free, browser-safe, so the
-  frontend can import the vocabulary without dragging the server graph -
-  and `@langwatch/authz-server` holds the services over repository
-  *interfaces*, with the Prisma implementations and the composition root
-  staying in the app. The dependency direction ADR-070 asks for is what
-  lets one engine serve both sides.
+  packages) and the
+  [AuthZ feature boundary](../../../packages/features/authz/adrs/001-package-boundary.md).
+  `@langwatch/authz-contract` is the Prisma-free, env-free, browser-safe
+  vocabulary and decision core. `@langwatch/authz-server` owns concrete
+  services and private infrastructure; the application runtime root composes
+  them and the process-role-aware preset selects consumers without exposing
+  repositories to ordinary callers.
 - Spec: `specs/rbac/unified-authorization-engine.feature` (this ADR);
   supersedes the override scenarios in `specs/rbac/scoped-role-bindings.feature`.
 - Delivery: [ADR-110](110-grant-aggregates-are-grants.md) carries the final
@@ -1203,4 +1213,4 @@ deliberately out of scope.
   delivery-plan doc was retired into it).
 - Evidence: `dev/docs/security/hono-api-rbac-audit.md` (PR #4283); issues
   #1247, #3388, #3429, #3685, #4008; `git log --since=2026-01-01 --
-  langwatch/src/server/api/rbac.ts` (28 commits).
+langwatch/src/server/api/rbac.ts` (28 commits).

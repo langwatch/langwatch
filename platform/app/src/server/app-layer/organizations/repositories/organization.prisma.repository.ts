@@ -1,5 +1,9 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { ledgerActorFor } from "@langwatch/actor";
+import type {
+  AuthzGrantsService,
+  AuthzLedgerBindingAttach,
+} from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { User } from "~/generated/prisma/client";
@@ -13,11 +17,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-  type LedgerBindingAttach,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -291,7 +291,7 @@ type ScopeBindingPlan = {
     role: TeamUserRole;
     customRoleId: string | null;
   };
-  attach?: LedgerBindingAttach;
+  attach?: AuthzLedgerBindingAttach;
 };
 
 /**
@@ -306,7 +306,7 @@ async function emitScopeBindingPlans({
   plans,
   actor,
 }: {
-  writer: GrantsLedgerWriter;
+  writer: AuthzGrantsService;
   organizationId: string;
   plans: ScopeBindingPlan[];
   actor: LedgerActor;
@@ -341,10 +341,18 @@ async function emitScopeBindingPlans({
 }
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+    writer?: AuthzGrantsService,
+  ) {
+    this.writerOverride = writer;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
 
   getClient(): PrismaClient {
     return this.prisma;

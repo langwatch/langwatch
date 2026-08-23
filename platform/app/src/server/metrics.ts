@@ -256,6 +256,15 @@ export const getAuthzDirectProjectionWriteCounter = (
   reason: "revocation" | "offboard",
 ) => authzDirectProjectionWriteCounter.labels(reason);
 
+register.removeSingleMetric("authz_engine_gate_read_failures_total");
+const authzEngineGateReadFailuresCounter = new Counter({
+  name: "authz_engine_gate_read_failures_total",
+  help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+});
+
+export const getAuthzEngineGateReadFailuresCounter = () =>
+  authzEngineGateReadFailuresCounter;
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer

@@ -1,4 +1,4 @@
-import { ALL_PERMISSIONS } from "@langwatch/authz";
+import { ALL_PERMISSIONS } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { hasPermissionWithHierarchy } from "../../api/rbac";
 import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";

@@ -6,7 +6,7 @@ Feature: Typed permission declarations
   runtime failure in production
 
   # Spec for ADR-092 delivery-plan PR 4, decision 25 (the declared surface).
-  # The registry (packages/authz/src/registry.ts) already states, per
+  # The registry (packages/features/authz/contract/src/registry.ts) states, per
   # resource, the scope tiers it can be granted at; this feature makes the
   # declaration surfaces derive their typing from that single source. The
   # scenarios about compile errors are bound by type-assertion tests that

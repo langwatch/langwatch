@@ -1,5 +1,5 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";

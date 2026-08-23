@@ -1,4 +1,4 @@
-import { arbitrateClaims } from "@langwatch/authz";
+import { arbitrateClaims } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";

@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import type {
   Group,
   GroupMembership,
@@ -6,7 +7,6 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { AccessListingBindingRow } from "~/server/app-layer/authz/repositories/access-listing.repository";
 
 export interface GroupWithDetails extends Group {
   _count: { members: number };
@@ -109,7 +109,7 @@ export interface GroupRepository {
   findBindings(params: {
     organizationId: string;
     groupId: string;
-  }): Promise<AccessListingBindingRow[]>;
+  }): Promise<AuthzAccessBinding[]>;
 
   createBinding(params: {
     data: CreateBindingInput;

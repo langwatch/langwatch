@@ -1,4 +1,5 @@
 import { ledgerActorFor } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
@@ -11,10 +12,6 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
@@ -266,13 +263,21 @@ interface ApproveInviteInput {
  * Dependencies are injected to follow DIP and enable testability.
  */
 export class InviteService {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
     private readonly licenseRepo: ILicenseEnforcementRepository,
     private readonly planProvider: PlanProvider,
     private readonly roleService?: RoleService,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+    writer?: AuthzGrantsService,
+  ) {
+    this.writerOverride = writer;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
 
   /**
    * Factory method for creating InviteService with default dependencies.
@@ -287,14 +292,23 @@ export class InviteService {
    */
   static create(
     prisma: PrismaClient | Prisma.TransactionClient,
-    options?: { planProvider?: PlanProvider },
+    options?: {
+      planProvider?: PlanProvider;
+      authzGrants?: AuthzGrantsService;
+    },
   ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
     const provider: PlanProvider = options?.planProvider ?? {
       getActivePlan: (params) => getApp().planProvider.getActivePlan(params),
     };
     const roleService = new RoleService(prisma);
-    return new InviteService(prisma, licenseRepo, provider, roleService);
+    return new InviteService(
+      prisma,
+      licenseRepo,
+      provider,
+      roleService,
+      options?.authzGrants,
+    );
   }
 
   /**

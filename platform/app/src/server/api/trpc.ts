@@ -45,8 +45,8 @@ import type {
   ScopeTierField,
   ValidatePermissionForInput,
   ViaFieldFor,
-} from "@langwatch/authz";
-import { authzDeclarationOf } from "@langwatch/authz";
+} from "@langwatch/authz-contract";
+import { authzDeclarationOf } from "@langwatch/authz-contract";
 import {
   HandledError,
   isZodLikeError,
@@ -131,6 +131,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
         prisma,
         session: opts.session,
         permissions: getApp().permissions,
+        authzGrants: getApp().authzGrants,
       }),
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,

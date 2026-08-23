@@ -1,3 +1,7 @@
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -10,15 +14,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { isCustomRole } from "~/server/api/enterprise";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import {
-  ACCESS_LISTING_USER_SELECT,
-  type AccessListingRepository,
-} from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -45,6 +41,13 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 
 const logger = createLogger("langwatch:teams:team.service");
+
+const TEAM_MEMBER_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+} as const satisfies Prisma.UserSelect;
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -222,27 +225,35 @@ function directAdminUserIdsAfterPlan({
 export class TeamService {
   private readonly prisma: PrismaClient;
   private readonly roleBindingRepo: RoleBindingRepository;
-  private readonly writer: GrantsLedgerWriter;
+  private readonly writerOverride: AuthzGrantsService | undefined;
   // Listing reads go through the per-organization fork (ADR-092,
   // delivery-plan PR 3 follow-up): a cut-over organization's team pages are
   // served from the ledger's own head.
-  private readonly accessListing: AccessListingRepository;
+  private readonly accessListingOverride: AuthzService | undefined;
 
   constructor({
     prisma,
     roleBindingRepo = new PrismaRoleBindingRepository(prisma),
-    writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    writer,
+    accessListing,
   }: {
     prisma: PrismaClient;
     roleBindingRepo?: RoleBindingRepository;
-    writer?: GrantsLedgerWriter;
-    accessListing?: AccessListingRepository;
+    writer?: AuthzGrantsService;
+    accessListing?: AuthzService;
   }) {
     this.prisma = prisma;
     this.roleBindingRepo = roleBindingRepo;
-    this.writer = writer;
-    this.accessListing = accessListing;
+    this.writerOverride = writer;
+    this.accessListingOverride = accessListing;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
   }
 
   /**
@@ -436,12 +447,12 @@ export class TeamService {
 
         // ── Fetch all RoleBindings touching this team (team-level + project-level) ──
         const [teamBindings, projectBindings] = await Promise.all([
-          this.accessListing.findScopeBindings({
+          this.accessListing.listScopeBindings({
             organizationId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeIds: [team.id],
           }),
-          this.accessListing.findScopeBindings({
+          this.accessListing.listScopeBindings({
             organizationId,
             scopeType: RoleBindingScopeType.PROJECT,
             scopeIds: projectIds,
@@ -469,7 +480,7 @@ export class TeamService {
                   group: { organizationId },
                   user: { orgMemberships: { some: { organizationId } } },
                 },
-                include: { user: { select: ACCESS_LISTING_USER_SELECT } },
+                include: { user: { select: TEAM_MEMBER_USER_SELECT } },
               })
             : [];
 

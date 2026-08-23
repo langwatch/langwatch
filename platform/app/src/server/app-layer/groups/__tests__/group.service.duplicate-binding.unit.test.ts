@@ -1,4 +1,4 @@
-import { DuplicateBindingError } from "@langwatch/authz-server";
+import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { RoleService } from "~/server/role";
 import { GroupRestService } from "../group.service";

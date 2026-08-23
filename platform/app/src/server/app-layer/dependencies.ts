@@ -1,7 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -65,7 +70,6 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
-import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
@@ -340,7 +344,10 @@ export interface AppDependencies {
    * middlewares, the management API) resolves THIS instance via
    * `getApp().permissions`; nothing composes its own from a client.
    */
-  permissions: PermissionsService;
+  permissions: AuthzService;
+  /** The one grant-mutation capability. Callers never construct its ledger,
+   *  cutover, epoch or persistence collaborators themselves. */
+  authzGrants: AuthzGrantsService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;
@@ -362,6 +369,9 @@ export interface AppDependencies {
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: EventSourcing;
+
+  /** Internal — the package-owned AuthZ migration installed by the runtime. */
+  _authzMigration?: SystemMigration;
 
   /** Internal — resources to gracefully close on shutdown. */
   _gracefulCloseables?: Array<{ name: string; close: () => Promise<void> }>;

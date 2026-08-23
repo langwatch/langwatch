@@ -16,9 +16,11 @@ import {
   InMemoryProcessStore,
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { AuthzFeature } from "~/runtime/app/features/authz";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
@@ -92,6 +94,7 @@ import { resolveProjectStorageDestination } from "~/server/stored-objects/projec
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -149,10 +152,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
-import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
-import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
-import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
-import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
+import { demoProjectId } from "./authz/demo-project";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -287,7 +287,6 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
-import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -395,8 +394,6 @@ export function initializeDefaultApp(options?: {
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
-  installAuthzEngineGateReporting();
-
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
@@ -433,10 +430,21 @@ export function initializeDefaultApp(options?: {
     skip: config.skipRedis,
   });
 
+  const authzFeature = AuthzFeature.create({
+    database: prisma,
+    redis: redis as never,
+    newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    cacheEnabled: () => {
+      const raw = process.env.AUTHZ_EPOCH_CACHE;
+      return raw === "1" || raw === "true";
+    },
+    demoProjectId,
+  });
+
   const broadcast = new BroadcastService(redis);
   const projects = traced(
     new ProjectService(
-      new PrismaProjectRepository(prisma),
+      new PrismaProjectRepository(prisma, authzFeature.grants),
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
     ),
     "ProjectService",
@@ -555,7 +563,7 @@ export function initializeDefaultApp(options?: {
   );
   const organizations = traced(
     new OrganizationService(
-      new PrismaOrganizationRepository(prisma),
+      new PrismaOrganizationRepository(prisma, authzFeature.grants),
       new PromptTagRepository(prisma),
     ),
     "OrganizationService",
@@ -695,7 +703,10 @@ export function initializeDefaultApp(options?: {
       // Pass planProvider explicitly — InviteService.create defaults to
       // getApp().planProvider, but we're still inside initializeDefaultApp
       // so the App singleton isn't available yet.
-      inviteApprover: InviteService.create(prisma, { planProvider }),
+      inviteApprover: InviteService.create(prisma, {
+        planProvider,
+        authzGrants: authzFeature.grants,
+      }),
       licensePurchaseHandler: { handle: handleLicensePurchase },
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
@@ -754,7 +765,8 @@ export function initializeDefaultApp(options?: {
   const shareRepo = new LedgerShareRepository({
     legacy: new PrismaShareRepository(prisma),
     prisma,
-    writer: () => grantsLedgerWriter(),
+    writer: () => authzFeature.grants,
+    authz: authzFeature.permissions,
   });
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
@@ -894,8 +906,6 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
-    authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
-    authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -1104,16 +1114,6 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
-  // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - one pass per boot, level-triggered, so held and parked
-  // organizations retry on the restart cadence with nobody running anything.
-  // Redis is handed in rather than read back off the App: this composes the
-  // App, so `tryGetApp()` is still null here, and a null handle would make
-  // the lease unacquirable and every pass a silent no-op.
-  const systemMigrations = roleRunsWorkers(config.processRole)
-    ? startSystemMigrations({ redis })
-    : undefined;
-
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1267,6 +1267,10 @@ export function initializeDefaultApp(options?: {
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
+    authz: {
+      pipeline: authzFeature.pipeline,
+      connect: (authzCommands) => authzFeature.connect(authzCommands as never),
+    },
     repositories,
     redis: redis!,
     broadcast,
@@ -1335,6 +1339,16 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionPool =
     commands.scenarioExecutionPool;
+
+  // The package-owned migration starts only after the pipeline has connected
+  // its command dispatcher. The app process exposes metadata but runs no
+  // automatic pass; worker-capable roles run one level-triggered pass.
+  const systemMigrations = roleRunsWorkers(config.processRole)
+    ? startSystemMigrations({
+        redis,
+        additionalMigrations: [authzFeature.migration],
+      })
+    : undefined;
 
   if (roleRunsWorkers(config.processRole)) {
     // One-time background seeds on worker boot (ADR-051): topic-model
@@ -1890,7 +1904,8 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
-    permissions: permissionsServiceFor(prisma),
+    permissions: authzFeature.permissions,
+    authzGrants: authzFeature.grants,
     tokenizer,
     usage,
     planProvider,
@@ -1907,6 +1922,7 @@ export function initializeDefaultApp(options?: {
     commands,
     ops,
     _eventSourcing: es,
+    _authzMigration: authzFeature.migration,
     _gracefulCloseables: gracefulCloseables,
   });
 }
@@ -1931,6 +1947,21 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const noop = async () => {
     /* noop */
   };
+  const testAuthz = AuthzFeature.create({
+    database: testPrisma,
+    redis: null,
+    newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    cacheEnabled: () => false,
+    demoProjectId: () => undefined,
+  });
+  testAuthz.connect({
+    attachGrant: { send: noop },
+    changeGrantRole: { send: noop },
+    revokeGrant: { send: noop },
+    defineRole: { send: noop },
+    changeRolePermissions: { send: noop },
+    deleteRole: { send: noop },
+  });
   // Clear the module-global discover broadcaster so a test app built
   // after `initializeDefaultApp` doesn't inherit the production
   // broadcaster's closure (which captured the production
@@ -2257,7 +2288,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: nullOrganizations,
     projects: nullProjects,
-    permissions: permissionsServiceFor(testPrisma),
+    permissions: testAuthz.permissions,
+    authzGrants: testAuthz.grants,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,
@@ -2396,14 +2428,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       // The same repository the real preset wires, so a test organization
       // that has been cut over exercises the ledger path rather than a shape
       // only tests see. The writer is built over `testPrisma` explicitly
-      // (rather than `grantsLedgerWriter()`, which always reaches for the
-      // app's Prisma singleton) - today the two are the same client
-      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
-      // should say what it depends on rather than rely on that coincidence.
+      // through the same contract capability as production.
       new LedgerShareRepository({
         legacy: new PrismaShareRepository(testPrisma),
         prisma: testPrisma,
-        writer: () => new GrantsLedgerWriter(testPrisma),
+        writer: () => testAuthz.grants,
+        authz: testAuthz.permissions,
       }),
       testPinnedTraceService,
       {
@@ -2431,6 +2461,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // No Redis in the test preset: every open counts as a viewing and nothing
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
+    _authzMigration: testAuthz.migration,
     ...overrides,
   });
 }

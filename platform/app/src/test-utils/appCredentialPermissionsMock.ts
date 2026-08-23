@@ -1,36 +1,56 @@
+import type {
+  ApiKeyPermissionCheck,
+  ApiKeyProjectDecision,
+  AuthzGetApiKeyProjectDecisionInput,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ForkAwareCredentialDecisionRepository } from "~/server/app-layer/permissions/credential-decision.repository";
-import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 
-const unstubbed = () => {
-  throw new Error(
-    "user-grant decisions are not stubbed by appCredentialPermissionsMock",
-  );
-};
+class CredentialBackedTestAuthzService {
+  constructor(private readonly prisma: PrismaClient) {}
 
-/**
- * Factory body for `vi.mock("~/server/app-layer/app", ...)` in tests that
- * exercise the CREDENTIAL (API-key) check path: the real service + credential
- * repository over the `role-binding-resolver` module, so a test's
- * `vi.mock("~/server/rbac/role-binding-resolver")` stub keeps deciding.
- * Separate from `appPermissionsMock` because this half's module graph pulls
- * the resolver's own imports, which user-grant tests deliberately avoid.
- *
- * `prisma` backs only `findProjectScope` (the project tenancy lookup); pass
- * a fake with `project.findUnique` when the test reaches it.
- */
+  hasApiKeyPermission(check: ApiKeyPermissionCheck): Promise<boolean> {
+    return resolveApiKeyPermission({ prisma: this.prisma, ...check });
+  }
+
+  async getApiKeyProjectDecision({
+    apiKeyId,
+    userId,
+    organizationId,
+    projectId,
+    permission,
+  }: AuthzGetApiKeyProjectDecisionInput): Promise<ApiKeyProjectDecision> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        team: { select: { id: true, organizationId: true } },
+      },
+    });
+    if (!project || project.team.organizationId !== organizationId) {
+      return { outcome: "project_not_found" };
+    }
+    const scope = {
+      projectId: project.id,
+      teamId: project.team.id,
+      organizationId: project.team.organizationId,
+    };
+    const allowed = await this.hasApiKeyPermission({
+      apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "project", id: scope.projectId, teamId: scope.teamId },
+      permission,
+    });
+    return allowed ? { outcome: "allowed", scope } : { outcome: "denied" };
+  }
+}
+
 export function appCredentialPermissionsMock(prisma?: unknown) {
-  const permissions = new PermissionsService({
-    decisions: {
-      findProjectDecision: unstubbed,
-      findProjectAnyDecision: unstubbed,
-      findTeamDecision: unstubbed,
-      findOrganizationDecision: unstubbed,
-    },
-    credentials: new ForkAwareCredentialDecisionRepository(
-      (prisma ?? {}) as PrismaClient,
-    ),
-  });
+  const permissions = new CredentialBackedTestAuthzService(
+    (prisma ?? {}) as PrismaClient,
+  ) as unknown as AuthzService;
   return {
     getApp: () => ({ permissions }),
     tryGetApp: () => null,

@@ -4,7 +4,7 @@ import {
   type BindingScopeTier,
   PermissionDeniedError,
   SCOPE_TIER_FIELDS,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "~/generated/prisma/client";

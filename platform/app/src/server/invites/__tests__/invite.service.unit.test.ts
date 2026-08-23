@@ -8,9 +8,9 @@
  * Tests the service in isolation with mocked dependencies.
  */
 
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
@@ -188,7 +188,7 @@ describe("InviteService", () => {
       mockLicenseRepo,
       mockPlanProvider,
       undefined,
-      ledger as unknown as GrantsLedgerWriter,
+      ledger as unknown as AuthzGrantsService,
     );
   });
 

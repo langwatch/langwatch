@@ -10,22 +10,10 @@
  * also finished the append. The golden creation path is covered by
  * personalWorkspace.service.integration.test.ts against real Postgres.
  */
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzLedgerUnavailableError } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import {
-  AuthzLedgerUnavailableError,
-  type GrantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
-
-vi.mock("~/server/app-layer/authz/ledger", async (importOriginal) => ({
-  // Keep the real AuthzLedgerUnavailableError (and everything else) — only
-  // the composed-writer factory is stubbed, and only because the service
-  // must never reach for it: these tests always inject their own writer.
-  ...(await importOriginal<typeof import("~/server/app-layer/authz/ledger")>()),
-  grantsLedgerWriter: vi.fn(() => {
-    throw new Error("unit test must inject its own writer");
-  }),
-}));
 
 import { PersonalWorkspaceService } from "../personalWorkspace.service";
 
@@ -72,7 +60,7 @@ const makePrisma = () => {
 const makeWriter = () =>
   ({
     attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
-  }) as unknown as GrantsLedgerWriter;
+  }) as unknown as AuthzGrantsService;
 
 const ownerAdminGrantOn = (teamId: string) =>
   expect.objectContaining({
@@ -90,7 +78,7 @@ const ownerAdminGrantOn = (teamId: string) =>
 
 describe("PersonalWorkspaceService.ensure", () => {
   let prisma: ReturnType<typeof makePrisma>;
-  let writer: GrantsLedgerWriter;
+  let writer: AuthzGrantsService;
   let service: PersonalWorkspaceService;
 
   beforeEach(() => {

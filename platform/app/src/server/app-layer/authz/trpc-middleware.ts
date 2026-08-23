@@ -36,7 +36,7 @@ import {
   PermissionDeniedError,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
@@ -74,7 +74,7 @@ type DeclaredMiddleware = DeclaredAuthzMiddleware<
 
 /**
  * `.permission(p)` / `.permission(p, { via })`. The type layer
- * (`@langwatch/authz` declaration.ts + the builder in `api/trpc.ts`)
+ * (`@langwatch/authz-contract` declaration.ts + the builder in `api/trpc.ts`)
  * guarantees the input carries a usable id; the runtime re-derives the same
  * answer and still fails loudly if the two ever disagree.
  */

@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/stored-objects-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "hono": "^4.12.27"

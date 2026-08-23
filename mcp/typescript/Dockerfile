@@ -21,8 +21,8 @@ COPY platform/app/package.json ./platform/app/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
-COPY packages/authz/package.json ./packages/authz/
-COPY packages/authz-server/package.json ./packages/authz-server/
+COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
+COPY packages/features/authz/server/package.json ./packages/features/authz/server/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/

@@ -47,15 +47,15 @@ vi.mock("~/server/app-layer/app", async () => {
   // The real composition over the real test database: `.permission()`
   // procedures decide through getApp().permissions (ADR-092), so a fake App
   // without it dies at the middleware, before the code this suite tests.
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
-      permissions: permissionsServiceFor(dbForPermissions),
+      permissions: appPermissionsService(dbForPermissions),
       // The trace service resolves its client through getApp().clickhouse now
       // (two-door access); the queue-item reads join real ClickHouse summaries,
       // so the facet delegates to the environment-configured client.

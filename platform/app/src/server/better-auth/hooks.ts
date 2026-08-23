@@ -1,6 +1,7 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -11,10 +12,6 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -100,7 +97,7 @@ const grantDefaultOrgMembership = ({
   organizationId,
   userId,
 }: {
-  writer: GrantsLedgerWriter;
+  writer: AuthzGrantsService;
   organizationId: string;
   userId: string;
 }) =>
@@ -175,7 +172,7 @@ const joinSsoOrganization = async ({
   org,
 }: {
   prisma: PrismaClient;
-  writer: GrantsLedgerWriter;
+  writer: AuthzGrantsService;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
 }): Promise<void> => {
@@ -286,12 +283,12 @@ const joinSsoOrganization = async ({
 export const afterUserCreate = async ({
   prisma,
   user,
-  writer = grantsLedgerWriter(),
+  writer = getApp().authzGrants,
 }: {
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
   /** Injectable so a test can watch the seam without a module mock. */
-  writer?: GrantsLedgerWriter;
+  writer?: AuthzGrantsService;
 }): Promise<void> => {
   // Same distinct_id posthog-js identifies with client-side (the user id),
   // so this server event joins the browser person.

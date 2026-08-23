@@ -12,7 +12,7 @@ import {
   builtinRolePermissions,
   permissionSatisfiedBy,
   roleKeyForTeamRole,
-} from "@langwatch/authz";
+} from "@langwatch/authz-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {

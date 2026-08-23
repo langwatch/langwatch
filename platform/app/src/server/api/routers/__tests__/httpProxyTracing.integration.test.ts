@@ -35,15 +35,15 @@ const { mockScheduleTrace } = vi.hoisted(() => ({
 // `.permission()` procedures decide through getApp().permissions (ADR-092),
 // so both fakes carry the real composition over the real test database.
 vi.mock("~/server/app-layer/app", async () => {
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
-      permissions: permissionsServiceFor(dbForPermissions),
+      permissions: appPermissionsService(dbForPermissions),
       traces: {
         recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
       },
@@ -51,13 +51,13 @@ vi.mock("~/server/app-layer/app", async () => {
   };
 });
 vi.mock("../../../app-layer/app", async () => {
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     getApp: () => ({
-      permissions: permissionsServiceFor(dbForPermissions),
+      permissions: appPermissionsService(dbForPermissions),
       traces: {
         recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
       },

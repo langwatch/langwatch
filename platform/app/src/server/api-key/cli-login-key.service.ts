@@ -1,4 +1,4 @@
-import { isRegistryPermission } from "@langwatch/authz";
+import { isRegistryPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";

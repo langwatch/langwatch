@@ -50,6 +50,20 @@ Feature: Post-event work
     Then the subscriber receives the event and event context
     And it receives no projection document
 
+  @integration @subscriber @idempotency
+  Scenario Outline: Subscriber redelivery does not repeat its action
+    Given a <subscriber> subscriber performs an externally visible action for a source event
+    And its action identity is stable for the subscriber action and source event identity
+    When the handler completes the action but queue acknowledgement is lost
+    And the same source event is delivered to that handler again
+    Then the target contains one externally visible result for that action identity
+    And the redelivered handler completes without repeating the action
+
+    Examples:
+      | subscriber |
+      | event      |
+      | projection |
+
   @unit
   Scenario: A throttled subscriber fires at most once per window
     Given a subscriber throttled to one firing per window

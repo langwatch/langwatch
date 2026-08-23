@@ -1,7 +1,7 @@
 /**
  * ADR-092 delivery-plan PR 3 (D-PR3-10) — share links, written through the
  * grants ledger for a cut-over organization. The same per-organization fork
- * the collector runs (see `authz/repositories/authz-read.cutover.repository.ts`
+ * the package-owned AuthZ service runs (see its routed read repository
  * and the `AuthzCutoverProjection` table both of them read): resolve the
  * organization this call is about, ask the cutover gate, and either speak the
  * ledger or delegate to the Prisma repository untouched.
@@ -21,21 +21,17 @@
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
-  SHARE_LINK_PERMISSION,
-  shareVisibilityAudience,
-} from "@langwatch/authz-server";
+  AUTHZ_SHARE_PERMISSION,
+  type AuthzGrantsService,
+  type AuthzService,
+  authzShareAudience,
+} from "@langwatch/authz-contract";
 import { nanoid } from "nanoid";
 import type {
   Prisma,
   PrismaClient,
   ShareLink,
 } from "~/generated/prisma/client";
-import {
-  organizationOnAuthzEngine,
-  readOrganizationOnAuthzEngine,
-} from "../../authz/engine-gate";
-import type { GrantsLedgerWriter } from "../../authz/ledger";
-import { liveGrants } from "../../authz/repositories/live-rows";
 import type {
   CreateShareLinkParams,
   ShareRepository,
@@ -75,18 +71,21 @@ function isRecordNotFound(error: unknown): boolean {
 export class LedgerShareRepository implements ShareRepository {
   private readonly legacy: ShareRepository;
   private readonly prisma: PrismaClient;
-  private readonly writer: () => GrantsLedgerWriter;
+  private readonly writer: () => AuthzGrantsService;
+  private readonly authz: AuthzService;
 
   constructor(deps: {
     legacy: ShareRepository;
     prisma: PrismaClient;
     /** Composed per call, like every other ledger caller: the writer holds
      *  no state and the pipeline it sends through resolves at send time. */
-    writer: () => GrantsLedgerWriter;
+    writer: () => AuthzGrantsService;
+    authz: AuthzService;
   }) {
     this.legacy = deps.legacy;
     this.prisma = deps.prisma;
     this.writer = deps.writer;
+    this.authz = deps.authz;
   }
 
   async findByToken(token: string): Promise<ShareWithProject | null> {
@@ -137,7 +136,7 @@ export class LedgerShareRepository implements ShareRepository {
       organizationId,
       grantId: id,
       projectId: params.projectId,
-      principal: shareVisibilityAudience({
+      principal: authzShareAudience({
         visibility,
         organizationId,
         projectId: params.projectId,
@@ -145,7 +144,7 @@ export class LedgerShareRepository implements ShareRepository {
       scopeId: params.resourceId,
       resource: {
         token: params.token,
-        permission: SHARE_LINK_PERMISSION,
+        permission: AUTHZ_SHARE_PERMISSION,
         kind: params.resourceType === "THREAD" ? "thread" : "trace",
         ...(params.expiresAt
           ? { expiresAtMs: params.expiresAt.getTime() }
@@ -520,11 +519,12 @@ export class LedgerShareRepository implements ShareRepository {
     resourceKind?: ShareResourceType;
     resourceId?: string;
   }): Promise<string[]> {
-    const rows = await liveGrants(this.prisma).findMany({
+    const rows = await this.prisma.grant.findMany({
       where: {
         // organizationId on every grant read (the org guard's requirement,
         // and the tenancy the lineage read already established).
         organizationId,
+        revokedAt: null,
         projectId,
         scopeType: "RESOURCE",
         ...(id !== undefined ? { id } : {}),
@@ -551,10 +551,7 @@ export class LedgerShareRepository implements ShareRepository {
     });
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
-    const onEngine = await organizationOnAuthzEngine({
-      prisma: this.prisma,
-      organizationId,
-    });
+    const onEngine = await this.authz.isOnEngine({ organizationId });
     return onEngine ? organizationId : null;
   }
 
@@ -589,14 +586,6 @@ export class LedgerShareRepository implements ShareRepository {
     });
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
-    try {
-      const onEngine = await readOrganizationOnAuthzEngine({
-        prisma: this.prisma,
-        organizationId,
-      });
-      return onEngine ? organizationId : null;
-    } catch {
-      return organizationId;
-    }
+    return organizationId;
   }
 }

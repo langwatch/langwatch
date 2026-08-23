@@ -101,7 +101,7 @@
     "@langwatch/agents-web": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/actor": "workspace:*",
-    "@langwatch/authz": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automations": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",

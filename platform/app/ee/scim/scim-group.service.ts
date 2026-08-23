@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -40,14 +38,14 @@ type MemberInstruction =
  */
 export class ScimGroupService {
   private readonly prisma: PrismaClient;
-  private readonly writer: GrantsLedgerWriter;
+  private readonly writer: AuthzGrantsService;
 
   constructor({
     prisma,
-    writer = grantsLedgerWriter(),
+    writer = getApp().authzGrants,
   }: {
     prisma: PrismaClient;
-    writer?: GrantsLedgerWriter;
+    writer?: AuthzGrantsService;
   }) {
     this.prisma = prisma;
     this.writer = writer;
@@ -55,7 +53,7 @@ export class ScimGroupService {
 
   static create(options: {
     prisma: PrismaClient;
-    writer?: GrantsLedgerWriter;
+    writer?: AuthzGrantsService;
   }): ScimGroupService {
     return new ScimGroupService(options);
   }

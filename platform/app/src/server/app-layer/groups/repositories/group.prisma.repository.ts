@@ -1,4 +1,9 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type {
+  AuthzAccessBinding,
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import {
   type Group,
   type GroupMembership,
@@ -6,15 +11,7 @@ import {
   type RoleBinding,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type {
-  AccessListingBindingRow,
-  AccessListingRepository,
-} from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
@@ -39,13 +36,25 @@ function attachFor(binding: CreateBindingInput) {
 }
 
 export class PrismaGroupRepository implements GroupRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+  private readonly accessListingOverride: AuthzService | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
-      prisma,
-    ),
-  ) {}
+    writer?: AuthzGrantsService,
+    accessListing?: AuthzService,
+  ) {
+    this.writerOverride = writer;
+    this.accessListingOverride = accessListing;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
+  }
 
   async findAllByOrganization({
     organizationId,
@@ -238,12 +247,12 @@ export class PrismaGroupRepository implements GroupRepository {
   }: {
     organizationId: string;
     groupId: string;
-  }): Promise<AccessListingBindingRow[]> {
+  }): Promise<AuthzAccessBinding[]> {
     // Through the per-organization fork (ADR-092, delivery-plan PR 3
     // follow-up): a cut-over organization's group page is served from the
     // ledger's own head. The organization now bounds the read, too - the
     // route has already proven the group belongs to it.
-    return this.accessListing.findGroupBindings({ organizationId, groupId });
+    return this.accessListing.listGroupBindings({ organizationId, groupId });
   }
 
   async createBinding({

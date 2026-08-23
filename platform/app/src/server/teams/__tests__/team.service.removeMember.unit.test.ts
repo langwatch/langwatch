@@ -13,6 +13,7 @@
  * takes the invariant with it.
  */
 
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type Prisma,
@@ -20,7 +21,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { TeamService } from "../team.service";
 
 const revokeBindings = vi.fn();
@@ -77,7 +77,7 @@ beforeEach(() => {
   service = new TeamService({
     prisma,
     roleBindingRepo: {} as never,
-    writer: { revokeBindings } as unknown as GrantsLedgerWriter,
+    writer: { revokeBindings } as unknown as AuthzGrantsService,
   });
 });
 

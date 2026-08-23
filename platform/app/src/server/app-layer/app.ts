@@ -91,6 +91,7 @@ export class App {
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly permissions: AppDependencies["permissions"];
+  readonly authzGrants: AppDependencies["authzGrants"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
@@ -109,8 +110,14 @@ export class App {
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
 
+  private readonly _authzMigration?: AppDependencies["_authzMigration"];
+
   get eventSourcing(): EventSourcing | undefined {
     return this._eventSourcing;
+  }
+
+  get authzMigration(): AppDependencies["_authzMigration"] {
+    return this._authzMigration;
   }
   private readonly _gracefulCloseables: Array<{
     name: string;
@@ -126,6 +133,7 @@ export class App {
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.permissions = deps.permissions;
+    this.authzGrants = deps.authzGrants;
     this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
@@ -171,6 +179,7 @@ export class App {
     this.share = deps.share;
     this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
+    this._authzMigration = deps._authzMigration;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }
 

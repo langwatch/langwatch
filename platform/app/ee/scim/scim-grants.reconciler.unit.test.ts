@@ -5,10 +5,11 @@
  * matters is that re-pushing the same state emits nothing at all, because an
  * IdP re-pushes on every sync and after every failure.
  */
+
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
   type DesiredScimGrant,
   reconcileScimGrants,
@@ -28,7 +29,7 @@ const prisma = {
 const writer = {
   attachBindings,
   revokeBindings,
-} as unknown as GrantsLedgerWriter;
+} as unknown as AuthzGrantsService;
 
 const memberOfOrg: DesiredScimGrant = {
   principal: { userId: USER_ID },

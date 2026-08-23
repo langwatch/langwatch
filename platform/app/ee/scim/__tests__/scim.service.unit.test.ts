@@ -9,7 +9,7 @@ import { ScimService } from "../scim.service";
 // deactivation paths takes its Postgres-only path instead of talking to a real
 // Redis from a unit test.
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ redis: null }),
+  getApp: () => ({ redis: null, authzGrants: ledger }),
   tryGetApp: () => ({ redis: null }),
 }));
 
@@ -23,10 +23,6 @@ const ledger = vi.hoisted(() => ({
   defineRole: vi.fn(),
   deleteRole: vi.fn(),
 }));
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ledger,
-}));
-
 function createMockPrisma() {
   // The reconciler reads the grants this push is authoritative over. The
   // write path must never reach the three write methods: since PR 2 the

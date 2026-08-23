@@ -1,4 +1,8 @@
 import type { LedgerActor } from "@langwatch/actor";
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -8,12 +12,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { getApp } from "~/server/app-layer/app";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
@@ -41,6 +40,9 @@ export type UpdateRoleParams = Partial<
  * Single Responsibility: Handle all database operations for CustomRole
  */
 export class RoleRepository {
+  private readonly writerOverride: AuthzGrantsService | undefined;
+  private readonly accessListingOverride: AuthzService | undefined;
+
   constructor(
     private readonly prisma: RolePrismaDelegate,
     /**
@@ -50,14 +52,23 @@ export class RoleRepository {
      * over the app's own client rather than `prisma` above, which may be a
      * transaction client.
      */
-    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    writer?: AuthzGrantsService,
     // Listing reads go through the per-organization fork (ADR-092,
     // delivery-plan PR 3 follow-up): a cut-over organization's role editor
     // lists from the ledger's own Role head.
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
-      prisma,
-    ),
-  ) {}
+    accessListing?: AuthzService,
+  ) {
+    this.writerOverride = writer;
+    this.accessListingOverride = accessListing;
+  }
+
+  private get writer(): AuthzGrantsService {
+    return this.writerOverride ?? getApp().authzGrants;
+  }
+
+  private get accessListing(): AuthzService {
+    return this.accessListingOverride ?? getApp().permissions;
+  }
 
   async findAllByOrganization(organizationId: string) {
     return this.prisma.customRole.findMany({
@@ -70,7 +81,7 @@ export class RoleRepository {
     // Through the per-organization fork (ADR-092, delivery-plan PR 3
     // follow-up): a cut-over organization's role editor is served from the
     // ledger's own Role head.
-    return this.accessListing.findUserCreatedRoles({ organizationId });
+    return this.accessListing.listUserCreatedRoles({ organizationId });
   }
 
   async findById(roleId: string) {

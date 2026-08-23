@@ -45,13 +45,18 @@ vi.mock("~/server/rbac/role-binding-resolver", async (importOriginal) => {
 });
 
 // The key's grants and its private role are ledger commands now.
-vi.mock("~/server/app-layer/authz/ledger", () => ({
-  grantsLedgerWriter: () => ({
-    attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
-    revokeBindings: vi.fn(),
-    revokeBindingsWhere: vi.fn().mockResolvedValue(0),
-    defineRole: vi.fn(),
-    deleteRole: vi.fn(),
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
+  getApp: () => ({
+    authzGrants: {
+      attachBindings: vi
+        .fn()
+        .mockResolvedValue({ attached: [], duplicates: [] }),
+      revokeBindings: vi.fn(),
+      revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+      defineRole: vi.fn(),
+      deleteRole: vi.fn(),
+    },
   }),
 }));
 

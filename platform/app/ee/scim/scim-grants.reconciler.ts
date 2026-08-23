@@ -16,19 +16,19 @@
  * Additions are plain queued commands.
  */
 import type { LedgerActor } from "@langwatch/actor";
-import { bindingIdentityKey } from "@langwatch/authz-server/migration";
+import {
+  type AuthzGrantsService,
+  type AuthzLedgerBindingAttach,
+  authzBindingIdentityKey,
+} from "@langwatch/authz-contract";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
-import type {
-  GrantsLedgerWriter,
-  LedgerBindingAttach,
-} from "~/server/app-layer/authz/ledger";
 
 /** What the directory says this principal should hold, minus the ids. */
-export type DesiredScimGrant = Omit<LedgerBindingAttach, "bindingId">;
+export type DesiredScimGrant = Omit<AuthzLedgerBindingAttach, "bindingId">;
 
 /**
  * A grant's identity as the projection's partial unique indexes define it -
- * `bindingIdentityKey` (@langwatch/authz-server). Two rows with the same key
+ * `authzBindingIdentityKey` (@langwatch/authz-contract). Two rows with the same key
  * are the same grant, whatever their row ids.
  */
 function grantKey(grant: {
@@ -40,8 +40,16 @@ function grantKey(grant: {
   role: string;
   customRoleId: string | null;
 }): string {
-  return bindingIdentityKey({
-    principal: grant,
+  const principal = grant.userId
+    ? ({ userId: grant.userId } as const)
+    : grant.groupId
+      ? ({ groupId: grant.groupId } as const)
+      : grant.apiKeyId
+        ? ({ apiKeyId: grant.apiKeyId } as const)
+        : null;
+  if (!principal) throw new Error("a SCIM grant names no principal");
+  return authzBindingIdentityKey({
+    principal,
     scopeType: grant.scopeType,
     scopeId: grant.scopeId,
     role: grant.role,
@@ -50,10 +58,11 @@ function grantKey(grant: {
 }
 
 function keyOfDesired(grant: DesiredScimGrant): string {
+  const principal = grant.principal;
   return grantKey({
-    userId: grant.principal.userId ?? null,
-    groupId: grant.principal.groupId ?? null,
-    apiKeyId: grant.principal.apiKeyId ?? null,
+    userId: "userId" in principal ? principal.userId : null,
+    groupId: "groupId" in principal ? principal.groupId : null,
+    apiKeyId: "apiKeyId" in principal ? principal.apiKeyId : null,
     scopeType: grant.scopeType,
     scopeId: grant.scopeId,
     role: grant.role,
@@ -84,7 +93,7 @@ export async function reconcileScimGrants({
   mintBindingId,
 }: {
   prisma: PrismaClient;
-  writer: GrantsLedgerWriter;
+  writer: AuthzGrantsService;
   organizationId: string;
   where: Prisma.RoleBindingWhereInput;
   desired: DesiredScimGrant[];

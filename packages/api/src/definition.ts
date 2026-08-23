@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { parseApiSchemaSync, type ApiSchema } from "./schema.js";

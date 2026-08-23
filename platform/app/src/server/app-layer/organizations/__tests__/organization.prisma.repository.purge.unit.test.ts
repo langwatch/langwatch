@@ -13,9 +13,9 @@
  * the organization itself.
  */
 
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
 
 const ORGANIZATION_ID = "org_acme";
@@ -58,7 +58,7 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
       const { prisma, deletions } = purgingPrisma();
       const repository = new PrismaOrganizationRepository(
         prisma,
-        {} as unknown as GrantsLedgerWriter,
+        {} as unknown as AuthzGrantsService,
       );
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);
@@ -85,7 +85,7 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
       const { prisma, deletions } = purgingPrisma();
       const repository = new PrismaOrganizationRepository(
         prisma,
-        {} as unknown as GrantsLedgerWriter,
+        {} as unknown as AuthzGrantsService,
       );
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);
@@ -108,7 +108,7 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
       const { prisma, transaction, deletions } = purgingPrisma();
       const repository = new PrismaOrganizationRepository(
         prisma,
-        {} as unknown as GrantsLedgerWriter,
+        {} as unknown as AuthzGrantsService,
       );
 
       await repository.deleteProvisionedOrganization(ORGANIZATION_ID);

@@ -1,10 +1,14 @@
 import type { AgentService as AgentServiceContract } from "@langwatch/agents-contract";
-import type { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import type {
+  AuthzGrantsService,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import { AgentsFeature, type AgentsRuntimeContext } from "./features/agents";
 
 export type RequestAppServices = {
   agents: AgentServiceContract;
-  permissions: PermissionsService;
+  permissions: AuthzService;
+  authzGrants: AuthzGrantsService;
 };
 
 /**
@@ -16,13 +20,21 @@ export type RequestAppServices = {
  */
 export class RequestApp implements RequestAppServices {
   static create(
-    context: AgentsRuntimeContext & { permissions: PermissionsService },
+    context: AgentsRuntimeContext & {
+      permissions: AuthzService;
+      authzGrants: AuthzGrantsService;
+    },
   ): RequestApp {
-    return new RequestApp(AgentsFeature.create(context), context.permissions);
+    return new RequestApp(
+      AgentsFeature.create(context),
+      context.permissions,
+      context.authzGrants,
+    );
   }
 
   private constructor(
     readonly agents: AgentServiceContract,
-    readonly permissions: PermissionsService,
+    readonly permissions: AuthzService,
+    readonly authzGrants: AuthzGrantsService,
   ) {}
 }

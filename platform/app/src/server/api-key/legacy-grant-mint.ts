@@ -54,17 +54,16 @@
  */
 import type { LedgerActor } from "@langwatch/actor";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { deriveGrantId } from "@langwatch/authz-server/migration";
+import {
+  AUTHZ_ENGINE_MIGRATION_NAME,
+  type AuthzGrantsService,
+  type AuthzLedgerBindingAttach,
+} from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-  type LedgerBindingAttach,
-} from "~/server/app-layer/authz/ledger";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
+import { AuthzFeature } from "~/runtime/app/features/authz";
+import { getApp } from "~/server/app-layer/app";
 import { prisma as appPrisma } from "~/server/db";
 import type { ApiKeyWithBindings } from "./api-key.repository";
 
@@ -223,7 +222,7 @@ export function keyPredatesLedger({
  */
 export function legacyGrantForKey(
   apiKey: ApiKeyWithBindings,
-): LedgerBindingAttach | null {
+): AuthzLedgerBindingAttach | null {
   if (apiKey.roleBindings.length > 0) return null;
   // A key that says what it is for cannot be widened into an org admin by a
   // missing row: an ingestion credential's access is its project binding, and
@@ -232,7 +231,7 @@ export function legacyGrantForKey(
   if (apiKey.userId !== null) return null;
 
   return {
-    bindingId: deriveGrantId({
+    bindingId: AuthzFeature.deriveGrantId({
       organizationId: apiKey.organizationId,
       principal: { type: "apiKey", id: apiKey.id },
       scope: {
@@ -261,11 +260,11 @@ export function mintLegacyKeyGrant({
   apiKey,
   writer,
   onLedgerWrites = ({ organizationId }) =>
-    organizationOnAuthzEngine({ prisma: appPrisma, organizationId }),
+    getApp().permissions.isOnEngine({ organizationId }),
   genesisMomentFor = genesisImportMoment,
 }: {
   apiKey: ApiKeyWithBindings;
-  writer?: GrantsLedgerWriter;
+  writer?: AuthzGrantsService;
   /** The per-organization write fork (decision 4); injectable for tests. */
   onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
   /** The organization's ledger-era boundary; injectable for tests. */
@@ -305,7 +304,7 @@ export function mintLegacyKeyGrant({
       ) {
         return;
       }
-      await (writer ?? grantsLedgerWriter()).attachBindings({
+      await (writer ?? getApp().authzGrants).attachBindings({
         organizationId: apiKey.organizationId,
         bindings: [binding],
         actor: READ_THROUGH_MINT_ACTOR,

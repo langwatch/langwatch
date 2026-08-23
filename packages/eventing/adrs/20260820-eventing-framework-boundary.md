@@ -4,8 +4,9 @@
 
 **Status:** Accepted
 
-**Behavioural contract:**
-[../specs/eventing-framework.feature](../specs/eventing-framework.feature)
+**Behavioural contracts:**
+[the framework boundary](../specs/eventing-framework.feature) and
+[post-event work](../specs/post-event-work.feature)
 
 **Related:**
 [the Group Queue framework boundary](../../group-queue/adrs/20260820-group-queue-framework-boundary.md),
@@ -113,19 +114,17 @@ const traceProcessing = definePipeline({
   .withClickHouseFoldProjection(
     new TraceSummaryFoldProjection({ store: deps.traceSummary }),
   )
-  .withPostgresProjection(
-    new GrantsStateProjection({ store: deps.grants }),
-  )
+  .withPostgresProjection(new GrantsStateProjection({ store: deps.grants }))
   .build();
 ```
 
 The three methods encode different guarantees:
 
-| Builder | Semantics | Required infrastructure |
-|---|---|---|
-| `withClickHouseMapProjection` | transform one event into a document/row without reading prior projection state | ClickHouse append/replacing store |
-| `withClickHouseFoldProjection` | load the latest state, evolve it purely, then write it back | ClickHouse store behind the app's Redis consistency adapter |
-| `withPostgresProjection` | load and evolve one row under the Postgres projection contract | Postgres repository; no ClickHouse cache options |
+| Builder                        | Semantics                                                                      | Required infrastructure                                     |
+| ------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `withClickHouseMapProjection`  | transform one event into a document/row without reading prior projection state | ClickHouse append/replacing store                           |
+| `withClickHouseFoldProjection` | load the latest state, evolve it purely, then write it back                    | ClickHouse store behind the app's Redis consistency adapter |
+| `withPostgresProjection`       | load and evolve one row under the Postgres projection contract                 | Postgres repository; no ClickHouse cache options            |
 
 ClickHouse folds require the app's Redis consistency adapter because replication
 and deduplication lag cannot feed stale state into the next evolution. Map
@@ -165,7 +164,19 @@ Subscriber authoring has two methods with distinct consistency boundaries:
 
 Both are best-effort side effects: relevance is decided before enqueue, jobs
 are at-least-once after staging, and subscribers do not run during replay.
-Work that cannot tolerate the pre-staging loss window is a process manager.
+Every externally visible action performed by either subscriber kind must be
+idempotent for the source event. A handler derives or forwards a stable action
+identity from the subscriber action and source event identity, so a crash
+after the action but before queue acknowledgement cannot repeat the effect. A
+database action may instead atomically deduplicate and apply the effect in one
+transaction. Queue deduplication is an optimisation and does not satisfy this
+rule by itself.
+
+Each product subscriber has a redelivery test proving that handling the same
+source event twice leaves one externally visible result. If its target cannot
+support that contract, the action is not safe to run as a subscriber. Work
+that cannot tolerate the pre-staging loss window is a process manager, whose
+intent executor is still required to be retry-safe.
 
 ### 6. Process managers are inline, durable orchestration
 
