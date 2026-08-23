@@ -376,6 +376,13 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
     When the card is rendered
     Then the builder renderer draws it and the add-alert control is offered
 
+  @unit
+  Scenario: The dashboard list counts exactly the cards the grid will render
+    Given a dashboard holding a builder graph and a saved workbench chart
+    When the dashboards are listed with the workbench on and again with it off
+    Then in each state the list's card count admits the same kinds the dashboard's grid read admits
+    And with the workbench off the count sees only builder graphs, as it did before the feature existed
+
   @integration
   Scenario: A workbench card is not offered an alert it cannot evaluate
     Given a dashboard grid holding a saved workbench chart

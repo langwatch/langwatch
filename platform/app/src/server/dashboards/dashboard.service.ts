@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { placeableKindFilter } from "~/server/analytics/placeableKindFilter";
 import { DashboardRepository } from "./dashboard.repository";
 import { DashboardNotFoundError, DashboardReorderError } from "./errors";
 
@@ -25,10 +26,17 @@ export class DashboardService {
   }
 
   /**
-   * Gets all dashboards for a project.
+   * Gets all dashboards for a project, each with its placeable-card count.
+   *
+   * The count applies the same flag-aware kind gate the graph-card procedures
+   * apply, so the list never advertises a card the dashboard read excludes.
    */
   async getAll(projectId: string) {
-    return await this.repository.findAll({ projectId });
+    const graphKindWhere = await placeableKindFilter({
+      prisma: this.prisma,
+      projectId,
+    });
+    return await this.repository.findAll({ projectId, graphKindWhere });
   }
 
   /**
