@@ -279,36 +279,38 @@ describe("loadReportCharts", () => {
   });
 
   describe("given a stored series whose aggregation the metric does not allow", () => {
-    /** @scenario "A report chart whose stored series pairs a disallowed aggregation fails validation before querying" */
-    it("fails with a validation error before any query is dispatched", async () => {
-      const deps = makeDeps({
-        graphs: [
-          makeGraph({
-            graph: {
-              graphId: "graph-1",
-              graphType: "line",
-              series: [
-                {
-                  metric: "metadata.trace_id",
-                  aggregation: "sum",
-                  name: "Broken",
-                },
-              ],
-              includePrevious: false,
-              timeScale: 60,
-            },
-          } as unknown as Partial<CustomGraph>),
-        ],
-        timeseries: { previousPeriod: [], currentPeriod: [] },
-      });
+    describe("when the report's charts are built", () => {
+      /** @scenario "A report chart whose stored series pairs a disallowed aggregation fails validation before querying" */
+      it("fails with a validation error before any query is dispatched", async () => {
+        const deps = makeDeps({
+          graphs: [
+            makeGraph({
+              graph: {
+                graphId: "graph-1",
+                graphType: "line",
+                series: [
+                  {
+                    metric: "metadata.trace_id",
+                    aggregation: "sum",
+                    name: "Broken",
+                  },
+                ],
+                includePrevious: false,
+                timeScale: 60,
+              },
+            } as unknown as Partial<CustomGraph>),
+          ],
+          timeseries: { previousPeriod: [], currentPeriod: [] },
+        });
 
-      await expect(
-        run({
-          deps,
-          source: { kind: "customGraph", customGraphId: "graph-1" },
-        }),
-      ).rejects.toThrow(/metadata\.trace_id/);
-      expect(deps.getTimeseries).not.toHaveBeenCalled();
+        await expect(
+          run({
+            deps,
+            source: { kind: "customGraph", customGraphId: "graph-1" },
+          }),
+        ).rejects.toThrow(/metadata\.trace_id/);
+        expect(deps.getTimeseries).not.toHaveBeenCalled();
+      });
     });
   });
 });
