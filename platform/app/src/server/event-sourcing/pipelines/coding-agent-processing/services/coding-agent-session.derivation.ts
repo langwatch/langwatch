@@ -1,3 +1,4 @@
+import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
@@ -321,6 +322,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+    agentReportedCostUsd: 0,
 
     modelCallMs: 0,
     toolMs: 0,
@@ -623,18 +625,18 @@ function foldModelCall(
 }
 
 /**
- * What one turn cost, for an agent whose telemetry states no price of its own.
+ * What one turn cost: the model registry's price for the call's own tokens.
  *
- * Claude reports what it was billed on its API_REQUEST event, and that number
- * is the session's cost. Codex reports a model and token counts and nothing
- * else, so its sessions read as free while the SAME turn's trace states a
- * figure — the trace pipeline prices the identical span against the model
- * registry. This is that same call, so the two agree.
+ * Every span-bearing agent's session is priced this way — the trace pipeline
+ * prices the identical span against the same registry, so a session and its
+ * traces state one figure by construction. What an agent reports about its
+ * own bill (claude's `cost_usd`) rides agentReportedCostUsd beside this,
+ * never instead of it.
  *
  * The facts are the respelled ones, whose `input_tokens` is the disjoint
- * non-cached bucket, and whose cache buckets keep codex's own spellings —
- * which are the gen_ai keys {@link computeSpanCost} reads. An unpriced model
- * comes back zero rather than an invented rate.
+ * non-cached bucket, and whose cache buckets are the gen_ai keys
+ * {@link computeSpanCost} reads. An unpriced model comes back zero rather
+ * than an invented rate.
  */
 function pricedFromTokens(facts: Record<string, unknown>): number {
   return computeSpanCost({
@@ -643,6 +645,33 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
     promptTokens: num(facts.input_tokens),
     completionTokens: num(facts.output_tokens),
   });
+}
+
+/**
+ * A Claude Code call's tokens, respelled into the gen_ai keys
+ * {@link computeSpanCost} reads. The llm_request span carries the CLI's bare
+ * spellings, whose `input_tokens` is already the disjoint non-cached bucket,
+ * so this is a respelling plus one judgment: the cache-write lifetime the
+ * call's request context implies ({@link claudeCacheWritesLongLived}) — the
+ * same stamp the trace pipeline's extractor puts on the identical span, so
+ * the session and the trace price one call to one figure.
+ */
+function claudeCallTokenFacts(
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const cacheWriteTokens = num(attrs.cache_creation_tokens);
+  return {
+    ...attrs,
+    "gen_ai.usage.cache_read.input_tokens": num(attrs.cache_read_tokens),
+    "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
+    ...(cacheWriteTokens > 0 &&
+    claudeCacheWritesLongLived({
+      llmRequestContext: str(attrs["llm_request.context"]),
+      querySource: str(attrs.query_source),
+    })
+      ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
+      : {}),
+  };
 }
 
 /**
@@ -707,9 +736,16 @@ export function applySpanToCodingAgentSession({
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
     // Identity still rides the span; only the counted facts are the log's.
-    return isLogsOnly
-      ? withIdentity(state, attrs)
-      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    if (isLogsOnly) return withIdentity(state, attrs);
+    const folded = foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    // Priced from the span's tokens with the same formula and the same
+    // cache-write lifetime the trace pipeline applies to the identical span,
+    // so the session and its traces state one figure. The cost the agent
+    // reports about itself lands on agentReportedCostUsd instead.
+    return {
+      ...folded,
+      costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
+    };
   }
 
   if (span.name === CODEX.SPAN.TURN) {
@@ -929,12 +965,27 @@ export function applyLogToCodingAgentSession({
       };
 
     case CLAUDE.EVENT.API_REQUEST: {
-      // The authoritative cost: the agent reports what it was actually billed,
-      // which no span carries.
-      const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+      // What the agent says it was billed, kept NEXT TO the computed cost
+      // rather than as it. The two disagreeing is a signal, not noise: the
+      // reported figure caught the registry pricing hour-long cache writes
+      // short-lived, and the computed one caught the agent still billing a
+      // model at a withdrawn price. Neither is trusted alone.
+      const reported = num(attrs.cost_usd);
+      const withReported = {
+        ...base,
+        agentReportedCostUsd: base.agentReportedCostUsd + reported,
+      };
       // For a logs-only agent this event IS the model call — the same facts
-      // the llm_request span carries for Claude Code fold from here instead.
-      return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+      // the llm_request span carries for Claude Code fold from here instead —
+      // and with no token-bearing span to compute from, the reported figure
+      // is also the session's cost.
+      return isLogsOnly
+        ? foldModelCall(
+            { ...withReported, costUsd: withReported.costUsd + reported },
+            attrs,
+            0,
+          )
+        : withReported;
     }
 
     case CLAUDE.EVENT.API_RESPONSE:

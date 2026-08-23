@@ -188,8 +188,8 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.agent).toBe("claude_code");
     });
 
-    /** @scenario "an agent that states its own price keeps it" */
-    it("keeps the reported cost and adds no estimate for the same turn", () => {
+    /** @scenario "The session's cost is computed from tokens, same formula as the trace" */
+    it("computes the span's cost and keeps the reported figure beside it", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -215,12 +215,71 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      // The reported cost survives and the span adds nothing on top.
-      // Estimating this span too would charge the turn twice, at two
-      // different rates. Folding the span alone and expecting 0 would pass
-      // just as well if the reported amount were dropped, so both halves
-      // are folded here.
-      expect(state.costUsd).toBe(0.25);
+      // Two figures, two homes: the session's cost is the span's tokens
+      // priced against the registry — the same formula the trace pipeline
+      // applies to the same span — and what the agent reported rides beside
+      // it. Folding either into the other would charge the turn twice, at
+      // two different rates.
+      expect(state.agentReportedCostUsd).toBe(0.25);
+      // 100 in x $3/M + 50 out x $15/M + 900 cache-read x $0.30/M.
+      expect(state.costUsd).toBeCloseTo(0.00132, 6);
+    });
+  });
+
+  describe("when claude llm_request spans price their cache writes", () => {
+    const pricedCall = (context: string | undefined) => {
+      const projection = makeProjection();
+      return projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: `llm-ttl-${context ?? "none"}`,
+          facts: {
+            model: "claude-sonnet-4-5",
+            cache_creation_tokens: 17_854,
+            ...(context !== undefined
+              ? { "llm_request.context": context }
+              : {}),
+          },
+        }),
+        initStateOf(projection),
+      );
+    };
+
+    it("prices a main-thread call's writes at the hour-long rate", () => {
+      // 17,854 writes at sonnet-4.5's $6/M hour-long rate vs $3.75/M
+      // five-minute rate — the same lifetime rule the trace pipeline's
+      // extractor stamps on the identical span.
+      expect(pricedCall("interaction").costUsd).toBeCloseTo(
+        17_854 * 0.000006,
+        6,
+      );
+    });
+
+    it("prices a sub-agent call's writes at the five-minute rate", () => {
+      expect(pricedCall("tool").costUsd).toBeCloseTo(17_854 * 0.00000375, 6);
+    });
+
+    it("prices a call with no stated context conservatively", () => {
+      expect(pricedCall(undefined).costUsd).toBeCloseTo(17_854 * 0.00000375, 6);
+    });
+
+    /** @scenario "A main-thread call known only by its query source prices the same way" */
+    it("prices a call named main-thread by its query source at the hour-long rate", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-ttl-query-source",
+          facts: {
+            model: "claude-sonnet-4-5",
+            cache_creation_tokens: 17_854,
+            query_source: "repl_main_thread",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(17_854 * 0.000006, 6);
     });
   });
 
@@ -319,8 +378,10 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
   });
 
-  describe("when the authoritative cost arrives on a log", () => {
-    it("sums it into the session", () => {
+  describe("when the agent reports its own bill on a log", () => {
+    /** @scenario "The agent-reported figure is kept as a drift signal" */
+    /** @scenario "an agent that states its own price keeps it beside the computed one" */
+    it("sums it beside the computed cost, never into it", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -338,7 +399,10 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      expect(state.costUsd).toBe(0.75);
+      expect(state.agentReportedCostUsd).toBe(0.75);
+      // The session's cost is computed from its spans' tokens; a span-bearing
+      // agent's api_request event contributes only the reported figure.
+      expect(state.costUsd).toBe(0);
     });
   });
 
@@ -1415,8 +1479,28 @@ describe("coding-agent session fold, per-agent gating", () => {
       expect(state.outputTokens).toBe(50);
       expect(state.cacheReadTokens).toBe(1_000);
       expect(state.cacheCreationTokens).toBe(200);
-      expect(state.costUsd).toBeCloseTo(0.42);
       expect(state.models).toEqual(["claude-fable-5"]);
+      expect(state.costUsd).toBeCloseTo(0.42);
+    });
+
+    /** @scenario "A logs-only agent keeps its reported cost as the session cost" */
+    it("keeps the reported cost as the session's cost, with no span to compute from", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            model: "claude-fable-5",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(0.42);
+      expect(state.agentReportedCostUsd).toBeCloseTo(0.42);
     });
 
     it("folds the tool run — name, count, step — from the tool_result event", () => {
@@ -1531,7 +1615,7 @@ describe("coding-agent session fold, per-agent gating", () => {
 
   describe("when a span-bearing agent's api_request event contributes", () => {
     /** @scenario re-delivered telemetry does not inflate a session */
-    it("folds cost only — its tokens arrive on the llm_request span", () => {
+    it("folds the reported cost only — its tokens arrive on the llm_request span", () => {
       const projection = makeProjection();
 
       const state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -1547,8 +1631,10 @@ describe("coding-agent session fold, per-agent gating", () => {
         initStateOf(projection),
       );
 
-      expect(state.costUsd).toBeCloseTo(0.42);
-      // The double-count gate: these fold from the span for claude_code.
+      expect(state.agentReportedCostUsd).toBeCloseTo(0.42);
+      // The double-count gate: these fold from the span for claude_code,
+      // including the computed cost.
+      expect(state.costUsd).toBe(0);
       expect(state.modelCalls).toBe(0);
       expect(state.inputTokens).toBe(0);
       expect(state.outputTokens).toBe(0);
