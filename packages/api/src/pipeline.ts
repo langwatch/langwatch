@@ -3,13 +3,15 @@ import type { Context, MiddlewareHandler } from "hono";
 import {
   type DescribeRouteOptions,
   describeRoute,
+  resolver,
   uniqueSymbol,
+  validator as zValidator,
 } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
-import type { ZodType } from "zod";
+import { ZodError, type ZodIssue, type ZodType } from "zod";
 
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse, type SSEConfig } from "./sse.js";
+import { ENDPOINT_ROUTE } from "./types.js";
 import type {
   BaseApp,
   EndpointConfig,
@@ -89,7 +91,10 @@ export function buildWithdrawnMiddlewareStack({
 }: Omit<StackOptions<unknown>, "ep" | "providers" | "onError"> & {
   ep: ResolvedEndpoint & { withdrawn: true };
 }): MiddlewareHandler[] {
-  const stack = [versionContextMiddleware(options)];
+  // A withdrawn endpoint gets the route too: its 410s are worth grouping by
+  // endpoint like any other answer, and it is the mount most likely to have
+  // someone asking who is still calling it.
+  const stack = [versionContextMiddleware({ ...options, ep })];
   appendAccessMiddleware({
     stack,
     config: ep.config,
@@ -109,14 +114,24 @@ export function buildWithdrawnMiddlewareStack({
 }
 
 function versionContextMiddleware({
+  ep,
   isVersioned,
   status,
   version,
-}: Pick<
-  StackOptions<unknown>,
-  "isVersioned" | "status" | "version"
->): MiddlewareHandler {
+}: Pick<StackOptions<unknown>, "isVersioned" | "status" | "version"> & {
+  // Only what the route identity is built from. A withdrawn endpoint has no
+  // handler, and asking for the whole registration would exclude it from the
+  // one field that says which endpoint its 410s belong to.
+  ep: Pick<EndpointRegistration, "method" | "path">;
+}): MiddlewareHandler {
+  // Built once per endpoint at mount time rather than per request: the
+  // registered path and method cannot change after the app is built.
+  const route = `${(ep.method === "sse" ? "get" : ep.method).toUpperCase()} ${
+    ep.path || "/"
+  }`;
+
   return async (c, next) => {
+    c.set(ENDPOINT_ROUTE, route);
     c.set("isVersionedRequest", isVersioned);
     if (version) c.set("apiVersion", version);
     try {
@@ -148,6 +163,20 @@ function appendAccessMiddleware({
 
   if (authSetting !== "none" && serviceConfig._legacy?.organizationMiddleware) {
     stack.push(serviceConfig._legacy.organizationMiddleware);
+  }
+
+  // Framework-mounted, deliberately BEFORE `config.middleware`: the check an
+  // endpoint declares cannot be displaced by the middleware array it also
+  // carries (the spread-overwrite that once left a declared policy
+  // unenforced).
+  if (config.permission) {
+    const enforce = serviceConfig.permissionEnforcer;
+    if (!enforce) {
+      throw new Error(
+        `Endpoint declares permission "${config.permission}" but the service has no permissionEnforcer`,
+      );
+    }
+    stack.push(enforce(config.permission));
   }
 
   if (includeResourceLimit && config.resourceLimit) {
@@ -209,13 +238,28 @@ function appendValidationMiddleware({
   ep: EndpointRegistration;
   documented: boolean;
 }): void {
+  /**
+   * The validation failure, as the error the boundary knows how to answer with.
+   *
+   * hono-openapi v0.4 handed the hook zod's `ZodError` itself; v1 wraps
+   * `@hono/standard-validator` and hands over the Standard Schema failure — the
+   * issue array, bare. Throwing that array reaches `onError` as a value with no
+   * `name`, no `message` and no prototype it recognises, so a 400 that named
+   * the offending field became an unhandled "Unknown Error" instead.
+   *
+   * The issues themselves are unchanged: zod's Standard Schema issues ARE
+   * `ZodIssue`s, so re-wrapping restores exactly the error v0.4 threw.
+   */
+  const asZodError = (error: unknown): unknown =>
+    Array.isArray(error) ? new ZodError(error as ZodIssue[]) : error;
+
   const addValidator = (
     target: "param" | "query" | "json",
     schema: ZodType | undefined,
   ) => {
     if (!schema) return;
     const middleware = zValidator(target, schema, (result) => {
-      if (!result.success) throw result.error;
+      if (!result.success) throw asZodError(result.error);
     }) as unknown as MiddlewareHandler;
     if (!documented) {
       // hono-openapi's validator carries OpenAPI metadata under uniqueSymbol,

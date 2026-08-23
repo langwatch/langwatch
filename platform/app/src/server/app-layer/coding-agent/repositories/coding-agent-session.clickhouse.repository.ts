@@ -73,6 +73,7 @@ interface ClickHouseWriteRecord {
   GitBranches: string[];
   GitWorktree: string;
   Title: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -97,6 +98,7 @@ interface ClickHouseWriteRecord {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AgentReportedCostUsd: number;
 
   ModelCallMs: string;
   ToolMs: string;
@@ -233,6 +235,7 @@ function toRecord({
     GitBranches: row.gitBranches,
     GitWorktree: row.gitWorktree,
     Title: row.title,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -259,6 +262,7 @@ function toRecord({
     CacheReadTokens: big(row.cacheReadTokens),
     CacheCreationTokens: big(row.cacheCreationTokens),
     CostUsd: row.costUsd,
+    AgentReportedCostUsd: row.agentReportedCostUsd,
 
     ModelCallMs: big(row.modelCallMs),
     ToolMs: big(row.toolMs),
@@ -383,7 +387,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId: row.tenantId, sessionId: row.sessionId },
         "failed to upsert coding agent session",
       );
@@ -906,7 +910,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: entries.length },
         "failed to upsert coding agent session batch",
       );
@@ -1074,6 +1078,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     gitBranches: asStringArray(record.GitBranches),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -1105,6 +1110,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
+    agentReportedCostUsd: asNumber(record.AgentReportedCostUsd),
 
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),

@@ -11,7 +11,12 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import {
+  LwqlKeyMapClickHouseRepository,
+  NullLwqlKeyMapRepository,
+} from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -21,6 +26,7 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
+import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -32,11 +38,13 @@ import {
   clearCustomClientCache,
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
-  getClickHouseClientForProject,
-  getSharedClickHouseClient,
+  getClickHouseClientForTenant,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { closeClickHouseClient } from "~/server/clickhouse/client";
+import {
+  _getSharedClickHouseClient,
+  closeClickHouseClient,
+} from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
@@ -50,6 +58,7 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
+  getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
@@ -60,7 +69,6 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -93,6 +101,7 @@ import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
   PipelineRegistry,
+  type ScenarioExecutionPoolHolder,
 } from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -103,8 +112,9 @@ import {
   NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { SimulationRunMetricsAppendStore } from "../event-sourcing/pipelines/simulation-processing/projections";
 import {
+  SimulationRunMetricsRepositoryClickHouse,
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
@@ -130,6 +140,10 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
+import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
+import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -245,6 +259,7 @@ import {
   ProcessAuditRepository,
 } from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
+import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
@@ -263,6 +278,7 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -278,6 +294,7 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
@@ -288,6 +305,7 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
+import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -336,11 +354,12 @@ import { UsageService } from "./usage/usage.service";
 const redisLogger = createLogger("langwatch:redis");
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound holder for this pod's scenario execution pool, read by the
+ * simulationRunExecution process manager's execute intent.
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
-  return (globalForApp as any).__scenarioExecutionHandle ?? null;
+export function getScenarioExecutionPool(): ScenarioExecutionPoolHolder | null {
+  return (globalForApp as any).__scenarioExecutionPool ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -367,6 +386,8 @@ export function initializeDefaultApp(options?: {
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
+  installAuthzEngineGateReporting();
+
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
@@ -376,7 +397,7 @@ export function initializeDefaultApp(options?: {
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
   ): Promise<ClickHouseClient> => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client)
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
@@ -405,7 +426,10 @@ export function initializeDefaultApp(options?: {
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(
@@ -432,6 +456,18 @@ export function initializeDefaultApp(options?: {
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table), the read floors that
+  // bound `evaluation_runs`, and the data-retention services wired further
+  // below. Constructed here rather than beside those services because the
+  // evaluation-run repository below needs it and is built first — without it
+  // that read floor silently falls back to the platform default, which is the
+  // whole point of making it tenant-aware.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
@@ -444,7 +480,10 @@ export function initializeDefaultApp(options?: {
   const evaluationRuns = traced(
     new EvaluationRunService(
       clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        ? new EvaluationRunClickHouseRepository({
+            resolveClient: resolveClickHouseClient,
+            retentionResolver: retentionPolicyCache,
+          })
         : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
@@ -527,14 +566,6 @@ export function initializeDefaultApp(options?: {
       workflowExecutor: { runEvaluationWorkflow },
     }),
     "EvaluationExecutionService",
-  );
-
-  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
-  // (which stamps dspy_steps as a traces-category table) and the data-retention
-  // services wired further below.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
   );
 
   const dspySteps = traced(
@@ -708,7 +739,14 @@ export function initializeDefaultApp(options?: {
   // service can ask "is this trace still shared?" without depending on
   // ShareService — that would close the cycle: ShareService already depends
   // on PinnedTraceService for auto(un)pin.
-  const shareRepo = new PrismaShareRepository(prisma);
+  // A cut-over organization's links are written through the grants ledger and
+  // read off the same compat row as ever (ADR-092 PR 3); everyone else gets
+  // the Prisma repository byte for byte.
+  const shareRepo = new LedgerShareRepository({
+    legacy: new PrismaShareRepository(prisma),
+    prisma,
+    writer: () => grantsLedgerWriter(),
+  });
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
@@ -773,6 +811,19 @@ export function initializeDefaultApp(options?: {
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
+    simulationRunMetricsStore: clickhouseEnabled
+      ? new SimulationRunMetricsAppendStore(
+          new SimulationRunMetricsRepositoryClickHouse(resolveClickHouseClient),
+        )
+      : // No ClickHouse → event sourcing is disabled; the append store is a noop.
+        {
+          append: async () => {
+            /* noop */
+          },
+          bulkAppend: async () => {
+            /* noop */
+          },
+        },
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
@@ -834,6 +885,8 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
+    authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
+    authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -892,7 +945,7 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
-  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // Governance's KPI rollup. One instance for the whole App: the subscriber
   // sync writes through it, the spend-spike anomaly evaluator reads through
   // it — the same repository reference the process manager below takes and
   // `app.governance.kpis` hands out.
@@ -904,7 +957,7 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
-  // reactor sync writes through it, the puller worker and the workspace-view
+  // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
   // through it — the same repository reference the process manager below
   // takes and `app.governance.ocsfEvents` hands out.
@@ -988,6 +1041,16 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
+  // ADR-092 stage B: the in-place system migrations. Worker-only and
+  // fire-and-forget - one pass per boot, level-triggered, so held and parked
+  // organizations retry on the restart cadence with nobody running anything.
+  // Redis is handed in rather than read back off the App: this composes the
+  // App, so `tryGetApp()` is still null here, and a null handle would make
+  // the lease unacquirable and every pass a silent no-op.
+  const systemMigrations = roleRunsWorkers(config.processRole)
+    ? startSystemMigrations({ redis })
+    : undefined;
+
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1062,13 +1125,25 @@ export function initializeDefaultApp(options?: {
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {
+                  // Both reads are scoped to builder charts: a scheduled
+                  // report renders each one through `getTimeseries`, which
+                  // needs the series a builder payload carries and a saved
+                  // workbench chart's definition does not have.
                   loadCustomGraph: ({ projectId, customGraphId }) =>
                     prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
+                      where: {
+                        id: customGraphId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                     }),
                   loadDashboardGraphs: ({ projectId, dashboardId }) =>
                     prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
+                      where: {
+                        dashboardId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
@@ -1109,7 +1184,7 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // The coding-agent pipeline's pull-request mapping reactor fires against a
+  // The coding-agent pipeline's pull-request mapping subscriber fires against a
   // service composed further down (it needs the GitHub connection, which needs
   // Redis and Prisma), so the registry is handed the callable proxy now and the
   // real implementation is wired once it exists.
@@ -1124,7 +1199,7 @@ export function initializeDefaultApp(options?: {
     "recheckDueBranches",
   );
   const pruneStaleBranchLinkage = new Deferred<
-    () => Promise<{ branchChecks: number; pullRequests: number }>
+    () => Promise<{ branchChecks: number }>
   >("pruneStaleBranchLinkage");
 
   const registry = new PipelineRegistry({
@@ -1163,6 +1238,16 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
+      // lands in the same ledger table, so without ClickHouse there is nowhere
+      // for it to go. The pipeline still records every observation on the log.
+      pulledUsageLedger: clickhouseEnabled
+        ? {
+            budgetCHRepository: new GatewayBudgetClickHouseRepository(
+              resolveClickHouseClient,
+            ),
+          }
+        : undefined,
     },
     projects,
     monitors,
@@ -1185,8 +1270,8 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle =
-    commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionPool =
+    commands.scenarioExecutionPool;
 
   if (roleRunsWorkers(config.processRole)) {
     // One-time background seeds on worker boot (ADR-051): topic-model
@@ -1273,6 +1358,12 @@ export function initializeDefaultApp(options?: {
     tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,
+    // Check-only cap view for the panel-open warm: signature parity with the
+    // turn's token strip, without spending a PR permit on a panel open.
+    checkPermit: getLangyGithubPrUsage,
+    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
+    // and riding `credentials.harness` into probe, stash and dispatch.
+    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
@@ -1408,6 +1499,8 @@ export function initializeDefaultApp(options?: {
         })
       ).map((project) => project.id),
     sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),
@@ -1530,6 +1623,14 @@ export function initializeDefaultApp(options?: {
       close: () => scheduler.stop(),
     });
   }
+  if (systemMigrations) {
+    // Aborts the pass between tenants; a truncated pass is harmless because
+    // every migration is idempotent and the next boot resumes the sweep.
+    gracefulCloseables.push({
+      name: "system-migrations",
+      close: () => systemMigrations.stop(),
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -1564,13 +1665,16 @@ export function initializeDefaultApp(options?: {
   // One snapshot store shared by this pod's writer and its reader: the writer
   // publishes only while it holds the lease, the reader always reads.
   const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
-  const sharedCh = getSharedClickHouseClient();
+  const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo),
+    queues: new QueueService({
+      repo: queueRepo,
+      audit: new QueueAuditRepository(prisma),
+    }),
     scheduler: new SchedulerOpsService({
       repo: new PrismaScheduledJobRepository(prisma),
       audit: new SchedulerAuditRepository(prisma),
@@ -1653,6 +1757,8 @@ export function initializeDefaultApp(options?: {
     clickhouse: {
       enabled: clickhouseEnabled,
       resolveClient: resolveClickHouseClient,
+      resolveOrganizationClient: getClickHouseClientForOrganization,
+      allInstances: getAllClickHouseInstances,
     },
     redis,
     billing: {
@@ -1664,17 +1770,6 @@ export function initializeDefaultApp(options?: {
       instance: new InstanceUsageStatsClickHouseRepository(
         getClickHouseClientForOrganization,
       ),
-    },
-    scenarios: {
-      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
-      // shared (cross-tenant) client directly rather than a per-tenant
-      // repository — see clickhouse-queries.md's "boot-time system sweeps"
-      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
-      // was built from.
-      orphanReconciliation: {
-        client: sharedCh,
-        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
-      },
     },
     governance: {
       ocsfEvents: governanceOcsfEventsRepository,
@@ -1708,7 +1803,11 @@ export function initializeDefaultApp(options?: {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({
+          fallbackClient: _getSharedClickHouseClient,
+        }),
+      ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1728,6 +1827,7 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
+    permissions: permissionsServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -1792,7 +1892,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "OrganizationService",
   );
   const nullProjects = traced(
-    new ProjectService(new NullProjectRepository()),
+    new ProjectService(
+      new NullProjectRepository(),
+      new NullLwqlKeyMapRepository(),
+    ),
     "ProjectService",
   );
 
@@ -1985,6 +2088,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       resolveClient: async () => {
         throw new Error("ClickHouse is not available in the test app");
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+      allInstances: async () => [],
     },
     // No Redis in the test preset; a test that needs one passes it as an
     // override, or injects a double into the unit directly.
@@ -1996,9 +2103,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       instance: new InstanceUsageStatsClickHouseRepository(async () => {
         throw new Error("ClickHouse is not available in the test app");
       }),
-    },
-    scenarios: {
-      orphanReconciliation: { client: null, finder: null },
     },
     governance: {
       ocsfEvents: undefined,
@@ -2031,7 +2135,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(
@@ -2088,6 +2194,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: nullOrganizations,
     projects: nullProjects,
+    permissions: permissionsServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,
@@ -2104,7 +2211,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: {
-      queues: new QueueService(new NullQueueRepository()),
+      queues: new QueueService({ repo: new NullQueueRepository() }),
       scheduler: new SchedulerOpsService({
         repo: new NullScheduledJobRepository(),
       }),
@@ -2205,15 +2312,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       automations: {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
-      scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
-        setPool: () => {
+      scenarioExecutionPool: {
+        get: () => null,
+        set: () => {
           /* noop */
         },
       },
@@ -2229,7 +2330,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
-      new PrismaShareRepository(testPrisma),
+      // The same repository the real preset wires, so a test organization
+      // that has been cut over exercises the ledger path rather than a shape
+      // only tests see. The writer is built over `testPrisma` explicitly
+      // (rather than `grantsLedgerWriter()`, which always reaches for the
+      // app's Prisma singleton) - today the two are the same client
+      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
+      // should say what it depends on rather than rely on that coincidence.
+      new LedgerShareRepository({
+        legacy: new PrismaShareRepository(testPrisma),
+        prisma: testPrisma,
+        writer: () => new GrantsLedgerWriter(testPrisma),
+      }),
       testPinnedTraceService,
       {
         isTraceSharingEnabled: async (projectId) => {

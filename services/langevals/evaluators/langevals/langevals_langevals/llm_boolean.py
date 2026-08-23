@@ -1,6 +1,6 @@
 import json
-import os
 from typing import Literal, Optional, cast
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
@@ -57,11 +57,6 @@ class CustomLLMBooleanEvaluator(
     is_guardrail = True
 
     def evaluate(self, entry: CustomLLMBooleanEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
@@ -105,6 +100,7 @@ class CustomLLMBooleanEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                **azure_api_version(self.settings.model, "2023-12-01-preview"),
                 messages=[
                     {
                         "role": "system",

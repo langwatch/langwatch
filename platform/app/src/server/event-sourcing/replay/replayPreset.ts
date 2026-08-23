@@ -88,7 +88,9 @@ export function createReplayRuntime(config: {
     [
       "evaluation_processing",
       new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository(clientResolver),
+        new EvaluationRunClickHouseRepository({
+          resolveClient: clientResolver,
+        }),
       ),
     ],
     [

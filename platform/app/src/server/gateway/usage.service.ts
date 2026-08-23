@@ -218,6 +218,13 @@ export class GatewayUsageService {
     organizationId: string;
     virtualKeyId: string;
     window: UsageWindow;
+    /**
+     * Narrows the recent-activity list to one model, and only that list.
+     * The totals, the daily series and the per-model breakdown stay whole:
+     * the breakdown is the control the model is picked from, so filtering
+     * it with the table would leave the reader one row and no way back.
+     */
+    model?: string;
   }): Promise<VirtualKeyUsageSummary> {
     if (!this.spendRepo) return emptyVkSummary();
 
@@ -236,6 +243,7 @@ export class GatewayUsageService {
         tenantIds,
         window: args.window,
         virtualKeyIds: [args.virtualKeyId],
+        model: args.model,
         limit: RECENT_DEBITS_LIMIT,
       }),
     ]);

@@ -2,15 +2,17 @@
  * Hono routes for the organization's GitHub App installation flow.
  *
  * Surfaces:
- *   GET  /api/github/install: start, a session-gated redirect to
- *        github.com/apps/<slug>/installations/new with a signed state.
+ *   GET  /api/github/install: start, a session-gated redirect to the App's
+ *        public installation page on the configured GitHub host, with a signed
+ *        state.
  *   GET  /api/github/setup: GitHub's post-install redirect. Verify the
  *        signed state, record the installation against the organization it was
  *        bound to, then postMessage the opener (popup) or 302 back (redirect).
- *   POST /api/github/webhook: GitHub installation webhooks. Verifies the
- *        X-Hub-Signature-256 HMAC and keeps the installation row + repo
+ *   POST /api/github/webhook: GitHub webhooks. Verifies the
+ *        X-Hub-Signature-256 HMAC, then keeps the installation row + repo
  *        selection fresh (created/deleted/suspend/unsuspend, repositories
- *        added/removed). Idempotent.
+ *        added/removed) and links a pull request to its head branch the moment
+ *        `pull_request` says one exists. Idempotent.
  *
  * There is no per-user OAuth: an installation IS the access boundary, PRs are
  * bot-authored, and tokens are minted on demand from the App private key. The
@@ -26,8 +28,8 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { env } from "~/env.mjs";
-import { hasOrganizationPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -36,6 +38,7 @@ import {
 import { getApp } from "~/server/app-layer";
 import { GithubInstallationConflictError } from "~/server/app-layer/github/github-installations.service";
 import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
+import { getGithubAppInstallUrl } from "~/server/app-layer/github/githubHost";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -50,8 +53,9 @@ import {
   signGithubInstallState,
   verifyGithubInstallState,
 } from "~/server/app-layer/github/githubInstallState";
+import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 
 import type { NextRequestShim } from "./types";
 
@@ -70,7 +74,7 @@ const WEBHOOK_PUBLIC_REASON =
   "every payload is verified in-handler by its X-Hub-Signature-256 HMAC.";
 
 // /install is session-gated in-handler: it requires a logged-in user and an
-// org-membership check before signing state and redirecting to github.com.
+// org-membership check before signing state and redirecting to GitHub.
 const INSTALL_HANDLER_AUTH_REASON =
   "Install-start endpoint: requires a valid application session (checked " +
   "in-handler via getServerAuthSession) plus an org-membership check before " +
@@ -193,8 +197,8 @@ async function handleInstall(c: any): Promise<Response> {
   // takes organization management: the same permission the tRPC surface demands
   // for every write to the connection.
   if (
-    !(await hasOrganizationPermission(
-      { prisma, session },
+    !(await probeOrganizationPermission(
+      { session },
       organizationId,
       "organization:manage",
     ))
@@ -222,11 +226,7 @@ async function handleInstall(c: any): Promise<Response> {
 
   // GitHub redirects back to the App's configured Setup URL after install; the
   // signed `state` round-trips so /setup can bind the installation to the org.
-  const url = new URL(
-    `https://github.com/apps/${encodeURIComponent(
-      config.appSlug,
-    )}/installations/new`,
-  );
+  const url = new URL(getGithubAppInstallUrl(config.appSlug));
   url.searchParams.set("state", state);
   return c.redirect(url.toString(), 302);
 }
@@ -328,8 +328,8 @@ async function rejectUnauthorizedSetup({
   // lowered between /install and GitHub's redirect back here, and recording
   // the installation is the write the permission exists to gate.
   if (
-    !(await hasOrganizationPermission(
-      { prisma, session },
+    !(await probeOrganizationPermission(
+      { session },
       state.organizationId,
       "organization:manage",
     ))
@@ -413,13 +413,24 @@ async function recordInstallAudit({
 
 // GitHub webhook events: installation created/deleted/suspend/unsuspend and
 // installation_repositories added/removed. Verified by HMAC; idempotent.
-type WebhookAction =
-  | "created"
-  | "deleted"
-  | "suspend"
-  | "unsuspend"
-  | "added"
-  | "removed";
+//
+// A schema rather than a bare type, so an action GitHub adds later is REJECTED
+// here and acked by the guard below, instead of being cast to this union and
+// reaching a dispatcher that has no default case to catch it.
+/** The envelope both installation events share, parsed before any field read. */
+const installationEnvelopeSchema = z.object({
+  action: z.unknown().optional(),
+  installation: z.object({ id: z.number().optional() }).nullish(),
+});
+
+const webhookActionSchema = z.enum([
+  "created",
+  "deleted",
+  "suspend",
+  "unsuspend",
+  "added",
+  "removed",
+]);
 
 function verifyWebhookSignature(
   rawBody: string,
@@ -434,6 +445,46 @@ function verifyWebhookSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * A `pull_request` delivery: link the head branch to its pull request now,
+ * rather than waiting for that branch's next scheduled recheck, which for a
+ * branch that has been asked about a few times already is up to a day away.
+ *
+ * Acked whatever happens, like every other event here. A payload this instance
+ * cannot act on is not something a GitHub retry fixes, and the periodic recheck
+ * is the backstop under a delivery that fails or never arrives at all.
+ */
+async function applyPullRequestEvent({
+  payload,
+  deliveryId,
+}: {
+  payload: unknown;
+  deliveryId: string | undefined;
+}): Promise<void> {
+  const event = parseGithubPullRequestEvent(payload);
+  if (!event) {
+    // The parser declines four different deliveries, and every one of them
+    // still answers 200. Without this line a linkage outage looks from the
+    // outside like an unbroken run of successful deliveries. The payload is
+    // deliberately not logged: the delivery id is enough to find it in
+    // GitHub's own redelivery view, and a raw body here would put customer
+    // repository content in the logs.
+    logger.info(
+      { deliveryId },
+      "github pull request delivery dropped before linkage",
+    );
+    return;
+  }
+  try {
+    await getApp().github.pullRequests.mapping.applyPullRequestEvent(event);
+  } catch (err) {
+    logger.warn(
+      { err, action: event.action, installationId: event.installationId },
+      "github pull request webhook handling failed",
+    );
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleWebhook(c: any): Promise<Response> {
   if (!getGithubAppConfig().webhookSecret) {
@@ -445,10 +496,7 @@ async function handleWebhook(c: any): Promise<Response> {
     return c.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let payload: {
-    action?: string;
-    installation?: { id?: number };
-  };
+  let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -456,9 +504,24 @@ async function handleWebhook(c: any): Promise<Response> {
   }
 
   const eventType = c.req.header("x-github-event");
-  const action = payload.action as WebhookAction | undefined;
+
+  if (eventType === "pull_request") {
+    await applyPullRequestEvent({
+      payload,
+      deliveryId: c.req.header("x-github-delivery"),
+    });
+    return c.json({ received: true });
+  }
+
+  // Parsed rather than asserted: an assertion is erased at runtime, so a
+  // delivery whose body is a valid JSON `null` threw on property access and
+  // answered 500 instead of reaching the acknowledgment below.
+  const installationEvent = installationEnvelopeSchema.safeParse(payload).data;
+  const action = webhookActionSchema.safeParse(installationEvent?.action).data;
   const installationId =
-    payload.installation?.id != null ? String(payload.installation.id) : null;
+    installationEvent?.installation?.id != null
+      ? String(installationEvent.installation.id)
+      : null;
 
   if (
     (eventType !== "installation" &&
@@ -504,11 +567,13 @@ secured
   .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
   .post("/github/webhook", handleWebhook);
 
-// The GitHub App configuration on github.com points its Setup URL and its
-// webhook delivery at the legacy paths, so both stay mounted on the same
-// handlers until that configuration is flipped to the canonical paths above.
-// Removing these two mounts is a tracked follow-up. /install needs no alias: it
-// is ours to call, and every caller in this repo uses the canonical path.
+// `/api/github-langy/setup` and `/api/github-langy/webhook` are an external
+// contract, held by two sets of App registrations: the hosted App, and every
+// self-hosted App an operator registered while the documentation named these
+// paths. Both point their Setup URL and their webhook delivery here, so the
+// aliases stay mounted on the same handlers until there is a deprecation path
+// that can move a registration we do not own. /install needs no alias: it is
+// ours to call, and every caller in this repo uses the canonical path.
 secured
   .access(publicEndpoint(SETUP_PUBLIC_REASON))
   .get("/github-langy/setup", handleSetup);

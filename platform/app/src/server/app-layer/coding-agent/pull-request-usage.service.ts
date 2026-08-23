@@ -38,6 +38,7 @@
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 import { GithubPullRequestNotMappedError } from "../github/errors";
+import { normalizeGithubHost } from "../github/githubHost";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
@@ -1141,9 +1142,7 @@ function groupSessionsByRepository(
     // sees one repository listed twice with its usage divided between the
     // rows, and the group whose host is not already lower case matches no
     // mapping row and reports every branch as unlinked.
-    const repositoryHost = (
-      session.repositoryHost === "" ? "github.com" : session.repositoryHost
-    ).toLowerCase();
+    const repositoryHost = normalizeGithubHost(session.repositoryHost);
     const repositoryFullName =
       `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase();
     const key = `${repositoryHost} ${repositoryFullName}`;

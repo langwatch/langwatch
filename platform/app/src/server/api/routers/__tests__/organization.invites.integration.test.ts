@@ -506,7 +506,7 @@ describe("Organization Invites Integration", () => {
             organizationId,
           }),
         ).rejects.toMatchObject({
-          code: "UNAUTHORIZED",
+          code: "FORBIDDEN",
         });
       });
     });

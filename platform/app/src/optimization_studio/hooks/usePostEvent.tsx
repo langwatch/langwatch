@@ -265,9 +265,6 @@ export const useHandleServerMessage = ({
             ? explanation.description || undefined
             : undefined,
           type: "info",
-          meta: {
-            closable: true,
-          },
           duration: 3000,
         });
       } else {
@@ -277,7 +274,6 @@ export const useHandleServerMessage = ({
           description: explanation.description || undefined,
           type: "error",
           meta: {
-            closable: true,
             // The copyable error id. For a failure we could not name it is the
             // only thing the customer can hand support — ADR-045's "generic
             // unknown PLUS a trace id", both halves.
@@ -439,9 +435,6 @@ export const useHandleServerMessage = ({
             //@ts-expect-error
             description: message.type,
             type: "warning",
-            meta: {
-              closable: true,
-            },
             duration: 5000,
           });
           break;

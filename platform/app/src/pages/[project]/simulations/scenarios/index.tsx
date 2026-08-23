@@ -26,11 +26,16 @@ import { useNewScenarioFlow } from "~/hooks/scenarios/useNewScenarioFlow";
 import { useScenarioSelection } from "~/hooks/scenarios/useScenarioSelection";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
 import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  // Every row here opens the scenario editor, which is a separate download.
+  // Fetch it while the person reads the list, so the click opens the editor
+  // rather than a spinner.
+  usePreloadDrawer("scenarioEditor");
   const {
     rowSelection,
     onRowSelectionChange,
@@ -77,7 +82,6 @@ function ScenarioLibraryPage() {
           title: "Some scenarios couldn't be archived",
           description: `${result.failed.length} failed. Please retry.`,
           type: "error",
-          meta: { closable: true },
         });
       }
       void utils.scenarios.getAll.invalidate();

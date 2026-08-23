@@ -58,6 +58,9 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
+const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
+  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -81,6 +84,14 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/schema":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -433,7 +444,7 @@ function slugify(text: string): string {
 function generateTitle(
   method: string,
   apiPath: string,
-  op: OpenAPIOperation
+  op: OpenAPIOperation,
 ): string {
   if (op.summary) return op.summary;
 
@@ -457,7 +468,9 @@ function generateTitle(
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
+    .filter(
+      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
+    )
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -469,7 +482,7 @@ function getResourceName(apiPath: string): string {
 function generateFileName(
   method: string,
   apiPath: string,
-  op: OpenAPIOperation
+  op: OpenAPIOperation,
 ): string {
   if (op.summary) {
     const s = slugify(op.summary);
@@ -585,22 +598,22 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   const unowned = Object.keys(spec.paths).filter(
-    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath)
+    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
   );
   if (unowned.length > 0) {
     const noun = unowned.length === 1 ? "spec path has" : "spec paths have";
     console.error(
-      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`
+      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`,
     );
     for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
     console.error(
-      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:"
+      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:",
     );
     console.error(
-      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or"
+      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or",
     );
     console.error(
-      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference."
+      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference.",
     );
     process.exit(1);
   }
@@ -615,7 +628,7 @@ function main() {
   const specOperations = new Set<string>();
   const operationOwner = new Map<string, EndpointGroup>();
   const groupOperations = new Map<EndpointGroup, Set<string>>(
-    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()])
+    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()]),
   );
   for (const [apiPath, methods] of Object.entries(spec.paths)) {
     const owner = owners.get(apiPath);
@@ -643,7 +656,7 @@ function main() {
       misownedOrder.push(
         `${group.name}: ${key} (${
           owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
-        })`
+        })`,
       );
     }
   }
@@ -651,11 +664,11 @@ function main() {
   if (unknownOrder.length > 0) {
     const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
     console.error(
-      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`
+      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`,
     );
     for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
     console.error(
-      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts."
+      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts.",
     );
   }
   if (misownedOrder.length > 0) {
@@ -664,11 +677,11 @@ function main() {
         ? "key names an operation"
         : "keys name operations";
     console.error(
-      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
     );
     for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
     console.error(
-      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered."
+      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered.",
     );
   }
   if (unknownOrder.length > 0 || misownedOrder.length > 0) {
@@ -727,7 +740,7 @@ function main() {
     if (!fs.existsSync(overviewPath)) {
       fs.writeFileSync(
         overviewPath,
-        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`
+        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
       );
       totalCreated++;
     } else {
@@ -754,8 +767,7 @@ function main() {
         fileName = `${ep.method}-${fileName}`;
       }
       if (usedNames.has(fileName)) {
-        const suffix =
-          ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
+        const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
         fileName = `${fileName}-${suffix}`;
       }
       usedNames.add(fileName);
@@ -766,7 +778,7 @@ function main() {
       if (!fs.existsSync(mdxPath)) {
         fs.writeFileSync(
           mdxPath,
-          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`
+          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`,
         );
         totalCreated++;
       } else {
@@ -789,7 +801,7 @@ function main() {
 
   // Update docs.json navigation
   const apiRefAnchor = docsJson.navigation.anchors.find(
-    (a: { anchor: string }) => a.anchor === "API Reference"
+    (a: { anchor: string }) => a.anchor === "API Reference",
   );
   if (apiRefAnchor) {
     apiRefAnchor.groups = allNavGroups;
@@ -852,10 +864,12 @@ function buildBuiltInEvaluatorNav(): (
   | { group: string; pages: string[] }
 )[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
+  const pages: (string | { group: string; pages: string[] })[] = [
+    p("overview"),
+  ];
 
   for (const [category, evaluators] of Object.entries(
-    BUILTIN_EVALUATOR_CATEGORIES
+    BUILTIN_EVALUATOR_CATEGORIES,
   )) {
     pages.push({
       group: category,

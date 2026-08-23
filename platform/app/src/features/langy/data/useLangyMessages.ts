@@ -56,6 +56,13 @@ export interface LangyMessagesResult {
   eventCursor: LangyEventCursor | null;
   /** The turn in flight per the durable fold — what a refresh reattaches to. */
   currentTurnId: string | null;
+  /**
+   * The model the conversation's latest turn ran on, off the durable fold —
+   * null before any turn recorded one. The panel seeds the composer's picker
+   * from it on open, so a conversation keeps the model it was last used with
+   * across tabs and reloads.
+   */
+  lastModel: string | null;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -123,6 +130,7 @@ export function useLangyMessages(
     shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
     eventCursor: query.data?.eventCursor ?? null,
     currentTurnId: query.data?.currentTurnId ?? null,
+    lastModel: query.data?.lastModel ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

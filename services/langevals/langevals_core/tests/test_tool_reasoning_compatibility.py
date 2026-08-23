@@ -16,9 +16,9 @@ import os
 from typing import Optional
 
 import litellm
-import litellm.cost_calculator
 import pytest
 
+from langevals_core import litellm_patch
 from langevals_core.litellm_patch import ToolReasoningConflictError, patch_litellm
 
 # The rejection as the provider words it, captured from a Comparison run whose
@@ -101,39 +101,26 @@ class _Provider:
 
 @pytest.fixture
 def provider(monkeypatch):
-    """langevals' litellm patch rebuilt over a stub, so a judge request can be
-    read exactly as the provider would receive it.
+    """langevals' litellm patch driving a stub provider, so a judge request can
+    be read exactly as the provider would receive it.
 
-    Both entry points langevals patches are stubbed, so an evaluator that
-    awaits its judge is covered by the same fixture as one that blocks on it.
-    litellm's module attributes are restored afterwards, so the rest of the
-    suite keeps the real client. X_LITELLM_ variables are cleared because the
-    patch merges them into every request, and an ambient reasoning effort would
-    read here as a caller's explicit choice.
+    The patch installs once per process and then calls the entry points it
+    captured in `litellm_patch.originals`. The stub goes there, at the
+    innermost layer, so the request travels the real patched path, and one
+    fixture covers the evaluators that block on their judge and the ones that
+    await it. X_LITELLM_ variables are cleared because the patch merges them
+    into every request, and an ambient reasoning effort would read here as a
+    caller's explicit choice.
     """
     for key in list(os.environ):
         if key.startswith("X_LITELLM_"):
             monkeypatch.delenv(key)
 
-    originals = (
-        litellm.completion,
-        litellm.acompletion,
-        litellm.embedding,
-        litellm.cost_calculator.completion_cost,
-    )
-    stub = _Provider()
-    litellm.completion = stub
-    litellm.acompletion = stub.acall
     patch_litellm()
-    try:
-        yield stub
-    finally:
-        (
-            litellm.completion,
-            litellm.acompletion,
-            litellm.embedding,
-            litellm.cost_calculator.completion_cost,
-        ) = originals
+    stub = _Provider()
+    monkeypatch.setitem(litellm_patch.originals, "completion", stub)
+    monkeypatch.setitem(litellm_patch.originals, "acompletion", stub.acall)
+    return stub
 
 
 def judge_request(model: str, **overrides) -> dict:

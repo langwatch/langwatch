@@ -61,6 +61,13 @@ const registry = {
       "Request fewer attribute/metadata fields",
     ],
   },
+  query_scan_limit_exceeded: {
+    tips: [
+      "Narrow the time range so fewer partitions are read",
+      "Add filters to reduce the amount of data scanned",
+      "Aggregate in the query rather than reading raw rows",
+    ],
+  },
   filter_parse_error: {
     tips: [
       "Check the filter syntax near the indicated position — filters are field:value pairs combined with AND/OR",
@@ -74,6 +81,75 @@ const registry = {
   },
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
+  },
+  lwql_unparseable: {
+    tips: [
+      "Read `meta.violations` — each entry carries the line and column the parser stopped at",
+      "The endpoint accepts native ClickHouse SQL; check for an unclosed quote, bracket, or parenthesis first",
+    ],
+  },
+  lwql_not_permitted: {
+    tips: [
+      "Read `meta.violations` — each entry names the rule (`code`) and the clause (`clause`) that was refused",
+      "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
+      "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
+    ],
+  },
+  lwql_parameter_missing: {
+    tips: [
+      "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
+      "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
+      "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
+    ],
+  },
+  lwql_reserved_parameter_supplied: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names the request set for itself",
+      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+    ],
+  },
+  lwql_reserved_parameter_type: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names declared with the wrong type",
+      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+    ],
+  },
+  lwql_not_enabled: {
+    tips: [
+      "The LangWatchQL feature is not enabled for this project — retrying will not help",
+      "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  saved_workbench_chart_already_exists: {
+    tips: [
+      "A saved chart with this id already exists in this project",
+      "Retry with a different id, or omit the id to have the server mint one",
+    ],
+  },
+  saved_workbench_chart_not_found: {
+    tips: [
+      "Check the chart id — a chart saved in another project is not readable from this one",
+      "List the project's saved charts to see which ids exist",
+    ],
+  },
+  saved_workbench_chart_specification_refused: {
+    tips: [
+      "Read `meta.errors` — each entry names the rule (`rule`) and the JSON path (`path`) that was refused",
+      "A specification may only read the datasets the workbench registers, and may not load anything over the network",
+      "The same specification is refused when rendering, so saving it unchanged will not help",
+    ],
+  },
+  saved_workbench_chart_definition_invalid: {
+    tips: [
+      "This is a defect on our side — the stored chart cannot be read back and retrying will not help",
+      "Save the chart again from the workbench to replace the unreadable definition",
+    ],
+  },
+  lwql_unavailable: {
+    tips: [
+      "The LangWatchQL analytics SQL API is not provisioned on this deployment — retrying will not help",
+      "Contact support to have it enabled for this workspace",
+    ],
   },
   page_too_deep: {
     tips: [
@@ -118,9 +194,21 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_permission_not_delegable: {
+    tips: [
+      "A wider key or a higher role does not change this — make the change in LangWatch instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_scope_violation: {
     tips: [
       "A key cannot be granted a scope you do not hold yourself — lower the requested scope or ask an admin to create the key",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  project_visibility_too_wide: {
+    tips: [
+      "Bind the key to the teams or projects it works with instead of the whole organization",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
@@ -199,6 +287,14 @@ const registry = {
     ],
   },
 
+  // ---- agent dev tunnel ----
+  agent_dev_tunnel_unreachable: {
+    tips: [
+      "Run `langwatch agent dev` again on the machine that started the tunnel; a new session repoints the agent automatically",
+      "If you are done developing locally, restore the agent's URL in its settings",
+    ],
+  },
+
   // ---- evaluations ----
   evaluation_not_found: {
     tips: [
@@ -262,6 +358,11 @@ const registry = {
   langy_conversation_not_owned: {
     tips: [
       "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
+    ],
+  },
+  langy_conversation_id_unadoptable: {
+    tips: [
+      "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
     ],
   },
   langy_model_not_configured: {

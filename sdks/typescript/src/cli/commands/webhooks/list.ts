@@ -24,16 +24,21 @@ export const listWebhooksCommand = async (): Promise<CommandResult | void> => {
           return;
         }
         console.log();
+        // A queue endpoint has no URL, so the column reads whichever address
+        // the endpoint actually delivers to.
+        const address = (e: (typeof endpoints)[number]) =>
+          e.sqs?.queue_url ?? e.url ?? "";
         formatTable({
           data: endpoints.map((e) => ({
             ID: e.id,
-            URL: e.url.length > 45 ? `${e.url.slice(0, 42)}...` : e.url,
+            Destination: e.destination_kind === "sqs" ? "Amazon SQS" : "HTTPS",
+            Address: address(e).length > 45 ? `${address(e).slice(0, 42)}...` : address(e),
             Status: e.status === "active" ? chalk.green("active") : chalk.red(`disabled${e.disabled_reason ? ` (${e.disabled_reason})` : ""}`),
             Events: e.enabled_events.length > 2 ? `${e.enabled_events.slice(0, 2).join(", ")} +${e.enabled_events.length - 2}` : e.enabled_events.join(", "),
             "Last success": e.last_success_at ? new Date(e.last_success_at).toLocaleString() : chalk.gray("never"),
           })),
-          headers: ["ID", "URL", "Status", "Events", "Last success"],
-          colorMap: { ID: chalk.gray, URL: chalk.cyan },
+          headers: ["ID", "Destination", "Address", "Status", "Events", "Last success"],
+          colorMap: { ID: chalk.gray, Address: chalk.cyan },
         });
         console.log();
       },

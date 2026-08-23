@@ -68,21 +68,25 @@ jobs:
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
       #
-      # Integration is back to six shards, each running its files serially.
+      # Integration runs four shards, each running its files serially.
       #
-      # The four-shard split traded wall-clock for runner-minutes (35 -> 26) on
-      # the strength of running two files at once inside a shard. It did not
-      # hold. Measured here: shards ran 7.4-9.2 min against the ~6 min the
-      # six-way serial split used to take, so the claim that no shard got
-      # longer was wrong -- and two groupQueue suites started failing
-      # non-deterministically, both with Redis state disappearing underneath
-      # them (a staged job never dispatched; `j1` gone from a group set).
+      # An earlier four-shard split traded wall-clock for runner-minutes on the
+      # strength of running two files AT ONCE inside a shard, and it did not
+      # hold: shards ran 7.4-9.2 min against the ~6 min the six-way serial split
+      # took, and two groupQueue suites began failing non-deterministically with
+      # Redis state disappearing underneath them (a staged job never dispatched;
+      # `j1` gone from a group set). That is why files are still serial here.
       #
       # The two kinds of parallelism are not interchangeable. A shard is its
       # own runner with its own Redis service container, so shards cannot
       # reach each other. Files inside a shard share one Redis server and are
       # kept apart only by logical-database juggling, which is exactly what
       # stopped holding. Buy the parallelism where it is free.
+      #
+      # Four is affordable again for a different reason: the lane is now ~477
+      # files rather than 1024, because the ones that never needed a datastore
+      # moved to `test-component`. Fewer files over fewer shards, with files
+      # still strictly serial — the property above is untouched.
       #
       # The counts below are the `--shard=N/COUNT` denominators, and they MUST
       # track the arrays. They were a literal `/4` in both run steps, which is
@@ -95,8 +99,44 @@ jobs:
       # its files while reporting a pass over all of them.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
-      integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '6' || '1' }}
+      # Six became four when the component lane took the files that never
+      # needed a datastore. 540 of the 1017 integration files declare jsdom and
+      # name no database, queue or cache; they now run on `test-component`
+      # below, with no service containers at all. What is left here is ~477
+      # files that genuinely talk to something, so the same per-shard file count
+      # fits in fewer shards — and two runners come off the critical path,
+      # which is its own win while every shard is queueing 5-10 minutes for one.
+      #
+      # The lane splits again by whether a file can share a module registry.
+      # Import was 42% of this lane's runner time — ~1.6s per file rebuilding
+      # the same Prisma client and server graph — and 331 of the 477 files can
+      # share one. The other 146 call `vi.mock`, which cannot apply to a
+      # registry an earlier file already populated, so they keep isolation.
+      # See platform/app/src/test-utils/integrationModuleGraph.ts.
+      #
+      # Two shards each rather than four of one kind: measured on src/app/api,
+      # the shared lane runs ~4x faster per file, so 331 shared files and 146
+      # mocking ones are close to balanced at 2+2 — the same four runners as
+      # before, finishing sooner.
+      integration-matrix: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
+      # The component lane is unit-shaped: forked VM workers and concurrent
+      # files, with no service containers to wait on, so a shard gets through
+      # its files far faster than a datastore shard does. (It does NOT share a
+      # module registry the way the unit lane does, see the `isolate` note in
+      # vitest.component.config.ts.)
+      #
+      # Three rather than two, because two put the lane inside a minute of the
+      # hard floor. The floor in src/test-unit-global-setup.ts fires at 4 min
+      # and is calibrated for a lane whose healthy shard takes ~3 min; measured
+      # on 540 files over two shards, shard 1 spent 3m34s in the test step, so
+      # 26 seconds separated a green lane from one the floor cut mid-run. Six
+      # more files crossed it. The floor then reports the shard as red with no
+      # failed test in it, which reads as a wedge rather than as a lane that
+      # outgrew its split, so the cost of being close to it is a confusing
+      # failure rather than a slow pass. Every PR that adds a component test
+      # spends that margin, so the split has to leave some.
+      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3]' || '[1]' }}
+      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '3' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -108,6 +148,23 @@ jobs:
       # main. The provider is already the fast one (vitest 4 defaults to v8,
       # not istanbul), so frequency was the only lever left.
       coverage: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+      # Refresh the shard sequencer's duration weights.
+      #
+      # The sequencer splits the matrix by measured cost where it has a figure
+      # and by file size where it does not (src/test-utils/shardWeights.ts). The
+      # figures come from vitest.durations.json, which is COMMITTED rather than
+      # cached, because every shard computes the split independently and they
+      # must all read identical weights — a manifest one shard has and another
+      # does not means two different splits, and a file silently running twice
+      # or not at all.
+      #
+      # So the run that WRITES the manifest is deliberately not the run that
+      # reads it: dispatch this workflow manually, download the
+      # `shard-durations` artifact it produces, and commit it. On demand rather
+      # than on a schedule because it is a handful of seconds of imbalance, not
+      # a correctness gate, and a weekly bot PR against a 1000-entry generated
+      # file is a poor trade for that.
+      durations: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -125,6 +182,9 @@ jobs:
               # Root workspace members the app's `...` closure installs from
               # source — a change there is a change to the app.
               - 'packages/**'
+              # @langwatch/langyworker tests + typecheck run on unit shard 1;
+              # without this a wrapper-only change runs zero app CI.
+              - 'services/langyworker/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config all live at the repo root since ADR-076. A PR that
               # bumps a dependency or adds a security override touches ONLY
@@ -150,7 +210,23 @@ jobs:
               # Composite actions are covered by ci-scripts-test through the
               # scripts they call, so an edit that only touches an action.yml
               # has to reach the gate too.
-              - '.github/actions/**'
+              #
+              # NAMED, not `.github/actions/**`. This flag gates nine jobs —
+              # typecheck, all ten test shards, build, e2e — and the glob
+              # matched every composite action in the repository, including
+              # ones this workflow has never used. A pull request adding
+              # `.github/actions/go-build-cache` for go-ci ran the entire app
+              # suite on two Go CI files and nothing else.
+              #
+              # The trade is real and worth stating: a list can go stale where
+              # a glob cannot. If you add a `uses: ./.github/actions/<name>`
+              # step to this workflow, add it here in the same edit, or an
+              # edit to that action will silently not re-run the suite it
+              # feeds. These three are every action this file currently uses
+              # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
+              - '.github/actions/detect-changes/**'
+              - '.github/actions/prepare-generated-files/**'
+              - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -200,11 +276,9 @@ jobs:
         with:
           install: "@langwatch/web..."
 
-      - name: Prepare files
-        working-directory: platform/app
-        run: pnpm start:prepare:files
+      - uses: ./.github/actions/prepare-generated-files
 
-      # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
+      # tsc writes incremental .tsbuildinfo caches to explicit paths
       # under node_modules/.cache/tsbuildinfo (see tsconfig.tsgo*.json). A warm
       # cache turns the full ~13-19s cold check into a ~1.5s revalidation of
       # only the files whose content changed. Restored after install so pnpm
@@ -215,18 +289,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: platform/app/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
-      - name: Run typecheck
+      - name: Run typecheck (app and tests in one program)
         working-directory: platform/app
-        run: pnpm typecheck
-
-      - name: Run typecheck (tests)
-        working-directory: platform/app
-        run: pnpm run typecheck:tests
+        run: pnpm run typecheck:all
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -271,11 +341,12 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          # langyworker is not a dependency of web, and its tests and
+          # typecheck run on this job's shard 1, so it needs its own
+          # install root.
+          install: "@langwatch/web... @langwatch/langyworker..."
 
-      - name: Prepare files
-        working-directory: platform/app
-        run: pnpm start:prepare:files
+      - uses: ./.github/actions/prepare-generated-files
 
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Anything encrypted at rest (webhook header values, signing secrets,
@@ -301,6 +372,66 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/redis-client run test:unit
 
+      # Same reason again. This one decides the level and the shape of every
+      # request record the fleet emits, so a suite that never runs is the worst
+      # place in the repo to have one — a regression here is invisible until
+      # someone reads a dashboard and finds it empty.
+      - name: Run @langwatch/observability unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/observability run test:unit
+
+      # Same reason again. This package owns the retry classifier, the
+      # concurrency limiter and the tenant routing every ClickHouse statement
+      # passes through — and the app's own suites exercise it only through the
+      # managedClient assembly, so a regression in an unassembled path (the
+      # query client, the router) would otherwise ship untested.
+      - name: Run @langwatch/clickhouse-client unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/clickhouse-client run test:unit
+
+      # @langwatch/authz is the pure authorization engine (ADR-092) and
+      # @langwatch/authz-server its storage-port runtime — raw TypeScript the
+      # app inlines the same way, same shard-1 arrangement.
+      - name: Run @langwatch/authz unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz run test
+
+      # @langwatch/actor is the actor vocabulary (who caused an action) —
+      # dependency-free raw TypeScript, same shard-1 arrangement.
+      - name: Run @langwatch/actor unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/actor run test
+
+      - name: Run @langwatch/authz-server unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz-server run test
+
+      # @langwatch/system-migrations is the in-place data-migration runner
+      # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
+      - name: Run @langwatch/system-migrations unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/system-migrations run test
+
+      # `pnpm typecheck` at the root checks @langwatch/web alone, so without
+      # this the package's own TypeScript — sources and tests both — is never
+      # compiled by CI at all.
+      - name: Typecheck @langwatch/system-migrations
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/system-migrations run typecheck
+
+      # @langwatch/langyworker is the langy-worker pi-harness wrapper
+      # (services/langyworker) the langyagent image compiles into the worker
+      # binary. It sits outside platform/app, so the root typecheck and the
+      # sharded app suite never see it, same raw-TypeScript, shard-1
+      # arrangement as the packages above.
+      - name: Run @langwatch/langyworker unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run test
+
+      - name: Typecheck @langwatch/langyworker
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run typecheck
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app
@@ -317,6 +448,12 @@ jobs:
           if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
+          # Passive: records how long each file took so the sequencer can weigh
+          # by measured cost. Only on a dispatched run — see `durations` above.
+          DUR=""
+          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
+            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
+          fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
             pnpm test:unit --run --changed origin/main --passWithNoTests \
@@ -324,10 +461,20 @@ jobs:
               --dangerouslyIgnoreUnhandledErrors
           else
             # shellcheck disable=SC2086
-            pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV \
+            pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV $DUR \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
           fi
+
+      # One shard's slice of the sequencer's weights. Merged by the
+      # `shard-durations` job below into a manifest to commit.
+      - name: Upload shard durations
+        if: always() && needs.changes.outputs.durations == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shard-durations-unit-${{ matrix.shard }}
+          path: platform/app/vitest.durations.delta.json
+          if-no-files-found: ignore
 
       - name: Extract test failures
         if: failure()
@@ -351,14 +498,158 @@ jobs:
           name: unit-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
 
-  test-integration:
+  # The `.integration.test.*` files that need no datastore.
+  #
+  # 540 of the app's 1017 integration files declare jsdom and name no database,
+  # queue or cache — they render a component and mock their boundaries. They
+  # were running on `test-integration` below, which means every one of them paid
+  # for a Postgres, a ClickHouse and a Redis container, a Prisma migration, a
+  # goose install, a ClickHouse schema replay and a Helm setup before it could
+  # render a button.
+  #
+  # This job is the unit job's shape, because those files are unit-shaped in
+  # everything except their name: no `services:` block, no migrations, no helm,
+  # concurrent files, a reused module registry. Which files land here is decided
+  # by src/test-utils/integrationLanes.ts, which vitest.integration.config.ts
+  # also calls, so the two lanes are exact complements and no file can go
+  # missing from CI. See specs/ci/integration-test-lanes.feature.
+  test-component:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
+        shard: ${{ fromJSON(needs.changes.outputs.component-shards) }}
     env:
+      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
+      BUILD_TIME: "true"
+      CI: "true"
+      # This lane inherits the UNIT lane's hard floor and needs a bigger one.
+      #
+      # vitest.component.config.ts spreads `...unitTest`, so it also inherits
+      # `globalSetup: ["./src/test-unit-global-setup.ts"]` and its
+      # DEFAULT_HARD_FLOOR_MS of 4 minutes. That number is sized for a unit
+      # shard, which the file says finishes in ~3 min. A component shard does
+      # not: measured over recent runs the median is 297s — 4.95 min — so the
+      # floor fires on a HEALTHY shard, mid-run, whenever it lands on the slow
+      # side of its own average.
+      #
+      # The failure reads as a hang and is not one. The floor says so itself:
+      # "the shard still had files to start, so the floor cut a run that was
+      # working rather than one that was wedged. Read that as a shard too slow
+      # for the floor, not as a hang." Observed on main (run 32011... shard 2)
+      # as well as on pull requests, so it is intermittent rather than new.
+      #
+      # 12 minutes keeps the floor doing its job — a finalize wedge still gets
+      # cut well before the 25-minute job cap below, which is the outcome the
+      # floor exists to avoid — while leaving a healthy 5-minute shard alone.
+      LANGWATCH_UNIT_HARD_FLOOR_MS: "720000"
+    runs-on: ubuntu-latest
+    # No services, so nothing here can wedge on a container. The cap matches
+    # test-unit's reasoning rather than test-integration's: a vitest finalize
+    # wedge, not a datastore that never came up.
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # Same reason as the integration job: anything encrypted at rest has to
+        # round-trip through a real key, and a component test asserting on a
+        # redacted value cannot mock the cipher it is asserting about.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Run component tests (shard ${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }})
+        id: component-tests
+        working-directory: platform/app
+        run: |
+          # Same draft treatment as test-unit: affected files only, unsharded,
+          # on one runner. The full sharded lane returns on ready_for_review.
+          COV=""
+          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
+            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
+          fi
+          # Passive: records how long each file took so the sequencer can weigh
+          # by measured cost. Only on a dispatched run — see `durations` above.
+          DUR=""
+          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
+            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
+          fi
+          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            pnpm test:component --run --changed origin/main --passWithNoTests \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          else
+            # shellcheck disable=SC2086
+            pnpm test:component --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }} $COV $DUR \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          fi
+
+      # One shard's slice of the sequencer's weights. Merged by the
+      # `shard-durations` job below into a manifest to commit.
+      - name: Upload shard durations
+        if: always() && needs.changes.outputs.durations == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shard-durations-component-${{ matrix.shard }}
+          path: platform/app/vitest.durations.delta.json
+          if-no-files-found: ignore
+
+      # The sibling lanes both upload, so without this the instrumentation the
+      # `coverage` flag turns on for this lane would be computed and thrown
+      # away — ~45% of the run for output nobody reads.
+      - name: Upload component test coverage to Codecov
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
+        with:
+          files: platform/app/coverage/lcov.info
+          flags: component
+          name: component-tests-shard-${{ matrix.shard }}
+          fail_ci_if_error: false
+
+      - name: Extract test failures
+        if: failure()
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+
+      - name: Notify Slack on new failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: platform/app
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-component
+
+  test-integration:
+    name: "test-integration (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})"
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.integration-matrix) }}
+    env:
+      # Which half of the datastore lane this shard runs, and — because the
+      # config derives `include` and `isolate` from this one variable — whether
+      # it may share a module registry. Setting it anywhere else, or setting it
+      # to something these two jobs do not, silently changes what runs.
+      INTEGRATION_GRAPH_LANE: ${{ matrix.lane }}
       # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
       # its files one at a time.
       #
@@ -454,9 +745,7 @@ jobs:
         with:
           install: "@langwatch/web..."
 
-      - name: Prepare files
-        working-directory: platform/app
-        run: pnpm start:prepare:files
+      - uses: ./.github/actions/prepare-generated-files
 
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Anything encrypted at rest (webhook header values, signing secrets,
@@ -528,7 +817,7 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add langwatch https://langwatch.github.io/langwatch
 
-      - name: Run integration tests (shard ${{ matrix.shard }}/4)
+      - name: Run integration tests (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})
         id: integration-tests
         working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
@@ -553,6 +842,12 @@ jobs:
           if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
+          # Passive: records how long each file took so the sequencer can weigh
+          # by measured cost. Only on a dispatched run — see `durations` above.
+          DUR=""
+          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
+            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
+          fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
             pnpm test:integration --changed origin/main --passWithNoTests \
@@ -560,10 +855,25 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/${{ needs.changes.outputs.integration-shard-count }} $COV \
+            pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
+
+      # One shard's slice of the sequencer's weights. Merged by the
+      # `shard-durations` job below into a manifest to commit.
+      - name: Upload shard durations
+        if: always() && needs.changes.outputs.durations == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # The lane is in the name because the two lanes both number their
+          # shards from 1: without it, `shared 1/2` and `mocking 1/2` would both
+          # upload `shard-durations-integration-1`, and upload-artifact rejects
+          # a duplicate name within one run. The merge job below globs
+          # `shard-durations-*`, so it picks both up either way.
+          name: shard-durations-integration-${{ matrix.lane }}-${{ matrix.shard }}
+          path: platform/app/vitest.durations.delta.json
+          if-no-files-found: ignore
 
       - name: Extract test failures
         if: failure()
@@ -725,16 +1035,18 @@ jobs:
           # run. They must agree: a path linted on one side and not the other
           # reads as that file's whole backlog appearing or vanishing.
           # `./packages` is GONE from this list, and deliberately not replaced
-          # with `../../packages`. The nine workspace packages now live in one
-          # repo-root tree, which is outside biome's project root here (the app
-          # directory, where biome.jsonc lives). Biome reports out-of-root files
+          # with `../../packages`. The nine workspace packages live in one
+          # repo-root tree that this run does not reach: it is started from the
+          # app directory, and /biome.jsonc scopes the workspace to
+          # platform/app/** anyway. Biome reports files outside the project root
           # by ABSOLUTE path, and the gate keys counts on the reported path, so
           # the base tree's temp-dir prefix can never match the head's: all 268
           # of their diagnostics read as brand new every run. Restoring coverage
-          # means giving packages/ its own biome root and its own gate run, which
-          # is a change to the lint setup rather than to this move -- tracked as
-          # a follow-up. The app tree, which is what this job is named for, is
-          # still fully covered.
+          # means giving packages/ a nested config of its own, adding it to the
+          # root config's includes, and giving it its own gate run -- a change to
+          # the lint setup rather than to this list, tracked as a follow-up. The
+          # app tree, which is what this job is named for, is still fully
+          # covered.
           BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
 
           # Biome exits non-zero whenever it reports anything; the gate is the
@@ -910,9 +1222,7 @@ jobs:
         with:
           install: "@langwatch/web..."
 
-      - name: Prepare files
-        working-directory: platform/app
-        run: pnpm start:prepare:files
+      - uses: ./.github/actions/prepare-generated-files
 
       - name: Check OpenAPI completeness
         working-directory: platform/app
@@ -1077,6 +1387,55 @@ jobs:
       - name: Test start-boxd-ssh-agent.sh
         run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
+      - name: Test biome-new-violations.sh
+        run: bash .github/scripts/__tests__/biome-new-violations.test.sh
+
+      - name: Test notify-slack-release.sh
+        run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      # Lives here rather than in deployment-impact-check.yml because that
+      # workflow filters `on.paths` down to deployment surface, which
+      # .github/** is not — so it would never start for a change to its own
+      # guard. This job's gate already lists `.github/scripts/**`.
+      - name: Test guard-deployment-impact.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
+  # The npm artifact's staging filters, run over the real tree.
+  #
+  # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
+  # receives. Its filters are rsync patterns, and a pattern that is broader than
+  # it means to be drops application source: twice already the published server
+  # died at first boot ~20 minutes in on exactly that. The guard inside the
+  # script compares what git tracks against what staging kept, and `--check-filters`
+  # runs it without a build and without packing, in about ten seconds.
+  #
+  # It used to run only inside npx-server-smoke, which does not run on main and
+  # whose path filter names none of the trees the guard reads. A `.gitignore`
+  # added under dev/scripts therefore merged green and turned every branch that
+  # merged main red.
+  #
+  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # package.json names, and a path filter listing them would be a second copy of
+  # that list, stale the day someone edits it. A minute on an unrelated pull
+  # request is the cheaper mistake.
+  pack-filters:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # None of it is in the package's `files`.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - name: Check the npm pack filters
+        run: bash dev/scripts/pack-npm.sh --check-filters
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1128,12 +1487,85 @@ jobs:
           echo "PASS: canary failed as expected and failures were extracted"
           cat platform/app/test-failures.txt
 
+  # Assemble the shard sequencer's weights from the lanes that just ran.
+  #
+  # Only on a dispatched run, and it produces an ARTIFACT rather than a commit:
+  # the manifest has to be identical for every shard that reads it, so it lands
+  # in the repo through a reviewed change like anything else. Download
+  # `shard-durations`, drop it at platform/app/vitest.durations.json, commit.
+  shard-durations:
+    needs: [changes, test-unit, test-component, test-integration]
+    if: always() && needs.changes.outputs.durations == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download every shard's durations
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: shard-durations-*
+          path: shard-durations
+
+      # The committed manifest is the base layer, so files this run did not
+      # execute keep the weights they already had.
+      - name: Check out the committed manifest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: platform/app/vitest.durations.json
+          sparse-checkout-cone-mode: false
+          path: baseline
+
+      - name: Merge into one manifest
+        run: |
+          # Baseline FIRST, then every shard's delta on top: `add` lets later
+          # keys win, so this is "the committed weights, updated by whatever was
+          # measured". The deltas cannot fight each other — each holds only the
+          # files its own shard ran, and the lanes partition the files
+          # (integrationLanes.ts) while a lane's shards partition its own — so
+          # their union is the same whatever order `find` lists them in.
+          #
+          # This ordering is the whole point. Were each shard to emit the full
+          # manifest instead of a delta, every artifact would carry the baseline,
+          # a file measured by shard A would hold its NEW value in A's artifact
+          # and its OLD one in every other, and whichever artifact `find`
+          # happened to list last would decide — silently discarding fresh
+          # measurements.
+          baseline=baseline/platform/app/vitest.durations.json
+          if [ ! -f "$baseline" ]; then
+            baseline=empty-baseline.json
+            echo '{}' > "$baseline"
+          fi
+
+          find shard-durations -name 'vitest.durations.delta.json' -print0 |
+            xargs -0 cat |
+            jq -s --slurpfile base "$baseline" \
+              '($base[0] + (add // {})) | to_entries | sort_by(.key) | from_entries' \
+              > vitest.durations.json
+
+          # An empty merge means no shard uploaded a delta AND there was no
+          # committed manifest — every test job skipped, or all of them died
+          # before their upload step. Publishing `{}` would hand someone an
+          # artifact the instructions above say to commit, and committing it
+          # would delete every weight in the repo. Fail instead: an absent
+          # manifest is a safe state, a blank one is not.
+          count=$(jq 'length' vitest.durations.json)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No shard produced any timings — refusing to publish an empty manifest."
+            echo "::error::Committing it would remove every weight the sequencer has."
+            exit 1
+          fi
+          echo "Merged $count file timings."
+
+      - name: Upload the manifest to commit
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shard-durations
+          path: vitest.durations.json
+
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test, pack-filters]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test

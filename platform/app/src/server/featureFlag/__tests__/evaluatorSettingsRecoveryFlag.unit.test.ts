@@ -4,12 +4,14 @@
  * AC0c2 for langwatch#6397 — the rollback flag's SCOPE is load-bearing, and
  * nothing else in the tree protects it.
  *
- * `PRODUCT` scope resolves env -> PostHog -> postgres -> default. A
- * PRODUCT-scoped flag with a 0%-rollout PostHog definition would leave the
- * registry default reading "recovery enabled" — so every acceptance test passes
- * — while production still ran the old behaviour and the customer still scored 0
- * on every trace. `SYSTEM` resolves env -> postgres -> default and never
- * consults PostHog.
+ * At the time, `PRODUCT` scope resolved env -> PostHog -> postgres ->
+ * default. A PRODUCT-scoped flag with a 0%-rollout PostHog definition would
+ * have left the registry default reading "recovery enabled" — so every
+ * acceptance test passes — while production still ran the old behaviour and
+ * the customer still scored 0 on every trace. `SYSTEM` resolved env ->
+ * postgres -> default and never consulted PostHog. PostHog has since been
+ * removed from the resolver entirely, but the scope stays pinned as the
+ * regression guard.
  */
 
 import { readFileSync } from "node:fs";
@@ -26,7 +28,7 @@ describe("the evaluator settings-recovery rollback flag", () => {
     expect(definition).toBeDefined();
   });
 
-  it("is SYSTEM scope, so PostHog can never decide it", () => {
+  it("is SYSTEM scope, pinned since langwatch#6397", () => {
     expect(definition?.scope).toBe("SYSTEM");
     expect(definition?.scope).not.toBe("PRODUCT");
   });

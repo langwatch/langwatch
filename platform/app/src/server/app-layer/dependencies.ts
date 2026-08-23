@@ -9,7 +9,6 @@ import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -66,6 +65,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
@@ -219,6 +219,16 @@ export interface AppDependencies {
   clickhouse: {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
+    /** Per-organization resolution, for aggregates keyed by organization
+     *  rather than project (usage rollups, the grants ledger). */
+    resolveOrganizationClient: (
+      organizationId: string,
+    ) => Promise<ClickHouseClient>;
+    /** Every configured instance - shared plus private - for fleet sweeps
+     *  and admin surfaces that legitimately touch all of them. */
+    allInstances: () => Promise<
+      Array<{ target: string; client: ClickHouseClient }>
+    >;
   };
   /**
    * The process's one Redis connection, owned by the composition root and
@@ -247,20 +257,9 @@ export interface AppDependencies {
     instance: InstanceUsageStatsRepository;
   };
   /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
-   * not configured, in which case both sweeps no-op.
-   */
-  scenarios: {
-    orphanReconciliation: {
-      client: ClickHouseClient | null;
-      finder: OrphanedRunFinder | null;
-    };
-  };
-  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
-   * audit trail and the reactor sync write through it; the SIEM export
+   * audit trail and the subscriber sync write through it; the SIEM export
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */
@@ -335,6 +334,13 @@ export interface AppDependencies {
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;
+  /**
+   * ADR-092 decision 25 — the one permission-checking service. Every grant
+   * check on every surface (tRPC declarations, Hono session and API-key
+   * middlewares, the management API) resolves THIS instance via
+   * `getApp().permissions`; nothing composes its own from a client.
+   */
+  permissions: PermissionsService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

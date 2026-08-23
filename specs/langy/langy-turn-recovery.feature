@@ -361,6 +361,20 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When a later relayed call streams to completion without an error event
     Then the capture is cleared and later calls pass through untouched
 
+  # The gateway can also forward an upstream rejection as a 200 whose
+  # Content-Type says event-stream but whose body is ONE bare JSON error
+  # object, with no event framing at all (seen live: Anthropic rejecting a
+  # request parameter). A sniffer that only reads framed events sees nothing,
+  # and the clean-end rule then CLEARS the capture, so the turn fails with no
+  # cause on record.
+  @unit
+  Scenario: A bare JSON error body under a stream content type is captured as the cause
+    Given the model provider rejects a relayed call
+    And the gateway forwards the rejection as a 200 stream whose body is one bare JSON error object
+    When the agent's SDK reads that body to its end
+    Then the rejection's reason code is captured as the turn's LLM cause
+    And the provider's own prose stays out of the capture
+
   # The turn stream's terminal error entry shares its `type: "error"`
   # discriminant with the SSE transport's own protocol failure frame. The
   # transport once claimed every such frame for itself, so the one entry that

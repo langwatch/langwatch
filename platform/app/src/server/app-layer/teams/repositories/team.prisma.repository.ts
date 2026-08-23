@@ -1,4 +1,16 @@
-import type { PrismaClient, Team } from "~/generated/prisma/client";
+import type { LedgerActor } from "@langwatch/actor";
+import { generate } from "@langwatch/ksuid";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+  type Team,
+  type TeamUserRole,
+} from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   CreateTeamInput,
   PaginatedResult,
@@ -7,7 +19,13 @@ import type {
 } from "./team.repository";
 
 export class PrismaTeamRepository implements TeamRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    // Team memberships are grants, and the ledger is their only writer since
+    // ADR-092 delivery-plan PR 2. Injectable so a test can watch the commands
+    // rather than the tables they end up in.
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   async findById(id: string): Promise<Team | null> {
     return this.prisma.team.findUnique({ where: { id } });
@@ -80,5 +98,71 @@ export class PrismaTeamRepository implements TeamRepository {
     });
     if (result.count === 0) return null;
     return this.prisma.team.findUnique({ where: { id } });
+  }
+
+  async isUserInOrganization({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, userId },
+      select: { userId: true },
+    });
+    return membership !== null;
+  }
+
+  async grantMembership({
+    teamId,
+    organizationId,
+    userId,
+    role,
+    actor,
+  }: {
+    teamId: string;
+    organizationId: string;
+    userId: string;
+    role: TeamUserRole;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.attachBindings({
+      organizationId,
+      bindings: [
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId },
+          role,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+        },
+      ],
+      actor,
+      onDuplicate: "reject",
+    });
+  }
+
+  async revokeMembership({
+    teamId,
+    organizationId,
+    userId,
+    actor,
+  }: {
+    teamId: string;
+    organizationId: string;
+    userId: string;
+    actor: LedgerActor;
+  }): Promise<number> {
+    return this.writer.revokeBindingsWhere({
+      organizationId,
+      where: {
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+        userId,
+      },
+      actor,
+    });
   }
 }

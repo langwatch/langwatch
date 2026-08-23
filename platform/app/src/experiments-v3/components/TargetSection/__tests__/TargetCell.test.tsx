@@ -181,7 +181,7 @@ describe("TargetCellContent", () => {
       const traceButton = screen.getByTestId("trace-link-target-1");
       await user.click(traceButton);
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("traceDetails", {
+      expect(mockOpenDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace_abc123",
       });
     });

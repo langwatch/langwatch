@@ -232,9 +232,26 @@ describe("applySpanToSummary attribute forwarding", () => {
 
       const state = applySpanToSummary({ state: createInitState(), span });
 
-      // Shape the reactor's early-return check expects.
+      // Shape the subscriber's early-return check expects.
       expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
       expect(state.attributes["langwatch.gateway_request_id"]).toBeTruthy();
+    });
+
+    // gen_ai.request.model holds the model that was dispatched, so a request
+    // a routing policy rewrote carries the caller's own name nowhere else.
+    // Without this mapping the tier a client asked for never reaches the
+    // trace, and no filter or breakdown can recover it.
+    it("forwards langwatch.requested_model to trace attributes", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.requested_model": "complex",
+          "gen_ai.request.model": "openai/gpt-5.6-sol",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.requested_model"]).toBe("complex");
     });
   });
 });

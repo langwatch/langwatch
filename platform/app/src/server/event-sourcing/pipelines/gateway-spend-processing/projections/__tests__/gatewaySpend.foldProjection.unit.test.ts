@@ -49,10 +49,47 @@ function makeEvent<E extends { type: string; data: unknown }>(
   }) as unknown as E;
 }
 
+/**
+ * The attribution an outcome states about itself, as an emitter that does
+ * NOT repeat it leaves it. The fold takes its attribution from the
+ * admission, so these fixtures exercise the path where the outcome adds
+ * nothing — which is what an older gateway build sends.
+ */
+const UNATTRIBUTED_OUTCOME = {
+  organization_id: "",
+  virtual_key_id: "",
+  end_user_id: "",
+  trace_id: "",
+  request_type: "",
+  labels: [] as string[],
+  metadata: "",
+  admitted_at: 0,
+  principal_user_id: "",
+  team_id: "",
+};
+
+/**
+ * The attribution an outcome states about itself when its emitter repeats it.
+ *
+ * The control plane confirms a brokered voice session, and the gateway
+ * admitted it, so the confirmation may be the first event the fold sees.
+ */
+const ATTRIBUTED_OUTCOME = {
+  ...UNATTRIBUTED_OUTCOME,
+  organization_id: "org_1",
+  virtual_key_id: "vk_1",
+  end_user_id: "end-user-7",
+  trace_id: "trace-1",
+  request_type: "realtime_session",
+  labels: ["customer:acme-172"] as string[],
+  metadata: '{"call_site":"summary"}',
+};
+
 const admitted = () =>
   makeEvent<GatewaySpendAdmittedEvent>(
     GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
     {
+      outcome_carries_attribution: false,
       gateway_request_id: REQUEST,
       occurred_at: T0,
       organization_id: "org_1",
@@ -88,10 +125,16 @@ const confirmed = () =>
         cache_read_input_tokens: 0,
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
+        cache_creation_1h_tokens: 0,
+        input_audio_tokens: 0,
+        output_audio_tokens: 0,
+        input_chars: 0,
+        audio_ms: 0,
       },
       cost_nano_usd: CONFIRMED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 3878,
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 3800,
   );
@@ -112,10 +155,16 @@ const failed = () =>
         cache_read_input_tokens: 0,
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
+        cache_creation_1h_tokens: 0,
+        input_audio_tokens: 0,
+        output_audio_tokens: 0,
+        input_chars: 0,
+        audio_ms: 0,
       },
       cost_nano_usd: FAILED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 1509,
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 1500,
   );
@@ -128,6 +177,9 @@ const settled = () =>
       occurred_at: T0 + 600_000,
       tenantId: TENANT,
       reason: "confirmation_deadline_expired",
+      model: "",
+      model_provider_id: "",
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 600_000,
   );
@@ -283,5 +335,77 @@ describe("gatewaySpend fold", () => {
     expect(state.httpStatus).toBe(504);
     expect(state.costNanoUsd).toBe(FAILED_COST_NANO_USD);
     expect(Number.isInteger(state.costNanoUsd)).toBe(true);
+  });
+  /** @scenario An outcome states the attribution its admission has not delivered */
+  it("names the organization and the key from an outcome that has no admission", () => {
+    const state = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        { ...confirmed().data, ...ATTRIBUTED_OUTCOME },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+
+    // Priced and named. Without the outcome's own attribution this row is a
+    // real charge belonging to no organization and no key, which is what a
+    // brokered voice session produced: the gateway admits it and the control
+    // plane confirms it, so the confirmation can reach the fold first.
+    expect(state.costNanoUsd).toBe(CONFIRMED_COST_NANO_USD);
+    expect(state.organizationId).toBe("org_1");
+    expect(state.virtualKeyId).toBe("vk_1");
+    expect(state.requestType).toBe("realtime_session");
+    expect(state.traceId).toBe("trace-1");
+    expect(state.endUserId).toBe("end-user-7");
+    expect(state.labels).toEqual(["customer:acme-172"]);
+  });
+
+  /** @scenario An outcome states the attribution its admission has not delivered */
+  it("does not let a late admission erase what the outcome stated", () => {
+    // The trace id is only known once the customer span opens, which happens
+    // after admission, so an admission carries none. A brokered voice session
+    // is confirmed by the control plane and can fold first, and an admission
+    // that overwrote unconditionally would blank the trace the settlement had
+    // just named, breaking the join between the spend row and the trace.
+    const early = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        { ...confirmed().data, ...ATTRIBUTED_OUTCOME },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+
+    const admitWithoutTrace = makeEvent<GatewaySpendAdmittedEvent>(
+      GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+      { ...admitted().data, trace_id: "" },
+      T0,
+    );
+
+    expect(
+      projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId,
+    ).toBe("trace-1");
+  });
+
+  /** @scenario An outcome states the attribution its admission has not delivered */
+  it("lets the admission win over what the outcome stated", () => {
+    const early = projection.handleGatewaySpendConfirmed(
+      makeEvent<GatewaySpendConfirmedEvent>(
+        GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        {
+          ...confirmed().data,
+          ...ATTRIBUTED_OUTCOME,
+          organization_id: "org_stale",
+        },
+        T0 + 3800,
+      ),
+      initial(),
+    );
+    expect(early.organizationId).toBe("org_stale");
+
+    // Admission is the authority. The outcome only fills a gap.
+    expect(
+      projection.handleGatewaySpendAdmitted(admitted(), early).organizationId,
+    ).toBe("org_1");
   });
 });

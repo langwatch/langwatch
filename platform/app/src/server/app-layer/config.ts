@@ -18,11 +18,11 @@ export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
 }
 
 /**
- * Whether a reactor with the given `runIn` role filter should run under the
- * current process role. A reactor with no filter runs everywhere. The `"all"`
+ * Whether a subscriber with the given `runIn` role filter should run under the
+ * current process role. A subscriber with no filter runs everywhere. The `"all"`
  * role (dev single-process mode) plays every role, so it satisfies any filter —
- * without this, reactors declared `runIn: ["worker"]` would be excluded in
- * in-process mode and the worker stack would boot but do no reactor work.
+ * without this, subscribers declared `runIn: ["worker"]` would be excluded in
+ * in-process mode and the worker stack would boot but do no subscriber work.
  */
 export function roleSatisfiesRunIn({
   runIn,
@@ -61,7 +61,7 @@ export interface AppConfig {
   // "web": dispatch commands only (no queue consumers)
   // "worker": full consumers
   // "all": web server + full consumers in one process (dev-only, WORKERS_IN_PROCESS=1)
-  // "migration": direct processCommand() calls, reactors excluded
+  // "migration": direct processCommand() calls, subscribers excluded
   // undefined: dispatch-only (web-like) — no consumers
   // Use `roleRunsWorkers(role)` rather than comparing to "worker" directly.
   processRole?: ProcessRole;

@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imported at the top: vitest hoists the vi.mock / vi.hoisted calls below above
 // these statements, so the modules under test still resolve the mocks.
-import DepartmentsPage from "~/pages/settings/governance/departments";
+import DepartmentsPage from "~/pages/governance/departments";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
@@ -60,6 +60,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     isLoading: false,
+    // The page hides its write controls without `governance:manage`, and this
+    // test is about what an admin sees.
+    hasAnyPermission: () => true,
   }),
 }));
 

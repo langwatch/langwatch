@@ -362,7 +362,7 @@ describe("testFireTrigger", () => {
       // The report example context populated — the trace context would have
       // left every report variable empty.
       expect(payload).toContain("trace_a1b2c3");
-      expect(payload).toContain("/acme/messages");
+      expect(payload).toContain("/acme/traces");
     });
 
     describe("when the report renders a dashboard", () => {

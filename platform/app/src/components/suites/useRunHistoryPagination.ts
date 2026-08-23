@@ -6,9 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { api } from "~/utils/api";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
@@ -89,24 +87,10 @@ export function useRunHistoryPagination({
     prevCursorRef.current = cursor;
   }, [runDataResult, cursor]);
 
-  // Client-side stall detection safety net: the server computes stall status
-  // at query time, but if the ClickHouse UpdatedAt was inflated by a
-  // re-projection, the server may return IN_PROGRESS for runs that are
-  // actually stalled. Re-check using the run's timestamp (= UpdatedAt).
-  const allRuns = useMemo(() => {
-    const now = Date.now();
-    return pages
-      .flatMap((p) => p.runs)
-      .map((run) => {
-        if (
-          run.status === ScenarioRunStatus.IN_PROGRESS &&
-          now - run.timestamp >= STALL_THRESHOLD_MS
-        ) {
-          return { ...run, status: ScenarioRunStatus.STALLED };
-        }
-        return run;
-      });
-  }, [pages]);
+  // Stored status is the only truth: stalled runs are finished ERROR by the
+  // process-manager stall watchdog and arrive here via the event broadcast
+  // refetch, so no client-side stall re-check is needed.
+  const allRuns = useMemo(() => pages.flatMap((p) => p.runs), [pages]);
 
   // Cheap freshness probe replaces the old 30s heavy re-fetch. Matches the
   // previous auto-refresh scope: only while the user hasn't paginated deeper

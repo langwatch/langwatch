@@ -3,12 +3,17 @@ import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { UserNotTeamMemberError } from "../errors";
 import { RoleService } from "../role.service";
 
-const mockTx = {
-  roleBinding: {
-    deleteMany: vi.fn(),
-    create: vi.fn(),
-  },
-};
+// A team role assignment is a ledger command since ADR-092 delivery-plan PR 2.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
 
 const mockPrisma = {
   team: {
@@ -27,7 +32,6 @@ const mockPrisma = {
     update: vi.fn(),
     delete: vi.fn(),
   },
-  $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockTx)),
   // `isRootPrismaClient` discriminates on `$connect` (Prisma 7 transaction
   // clients carry `$transaction` too), so a root-client stand-in must have it.
   $connect: vi.fn(),
@@ -62,16 +66,22 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("allows role assignment via RoleBinding membership check", async () => {
       await expect(
-        service.assignRoleToUser("user-rolebinding-only", "team-1", "role-1"),
+        service.assignRoleToUser({
+          userId: "user-rolebinding-only",
+          teamId: "team-1",
+          customRoleId: "role-1",
+          actor: { type: "user" as const, id: "actor_1" },
+        }),
       ).resolves.toEqual({ success: true });
     });
 
     it("queries roleBinding with team scope for membership", async () => {
-      await service.assignRoleToUser(
-        "user-rolebinding-only",
-        "team-1",
-        "role-1",
-      );
+      await service.assignRoleToUser({
+        userId: "user-rolebinding-only",
+        teamId: "team-1",
+        customRoleId: "role-1",
+        actor: { type: "user" as const, id: "actor_1" },
+      });
 
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
@@ -99,7 +109,12 @@ describe("RoleService.assignRoleToUser", () => {
 
     it("throws UserNotTeamMemberError", async () => {
       await expect(
-        service.assignRoleToUser("user-nobody", "team-1", "role-1"),
+        service.assignRoleToUser({
+          userId: "user-nobody",
+          teamId: "team-1",
+          customRoleId: "role-1",
+          actor: { type: "user" as const, id: "actor_1" },
+        }),
       ).rejects.toThrow(UserNotTeamMemberError);
     });
   });

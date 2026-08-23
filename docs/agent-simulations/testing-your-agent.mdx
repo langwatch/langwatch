@@ -1,0 +1,144 @@
+---
+title: Testing Your Agent
+sidebarTitle: Testing your agent
+keywords: langwatch, agent simulations, scenarios, run plans, product managers, domain experts, no code, langy
+description: Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+---
+
+## What this guide covers
+
+This guide shows how to test your AI agent with simulations, entirely from the LangWatch interface. You write scenarios that describe real situations, run them against your agent, and read a clear verdict for each one. No code is involved in any step.
+
+<Note>
+One technical step happens before this guide: a developer connects the agent to LangWatch, so simulations can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-simulations/connect-your-agent) guide. It is a one-time setup and usually takes under an hour.
+</Note>
+
+## What a scenario is
+
+A scenario has two parts:
+
+- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn, like a real customer would.
+- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation, and the agent's internal actions, and decides each criterion.
+
+You do not write the conversation itself. The simulated user improvises within the situation, so every run exercises your agent the way real users do: with slightly different words each time.
+
+Write criteria about outcomes, not wording. "The agent looks up the order before answering" and "The agent does not promise a refund" are strong criteria. "The agent says exactly this sentence" is not.
+
+## Where your scenarios live
+
+Open **Simulations → Scenarios** in the sidebar. The Scenario Library lists every scenario in the project, with labels to organize them:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-library.png" alt="The Scenario Library with scenarios and their labels" />
+</Frame>
+
+## Create a scenario
+
+Click **New Scenario**. You can describe what you want and let AI draft it, or build it yourself.
+
+<Note>
+A scenario is saved in your project, and everyone with access to the project can read it. The AI draft step also sends the text you give it to a model. Remove names, contact details, account numbers and other personal data before you paste, or replace them with invented equivalents. The test works the same way with invented details.
+</Note>
+
+### Draft with AI
+
+Describe the behavior you care about in your own words. Paste in real material: a support ticket, a complaint email, a paragraph from a requirements document, or a snippet of a real conversation that went wrong. AI turns it into an editable situation and criteria:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-create-with-ai.png" alt="The Create new scenario dialog with a behavior description ready to draft with AI" />
+</Frame>
+
+### Build it yourself
+
+The editor asks for the name, the situation, and the criteria, with guidance next to it. You can hand any half-written scenario to AI for a draft at any point:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-editor.png" alt="The scenario editor with a situation and two criteria filled in" />
+</Frame>
+
+Two tips that make scenarios much more useful:
+
+- Include at least one criterion about what the agent does internally, such as "looks up the order before answering" or "reads the tender documents". The judge verifies these against the agent's real actions, not against what the reply claims.
+- Write at least one "must not" criterion for each scenario. The most valuable tests describe the failure you are afraid of: inventing a date, quoting another customer's data, promising something the policy forbids.
+
+## Create scenarios with Langy
+
+Langy, the assistant in the bottom corner of every page, creates scenarios for you. Paste text from documents or conversations you already have, describe what must hold, and Langy writes and saves the scenario in one step:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/langy-creates-scenario.png" alt="Langy creating a scenario from a pasted snippet of a customer chat" />
+</Frame>
+
+Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript of a conversation where the agent got it wrong. Each of these becomes a permanent test, so the same mistake cannot come back unnoticed. Remove personal data from the text first, as above.
+
+## Create scenarios from your own tools
+
+Your team's AI assistants can create scenarios too. Through the [LangWatch MCP integration](/integration/mcp), tools such as Claude and Cursor can read and write scenarios in your project. A teammate can highlight a bug report in their editor and ask their assistant to turn it into a LangWatch scenario, without opening the platform.
+
+## Run your scenarios
+
+### Run one scenario
+
+From the scenario editor, **Save and Run** asks which agent to run against:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-run-target.png" alt="The target picker with the registered agent to run the scenario against" />
+</Frame>
+
+Then it asks which models play the simulated user and the judge. The defaults are fine; change them only if your team has a preference:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/scenario-choose-models.png" alt="The model picker for the user simulator and the judge" />
+</Frame>
+
+### Run a set of scenarios with a run plan
+
+A run plan groups scenarios and runs them together against a target. This is what you run before a release, or after every change. Open **Simulations → Runs**, create a run plan with **New Run Plan**, pick the scenarios and the agent, and press **Run**:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-plan.png" alt="A run plan with its scenarios, pass rate and run history" />
+</Frame>
+
+The confirmation shows what is about to run, including any parameters the scenarios declare, such as which test account to act as:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-plan-confirm.png" alt="The run confirmation with the scenario count and the run parameters" />
+</Frame>
+
+### Watch it run
+
+Runs execute live. Each card is one conversation with your agent, and you can watch the messages arrive as the simulated user and the agent talk:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-live.png" alt="A run in progress with two conversations running live" />
+</Frame>
+
+A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back.
+
+## Read the results
+
+Open any finished run. The top shows the conversation exactly as it happened, with the simulated user's messages and your agent's replies:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the full conversation transcript" />
+</Frame>
+
+Below it, the verdict: which criteria were met, which were not, and the judge's reasoning in plain language. The reasoning cites what the agent actually did, such as which lookup it performed before answering:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the pass verdict and the judge reasoning" />
+</Frame>
+
+Three outcomes are possible for a criterion:
+
+- **Met**: the conversation, or the agent's internal actions, prove it.
+- **Not met**: the agent did the thing the criterion forbids, or failed to do the thing it requires. Read the reasoning, then the conversation, and share both with your team; the run page link is enough for a developer to investigate.
+- **Inconclusive**: the judge did not find evidence either way. For criteria about internal actions, this usually means the agent's traces did not arrive; ask your developer to check the connection with the [Connect your agent](/agent-simulations/connect-your-agent) guide.
+
+Each turn also carries a **View trace** link, opening the exact steps the agent took for that reply. You do not need to read traces yourself, but the link is the fastest thing to hand a developer when something looks wrong.
+
+## Make it a habit
+
+- Run your run plan before every release. The history on the run plan page shows the pass rate over time, so a regression is visible the moment it happens.
+- After every incident or complaint, add a scenario for it. The library becomes the collective memory of everything your agent must never do again.
+- Keep scenarios short and focused: one situation, a handful of criteria. Ten small scenarios find more than one large one.

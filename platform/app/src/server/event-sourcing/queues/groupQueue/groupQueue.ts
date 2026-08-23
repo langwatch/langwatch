@@ -1779,8 +1779,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * parse failure — the job was already removed from staging, so it is DISCARDED
    * here, mirroring the dispatched job's own parse-failure handling.
    *
-   * This used to say "recoverable via event replay". It is not, for a reactor
-   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
+   * This used to say "recoverable via event replay". It is not, for a subscriber
+   * job: replay never invokes subscribers (see {@link dropStagedJob}). The loss is
    * counted instead of asserted away.
    */
   private async parseDrainedPayload({
@@ -1976,7 +1976,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Set on BOTH outcomes, and before the split recurses. The flag means "an
     // earlier call in this descent MAY have written", which is what a later
-    // commit needs to know — a handler that stored and then threw (a reactor
+    // commit needs to know — a handler that stored and then threw (a subscriber
     // failing after the fold committed) has written just as surely as one that
     // returned. Treating that as a fresh delivery lets the next sub-batch's
     // commit REPLACE the applied set the failed call recorded (#6578). The
@@ -2341,16 +2341,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * does not — and the proof is structural, not another comment: `ReplayExecutor`
    * calls the fold's pure `projection.apply()` and writes straight to the store
    * via `store.store()`, never constructing a `ProjectionRouter` — which is the
-   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
-   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * only thing that calls `dispatchToSubscribers`. Subscribers are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a subscriber at all,
    * except two that exist to *suppress* re-fires.)
    *
    * `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
-   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * subscribers on the `traceSummary` fold — so for them this method IS the terminal
    * event, and the counter below is the only evidence it ever happened. Scoped
    * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
    * drives `config.projections` + `config.mapProjections`). The false part is
-   * reactor-specific.
+   * subscriber-specific.
    *
    * **Why `complete()`** — there are THREE options here, not two, and an earlier
    * draft of this comment argued a false binary:
@@ -2613,7 +2613,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         err,
         reason: "transient_exhausted",
-        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
       });
       return;
     }
@@ -2804,7 +2804,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Group queue processor closed successfully",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error,

@@ -2,8 +2,10 @@
 #
 # Implementation:
 #   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
+#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
+#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor.ts (fold trigger)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
@@ -84,19 +86,9 @@ Rule: Branches map to their pull requests through the organization connection
     When the tick fires
     Then one sweep runs and the others stand down
 
-  # Nothing removed a branch's bookkeeping or its pull requests, ever, at one
-  # row per agent branch per repository.
   @unit
-  Scenario: Linkage rows nobody asks about stop accumulating
-    Given a branch outside the sweep's activity window
-    When the retention prune runs
-    Then its bookkeeping is removed
-    And the pull requests it was the only reason to keep are removed
-    And a reader asking again re-maps the branch from GitHub
-
-  @unit
-  Scenario: A repository on a non-GitHub host never triggers a GitHub call
-    Given a session whose repository host is not github.com
+  Scenario: A repository on a host this instance cannot answer for never triggers a GitHub call
+    Given a session whose repository host is not the instance's GitHub host
     When the mapping trigger evaluates the session
     Then no mapping is requested
 
@@ -105,6 +97,153 @@ Rule: Branches map to their pull requests through the organization connection
     Given sessions with repo and branch folded before any GitHub connection existed
     When the organization connects GitHub
     Then the recent branches are mapped without waiting for new sessions
+
+Rule: Demand is what a session asks for, and only demand keeps a branch in the sweep
+
+  # The column the sweep selects on was also written by the sweep itself, so a
+  # branch that never gets a pull request renewed its own place in the sweep and
+  # was asked about every day for as long as the connection existed.
+  @integration
+  Scenario: The sweep does not renew the demand it selects on
+    Given a branch with no pull request that the sweep asks GitHub about
+    When the sweep records the empty answer
+    Then the branch's last demand time is unchanged
+
+  @integration
+  Scenario: A session folding on a branch records demand for it
+    Given a branch with no pull request
+    When a session folds on that branch and the mapping runs
+    Then the branch's last demand time moves to the time of the fold
+
+  @integration
+  Scenario: A branch with no session demand for a week leaves the sweep
+    Given a branch whose last session demand is older than the activity window
+    When the periodic recheck selects branches
+    Then that branch is not selected
+
+Rule: Bookkeeping is pruned, and the pull requests it found are kept
+
+  # One bookkeeping row per agent branch per repository, and nothing removed
+  # them, so the table grew for as long as the connection existed.
+  @integration
+  Scenario: Bookkeeping for a branch outside the activity window is removed
+    Given a branch outside the sweep's activity window
+    When the retention prune runs
+    Then its bookkeeping is removed
+    And a session folding on that branch again re-maps it from GitHub
+
+  # A pull request is a record of work that was done. Removing it when the
+  # branch went quiet took merged work off the Pull Requests page, which is the
+  # work people most want to look back at.
+  @integration
+  Scenario: A linked pull request stays after its branch goes quiet
+    Given a branch outside the sweep's activity window whose pull request is linked
+    When the retention prune runs
+    Then the pull request is still stored for the organization
+
+Rule: A pull request links itself the moment GitHub announces it
+
+  # Polling alone linked a branch up to a day after its pull request was
+  # opened, because a branch is at its most backed-off exactly when the pull
+  # request finally appears: people and coding agents branch first, work for
+  # hours, and open the pull request last.
+  @integration
+  Scenario: A pull request opened on a branch is linked without waiting for a recheck
+    Given an organization whose GitHub connection covers a repository
+    And a branch with no pull request yet
+    When GitHub announces that a pull request was opened for that branch
+    Then the pull request is stored for the branch straight away
+    And GitHub is not asked to list the branch's pull requests
+
+  @integration
+  Scenario: The announcement clears the branch's backoff
+    Given a branch whose repeated empty answers armed the longest backoff
+    When GitHub announces a pull request for that branch
+    Then the branch is no longer waiting to be asked again
+    And a later empty answer arms the shortest backoff rather than the longest
+
+  @integration
+  Scenario: A pull request that merges is announced as merged
+    Given a stored pull request that is open
+    When GitHub announces that it was merged
+    Then the stored pull request reads as merged
+
+  @unit
+  Scenario: An announcement for a connection this instance does not hold is dropped
+    Given an announcement carrying an installation with no local record
+    When it arrives
+    Then nothing is stored for it
+
+  @unit
+  Scenario: An announcement that changes nothing the page shows is dropped
+    Given an announcement that a label was added to a pull request
+    When it arrives
+    Then nothing is written
+
+  # The head of a pull request from a fork lives in another repository, which
+  # is a repository a session on this one never names.
+  @unit
+  Scenario: An announcement for a pull request opened from a fork is dropped
+    Given an announcement whose head branch lives in a different repository
+    When it arrives
+    Then nothing is stored for it
+
+  @integration
+  Scenario: Every announcement is acknowledged, applied or not
+    Given a signed announcement this instance has nothing to do with
+    When GitHub delivers it
+    Then GitHub is told the delivery succeeded
+
+  @integration
+  Scenario: A redelivered announcement changes nothing
+    Given an announcement that has already been applied
+    When GitHub delivers it a second time
+    Then the branch still carries exactly one pull request, unchanged
+
+  # GitHub does not promise the order it delivers announcements in, and a
+  # pull request's close and merge times are what decide which sessions are
+  # priced under it. A late announcement written over a newer one reopens a
+  # merged pull request and takes the sessions that ran after it closed.
+  @integration
+  Scenario: A late delivery about an earlier state does not roll the pull request back
+    Given a pull request stored as merged
+    When an announcement about its earlier state arrives after the merge
+    Then the pull request still reads as merged
+    And its close and merge times are unchanged
+    And its title is not put back to the earlier one
+
+  @integration
+  Scenario: A listing that answers after a newer announcement does not roll it back
+    Given a listing of a branch's pull requests still waiting on GitHub
+    When the pull request is announced as merged before the listing answers
+    Then the listing's older answer leaves the stored pull request as merged
+
+  # Deliveries get missed, installations get suspended and resumed, and a
+  # self-hosted instance may never be reachable by GitHub at all. The recheck
+  # is the floor under the announcement, not something it replaces.
+  @integration
+  Scenario: A branch whose announcement never arrived is still linked by the recheck
+    Given a pull request opened for a branch and no announcement delivered
+    When the periodic recheck runs after the branch's backoff elapses
+    Then the pull request is linked
+
+Rule: A branch a session just ran on is asked about again soon
+
+  # The backoff grew on the theory that a branch empty four times is a branch
+  # whose work never became a pull request. A session folding on that branch is
+  # the plainest evidence to the contrary, so it brings the next question
+  # forward instead of inheriting a day-long wait.
+  @integration
+  Scenario: A new session on a branch brings its next question forward
+    Given a branch sitting on the longest backoff with no pull request
+    When a coding-agent session folds on that branch
+    Then the branch is due to be asked about again within the shortest backoff
+
+  @integration
+  Scenario: Repeated folds on one branch still ask GitHub once per backoff
+    Given a branch a session just folded on and asked GitHub about
+    When more sessions fold on it before the backoff elapses
+    Then GitHub is not asked again
 
 Rule: Sessions attach to pull requests by the pull request's lifetime
 
@@ -320,6 +459,14 @@ Rule: A contributor is a person or a project, never an agent-reported id
     When the caller's project scope is resolved
     Then the workspace is named by itself
     And the name still opens nothing
+
+  # The schema has no foreign keys, so a membership row can outlive its user.
+  @integration
+  Scenario: A membership row that outlives its user still resolves the scope
+    Given a personal workspace whose membership row points at a deleted user
+    When the caller's project scope is resolved
+    Then the read does not fail
+    And the workspace is named by itself
 
   # Members answer "who worked here" only where the answer is one person, and
   # reading them for every team would cost a query nothing displays.

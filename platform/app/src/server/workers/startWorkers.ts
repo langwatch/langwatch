@@ -61,12 +61,13 @@ async function bootStorageStatsCollection(
 }
 
 // Scenario simulation executor: an in-process pool late-bound into the
-// scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
-// fires with no pool wired and simulations never execute.
+// pool holder the simulationRunExecution process manager's execute intent
+// reads. Without this the intent throws (outbox retries) and simulations
+// never execute on this pod.
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getScenarioExecutionHandle } = await import(
+  const { getScenarioExecutionPool } = await import(
     "~/server/app-layer/presets"
   );
   const { ScenarioExecutionPool } = await import(
@@ -81,7 +82,7 @@ async function bootScenarioProcessor(
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
-  getScenarioExecutionHandle()?.setPool(scenarioPool);
+  getScenarioExecutionPool()?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({
     pool: scenarioPool,
   });
@@ -118,6 +119,21 @@ async function bootSpendSpikeAnomalyWorker(
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
+}
+
+// Reconciles brokered realtime voice sessions whose post-call webhook never
+// arrived, so the webhook is an optimisation rather than something a
+// customer must configure before voice spend can be billed at all
+// (specs/ai-gateway/realtime-sessions.feature).
+async function bootRealtimeSessionPoller(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startRealtimeSessionPoller } = await import(
+    "~/server/gateway/realtimeSessionPoller"
+  );
+  const poller = startRealtimeSessionPoller();
+  shutdownHandles.push(() => poller.stop());
+  logger.info("realtime voice session poller ready");
 }
 
 // Self-hosted daily usage telemetry (no-op on SaaS or when
@@ -502,6 +518,11 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
+    await bootRealtimeSessionPoller(shutdownHandles);
+    // One-time in-place data migrations (ADR-092 stage B and successors) are
+    // NOT booted here: they are a worker-only background loop like the
+    // scheduler, so the app layer starts them and the App's graceful
+    // closeables stop them (see presets.ts).
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }

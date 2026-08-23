@@ -12,6 +12,7 @@ import {
   mintLangySessionApiKey,
 } from "./langyApiKey";
 import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
+import type { LangyHarness } from "./langyHarness";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -255,7 +256,28 @@ export type LangyCredentials = {
    * manager mirrors nothing without a destination.
    */
   mirrorTier?: LangyMirrorTier;
+  /**
+   * Which worker harness serves this turn (`release_langy_pi_harness`,
+   * resolved once per turn, see `langyHarness.ts`). Part of the worker
+   * credential signature on the Go side, where absent and "opencode" collapse
+   * so pre-flag workers never respawn on deploy; a flag flip is a probe MISS
+   * and the worker re-warms on the other harness.
+   */
+  harness?: LangyHarness;
 };
+
+/**
+ * Strip the GitHub capability from a turn's (or warm's) credential bundle when
+ * the per-day PR cap is reached, so the worker never even holds a token the
+ * turn is not allowed to spend. Shared by the turn path (which RESERVES a
+ * permit) and the warm path (which only PEEKS at the cap) so both produce the
+ * same worker signature, a warm that kept the token while the turn stripped
+ * it would boot a worker the turn cannot reuse.
+ */
+export function stripGithubCredentials(credentials: LangyCredentials): void {
+  delete credentials.githubToken;
+  delete credentials.githubLogin;
+}
 
 /**
  * Resolves the credentials a Langy worker subprocess needs in its env.
@@ -370,7 +392,7 @@ export class LangyCredentialService {
         // in this project) — surface it verbatim as the 409 body.
         throw new LangyCredentialResolutionError(error.message);
       }
-      logger.error(
+      logger.warn(
         { error, projectId, userId: actorUserId },
         "failed to mint Langy session key",
       );

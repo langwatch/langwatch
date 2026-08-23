@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import type { CustomGraph, Prisma } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -98,6 +98,7 @@ secured.access(requires("analytics:view")).get(
     const graphs = await prisma.customGraph.findMany({
       where: {
         projectId: project.id,
+        kind: BUILDER_CHART_KIND,
         ...(dashboardId ? { dashboardId } : {}),
       },
       orderBy: dashboardId
@@ -137,7 +138,7 @@ secured.access(requires("analytics:view")).get(
     const { id } = c.req.param();
 
     const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id },
+      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
     });
 
     if (!graph) {
@@ -179,6 +180,10 @@ secured.access(requires("analytics:create")).post(
       return c.json({ error: "Dashboard not found" }, 404);
     }
 
+    // Deliberately not filtered by `kind`: the grid is one shared space, so the
+    // next free row has to account for every chart occupying it. Scoping this to
+    // builder rows would place a new chart on top of a saved workbench chart the
+    // moment those gain dashboard placement.
     let gridRow = body.gridRow;
     if (gridRow === undefined && body.dashboardId) {
       const lastGraph = await prisma.customGraph.findFirst({
@@ -237,7 +242,7 @@ secured.access(requires("analytics:update")).patch(
     const body = c.req.valid("json");
 
     const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id },
+      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
     });
 
     if (!graph) {
@@ -245,7 +250,7 @@ secured.access(requires("analytics:update")).patch(
     }
 
     const updated = await prisma.customGraph.update({
-      where: { id, projectId: project.id },
+      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
       data: {
         ...(body.name !== undefined ? { name: body.name } : {}),
         ...(body.graph !== undefined
@@ -292,7 +297,7 @@ secured.access(requires("analytics:manage")).delete(
     const { id } = c.req.param();
 
     const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id },
+      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
     });
 
     if (!graph) {
@@ -300,7 +305,7 @@ secured.access(requires("analytics:manage")).delete(
     }
 
     await prisma.customGraph.delete({
-      where: { id, projectId: project.id },
+      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
     });
 
     return c.json({ id, deleted: true });

@@ -243,6 +243,28 @@ export const goErrorCodes = {
    */
   model_not_allowed: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrModelNotRecognized — means the request named a model that matches
+   * nothing this key can place: no provider declares it, its name matches no
+   * vendor the gateway can guess from, and the key holds more than one
+   * provider that told us what it serves. Sending it down the chain anyway
+   * makes every vendor answer for a model it never had, and the caller reads
+   * the last vendor's error instead of the real problem. Distinct from
+   * model_provider_not_bound, which is a provider the caller DID name.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_not_recognized: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrProviderNotBound — means the request names a provider (explicit
+   * "provider/model" prefix or alias) that has no credential slot on this VK.
+   * Dispatching anyway would hand a mismatched credential to the provider
+   * selected by the model prefix, which surfaces as opaque provider-config
+   * errors ("deployments not set", HTML error pages).
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_provider_not_bound: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrNoFreeUID — signals every UID slot in the per-worker range is in use.
    * With 60_000 slots and a default MAX_WORKERS of 20 this cannot happen in
    * practice; surfaced rather than silently colliding when an operator raises
@@ -320,6 +342,24 @@ export const goErrorCodes = {
    */
   rate_limited: { service: "aigateway", httpStatus: 429 },
   /**
+   * ErrRealtimeRegistryUnavailable — means the control plane could not record
+   * the session, so the gateway refused to mint one. This is a deliberate
+   * departure from the budget fail-open rule: an unrecorded session is voice
+   * nobody can bill and a cap nobody can enforce.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_registry_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrRealtimeSessionLimit — means the virtual key already holds as many open
+   * realtime voice sessions as its realtime.maxOpenSessions allows. A voice
+   * session bills for as long as it runs, so the arrival-rate limits do not
+   * bound it and this is the only cap that does.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_session_limit: { service: "aigateway", httpStatus: 429 },
+  /**
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
    *
@@ -391,6 +431,16 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   virtual_key_disabled: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrKeyExpired — is the stop nobody pressed: the key carries an expiration
+   * date and that date has passed. The key material is intact and the key is
+   * still ACTIVE in the control plane, so the fix is a new date rather than a
+   * new secret. Distinct from revoked and disabled so a tenant can tell
+   * "extend it" from "ask an administrator" from "mint a new one".
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  virtual_key_expired: { service: "aigateway", httpStatus: 403 },
   /**
    * ErrKeyRevoked
    *

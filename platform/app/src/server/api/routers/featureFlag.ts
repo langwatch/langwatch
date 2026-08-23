@@ -3,7 +3,6 @@ import { z } from "zod";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
-import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
@@ -38,14 +37,14 @@ export const featureFlagRouter = createTRPCRouter({
         organizationId: z.string().optional(),
       }),
     )
-    .use(
-      skipPermissionCheck({
-        allow: {
-          projectId: "for PostHog targeting, not resource access",
-          organizationId: "for PostHog targeting, not resource access",
-        },
-      }),
-    )
+    .noPermission({
+      reason:
+        "feature flags are read per authenticated user; no tenant data is exposed",
+      allow: {
+        projectId: "for PostHog targeting, not resource access",
+        organizationId: "for PostHog targeting, not resource access",
+      },
+    })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -111,7 +110,10 @@ export const featureFlagRouter = createTRPCRouter({
     // Membership filtering below is the real authorization check; the
     // rbac middleware's sensitive-key guard does not cover plural
     // targeting params and is not relevant here.
-    .use(skipPermissionCheck())
+    .noPermission({
+      reason:
+        "feature flags are read per authenticated user; no tenant data is exposed",
+    })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -175,7 +177,10 @@ export const featureFlagRouter = createTRPCRouter({
         organizationIds: z.array(z.string()),
       }),
     )
-    .use(skipPermissionCheck())
+    .noPermission({
+      reason:
+        "feature flags are read per authenticated user; no tenant data is exposed",
+    })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 

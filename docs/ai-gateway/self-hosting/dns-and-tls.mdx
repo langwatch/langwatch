@@ -4,7 +4,7 @@ description: Point a public hostname at the AI Gateway, AWS ELB, NLB + Cloudflar
 sidebarTitle: DNS & TLS
 ---
 
-The AI Gateway is a customer-facing HTTPS endpoint. Clients (OpenAI SDKs, Claude Code, Cursor, curl) resolve a hostname, open a TLS connection, and send chat-completion requests. This page covers the SaaS posture (`gateway.langwatch.ai`) and the self-hoster checklist to point your own hostname at a private deployment.
+The AI Gateway is a customer-facing HTTPS endpoint. Clients (OpenAI SDKs, Claude Code, Cursor, curl) resolve a hostname, open a TLS connection, and send chat-completion requests. LangWatch SaaS serves that endpoint at `gateway.langwatch.ai`. A self-hosted deployment needs its own hostname pointed at a private gateway.
 
 ## SaaS: dedicated NLB + ACM cert + Cloudflare DNS-only
 
@@ -69,7 +69,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
-The four `proxy-*` annotations are load-bearing, they unlock SSE streaming through nginx. Removing them will cause streamed `/v1/chat/completions` responses to buffer until the full body arrives, which breaks incremental rendering in every OpenAI SDK.
+The four `proxy-*` annotations are what make SSE streaming work through nginx. Without them, streamed `/v1/chat/completions` responses buffer until the full body arrives, which breaks incremental rendering in every OpenAI SDK.
 
 cert-manager with a DNS-01 Let's Encrypt issuer is the zero-touch path for the cert:
 

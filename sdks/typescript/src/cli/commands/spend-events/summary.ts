@@ -9,6 +9,7 @@ import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { parseInstantOrNull } from "../../utils/instant";
+import { parseKeyValueFlags } from "../../utils/keyValueFlags";
 
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
@@ -112,49 +113,6 @@ function oneOf<T extends string>({
   return value as T;
 }
 
-/**
- * `--metadata tier=gold`, repeated. Equals rather than a colon, because the
- * value may itself contain a colon and a shell user expects `key=value`.
- *
- * A key may not contain a colon: the server splits a pair on its FIRST colon,
- * so a key carrying one would silently address a different key. Refusing beats
- * reporting spend for a filter the caller did not write.
- */
-function parseMetadataFlags(
-  pairs: string[] | undefined,
-): Record<string, string[]> | undefined {
-  if (pairs === undefined || pairs.length === 0) return undefined;
-  const parsed: Record<string, string[]> = {};
-  for (const pair of pairs) {
-    const separator = pair.indexOf("=");
-    if (separator <= 0) {
-      console.error(
-        chalk.red(`Invalid --metadata value: ${pair} (expected key=value)`),
-      );
-      process.exit(1);
-    }
-    const key = pair.slice(0, separator);
-    if (key.includes(":")) {
-      console.error(
-        chalk.red(
-          `Invalid --metadata key: ${key} (a metadata key cannot contain a colon)`,
-        ),
-      );
-      process.exit(1);
-    }
-    const value = pair.slice(separator + 1);
-    if (value === "") {
-      console.error(
-        chalk.red(
-          `Invalid --metadata value: ${pair} (an empty value would match every request that lacks the key)`,
-        ),
-      );
-      process.exit(1);
-    }
-    (parsed[key] ??= []).push(value);
-  }
-  return parsed;
-}
 
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
@@ -214,7 +172,10 @@ export const spendSummaryCommand = async (options: {
       model: options.model,
       providerKey: options.provider,
       endUserId: options.endUser,
-      metadata: parseMetadataFlags(options.metadata),
+      metadata: parseKeyValueFlags({
+        pairs: options.metadata,
+        flag: "--metadata",
+      }),
       limit:
         options.limit !== undefined
           ? parsePositiveInt(options.limit, "--limit")

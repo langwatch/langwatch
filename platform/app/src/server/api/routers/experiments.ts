@@ -10,6 +10,7 @@ import {
   ExperimentType,
   type Prisma,
 } from "~/generated/prisma/client";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
@@ -37,7 +38,6 @@ import {
 import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
 import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
   type createInnerTRPCContext,
   createTRPCRouter,
@@ -72,7 +72,7 @@ export const experimentsRouter = createTRPCRouter({
         commitMessage: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
 
@@ -225,7 +225,7 @@ export const experimentsRouter = createTRPCRouter({
         state: persistedEvaluationsV3StateSchema,
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
       const experimentId =
@@ -310,7 +310,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -341,7 +341,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ input }) => {
       const experiment =
         await experimentService().findByIdWithWorkflowCurrentVersion({
@@ -415,7 +415,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       if (input.experimentId) {
         return await experimentService()
@@ -447,7 +447,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -476,7 +476,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       return await experimentService().getAll({
         projectId: input.projectId,
@@ -491,7 +491,7 @@ export const experimentsRouter = createTRPCRouter({
         pageSize: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
@@ -587,7 +587,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -669,7 +669,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -723,7 +723,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -749,7 +749,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -796,7 +796,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:delete"))
+    .permission("workflows:delete")
     .mutation(async ({ input }) => {
       return await experimentService()
         .archive({ projectId: input.projectId, id: input.experimentId })
@@ -812,10 +812,10 @@ export const experimentsRouter = createTRPCRouter({
         copyDatasets: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least evaluations:manage permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -945,7 +945,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       return await experimentService().getLatest({
         projectId: input.projectId,

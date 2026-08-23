@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { normalizeGithubHost } from "../github/githubHost";
 import type {
   GithubPullRequestLookup,
   PullRequestBranchKey,
@@ -217,7 +218,7 @@ function branchDrivesOf(rows: CodingAgentSessionRow[]): BranchDrive[] {
   const drives: BranchDrive[] = [];
   for (const row of rows) {
     if (!row.repositoryOwner || !row.repositoryName) continue;
-    const repositoryHost = (row.repositoryHost || "github.com").toLowerCase();
+    const repositoryHost = normalizeGithubHost(row.repositoryHost ?? "");
     const repositoryFullName =
       `${row.repositoryOwner}/${row.repositoryName}`.toLowerCase();
     for (const headBranch of branchesOf(row)) {
@@ -377,6 +378,8 @@ function toListRow(
 ): CodingAgentSessionListRow {
   return {
     sessionId: row.sessionId,
+    // One Title column; the fold already resolved the precedence (the
+    // session's own name, then the generated title, then the first prompt).
     title: row.title === "" ? null : row.title,
     agent: row.agent,
     agentVersion: row.agentVersion,

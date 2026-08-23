@@ -79,7 +79,6 @@ const renderMenu = ({
         dejaViewHref={null}
         onOpenRawJson={vi.fn()}
         onShowShortcuts={vi.fn()}
-        onShare={vi.fn()}
         onAddToAnnotationQueue={onAddToAnnotationQueue}
         pinned={false}
         onTogglePinned={vi.fn()}

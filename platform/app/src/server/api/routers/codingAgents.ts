@@ -2,13 +2,13 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
+import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
 import {
   type CallerProjectScope,
   resolveCallerProjectScope,
 } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { canReadCapturedContent } from "~/server/traces/protections";
-import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gatePullRequestSessionTitles,
@@ -43,7 +43,7 @@ export const codingAgentsRouter = createTRPCRouter({
         toMs: z.number().int().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const toMs = input.toMs ?? Date.now();
@@ -69,7 +69,7 @@ export const codingAgentsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const toMs = input.toMs ?? Date.now();
@@ -98,7 +98,7 @@ export const codingAgentsRouter = createTRPCRouter({
    */
   sessionsList: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -124,7 +124,7 @@ export const codingAgentsRouter = createTRPCRouter({
    */
   pullRequestUsage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const app = getApp();
       const scope = await scopeFor({
@@ -159,7 +159,7 @@ export const codingAgentsRouter = createTRPCRouter({
         prNumber: z.number().int().positive(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) {
@@ -253,6 +253,11 @@ async function scopeFor({
  * route answers 503 there, and a link that cannot start its flow is worse than
  * no link at all. It is the only availability signal in this payload, so its
  * absence is what tells the page not to offer connecting.
+ *
+ * "Configured" is read the way the install route reads it, App slug included.
+ * The token service answers a narrower question, whether it can mint, and an
+ * instance holding an id and a key but no slug mints happily while the deep
+ * link this builds has nowhere on github.com to point.
  */
 async function connectionFor(projectId: string): Promise<{
   connected: boolean;
@@ -264,7 +269,7 @@ async function connectionFor(projectId: string): Promise<{
   const existing = await installations.getAllForOrganization(organizationId);
   return {
     connected: existing.length > 0,
-    installUrl: installations.configured
+    installUrl: getGithubAppConfig().configured
       ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
       : null,
   };

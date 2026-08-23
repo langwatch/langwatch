@@ -10,9 +10,14 @@ import {
   collectMediaRefs,
   MAX_TRACE_MEDIA_REFS,
   mediaRefBelongsToSide,
+  mergeMediaRefs,
   parseMediaRefs,
-  serializeMediaRefs,
+  serializeMediaRefList,
 } from "../media-refs";
+
+/** The fold's two steps in one call: walk a span payload, then serialize it. */
+const serializeMediaRefs = (value: unknown) =>
+  serializeMediaRefList(collectMediaRefs(value));
 
 describe("collectMediaRefs", () => {
   describe("given a winning span IO with externalized media", () => {
@@ -47,6 +52,56 @@ describe("collectMediaRefs", () => {
           mimeType: "application/pdf",
           role: "user",
         },
+      ]);
+    });
+  });
+
+  describe("given one recording reachable through two paths in the payload", () => {
+    /** @scenario One recording reachable through two paths collapses to one ref */
+    it("records it once", () => {
+      const audio = {
+        type: "input_audio",
+        input_audio: { url: "/api/files/p1/a1", mimeType: "audio/wav" },
+      };
+      const value = [
+        {
+          role: "user",
+          // The same part reached twice: once as message content, once through
+          // a mirrored field an SDK carries alongside it.
+          content: [audio],
+          parts: [audio],
+        },
+      ];
+
+      expect(collectMediaRefs(value)).toEqual([
+        { kind: "audio", url: "/api/files/p1/a1", role: "user" },
+      ]);
+    });
+
+    it("keeps the first role recorded when the same url arrives under two roles", () => {
+      const value = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_audio",
+              input_audio: { url: "/api/files/p1/a1", mimeType: "audio/wav" },
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "input_audio",
+              input_audio: { url: "/api/files/p1/a1", mimeType: "audio/wav" },
+            },
+          ],
+        },
+      ];
+
+      expect(collectMediaRefs(value)).toEqual([
+        { kind: "audio", url: "/api/files/p1/a1", role: "user" },
       ]);
     });
   });
@@ -225,6 +280,67 @@ describe("mediaRefBelongsToSide", () => {
           ),
         ).toBe(true);
       }
+    });
+  });
+});
+
+describe("mergeMediaRefs", () => {
+  const imageRef = (id: string) =>
+    ({ kind: "image", url: `/api/files/p1/${id}` }) as const;
+
+  describe("when the incoming span won the trace's headline input", () => {
+    /** @scenario The headline span's media is preferred over a child's */
+    it("puts its media first", () => {
+      expect(
+        mergeMediaRefs({
+          existing: [imageRef("child")],
+          incoming: [imageRef("winner")],
+          precedence: "prepend",
+        }),
+      ).toEqual([imageRef("winner"), imageRef("child")]);
+    });
+  });
+
+  describe("when the incoming span did not win", () => {
+    /** @scenario Media on a child span reaches the trace's refs */
+    it("keeps its media behind what is already there", () => {
+      expect(
+        mergeMediaRefs({
+          existing: [imageRef("winner")],
+          incoming: [imageRef("child")],
+          precedence: "append",
+        }),
+      ).toEqual([imageRef("winner"), imageRef("child")]);
+    });
+  });
+
+  describe("when both sides carry the same stored object", () => {
+    it("keeps one ref", () => {
+      expect(
+        mergeMediaRefs({
+          existing: [imageRef("same")],
+          incoming: [imageRef("same")],
+          precedence: "append",
+        }),
+      ).toEqual([imageRef("same")]);
+    });
+  });
+
+  describe("when the merged list would exceed the cap", () => {
+    /** @scenario The refs stay capped however many spans carry media */
+    it("stops at the cap", () => {
+      const many = Array.from({ length: MAX_TRACE_MEDIA_REFS + 3 }, (_, i) =>
+        imageRef(`i${i}`),
+      );
+
+      const merged = mergeMediaRefs({
+        existing: many,
+        incoming: [imageRef("late")],
+        precedence: "append",
+      });
+
+      expect(merged).toHaveLength(MAX_TRACE_MEDIA_REFS);
+      expect(merged).not.toContainEqual(imageRef("late"));
     });
   });
 });

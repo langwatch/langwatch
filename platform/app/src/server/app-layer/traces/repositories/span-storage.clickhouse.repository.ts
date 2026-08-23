@@ -263,6 +263,8 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'] AS CacheCreation1hTokens,
   SpanAttributes['gen_ai.usage.input_chars'] AS InputChars,
   SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
+  SpanAttributes['gen_ai.usage.input_audio_tokens'] AS InputAudioTokens,
+  SpanAttributes['gen_ai.usage.output_audio_tokens'] AS OutputAudioTokens,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
@@ -500,6 +502,8 @@ export interface SpanSummaryQueryRow {
   CacheCreation1hTokens: string;
   InputChars: string;
   AudioSeconds: string;
+  InputAudioTokens: string;
+  OutputAudioTokens: string;
   CustomInputRate: string;
   CustomOutputRate: string;
   CustomCacheReadRate: string;
@@ -557,6 +561,10 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CacheCreation1hTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]:
+          row.InputAudioTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]:
+          row.OutputAudioTokens || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
           row.CustomInputRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
@@ -972,7 +980,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: span.tenantId,
           spanId: span.spanId,
@@ -1021,7 +1029,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           count: spans.length,
           error: error instanceof Error ? error.message : String(error),
@@ -1084,7 +1092,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1150,7 +1158,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1194,7 +1202,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1266,7 +1274,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           }),
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1628,7 +1636,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1678,7 +1686,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         (await result.json()) as TraceEventRollupRow[],
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceCount: traceIds.length,
@@ -1749,7 +1757,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1829,7 +1837,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,

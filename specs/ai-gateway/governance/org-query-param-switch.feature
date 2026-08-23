@@ -28,9 +28,9 @@ Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pag
   @bdd @ui @governance @org-query-param @integration
   Scenario: The `?org=` switch works on any org-scoped page, preserving the path
     Given the user is currently on organization "alpha"
-    When the user opens "/settings/gateway/virtual-keys?org=beta"
+    When the user opens "/gateway/virtual-keys?org=beta"
     Then the selected organization becomes "beta"
-    And the URL is rewritten to "/settings/gateway/virtual-keys" without the "?org" parameter
+    And the URL is rewritten to "/gateway/virtual-keys" without the "?org" parameter
 
   @bdd @ui @governance @org-query-param @integration
   Scenario: An `?org=<slug>` the user does not belong to is ignored

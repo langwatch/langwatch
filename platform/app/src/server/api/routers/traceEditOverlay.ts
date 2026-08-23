@@ -5,7 +5,6 @@ import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEd
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import type { Protections } from "~/server/traces/protections";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -63,7 +62,7 @@ async function isTraceWindowRedacted({
 export const traceEditOverlayRouter = createTRPCRouter({
   getByTraceId: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const overlay = await getApp().traces.editOverlay.getByTraceId({
         projectId: input.projectId,
@@ -106,7 +105,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         patch: traceEditOverlayPatchSchema,
       }),
     )
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       const editOverlay = getApp().traces.editOverlay;
       const stored = await editOverlay.getByTraceId({
@@ -158,7 +157,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ input }) => {
       await getApp().traces.editOverlay.delete({
         projectId: input.projectId,

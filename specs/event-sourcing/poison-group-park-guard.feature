@@ -46,7 +46,7 @@ Feature: GroupQueue poison-group park guard
   #   - Parked groups use the existing ops surface (getBlockedSummary,
   #     unblockGroup, drainGroup) - no new operator concepts.
   #
-  # Incident 2026-07-20: a claudeCodeSpanSync reactor group for one trace churned
+  # Incident 2026-07-20: a claudeCodeSpanSync subscriber group for one trace churned
   # ~5 fresh jobs/min for 14h against a precondition that never became true, and
   # took ~a quarter of the shared {event-sourcing/jobs} queue's retry capacity.
   # The per-JOB retry cap (JOB_RETRY_CONFIG.maxAttempts) never fired because

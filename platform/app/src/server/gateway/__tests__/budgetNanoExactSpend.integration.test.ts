@@ -28,7 +28,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -89,6 +89,11 @@ function servedRequest(options: {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       reasoning_tokens: 0,
+      cache_creation_1h_tokens: 0,
+      input_audio_tokens: 0,
+      output_audio_tokens: 0,
+      input_chars: 0,
+      audio_ms: 0,
     },
     cost_nano_usd: options.costNanoUsd,
     rate_version: "catalog@test",
@@ -161,7 +166,7 @@ async function wireRowFor(budgetId: string) {
 
 /** The nano sum the ledger itself holds, read straight out of ClickHouse. */
 async function ledgerNanoFor(budgetId: string): Promise<number> {
-  const client = await getClickHouseClientForProject(PROJECT_ID);
+  const client = await getClickHouseClientForTenant(PROJECT_ID);
   if (!client) throw new Error("no ClickHouse client in test environment");
   const result = await client.query({
     query: `
@@ -242,7 +247,7 @@ beforeAll(async () => {
   });
 
   chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   });

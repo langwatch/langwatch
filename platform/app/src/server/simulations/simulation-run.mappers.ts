@@ -1,6 +1,5 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
-import { resolveRunStatus } from "../scenarios/stall-detection";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -81,11 +80,12 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
 
 /**
  * Maps a ClickHouse simulation_runs row to ScenarioRunData.
- * Applies stall detection using UpdatedAt timestamp.
+ * Stored status is the only truth: runs without a finish timestamp read as
+ * IN_PROGRESS regardless of age — a stalled run reaches terminal ERROR via
+ * the process-manager stall watchdog, not a read-time derivation.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
-  now = Date.now(),
 ): ScenarioRunData {
   const baseStatus = mapStatus(row.Status);
   const updatedAt = Number(row.UpdatedAt);
@@ -97,12 +97,10 @@ export function mapClickHouseRowToScenarioRunData(
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
-  // Apply stall detection: if run has no finished timestamp, check if it's stalled
-  const resolvedStatus = resolveRunStatus({
-    finishedStatus: finishedAt != null ? baseStatus : undefined,
-    lastEventTimestamp: updatedAt,
-    now,
-  });
+  // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its
+  // stored status.
+  const resolvedStatus =
+    finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
 
   const verdictEnum = mapVerdict(row.Verdict);
 
@@ -154,11 +152,20 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          return parsed != null &&
-            typeof parsed === "object" &&
-            !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : null;
+          if (
+            parsed == null ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+          ) {
+            return null;
+          }
+          // A run's secret parameter values never belong in a stored row, and
+          // the fold projection keeps them out. Dropped again on the way out
+          // so a row written by another path cannot serve one. The names, on
+          // `secretParameterNames`, stay.
+          const { secretParameters: _secretParameters, ...rest } =
+            parsed as Record<string, unknown>;
+          return rest;
         } catch {
           return null;
         }

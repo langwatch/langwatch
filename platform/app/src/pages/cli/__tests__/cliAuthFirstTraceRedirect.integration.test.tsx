@@ -127,6 +127,20 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => ({ data: undefined, isLoading: false }),
         },
       },
+      // Org admin ceiling so the device-session flow defaults to a full
+      // organization scope selection and the Approve button stays enabled;
+      // the key-selection UI itself is covered by
+      // cliAuthKeySelection.integration.test.tsx.
+      apiKey: {
+        myBindings: {
+          useQuery: () => ({
+            data: [
+              { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+            ],
+            isLoading: false,
+          }),
+        },
+      },
       project: {
         getHasFirstMessage: {
           useQuery: (
@@ -172,10 +186,10 @@ const serveCliAuthEndpoints = () => {
       );
     }
     if (url.includes("/api/auth/cli/approve")) {
-      return new Response(
-        JSON.stringify({ ok: true, personal_vk_label: "default" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(JSON.stringify({}), {
       status: 200,

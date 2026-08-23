@@ -77,7 +77,6 @@ export class App {
   readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
   readonly usageStats: AppDependencies["usageStats"];
-  readonly scenarios: AppDependencies["scenarios"];
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly commands: AppCommands;
@@ -91,6 +90,7 @@ export class App {
   readonly emailSuppressions: AppDependencies["emailSuppressions"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
+  readonly permissions: AppDependencies["permissions"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
@@ -125,6 +125,7 @@ export class App {
     this.emailSuppressions = deps.emailSuppressions;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
+    this.permissions = deps.permissions;
     this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
@@ -157,7 +158,6 @@ export class App {
     this.redis = deps.redis;
     this.billing = deps.billing;
     this.usageStats = deps.usageStats;
-    this.scenarios = deps.scenarios;
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
     this.commands = deps.commands;

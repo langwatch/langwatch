@@ -42,7 +42,7 @@ import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
  *      run-level dim columns (UserId / ConversationId / CustomerId / Origin)
  *      are kept Nullable and emitted as `null` from this projection;
  *      Phase 7 may lift them off the trace fold via a cross-pipeline read
- *      at write time, matching the eval alert reactor's pattern.
+ *      at write time, matching the eval alert subscriber's pattern.
  *
  *   2. **Attributes map is TRIMMED** at write time via
  *      `trimAttributesForAnalytics` — the EXACT same trim service the trace
@@ -274,7 +274,7 @@ export function projectEvaluationAnalyticsStateToRow({
     model: state.model,
     traceId: state.traceId,
     // Phase 6 leaves the trace-derived dim columns Null; a Phase 7
-    // cross-pipeline hoist (mirroring the eval alert reactor) can fill them
+    // cross-pipeline hoist (mirroring the eval alert subscriber) can fill them
     // without an additive schema change.
     userId: null,
     conversationId: null,

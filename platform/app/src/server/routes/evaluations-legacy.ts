@@ -17,8 +17,7 @@ import type { JsonArray } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -60,7 +59,10 @@ import {
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
-import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type CustomEvaluatorDefinition,
+  getEvaluatorDefaultSettings,
+} from "~/server/evaluations/getEvaluator";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -178,7 +180,7 @@ async function authenticateRequest(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the descriptor
@@ -989,14 +991,15 @@ export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
 ): Promise<
-  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
+  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
+  | CustomEvaluatorDefinition
+  | undefined
 > => {
   const availableCustomEvaluators = await getCustomEvaluators({
     projectId,
   });
 
-  const customEntries: [string, { name: string; requiredFields: string[] }][] =
-    [];
+  const customEntries: [string, CustomEvaluatorDefinition][] = [];
   for (const evaluator of availableCustomEvaluators ?? []) {
     const dsl = evaluator.versions[0]?.dsl;
     if (!dsl) {
@@ -1280,9 +1283,12 @@ async function handleEvaluatorCall(
     // flips silently on reroute. Narrow enough (and low-impact enough) to
     // document rather than special-case.
     const mergedSettings = {
+      // Custom evaluator definitions have no `settings` to derive defaults
+      // from — getEvaluatorDefaultSettings returns {} for that arm instead of
+      // crashing. (Workflow evaluators never reach it: this branch.)
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
-            evaluatorDefinition as any,
+            evaluatorDefinition,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),

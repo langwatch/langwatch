@@ -5,7 +5,7 @@ interface ProjectHasTracesResult {
    * `true` if the project has ever received a trace, `false` if it hasn't,
    * `undefined` while the project context is still loading. Reads off the
    * `firstMessage` flag on the Project model — flipped to `true` by the
-   * collector worker / projectMetadata reactor on first ingest. This is
+   * collector worker / projectMetadata subscriber on first ingest. This is
    * cheaper and more accurate than probing the trace store.
    *
    * NB: this is "have they ever sent a trace?" — not "do they have a

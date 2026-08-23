@@ -15,15 +15,25 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Skills Directory](https://langwatch.ai/docs/skills/directory.md): Get started with LangWatch in seconds. Install a skill, and your AI agent does the rest.
 - [PM & Domain Expert Skills](https://langwatch.ai/docs/skills/pms-and-domain-experts.md): Skills for PMs and domain experts to collaborate with their team using AI assistants.
 
-- [LangWatch CLI](https://langwatch.ai/docs/integration/cli.md): The `langwatch` CLI is a single tool that gives you—and your coding assistant—full access to LangWatch from the terminal. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
+- [LangWatch CLI](https://langwatch.ai/docs/integration/cli.md): The `langwatch` CLI is a single tool that drives LangWatch from the terminal, for you and for your coding assistant. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
 - [Better Agents](https://langwatch.ai/docs/better-agents/overview.md): Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development
 
 ## Agent Simulations
 
 - [Introduction to Agent Testing](https://langwatch.ai/docs/agent-simulations/introduction.md)
-- [Getting Started](https://langwatch.ai/docs/agent-simulations/getting-started.md)
-- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent and project secrets.
+
+### Connect your agent
+
+- [Connect Your Agent](https://langwatch.ai/docs/agent-simulations/connect-your-agent.md): Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
+- [Linking Your Traces](https://langwatch.ai/docs/agent-simulations/remote-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
+- [Local Development](https://langwatch.ai/docs/agent-simulations/local-development.md): Run platform scenario suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
+- [Scenario Run Parameters](https://langwatch.ai/docs/agent-simulations/scenario-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
+- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
+
+- [Testing Your Agent](https://langwatch.ai/docs/agent-simulations/testing-your-agent.md): Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+- [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
+- [Run Suites from CI](https://langwatch.ai/docs/agent-simulations/run-suites-from-ci.md): Start a suite from a CI job and wait for every run of the batch to finish.
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-simulations/voice-agents.md)
 - [Red Teaming](https://langwatch.ai/docs/agent-simulations/red-teaming.md)
 
@@ -94,7 +104,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Prompt Management
 
-- [Overview](https://langwatch.ai/docs/prompt-management/overview.md): Organize, version, and optimize your AI prompts with LangWatch's comprehensive prompt management system
+- [Overview](https://langwatch.ai/docs/prompt-management/overview.md): Organize, version, and optimize your AI prompts with LangWatch's prompt management system
 - [Get Started](https://langwatch.ai/docs/prompt-management/getting-started.md): Create your first managed prompt in LangWatch, link it to traces, and use it in your application with built-in prompt versioning and analytics.
 - [Prompts CLI](https://langwatch.ai/docs/prompt-management/cli.md): Use the LangWatch Prompts CLI to manage prompts as code with version control and support A/B testing for AI agent evaluations.
 - [Prompt Playground](https://langwatch.ai/docs/prompt-management/prompt-playground.md): Use LangWatch’s Prompt Playground to edit, test, and iterate prompts with versioning, analytics, and AI agent test feedback loops.
@@ -144,11 +154,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Cookbooks
 
 - [Measuring RAG Performance](https://langwatch.ai/docs/cookbooks/build-a-simple-rag-app.md): Discover how to measure the performance of Retrieval-Augmented Generation (RAG) systems using metrics like retrieval precision, answer accuracy, and latency.
-- [Optimizing Embeddings](https://langwatch.ai/docs/cookbooks/finetuning-embedding-models.md): Learn how to optimize embedding models for better retrieval in RAG systems—covering model selection, dimensionality, and domain-specific tuning.
+- [Optimizing Embeddings](https://langwatch.ai/docs/cookbooks/finetuning-embedding-models.md): Embedding model tuning for better retrieval in RAG systems, covering model selection, dimensionality, and domain-specific tuning.
 - [Vector Search vs Hybrid Search using LanceDB](https://langwatch.ai/docs/cookbooks/vector-vs-hybrid-search.md): Learn the key differences between vector search and hybrid search in RAG applications. Use cases, performance tradeoffs, and when to choose each.
-- [Evaluating Tool Selection](https://langwatch.ai/docs/cookbooks/tool-selection.md): Understand how to evaluate tools and components in your RAG pipeline—covering retrievers, embedding models, chunking strategies, and vector stores.
-- [Finetuning Agents with GRPO](https://langwatch.ai/docs/cookbooks/finetuning-agents.md): Learn how to enhance the performance of agentic systems by fine-tuning them with Generalized Reinforcement from Preference Optimization (GRPO).
-- [Multi-Turn Conversations](https://langwatch.ai/docs/cookbooks/evaluating-multi-turn-conversations.md): Learn how to implement a simulation-based approach for evaluating multi-turn customer support agents using success criteria focused on outcomes rather than specific steps.
+- [Evaluating Tool Selection](https://langwatch.ai/docs/cookbooks/tool-selection.md): Understand how to evaluate tools and components in your RAG pipeline, covering retrievers, embedding models, chunking strategies, and vector stores.
+- [Finetuning Agents with GRPO](https://langwatch.ai/docs/cookbooks/finetuning-agents.md): Fine-tuning agentic systems with Group Relative Policy Optimization (GRPO) to improve their performance.
+- [Multi-Turn Conversations](https://langwatch.ai/docs/cookbooks/evaluating-multi-turn-conversations.md): A simulation-based approach for evaluating multi-turn customer support agents, with success criteria on outcomes rather than specific steps.
 
 ### Use Cases
 
@@ -160,7 +170,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Help
 
-- [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works — events, data retention, and answers to common questions.
+- [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works, with events, data retention, and answers to common questions.
 - [What counts as a billable event](https://langwatch.ai/docs/pricing/billable-events.md): The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works
 - [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
 - [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
@@ -204,18 +214,33 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 #### Capturing Input/Output
 
-- [Capturing and Mapping Inputs & Outputs](https://langwatch.ai/docs/integration/python/tutorials/capturing-mapping-input-output.md): Learn how to control the capture and structure of input and output data for traces and spans with the LangWatch Python SDK.
-- [Capturing and Mapping Inputs & Outputs](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-input-output.md): Learn how to control the capture and structure of input and output data for traces and spans with the LangWatch TypeScript SDK.
+- [Capturing and Mapping Inputs & Outputs](https://langwatch.ai/docs/integration/python/tutorials/capturing-mapping-input-output.md): The LangWatch Python SDK controls which input and output data traces and spans capture, and how that data is structured.
+- [Capturing and Mapping Inputs & Outputs](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-input-output.md): The LangWatch TypeScript SDK controls which input and output data traces and spans capture, and how that data is structured.
 
 #### Capturing RAG
 
-- [Capturing RAG](https://langwatch.ai/docs/integration/python/tutorials/capturing-rag.md): Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
-- [Capturing RAG](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-rag.md): Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
+- [Capturing RAG](https://langwatch.ai/docs/integration/python/tutorials/capturing-rag.md): LangWatch captures Retrieval-Augmented Generation (RAG) data for evaluations and agent testing.
+- [Capturing RAG](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-rag.md): LangWatch captures Retrieval-Augmented Generation (RAG) data for evaluations and agent testing.
 
 #### Capturing Metadata
 
-- [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/python/tutorials/capturing-metadata.md): Learn how to enrich your traces and spans with custom metadata and attributes using the LangWatch Python SDK.
-- [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-metadata.md): Learn how to enrich your traces and spans with custom metadata and attributes using the LangWatch TypeScript SDK.
+- [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/python/tutorials/capturing-metadata.md): The LangWatch Python SDK attaches custom metadata and attributes to traces and spans.
+- [Capturing Metadata and Attributes](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-metadata.md): The LangWatch TypeScript SDK attaches custom metadata and attributes to traces and spans.
+
+#### Capturing Images
+
+- [Capturing Images](https://langwatch.ai/docs/integration/python/tutorials/capturing-images.md): LangWatch captures the images your Python application sends to a model and shows them on the trace.
+- [Capturing Images](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-images.md): LangWatch captures the images your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Documents
+
+- [Capturing Documents](https://langwatch.ai/docs/integration/python/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your Python application sends to a model and shows them on the trace.
+- [Capturing Documents](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-documents.md): LangWatch captures the PDF files and other documents your TypeScript application sends to a model and shows them on the trace.
+
+#### Capturing Audio and Voice
+
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/python/tutorials/capturing-audio.md): LangWatch captures the audio your Python application sends to a model and plays it back on the trace.
+- [Capturing Audio and Voice](https://langwatch.ai/docs/integration/typescript/tutorials/capturing-audio.md): LangWatch captures the audio your TypeScript application sends to a model and plays it back on the trace.
 
 #### Tracking LLM Costs
 
@@ -239,9 +264,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 #### Evaluations & Guardrails
 
-- [Capturing Evaluations & Guardrails](https://langwatch.ai/docs/integration/python/tutorials/capturing-evaluations-guardrails.md): Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
+- [Capturing Evaluations & Guardrails](https://langwatch.ai/docs/integration/python/tutorials/capturing-evaluations-guardrails.md): LangWatch logs custom evaluations, triggers managed evaluations, and runs guardrails.
 
-- [Combining the SDK with OpenTelemetry Spans](https://langwatch.ai/docs/integration/tutorials/open-telemetry.md): Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
+- [Combining the SDK with OpenTelemetry Spans](https://langwatch.ai/docs/integration/tutorials/open-telemetry.md): LangWatch receives traces from an existing OpenTelemetry setup in Python and TypeScript.
 
 ## Frameworks
 
@@ -259,10 +284,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [LiteLLM Instrumentation](https://langwatch.ai/docs/integration/python/integrations/lite-llm.md): Instrument LiteLLM calls with the LangWatch Python SDK to capture LLM traces, measure quality, and support AI agent testing workflows.
 - [OpenAI Agents SDK Instrumentation](https://langwatch.ai/docs/integration/python/integrations/open-ai-agents.md): Instrument OpenAI Agents with the LangWatch Python SDK to capture traces, run AI agent evaluations, and debug agent testing scenarios.
 - [PydanticAI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/pydantic-ai.md): Connect PydanticAI applications to LangWatch using the Python SDK to trace calls, debug structured outputs, and improve AI agent evaluations.
-- [Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra.md): Learn how to integrate Mastra, a TypeScript agent framework, with LangWatch for observability and tracing.
-- [DSPy Instrumentation](https://langwatch.ai/docs/integration/python/integrations/dspy.md): Learn how to instrument DSPy programs with the LangWatch Python SDK to trace RAG pipelines, optimize prompts, and improve AI agent evaluations.
+- [Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra.md): LangWatch traces agents built with Mastra, the TypeScript agent framework.
+- [DSPy Instrumentation](https://langwatch.ai/docs/integration/python/integrations/dspy.md): Instrument DSPy programs with the LangWatch Python SDK to trace RAG pipelines, optimize prompts, and improve AI agent evaluations.
 - [LlamaIndex Instrumentation](https://langwatch.ai/docs/integration/python/integrations/llamaindex.md): Instrument LlamaIndex applications with LangWatch to trace retrieval, generation, and RAG behavior for AI agent evaluations.
-- [Haystack Instrumentation](https://langwatch.ai/docs/integration/python/integrations/haystack.md): Learn how to instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
+- [Haystack Instrumentation](https://langwatch.ai/docs/integration/python/integrations/haystack.md): Instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
 - [Strands Agents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/strand-agents.md): Instrument Strands Agents with LangWatch to capture decision flows and support repeatable AI agent testing.
 - [Agno Instrumentation](https://langwatch.ai/docs/integration/python/integrations/agno.md): Instrument Agno agents with LangWatch’s Python SDK to send traces, analyze behaviors, and strengthen AI agent testing and evaluations.
 - [CrewAI](https://langwatch.ai/docs/integration/python/integrations/crew-ai.md): Integrate the CrewAI Python SDK with LangWatch to trace multi-agent workflows, debug failures, and support systematic AI agent testing.
@@ -299,21 +324,24 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Google Cloud
 
-- [Google Vertex AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/vertex-ai.md): Learn how to instrument Google Vertex AI API calls with the LangWatch Python SDK using OpenInference
-- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Learn how to instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+- [Google Vertex AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/vertex-ai.md): The LangWatch Python SDK instruments Google Vertex AI API calls through OpenInference.
+- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
 
 ### Amazon Web Services
 
 - [AWS Bedrock Instrumentation](https://langwatch.ai/docs/integration/python/integrations/aws-bedrock.md): Instrument AWS Bedrock calls using OpenInference and LangWatch to capture metrics and behaviors for AI agent testing workflows.
 
-- [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for fast LLM observability, cost tracking, and agent evaluation insights.
-- [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture high-speed traces and improve AI agent evaluations.
+- [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
+- [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
 - [Ollama (Local Models) Integration](https://langwatch.ai/docs/integration/go/integrations/ollama.md): Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
 - [OpenRouter Integration](https://langwatch.ai/docs/integration/go/integrations/openrouter.md): Instrument OpenRouter model calls in Go with LangWatch to compare models, track quality, and run AI agent evaluations.
 
 ## Tools
 
-- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Monitor Claude Code usage with LangWatch using OpenTelemetry traces
+- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [opencode Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
 - [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## No-Code Platforms
@@ -391,10 +419,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Governance
 
-- [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): One control plane for every AI tool in your enterprise — virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
-- [Personal IDE keys — your AI tools, governed by your company](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal monthly budget, and zero per-tool config.
-- [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): One-time configuration for an organization rolling out LangWatch Governance — SSO, providers, routing policies, and budgets.
-- [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+- [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): One control plane for every AI tool in your enterprise, with virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
+- [Personal IDE keys: your AI tools, governed by your company](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal budget, and no per-tool configuration.
+- [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): One-time SSO, provider, routing-policy, and budget configuration for an organization rolling out LangWatch Governance.
+- [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
 - [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
 
 ## Providers
@@ -422,7 +450,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Security & Trust](https://langwatch.ai/docs/ai-gateway/security.md): How the LangWatch AI Gateway protects secrets, isolates tenants, and audits privileged actions.
 - [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who did what, when, to which resource, gateway mutations land in the same audit log as the rest of the platform.
 
-- [Model Naming](https://langwatch.ai/docs/ai-gateway/model-naming.md): How to name models in requests, bare, prefixed, or aliased, and how the gateway resolves each.
+- [Model Naming](https://langwatch.ai/docs/ai-gateway/model-naming.md): How to name a model in a request, and which provider the gateway sends it to.
 - [Parameter mapping](https://langwatch.ai/docs/ai-gateway/parameter-mapping.md): How every OpenAI chat-completions parameter behaves on each provider lane, and how to control dropping with drop_tuning_params.
 - [Model Aliases](https://langwatch.ai/docs/ai-gateway/model-aliases.md): Per-VK redirects from client-facing model names to specific provider/model/deployment combinations.
 
@@ -436,7 +464,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [POST /v1/chat/completions](https://langwatch.ai/docs/ai-gateway/api/chat-completions.md): OpenAI-compatible chat completions through the LangWatch AI Gateway.
 - [POST /v1/messages](https://langwatch.ai/docs/ai-gateway/api/messages.md): Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
-- [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+- [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway, on OpenAI's wire and on ElevenLabs' own.
+- [Realtime voice](https://langwatch.ai/docs/ai-gateway/api/realtime.md): Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor.
 - [GET /v1/models](https://langwatch.ai/docs/ai-gateway/api/models.md): List the models a virtual key can access through the LangWatch AI Gateway.
 - [Error Envelope](https://langwatch.ai/docs/ai-gateway/api/errors.md): OpenAI-compatible error shapes and a complete type enum.
 - [Management REST API](https://langwatch.ai/docs/ai-gateway/api/management.md): Manage virtual keys, budgets, and routing policies programmatically via /api/gateway/v1/*.
@@ -489,7 +518,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
 - [Departments](https://langwatch.ai/docs/ai-governance/departments.md): A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
 
 ## Privacy
@@ -510,7 +539,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the reactor evaluates today, what is preview-only, and how to write a working rule.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
 
 ## Compliance & Architecture
 
@@ -551,7 +580,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Security & Control
 
-- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter; this page states exactly what each layer blocks and where the boundary is only cooperative today.
+- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 - [Langy Data Flow and Privacy](https://langwatch.ai/docs/langy/security/data-flow-and-privacy.md): Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it.
 - [What Langy Can Do in Your GitHub](https://langwatch.ai/docs/langy/security/github-access.md): Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
 
@@ -566,8 +595,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
-- [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one
-- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
+- [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license adds, and how to activate one
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while using LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
 ## Configuration
@@ -603,7 +632,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Ops Console
 
-- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from a single pane of glass
+- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from one interface
 - [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
 - [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
 - [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
@@ -614,7 +643,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
 - [Langy Assistant](https://langwatch.ai/docs/self-hosting/langy/setup.md): Run LangWatch's in-product AI assistant on your own cluster
-- [Register the Langy GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+- [Register the GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 - [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
 - [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
 
@@ -791,6 +820,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List Simulation Runs](https://langwatch.ai/docs/api-reference/simulation-runs/list-simulation-runs.md)
 - [List batch summaries for a scenario set](https://langwatch.ai/docs/api-reference/simulation-runs/list-list.md)
 - [Get a single simulation run by its ID](https://langwatch.ai/docs/api-reference/simulation-runs/get-simulation-runs.md)
+- [Get Batches](https://langwatch.ai/docs/api-reference/simulation-runs/get-batches.md)
 
 ## Suites
 

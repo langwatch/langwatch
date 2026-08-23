@@ -213,7 +213,7 @@ func (o *Orchestrator) scanMeta(row PruneRow, chDBs, pgDBs []string, now time.Ti
 		if !domain.IsProtectedDatabase(db) {
 			meta.HasCHDB = o.cfg.ShouldManageClickHouse && slices.Contains(chDBs, db)
 			meta.HasPGDB = o.cfg.ShouldManagePostgres && slices.Contains(pgDBs, db)
-			meta.RedisDB = domain.RedisDBForSlug(row.Slug)
+			meta.RedisDB = o.redisDBFor(row.Slug)
 		}
 	}
 	return meta

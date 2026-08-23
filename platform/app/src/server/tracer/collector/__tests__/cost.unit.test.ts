@@ -114,6 +114,101 @@ describe("estimateCost", () => {
     });
   });
 
+  describe("when audio tokens are given", () => {
+    const realtime: MaybeStoredLLMModelCost = {
+      projectId: "",
+      model: "openai/gpt-realtime",
+      regex: "^(openai\\/)?gpt-realtime",
+      inputCostPerToken: 0.000004,
+      outputCostPerToken: 0.000016,
+      inputAudioCostPerToken: 0.000032,
+      outputAudioCostPerToken: 0.000064,
+    };
+
+    it("prices input audio at the audio rate, not the text rate", () => {
+      expect(
+        estimateCost({
+          llmModelCost: realtime,
+          inputTokens: 200,
+          inputAudioTokens: 800,
+        }),
+      ).toBeCloseTo(200 * 0.000004 + 800 * 0.000032, 10);
+    });
+
+    it("prices output audio at its own rate", () => {
+      expect(
+        estimateCost({
+          llmModelCost: realtime,
+          outputTokens: 50,
+          outputAudioTokens: 250,
+        }),
+      ).toBeCloseTo(50 * 0.000016 + 250 * 0.000064, 10);
+    });
+
+    it("prices a split exactly like the flat total when the model declares no audio rate", () => {
+      const noAudioRates: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "x/y",
+        regex: "^x\\/y$",
+        inputCostPerToken: 0.00001,
+        outputCostPerToken: 0.00002,
+      };
+      const flat = estimateCost({
+        llmModelCost: noAudioRates,
+        inputTokens: 1000,
+        outputTokens: 300,
+      });
+      const split = estimateCost({
+        llmModelCost: noAudioRates,
+        inputTokens: 200,
+        inputAudioTokens: 800,
+        outputTokens: 50,
+        outputAudioTokens: 250,
+      });
+      expect(split).toBe(flat);
+    });
+
+    it("counts an audio-only rate as a priced model", () => {
+      expect(
+        estimateCost({
+          llmModelCost: {
+            projectId: "",
+            model: "audio/only",
+            regex: "^audio\\/only$",
+            inputAudioCostPerToken: 0.000032,
+          },
+          inputAudioTokens: 800,
+        }),
+      ).toBeCloseTo(800 * 0.000032, 10);
+    });
+  });
+
+  describe("when characters, seconds and tokens all arrive together", () => {
+    it("sums every term", () => {
+      const mixed: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "mixed/model",
+        regex: "^mixed\\/model$",
+        inputCostPerToken: 0.000004,
+        outputCostPerToken: 0.000016,
+        inputCostPerCharacter: 0.000015,
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({
+          llmModelCost: mixed,
+          inputTokens: 100,
+          outputTokens: 20,
+          inputCharacters: 4000,
+          audioSeconds: 30,
+        }),
+      ).toBeCloseTo(
+        100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001,
+        10,
+      );
+    });
+  });
+
   describe("when the model has no rates at all", () => {
     it("returns undefined", () => {
       expect(

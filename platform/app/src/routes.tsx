@@ -5,12 +5,13 @@ import {
   createBrowserRouter,
   Outlet,
   type RouteObject,
-  redirect,
   useLocation,
   useNavigation,
 } from "react-router";
+import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
+import { legacyRedirectRoutes } from "./legacyRedirects";
 import NotFoundOrErrorPage from "./pages/_not-found";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
@@ -201,84 +202,78 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/usage")),
       },
       {
-        path: "/settings/routing-policies",
-        ...page(() => import("./pages/settings/routing-policies")),
-      },
-      {
         path: "/settings/email-suppressions",
         ...page(() => import("./pages/settings/email-suppressions")),
       },
       {
-        // Top-level governance home (admin oversight dashboard).
-        // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
-        // routing-policies) stay under /settings/* per the daily-use vs
-        // admin-authoring distinction.
+        // Governance home (admin oversight dashboard). The whole family
+        // lives at the top level: it is org-scoped, not a settings page.
         path: "/governance",
-        ...page(() => import("./pages/settings/governance")),
+        ...page(() => import("./pages/governance/index")),
       },
       {
-        // Back-compat alias for the original path. Any existing bookmarks
-        // / docs referencing /settings/governance still land on the same
-        // dashboard. Removed in a future cleanup once nothing links here.
-        path: "/settings/governance",
-        ...page(() => import("./pages/settings/governance")),
-      },
-      {
-        path: "/settings/governance/ingestion-sources",
+        path: "/governance/ingestion-sources",
         ...page(
           () => import("@ee/governance/dashboard/pages/ingestion-sources"),
         ),
       },
       {
-        path: "/settings/governance/ingestion-sources/:id",
+        path: "/governance/ingestion-sources/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
         ),
       },
       {
-        path: "/settings/governance/anomaly-rules",
+        path: "/governance/anomaly-rules",
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/settings/governance/tool-catalog",
-        ...page(() => import("./pages/settings/governance/tool-catalog")),
+        path: "/governance/tool-catalog",
+        ...page(() => import("./pages/governance/tool-catalog")),
       },
       {
-        path: "/settings/governance/departments",
-        ...page(() => import("./pages/settings/governance/departments")),
+        path: "/governance/departments",
+        ...page(() => import("./pages/governance/departments")),
       },
       {
-        // Redirect the pre-rename path so old bookmarks do not 404.
-        path: "/settings/governance/cost-centers",
-        loader: () => redirect("/settings/governance/departments"),
+        // The departments page was once named cost centers; old bookmarks
+        // land on the new name (the legacy /settings/governance/cost-centers
+        // address chains through here).
+        path: "/governance/cost-centers",
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/cost-centers"
+            to="/governance/departments"
+          />
+        ),
       },
       {
         // View-all teams listing - bird's-eye `View all teams →` lands here.
         // 500-row paginated list with sort chips for spend / requests /
         // last-activity. Per-row click-through routes to the team detail
         // page below.
-        path: "/settings/governance/teams",
-        ...page(() => import("./pages/settings/governance/teams")),
+        path: "/governance/teams",
+        ...page(() => import("./pages/governance/teams")),
       },
       {
         // Per-team detail - single-row scoped view of `spendByTeam` filtered
         // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
         // to the listing. Detail-data depth (per-day trend, per-user
         // breakdown, model mix) defers to a follow-up.
-        path: "/settings/governance/teams/:id",
-        ...page(() => import("./pages/settings/governance/teams/[id]")),
+        path: "/governance/teams/:id",
+        ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
         // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/settings/governance/users",
-        ...page(() => import("./pages/settings/governance/users")),
+        path: "/governance/users",
+        ...page(() => import("./pages/governance/users")),
       },
       {
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
-        path: "/settings/governance/users/:id",
-        ...page(() => import("./pages/settings/governance/users/[id]")),
+        path: "/governance/users/:id",
+        ...page(() => import("./pages/governance/users/[id]")),
       },
 
       // Personal-scope governance routes (must precede the /:project catch-all
@@ -322,52 +317,58 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/cli/auth")),
       },
 
-      // AI Gateway — org-scoped admin pages live under /settings/gateway/**
-      // alongside model-providers, routing-policies, audit-log etc. Every
-      // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
-      // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
-      // project layout route below — these are /settings/* routes, not
-      // /:project/* routes, so Langy must not mount on them.
+      // AI Gateway: org-scoped admin pages live under /gateway/** at the top
+      // level, like /governance. Every gateway resource (VirtualKey /
+      // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
+      // chrome reflects that. Kept OUT of the project layout route below:
+      // these are not /:project/* routes, so Langy must not mount on them.
+      // The static /gateway segment always wins over the /:project catch-all,
+      // and project slug minting refuses reserved top-level names.
       {
-        path: "/settings/gateway",
-        ...page(() => import("./pages/settings/gateway/index")),
+        path: "/gateway",
+        ...page(() => import("./pages/gateway/index")),
       },
       {
-        path: "/settings/gateway/virtual-keys",
-        ...page(() => import("./pages/settings/gateway/virtual-keys")),
+        path: "/gateway/virtual-keys",
+        ...page(() => import("./pages/gateway/virtual-keys")),
       },
       {
-        path: "/settings/gateway/virtual-keys/:id",
-        ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
+        path: "/gateway/virtual-keys/:id",
+        ...page(() => import("./pages/gateway/virtual-keys/[id]")),
       },
       {
-        path: "/settings/gateway/budgets",
-        ...page(() => import("./pages/settings/gateway/budgets")),
+        path: "/gateway/budgets",
+        ...page(() => import("./pages/gateway/budgets")),
       },
       {
-        path: "/settings/gateway/budgets/:id",
-        ...page(() => import("./pages/settings/gateway/budgets/[id]")),
+        path: "/gateway/budgets/:id",
+        ...page(() => import("./pages/gateway/budgets/[id]")),
       },
       {
-        path: "/settings/gateway/usage",
-        ...page(() => import("./pages/settings/gateway/usage")),
+        path: "/gateway/routing-policies",
+        ...page(() => import("./pages/gateway/routing-policies")),
       },
       {
-        path: "/settings/gateway/cache-rules",
-        ...page(() => import("./pages/settings/gateway/cache-rules")),
+        path: "/gateway/usage",
+        ...page(() => import("./pages/gateway/usage")),
       },
       {
-        path: "/settings/gateway/guardrails",
-        ...page(() => import("./pages/settings/gateway/guardrails")),
+        path: "/gateway/cache-rules",
+        ...page(() => import("./pages/gateway/cache-rules")),
       },
       {
-        path: "/settings/gateway/billing-events",
-        ...page(() => import("./pages/settings/gateway/billing-events")),
+        path: "/gateway/guardrails",
+        ...page(() => import("./pages/gateway/guardrails")),
       },
       {
-        path: "/settings/gateway/webhooks",
-        ...page(() => import("./pages/settings/gateway/webhooks")),
+        path: "/gateway/billing-events",
+        ...page(() => import("./pages/gateway/billing-events")),
       },
+      {
+        path: "/gateway/webhooks",
+        ...page(() => import("./pages/gateway/webhooks")),
+      },
+      ...legacyRedirectRoutes,
     ],
   },
 
@@ -388,6 +389,17 @@ const routes: RouteObject[] = [
         path: "/:project/agents",
         ...page(() => import("./pages/[project]/agents")),
       },
+
+      // Coding-agent activity, project scope
+      {
+        path: "/:project/sessions",
+        ...page(() => import("./pages/[project]/sessions")),
+      },
+      {
+        path: "/:project/pull-requests",
+        ...page(() => import("./pages/[project]/pull-requests")),
+      },
+
       {
         path: "/:project/automations",
         ...page(() => import("./pages/[project]/automations")),
@@ -453,16 +465,19 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/evaluations/[id]/edit/choose")),
       },
       {
-        path: "/:project/messages",
-        ...page(() => import("./pages/[project]/messages")),
-      },
-      {
         path: "/:project/traces",
         ...page(() => import("./pages/[project]/traces")),
       },
       {
         path: "/:project/traces/:trace",
         ...page(() => import("./pages/[project]/traces/[trace]")),
+      },
+
+      // Legacy /messages paths. The legacy Traces page is gone; these are
+      // redirects only, so old bookmarks and notification links keep working.
+      {
+        path: "/:project/messages",
+        ...page(() => import("./pages/[project]/messages/index")),
       },
       {
         path: "/:project/messages/:trace",
@@ -549,6 +564,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/analytics/users")),
       },
       {
+        path: "/:project/analytics/query",
+        ...page(() => import("./pages/[project]/analytics/query")),
+      },
+      {
         path: "/:project/analytics/custom",
         ...page(() => import("./pages/[project]/analytics/custom/index")),
       },
@@ -598,7 +617,27 @@ const routes: RouteObject[] = [
   { path: "/ops/scheduler", ...page(() => import("./pages/ops/scheduler")) },
   {
     path: "/ops/event-sourcing",
-    ...page(() => import("./pages/ops/event-sourcing")),
+    ...page(() => import("./pages/ops/event-sourcing/index")),
+  },
+  {
+    path: "/ops/event-sourcing/dead-letters",
+    ...page(() => import("./pages/ops/event-sourcing/dead-letters")),
+  },
+  {
+    path: "/ops/event-sourcing/processes",
+    ...page(() => import("./pages/ops/event-sourcing/processes")),
+  },
+  {
+    path: "/ops/event-sourcing/projections",
+    ...page(() => import("./pages/ops/event-sourcing/projections")),
+  },
+  {
+    path: "/ops/event-sourcing/subscribers",
+    ...page(() => import("./pages/ops/event-sourcing/subscribers")),
+  },
+  {
+    path: "/ops/event-sourcing/schedules",
+    ...page(() => import("./pages/ops/event-sourcing/schedules")),
   },
   { path: "/ops/blobs", ...page(() => import("./pages/ops/blobs")) },
   {
@@ -606,6 +645,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/ops/feature-flags")),
   },
   { path: "/ops/foundry", ...page(() => import("./pages/ops/foundry")) },
+  {
+    path: "/ops/migrations",
+    ...page(() => import("./pages/ops/migrations")),
+  },
   {
     path: "/ops/projections",
     ...page(() => import("./pages/ops/projections")),

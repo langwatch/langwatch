@@ -25,6 +25,18 @@ export const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
 };
 
 /**
+ * The same table read the other way, for callers that hold a source type and
+ * need the tool slug the rest of the config is keyed by (`tool_project_keys`,
+ * `tool_mode`, `tool_policies`). Derived, so the two can never disagree.
+ */
+export const TOOL_BY_SOURCE_TYPE: Record<string, string> = Object.fromEntries(
+	Object.entries(SOURCE_TYPE_BY_TOOL).map(([tool, sourceType]) => [
+		sourceType,
+		tool,
+	]),
+);
+
+/**
  * The env var names langwatch persists for `tool`'s Path B telemetry.
  * Derived from the same builder that installs them, so the logout /
  * removal path can strip exactly the keys the install path wrote (no

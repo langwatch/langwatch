@@ -19,9 +19,8 @@
  *
  * State lives in Redis with the device_code as the key, TTL'd to the
  * device-code lifetime (default 600s). On approval, the browser-side
- * approval handler (see /pages/cli/auth.tsx — alexis lane) flips the
- * status to APPROVED and writes the user/org/personal-VK payload that
- * the next /exchange poll picks up.
+ * approval handler (see /pages/cli/auth.tsx) flips the status to APPROVED
+ * and writes the user/org payload that the next /exchange poll picks up.
  *
  * Wire format is snake_case JSON to match RFC 8628 + every other OAuth
  * library out there (incl. the Go CLI's keyring-backed client).
@@ -30,8 +29,12 @@
 import { randomBytes } from "node:crypto";
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import {
+  IngestionKeyService,
+  PersonalWorkspaceMissingError,
+} from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   NoEligibleProvidersError,
@@ -40,6 +43,7 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platformToolPolicy.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -50,16 +54,23 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-} from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
+  type CliKeySelection,
+  CliLoginKeyService,
+} from "~/server/api-key/cli-login-key.service";
+import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -179,7 +190,11 @@ interface DeviceCodeRecord {
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;
-  /** Default personal VK shipped in /exchange response. Created lazily on approval. */
+  /**
+   * Personal VK shipped in the /exchange response. Approval no longer writes
+   * it: the field stays readable so a device approved by another instance
+   * mid-rollout still resolves.
+   */
   personal_vk?: {
     id: string;
     label: string;
@@ -197,6 +212,13 @@ interface DeviceCodeRecord {
     project_name: string;
     api_key: string;
   };
+  /**
+   * For `credential_type: "device_session"` after approval — the scope +
+   * permission selection the authorize screen approved (or the server-side
+   * default when the client sent none). Consumed by /exchange, which mints
+   * the user-scoped CLI ApiKey from it. Approval itself mints nothing.
+   */
+  key_selection?: CliKeySelection;
 }
 
 /**
@@ -228,6 +250,12 @@ interface RefreshTokenRecord {
   expires_at: number;
   /** Phase 8 — present when the CLI sent client_info on /exchange. */
   client_info?: ClientInfo;
+  /**
+   * The user-scoped CLI ApiKey /exchange minted for this session, carried
+   * across /refresh rotations so /logout can revoke the key alongside the
+   * tokens. Absent for sessions that minted no key.
+   */
+  cli_api_key_id?: string;
 }
 
 interface AccessTokenRecord {
@@ -238,6 +266,8 @@ interface AccessTokenRecord {
   /** Phase 8 — mirror of refresh-token client_info; useful for the
    * devices inventory, which reads access tokens directly. */
   client_info?: ClientInfo;
+  /** Mirror of the refresh-token field; see there. */
+  cli_api_key_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,11 +400,10 @@ async function refuseProjectKeyHandout(
       400,
     );
   }
-  const canWriteProject = await hasProjectPermission(
+  const canWriteProject = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: userId } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "project:update",
   );
@@ -821,6 +850,73 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // User-scoped CLI ApiKey — minted HERE, from the selection approval
+    // stamped, so an approval that is never exchanged mints nothing. Minted
+    // before the session tokens: a mint failure fails the whole exchange
+    // (handled error via onError) rather than leaving a half-logged-in CLI
+    // holding tokens but no key. Re-login from the same device label revokes
+    // the previous login key inside the service, so logins never accumulate
+    // credentials.
+    let cliApiKey: string | undefined;
+    let cliApiKeyId: string | undefined;
+    let cliApiKeyScope:
+      | { kind: "organization" | "projects"; project_ids: string[] }
+      | undefined;
+    if (record.key_selection) {
+      // Same normalization the other label paths use, and the user-chosen
+      // label wins over the machine hostname. The value names the key AND
+      // matches the previous login key for replacement, so an unnormalized
+      // value would leave the old key alive on a hostname or formatting
+      // change and let credentials accumulate.
+      const deviceLabel =
+        sanitizeDeviceLabel(
+          parsed.data.client_info?.device_label ??
+            parsed.data.client_info?.hostname,
+        ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
+      let minted: Awaited<
+        ReturnType<CliLoginKeyService["mintForDeviceSession"]>
+      >;
+      try {
+        minted = await CliLoginKeyService.create(prisma).mintForDeviceSession({
+          userId: user.id,
+          organizationId: organization.id,
+          deviceLabel,
+          selection: record.key_selection,
+        });
+      } catch (err) {
+        // A ceiling refusal is permanent: the selection was approved minutes
+        // ago and the approver has lost access since, so every later poll
+        // would refuse again. The CLI treats a non-200 as "keep polling", so
+        // leaving the record approved for its remaining TTL means one full
+        // ceiling walk every 4 seconds with no terminal error on screen.
+        // Burn the device code and answer with the one code the CLI already
+        // treats as fatal.
+        if (ApiKeyScopeViolationError.is(err)) {
+          logger.warn(
+            { err, userId: user.id, organizationId: organization.id },
+            "[auth-cli] CLI login key refused at exchange; terminating the device code",
+          );
+          await redis.del(deviceCodeKey(device_code));
+          await redis.del(userCodeKey(record.user_code));
+          return c.json(
+            {
+              error: "access_denied",
+              error_description:
+                "Your access changed after you approved this login. Run `langwatch login` again.",
+            },
+            410,
+          );
+        }
+        throw err;
+      }
+      cliApiKey = minted.token;
+      cliApiKeyId = minted.apiKeyId;
+      cliApiKeyScope = {
+        kind: minted.scope.kind,
+        project_ids: minted.scope.projectIds,
+      };
+    }
+
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
     // tokens against an authoritative store.
@@ -840,6 +936,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     const refreshRecord: RefreshTokenRecord = {
       user_id: user.id,
@@ -847,6 +944,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot. The two records can briefly diverge
@@ -905,6 +1003,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         },
         default_personal_vk: record.personal_vk,
         personal_project: personalProject,
+        // The user-scoped key + its reach summary. Additive: an older CLI
+        // ignores both and keeps using personal_project exactly as before.
+        ...(cliApiKey && cliApiKeyScope
+          ? { cli_api_key: cliApiKey, cli_api_key_scope: cliApiKeyScope }
+          : {}),
         endpoint: responseEndpoint,
       },
       200,
@@ -1024,6 +1127,9 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    // Carried across rotations so /logout can still revoke the CLI key
+    // this session minted at /exchange.
+    cli_api_key_id: record.cli_api_key_id,
   };
   const newRefreshRecord: RefreshTokenRecord = {
     user_id: record.user_id,
@@ -1031,6 +1137,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    cli_api_key_id: record.cli_api_key_id,
   };
 
   await redis
@@ -1229,6 +1336,39 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget-overview
+// ---------------------------------------------------------------------------
+// Every budget that binds the caller's own keys, labelled per scope, for
+// the `langwatch login` epilogue. Wire shape matches the tRPC
+// `api.user.budgetOverview` procedure byte-for-byte (both surfaces share
+// BudgetOverviewService), replacing the collapsed single number the
+// /bootstrap `budget` field carries for older CLIs.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = BudgetOverviewService.create(
+    prisma,
+    getApp().gateway.budgets,
+  );
+  const result = await service.overviewForUser({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/personal-project
 // ---------------------------------------------------------------------------
 // Lazy personal-key exchange for device sessions minted before /exchange
@@ -1293,6 +1433,198 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/virtual-key
+// ---------------------------------------------------------------------------
+// Issues the caller's personal virtual key on demand. This is the only way
+// the CLI can obtain one: it calls this the first time a tool resolves to
+// gateway mode, so a login that never routes a model call leaves no key
+// behind, and a re-login on a machine that already holds one adds nothing.
+//
+// Body: { device_label? }. The first call for an org returns the "default"
+// key. Later calls issue an extra key named after the device, since the
+// stored secret is hash-only and cannot be handed out twice.
+//
+// Returns 201 { id, secret, prefix }. The secret is readable exactly once.
+// 409 `no_eligible_providers` when the org has no gateway provider to route
+// to: a key minted then would fail on its first request.
+//
+// Spec: specs/ai-gateway/governance/cli-login.feature
+// ---------------------------------------------------------------------------
+const issueVirtualKeySchema = z.object({
+  device_label: z.string().optional(),
+});
+
+/**
+ * Reduce a free-form device label to the charset a VK name carries. Returns
+ * null when nothing usable survives, so the caller falls back to a random
+ * suffix rather than naming every machine the same.
+ */
+function sanitizeDeviceLabel(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .slice(0, 24)
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  // Same tenancy boundary as /personal-project: this mints a credential, so
+  // an offboarded user's pre-removal token must not reach it.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = issueVirtualKeySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "device_label must be a string",
+      },
+      400,
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: tokenRecord.user_id },
+    select: { name: true, email: true },
+  });
+  const service = PersonalVirtualKeyService.create(prisma);
+
+  try {
+    const issued = await issuePersonalVirtualKey({
+      service,
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      displayName: user?.name,
+      displayEmail: user?.email,
+      deviceLabel: sanitizeDeviceLabel(parsed.data.device_label),
+    });
+    return c.json(
+      {
+        id: issued.virtualKey.id,
+        secret: issued.secret,
+        prefix: issued.virtualKey.displayPrefix,
+      },
+      201,
+    );
+  } catch (err) {
+    return virtualKeyFailureResponse(c, err, tokenRecord);
+  }
+});
+
+/**
+ * Map a failed personal-VK issuance onto the wire.
+ *
+ * Both empty-provider causes collapse into one 409: whether the org has no
+ * provider at all or pinned a policy holding none, the user's next step is
+ * the same, and a key minted anyway would fail on its first request.
+ */
+function virtualKeyFailureResponse(
+  c: Context,
+  err: unknown,
+  tokenRecord: AccessTokenRecord,
+): Response {
+  if (
+    err instanceof NoEligibleProvidersError ||
+    err instanceof RoutingPolicyHasNoProvidersError
+  ) {
+    logger.info(
+      {
+        userId: tokenRecord.user_id,
+        organizationId: tokenRecord.organization_id,
+        reason:
+          err instanceof NoEligibleProvidersError
+            ? "no_eligible_providers"
+            : "routing_policy_has_no_providers",
+      },
+      "[auth-cli] refusing personal VK: no provider to route to",
+    );
+    return c.json(
+      {
+        error: "no_eligible_providers",
+        error_description:
+          "Your organization has no AI providers configured for the gateway. Ask an admin to add one at Settings → Model Providers.",
+      },
+      409,
+    );
+  }
+  logger.error(
+    { err, userId: tokenRecord.user_id },
+    "[auth-cli] personal virtual key issuance failed",
+  );
+  return c.json(
+    {
+      error: "server_error",
+      error_description: "Could not issue a personal virtual key",
+    },
+    500,
+  );
+}
+
+/**
+ * Return a usable personal VK for the caller: the org default on the first
+ * ask, a device-named key afterwards. `ensureDefault` refuses to re-issue an
+ * existing default because its secret is stored hashed, so a second machine
+ * needs a key of its own.
+ */
+async function issuePersonalVirtualKey({
+  service,
+  userId,
+  organizationId,
+  displayName,
+  displayEmail,
+  deviceLabel,
+}: {
+  service: PersonalVirtualKeyService;
+  userId: string;
+  organizationId: string;
+  displayName?: string | null;
+  displayEmail?: string | null;
+  deviceLabel: string | null;
+}) {
+  try {
+    return await service.ensureDefault({
+      userId,
+      organizationId,
+      displayName,
+      displayEmail,
+    });
+  } catch (err) {
+    if (!(err instanceof PersonalVirtualKeyAlreadyExistsError)) throw err;
+  }
+
+  const workspace = await new PersonalWorkspaceService(prisma).ensure({
+    userId,
+    organizationId,
+    displayName,
+    displayEmail,
+  });
+  const suffix = deviceLabel ?? randomBytes(3).toString("hex");
+  return await service.issue({
+    userId,
+    organizationId,
+    personalProjectId: workspace.project.id,
+    personalTeamId: workspace.team.id,
+    label: `device-${suffix}`,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/project-key
@@ -1427,8 +1759,8 @@ async function ensureGovernancePermissionOr403(
   tokenRecord: { user_id: string; organization_id: string },
   permission: Permission,
 ): Promise<Response | null> {
-  const allowed = await hasOrganizationPermission(
-    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+  const allowed = await probeOrganizationPermission(
+    { session: { user: { id: tokenRecord.user_id } } } as any,
     tokenRecord.organization_id,
     permission,
   );
@@ -1700,17 +2032,198 @@ secured
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/governance/ingestion-key
 // ---------------------------------------------------------------------------
-// Mints (rotating in place) a personal-project ingestion key for the
-// device-session caller, replacing the retired binding install/rotate
-// adapters. The unified `langwatch <tool>` CLI Path B calls this to obtain a
-// write-only `sk-lw-` token + the OTLP endpoint, then points the tool's OTLP
-// exporter at it. `source_type` carries the tool slug stamped as
-// `langwatch.source` provenance. Body: { source_type }. Returns
-// { token, prefix, endpoint } where endpoint = `${baseUrl}/api/otel`.
+// Mints an ingestion key for the device-session caller. The unified
+// `langwatch <tool>` CLI Path B calls this to obtain a write-only `ik-lw-`
+// token + the OTLP endpoint, then points the tool's OTLP exporter at it.
+// `source_type` carries the tool slug stamped as `langwatch.source`
+// provenance.
+//
+// Body: { source_type, project?, device_label? }.
+//
+//   - Without `project`: the caller's personal project, rotating in place, so
+//     one user never accumulates keys for a tool. Returns
+//     { token, prefix, endpoint }.
+//   - With `project` (a project id or slug inside the caller's organization):
+//     that project, create-only, so two machines instrumenting the same
+//     repository each keep a working token. The caller needs `traces:create`
+//     on the project. Returns { token, prefix, endpoint, project }.
+//
+// `endpoint` is `${baseUrl}/api/otel` on both branches.
+//
+// Both branches refuse with 403 `direct_otel_not_allowed` when the caller's
+// organization turned the direct-OTLP path off for the tool `source_type`
+// declares. The declaration is what the policy reads, and it is caller-
+// controlled, so the check is a backstop for compliant clients (an old CLI,
+// a stale cached policy, a hand-run of the documented flow), not an
+// isolation boundary: a caller who declares another source type still
+// mints, because types outside the wrapped-tool set are a supported input
+// here (`copilot_app`, ingestion templates, SDK sources) and a minted key
+// carries only the `traces:create` the caller already holds. The receiver
+// stamps `langwatch.source` provenance from the key's stored source type,
+// so an export sent through a key minted under another tool's name stays
+// attributable to that key and the device that minted it.
 // ---------------------------------------------------------------------------
 const mintIngestionKeySchema = z.object({
   source_type: z.string().min(1),
+  /**
+   * Project id or slug, resolved inside the caller's organization only. Omit
+   * for the caller's personal project.
+   */
+  project: z.string().min(1).optional(),
+  /**
+   * Machine this key is for, shown as provenance on the API-keys page. Capped
+   * like every other device label the CLI sends, and sanitized before it
+   * reaches the key name.
+   */
+  device_label: z.string().min(1).max(128).optional(),
 });
+
+/**
+ * Resolve a project the CLI named, as an id first and a slug second, inside
+ * one organization. Returns null when nothing matches, which every caller
+ * reports as "not found" rather than distinguishing tenants.
+ */
+async function findProjectInOrg({
+  projectRef,
+  organizationId,
+}: {
+  projectRef: string;
+  organizationId: string;
+}) {
+  const select = {
+    id: true,
+    slug: true,
+    name: true,
+    isPersonal: true,
+    ownerUserId: true,
+  } as const;
+  const inOrg = { archivedAt: null, team: { organizationId } };
+  return (
+    (await prisma.project.findFirst({
+      where: { id: projectRef, ...inOrg },
+      select,
+    })) ??
+    (await prisma.project.findFirst({
+      where: { slug: projectRef, ...inOrg },
+      select,
+    }))
+  );
+}
+
+/**
+ * The named-project branch of the ingestion-key mint.
+ *
+ * `projectRef` is read as an id first, then as a slug, and both lookups are
+ * confined to the caller's organization: a project in another tenant reports
+ * the same `project_not_found` as one that does not exist, so the response
+ * never says which ids are real elsewhere. Membership alone does not
+ * authorize the mint, the caller needs `traces:create` on the project itself,
+ * which is exactly the permission the minted key carries.
+ */
+async function mintProjectIngestionKey(
+  c: Context,
+  {
+    tokenRecord,
+    service,
+    projectRef,
+    sourceType,
+    deviceLabel,
+  }: {
+    tokenRecord: AccessTokenRecord;
+    service: IngestionKeyService;
+    projectRef: string;
+    sourceType: string;
+    deviceLabel: string | null;
+  },
+): Promise<Response> {
+  const project = await findProjectInOrg({
+    projectRef,
+    organizationId: tokenRecord.organization_id,
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: "project_not_found",
+        error_description: `No project "${projectRef}" in your organization`,
+      },
+      404,
+    );
+  }
+
+  // Another user's personal workspace is theirs alone; no permission grant
+  // can make a second principal's key into it legitimate.
+  if (project.isPersonal && project.ownerUserId !== tokenRecord.user_id) {
+    return c.json(
+      {
+        error: "personal_project_not_allowed",
+        error_description:
+          "Another user's personal project can't receive your ingestion key. Pick a shared team project, or your own personal workspace.",
+      },
+      400,
+    );
+  }
+
+  const allowed = await probeProjectPermission(
+    {
+      session: { user: { id: tokenRecord.user_id } },
+    } as Parameters<typeof probeProjectPermission>[0],
+    project.id,
+    "traces:create",
+  );
+  if (!allowed) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description:
+          "You need permission to write traces into this project to mint an ingestion key for it.",
+      },
+      403,
+    );
+  }
+
+  try {
+    const result = await service.issueForProject({
+      callerUserId: tokenRecord.user_id,
+      // A shared project's key is an org service key, owned by nobody, so it
+      // stays visible to the whole team. The caller's own personal workspace
+      // is the exception: only its owner may hold a key that reaches it.
+      ownerUserId: project.isPersonal ? tokenRecord.user_id : null,
+      organizationId: tokenRecord.organization_id,
+      projectId: project.id,
+      sourceType,
+      // The label lands inside the key's display name, so it goes through the
+      // same reduction a virtual-key label does rather than reaching the name
+      // as free-form text.
+      createdByDeviceLabel: sanitizeDeviceLabel(
+        deviceLabel ??
+          tokenRecord.client_info?.device_label ??
+          tokenRecord.client_info?.hostname ??
+          undefined,
+      ),
+    });
+    return c.json(
+      {
+        token: result.token,
+        prefix: result.prefix,
+        endpoint: `${controlPlaneBaseUrl()}/api/otel`,
+        project: { id: project.id, slug: project.slug, name: project.name },
+      },
+      201,
+    );
+  } catch (err) {
+    logger.error(
+      { err, projectId: project.id, sourceType },
+      "[auth-cli] project ingestion-key mint failed",
+    );
+    return c.json(
+      {
+        error: "server_error",
+        error_description: "Could not mint an ingestion key for this project",
+      },
+      500,
+    );
+  }
+}
 
 secured
   .access(CLI_POLICY)
@@ -1728,6 +2241,11 @@ secured
         401,
       );
     }
+    // This mints a credential, so an offboarded caller's pre-removal token
+    // must not reach it, the same boundary /virtual-key holds.
+    const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+    if (denied) return denied;
+
     const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json(
@@ -1738,41 +2256,125 @@ secured
         400,
       );
     }
-    const service = IngestionKeyService.create(prisma);
-    try {
-      const result = await service.ensureForPersonalProject({
-        userId: tokenRecord.user_id,
+    // Apply the declared tool's direct-OTLP policy: a mint that names a tool
+    // the organization turned off is refused, which catches an old CLI, a
+    // stale cached policy, or a hand-run of the documented flow. The
+    // declaration is trusted; the route docblock states why it cannot be
+    // more than that. Only source types a wrapped tool stamps are governed;
+    // anything else has no per-tool policy to apply and must stay mintable
+    // (`copilot_app`, ingestion templates, SDK sources).
+    //
+    // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
+    // so `"toString"` would otherwise resolve an inherited function, pass a
+    // truthy check, and index the policy map with nothing.
+    const policedSlug = Object.hasOwn(
+      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
+      parsed.data.source_type,
+    )
+      ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
+      : undefined;
+    if (policedSlug) {
+      const policy = await AiToolEntryService.create(prisma).resolveToolPolicy({
         organizationId: tokenRecord.organization_id,
-        sourceType: parsed.data.source_type,
-        // Snapshot which device minted the key so the API-keys settings page
-        // can attribute it. Falls back to the hostname when the CLI sent no
-        // explicit label; null for CLIs that predate device metadata.
-        createdByDeviceLabel:
-          tokenRecord.client_info?.device_label ??
-          tokenRecord.client_info?.hostname ??
-          null,
+        userId: tokenRecord.user_id,
+        slug: policedSlug,
       });
-      return c.json(
-        {
-          token: result.token,
-          prefix: result.prefix,
-          endpoint: `${controlPlaneBaseUrl()}/api/otel`,
-        },
-        201,
-      );
-    } catch (err) {
-      // No personal project for the caller yet — surface as a precondition
-      // so the CLI can prompt the user to finish workspace setup.
+      if (!policy.allowOtelDirect) {
+        return c.json(
+          {
+            error: "direct_otel_not_allowed",
+            error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
+          },
+          403,
+        );
+      }
+    }
+
+    const service = IngestionKeyService.create(prisma);
+
+    if (parsed.data.project) {
+      return await mintProjectIngestionKey(c, {
+        tokenRecord,
+        service,
+        projectRef: parsed.data.project,
+        sourceType: parsed.data.source_type,
+        deviceLabel: parsed.data.device_label ?? null,
+      });
+    }
+
+    return await mintPersonalIngestionKey(c, {
+      tokenRecord,
+      service,
+      sourceType: parsed.data.source_type,
+    });
+  });
+
+/**
+ * The personal-project branch of the ingestion-key mint: the caller's own
+ * workspace, rotating in place so one user never accumulates keys for a tool.
+ */
+async function mintPersonalIngestionKey(
+  c: Context,
+  {
+    tokenRecord,
+    service,
+    sourceType,
+  }: {
+    tokenRecord: AccessTokenRecord;
+    service: IngestionKeyService;
+    sourceType: string;
+  },
+): Promise<Response> {
+  try {
+    const result = await service.ensureForPersonalProject({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      sourceType,
+      // Snapshot which device minted the key so the API-keys settings page
+      // can attribute it. Falls back to the hostname when the CLI sent no
+      // explicit label; null for CLIs that predate device metadata.
+      createdByDeviceLabel:
+        tokenRecord.client_info?.device_label ??
+        tokenRecord.client_info?.hostname ??
+        null,
+    });
+    return c.json(
+      {
+        token: result.token,
+        prefix: result.prefix,
+        endpoint: `${controlPlaneBaseUrl()}/api/otel`,
+      },
+      201,
+    );
+  } catch (err) {
+    // Only the missing workspace is a precondition the caller can fix, so it
+    // is the only failure that reports as one. Everything else is a server
+    // fault: it gets logged and a fixed message, the way the project branch
+    // does, rather than a prompt the user cannot act on and an internal error
+    // string on the wire.
+    if (err instanceof PersonalWorkspaceMissingError) {
       return c.json(
         {
           error: "precondition_failed",
           error_description:
-            err instanceof Error ? err.message : "Could not mint ingestion key",
+            "Sign in to a personal workspace before issuing an ingestion key.",
         },
         412,
       );
     }
-  });
+    logger.error(
+      { err, userId: tokenRecord.user_id, sourceType },
+      "[auth-cli] personal ingestion-key mint failed",
+    );
+    return c.json(
+      {
+        error: "server_error",
+        error_description: "Could not mint an ingestion key",
+      },
+      500,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/governance/ingestion-keys
@@ -1885,8 +2487,9 @@ secured.access(CLI_POLICY).get("/lookup", async (c: Context) => {
 // POST /api/auth/cli/approve
 // ---------------------------------------------------------------------------
 // Called by the browser-side /cli/auth page when the user clicks
-// "Approve". Mints (or returns existing) personal VK and flips the
-// device-code record to `approved`. Session-protected.
+// "Approve". Flips the device-code record to `approved`. No credential is
+// minted for a device session: the CLI asks for its personal virtual key
+// later, through POST /virtual-key. Session-protected.
 // ---------------------------------------------------------------------------
 const approveRequestSchema = z.object({
   user_code: z.string().min(1),
@@ -1898,6 +2501,30 @@ const approveRequestSchema = z.object({
    * verbatim copy of `Project.apiKey` for the SDK to consume).
    */
   project_id: z.string().optional(),
+  /**
+   * For `device_session` approvals — the scope + permission selection the
+   * authorize screen collected for the user-scoped CLI key /exchange mints.
+   * Optional: a client that sends none gets the server-side default (the
+   * widest scope the approving user holds, with the default CLI permission
+   * list narrowed to what they hold there).
+   */
+  key_selection: z
+    .object({
+      // Bounded at the edge: the ceiling assertion runs one database round
+      // per binding per permission, so an unbounded body is a request-thread
+      // fan-out that starves the connection pool, and every unrecognised
+      // permission is echoed back in the field errors.
+      bindings: z
+        .array(
+          z.object({
+            scope_type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+            scope_id: z.string().min(1).max(64),
+          }),
+        )
+        .max(200),
+      permissions: z.array(z.string().min(1).max(128)).max(500),
+    })
+    .optional(),
 });
 
 secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
@@ -1981,7 +2608,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     // Resolve the picked project: it must live in the chosen org and not be
     // archived. Authorization is NOT decided by this lookup. The
-    // `hasProjectPermission(..., "project:update")` check below is the source
+    // `probeProjectPermission(..., "project:update")` check below is the source
     // of truth, and it re-derives the org from the project id and inspects
     // project-, team- and org-scoped role bindings plus the org role. So an
     // org-level admin (or an org/team-scoped role-binding admin) who sees the
@@ -2076,102 +2703,59 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     );
   }
 
-  // Mint (or return) the user's default personal VK for this org.
-  // Idempotent — if already present, the service throws
-  // PersonalVirtualKeyAlreadyExistsError; we map that to 409 so the
-  // user knows they already have a default and should run a fresh
-  // login on the new device only after revoking the old one.
-  const service = PersonalVirtualKeyService.create(prisma);
-  let issued;
-  try {
-    issued = await service.ensureDefault({
+  // Approval proves identity and stamps the key SELECTION — it still mints
+  // no credential. The personal virtual key is minted later, by POST
+  // /virtual-key, and the user-scoped CLI ApiKey is minted by /exchange from
+  // the selection stamped here, so an approval that is never exchanged
+  // leaves no ApiKey row behind.
+  const cliLoginKeys = CliLoginKeyService.create(prisma);
+  let keySelection: CliKeySelection | undefined;
+  if (parsed.data.key_selection) {
+    // Explicit selection from the authorize screen: validated against the
+    // registry and the approving user's own ceiling. A violation throws a
+    // HandledError (cli_key_selection_invalid / api_key_scope_violation /
+    // personal_workspace_not_managed_here) and nothing is stamped.
+    keySelection = await cliLoginKeys.validateSelection({
       userId: session.user.id,
       organizationId: organization_id,
-      displayName: session.user.name,
-      displayEmail: session.user.email,
+      selection: {
+        bindings: parsed.data.key_selection.bindings.map((binding) => ({
+          scopeType: binding.scope_type,
+          scopeId: binding.scope_id,
+        })),
+        permissions: parsed.data.key_selection.permissions,
+      },
     });
-  } catch (err) {
-    if (
-      err instanceof NoEligibleProvidersError ||
-      err instanceof RoutingPolicyHasNoProvidersError
-    ) {
-      // Fresh signup / dogfood account / org with no accessible
-      // providers (or with an explicitly-pinned empty policy): log the
-      // user in with a device session anyway. The /me Model Providers
-      // tile surfaces the actionable "add a provider" CTA; failing the
-      // entire approve flow here blocked solo devs from ever reaching
-      // the setup screens. Post-fix to the no-default-policy graceful
-      // fallback, this branch fires only when there are truly zero
-      // eligible providers via scope cascade.
-      logger.info(
-        {
-          user_code,
-          organization_id,
-          reason:
-            err instanceof NoEligibleProvidersError
-              ? "no_eligible_providers"
-              : "routing_policy_has_no_providers",
-        },
-        "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",
-      );
-      await approveDeviceCode({
-        deviceCode: record.device_code,
+  } else {
+    // Legacy client (no selection): stamp the server-side default. The
+    // personal workspace is ensured first so its team can be part of the
+    // default reach — idempotent, and not a credential. Both steps are
+    // best-effort: a default that cannot be resolved must not fail the
+    // login, it just completes without a scoped key.
+    try {
+      await new PersonalWorkspaceService(prisma).ensure({
         userId: session.user.id,
         organizationId: organization_id,
+        displayName: session.user.name,
+        displayEmail: session.user.email,
       });
-      return c.json({ ok: true, organization_id }, 200);
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not ensure personal workspace at approve; default key selection proceeds without it",
+      );
     }
-    if (err instanceof PersonalVirtualKeyAlreadyExistsError) {
-      // Issue an additional device-specific key instead so multiple
-      // devices don't have to share the "default" key. Label includes
-      // a short suffix from the user_code for human discoverability.
-      const labelSuffix = user_code.replace("-", "").toLowerCase().slice(0, 6);
-      const workspace = await prisma.team.findFirst({
-        where: {
+    try {
+      keySelection =
+        (await cliLoginKeys.resolveDefaultSelection({
+          userId: session.user.id,
           organizationId: organization_id,
-          ownerUserId: session.user.id,
-          isPersonal: true,
-        },
-        select: {
-          id: true,
-          projects: {
-            where: { isPersonal: true, archivedAt: null },
-            select: { id: true },
-            take: 1,
-          },
-        },
-      });
-      if (!workspace?.projects[0]) {
-        return c.json(
-          {
-            error: "server_error",
-            error_description: "Personal workspace missing",
-          },
-          500,
-        );
-      }
-      issued = await service.issue({
-        userId: session.user.id,
-        organizationId: organization_id,
-        personalProjectId: workspace.projects[0].id,
-        personalTeamId: workspace.id,
-        label: `device-${labelSuffix}`,
-      });
-    } else {
-      logger.error(
-        { err, user_code },
-        `[auth-cli] approve failed for ${user_code}`,
+        })) ?? undefined;
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
       );
-      // Surface the actionable case where the org has no provider
-      // credentials configured yet — admin needs to set one up before
-      // users can issue personal VKs (storyboard Screen 4 prerequisite).
-      // Other errors stay generic to avoid leaking internals.
-      const message =
-        err instanceof Error &&
-        /provider credential is required/i.test(err.message)
-          ? "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers."
-          : "Failed to issue key";
-      return c.json({ error: "server_error", error_description: message }, 500);
     }
   }
 
@@ -2179,22 +2763,10 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     deviceCode: record.device_code,
     userId: session.user.id,
     organizationId: organization_id,
-    personalVk: {
-      id: issued.virtualKey.id,
-      label: issued.virtualKey.name,
-      secret: issued.secret,
-      base_url: issued.baseUrl,
-    },
+    keySelection,
   });
 
-  return c.json(
-    {
-      ok: true,
-      personal_vk_label: issued.virtualKey.name,
-      organization_id,
-    },
-    200,
-  );
+  return c.json({ ok: true, organization_id }, 200);
 });
 
 // ---------------------------------------------------------------------------
@@ -2235,6 +2807,9 @@ secured.access(CLI_POLICY).post("/deny", async (c: Context) => {
 // only the refresh is revoked and the access token expires naturally
 // in up to 1h — which is a real security gap if the access token was
 // stolen, hence the new `access_token` field added alongside refresh.
+// Also revokes the user-scoped CLI ApiKey the session's /exchange minted
+// (its id rides on the token records), so a logout leaves no live
+// credential behind.
 // ---------------------------------------------------------------------------
 const logoutRequestSchema = z.object({
   refresh_token: z.string().optional(),
@@ -2250,6 +2825,19 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     // to fail if they pass garbage; just nothing to revoke.
     return c.json({ ok: true });
   }
+
+  // Read the records BEFORE the delete: they carry the id of the CLI ApiKey
+  // /exchange minted for this session, which logout revokes alongside the
+  // tokens so the wiped config leaves no live credential behind.
+  const [refreshRaw, accessRaw] = await Promise.all([
+    parsed.data.refresh_token
+      ? redis.get(refreshTokenKey(parsed.data.refresh_token))
+      : null,
+    parsed.data.access_token
+      ? redis.get(accessTokenKey(parsed.data.access_token))
+      : null,
+  ]);
+
   const ops = redis.multi();
   if (parsed.data.refresh_token) {
     ops.del(refreshTokenKey(parsed.data.refresh_token));
@@ -2258,8 +2846,47 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     ops.del(accessTokenKey(parsed.data.access_token));
   }
   await ops.exec();
+
+  await revokeCliKeysFromTokenRecords([refreshRaw, accessRaw]);
+
   return c.json({ ok: true });
 });
+
+/**
+ * Revokes the CLI ApiKeys named by a logout's token records. Best-effort and
+ * idempotent, like the token deletes beside it: logout stays a 200 whatever
+ * state the key is in, and a failed revoke is logged rather than surfaced —
+ * the key still dies with the owner's next re-login from the same device.
+ */
+async function revokeCliKeysFromTokenRecords(
+  raws: Array<string | null>,
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const raw of raws) {
+    if (!raw) continue;
+    let record: RefreshTokenRecord | AccessTokenRecord;
+    try {
+      record = JSON.parse(raw) as RefreshTokenRecord;
+    } catch {
+      continue;
+    }
+    const apiKeyId = record.cli_api_key_id;
+    if (!apiKeyId || seen.has(apiKeyId)) continue;
+    seen.add(apiKeyId);
+    try {
+      await CliLoginKeyService.create(prisma).revokeForLogout({
+        apiKeyId,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId, userId: record.user_id },
+        "[auth-cli] failed to revoke the CLI key on logout",
+      );
+    }
+  }
+}
 
 export const app = secured.hono;
 
@@ -2284,40 +2911,35 @@ export async function findDeviceCodeByUserCode(
 }
 
 /**
- * Approve a device-code session — flips status to `approved` and stamps
- * the user/org/credential payload that the next /exchange poll returns.
- * The shape of the credential payload depends on the device-code's
- * `credential_type`:
+ * Approve a device-code session: flips status to `approved` and stamps the
+ * user/org payload that the next /exchange poll returns.
  *
- *   - `device_session` (default): caller supplies `personalVk`
- *   - `project_api_key`: caller supplies `projectApiKey`
- *
- * Exactly one of `personalVk` / `projectApiKey` must be passed; the
- * caller (browser approval handler) is responsible for picking the right
- * one based on `record.credential_type`.
+ * A `device_session` approval carries no credential. `projectApiKey` is
+ * passed only for a `project_api_key` device code, where the browser
+ * approval handler has resolved the picked project.
  */
 export async function approveDeviceCode({
   deviceCode,
   userId,
   organizationId,
-  personalVk,
   projectApiKey,
+  keySelection,
 }: {
   deviceCode: string;
   userId: string;
   organizationId: string;
-  personalVk?: {
-    id: string;
-    label: string;
-    secret: string;
-    base_url: string;
-  };
   projectApiKey?: {
     project_id: string;
     project_slug: string;
     project_name: string;
     api_key: string;
   };
+  /**
+   * For a `device_session` code — the validated scope + permission selection
+   * /exchange mints the user-scoped CLI key from. Stamping it here mints
+   * nothing.
+   */
+  keySelection?: CliKeySelection;
 }): Promise<{ approved: boolean }> {
   const redis = getRedis();
   const raw = await redis.get(deviceCodeKey(deviceCode));
@@ -2331,8 +2953,8 @@ export async function approveDeviceCode({
     status: "approved",
     user_id: userId,
     organization_id: organizationId,
-    personal_vk: personalVk,
     project_api_key: projectApiKey,
+    key_selection: keySelection,
   };
 
   // Preserve original TTL by computing remaining seconds.

@@ -19,6 +19,7 @@ import {
   vi,
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -99,12 +100,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission: vi.fn().mockImplementation(() => {
-      return async ({ ctx, next }: any) =>
-        next({
-          ctx: { ...ctx, permissionChecked: true },
-        });
-    }),
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
@@ -323,7 +321,11 @@ describe("automationRouter", () => {
           await caller.upsert(baseGraphAlertInput as any);
 
           expect(mockCustomGraphFindUnique).toHaveBeenCalledWith({
-            where: { id: "graph_1", projectId: "proj_123" },
+            where: {
+              id: "graph_1",
+              projectId: "proj_123",
+              kind: BUILDER_CHART_KIND,
+            },
             select: { id: true },
           });
           expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
@@ -905,7 +907,11 @@ describe("automationRouter", () => {
 
         // Multitenancy: the graph lookup is scoped to the calling project.
         expect(mockCustomGraphFindMany).toHaveBeenCalledWith({
-          where: { id: { in: ["graph-1"] }, projectId: "proj_123" },
+          where: {
+            id: { in: ["graph-1"] },
+            projectId: "proj_123",
+            kind: BUILDER_CHART_KIND,
+          },
           select: { id: true, name: true },
         });
         const graphRow = result.find((t) => t.id === "trigger_graph");

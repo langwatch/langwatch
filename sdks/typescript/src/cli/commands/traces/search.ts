@@ -15,14 +15,25 @@ import { parseOriginOption } from "./origin-filter";
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
 
+/**
+ * The text query is matched as a phrase, so a Lucene-style query returns zero
+ * rows rather than an error, and zero rows reads like "you have none of those".
+ * Measured against a project with 638 traces: "validation failed" matched 40,
+ * "validation AND failed" matched 0. Named here so an empty result says which
+ * of the two it is.
+ */
+const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
+
 export const searchTracesCommand = async (options: {
   query?: string;
   startDate?: string;
   endDate?: string;
   limit?: string;
   origin?: string;
+  errorsOnly?: boolean;
+  project?: string;
 } & RawOutputFlags): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const service = new TracesApiService();
   const spinner = createSpinner("Searching traces...").start();
@@ -44,6 +55,14 @@ export const searchTracesCommand = async (options: {
       : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
+    // "Show me my failed traces" has no text to search for: the error lives on
+    // the span, not in the trace's indexed text, so `-q error` returns nothing
+    // and reads like a clean project. `traces.error` is the same filter the
+    // Trace Explorer's error toggle uses.
+    const filters = {
+      ...(originFilter ? { "traces.origin": originFilter } : {}),
+      ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
+    };
 
     // The `format` option controls CLI output (table vs json); the API's
     // `format` parameter controls server response shape ("digest" | "json").
@@ -54,7 +73,7 @@ export const searchTracesCommand = async (options: {
       endDate,
       pageSize,
       format: "json",
-      ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
+      ...(Object.keys(filters).length > 0 ? { filters } : {}),
     });
 
     const matched = result.pagination.totalHits;
@@ -103,6 +122,13 @@ export const searchTracesCommand = async (options: {
       if (traces.length === 0) {
         console.log();
         console.log(chalk.gray("No traces found matching your criteria."));
+        if (options.query && BOOLEAN_OPERATORS.test(options.query)) {
+          console.log(
+            chalk.gray(
+              "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
+            ),
+          );
+        }
         console.log(chalk.gray("Try widening your date range or search query."));
       } else {
         printTable({ events, traces, matched });

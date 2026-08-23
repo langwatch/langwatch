@@ -371,7 +371,7 @@ export function createEnvConfig() {
       ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
-      // bypass the reactor depth check; emergency rollback only.
+      // bypass the subscriber depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
       // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
       // groups per tenant in the DISPATCH_LUA scheduler.
@@ -479,10 +479,15 @@ export function createEnvConfig() {
       //                                installation webhooks.
       //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
       //                                github.com/apps/<slug>/installations/new.
+      //
+      // GITHUB_LANGY_HOST is the GitHub host this instance connects to. Unset
+      // means github.com. Set it to a GitHub Enterprise Server hostname to bind
+      // the instance to that server.
       GITHUB_LANGY_APP_ID: z.string().optional(),
       GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
       GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
       GITHUB_LANGY_APP_SLUG: z.string().optional(),
+      GITHUB_LANGY_HOST: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -701,6 +706,7 @@ export function createEnvConfig() {
       GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
       GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
       GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
+      GITHUB_LANGY_HOST: process.env.GITHUB_LANGY_HOST,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

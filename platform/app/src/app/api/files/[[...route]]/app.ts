@@ -4,7 +4,6 @@ import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 import { requireProjectPermission } from "~/server/auth/permissions";
-import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
 import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
@@ -59,6 +58,10 @@ export function requiredPermissionForPurpose(
 const DENIAL_CODES: ReadonlySet<string> = new Set([
   "project_permission_denied",
   "lite_member_restricted",
+  // The ADR-092 engine's denial. A route that has migrated to
+  // `authz.authorize()` throws this instead of the legacy pair, and without
+  // it here the engine's 403 would surface as a 500.
+  "permission_denied",
 ]);
 
 /**
@@ -106,7 +109,6 @@ async function authorizeFileRead({
           userId,
           projectId: ownerProjectId,
           permission,
-          prisma,
         });
         return;
       } catch (err) {
@@ -142,7 +144,6 @@ async function authorizeFilePurpose({
       userId,
       projectId: ownerProjectId,
       permission: requiredPermissionForPurpose(purpose),
-      prisma,
     });
   } catch (err) {
     if (!isPermissionDenial(err)) throw err;

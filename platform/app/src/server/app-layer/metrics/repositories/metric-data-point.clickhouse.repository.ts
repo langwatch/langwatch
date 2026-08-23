@@ -512,7 +512,12 @@ export class MetricDataPointClickHouseRepository
         clickhouse_settings: INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      // Warning, not error: this rethrows, so the caller decides the outcome.
+      // Under the worker queue that caller retries, and most of these attempts
+      // land on a later one. The error-level record belongs to whoever gives
+      // up — GroupQueue's "Group blocked after exhausted retries".
+      // See specs/observability/retryable-failure-log-level.feature.
+      logger.warn(
         {
           tenantId: points[0]!.tenantId,
           pointCount: points.length,

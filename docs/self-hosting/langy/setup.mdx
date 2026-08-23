@@ -51,7 +51,7 @@ The rung above them is a **sandboxed runtime**, which protects the node's kernel
 from a worker that escapes its container. That needs a kernel exploit on top of
 the injection, and it is the one control whose behaviour depends on your node
 image, container runtime and sandbox build, so it is a deliberate step rather
-than a default. Take it below.
+than a default.
 
 ## Hardening: a sandboxed runtime
 
@@ -293,7 +293,7 @@ langyagent:
   enableForAllUsers: false
 ```
 
-Langy then stays dark until you enable `release_langy_enabled`, or add targeting
+Langy then stays hidden until you enable `release_langy_enabled`, or add targeting
 rules for specific projects and organizations, from `/ops/feature-flags` in your
 install.
 

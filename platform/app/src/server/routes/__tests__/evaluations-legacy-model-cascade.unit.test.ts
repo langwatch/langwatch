@@ -53,7 +53,7 @@ describe("resolveEvaluatorSettingsDefaults", () => {
         async (_ctx: unknown, params: { featureKey: string }) => {
           if (params.featureKey === "evaluator.create_default") {
             return {
-              model: "openai/gpt-4o",
+              model: "openai/gpt-5-mini",
               source: "feature_override",
               scope: "project",
             };
@@ -69,14 +69,24 @@ describe("resolveEvaluatorSettingsDefaults", () => {
       const resolved = await resolveEvaluatorSettingsDefaults("proj-1");
 
       expect(resolved).toEqual({
-        defaultModel: "openai/gpt-4o",
+        defaultModel: "openai/gpt-5-mini",
         embeddingsModel: "openai/text-embedding-3-large",
       });
+      // The embeddings model must come from its own feature key — a typo'd
+      // key would fall into the mock's catch-all and still return the right
+      // value, so pin the exact second call.
+      expect(getResolvedDefaultForFeature).toHaveBeenCalledWith(
+        expect.anything(),
+        {
+          projectId: "proj-1",
+          featureKey: "analytics.topic_clustering_embeddings",
+        },
+      );
     });
 
     it("resolves for the given project id and the evaluator.create_default feature key (AC#3/#4)", async () => {
       getResolvedDefaultForFeature.mockResolvedValue({
-        model: "anthropic/claude-3-5-sonnet",
+        model: "openai/gpt-5-mini",
         source: "role_default",
         scope: "team",
       });
@@ -95,7 +105,7 @@ describe("resolveEvaluatorSettingsDefaults", () => {
 
     it("feeds getEvaluatorDefaultSettings the custom model, not DEFAULT_MODEL (AC#6)", async () => {
       getResolvedDefaultForFeature.mockResolvedValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         source: "feature_override",
         scope: "project",
       });
@@ -106,8 +116,23 @@ describe("resolveEvaluatorSettingsDefaults", () => {
         resolved,
       );
 
-      expect((settings as any).model).toBe("openai/gpt-4o");
+      expect((settings as any).model).toBe("openai/gpt-5-mini");
       expect((settings as any).model).not.toBe(DEFAULT_MODEL);
+    });
+  });
+
+  describe("when the evaluator definition carries no settings (custom evaluator)", () => {
+    it("getEvaluatorDefaultSettings returns {} instead of throwing (regression)", () => {
+      // getEvaluatorIncludingCustom builds custom (non-workflow) definitions
+      // as { name, requiredFields } with NO `settings`; the legacy dispatch
+      // route used to hand those straight to getEvaluatorDefaultSettings,
+      // which crashed on Object.entries(undefined).
+      const customDefinition = {
+        name: "Custom evaluator",
+        requiredFields: ["input"],
+      } as any;
+
+      expect(getEvaluatorDefaultSettings(customDefinition)).toEqual({});
     });
   });
 

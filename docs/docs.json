@@ -74,8 +74,19 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              {
+                "group": "Connect your agent",
+                "pages": [
+                  "agent-simulations/connect-your-agent",
+                  "agent-simulations/remote-traces",
+                  "agent-simulations/local-development",
+                  "agent-simulations/scenario-parameters",
+                  "agent-simulations/authenticated-agents"
+                ]
+              },
+              "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
-              "agent-simulations/authenticated-agents",
+              "agent-simulations/run-suites-from-ci",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -329,6 +340,27 @@
                     ]
                   },
                   {
+                    "group": "Capturing Images",
+                    "pages": [
+                      "integration/python/tutorials/capturing-images",
+                      "integration/typescript/tutorials/capturing-images"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Documents",
+                    "pages": [
+                      "integration/python/tutorials/capturing-documents",
+                      "integration/typescript/tutorials/capturing-documents"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Audio and Voice",
+                    "pages": [
+                      "integration/python/tutorials/capturing-audio",
+                      "integration/typescript/tutorials/capturing-audio"
+                    ]
+                  },
+                  {
                     "group": "Tracking LLM Costs",
                     "pages": [
                       "integration/python/tutorials/tracking-llm-costs",
@@ -456,6 +488,9 @@
             "group": "Tools",
             "pages": [
               "integration/tools/integrations/claude-code",
+              "integration/tools/integrations/openai-codex",
+              "integration/tools/integrations/github-copilot-cli",
+              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -636,6 +671,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -1087,7 +1123,8 @@
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
               "api-reference/simulation-runs/list-list",
-              "api-reference/simulation-runs/get-simulation-runs"
+              "api-reference/simulation-runs/get-simulation-runs",
+              "api-reference/simulation-runs/get-batches"
             ]
           },
           {
@@ -1483,7 +1520,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786600824",
+      "source": "/ci/cache/busted/1787409592",
       "destination": "/"
     },
     {

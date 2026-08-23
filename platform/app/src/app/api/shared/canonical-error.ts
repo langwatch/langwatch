@@ -144,9 +144,19 @@ export function canonicalErrorFor(
 }
 
 /**
- * The envelope for a handled error: its own code and status, its meta, and
- * its reason chain. A 5xx is the one case where none of that reaches the
- * caller, because a platform failure's detail is not API copy.
+ * The envelope for a handled error: its own code, status, meta, and reason
+ * chain below 5xx; the opaque body at 5xx.
+ *
+ * A HandledError's message is customer-safe by construction (ADR-045), but
+ * customer-safe and caller-actionable are different questions. At 5xx the
+ * failure is the platform's — retrying the same request does not fix
+ * `lwql_unavailable` any more than it fixes a database outage — so the
+ * caller has nothing to act on and the class's own code/message/meta/reasons
+ * are not API copy. The status still answers as the class's own (503 stays
+ * 503); only the body collapses, to the same opaque shape an unhandled
+ * failure gets. Trace ids are the correlation channel that survives the
+ * collapse — quote one to support and the platform-side detail is in the
+ * logs, not the response.
  */
 function handledErrorEnvelope(
   error: HandledError,

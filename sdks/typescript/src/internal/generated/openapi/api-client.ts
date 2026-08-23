@@ -756,6 +756,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run LangWatchQL analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the LangWatchQL analytics schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/charts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List saved workbench charts
+         * @description Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsCharts"];
+        put?: never;
+        /**
+         * Save a workbench chart
+         * @description Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsCharts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a saved workbench chart
+         * @description Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a saved workbench chart
+         * @description Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a saved workbench chart
+         * @description Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.
+         */
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -767,7 +859,7 @@ export interface paths {
          * List coding agent session events
          * @description List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).
          */
-        get: operations["getApiCoding-agentSessionsBySessionIdEvents"];
+        get: operations["getApiCodingAgentSessionsBySessionIdEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -787,7 +879,7 @@ export interface paths {
          * Get pull request coding agent usage
          * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
          */
-        get: operations["getApiCoding-agentPull-request-usage"];
+        get: operations["getApiCodingAgentPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -895,7 +987,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Start a direct browser→S3 dataset upload (returns a presigned PUT) */
-        post: operations["postApiDatasetDirect-upload"];
+        post: operations["postApiDatasetDirectUpload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -911,7 +1003,7 @@ export interface paths {
         };
         get?: never;
         /** @description Stream a heavy upload into staging when there is no browser-reachable S3 */
-        put: operations["putApiDatasetDirect-uploadStagingByUploadId"];
+        put: operations["putApiDatasetDirectUploadStagingByUploadId"];
         post?: never;
         delete?: never;
         options?: never;
@@ -929,7 +1021,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Finalize a direct upload: size-check and start processing */
-        post: operations["postApiDatasetDirect-uploadByDatasetIdFinalize"];
+        post: operations["postApiDatasetDirectUploadByDatasetIdFinalize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -946,7 +1038,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Retry normalization of a failed or stuck dataset */
-        post: operations["postApiDatasetDirect-uploadByDatasetIdRetry"];
+        post: operations["postApiDatasetDirectUploadByDatasetIdRetry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -964,7 +1056,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** @description Abort a still-pending direct upload and clean up its row */
-        delete: operations["deleteApiDatasetDirect-uploadByDatasetId"];
+        delete: operations["deleteApiDatasetDirectUploadByDatasetId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1182,7 +1274,7 @@ export interface paths {
          * Report batch evaluation results
          * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
          */
-        post: operations["postApiEvaluationsBatchLog_results"];
+        post: operations["postApiEvaluationsBatchLogResults"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1382,7 +1474,7 @@ export interface paths {
          * Report DSPy optimizer steps
          * @description Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.
          */
-        post: operations["postApiDspyLog_steps"];
+        post: operations["postApiDspyLogSteps"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1442,7 +1534,7 @@ export interface paths {
          * Track an event (legacy path)
          * @description Record a customer event against a trace or thread. Identical to `POST /api/events/track`, which is the path to use in new integrations; this one stays for callers written against it. Supply `event_id` yourself to make the call idempotent.
          */
-        post: operations["postApiTrack_event"];
+        post: operations["postApiTrackEvent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1520,13 +1612,13 @@ export interface paths {
          * List virtual keys
          * @description Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.
          */
-        get: operations["getApiGatewayV1Virtual-keys"];
+        get: operations["getApiGatewayV1VirtualKeys"];
         put?: never;
         /**
          * Create virtual key
          * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
-        post: operations["postApiGatewayV1Virtual-keys"];
+        post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1541,7 +1633,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get virtual key */
-        get: operations["getApiGatewayV1Virtual-keysById"];
+        get: operations["getApiGatewayV1VirtualKeysById"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1551,7 +1643,7 @@ export interface paths {
          * Update virtual key
          * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
-        patch: operations["patchApiGatewayV1Virtual-keysById"];
+        patch: operations["patchApiGatewayV1VirtualKeysById"];
         trace?: never;
     };
     "/api/gateway/v1/virtual-keys/{id}/spend": {
@@ -1565,7 +1657,7 @@ export interface paths {
          * Read a virtual key's spend
          * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
-        get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
+        get: operations["getApiGatewayV1VirtualKeysByIdSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1587,7 +1679,7 @@ export interface paths {
          * Rotate virtual key secret
          * @description Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdRotate"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRotate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1607,7 +1699,7 @@ export interface paths {
          * Disable virtual key
          * @description Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdDisable"];
+        post: operations["postApiGatewayV1VirtualKeysByIdDisable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1627,7 +1719,7 @@ export interface paths {
          * Enable virtual key
          * @description Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdEnable"];
+        post: operations["postApiGatewayV1VirtualKeysByIdEnable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1647,7 +1739,7 @@ export interface paths {
          * Revoke virtual key
          * @description Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdRevoke"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRevoke"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1785,13 +1877,13 @@ export interface paths {
          * List cache-control rules
          * @description Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.
          */
-        get: operations["getApiGatewayV1Cache-rules"];
+        get: operations["getApiGatewayV1CacheRules"];
         put?: never;
         /**
          * Create a cache rule
          * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.
          */
-        post: operations["postApiGatewayV1Cache-rules"];
+        post: operations["postApiGatewayV1CacheRules"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1809,21 +1901,21 @@ export interface paths {
          * Get a cache rule
          * @description Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).
          */
-        get: operations["getApiGatewayV1Cache-rulesById"];
+        get: operations["getApiGatewayV1CacheRulesById"];
         put?: never;
         post?: never;
         /**
          * Archive a cache rule
          * @description Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
          */
-        delete: operations["deleteApiGatewayV1Cache-rulesById"];
+        delete: operations["deleteApiGatewayV1CacheRulesById"];
         options?: never;
         head?: never;
         /**
          * Update a cache rule
          * @description Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.
          */
-        patch: operations["patchApiGatewayV1Cache-rulesById"];
+        patch: operations["patchApiGatewayV1CacheRulesById"];
         trace?: never;
     };
     "/api/governance/ingestion-templates": {
@@ -1837,13 +1929,13 @@ export interface paths {
          * List ingestion templates
          * @description Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.
          */
-        get: operations["getApiGovernanceIngestion-templates"];
+        get: operations["getApiGovernanceIngestionTemplates"];
         put?: never;
         /**
          * Create org-authored ingestion template
          * @description Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.
          */
-        post: operations["postApiGovernanceIngestion-templates"];
+        post: operations["postApiGovernanceIngestionTemplates"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1861,7 +1953,7 @@ export interface paths {
          * List ingestion templates (admin shape, includes OTTL)
          * @description Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.
          */
-        get: operations["getApiGovernanceIngestion-templatesAdmin"];
+        get: operations["getApiGovernanceIngestionTemplatesAdmin"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1881,14 +1973,14 @@ export interface paths {
          * Get ingestion template
          * @description Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).
          */
-        get: operations["getApiGovernanceIngestion-templatesById"];
+        get: operations["getApiGovernanceIngestionTemplatesById"];
         put?: never;
         post?: never;
         /**
          * Soft-archive an org-authored template
          * @description Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.
          */
-        delete: operations["deleteApiGovernanceIngestion-templatesById"];
+        delete: operations["deleteApiGovernanceIngestionTemplatesById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1911,7 +2003,7 @@ export interface paths {
          * Replace ottl_rules on an org-authored template
          * @description Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.
          */
-        patch: operations["patchApiGovernanceIngestion-templatesByIdOttl-rules"];
+        patch: operations["patchApiGovernanceIngestionTemplatesByIdOttlRules"];
         trace?: never;
     };
     "/api/governance/ingestion-templates/clone": {
@@ -1927,7 +2019,7 @@ export interface paths {
          * Clone a platform-published template into the caller's org
          * @description Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
          */
-        post: operations["postApiGovernanceIngestion-templatesClone"];
+        post: operations["postApiGovernanceIngestionTemplatesClone"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2154,10 +2246,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
-        get: operations["getApiModel-defaults"];
+        get: operations["getApiModelDefaults"];
         put?: never;
         /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
-        post: operations["postApiModel-defaults"];
+        post: operations["postApiModelDefaults"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2173,10 +2265,10 @@ export interface paths {
         };
         get?: never;
         /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
-        put: operations["putApiModel-defaultsById"];
+        put: operations["putApiModelDefaultsById"];
         post?: never;
         /** @description Delete a default-model config. Scope attachments cascade. */
-        delete: operations["deleteApiModel-defaultsById"];
+        delete: operations["deleteApiModelDefaultsById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2190,7 +2282,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all model providers for a project with masked API keys */
-        get: operations["getApiModel-providers"];
+        get: operations["getApiModelProviders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2208,7 +2300,7 @@ export interface paths {
         };
         get?: never;
         /** @description Create or update a model provider */
-        put: operations["putApiModel-providersByProvider"];
+        put: operations["putApiModelProvidersByProvider"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2430,7 +2522,7 @@ export interface paths {
         /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
         get: operations["listRoleBindings"];
         put?: never;
-        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. */
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
         post: operations["createRoleBinding"];
         delete?: never;
         options?: never;
@@ -2656,7 +2748,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned user
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.
          */
         patch: operations["scimPatchUser"];
         trace?: never;
@@ -2712,7 +2804,7 @@ export interface paths {
         head?: never;
         /**
          * Update a provisioned group
-         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.
          */
         patch: operations["scimPatchGroup"];
         trace?: never;
@@ -2727,9 +2819,9 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Create a new scenario event */
-        post: operations["postApiScenario-events"];
+        post: operations["postApiScenarioEvents"];
         /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
-        delete: operations["deleteApiScenario-events"];
+        delete: operations["deleteApiScenarioEvents"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2745,7 +2837,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it. */
-        post: operations["postApiScenario-eventsBrowser-tab"];
+        post: operations["postApiScenarioEventsBrowserTab"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2926,7 +3018,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
-        get: operations["getApiSimulation-runs"];
+        get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2943,7 +3035,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a single simulation run by its ID */
-        get: operations["getApiSimulation-runsByScenarioRunId"];
+        get: operations["getApiSimulationRunsByScenarioRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2960,7 +3052,24 @@ export interface paths {
             cookie?: never;
         };
         /** @description List batch summaries for a scenario set (pass/fail counts per batch) */
-        get: operations["getApiSimulation-runsBatchesList"];
+        get: operations["getApiSimulationRunsBatchesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/batches/{batchRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get the summary of a single batch run, including its completion flag */
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3359,7 +3468,7 @@ export interface paths {
         put?: never;
         /**
          * Create a webhook endpoint
-         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
@@ -3391,7 +3500,7 @@ export interface paths {
         head?: never;
         /**
          * Update a webhook endpoint
-         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
          */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
@@ -3409,7 +3518,7 @@ export interface paths {
          * Roll an endpoint's signing secret
          * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
          */
-        post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
+        post: operations["postApiWebhooksV1EndpointsByIdRollSecret"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3487,7 +3596,7 @@ export interface paths {
          * List subscribable event types
          * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
          */
-        get: operations["getApiWebhooksV1Event-types"];
+        get: operations["getApiWebhooksV1EventTypes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3547,7 +3656,7 @@ export interface paths {
          * List spend summaries
          * @description Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.
          */
-        get: operations["getApiGatewayV1Spend-summaries"];
+        get: operations["getApiGatewayV1SpendSummaries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3567,7 +3676,7 @@ export interface paths {
          * List spend events
          * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.
          */
-        get: operations["getApiGatewayV1Spend-events"];
+        get: operations["getApiGatewayV1SpendEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3587,7 +3696,7 @@ export interface paths {
          * Read one end user's spend
          * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.
          */
-        get: operations["getApiGatewayV1End-usersByIdSpend"];
+        get: operations["getApiGatewayV1EndUsersByIdSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3609,7 +3718,7 @@ export interface paths {
          * Replay spend events to an endpoint
          * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
          */
-        post: operations["postApiGatewayV1Spend-eventsReplay"];
+        post: operations["postApiGatewayV1SpendEventsReplay"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4046,7 +4155,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -4094,7 +4203,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -4152,7 +4261,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /**
@@ -4377,7 +4486,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -4493,7 +4602,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     startDate: number | string;
@@ -4988,7 +5097,939 @@ export interface operations {
             };
         };
     };
-    "getApiCoding-agentSessionsBySessionIdEvents": {
+    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    timeWindow?: {
+                        start: string | number;
+                        end: string | number;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran, and the result is scoped to the caller's project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        followsTimeWindow: boolean;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsSchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The LangWatchQL schema, scoped to the caller's permissions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsCharts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's saved workbench charts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                sql: string;
+                                parameters: {
+                                    [key: string]: unknown;
+                                };
+                                vegaLiteSpec?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsCharts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    definition?: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The chart was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved chart */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chart was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    definition?: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated chart */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiCodingAgentSessionsBySessionIdEvents: {
         parameters: {
             query?: {
                 /** @description Comma-separated event kinds to include. Known kinds: model_call, compaction, rate_limit, api_error, retries_exhausted, tool_result, tool_decision, user_prompt, subagent_completed. */
@@ -5113,7 +6154,7 @@ export interface operations {
             };
         };
     };
-    "getApiCoding-agentPull-request-usage": {
+    getApiCodingAgentPullRequestUsage: {
         parameters: {
             query: {
                 /** @description The repository as "owner/name". */
@@ -5256,7 +6297,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5272,7 +6313,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     dashboardIds: string[];
@@ -5314,7 +6355,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5343,7 +6384,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5367,7 +6408,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-upload": {
+    postApiDatasetDirectUpload: {
         parameters: {
             query?: never;
             header?: never;
@@ -5377,7 +6418,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "putApiDatasetDirect-uploadStagingByUploadId": {
+    putApiDatasetDirectUploadStagingByUploadId: {
         parameters: {
             query?: never;
             header?: never;
@@ -5389,7 +6430,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-uploadByDatasetIdFinalize": {
+    postApiDatasetDirectUploadByDatasetIdFinalize: {
         parameters: {
             query?: never;
             header?: never;
@@ -5401,7 +6442,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-uploadByDatasetIdRetry": {
+    postApiDatasetDirectUploadByDatasetIdRetry: {
         parameters: {
             query?: never;
             header?: never;
@@ -5413,7 +6454,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "deleteApiDatasetDirect-uploadByDatasetId": {
+    deleteApiDatasetDirectUploadByDatasetId: {
         parameters: {
             query?: never;
             header?: never;
@@ -5461,7 +6502,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     entries: {
@@ -5481,7 +6522,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     recordIds: string[];
@@ -5499,7 +6540,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": components["schemas"]["DatasetPostEntries"];
             };
@@ -5620,7 +6661,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -5643,7 +6684,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     entry: {
@@ -5756,7 +6797,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5971,7 +7012,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -6376,7 +7417,7 @@ export interface operations {
             };
         };
     };
-    postApiEvaluationsBatchLog_results: {
+    postApiEvaluationsBatchLogResults: {
         parameters: {
             query?: never;
             header?: never;
@@ -8120,7 +9161,7 @@ export interface operations {
             };
         };
     };
-    postApiDspyLog_steps: {
+    postApiDspyLogSteps: {
         parameters: {
             query?: never;
             header?: never;
@@ -8461,7 +9502,7 @@ export interface operations {
             };
         };
     };
-    postApiTrack_event: {
+    postApiTrackEvent: {
         parameters: {
             query?: never;
             header?: never;
@@ -9027,11 +10068,12 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keys": {
+    getApiGatewayV1VirtualKeys: {
         parameters: {
             query?: {
                 cursor?: string;
                 limit?: number;
+                /** @description Exact match on the resource's `external_id`. */
                 external_id?: string;
             };
             header?: never;
@@ -9076,10 +10118,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
                         next_cursor: string | null;
@@ -9168,7 +10219,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keys": {
+    postApiGatewayV1VirtualKeys: {
         parameters: {
             query?: never;
             header?: {
@@ -9178,7 +10229,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -9193,6 +10244,8 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
+                    expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -9223,26 +10276,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -9267,6 +10304,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -9327,10 +10373,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -9438,7 +10493,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keysById": {
+    getApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9485,10 +10540,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -9595,7 +10659,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGatewayV1Virtual-keysById": {
+    patchApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9604,7 +10668,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -9619,6 +10683,8 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`. */
+                    expires_at?: string | null;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -9649,26 +10715,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -9693,6 +10743,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -9749,10 +10808,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -9839,7 +10907,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keysByIdSpend": {
+    getApiGatewayV1VirtualKeysByIdSpend: {
         parameters: {
             query?: {
                 from?: number;
@@ -9993,7 +11061,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdRotate": {
+    postApiGatewayV1VirtualKeysByIdRotate: {
         parameters: {
             query?: never;
             header?: never;
@@ -10040,10 +11108,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -10131,7 +11208,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdDisable": {
+    postApiGatewayV1VirtualKeysByIdDisable: {
         parameters: {
             query?: never;
             header?: never;
@@ -10185,10 +11262,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10275,7 +11361,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdEnable": {
+    postApiGatewayV1VirtualKeysByIdEnable: {
         parameters: {
             query?: never;
             header?: never;
@@ -10322,10 +11408,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10412,7 +11507,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdRevoke": {
+    postApiGatewayV1VirtualKeysByIdRevoke: {
         parameters: {
             query?: never;
             header?: never;
@@ -10459,10 +11554,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10776,7 +11880,9 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
+                /** @description Comma-separated subset of the scope types, lowercase, e.g. `virtual_key,principal`. */
                 scope_type?: string;
+                /** @description Exact match on the resource's `external_id`. */
                 external_id?: string;
             };
             header?: never;
@@ -10934,7 +12040,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     scope: {
@@ -11473,7 +12579,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -11629,6 +12735,7 @@ export interface operations {
     postApiGatewayV1BudgetsByIdReset: {
         parameters: {
             query?: {
+                /** @description Resets ONE end-user bucket on an attributed-user template, leaving the template period untouched. */
                 end_user_id?: string;
             };
             header?: never;
@@ -12008,7 +13115,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Cache-rules": {
+    getApiGatewayV1CacheRules: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -12136,7 +13243,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Cache-rules": {
+    postApiGatewayV1CacheRules: {
         parameters: {
             query?: never;
             header?: {
@@ -12146,7 +13253,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -12309,7 +13416,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Cache-rulesById": {
+    getApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12434,7 +13541,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiGatewayV1Cache-rulesById": {
+    deleteApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12559,7 +13666,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGatewayV1Cache-rulesById": {
+    patchApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12568,7 +13675,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -12709,7 +13816,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templates": {
+    getApiGovernanceIngestionTemplates: {
         parameters: {
             query?: never;
             header?: never;
@@ -12791,7 +13898,7 @@ export interface operations {
             };
         };
     };
-    "postApiGovernanceIngestion-templates": {
+    postApiGovernanceIngestionTemplates: {
         parameters: {
             query?: never;
             header?: never;
@@ -12876,7 +13983,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templatesAdmin": {
+    getApiGovernanceIngestionTemplatesAdmin: {
         parameters: {
             query?: never;
             header?: never;
@@ -12958,7 +14065,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templatesById": {
+    getApiGovernanceIngestionTemplatesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -13057,7 +14164,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiGovernanceIngestion-templatesById": {
+    deleteApiGovernanceIngestionTemplatesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -13160,7 +14267,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGovernanceIngestion-templatesByIdOttl-rules": {
+    patchApiGovernanceIngestionTemplatesByIdOttlRules: {
         parameters: {
             query?: never;
             header?: never;
@@ -13274,7 +14381,7 @@ export interface operations {
             };
         };
     };
-    "postApiGovernanceIngestion-templatesClone": {
+    postApiGovernanceIngestionTemplatesClone: {
         parameters: {
             query?: never;
             header?: never;
@@ -13464,7 +14571,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -13750,7 +14857,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -14185,7 +15292,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     handle: string;
@@ -14404,7 +15511,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     versionId: string;
@@ -14567,7 +15674,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -14647,7 +15754,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -15321,7 +16428,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     model?: string;
@@ -15631,7 +16738,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     configData: {
@@ -15969,7 +17076,7 @@ export interface operations {
             };
         };
     };
-    "getApiModel-defaults": {
+    getApiModelDefaults: {
         parameters: {
             query?: never;
             header?: never;
@@ -16075,14 +17182,14 @@ export interface operations {
             };
         };
     };
-    "postApiModel-defaults": {
+    postApiModelDefaults: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     config: {
@@ -16158,7 +17265,7 @@ export interface operations {
             };
         };
     };
-    "putApiModel-defaultsById": {
+    putApiModelDefaultsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -16167,7 +17274,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     config?: {
@@ -16239,7 +17346,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiModel-defaultsById": {
+    deleteApiModelDefaultsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -16307,7 +17414,7 @@ export interface operations {
             };
         };
     };
-    "getApiModel-providers": {
+    getApiModelProviders: {
         parameters: {
             query?: never;
             header?: never;
@@ -16410,7 +17517,7 @@ export interface operations {
             };
         };
     };
-    "putApiModel-providersByProvider": {
+    putApiModelProvidersByProvider: {
         parameters: {
             query?: never;
             header?: never;
@@ -16419,7 +17526,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     enabled: boolean;
@@ -16640,7 +17747,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -16962,7 +18069,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -17102,7 +18209,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     enabled: boolean;
@@ -17225,7 +18332,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -17384,7 +18491,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @enum {string} */
@@ -17522,7 +18629,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     invites: {
@@ -17656,7 +18763,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -17857,7 +18964,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     userId?: string;
@@ -17936,7 +19043,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @enum {string} */
@@ -18010,7 +19117,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -18129,7 +19236,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -18191,7 +19298,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     description?: string;
@@ -19500,14 +20607,14 @@ export interface operations {
             };
         };
     };
-    "postApiScenario-events": {
+    postApiScenarioEvents: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @constant */
@@ -20021,7 +21128,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiScenario-events": {
+    deleteApiScenarioEvents: {
         parameters: {
             query: {
                 scenarioSetId: string;
@@ -20095,14 +21202,14 @@ export interface operations {
             };
         };
     };
-    "postApiScenario-eventsBrowser-tab": {
+    postApiScenarioEventsBrowserTab: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     tabKey: string;
@@ -20195,6 +21302,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -20257,7 +21372,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -20266,6 +21381,15 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                        defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
+                    }[];
                 };
             };
         };
@@ -20282,6 +21406,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20360,6 +21492,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20436,13 +21576,22 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                        defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
+                    }[];
                 };
             };
         };
@@ -20459,6 +21608,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20658,7 +21815,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @description Project name */
@@ -20829,7 +21986,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -21048,7 +22205,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -21231,7 +22388,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     value: string;
@@ -21401,7 +22558,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runs": {
+    getApiSimulationRuns: {
         parameters: {
             query?: {
                 scenarioSetId?: string;
@@ -21502,7 +22659,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runsByScenarioRunId": {
+    getApiSimulationRunsByScenarioRunId: {
         parameters: {
             query?: never;
             header?: never;
@@ -21608,7 +22765,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runsBatchesList": {
+    getApiSimulationRunsBatchesList: {
         parameters: {
             query: {
                 scenarioSetId: string;
@@ -21634,11 +22791,18 @@ export interface operations {
                             passCount: number;
                             failCount: number;
                             runningCount: number;
+                            settledCount: number;
                             stalledCount: number;
                             lastRunAt: number;
                             lastUpdatedAt: number;
                             firstCompletedAt: number | null;
+                            /**
+                             * @deprecated
+                             * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                             */
                             allCompletedAt: number | null;
+                            /** @description True when every run of the batch reached a terminal status. */
+                            isComplete: boolean;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -21659,6 +22823,106 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSimulationRunsBatchesByBatchRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        batchRunId: string;
+                        totalCount: number;
+                        passCount: number;
+                        failCount: number;
+                        runningCount: number;
+                        settledCount: number;
+                        stalledCount: number;
+                        lastRunAt: number;
+                        lastUpdatedAt: number;
+                        firstCompletedAt: number | null;
+                        /**
+                         * @deprecated
+                         * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                         */
+                        allCompletedAt: number | null;
+                        /** @description True when every run of the batch reached a terminal status. */
+                        isComplete: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Batch run not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -21787,7 +23051,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -22075,7 +23339,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -22288,10 +23552,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -22406,7 +23674,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -22448,7 +23716,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -22478,7 +23746,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     userId: string;
@@ -22537,7 +23805,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -22588,7 +23856,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -22618,7 +23886,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     userId: string;
@@ -22661,7 +23929,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @enum {string} */
@@ -22695,7 +23963,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     query?: string;
@@ -23233,7 +24501,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     metadata: {
@@ -23400,7 +24668,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -23693,7 +24961,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -23817,9 +25085,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data: {
-                            id: string;
+                        data: ({
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -23833,7 +25104,36 @@ export interface operations {
                             max_in_flight: number;
                             created_at: string;
                             updated_at: string;
-                        }[];
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        })[];
                     };
                 };
             };
@@ -23929,10 +25229,19 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
-                    url: string;
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
+                    url?: string;
+                    sqs?: {
+                        queue_url: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events: string[];
                     max_batch_size?: number;
                     max_batch_delay_ms?: number;
@@ -23951,8 +25260,41 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                            secret: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24092,8 +25434,40 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24349,10 +25723,19 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
                     url?: string;
+                    sqs?: {
+                        queue_url?: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events?: string[];
                     /** @enum {string} */
                     status?: "active" | "disabled";
@@ -24371,8 +25754,40 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24492,7 +25907,7 @@ export interface operations {
             };
         };
     };
-    "postApiWebhooksV1EndpointsByIdRoll-secret": {
+    postApiWebhooksV1EndpointsByIdRollSecret: {
         parameters: {
             query?: never;
             header?: never;
@@ -24511,8 +25926,41 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                            secret: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -25038,7 +26486,7 @@ export interface operations {
             };
         };
     };
-    "getApiWebhooksV1Event-types": {
+    getApiWebhooksV1EventTypes: {
         parameters: {
             query?: never;
             header?: never;
@@ -25396,14 +26844,18 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Spend-summaries": {
+    getApiGatewayV1SpendSummaries: {
         parameters: {
             query: {
+                /** @description One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key. */
                 group_by: string;
                 bucket?: "none" | "hour" | "day";
                 timezone?: string;
+                /** @description true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent. */
                 allow_unstable?: string;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 to: number;
                 cursor?: string;
                 limit?: number;
@@ -25418,6 +26870,7 @@ export interface operations {
                 request_type?: string | string[];
                 label?: string | string[];
                 metadata?: string | string[];
+                /** @description Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those. */
                 status?: "success" | "error" | "confirmed" | "failed" | "settled";
             };
             header?: never;
@@ -25541,10 +26994,12 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Spend-events": {
+    getApiGatewayV1SpendEvents: {
         parameters: {
             query: {
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 to: number;
                 cursor?: string;
                 limit?: number;
@@ -25699,7 +27154,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1End-usersByIdSpend": {
+    getApiGatewayV1EndUsersByIdSpend: {
         parameters: {
             query?: {
                 window?: "day" | "week" | "month";
@@ -25839,14 +27294,14 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Spend-eventsReplay": {
+    postApiGatewayV1SpendEventsReplay: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     from: number;
@@ -26223,7 +27678,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -26324,7 +27779,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @description Committed version to evaluate; defaults to the latest commit */

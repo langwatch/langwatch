@@ -231,6 +231,31 @@ export const getEdgeMediaExtractFailOpenCounter = (
     | "part_store",
 ) => edgeMediaExtractFailOpenCounter.labels(reason);
 
+// Authorization writes that reach the projection WITHOUT going through the
+// group queue. Every other authz write is queued; these two are deliberate
+// exceptions, and both only ever make a denial true earlier: a revocation
+// and an offboarding.
+//
+// The reason to count them is that a direct write is the one path whose
+// effect is NOT recorded as an event when Redis is down — the deny lands in
+// Postgres, the event never appends, and a later projection replay would
+// resurrect the access. This counter is how you know that window happened
+// and how wide it was; a replay run without checking it is unsafe.
+//
+// A healthy fleet emits this at a low, human-paced rate (it tracks people
+// revoking and offboarding). A spike means a bulk revocation; increments
+// while the queue is down are the ones that matter.
+register.removeSingleMetric("langwatch_authz_direct_projection_write_total");
+const authzDirectProjectionWriteCounter = new Counter({
+  name: "langwatch_authz_direct_projection_write_total",
+  help: "Authorization projection writes that bypassed the group queue, by cause",
+  labelNames: ["reason"] as const,
+});
+
+export const getAuthzDirectProjectionWriteCounter = (
+  reason: "revocation" | "offboard",
+) => authzDirectProjectionWriteCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer
@@ -314,12 +339,12 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 });
 
 // ============================================================================
-// Event Sourcing Pipeline Metrics (command, fold, map, reactor)
+// Event Sourcing Pipeline Metrics (command, fold, map, subscriber)
 // ============================================================================
 
 type ESStatus = "completed" | "failed";
-/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
-type ReactorStatus = ESStatus | "skipped";
+/** Subscribers additionally skip pre-enqueue when shouldDispatch returns false. */
+type SubscriberStatus = ESStatus | "skipped";
 
 // --- Unified projection metrics ---
 // Keep the existing kind-specific metrics below for backwards compatibility,
@@ -544,7 +569,7 @@ export const incrementEsFoldAbsentMissTrustedTotal = (
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
-  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
+  help: "Subscriber dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
   labelNames: ["pipeline_name", "reactor_name"] as const,
 });
 
@@ -556,9 +581,9 @@ const esReactorCollapsedTotal = new Counter({
  */
 export const incrementEsReactorCollapsedTotal = (
   pipelineName: string,
-  reactorName: string,
+  subscriberName: string,
   skipped: number,
-) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
+) => esReactorCollapsedTotal.labels(pipelineName, subscriberName).inc(skipped);
 
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
@@ -652,33 +677,33 @@ export const observeEsMapProjectionDuration = ({
   });
 };
 
-// --- Reactor metrics ---
+// --- Subscriber metrics ---
 register.removeSingleMetric("es_reactor_total");
 const esReactorTotal = new Counter({
   name: "es_reactor_total",
-  help: "Total number of reactor executions",
+  help: "Total number of subscriber executions",
   labelNames: ["pipeline_name", "reactor_name", "status"] as const,
 });
 
 export const incrementEsReactorTotal = (
   pipelineName: string,
-  reactorName: string,
-  status: ReactorStatus,
-) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
+  subscriberName: string,
+  status: SubscriberStatus,
+) => esReactorTotal.labels(pipelineName, subscriberName, status).inc();
 
 register.removeSingleMetric("es_reactor_duration_milliseconds");
 const esReactorDuration = new Histogram({
   name: "es_reactor_duration_milliseconds",
-  help: "Duration of reactor execution in milliseconds",
+  help: "Duration of subscriber execution in milliseconds",
   labelNames: ["pipeline_name", "reactor_name"] as const,
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
 });
 
 export const observeEsReactorDuration = (
   pipelineName: string,
-  reactorName: string,
+  subscriberName: string,
   durationMs: number,
-) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
+) => esReactorDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
 // --- Event subscriber metrics ---
 register.removeSingleMetric("es_subscriber_total");
@@ -929,8 +954,32 @@ export const incrementEsProcessOutboxTotal = ({
 }: {
   processName: string;
   intentType: string;
-  status: "dispatched" | "retried" | "dead";
+  /**
+   * `fenced`: an acknowledgement matched zero rows because the lease lapsed
+   * mid-delivery and another dispatcher superseded it — the effect may have
+   * run more than once. `released`: a leased message was returned to the pool
+   * un-attempted because its batch ran out of lease budget. Both should sit
+   * at zero in a healthy fleet; a sustained fenced rate is the direct
+   * signature of the issue #7016 redelivery loop.
+   */
+  status: "dispatched" | "retried" | "dead" | "fenced" | "released";
 }) => esProcessOutboxTotal.labels(processName, intentType, status).inc();
+
+// A drain that never settled and was abandoned by the worker's watchdog.
+// Each count is one process manager on one pod whose outbox loop would have
+// been wedged until the next rollout before the watchdog existed.
+register.removeSingleMetric("es_process_outbox_stuck_drains_total");
+const esProcessOutboxStuckDrains = new Counter({
+  name: "es_process_outbox_stuck_drains_total",
+  help: "Process-manager outbox drains abandoned after not settling within the stuck-drain threshold",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessOutboxStuckDrains = ({
+  processName,
+}: {
+  processName: string;
+}) => esProcessOutboxStuckDrains.labels(processName).inc();
 
 register.removeSingleMetric("es_process_outbox_duration_milliseconds");
 const esProcessOutboxDuration = new Histogram({
@@ -1323,7 +1372,7 @@ const esFoldPostStoreFailure = new Counter({
  * A fold threw *after* its state was already written durably.
  *
  * Queue delivery is at-least-once and the fold's state is stored before
- * reactors are dispatched, so anything that throws from that point fails the
+ * subscribers are dispatched, so anything that throws from that point fails the
  * job without un-writing it: the queue re-delivers events the store already
  * holds. Folds accumulate rather than being idempotent (trace summary does
  * `spanCount + 1` and sums cost), so the re-apply double-counts.

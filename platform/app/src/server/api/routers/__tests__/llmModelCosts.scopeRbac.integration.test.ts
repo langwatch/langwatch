@@ -21,7 +21,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -30,6 +30,8 @@ import {
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
