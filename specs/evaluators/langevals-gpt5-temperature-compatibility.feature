@@ -12,8 +12,12 @@ Feature: Evaluator judge temperature on models that pin it
   # support at all, and these models do support temperature — they restrict
   # its value. Two evaluators carried their own guard for it
   # (llm_answer_match, select_best_compare); every other one, and every
-  # user-configured judge model, failed before it started. The treatment
-  # lives centrally in the litellm patch so it covers all of them at once.
+  # user-configured judge model, failed before it started. The treatment now
+  # lives in the litellm patch, which every litellm call passes through, so
+  # it covers all of them at once. Those two guards are left in place as
+  # redundant rather than removed — and the ragas path builds its call
+  # through langchain instead, so it does not pass this seam and keeps
+  # needing its own.
   #
   # Bindings:
   #   services/langevals/langevals_core/langevals_core/litellm_patch.py
