@@ -40,6 +40,8 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 
+import { allocateNextGridRow } from "../allocateNextGridRow";
+import { dashboardBelongsToProject } from "../dashboardBelongsToProject";
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
@@ -52,6 +54,7 @@ import type { LangWatchQLBudgetOverflowMode } from "../lwql/resolveTimeWindow";
 import type { LangWatchQLTimeWindow } from "../lwql/timeWindow";
 import {
   SavedWorkbenchChartAlreadyExistsError,
+  SavedWorkbenchChartDashboardNotFoundError,
   SavedWorkbenchChartDefinitionInvalidError,
   SavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartSpecificationRefusedError,
@@ -90,6 +93,17 @@ export interface SavedWorkbenchChart {
   readonly definition: WorkbenchChartDefinition;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /**
+   * `null` when the chart has never been placed, or has been unplaced.
+   * `gridColumn`/`gridRow`/`colSpan`/`rowSpan` are meaningful only alongside a
+   * non-null `dashboardId` — an unplaced chart's grid fields are the column's
+   * defaults and are not a position on any dashboard.
+   */
+  readonly dashboardId: string | null;
+  readonly gridColumn: number;
+  readonly gridRow: number;
+  readonly colSpan: number;
+  readonly rowSpan: number;
 }
 
 export interface SavedWorkbenchChartServiceDependencies {
@@ -99,7 +113,43 @@ export interface SavedWorkbenchChartServiceDependencies {
    * identity, so charts can be saved on a deployment that could not run them.
    */
   readonly lwql: LangWatchQLService;
+  /**
+   * Answers whether a dashboard id belongs to a project. Injected rather than
+   * called directly so a unit suite can drive `placeChart`'s tenancy refusal
+   * against an in-memory answer instead of a real Prisma client — the same
+   * reason `repository` is an interface rather than the Prisma repository
+   * itself.
+   *
+   * @default the real {@link dashboardBelongsToProject}, bound to a Prisma
+   *   client by {@link SavedWorkbenchChartService.create}.
+   */
+  readonly dashboardBelongsToProject: (
+    dashboardId: string,
+    projectId: string,
+  ) => Promise<boolean>;
+  /**
+   * The next free grid row on a dashboard, counting every chart on it
+   * regardless of kind. Shared with `graphs.create` via
+   * {@link allocateNextGridRow} so the two writers that can place a chart on
+   * this grid never disagree about which row is free.
+   *
+   * @default the real {@link allocateNextGridRow}, bound to a Prisma client
+   *   by {@link SavedWorkbenchChartService.create}.
+   */
+  readonly allocateNextGridRow: (input: {
+    dashboardId: string;
+    projectId: string;
+  }) => Promise<number>;
 }
+
+/** Grid bounds a chart may be placed with — the same 2-column grid the chart builder places onto. */
+const placementSchema = z.object({
+  dashboardId: z.string().min(1),
+  gridColumn: z.number().min(0).max(1).optional(),
+  gridRow: z.number().min(0).optional(),
+  colSpan: z.number().min(1).max(2).optional(),
+  rowSpan: z.number().min(1).max(2).optional(),
+});
 
 export class SavedWorkbenchChartService {
   constructor(private readonly deps: SavedWorkbenchChartServiceDependencies) {}
@@ -109,6 +159,9 @@ export class SavedWorkbenchChartService {
     return new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
       lwql: getLangWatchQLService(),
+      dashboardBelongsToProject: (dashboardId, projectId) =>
+        dashboardBelongsToProject(prisma, dashboardId, projectId),
+      allocateNextGridRow: (input) => allocateNextGridRow(prisma, input),
     });
   }
 
@@ -338,6 +391,97 @@ export class SavedWorkbenchChartService {
   }
 
   /**
+   * Places a saved chart on a dashboard.
+   *
+   * `createChart` never places what it writes — this is the only way an
+   * already-saved chart gains a `dashboardId` and a grid position, whether it
+   * is being placed for the first time or moved from where it was.
+   *
+   * When no grid row is supplied, one is allocated the same way a builder
+   * chart created with no explicit row is: the next row free on that
+   * dashboard, counting charts of both kinds, through the shared
+   * {@link SavedWorkbenchChartServiceDependencies.allocateNextGridRow}.
+   *
+   * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
+   *   that id in this project.
+   * @throws {SavedWorkbenchChartDashboardNotFoundError} when the dashboard id
+   *   does not belong to this project — another project's dashboard included.
+   *   Checked before anything is written, through the same
+   *   {@link dashboardBelongsToProject} check dashboard-scoped chart creation
+   *   already runs, so a foreign dashboard id is refused identically whether
+   *   the chart being placed is new or already saved.
+   */
+  async placeChart({
+    id,
+    projectId,
+    input,
+  }: {
+    id: string;
+    projectId: string;
+    input: {
+      dashboardId: string;
+      gridColumn?: number;
+      gridRow?: number;
+      colSpan?: number;
+      rowSpan?: number;
+    };
+  }): Promise<SavedWorkbenchChart> {
+    const parsed = placementSchema.safeParse(input);
+    if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+
+    // Refused before anything else is resolved, so a member placing onto
+    // another project's dashboard learns only that it is not here — the same
+    // shape of refusal `getById` already gives for a foreign chart id.
+    const belongs = await this.deps.dashboardBelongsToProject(
+      parsed.data.dashboardId,
+      projectId,
+    );
+    if (!belongs) throw new SavedWorkbenchChartDashboardNotFoundError();
+
+    const gridRow =
+      parsed.data.gridRow ??
+      (await this.deps.allocateNextGridRow({
+        dashboardId: parsed.data.dashboardId,
+        projectId,
+      }));
+
+    const row = await this.deps.repository.place({
+      id,
+      projectId,
+      dashboardId: parsed.data.dashboardId,
+      gridColumn: parsed.data.gridColumn ?? 0,
+      gridRow,
+      colSpan: parsed.data.colSpan ?? 1,
+      rowSpan: parsed.data.rowSpan ?? 1,
+    });
+    if (!row) throw new SavedWorkbenchChartNotFoundError();
+
+    return this.present(row);
+  }
+
+  /**
+   * Removes a saved chart from whatever dashboard it is on.
+   *
+   * Idempotent: unplacing a chart that is already unplaced succeeds and
+   * changes nothing, because the caller's intent — "this chart should not be
+   * on a dashboard" — is already true.
+   *
+   * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
+   *   that id in this project.
+   */
+  async unplaceChart({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<SavedWorkbenchChart> {
+    const row = await this.deps.repository.unplace({ id, projectId });
+    if (!row) throw new SavedWorkbenchChartNotFoundError();
+    return this.present(row);
+  }
+
+  /**
    * Deletes a saved chart.
    *
    * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
@@ -436,6 +580,11 @@ export class SavedWorkbenchChartService {
       definition: parsed.data,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      dashboardId: row.dashboardId,
+      gridColumn: row.gridColumn,
+      gridRow: row.gridRow,
+      colSpan: row.colSpan,
+      rowSpan: row.rowSpan,
     };
   }
 }

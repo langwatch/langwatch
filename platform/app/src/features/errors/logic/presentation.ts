@@ -409,6 +409,11 @@ const presentations = {
     describe: () =>
       "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
   },
+  saved_workbench_chart_dashboard_not_found: {
+    title: "That dashboard isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboards and try placing the chart again.",
+  },
   saved_workbench_chart_not_found: {
     title: "That saved chart isn't here",
     describe: () =>

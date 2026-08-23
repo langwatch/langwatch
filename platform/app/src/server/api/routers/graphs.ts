@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { allocateNextGridRow } from "~/server/analytics/allocateNextGridRow";
 import {
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
@@ -97,19 +98,15 @@ export const graphsRouter = createTRPCRouter({
         });
       }
 
-      // If no gridRow provided, find the next available row.
-      //
-      // Deliberately not filtered by `kind`: the grid is one shared space, so
-      // the next free row has to account for every chart occupying it. Scoping
-      // this to builder rows would place a new chart on top of a saved
-      // workbench chart the moment those gain dashboard placement.
+      // If no gridRow provided, find the next available row. Shared with
+      // `placeChart` so the two writers that can put a chart on this grid
+      // never disagree about which row is free.
       let gridRow = input.gridRow;
       if (gridRow === undefined && input.dashboardId) {
-        const lastGraph = await ctx.prisma.customGraph.findFirst({
-          where: { dashboardId: input.dashboardId, projectId: input.projectId },
-          orderBy: { gridRow: "desc" },
+        gridRow = await allocateNextGridRow(ctx.prisma, {
+          dashboardId: input.dashboardId,
+          projectId: input.projectId,
         });
-        gridRow = (lastGraph?.gridRow ?? -1) + 1;
       }
 
       const customGraph = await ctx.prisma.customGraph.create({

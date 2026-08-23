@@ -112,6 +112,25 @@ class FakeStore implements SavedWorkbenchChartStore {
   async delete(_input: { id: string; projectId: string }): Promise<number> {
     throw new Error("not used by this suite");
   }
+
+  async place(_input: {
+    id: string;
+    projectId: string;
+    dashboardId: string;
+    gridColumn: number;
+    gridRow: number;
+    colSpan: number;
+    rowSpan: number;
+  }): Promise<CustomGraph | null> {
+    throw new Error("not used by this suite");
+  }
+
+  async unplace(_input: {
+    id: string;
+    projectId: string;
+  }): Promise<CustomGraph | null> {
+    throw new Error("not used by this suite");
+  }
 }
 
 function recordingExecutor(): LangWatchQLExecutor & {
@@ -148,6 +167,9 @@ function build() {
   const service = new SavedWorkbenchChartService({
     repository: store,
     lwql: new LangWatchQLService({ executor, database: "analytics" }),
+    // Placement is not exercised by this suite; the answers are inert.
+    dashboardBelongsToProject: async () => false,
+    allocateNextGridRow: async () => 0,
   });
   return { store, service, executor };
 }

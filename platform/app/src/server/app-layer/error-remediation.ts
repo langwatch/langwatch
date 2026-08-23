@@ -151,6 +151,12 @@ const registry = {
       "List the project's saved charts to see which ids exist",
     ],
   },
+  saved_workbench_chart_dashboard_not_found: {
+    tips: [
+      "Check the dashboard id — a dashboard from another project cannot be placed on from this one",
+      "List the project's dashboards to see which ids exist",
+    ],
+  },
   saved_workbench_chart_specification_refused: {
     tips: [
       "Read `meta.errors` — each entry names the rule (`rule`) and the JSON path (`path`) that was refused",

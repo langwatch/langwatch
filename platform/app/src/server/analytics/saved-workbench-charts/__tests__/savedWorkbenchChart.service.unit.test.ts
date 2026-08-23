@@ -24,6 +24,7 @@ import type {
 import { LangWatchQLService } from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
+  PlaceSavedWorkbenchChartInput,
   SavedWorkbenchChartStore,
   UpdateSavedWorkbenchChartInput,
 } from "../savedWorkbenchChart.repository";
@@ -100,7 +101,22 @@ class FakeStore implements SavedWorkbenchChartStore {
     projectId: string;
     name: string;
     graph: unknown;
+    /** Carried across an update/place/unplace so an untouched field survives. */
+    placement?: {
+      dashboardId: string | null;
+      gridColumn: number;
+      gridRow: number;
+      colSpan: number;
+      rowSpan: number;
+    };
   }): CustomGraph {
+    const placement = input.placement ?? {
+      dashboardId: null,
+      gridColumn: 0,
+      gridRow: 0,
+      colSpan: 1,
+      rowSpan: 1,
+    };
     return {
       id: input.id,
       projectId: input.projectId,
@@ -110,11 +126,7 @@ class FakeStore implements SavedWorkbenchChartStore {
       kind: WORKBENCH_SQL_CHART_KIND,
       createdAt: new Date("2026-02-01T00:00:00.000Z"),
       updatedAt: new Date("2026-02-01T00:00:00.000Z"),
-      dashboardId: null,
-      gridColumn: 0,
-      gridRow: 0,
-      colSpan: 1,
-      rowSpan: 1,
+      ...placement,
     } as CustomGraph;
   }
 
@@ -158,6 +170,61 @@ class FakeStore implements SavedWorkbenchChartStore {
       projectId: existing.projectId,
       name: input.name ?? existing.name,
       graph: input.definition ?? existing.graph,
+      placement: {
+        dashboardId: existing.dashboardId,
+        gridColumn: existing.gridColumn,
+        gridRow: existing.gridRow,
+        colSpan: existing.colSpan,
+        rowSpan: existing.rowSpan,
+      },
+    });
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async place(
+    input: PlaceSavedWorkbenchChartInput,
+  ): Promise<CustomGraph | null> {
+    const existing = await this.findById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (!existing) return null;
+
+    const row = this.row({
+      id: existing.id,
+      projectId: existing.projectId,
+      name: existing.name,
+      graph: existing.graph,
+      placement: {
+        dashboardId: input.dashboardId,
+        gridColumn: input.gridColumn,
+        gridRow: input.gridRow,
+        colSpan: input.colSpan,
+        rowSpan: input.rowSpan,
+      },
+    });
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async unplace({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<CustomGraph | null> {
+    const existing = await this.findById({ id, projectId });
+    if (!existing) return null;
+
+    const row = this.row({
+      id: existing.id,
+      projectId: existing.projectId,
+      name: existing.name,
+      graph: existing.graph,
+      // Defaults — the same shape `row()` already falls back to when no
+      // placement is given, which is exactly "unplaced".
     });
     this.rows.set(row.id, row);
     return row;
@@ -206,7 +273,24 @@ function recordingExecutor(): LangWatchQLExecutor & {
   };
 }
 
-function build(executor: LangWatchQLExecutor | null = null) {
+function build(
+  executor: LangWatchQLExecutor | null = null,
+  overrides: {
+    /** Every dashboard belongs, by default: most suites are not testing tenancy. */
+    dashboardBelongsToProject?: (
+      dashboardId: string,
+      projectId: string,
+    ) => Promise<boolean>;
+    /**
+     * Row 0, by default: most suites place a single chart and never look at
+     * the row it landed on.
+     */
+    allocateNextGridRow?: (input: {
+      dashboardId: string;
+      projectId: string;
+    }) => Promise<number>;
+  } = {},
+) {
   const store = new FakeStore();
   const service = new SavedWorkbenchChartService({
     repository: store,
@@ -216,6 +300,9 @@ function build(executor: LangWatchQLExecutor | null = null) {
       executor,
       database: "analytics",
     }),
+    dashboardBelongsToProject:
+      overrides.dashboardBelongsToProject ?? (async () => true),
+    allocateNextGridRow: overrides.allocateNextGridRow ?? (async () => 0),
   });
   return { store, service };
 }
@@ -563,6 +650,129 @@ describe("editing a saved workbench chart", () => {
 
         expect(renamed.name).toBe("Traces per week");
         expect(renamed.definition).toEqual(saved.definition);
+      });
+    });
+  });
+});
+
+/**
+ * The placement path: what makes an already-saved chart show up on a
+ * dashboard. `dashboardBelongsToProject` and `allocateNextGridRow` are the
+ * only two collaborators `placeChart` reaches for beyond the store, so this
+ * suite drives them as plain fakes rather than a real Prisma client — the
+ * same reason the store itself is a fake.
+ */
+describe("placing a saved workbench chart on a dashboard", () => {
+  describe("given a saved chart and the id of a dashboard in the same project", () => {
+    describe("when the chart is placed with no grid position supplied", () => {
+      /** @scenario "Placing a chart requires a dashboard id and accepts an optional grid position" */
+      it("accepts the placement and allocates a grid position for it", async () => {
+        const { service } = build(null, {
+          allocateNextGridRow: async () => 2,
+        });
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: { name: "Traces per day", definition: definition() },
+        });
+
+        const placed = await service.placeChart({
+          id: saved.id,
+          projectId: PROJECT_ID,
+          input: { dashboardId: "dashboard-1" },
+        });
+
+        expect(placed.dashboardId).toBe("dashboard-1");
+        // Allocated, not defaulted to 0: the fake above stands in for "row 0
+        // and row 1 are already taken".
+        expect(placed.gridRow).toBe(2);
+        expect(placed.gridColumn).toBe(0);
+        expect(placed.colSpan).toBe(1);
+        expect(placed.rowSpan).toBe(1);
+      });
+    });
+  });
+
+  describe("given a saved chart already placed on a dashboard with a grid position", () => {
+    describe("when the chart is unplaced", () => {
+      /** @scenario "Unplacing a chart clears every placement field, not just the dashboard id" */
+      it("clears the dashboard id, grid column, grid row, column span and row span, and leaves the definition untouched", async () => {
+        const { service } = build();
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: { name: "Traces per day", definition: definition() },
+        });
+        await service.placeChart({
+          id: saved.id,
+          projectId: PROJECT_ID,
+          input: {
+            dashboardId: "dashboard-1",
+            gridColumn: 1,
+            gridRow: 3,
+            colSpan: 2,
+            rowSpan: 2,
+          },
+        });
+
+        const unplaced = await service.unplaceChart({
+          id: saved.id,
+          projectId: PROJECT_ID,
+        });
+
+        expect(unplaced.dashboardId).toBeNull();
+        expect(unplaced.gridColumn).toBe(0);
+        expect(unplaced.gridRow).toBe(0);
+        expect(unplaced.colSpan).toBe(1);
+        expect(unplaced.rowSpan).toBe(1);
+        expect(unplaced.definition).toEqual(saved.definition);
+      });
+    });
+  });
+
+  describe("given a chart id that does not name a saved chart in this project", () => {
+    describe("when the member tries to place it on a dashboard", () => {
+      /** @scenario "Placing a chart that does not exist in this project is refused" */
+      it("refuses the placement as not found", async () => {
+        const { service } = build();
+
+        const refusal = await refusalOf(() =>
+          service.placeChart({
+            id: "never-saved",
+            projectId: PROJECT_ID,
+            input: { dashboardId: "dashboard-1" },
+          }),
+        );
+
+        expect(refusal.code).toBe("saved_workbench_chart_not_found");
+      });
+    });
+  });
+
+  describe("given a dashboard id belonging to another project", () => {
+    describe("when the member tries to place a chart on it", () => {
+      it("refuses the placement and writes nothing", async () => {
+        const { store, service } = build(null, {
+          dashboardBelongsToProject: async () => false,
+        });
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: { name: "Traces per day", definition: definition() },
+        });
+
+        const refusal = await refusalOf(() =>
+          service.placeChart({
+            id: saved.id,
+            projectId: PROJECT_ID,
+            input: { dashboardId: "dashboard-elsewhere" },
+          }),
+        );
+
+        expect(refusal.code).toBe(
+          "saved_workbench_chart_dashboard_not_found",
+        );
+        expect(store.rows.get(saved.id)?.dashboardId).toBeNull();
       });
     });
   });
