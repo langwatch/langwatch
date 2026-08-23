@@ -238,10 +238,13 @@ async function createProvisionedOrganization(
  * page attributes by name. Finalized-without-enrolled is the honest reading,
  * and the two counters were never a join in the first place.
  */
-async function putNewOrganizationOnAuthzEngine(
-  tx: Prisma.TransactionClient,
-  organizationId: string,
-): Promise<void> {
+async function putNewOrganizationOnAuthzEngine({
+  tx,
+  organizationId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+}): Promise<void> {
   await tx.systemMigrationTenantState.create({
     data: {
       migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
@@ -598,7 +601,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
       // Before the membership row and before the founder's grants: every
       // later write forks on this.
-      await putNewOrganizationOnAuthzEngine(tx, organization.id);
+      await putNewOrganizationOnAuthzEngine({
+        tx,
+        organizationId: organization.id,
+      });
 
       await tx.organizationUser.create({
         data: {
@@ -676,7 +682,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // A provisioned organization is as new as a signed-up one: no legacy
       // access to carry, and whoever is assigned to it later must be granted
       // through the engine.
-      await putNewOrganizationOnAuthzEngine(tx, organization.id);
+      await putNewOrganizationOnAuthzEngine({
+        tx,
+        organizationId: organization.id,
+      });
 
       const team = await tx.team.create({
         data: {

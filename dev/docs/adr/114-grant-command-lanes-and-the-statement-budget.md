@@ -3,7 +3,16 @@
 **Date:** 2026-08-23
 
 **Status:** Accepted. **Decision 1 was amended the same day, before it ever ran
-in production** — see [Amendment](#amendment--decision-1-traded-away-an-ordering-guarantee).
+in production** — see [Amendment (2026-08-23)](#amendment-2026-08-23--decision-1-traded-away-an-ordering-guarantee).
+
+**Redacted for publication (2026-08-23).** The Context section originally
+carried a table of production measurements, a per-job-type latency chart, the
+arithmetic derived from them, and the identifier of the organization involved.
+This repository is public, so the narrative was rewritten to describe the
+failure by its shape instead. Nothing about the decision changed, and the
+removed material is deliberately not reproduced or summarised here — if you
+need the figures, they are in the incident's own records, not in a public
+repository.
 
 **Builds on:** ADR-110 (a grant is its own aggregate), ADR-100 (the
 aggregate-scoped lane), ADR-066 pillar 2 (append coalescing).
@@ -51,7 +60,7 @@ first-served: it bounds total concurrency and bounds the wait queue, but it
 has no notion of what the statement is *for*. A bulk backfill and a customer's
 trace write are peers.
 
-## Amendment — decision 1 traded away an ordering guarantee
+## Amendment (2026-08-23) — decision 1 traded away an ordering guarantee
 
 The decision below originally sharded an organization's grant commands across
 a fixed number of lanes so their appends could coalesce. That shipped and was

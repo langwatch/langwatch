@@ -34,7 +34,7 @@ function recordingPrisma() {
   const tx = {
     organization: {
       create: record("organization.create", { id: "org_new", name: "Acme" }),
-      findUnique: vi.fn(async () => null),
+      findUnique: vi.fn(async (_args: unknown) => null),
     },
     systemMigrationTenantState: {
       create: record("systemMigrationTenantState.create", {}),
@@ -56,17 +56,17 @@ function recordingPrisma() {
     $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
   } as unknown as PrismaClient;
 
-  return { prisma, tx, calls };
-}
-
-function writerSpy() {
-  const attachBindings = vi.fn(async () => {
+  // The ledger writer shares the SAME sequence as the transaction's writes.
+  // Attaching the founder's grants is the write the status row has to
+  // precede, so an ordering test that could not see it would be checking the
+  // easy half of the contract.
+  const attachBindings = vi.fn(async (_args: unknown) => {
+    calls.push("writer.attachBindings");
     return { attached: [], duplicates: [] };
   });
-  return {
-    writer: { attachBindings } as unknown as GrantsLedgerWriter,
-    attachBindings,
-  };
+  const writer = { attachBindings } as unknown as GrantsLedgerWriter;
+
+  return { prisma, tx, calls, writer, attachBindings };
 }
 
 const CREATE_INPUT = {
@@ -82,12 +82,24 @@ const CREATE_INPUT = {
   pricingModel: undefined,
 } as never;
 
+/** The index of a recorded write, failing loudly when it never happened —
+ *  `indexOf` returns -1 for an absent call, and -1 sorts before everything,
+ *  so an ordering assertion over a missing write would pass vacuously. */
+function orderOf(calls: string[], name: string): number {
+  const index = calls.indexOf(name);
+  if (index === -1) {
+    throw new Error(
+      `"${name}" was never called; recorded: ${calls.join(", ")}`,
+    );
+  }
+  return index;
+}
+
 describe("given an organization is created after the authz migration", () => {
   describe("when a user signs up and their organization is created", () => {
     /** @scenario "A new organization is created on the engine" */
     it("records it as being on the engine", async () => {
-      const { prisma, tx } = recordingPrisma();
-      const { writer } = writerSpy();
+      const { prisma, tx, writer } = recordingPrisma();
 
       await new PrismaOrganizationRepository(prisma, writer).createAndAssign(
         CREATE_INPUT,
@@ -104,8 +116,7 @@ describe("given an organization is created after the authz migration", () => {
 
     /** @scenario "A new organization is on the engine before its first grants" */
     it("writes the status row before the membership and the founder's grants", async () => {
-      const { prisma, calls } = recordingPrisma();
-      const { writer, attachBindings } = writerSpy();
+      const { prisma, calls, writer } = recordingPrisma();
 
       await new PrismaOrganizationRepository(prisma, writer).createAndAssign(
         CREATE_INPUT,
@@ -113,21 +124,17 @@ describe("given an organization is created after the authz migration", () => {
 
       // The gate is read by `attachBindings`. If the status row landed after
       // it, the founder's two ADMIN grants would take the LEGACY path and the
-      // organization would only claim to be on the engine.
-      expect(calls.indexOf("systemMigrationTenantState.create")).toBeLessThan(
-        calls.indexOf("organizationUser.create"),
-      );
-      expect(
-        calls.indexOf("systemMigrationTenantState.create"),
-      ).toBeGreaterThan(-1);
-      // And the grants are attached only after the transaction has run at all.
-      expect(attachBindings).toHaveBeenCalledTimes(1);
+      // organization would only claim to be on the engine — so the grants,
+      // not just the membership row, are what the order is checked against.
+      const stateRow = orderOf(calls, "systemMigrationTenantState.create");
+      expect(stateRow).toBeGreaterThan(orderOf(calls, "organization.create"));
+      expect(stateRow).toBeLessThan(orderOf(calls, "organizationUser.create"));
+      expect(stateRow).toBeLessThan(orderOf(calls, "writer.attachBindings"));
     });
 
     /** @scenario "A new organization is not enrolled in the migration" */
     it("writes no enrollment row", async () => {
-      const { prisma, tx } = recordingPrisma();
-      const { writer } = writerSpy();
+      const { prisma, tx, writer } = recordingPrisma();
 
       await new PrismaOrganizationRepository(prisma, writer).createAndAssign(
         CREATE_INPUT,
@@ -141,8 +148,7 @@ describe("given an organization is created after the authz migration", () => {
 
     /** @scenario "A new organization's state says it was never migrated" */
     it("records a report that does not claim a parity proof ran", async () => {
-      const { prisma, tx } = recordingPrisma();
-      const { writer } = writerSpy();
+      const { prisma, tx, writer } = recordingPrisma();
 
       await new PrismaOrganizationRepository(prisma, writer).createAndAssign(
         CREATE_INPUT,
@@ -159,8 +165,7 @@ describe("given an organization is created after the authz migration", () => {
   describe("when an organization is provisioned rather than signed up for", () => {
     /** @scenario "A provisioned organization is created on the engine too" */
     it("records it as being on the engine as well", async () => {
-      const { prisma, tx } = recordingPrisma();
-      const { writer } = writerSpy();
+      const { prisma, tx, writer } = recordingPrisma();
 
       await new PrismaOrganizationRepository(
         prisma,
@@ -173,6 +178,23 @@ describe("given an organization is created after the authz migration", () => {
           status: "finalized",
         }),
       });
+    });
+
+    /** @scenario "A new organization is on the engine before its first grants" */
+    it("writes the status row before anything else the provisioning does", async () => {
+      const { prisma, calls, writer } = recordingPrisma();
+
+      await new PrismaOrganizationRepository(
+        prisma,
+        writer,
+      ).createForProvisioning(CREATE_INPUT);
+
+      // This path attaches no grants of its own — whoever is assigned to the
+      // organization is granted later — so the row only has to precede the
+      // rest of the provisioning for those grants to take the engine path.
+      const stateRow = orderOf(calls, "systemMigrationTenantState.create");
+      expect(stateRow).toBeGreaterThan(orderOf(calls, "organization.create"));
+      expect(stateRow).toBeLessThan(orderOf(calls, "team.create"));
     });
   });
 });
