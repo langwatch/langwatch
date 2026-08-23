@@ -1,13 +1,17 @@
 /**
- * Shared shard-bucketing helper for the trace-processing command group key.
+ * Shard-bucketing shared by every pipeline that fans one owner's commands
+ * across parallel GroupQueue lanes.
  *
  * `spanCommandGroupKey` (recordSpan) fans a hot trace's spans across
- * `traceId:<shard>` lanes on the GroupQueue, bucketing on the record's span id
- * with the rolling hash and clamp shape defined here. Holding the shard math in
- * one module keeps a record's bucket byte-stable — deterministic across
- * processes and restarts, the property a record's retries and its dedup squash
- * window depend on. `spanCommandGroupKey` keeps its own public API and its own
- * `MAX_SPAN_SHARD_COUNT` constant.
+ * `traceId:<shard>` lanes; `grantCommandLane` (ADR-114) buckets an
+ * organization's grant commands, returning the shard ALONE — the tenant that
+ * makes those lanes per-organization is prepended by `buildGroupKey`, not by
+ * the `getGroupKey` callback.
+ * Holding the shard math in one module keeps a record's bucket byte-stable —
+ * deterministic across processes and restarts, the property a record's
+ * retries and its dedup squash window depend on. Each caller keeps its own
+ * public API and its own `MAX_*_SHARD_COUNT` constant, because the right
+ * ceiling is a property of the workload, not of the hash.
  */
 
 // FNV-1a (32-bit) constants. A record's bucket must be deterministic across
