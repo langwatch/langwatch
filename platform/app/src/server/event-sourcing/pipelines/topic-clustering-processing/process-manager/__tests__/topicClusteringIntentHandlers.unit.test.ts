@@ -220,27 +220,32 @@ describe("createTopicClusteringRunHandler", () => {
   });
 
   describe("when clustering fails for a reason only the customer can fix", () => {
+    /** @scenario A failure only the customer can fix is recorded without burning retries */
     it("records run_failed on the first attempt instead of retrying", async () => {
       const commands = makeCommands();
+      const runClusteringPage = vi
+        .fn()
+        .mockRejectedValue(
+          new ModelNotConfiguredError(
+            "analytics.topic_clustering_llm",
+            "FAST",
+            "Topic clustering",
+            "project-1",
+          ),
+        );
       const run = createTopicClusteringRunHandler({
-        runPort: {
-          runClusteringPage: vi
-            .fn()
-            .mockRejectedValue(
-              new ModelNotConfiguredError(
-                "analytics.topic_clustering_llm",
-                "FAST",
-                "Topic clustering",
-                "project-1",
-              ),
-            ),
-        },
+        runPort: { runClusteringPage },
         commands: () => commands,
         clock: () => 999,
       });
 
-      await run(makePayload(), makeContext({ attempt: 1 }));
+      // Resolving rather than throwing is what tells the outbox the intent is
+      // finished: a throw here is what would buy the two extra attempts.
+      await expect(
+        run(makePayload(), makeContext({ attempt: 1 })),
+      ).resolves.toBeUndefined();
 
+      expect(runClusteringPage).toHaveBeenCalledTimes(1);
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
           errorCode: "model_not_configured",
@@ -251,6 +256,7 @@ describe("createTopicClusteringRunHandler", () => {
   });
 
   describe("when clustering fails on the final attempt", () => {
+    /** @scenario A failing clustering effect retries then records a visible failure */
     it("records a durable run_failed instead of dying silently", async () => {
       const commands = makeCommands();
       const run = createTopicClusteringRunHandler({

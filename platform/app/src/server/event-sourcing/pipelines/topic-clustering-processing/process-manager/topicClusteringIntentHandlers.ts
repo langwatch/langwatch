@@ -156,10 +156,12 @@ async function recordClusteringFailure(params: {
   context: PageContext;
   occurredAt: number;
   error: unknown;
+  /** Classified by the caller, which already had to ask to pick its branch. */
+  classified: ReturnType<typeof classifyClusteringError>;
 }): Promise<void> {
   const { projectId, runId, page, attempt } = params.context;
   const errorMessage = errorText(params.error);
-  const classified = classifyClusteringError(params.error);
+  const { classified } = params;
   // A user-actionable failure is the customer's to fix, not an incident of
   // ours — it logs at warn, while an internal failure stays at error.
   logger[classified.isUserActionable ? "warn" : "error"](
@@ -308,13 +310,15 @@ export function createTopicClusteringRunHandler(
       // cannot be fixed by retrying — only the customer changing their
       // configuration can. Record the durable, visible outcome immediately
       // instead of burning the retry budget re-asking the same question.
-      if (classifyClusteringError(error).isUserActionable) {
+      const classified = classifyClusteringError(error);
+      if (classified.isUserActionable) {
         incrementTopicClusteringPageTotal({ outcome: "failed_customer" });
         await recordClusteringFailure({
           commands,
           context,
           occurredAt: clock(),
           error,
+          classified,
         });
         return;
       }
@@ -336,6 +340,7 @@ export function createTopicClusteringRunHandler(
         context,
         occurredAt: clock(),
         error,
+        classified,
       });
       return;
     }
