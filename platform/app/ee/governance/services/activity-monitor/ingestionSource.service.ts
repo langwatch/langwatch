@@ -233,9 +233,14 @@ async function assertTraceDestinationIsOwnLiveProject(
     select: { id: true },
   });
   if (!project) {
-    throw new ValidationError(
-      "Trace destination must be an active project of this organization.",
-    );
+    // Without meta.formErrors the presentation layer shows the generic
+    // "Check your input" copy and this sentence never reaches the customer
+    // (see assertPullSchedule above for the same trap).
+    const complaint =
+      "Trace destination must be an active project of this organization.";
+    throw new ValidationError(complaint, {
+      meta: { formErrors: [complaint] },
+    });
   }
 }
 
