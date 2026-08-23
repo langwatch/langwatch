@@ -39,11 +39,10 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-
-import { allocateNextGridRow } from "../allocateNextGridRow";
-import { dashboardBelongsToProject } from "../dashboardBelongsToProject";
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
+import { allocateNextGridRow } from "../allocateNextGridRow";
+import { dashboardBelongsToProject } from "../dashboardBelongsToProject";
 import {
   getLangWatchQLService,
   type LangWatchQLCaller,
@@ -142,13 +141,20 @@ export interface SavedWorkbenchChartServiceDependencies {
   }) => Promise<number>;
 }
 
+/**
+ * The ceiling a grid coordinate may carry. Far beyond any real dashboard, but
+ * within Postgres's Int range — a larger value would overflow the column into
+ * a generic 500 instead of this schema's named validation refusal.
+ */
+const MAX_GRID_COORDINATE = 2_000_000_000;
+
 /** Grid bounds a chart may be placed with — the same 2-column grid the chart builder places onto. */
 const placementSchema = z.object({
   dashboardId: z.string().min(1),
-  gridColumn: z.number().min(0).max(1).optional(),
-  gridRow: z.number().min(0).optional(),
-  colSpan: z.number().min(1).max(2).optional(),
-  rowSpan: z.number().min(1).max(2).optional(),
+  gridColumn: z.number().int().min(0).max(1).optional(),
+  gridRow: z.number().int().min(0).max(MAX_GRID_COORDINATE).optional(),
+  colSpan: z.number().int().min(1).max(2).optional(),
+  rowSpan: z.number().int().min(1).max(2).optional(),
 });
 
 export class SavedWorkbenchChartService {

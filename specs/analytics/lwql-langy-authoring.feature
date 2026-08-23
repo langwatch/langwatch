@@ -190,8 +190,10 @@ Feature: Langy authors saved workbench charts and places them on dashboards
   # ---------------------------------------------------------------------------
   # Langy's CLI — author, then place (bound in later commits of this slice)
   # ---------------------------------------------------------------------------
+  # The CLI-lane scenarios below are delivered by the next slice of #6712
+  # (SDK client, CLI chart family, skill routing); @unimplemented until it lands.
 
-  @integration
+  @integration @unimplemented
   Scenario: Langy creates a chart with the CLI and reads it back with the same query, parameters and specification
     Given Langy holding CLI credentials for a project
     When it creates a chart from a SQL file, named parameters and a
@@ -199,7 +201,7 @@ Feature: Langy authors saved workbench charts and places them on dashboards
     Then the SQL, the parameter values and the specification it reads back are
       the ones it submitted
 
-  @integration
+  @integration @unimplemented
   Scenario: A chart Langy creates is indistinguishable from one a member saves by hand
     Given a chart created through the CLI and a chart saved through the
       application by a member
@@ -208,21 +210,21 @@ Feature: Langy authors saved workbench charts and places them on dashboards
       project scoping
     And they differ only in id, name and timestamps
 
-  @integration
+  @integration @unimplemented
   Scenario: SQL naming a column Langy's credentials cannot read is refused identically everywhere
     Given SQL naming a column that Langy's protections withhold
     When the chart is saved through the CLI, through REST directly and through
       the application's own save path
     Then every path refuses with the same LangWatchQL validator error code
 
-  @integration
+  @integration @unimplemented
   Scenario: A specification the chart policy refuses cannot be written through the CLI
     Given a specification the workbench's Vega-Lite policy refuses
     When Langy tries to create a chart carrying it
     Then the CLI reports error code saved_workbench_chart_specification_refused
     And no chart is created
 
-  @integration
+  @integration @unimplemented
   Scenario: Langy places a saved chart on a dashboard with the CLI
     Given Langy holding CLI credentials and the id of a dashboard in the
       project
@@ -230,7 +232,7 @@ Feature: Langy authors saved workbench charts and places them on dashboards
     Then the chart's dashboard id and grid position are set
     And the chart is listed among that dashboard's charts
 
-  @unit
+  @unit @unimplemented
   Scenario: Every new CLI verb is machine-readable, not just human-formatted
     Given a chart created, placed, listed, updated, unplaced or deleted through
       the CLI
@@ -238,7 +240,7 @@ Feature: Langy authors saved workbench charts and places them on dashboards
     Then the data returned carries no human-only formatting
     And it can be parsed by an agent without inspecting the human table output
 
-  @unit
+  @unit @unimplemented
   Scenario: Every CLI verb this slice adds refuses while the workbench switch is off, and writes nothing
     Given the LangWatchQL feature switch is off for the project
     When Langy invokes create, update, delete, run, place or unplace through
@@ -246,7 +248,7 @@ Feature: Langy authors saved workbench charts and places them on dashboards
     Then every one of them refuses with error code lwql_not_enabled
     And no row is created or mutated by any of them
 
-  @unit
+  @unit @unimplemented
   Scenario: The chart family is discoverable by name, and its skill teaches Langy to check the schema first
     Given the CLI's own command listing and the compiled skill tree
     When the chart command group and the LWQL charts skill are looked up

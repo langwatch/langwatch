@@ -769,9 +769,56 @@ describe("placing a saved workbench chart on a dashboard", () => {
           }),
         );
 
-        expect(refusal.code).toBe(
-          "saved_workbench_chart_dashboard_not_found",
+        expect(refusal.code).toBe("saved_workbench_chart_dashboard_not_found");
+        expect(store.rows.get(saved.id)?.dashboardId).toBeNull();
+      });
+    });
+  });
+
+  describe("given a grid position outside what the store can hold", () => {
+    // The REST envelope enforces integrality too, but the rule lives HERE:
+    // the service is the single write path, and a future non-REST caller
+    // must meet the same refusal, not the Int column's overflow error.
+    describe("when the member places a chart with a fractional grid row", () => {
+      it("refuses it as invalid input and writes nothing", async () => {
+        const { store, service } = build();
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: { name: "Traces per day", definition: definition() },
+        });
+
+        const refusal = await refusalOf(() =>
+          service.placeChart({
+            id: saved.id,
+            projectId: PROJECT_ID,
+            input: { dashboardId: "dashboard-1", gridRow: 1.5 },
+          }),
         );
+
+        expect(refusal.code).toBe("validation_error");
+        expect(store.rows.get(saved.id)?.dashboardId).toBeNull();
+      });
+    });
+
+    describe("when the member places a chart with a grid row past the column's range", () => {
+      it("refuses it as invalid input rather than overflowing the store", async () => {
+        const { store, service } = build();
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: { name: "Traces per day", definition: definition() },
+        });
+
+        const refusal = await refusalOf(() =>
+          service.placeChart({
+            id: saved.id,
+            projectId: PROJECT_ID,
+            input: { dashboardId: "dashboard-1", gridRow: 9e15 },
+          }),
+        );
+
+        expect(refusal.code).toBe("validation_error");
         expect(store.rows.get(saved.id)?.dashboardId).toBeNull();
       });
     });
