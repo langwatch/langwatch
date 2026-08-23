@@ -24,7 +24,7 @@ Never guess dataset or column names. The schema command lists every dataset your
 langwatch chart schema -o json
 ```
 
-Read the datasets, their grain, their time column, and which columns are `available` to you. Saving validates the SQL against the analytics policy and the specification against the chart policy — it does not check that every column exists, so SQL naming a wrong column saves fine and only fails when the chart runs. Writing SQL against the schema you just read, then test-running the chart right after saving it (Step 3), is what catches a bad column before anyone sees it on a dashboard.
+Read the datasets, their grain, their time column, and which columns are `available` to you. Saving validates the SQL against the analytics policy and the specification against the chart policy — it does not check that every column exists, so SQL naming a wrong column saves fine; the run then refuses it with `lwql_unknown_identifier`, naming the column it could not find. Writing SQL against the schema you just read, then test-running the chart right after saving it (Step 3), is what catches a bad column before anyone sees it on a dashboard.
 
 ## Step 2: Write the SQL, using the reserved period parameters
 
