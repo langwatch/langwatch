@@ -190,6 +190,23 @@ describe("resolveLangWatchQLGranularity", () => {
       expect(message).not.toContain("period_start");
       expect(message).not.toContain("period_end");
     });
+
+    it("does not reject a caller parameter that is not a surface name", () => {
+      // The guard's own reserved name is period_granularity_seconds; a
+      // member's own parameter must ride through untouched even when a
+      // genuine granularity declaration and step are present alongside it.
+      const resolution = resolveLangWatchQLGranularity({
+        declared: [...PERIOD, ...GRANULARITY],
+        parameters: { minTraceCount: 5 },
+        timeWindow: WINDOW,
+        granularitySeconds: 3600,
+      });
+
+      expect(resolution).toEqual({
+        followsGranularity: true,
+        granularitySeconds: 3600,
+      });
+    });
   });
 
   describe("given a malformed surface step", () => {
