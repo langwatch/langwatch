@@ -1242,9 +1242,9 @@ describe("given an organization with legacy access rows", () => {
     });
 
     /**
-     * The family that made this necessary: one organization carries 428,720
-     * share links, one fact each, and a held organization restaged all of
-     * them on every worker boot.
+     * The family that made this necessary: share links, one fact each, in a
+     * population large enough that a held organization restaging all of them
+     * on every worker boot never converged.
      *
      * @scenario "A pass states only the facts the heads do not carry"
      */
@@ -1371,6 +1371,26 @@ describe("given an organization with legacy access rows", () => {
           .map((fact) => fact.grantId)
           .sort(),
       ).toEqual(["binding_1", "share_1"]);
+    });
+  });
+});
+
+describe("given a self-hosted installation", () => {
+  describe("when the migration's release declaration is read", () => {
+    /** @scenario "The migration is released for self-hosted installations" */
+    it("declares that it runs automatically", () => {
+      // Flipping this IS the release act, and it is the prerequisite for
+      // removing the legacy authorization path: that removal is only safe
+      // once every installation that might upgrade into it has already had a
+      // release that runs this migration. Reverting it would silently reopen
+      // that hole, so it is pinned rather than left to a comment.
+      expect(
+        new AuthzEngineMigration({
+          store: {} as never,
+          ledger: {} as never,
+          now: () => 0,
+        }).runsAutomaticallyOnSelfHosted,
+      ).toBe(true);
     });
   });
 });

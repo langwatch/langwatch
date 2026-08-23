@@ -97,8 +97,8 @@ Feature: Moving an organization onto the grants projection
 
   # A restated fact dedupes at the event store, but the queue has already paid
   # to carry it. A grant is its own aggregate, so a held organization restaged
-  # one group per grant on every worker boot: one organization carries 428,720
-  # share links and converged on nothing while it repeated them.
+  # one group per grant on every worker boot. An organization holding a large
+  # share-link population converged on nothing while it repeated them.
   @unit
   Scenario: A pass states only the facts the heads do not carry
     Given an organization whose projection already holds some of its facts
@@ -178,6 +178,22 @@ Feature: Moving an organization onto the grants projection
     When the read path is inspected
     Then the organization's migration status is the only fork
     And no separate cutover record exists
+
+  # ═══ Self-hosted installations ════════════════════════════════════════
+  #
+  # Cloud paces this migration per organization by enrollment. Self-hosted
+  # has no enrollment: a migration either runs for every organization or for
+  # none, and which it is comes from the migration's own release
+  # declaration. Releasing it is the prerequisite for ever removing the
+  # legacy authorization path, because that removal is only safe once every
+  # installation that might upgrade into it has already had a release that
+  # runs this migration.
+
+  @unit
+  Scenario: The migration is released for self-hosted installations
+    When the migration's release declaration is read
+    Then it runs automatically on a self-hosted installation
+    And every organization there migrates without anyone enrolling it
 
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-
