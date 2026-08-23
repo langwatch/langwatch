@@ -172,6 +172,18 @@ describe("findAllRows", () => {
       expect(all[0]?.id).toBe("row_000");
       expect(all[249]?.id).toBe("row_249");
       expect(findMany).toHaveBeenCalledTimes(3);
+      // Offset paging is only coherent under a stable order: every page
+      // request names its offset and asks for ascending id explicitly.
+      for (const [index, offset] of [0, 100, 200].entries()) {
+        expect(findMany).toHaveBeenNthCalledWith(
+          index + 1,
+          expect.objectContaining({
+            limit: 100,
+            offset,
+            sortBy: { field: "id", direction: "asc" },
+          }),
+        );
+      }
     });
   });
 });
