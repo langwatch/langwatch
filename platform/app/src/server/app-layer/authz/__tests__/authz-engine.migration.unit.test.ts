@@ -760,6 +760,13 @@ describe("given an organization with legacy access rows", () => {
       // The one case the seed's guard refuses: a usage row that disagrees
       // about which project it belongs to. Outstanding rather than a diff, so
       // it heals the moment the row is corrected instead of latching.
+      //
+      // Only while the COUNTS also disagree, which is what this pins. Such a
+      // row already at the right count reads as agreement and the
+      // organization finalizes over it — deliberately: the row is not the
+      // seed's to move, the mismatch fails toward fewer views (the consume
+      // fences on the same columns and simply misses), and holding on it
+      // would be a hold no later pass could clear.
       const row = shareLink({ maxViews: 10, viewCount: 3 });
       const { migration } = harness({
         shareLinks: [row],

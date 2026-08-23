@@ -309,6 +309,15 @@ function roleDiffs({
  * legacy count is a budget that grew back, which nothing legitimate
  * produces, so that is the named diff.
  *
+ * That last case is only VISIBLE while the counts also disagree. A usage row
+ * on the wrong project but already at the right count reads as agreement here
+ * and the organization finalizes over it, which is deliberate: the row is not
+ * the seed's to move, the mismatch fails toward fewer views rather than more
+ * (the consume fences on the same three columns, so it simply does not
+ * match), and holding on it would be a hold no pass could ever clear — the
+ * exact disease the rest of this file exists to cure. The budget VALUE, which
+ * is what the proof is actually about, is correct either way.
+ *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the
  * values.

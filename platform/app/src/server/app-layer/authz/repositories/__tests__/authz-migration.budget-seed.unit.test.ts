@@ -123,6 +123,10 @@ describe("PrismaAuthzMigrationRepository budget seeding", () => {
 
         await repository.findResourceGrantRows({ organizationId: ORG });
 
+        // Both halves: the shape of the read, and that there is only one of
+        // it. `toHaveBeenCalledWith` alone passes just as happily on an
+        // implementation that adds a second, per-link read beside it.
+        expect(usageFindMany).toHaveBeenCalledTimes(1);
         expect(usageFindMany).toHaveBeenCalledWith({
           where: { organizationId: ORG },
           select: { grantId: true, viewCount: true },
