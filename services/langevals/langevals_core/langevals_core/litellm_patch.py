@@ -133,6 +133,30 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     return kwargs
 
 
+def apply_gpt5_temperature_compatibility(kwargs: dict) -> dict:
+    """
+    Pin temperature to the default for gpt-5-family models, which accept only
+    that value and reject every other with a BadRequestError ("'temperature'
+    does not support 0.0 with this model. Only the default (1) value is
+    supported.").
+
+    drop_params cannot cover this: it strips parameters a model does not
+    support at all, and these models do support temperature — they restrict
+    its value. Evaluators default to temperature 0 for deterministic
+    verdicts, so without this a gpt-5 judge call fails before it starts.
+    Applied centrally so every evaluator and every user-configured judge
+    model gets it, not only the two that carry their own guard
+    (llm_answer_match, select_best_compare).
+    """
+    model = kwargs.get("model") or ""
+    if "gpt-5" not in model:
+        return kwargs
+    if kwargs.get("temperature") in (None, 1, 1.0):
+        return kwargs
+    kwargs["temperature"] = 1.0
+    return kwargs
+
+
 def convert_param_type(key: str, value: str):
     """Convert string env var value to proper type for litellm params."""
     if key in INT_PARAMS:
@@ -294,6 +318,10 @@ def patch_litellm_params(kwargs):
     # explicit choice and the azure rewrites above have already settled
     # which model the request actually names.
     kwargs = apply_tool_reasoning_compatibility(kwargs)
+    # Same position for the same reason: the model name is now final, and an
+    # explicit X_LITELLM_temperature has landed — a value the model refuses
+    # is normalized rather than sent to fail.
+    kwargs = apply_gpt5_temperature_compatibility(kwargs)
 
     return kwargs
 
