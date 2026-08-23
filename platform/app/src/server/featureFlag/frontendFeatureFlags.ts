@@ -36,13 +36,14 @@
  *
  * ## Targeting
  *
- * Flags can target users, projects, or organizations via PostHog personProperties.
- * Configure targeting in PostHog release conditions, not in the flag name.
+ * Flags can target users, projects, or organizations via targeting rules in
+ * the internal flag store (/ops/feature-flags). Configure targeting there,
+ * not in the flag name.
  * Pass `projectId` or `organizationId` to `useFeatureFlag` for targeted evaluation.
  *
  * ## Adding New Flags
  *
- * 1. Create the flag in PostHog with your desired release conditions
+ * 1. Create the flag in the registry with its description and default
  * 2. Add the flag key to this array
  * 3. Use `useFeatureFlag("your_flag_key")` in components
  *
