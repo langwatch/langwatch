@@ -489,7 +489,7 @@ function queryStepSpan(
     stepAttrs.push(stringAttr("statement_id", attachment.query.statement_id));
   }
   if (typeof rowCount === "number") {
-    stepAttrs.push(stringAttr("row_count", String(rowCount)));
+    stepAttrs.push(intAttr("row_count", rowCount));
   }
   return {
     traceId: frame.traceId,
