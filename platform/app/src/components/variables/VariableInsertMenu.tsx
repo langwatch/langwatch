@@ -416,11 +416,10 @@ export const VariableInsertMenu = ({
                       ? "blue.subtle"
                       : undefined
                   }
-                  color={
-                    highlightedIndex === createOptionIndex
-                      ? "blue.fg"
-                      : undefined
-                  }
+                  // The row is blue whether or not it is highlighted — the
+                  // background is what marks the highlight — and its children
+                  // inherit that rather than naming shades of their own.
+                  color="blue.fg"
                   onMouseMove={() => {
                     if (
                       isKeyboardNav ||
@@ -435,8 +434,11 @@ export const VariableInsertMenu = ({
                   marginTop={filteredSources.length > 0 ? 2 : 0}
                   onClick={() => onCreateVariable?.(normalizedQuery)}
                 >
-                  <Plus size={12} color="var(--chakra-colors-blue-500)" />
-                  <Text fontSize="13px" color="blue.600">
+                  {/* Both take the row's own colour. Naming a fixed shade here
+                      overrode the inherited one and kept exactly the dark-mode
+                      contrast the row above was changed to fix. */}
+                  <Plus size={12} />
+                  <Text fontSize="13px">
                     Create variable "{`{{${normalizedQuery}}}`}"
                   </Text>
                 </HStack>

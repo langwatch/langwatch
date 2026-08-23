@@ -133,6 +133,10 @@ export function SyncedChatInput({
    * Single Responsibility: Triggers send on Enter key (unless Shift held for new line).
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // An IME fires Enter to commit the candidate it is showing. Sending on
+    // that one takes a half-written word off the composer and posts it, so
+    // composition has to finish before Enter means send.
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       // Enter is a no-op mid-run rather than a queue: the run in flight is the
@@ -156,6 +160,19 @@ export function SyncedChatInput({
           rather than a bordered box with a control floating over one corner. */}
       <Box
         position="relative"
+        // Focus is tracked on the surface, not on the field: the sync checkbox
+        // below is revealed by this same flag, so tracking the textarea alone
+        // hid the checkbox the moment a keyboard user tabbed onto it — the
+        // control kept focus while invisible and unclickable. React's focus
+        // events bubble, and `relatedTarget` staying inside the card is what
+        // tells a move between the field, the button and the checkbox apart
+        // from a move out of the composer altogether.
+        onFocus={() => setIsFocused(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setIsFocused(false);
+          }
+        }}
         borderRadius={COMPOSER_RADIUS}
         borderWidth="1px"
         borderStyle="solid"
@@ -195,8 +212,6 @@ export function SyncedChatInput({
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             ref={textareaRef}
             data-tab-id={tabId}
           />

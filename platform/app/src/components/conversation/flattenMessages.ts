@@ -136,9 +136,14 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 
 /** The calls a message requested, in the order it requested them. */
 function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
-  return readToolCalls(msg).map((call) => ({
+  return readToolCalls(msg).map((call, index) => ({
     kind: "tool",
-    id: `${msg.id ?? ""}-tool-${call.function?.name ?? "unknown"}`,
+    // The index disambiguates, as it does in `contentParts`. Parallel calls to
+    // one tool are ordinary — two `search` calls in a single message — and the
+    // name alone gave them the same id. That id is the React key and the turn
+    // key, so React could reuse the wrong node and a card show the other call's
+    // arguments.
+    id: `${msg.id ?? ""}-tool-${index}-${call.function?.name ?? "unknown"}`,
     name: call.function?.name ?? "unknown",
     arguments: safeJsonParseOrStringFallback(call.function?.arguments ?? "{}"),
     toolCallId: call.id,

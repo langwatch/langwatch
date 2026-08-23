@@ -64,6 +64,7 @@ import {
   PROMPT_NODE_ID,
 } from "~/server/prompt-config/buildPromptExecutionEvent";
 import { extractStreamableOutput } from "~/server/prompt-config/output-formatter";
+import type { NextRequest } from "~/types/next-stubs";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateOtelTraceId } from "~/utils/trace";
@@ -177,7 +178,11 @@ const requireSameOrigin: MiddlewareHandler = async (c, next) => {
 
 /** Resolves the browser session, refusing anonymous callers with a code. */
 const sessionAuth: MiddlewareHandler = async (c, next) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  // `NextRequest` in this tree is the standard web Request, which is exactly
+  // what Hono hands over, and the session resolver reads only its headers.
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequest,
+  });
   if (!session) {
     throw new MissingSessionError();
   }

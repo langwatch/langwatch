@@ -98,17 +98,22 @@ export function resolvePromptInputs({
     return acc;
   }, {});
 
-  // Falsy check, not `=== undefined`: a saved prompt declares `input` in its
-  // inputs list, so the form always carries an `input` key, defaulting to "".
-  // A strict-undefined check left it empty, `{{input}}` rendered to nothing,
-  // AND the absorb step above dropped the live turn — the 2026-05-17 prod
-  // regression. Treating empty as "not set" keeps the user's intent: an
-  // explicit value from the Variables panel still wins.
+  // Empty counts as "not set", not merely undefined: a saved prompt declares
+  // `input` in its inputs list, so the form always carries an `input` key,
+  // defaulting to "". A strict-undefined check left it empty, `{{input}}`
+  // rendered to nothing, AND the absorb step above dropped the live turn — the
+  // 2026-05-17 prod regression. An explicit value from the Variables panel
+  // still wins.
+  //
+  // Only the empty string, though. A plain falsy check also swallowed `0` and
+  // `false`, so a prompt declaring `input` as a float or a bool had the panel's
+  // deliberate 0 quietly overwritten by the chat text.
+  const inputIsUnset = inputs.input === undefined || inputs.input === "";
   const lastLiveUserContent =
     typeof lastLiveUserMsg?.content === "string"
       ? lastLiveUserMsg.content
       : undefined;
-  if (lastLiveUserContent !== undefined && !inputs.input) {
+  if (lastLiveUserContent !== undefined && inputIsUnset) {
     inputs.input = lastLiveUserContent;
   }
 
@@ -249,9 +254,10 @@ export function buildPromptExecutionEvent({
 
 /** The output fields a run streams, defaulting to the single `output` field. */
 export function outputConfigsFor(formValues: PromptConfigFormValues) {
-  return (
-    formValues.version.configData.outputs ?? [
-      { identifier: "output", type: "str" as const },
-    ]
-  );
+  const declared = formValues.version.configData.outputs;
+  // Empty is absent, not a declaration of nothing. `??` alone let `[]` through,
+  // and a run with no output configs streams no reply at all — the formatter
+  // has nothing to pick, so the run completes and the thread stays empty.
+  if (declared && declared.length > 0) return declared;
+  return [{ identifier: "output", type: "str" as const }];
 }

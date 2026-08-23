@@ -34,9 +34,14 @@ export function playgroundConversationLabels({
 }
 
 /**
- * The model's name as the rest of the product writes it: the family name the
- * model picker and the default-models table show, without the provider prefix
- * the id carries.
+ * The model's family name, without the provider prefix its id carries.
+ *
+ * NOT the project's custom display name, if it has configured one:
+ * `modelDisplayLabel` would resolve that first, but it needs the project's
+ * display-name map and this label is computed from the form alone. A project
+ * that renamed a model therefore sees its own name in the model picker and the
+ * family name here. Worth closing, and it needs the map plumbed to this call
+ * site rather than a change in here.
  *
  * A bare id with no prefix keeps its whole self. `modelDisplayLabel` drops
  * everything before the first slash, which for such an id is the entire

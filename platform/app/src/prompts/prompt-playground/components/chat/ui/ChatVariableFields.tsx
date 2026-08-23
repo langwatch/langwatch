@@ -115,6 +115,10 @@ function VariableChip({
                 onValueChange(variable.identifier, event.target.value)
               }
               placeholder="Value for this run"
+              // The identifier above is not associated with the field, so a
+              // screen reader moving between chips announced the placeholder
+              // every time and never which variable was being edited.
+              aria-label={`Value for ${variable.identifier}`}
               size="sm"
               rows={3}
               maxHeight="200px"
