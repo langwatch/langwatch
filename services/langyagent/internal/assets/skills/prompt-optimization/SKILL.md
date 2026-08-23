@@ -78,6 +78,8 @@ langwatch experiment status <slug> --format json
 
 Check every 30 to 60 seconds, and post a progress line each time the count moves. Long single sleeps make the turn look dead and tell the user nothing.
 
+A status poll is not a retry, so the two attempt rule does not cap it: each call answers with fresh progress rather than repeating a failed one. Stop polling when the run reaches a terminal state, when the status call itself fails twice, or after 20 minutes, and report where the run stood.
+
 Do not start the run with `--wait`. It blocks for as long as the run takes, and the command timeout kills it first, so you lose the shell and learn nothing about the run you started.
 
 ## Stop conditions

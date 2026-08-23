@@ -62,9 +62,9 @@ describe("workbenchActorFrom", () => {
   });
 
   describe.each([
-    ["null", null],
-    ["undefined", undefined],
-  ])("when the resolved token is %s", (_label, resolved) => {
+    { label: "null", resolved: null },
+    { label: "undefined", resolved: undefined },
+  ])("when the resolved token is $label", ({ resolved }) => {
     it("attributes the write to an integration", () => {
       expect(workbenchActorFrom({ resolved })).toEqual({ label: "api" });
     });

@@ -44,13 +44,20 @@ export function uiActionDedupKey({
   return `${turnId ?? ""}:${actionId}`;
 }
 
-/** Tell the server how one action ended. */
+/**
+ * Tell the server how one action ended.
+ *
+ * `accepted: false` is the server's soft refusal: the pending action, the
+ * claimant or the turn no longer match, so it dropped the report instead of
+ * throwing. The agent gets no terminal result either way, so it counts the
+ * same as a thrown call.
+ */
 type CompleteUiAction = (args: {
   actionId: string;
   ok: boolean;
   result?: unknown;
   errorCode?: string;
-}) => Promise<unknown>;
+}) => Promise<{ accepted: boolean }>;
 
 /**
  * What a thrown handler owes the two audiences: an error code for the agent
@@ -87,8 +94,8 @@ async function reportOutcome({
   outcome: Parameters<CompleteUiAction>[0];
 }): Promise<boolean> {
   try {
-    await complete(outcome);
-    return true;
+    const { accepted } = await complete(outcome);
+    return accepted;
   } catch {
     return false;
   }

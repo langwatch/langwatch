@@ -187,6 +187,28 @@ describe("executeUiAction", () => {
     });
   });
 
+  describe("when the server refuses the completion instead of throwing", () => {
+    it("reports the completion as failed, not as executed", async () => {
+      const legs = makeLegs();
+      const onHandlerError = vi.fn();
+      // The pending action, the claimant or the turn no longer match, so the
+      // server drops the report. The agent gets no terminal result from it.
+      legs.complete.mockResolvedValue({ accepted: false });
+
+      const outcome = await executeUiAction({
+        entry: ENTRY,
+        turnId: "turn-1",
+        seen: new Set(),
+        handlers: makeHandlers(),
+        ...legs,
+        onHandlerError,
+      });
+
+      expect(outcome).toBe("completion-failed");
+      expect(onHandlerError).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the handler failed and its completion call fails too", () => {
     it("still tells the user, and reports the handler failure", async () => {
       const legs = makeLegs();

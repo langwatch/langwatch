@@ -200,9 +200,10 @@ const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
  * answers "never deployed" spends the turn on a surface it cannot reach.
  *
  * Never throws — the same contract `resolveLangyHarness` holds. A flag-store
- * blip must not keep a turn from starting, and it resolves to the flag's own
- * default (on), which is what almost every project evaluates to, so a blip
- * changes nothing for them.
+ * blip must not keep a turn from starting, so it resolves to closed: the turn
+ * runs without live page control, which is the flag's own rollback position.
+ * Resolving to open would be the worse half of the trade, because it is the
+ * one answer that can send the agent to a surface answering "never deployed".
  */
 async function resolveLangyUiActionsOpen({
   userId,
@@ -222,9 +223,9 @@ async function resolveLangyUiActionsOpen({
   } catch (error) {
     logger.warn(
       { error, projectId },
-      "langy ui-actions flag evaluation failed, advertising the channel",
+      "langy ui-actions flag evaluation failed, holding the channel closed",
     );
-    return true;
+    return false;
   }
 }
 

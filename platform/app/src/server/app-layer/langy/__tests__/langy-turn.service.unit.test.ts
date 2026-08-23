@@ -638,6 +638,23 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       // The rest of the screen context still travels.
       expect(prompt).toContain("my-exp");
     });
+
+    it("starts the turn with the channel closed when the flag store fails", async () => {
+      // A flag-store blip must not stop the turn, and it must not advertise a
+      // surface it could not confirm: the route may still be answering a 404.
+      vi.spyOn(featureFlagService, "isEnabled").mockRejectedValue(
+        new Error("flag store unavailable"),
+      );
+      const { deps: ownDeps, mocks: ownMocks } = makeDeps();
+
+      await LangyTurnService.create(ownDeps).startConversationTurn(
+        input({ turnContext: experimentContext }),
+      );
+
+      const prompt = dispatchedOf(ownMocks.dispatch).prompt;
+      expect(prompt).not.toContain("langwatch ui actions");
+      expect(prompt).toContain("my-exp");
+    });
   });
 
   /** @scenario A follow-up turn carries the conversation so far */

@@ -56,8 +56,10 @@ describe("creating an experiment over REST", () => {
         });
 
       const body = (await response.json()) as { id: string; slug: string };
+      // Register before asserting: a non-200 that still persisted a row would
+      // throw past the cleanup list and leave the row in the shared database.
+      if (body.id) createdIds.push(body.id);
       expect(response.status).toBe(200);
-      createdIds.push(body.id);
 
       expect(broadcast).toHaveBeenCalledWith(
         project.id,

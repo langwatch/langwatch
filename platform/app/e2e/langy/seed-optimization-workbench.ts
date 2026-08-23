@@ -122,7 +122,7 @@ function buildBaselineTarget({ promptId }: { promptId: string }) {
   };
 }
 
-/** The evaluator the loop variants start with, wired onto the baseline. */
+/** Grades a free-text answer against the golden one, wired onto the baseline. */
 function buildAnswerMatchEvaluator() {
   return {
     id: "evaluator-answer-match",
@@ -144,13 +144,45 @@ function buildAnswerMatchEvaluator() {
   };
 }
 
+/** Grades a label, which is right or wrong with nothing in between. */
+function buildExactMatchEvaluator() {
+  return {
+    id: "evaluator-exact-match",
+    evaluatorType: "langevals/exact_match",
+    inputs: [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+    ],
+    mappings: {
+      [DATASET_ID]: {
+        [BASELINE_TARGET_ID]: {
+          output: baselineOutput(),
+          expected_output: datasetField("expected_output"),
+        },
+      },
+    },
+  };
+}
+
+/**
+ * The evaluator each golden style grades with. "none" seeds no golden column,
+ * so it seeds no evaluator either: an evaluator mapped to `expected_output`
+ * would point at a field the dataset does not hold.
+ */
+function buildEvaluators({ goldenStyle }: { goldenStyle: GoldenStyle }) {
+  if (goldenStyle === "none") return [];
+  return goldenStyle === "label"
+    ? [buildExactMatchEvaluator()]
+    : [buildAnswerMatchEvaluator()];
+}
+
 /**
  * Builds and saves the experiment. Variants:
  * - rows: 0 seeds the empty-dataset bootstrap case; 20 is the loop default;
  *   120 crosses the skill's 100-row ask-before-spending threshold.
  * - goldenStyle: "free-text" pairs with llm_answer_match, "label" with
  *   exact_match, "none" seeds inputs only (the comparison case).
- * - withEvaluator: whether the llm_answer_match evaluator is pre-wired
+ * - withEvaluator: whether the golden style's evaluator is pre-wired
  *   (bootstrap scenarios seed without it).
  * - withContexts: adds a contexts column (the faithfulness case).
  */
@@ -177,7 +209,7 @@ export async function seedOptimizationWorkbench({
     name,
     datasets: [buildDataset({ name, rows, goldenStyle, withContexts })],
     activeDatasetId: DATASET_ID,
-    evaluators: withEvaluator ? [buildAnswerMatchEvaluator()] : [],
+    evaluators: withEvaluator ? buildEvaluators({ goldenStyle }) : [],
     targets: [buildBaselineTarget({ promptId })],
   };
 
