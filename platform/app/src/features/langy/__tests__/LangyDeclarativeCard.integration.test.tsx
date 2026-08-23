@@ -425,6 +425,28 @@ describe("LangyDeclarativeCard", () => {
       });
     });
   });
+
+  describe("given a page action Langy carried out on the open page", () => {
+    /** @scenario "Every LangWatch action Langy takes shows a result card" */
+    it("titles the card with the action, and spends no row on the correlation id", () => {
+      renderCard({
+        name: "langwatch.ui.call",
+        output: JSON.stringify({
+          kind: "workbench.duplicateTarget",
+          status: "done",
+          executedVia: "browser",
+          actionId: "i5KRzS-5c2UVUD99UzyWw",
+          result: { targetId: "target-cW6HpQ0S" },
+        }),
+      });
+
+      // "UI action" stays as the overline: it names the family. The title is
+      // the one line that has to say what happened.
+      expect(screen.getByText("Duplicate target")).toBeTruthy();
+      expect(screen.queryByText("action id")).toBeNull();
+      expect(screen.queryByText("i5KRzS-5c2UVUD99UzyWw")).toBeNull();
+    });
+  });
 });
 
 /**

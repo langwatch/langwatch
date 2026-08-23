@@ -96,6 +96,23 @@ Feature: Langy drives the open page through typed UI actions
     When the action's execute budget runs out
     Then the agent gets langy_ui_timeout and the action is never re-dispatched
 
+  # The budgets were written when a browser-handled action was a pure state
+  # edit. It saves before it answers now, so one second was not the time the
+  # work takes: the dispatch gave up on a duplicate the page had already made,
+  # and the retry left a second column beside it.
+  @unit
+  Scenario: A page action is given as long as saving actually takes
+    Given a page action that persists its change before it answers
+    When the dispatch waits for the page
+    Then it waits for the whole round trip, not for a pure state edit
+
+  @unit
+  Scenario: A failed dispatch says the action may still have applied
+    Given the page claims an action and carries it out before it answers
+    When the dispatch fails, whichever way it failed
+    Then the agent is told to read the state again before it retries
+    And it never retries a change that already landed
+
   @unit
   Scenario: A browser handler failure reaches the agent as langy_ui_handler_failed and the user as a toast
     Given the page's handler threw while applying the action

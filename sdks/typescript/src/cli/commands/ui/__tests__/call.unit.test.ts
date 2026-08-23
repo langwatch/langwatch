@@ -214,4 +214,39 @@ describe("the ui call command", () => {
       });
     });
   });
+
+  /**
+   * The page claims an action and carries it out before it answers, so a
+   * failed dispatch is the ANSWER going missing rather than the work. A caller
+   * told only that the request failed retries, and a retried duplicate leaves
+   * a second column beside the one that was made.
+   */
+  describe("given the dispatch fails after the page may have acted", () => {
+    /** @scenario "A failed dispatch says the action may still have applied" */
+    it("says the action may have applied, whichever way it failed", async () => {
+      vi.spyOn(console, "log").mockImplementation(() => undefined);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                error: {
+                  type: "internal_error",
+                  code: "langy_ui_timeout",
+                  message: "The page did not answer in time.",
+                },
+              }),
+              { status: 504 },
+            ),
+        ),
+      );
+
+      await uiCallCommand("workbench.duplicateTarget", { payload: "{}" });
+
+      expect(process.exitCode).toBe(1);
+      expect(stderr.join("")).toContain("read the state again before you retry");
+    });
+  });
 });

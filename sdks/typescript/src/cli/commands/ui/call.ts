@@ -14,6 +14,20 @@ import type { CommandResult } from "../../utils/output";
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 
+/**
+ * True of EVERY failed dispatch, whichever way it failed.
+ *
+ * The page claims the action and carries it out before it answers, so a
+ * failure here is only ever the ANSWER going missing: the column may already
+ * be there. Retrying blind is what turns one duplicate into two, and it is the
+ * obvious move for a caller told nothing else. It has to be said on the server
+ * failures too, not only on the local deadline: a 504 from the dispatch is the
+ * page taking longer than its budget, which is exactly the case where the work
+ * did land.
+ */
+const MAY_HAVE_APPLIED =
+  "The action may still have applied: read the state again before you retry.";
+
 /** Everything on stdin, for `--payload-file -`. */
 const readStdin = async (): Promise<string> => {
   const chunks: Buffer[] = [];
@@ -129,14 +143,12 @@ export const uiCallCommand = async (
     });
   } catch (error) {
     // A tripped deadline rejects with a bare TimeoutError, which reads as a
-    // crash rather than as the limit this command set. Name it, and say the
-    // action may still have applied: the next step is to read the state again,
-    // not to retry blind. Every other failure is left to the caller's error
-    // path.
+    // crash rather than as the limit this command set. Name it. Every other
+    // failure is left to the caller's error path.
     if ((error as { name?: string } | null)?.name !== "TimeoutError") throw error;
     process.stderr.write(
       `${endpoint} did not answer "${kind}" within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
-        "The action may still have applied: read the state again before you retry.\n",
+        `${MAY_HAVE_APPLIED}\n`,
     );
     process.exitCode = 1;
     return;
@@ -166,6 +178,7 @@ export const uiCallCommand = async (
         }) ?? new Error(text),
       ...(options.format ? { format: options.format } : {}),
     });
+    process.stderr.write(`${MAY_HAVE_APPLIED}\n`);
     process.exitCode = 1;
     return;
   }

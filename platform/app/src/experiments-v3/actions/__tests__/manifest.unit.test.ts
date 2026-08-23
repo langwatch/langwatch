@@ -88,6 +88,26 @@ describe("given the workbench action manifest", () => {
     }
   });
 
+  /**
+   * A browser-handled action saves before it answers, so its budget has to
+   * cover a round trip to the server and back. It once covered a pure state
+   * edit instead, at one second, which is under the 3s claim window alone: the
+   * dispatch gave up on work the page had already done, and the retry left a
+   * second column beside the one it had made.
+   */
+  /** @scenario "A page action is given as long as saving actually takes" */
+  it("budgets a page action for the save it makes, not for a state edit", () => {
+    // The claim window (3s) comes out of the budget before the page is even
+    // asked, so anything under that leaves no time to answer in at all.
+    const FLOOR_MS = 10_000;
+    for (const [kind, definition] of entries) {
+      if (definition.backend !== "transform") continue;
+      expect(definition.executeBudgetMs ?? 0, kind).toBeGreaterThanOrEqual(
+        FLOOR_MS,
+      );
+    }
+  });
+
   describe("when a caller checks a kind against the manifest", () => {
     it("accepts a listed kind and rejects anything else", () => {
       expect(isWorkbenchActionKind("workbench.addTarget")).toBe(true);

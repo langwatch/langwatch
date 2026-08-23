@@ -58,8 +58,15 @@ export type WorkbenchActionDefinition = {
   resultSchema?: z.ZodTypeAny;
   requiredPermission: AuthzPermission;
   /**
-   * Wall-clock budget for one execution. Transforms are pure state edits and
-   * finish in microseconds; a run is bounded by the evaluation pipeline.
+   * Wall-clock budget for one execution, claim window included.
+   *
+   * The transform itself is a pure state edit that finishes in microseconds,
+   * and these were once budgeted as such. A browser-handled action now SAVES
+   * before it answers, so the budget has to cover a round trip to the server,
+   * and one second did not: the dispatch gave up on an action the page had
+   * already carried out, the agent read the timeout as "it did not happen",
+   * and retrying left a second column beside the one that was made. A run is
+   * bounded by the evaluation pipeline instead.
    */
   executeBudgetMs?: number;
   backend: WorkbenchActionBackend;
@@ -77,7 +84,7 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: duplicateTargetPayloadSchema,
     resultSchema: duplicateTargetResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: duplicateTarget,
   },
@@ -85,7 +92,7 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: setTargetPromptPayloadSchema,
     resultSchema: setTargetPromptResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: setTargetPrompt,
   },
@@ -93,21 +100,21 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: updateTargetModelPayloadSchema,
     resultSchema: updateTargetModelResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: updateTargetModel,
   },
   "workbench.setMapping": {
     payloadSchema: setMappingPayloadSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: setTargetMapping,
   },
   "workbench.setEvaluatorMapping": {
     payloadSchema: setEvaluatorMappingPayloadSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: setEvaluatorMapping,
   },
@@ -115,7 +122,7 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: addEvaluatorPayloadSchema,
     resultSchema: addEvaluatorResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: addEvaluator,
   },
@@ -123,14 +130,14 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: addTargetPayloadSchema,
     resultSchema: addTargetResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: addTarget,
   },
   "workbench.setCellValue": {
     payloadSchema: setCellValuePayloadSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: setCellValue,
   },
@@ -138,7 +145,7 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: addColumnPayloadSchema,
     resultSchema: addColumnResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: addColumn,
   },
@@ -146,7 +153,7 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: addRowsPayloadSchema,
     resultSchema: addRowsResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: addRows,
   },
@@ -154,14 +161,14 @@ export const WORKBENCH_ACTIONS = {
     payloadSchema: removeTargetPayloadSchema,
     resultSchema: removeTargetResultSchema,
     requiredPermission: "experiments:update",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "transform",
     transform: removeTarget,
   },
   "workbench.getState": {
     payloadSchema: getStatePayloadSchema,
     requiredPermission: "experiments:view",
-    executeBudgetMs: 1_000,
+    executeBudgetMs: 12_000,
     backend: "read",
   },
   "workbench.run": {
