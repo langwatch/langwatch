@@ -124,6 +124,20 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And a vetoed ceremony refuses the protocol write too
 
   @unit
+  Scenario: Deleting a latched user runs the erase ceremony before the row delete
+    Given "sam"'s identifier backfill has latched
+    When better-auth deletes "sam"'s user row through the adapter
+    Then the erase ceremony runs as an identity command before the row delete
+    And the protocol delete is pinned to exactly the rows the ceremony saw
+
+  @unit
+  Scenario: Deleting an unlatched user runs no ceremony; the erasure service reconciles
+    Given "sam"'s identifier backfill has not latched
+    When better-auth deletes "sam"'s user row through the adapter
+    Then the row is deleted exactly as the stock adapter would
+    And no identity command is dispatched
+
+  @unit
   Scenario: An unrouted better-auth write is refused and named
     Given a better-auth model+operation missing from the adapter routing table
     When better-auth writes to it

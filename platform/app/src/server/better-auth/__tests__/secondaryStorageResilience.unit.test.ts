@@ -80,7 +80,7 @@ describe("better-auth secondary storage fail-open (D02 seam b)", () => {
       const storage = {
         get: vi.fn(async () => null),
         set: vi.fn(async () => {}),
-        delete: vi.fn(async () => {
+        delete: vi.fn(async (_key: string) => {
           if (redisIsDown) throw new Error("connection refused");
         }),
       };
