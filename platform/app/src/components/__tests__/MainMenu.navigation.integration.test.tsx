@@ -112,7 +112,6 @@ describe("<MainMenu /> navigation", () => {
           "Dashboard",
           "Event Sourcing",
           "The Foundry",
-          "Deja View",
           "Feature Flags",
           "Migrations",
         ]),
