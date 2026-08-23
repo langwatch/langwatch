@@ -31,6 +31,8 @@ langwatch workbench get-state <experiment-slug>
 
 Assess four things: rows in the dataset, a prompt target, at least one evaluator whose mappings resolve for every target, and results from a previous run. The `dirty` and `version` fields tell you whether the user has unsaved work in front of them; tread lightly when they do.
 
+Never pipe this through `head`. Cutting the answer at a byte count leaves broken JSON, kills the command with a closed pipe, and the card the user reads then says the result could not be read. Ask for less instead: `--no-include-results` drops the results summary, `-o agents` returns one compact line, and `--jq` returns only the path you name.
+
 If you are not on an experiment (no slug in context), see "No experiment yet" below.
 
 ## Bootstrap branches
