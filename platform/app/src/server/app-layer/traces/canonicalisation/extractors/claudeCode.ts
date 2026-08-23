@@ -108,6 +108,32 @@ export const isConversationalQuerySource = (
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
+/**
+ * Whether a Claude Code call's cache writes buy hour-long entries.
+ *
+ * Anthropic bills an hour-long cache entry at 2x the input rate and a
+ * five-minute one at 1.25x, and the llm_request span states how many tokens
+ * were written but not how long they live. The lifetime follows the call's
+ * request context, measured against Claude Code's live traffic: a main-thread
+ * request (`llm_request.context: "interaction"`, `query_source:
+ * "repl_main_thread"` on the log side) writes hour-long entries, a sub-agent
+ * request (`"tool"` / `agent:*`) writes five-minute ones, and utility calls
+ * write nothing. An unknown context prices short-lived, which never
+ * overstates.
+ *
+ * The provider can change this policy without notice. The session fold keeps
+ * the cost the agent reports about itself next to the computed one, and the
+ * two drifting apart is the alarm that this rule went stale.
+ */
+export const claudeCacheWritesLongLived = ({
+  llmRequestContext,
+  querySource,
+}: {
+  llmRequestContext?: string | null;
+  querySource?: string | null;
+}): boolean =>
+  llmRequestContext === "interaction" || querySource === "repl_main_thread";
+
 export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   readonly id = "claude-code";
 
@@ -137,14 +163,27 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       "cache_creation_tokens",
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     );
-    // No hour-long count is lifted here. The span says how many tokens were
-    // written to the cache but never how long they live, and Anthropic bills an
-    // hour-long entry at twice the input rate against a five-minute entry's
-    // 1.25x. The real split is stated only in the response body, which reaches
-    // us on the log stream: liftApiResponseBodyUsage reads it there, and a
-    // response can report both buckets at once. Deriving an hour-long count
-    // from the write total would assert a lifetime nothing measured, so a span
-    // whose writes are unqualified prices them short-lived.
+    // The span states how many tokens were written to the cache but not how
+    // long they live; the lifetime follows the call's request context (see
+    // claudeCacheWritesLongLived). A main-thread call's writes are stamped
+    // hour-long so computeSpanCost prices them at 2x input rather than the
+    // five-minute 1.25x, which undercounted every cache-heavy turn by about a
+    // third. setAttrIfAbsent keeps a provider-stated split, should the span
+    // ever start carrying one, ahead of this rule.
+    const cacheWriteTokens = asNumber(attrs.get("cache_creation_tokens"));
+    if (
+      cacheWriteTokens !== null &&
+      cacheWriteTokens > 0 &&
+      claudeCacheWritesLongLived({
+        llmRequestContext: asString(attrs.get("llm_request.context")),
+      })
+    ) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS,
+        cacheWriteTokens,
+      );
+      fired = true;
+    }
 
     const model = attrs.get("model");
     if (typeof model === "string" && model.length > 0) {
