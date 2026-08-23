@@ -137,3 +137,22 @@ Feature: Langy drives the open page through typed UI actions
     When the run starts on either the browser or the backend path
     Then only that target's cells for those rows execute
     And neither filter is silently dropped in favor of the other
+
+  Rule: The customer can read what the agent asked the page to do
+
+    The actions a page accepts are keyed by kind and carry no name of their
+    own. The card that lists them numbered the rows instead, so the customer
+    read "UI action 1, UI action 2" and learned nothing about any of them.
+
+    @unit
+    Scenario: The listed actions read as their kinds
+      Given a result whose rows carry a kind and no name
+      When Langy shows the list
+      Then each row reads as its kind
+      And no row reads as a numbered noun
+
+    @unit
+    Scenario: A row that has a real name keeps it
+      Given a result whose rows carry both a name and a kind
+      When Langy shows the list
+      Then each row reads as its name

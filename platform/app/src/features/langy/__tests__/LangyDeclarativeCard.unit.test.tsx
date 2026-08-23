@@ -142,6 +142,44 @@ describe("LangyDeclarativeCard", () => {
     });
   });
 
+  describe("given a collection whose rows are named by kind", () => {
+    // The UI actions a page accepts are keyed by kind and carry no name, so
+    // every row fell back to the numbered noun: "UI action 1", "UI action 2".
+    // The list said how many there were and nothing about any of them.
+    const output = JSON.stringify({
+      actions: [
+        { kind: "workbench.getState", permission: "experiments:view" },
+        { kind: "workbench.duplicateTarget", permission: "experiments:update" },
+      ],
+    });
+
+    describe("when the card renders", () => {
+      /** @scenario The listed actions read as their kinds */
+      it("names each row by its kind", () => {
+        renderCard({ name: "langwatch.ui.actions", output });
+
+        expect(screen.getByText("workbench.getState")).toBeTruthy();
+        expect(screen.getByText("workbench.duplicateTarget")).toBeTruthy();
+        expect(screen.queryByText("UI action 1")).toBeNull();
+      });
+
+      /** @scenario A row that has a real name keeps it */
+      it("still prefers a real name when the row has one", () => {
+        renderCard({
+          name: "langwatch.ui.actions",
+          output: JSON.stringify({
+            actions: [
+              { kind: "workbench.getState", name: "Read the workbench" },
+            ],
+          }),
+        });
+
+        expect(screen.getByText("Read the workbench")).toBeTruthy();
+        expect(screen.queryByText("workbench.getState")).toBeNull();
+      });
+    });
+  });
+
   describe("given a collection read that matched nothing", () => {
     describe("when the card renders", () => {
       it("says there are none — a real answer, not a failure", () => {

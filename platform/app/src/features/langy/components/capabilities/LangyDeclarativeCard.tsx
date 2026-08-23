@@ -67,7 +67,19 @@ function labelize(key: string): string {
 }
 
 /** A row/document's human name, checked in the order a reader would want. */
-const NAME_KEYS = ["name", "title", "displayName", "label", "handle", "slug"];
+// `kind` sits last: it is a discriminator, not a title, so it only names a row
+// that has no better name. It earns its place because a catalog keyed by kind
+// (the UI actions a page accepts) otherwise rendered as "UI action 1",
+// "UI action 2", which tells the reader nothing about any of them.
+const NAME_KEYS = [
+  "name",
+  "title",
+  "displayName",
+  "label",
+  "handle",
+  "slug",
+  "kind",
+];
 /** A row/document's id, however this endpoint spelled it. */
 const ROW_ID_KEYS = ["id", "trace_id", "traceId", "runId", "slug", "key"];
 
