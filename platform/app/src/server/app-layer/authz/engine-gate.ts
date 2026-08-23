@@ -61,7 +61,17 @@ export function setAuthzEngineGateFailureReporter(
  * restates, rekeys or revokes — that loop is how it heals into `finalized`.
  * Anything else (absent, pending, parked, rolled back) is legacy too.
  */
-const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
+/**
+ * The one status that means "on the engine", exported because one other
+ * caller must WRITE it: a brand-new organization is put on the engine at
+ * creation rather than migrated onto it later
+ * (`organization.prisma.repository.ts`). Sharing the constant is what keeps
+ * that write and this read one decision — a rename here follows through to
+ * the birth write instead of silently leaving new organizations on legacy.
+ */
+export const ON_ENGINE_STATUS: MigrationTenantStatus = "finalized";
+
+const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = [ON_ENGINE_STATUS];
 
 /**
  * One bound for both directions. The negative one is what lets a finishing

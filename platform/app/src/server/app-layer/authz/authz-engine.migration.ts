@@ -213,9 +213,22 @@ export class AuthzEngineMigration implements SystemMigration {
   // Finalizing changes who answers permission checks for the organization,
   // so an operator action on it takes the typed destructive confirmation.
   readonly requiresOperatorConfirmation = true;
-  // Cloud soaks first (per-organization enrollment); a later release flips
-  // this once it has. Flipping it IS the self-hosted release act.
-  readonly runsAutomaticallyOnSelfHosted = false;
+  // RELEASED FOR SELF-HOSTED. Cloud soaked it first, per organization, by
+  // enrollment. Flipping this IS the self-hosted release act — there is no
+  // enrollment off cloud, so from the release that carries this line every
+  // self-hosted installation migrates every organization it has,
+  // automatically, at worker boot.
+  //
+  // It stays true. This is the prerequisite for removing the legacy
+  // authorization path altogether: that removal cannot be safe until every
+  // installation that might upgrade into it has already had a release that
+  // runs this migration, and this is that release.
+  //
+  // The first pass after an upgrade states an organization's whole fact set,
+  // because its projection heads start empty — unavoidable, and the only
+  // time it happens. Every later pass states only what the heads do not
+  // already carry (#7429), so this does not repeat at each boot.
+  readonly runsAutomaticallyOnSelfHosted = true;
 
   constructor(private readonly deps: AuthzEngineMigrationDeps) {}
 
