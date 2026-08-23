@@ -118,7 +118,7 @@ const registry = {
     tips: [
       "Read `meta.parameters` — it lists the parameter whose declaration was refused",
       "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
-      "When the surface supplies the step itself, it must be a positive whole number of seconds",
+      "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
     ],
   },
   lwql_granularity_too_fine: {

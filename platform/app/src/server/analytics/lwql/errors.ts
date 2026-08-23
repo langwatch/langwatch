@@ -222,13 +222,13 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
 export type LangWatchQLGranularityFault =
   /** Declared as something other than `UInt32`. */
   | "declared-type"
-  /** Declared correctly, but the step supplied is not a positive integer. */
+  /** Declared correctly, but the step supplied is not an offered step. */
   | "step-value";
 
 /**
  * The granularity parameter was declared with a type other than `UInt32`, or
- * the surface supplied a step that is not a positive whole number of
- * seconds.
+ * the surface supplied a step that is not one of the offered granularity
+ * steps.
  *
  * A sibling of {@link LangWatchQLReservedParameterTypeError} -- from the
  * caller's side both read as "you declared a surface-owned parameter with the
@@ -250,7 +250,7 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
     super(
       "lwql_granularity_parameter_type",
       fault === "step-value"
-        ? "The datapoint granularity must be a whole number of seconds greater than zero."
+        ? "The datapoint granularity must be one of the offered steps: 1 second, 1 minute, or 1 hour."
         : "The query declares period_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
@@ -268,8 +268,8 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
  * more buckets than one governed run may return.
  *
  * The workbench and the REST route refuse here because their callers chose
- * the step; the dashboard does not arrive here -- it owns the range, so it
- * auto-coarsens instead and says so.
+ * the step; the dashboard owns the range and auto-coarsens instead, arriving
+ * here only when even the coarsest offered step still overflows the ceiling.
  *
  * Remediation is arithmetic, not retrying: widen the step until the bucket
  * count fits the ceiling, or narrow the window.

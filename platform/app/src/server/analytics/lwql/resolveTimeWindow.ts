@@ -65,12 +65,15 @@ export interface LangWatchQLTimeWindowResolution {
    */
   readonly followsTimeWindow: boolean;
   /**
-   * Reserved names the statement declares that no window filled, sorted.
+   * Reserved names the statement declares that no surface value filled,
+   * sorted: the window pair when no window was supplied, plus a declared
+   * granularity until the granularity resolver binds a step for it.
    *
-   * Non-empty only when no window was supplied at all. It is not a refusal on
-   * its own: validating a statement for *saving* has no window and must not be
-   * refused for it, because the window is supplied by whoever renders the
-   * chart. Executing with names still on this list is what cannot proceed.
+   * It is not a refusal on its own: validating a statement for *saving* has
+   * no window and must not be refused for it, because every name here is
+   * supplied by whoever renders the chart — never by the caller, so none of
+   * them may reach a caller-missing refusal at validation. Executing with
+   * names still on this list is what cannot proceed.
    */
   readonly awaitingTimeWindow: readonly string[];
 }
@@ -138,12 +141,23 @@ export function resolveLangWatchQLTimeWindow({
     throw new LangWatchQLReservedParameterSuppliedError(supplied);
   }
 
+  // A declared granularity is reserved too, but never window-injected: its
+  // value is bound by the granularity resolver at run. Listing it as awaiting
+  // is what keeps it out of the caller-missing sweep — a refusal naming a
+  // parameter the caller is forbidden to supply is a dead end.
+  const awaitingGranularity = declared
+    .filter((parameter) => parameter.name === LWQL_PERIOD_GRANULARITY_PARAMETER)
+    .map((parameter) => parameter.name);
+
   const followsTimeWindow = reserved.length > 0;
   if (!timeWindow) {
     return {
       ...(parameters ? { parameters } : {}),
       followsTimeWindow,
-      awaitingTimeWindow: reserved.map((parameter) => parameter.name).sort(),
+      awaitingTimeWindow: [
+        ...reserved.map((parameter) => parameter.name),
+        ...awaitingGranularity,
+      ].sort(),
     };
   }
 
@@ -157,7 +171,7 @@ export function resolveLangWatchQLTimeWindow({
   return {
     ...(merged ? { parameters: merged } : {}),
     followsTimeWindow,
-    awaitingTimeWindow: [],
+    awaitingTimeWindow: [...awaitingGranularity].sort(),
   };
 }
 
@@ -200,23 +214,18 @@ export interface LangWatchQLGranularityResolution {
 
 /**
  * The finest offered step whose bucket count fits the ceiling, for the
- * surfaces that coarsen instead of refusing. Falls back to the coarsest
- * step when even it does not fit: a multi-year window on the one-hour floor
- * still renders, with the notice saying so, rather than refusing a shared
- * dashboard URL that happens to span years.
+ * surfaces that coarsen instead of refusing. Undefined when even the
+ * coarsest offered step overflows: the ceiling is a hard browser-safety
+ * cap, so a window nothing fits must refuse rather than hand back an
+ * in-budget-looking answer carrying many times the budget.
  */
-function finestFittingStep(windowSeconds: number): number {
-  // The coarsest offered step, the answer when nothing fits. Seeded from the
-  // first element rather than an end-of-array index, whose result the
-  // compiler cannot know is populated.
-  let coarsest: number = LWQL_GRANULARITY_STEPS[0];
+function finestFittingStep(windowSeconds: number): number | undefined {
   for (const step of LWQL_GRANULARITY_STEPS) {
     if (bucketCount(windowSeconds, step) <= LWQL_GRANULARITY_MAX_BUCKETS) {
       return step;
     }
-    coarsest = step;
   }
-  return coarsest;
+  return undefined;
 }
 
 /** Whether a step is one the surface offers. */
@@ -286,7 +295,9 @@ function assertSurfaceStepIsClean({
  * caller did not.
  *
  * @throws {LangWatchQLGranularityTooFineError} on overflow when asked to
- *   refuse.
+ *   refuse — and, when asked to coarsen, when even the coarsest offered step
+ *   still overflows: the ceiling is a hard cap, not a preference coarsening
+ *   may trade away.
  */
 function resolveAgainstBudget({
   declaredName,
@@ -318,6 +329,15 @@ function resolveAgainstBudget({
   }
 
   const effective = finestFittingStep(windowSeconds);
+  if (effective === undefined) {
+    // Even the one-hour floor overflows: refuse with the same arithmetic the
+    // refuse path names, so the caller learns the window is what must narrow.
+    throw new LangWatchQLGranularityTooFineError({
+      requestedGranularitySeconds: granularitySeconds,
+      windowSeconds,
+      maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
+    });
+  }
   return {
     followsGranularity: true,
     granularitySeconds: effective,
@@ -404,7 +424,8 @@ export function assertLangWatchQLGranularityDeclaration(
  *   this function stays safe when called on its own.
  * @throws {LangWatchQLGranularityTooFineError} when the declared window at
  *   the supplied step exceeds {@link LWQL_GRANULARITY_MAX_BUCKETS} buckets
- *   and the surface asked to refuse rather than coarsen.
+ *   and the surface asked to refuse rather than coarsen — or when it asked
+ *   to coarsen and even the coarsest offered step still overflows.
  */
 export function resolveLangWatchQLGranularity({
   declared,

@@ -886,6 +886,7 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
 #   → Scenario: A granularity declared alongside a mistyped period bound is refused at save
 # AC5 "a window finer than the bucket ceiling is refused on caller-owned surfaces"
 #   → Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
+#   → Scenario: A window too wide for even the coarsest offered step is refused everywhere
 # AC6 "offered steps are sub-day: 1 second, 1 minute, 1 hour" — O1 resolved to
 #     sub-day by probe: over the Amsterdam fallback night the timezone-argument
 #     seconds form drifts off local midnight while toStartOfDay stays at 00:00.
@@ -914,7 +915,7 @@ Scenario: A granularity declared with no step supplied runs on its own authored 
   And the surface supplies no step
   When the member runs the query
   Then no granularity value is bound
-  And the result is labelled as not following the granularity
+  And the result is still labelled as following the granularity, since the statement declares it
 
 @unit
 Scenario: A caller that supplies period_granularity_seconds itself is refused
@@ -960,3 +961,10 @@ Scenario: A window that would produce more buckets than the ceiling refuses on t
   When the member runs it on a caller-owned surface
   Then the run is refused as too fine for the period
   And a dashboard running the same chart is coarsened to the finest step that fits
+
+@unit
+Scenario: A window too wide for even the coarsest offered step is refused everywhere
+  Given a chart declaring granularity over a period spanning a decade
+  When even the one-hour step would exceed 10,000 buckets for that period
+  Then the run is refused as too fine for the period on coarsening surfaces too
+  And the refusal names the requested step and the bucket ceiling

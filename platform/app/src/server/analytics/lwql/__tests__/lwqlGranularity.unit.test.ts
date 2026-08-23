@@ -216,7 +216,10 @@ describe("resolveLangWatchQLGranularity", () => {
 
       expect(codeOf(run)).toBe("lwql_granularity_parameter_type");
       expect(messageOf(run)).not.toContain("UInt32");
-      expect(messageOf(run)).toContain("whole number of seconds");
+      // The check is list-membership, not integer-ness: 7,200 is a whole
+      // number of seconds and is still refused, so the copy names the list.
+      expect(messageOf(run)).toContain("offered steps");
+      expect(messageOf(run)).toContain("1 second, 1 minute, or 1 hour");
     });
 
     it("refuses a positive whole step the surface does not offer", () => {
@@ -322,8 +325,14 @@ describe("resolveLangWatchQLGranularity", () => {
       const windows = [
         WINDOW,
         {
+          // Exactly 10,000 hours: the widest window whose one-hour floor
+          // still fits the ceiling, so every step resolves rather than
+          // refusing (a wider window refuses -- pinned below).
           start: new Date("2026-02-20T00:00:00.000Z"),
-          end: new Date("2036-02-20T00:00:00.000Z"),
+          end: new Date(
+            new Date("2026-02-20T00:00:00.000Z").getTime() +
+              LWQL_GRANULARITY_MAX_BUCKETS * 3600 * 1000,
+          ),
         },
       ];
 
@@ -345,21 +354,31 @@ describe("resolveLangWatchQLGranularity", () => {
       }
     });
 
-    it("coarsens to the coarsest floor when nothing fits, still naming the change", () => {
-      // Ten years at an hour: ~87,600 buckets. Nothing fits.
+    /** @scenario "A window too wide for even the coarsest offered step is refused everywhere" */
+    it("refuses when even the coarsest offered step still overflows, coarsening or not", () => {
+      // Ten years at the one-hour floor: ~87,600 buckets. Nothing fits, and
+      // the ceiling is a hard browser-safety cap -- an answer carrying nine
+      // times the budget must not come back looking in-budget.
       const decade = {
         start: new Date("2026-02-20T00:00:00.000Z"),
         end: new Date("2036-02-20T00:00:00.000Z"),
       };
-      const resolution = resolveLangWatchQLGranularity({
-        declared: [...PERIOD, ...GRANULARITY],
-        timeWindow: decade,
-        granularitySeconds: 60,
-        onBudgetOverflow: "coarsen",
-      });
+      const run = () =>
+        resolveLangWatchQLGranularity({
+          declared: [...PERIOD, ...GRANULARITY],
+          timeWindow: decade,
+          granularitySeconds: 60,
+          onBudgetOverflow: "coarsen",
+        });
 
-      expect(resolution.granularitySeconds).toBe(3600);
-      expect(resolution.coarsenedFromSeconds).toBe(60);
+      expect(() => run()).toThrow(LangWatchQLGranularityTooFineError);
+      expect(codeOf(run)).toBe("lwql_granularity_too_fine");
+      // The refusal names the caller's own step and the window, the same
+      // arithmetic the refuse path carries.
+      expect(metaOf(run)).toMatchObject({
+        requestedGranularitySeconds: 60,
+        maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
+      });
     });
   });
 

@@ -642,6 +642,41 @@ describe("given the LangWatchQL service", () => {
         "period_start",
       ]);
     });
+
+    it("defers a declared granularity to the surface instead of refusing it as caller-missing", () => {
+      // The caller is forbidden to supply period_granularity_seconds, so the
+      // missing-parameter sweep naming it was a dead end: a refusal asking
+      // for a value the caller may never send. The declaration is awaiting
+      // the surface -- the granularity resolver binds the step at run.
+      const service = serviceWith(recordingExecutor());
+      const sql =
+        "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+        "count() AS value FROM analytics.traces " +
+        "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+        "GROUP BY bucket ORDER BY bucket";
+
+      const validated = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql,
+        timeWindow: TIME_WINDOW,
+      });
+      expect(validated.awaitingTimeWindow).toEqual([
+        "period_granularity_seconds",
+      ]);
+
+      // Saving has no window either; the whole reserved trio is deferred.
+      const saved = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+      expect(saved.awaitingTimeWindow).toEqual([
+        "period_end",
+        "period_granularity_seconds",
+        "period_start",
+      ]);
+    });
   });
 
   describe("when the statement declares no time-window parameters", () => {
