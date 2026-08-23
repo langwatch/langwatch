@@ -233,7 +233,9 @@ describe("Feature: Dashboard REST API", () => {
         const listBody = await listRes.json();
 
         for (const listed of listBody.data) {
-          const detailRes = await helpers.api.get(`/api/dashboards/${listed.id}`);
+          const detailRes = await helpers.api.get(
+            `/api/dashboards/${listed.id}`,
+          );
           expect(detailRes.status).toBe(200);
 
           const detailBody = await detailRes.json();
@@ -269,7 +271,9 @@ describe("Feature: Dashboard REST API", () => {
         const listBody = await listRes.json();
         expect(listBody.data[0].graphCount).toBe(1);
 
-        const detailRes = await helpers.api.get(`/api/dashboards/${dashboard.id}`);
+        const detailRes = await helpers.api.get(
+          `/api/dashboards/${dashboard.id}`,
+        );
         expect(detailRes.status).toBe(200);
 
         const detailBody = await detailRes.json();
