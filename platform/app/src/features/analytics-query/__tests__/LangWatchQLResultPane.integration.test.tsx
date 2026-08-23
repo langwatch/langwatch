@@ -583,6 +583,47 @@ describe("the LangWatchQL result pane", () => {
         );
         expect(chip()).toBe("Timed out");
       });
+
+      /** @scenario "An unhandled failure is never dressed as a refusal" */
+      it("labels an unnamed failure as Failed, never Refused", () => {
+        renderPane(
+          stateWith({
+            answer: { kind: "error", error: new Error("boom") },
+          }),
+        );
+
+        const chip = screen.getByTestId("lwql-result-chip");
+        expect(chip).toHaveTextContent("Failed");
+        // The pane beside the chip says "we've been notified"; a chip claiming
+        // the server refused the statement would contradict it.
+        expect(chip.textContent).not.toContain("Refused");
+        expect(chip.getAttribute("title")).not.toContain("before reading");
+      });
+
+      /** @scenario "An unknown column is presented as the member's own refusal, naming the column" */
+      it("refuses an unknown column by name without claiming it happened before reading", () => {
+        renderPane(
+          stateWith({
+            answer: {
+              kind: "error",
+              error: handledErrorEnvelope({
+                code: "lwql_unknown_identifier",
+                meta: { identifier: "NoSuchColumn" },
+              }),
+            },
+          }),
+        );
+
+        const chip = screen.getByTestId("lwql-result-chip");
+        expect(chip).toHaveTextContent("Refused");
+        // The refusal happens while the server resolves the statement's
+        // names — after the query has started — so the chip must not claim it
+        // happened before reading any data.
+        expect(chip.getAttribute("title")).not.toContain("before reading");
+        expect(screen.getByTestId("lwql-result-pane").textContent).toContain(
+          "NoSuchColumn",
+        );
+      });
     });
   });
 

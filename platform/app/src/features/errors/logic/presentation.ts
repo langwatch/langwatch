@@ -350,6 +350,15 @@ const presentations = {
     describe: () =>
       "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
   },
+  lwql_unknown_identifier: {
+    title: "That column doesn't exist",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `There's no column called "${identifier}" in the datasets this query reads. Check the schema for the available columns.`
+        : "The query names a column that doesn't exist. Check the schema for the available columns.";
+    },
+  },
   lwql_parameter_missing: {
     title: "This query is missing a value",
     describe: () =>

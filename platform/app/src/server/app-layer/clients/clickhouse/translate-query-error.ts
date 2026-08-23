@@ -60,6 +60,20 @@ const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 // missing table, missing database, and an RBAC refusal. Grouped because a
 // caller cannot tell them apart and must not be able to — which of the three
 // fired describes the server's internals, not the query.
+// The two shapes of "the statement names a column that is not there": the
+// analyzer's UNKNOWN_IDENTIFIER (47) and the older interpreter path's
+// NO_SUCH_COLUMN_IN_TABLE (16). Grouped because they are the same fact to a
+// caller — a column name the datasets do not expose — differing only in which
+// stage of the server noticed.
+const UNKNOWN_IDENTIFIER: ServerError = {
+  code: "47",
+  name: "UNKNOWN_IDENTIFIER",
+};
+const NO_SUCH_COLUMN_IN_TABLE: ServerError = {
+  code: "16",
+  name: "NO_SUCH_COLUMN_IN_TABLE",
+};
+
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
@@ -108,6 +122,24 @@ export function isClickHouseObjectUnavailableError(error: unknown): boolean {
   return raisedServerError({
     error,
     variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
+  });
+}
+
+/**
+ * True when the server refused because the statement names a column that does
+ * not exist — UNKNOWN_IDENTIFIER (47), NO_SUCH_COLUMN_IN_TABLE (16).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}: on the
+ * application's own connection an unknown column is a bug in our SQL and must
+ * degrade to "unknown" (ADR-045). Exported for the LangWatchQL executor, where
+ * the SQL is member-authored — there a wrong column name is the member's own
+ * knowable, actionable failure and becomes a handled refusal naming it.
+ */
+export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({
+    error,
+    variants: [UNKNOWN_IDENTIFIER, NO_SUCH_COLUMN_IN_TABLE],
   });
 }
 

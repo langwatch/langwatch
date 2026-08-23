@@ -93,6 +93,83 @@ export class LangWatchQLUnavailableError extends HandledError {
 }
 
 /**
+ * The message shapes ClickHouse writes when a statement names a column it
+ * cannot resolve, across both analyzer generations. Matched only AFTER the
+ * numeric error code (47 / 16) has already selected the failure class, so the
+ * message never decides WHICH error a caller gets — it only recovers the name
+ * the caller themselves wrote, for the copy to echo back.
+ *
+ * Bounded so a pathological message cannot push a novel-length "identifier"
+ * into the response; a message matching none of these still yields the handled
+ * error, just without the name.
+ */
+const UNKNOWN_IDENTIFIER_MESSAGE_SHAPES: readonly RegExp[] = [
+  // Analyzer (24.3+ default): Unknown expression identifier `NoSuchColumn` in scope …
+  /Unknown expression identifier ['`]([^'`\s]{1,128})['`]/,
+  // Legacy analyzer: Missing columns: 'NoSuchColumn' while processing query: …
+  /Missing columns: '([^']{1,128})'/,
+  // NO_SUCH_COLUMN_IN_TABLE variants.
+  /There is no column with name ['`]?([\w.]{1,128})/,
+  /No such column ([\w.]{1,128}) in table/,
+];
+
+/**
+ * The column name a ClickHouse unknown-identifier message refused, when the
+ * message carries one in a shape we recognise. `undefined` degrades to copy
+ * that names no column rather than to the raw database text.
+ */
+export function unknownIdentifierFromClickHouseMessage(
+  message: string,
+): string | undefined {
+  for (const shape of UNKNOWN_IDENTIFIER_MESSAGE_SHAPES) {
+    const match = shape.exec(message);
+    if (match?.[1]) return match[1];
+  }
+  return undefined;
+}
+
+/**
+ * The statement names a column no dataset it reads exposes.
+ *
+ * The one authoring mistake save-time validation cannot catch — the validator
+ * checks policy and shape, not column existence — so run time is the only
+ * place to name it. Raised from the executor's translation of ClickHouse
+ * UNKNOWN_IDENTIFIER / NO_SUCH_COLUMN_IN_TABLE, carrying only the identifier
+ * the member wrote: the raw database text rides in `reasons` for the
+ * operator's logs and never in the response.
+ *
+ * `customer` fault on the same reasoning as the parameter errors: the member
+ * can fix it in one edit, with the schema sidebar or `langwatch chart schema`
+ * listing what exists.
+ */
+export class LangWatchQLUnknownIdentifierError extends HandledError {
+  declare readonly code: "lwql_unknown_identifier";
+
+  constructor(
+    options: {
+      /** The name the member wrote, when the message carried it recognisably. */
+      readonly identifier?: string;
+      readonly reasons?: readonly Error[];
+    } = {},
+  ) {
+    super(
+      "lwql_unknown_identifier",
+      "The query names a column that does not exist in the datasets it reads.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumers: the registry copy, which echoes the column back,
+        // and an agent repairing SQL it composed.
+        meta: options.identifier ? { identifier: options.identifier } : {},
+        ...remediation("lwql_unknown_identifier"),
+        ...(options.reasons ? { reasons: options.reasons } : {}),
+      },
+    );
+    this.name = "LangWatchQLUnknownIdentifierError";
+  }
+}
+
+/**
  * The query declares a bound parameter the request supplied no value for.
  *
  * Caught at the gateway rather than left to the database: ClickHouse answers a

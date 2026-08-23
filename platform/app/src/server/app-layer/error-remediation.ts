@@ -82,6 +82,13 @@ const registry = {
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
   },
+  lwql_unknown_identifier: {
+    tips: [
+      "Read `meta.identifier` — it names the column the database could not find",
+      "List the available columns with `langwatch chart schema`, or open the workbench schema sidebar",
+      "Saving cannot check column existence, so a misspelled or renamed column is only refused when the query runs",
+    ],
+  },
   lwql_unparseable: {
     tips: [
       "Read `meta.violations` — each entry carries the line and column the parser stopped at",

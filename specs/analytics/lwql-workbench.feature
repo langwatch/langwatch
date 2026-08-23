@@ -226,6 +226,19 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     Then the member reads a timeout presentation distinct from the generic error
     And it suggests narrowing the query rather than blaming the platform
 
+  @integration
+  Scenario: An unknown column is presented as the member's own refusal, naming the column
+    Given the submitted statement names a column that does not exist
+    When the run is refused with the unknown-identifier code
+    Then the member reads registry copy naming the column
+    And the state chip does not claim the statement was refused before reading any data
+
+  @integration
+  Scenario: An unhandled failure is never dressed as a refusal
+    Given the submitted statement fails for a reason the server did not name
+    When the result pane renders the failure
+    Then the state chip reads Failed rather than Refused
+
   # ---------------------------------------------------------------------------
   # Native result table
   # ---------------------------------------------------------------------------

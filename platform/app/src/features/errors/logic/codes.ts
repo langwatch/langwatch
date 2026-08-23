@@ -170,6 +170,7 @@ export const APP_ERROR_CODES = [
   "lwql_reserved_parameter_supplied",
   "lwql_reserved_parameter_type",
   "lwql_unavailable",
+  "lwql_unknown_identifier",
   "lwql_unparseable",
   "malformed_custom_role_permissions",
   "malformed_request",

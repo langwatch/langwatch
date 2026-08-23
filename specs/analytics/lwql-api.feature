@@ -703,6 +703,31 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And no unmarked partial result is returned
 
   # ---------------------------------------------------------------------------
+  # Run-time authoring errors (#7447) — the mistakes save-time validation
+  # deliberately cannot catch, named at the only place they can be
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: An unknown column is refused by name at run time
+    Given a governed run whose SQL names a column no dataset exposes
+    When the database refuses the statement with an unknown-identifier error
+    Then the caller receives the handled code lwql_unknown_identifier, a caller fault
+    And the error names the identifier the caller wrote and none of the raw database text
+
+  @unit
+  Scenario: An unknown-identifier refusal whose message shape is unrecognised still gets the handled code
+    Given a governed run the database refused with an unknown-identifier code but an unfamiliar message
+    When the failure is translated
+    Then the caller receives lwql_unknown_identifier without a named identifier
+    And no raw database text is relayed in its place
+
+  @unit
+  Scenario: An unrelated database failure still degrades to unknown
+    Given a governed run that fails for a reason the platform has not named
+    When the failure is translated
+    Then it stays unhandled and degrades to the generic unknown answer
+
+  # ---------------------------------------------------------------------------
   # Diagnostics (bound in this PR — advisory, never a refusal)
   # ---------------------------------------------------------------------------
 

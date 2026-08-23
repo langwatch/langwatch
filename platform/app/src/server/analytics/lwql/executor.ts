@@ -35,11 +35,16 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   isClickHouseObjectUnavailableError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
 
-import { LangWatchQLUnavailableError } from "./errors";
+import {
+  LangWatchQLUnavailableError,
+  LangWatchQLUnknownIdentifierError,
+  unknownIdentifierFromClickHouseMessage,
+} from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
@@ -208,6 +213,49 @@ const LWQL_REQUEST_TIMEOUT_MS =
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
 /**
+ * What a failed governed run throws, from whatever the driver raised.
+ *
+ * Three translations, in order of how specific the invariant behind them is:
+ *
+ * 1. An unknown column (UNKNOWN_IDENTIFIER / NO_SUCH_COLUMN_IN_TABLE) IS the
+ *    caller's SQL — column existence is the one thing save-time validation
+ *    deliberately does not check — so it becomes the handled
+ *    `lwql_unknown_identifier`, carrying only the name the member wrote.
+ * 2. An unknown table/database or an access refusal CANNOT be the caller's
+ *    SQL: the validator only lets catalog-approved names reach this point. It
+ *    is a deployment whose LangWatchQL objects or grants are missing — the
+ *    same "not provisioned here" condition as a null executor, and it gets the
+ *    same answer. The raw error rides in `reasons` for the operator's logs and
+ *    never in the response.
+ * 3. Everything else reuses the read path's translation, so the resource
+ *    ceilings a caller can act on arrive as the platform's existing codes
+ *    rather than as a second vocabulary for the same failures. Anything it
+ *    does not recognise stays unhandled and degrades to "unknown" — correct,
+ *    because a driver diagnostic is not something a caller can act on and is
+ *    exactly the kind of text this API must not relay.
+ *
+ * Exported so the translation is testable without a live server; the executor
+ * is its only production caller.
+ */
+export function translateLangWatchQLExecutionError(
+  error: unknown,
+  durationMs: number,
+): unknown {
+  if (isClickHouseUnknownIdentifierError(error)) {
+    return new LangWatchQLUnknownIdentifierError({
+      identifier: unknownIdentifierFromClickHouseMessage(
+        error instanceof Error ? error.message : "",
+      ),
+      reasons: [toError(error)],
+    });
+  }
+  if (isClickHouseObjectUnavailableError(error)) {
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+  return translateClickHouseQueryError(error, durationMs);
+}
+
+/**
  * An executor that runs LangWatchQL as the restricted identity.
  *
  * The client is built here rather than taken as an argument so that the two
@@ -256,22 +304,7 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        // An unknown table/database or an access refusal cannot be the
-        // caller's SQL: the validator only lets catalog-approved names reach
-        // this point. It is a deployment whose LangWatchQL objects or grants
-        // are missing — the same "not provisioned here" condition as a null
-        // executor, and it gets the same answer. The raw error rides in
-        // `reasons` for the operator's logs and never in the response.
-        if (isClickHouseObjectUnavailableError(error)) {
-          throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
-        }
-        // Reuses the read path's translation, so the two resource ceilings a
-        // caller can act on arrive as the platform's existing codes rather than
-        // as a second vocabulary for the same two failures. Anything it does
-        // not recognise stays unhandled and degrades to "unknown" — correct,
-        // because a driver diagnostic is not something a caller can act on and
-        // is exactly the kind of text this API must not relay.
-        throw translateClickHouseQueryError(error, Date.now() - startedAt);
+        throw translateLangWatchQLExecutionError(error, Date.now() - startedAt);
       }
     },
 
