@@ -314,16 +314,16 @@ export function logPrefetchFailure({
   jobLogger: ReturnType<typeof createScenarioLogger>;
   prefetchResult: Extract<PrefetchResult, { success: false }>;
 }): void {
-  const customerActionable =
+  const isCustomerActionable =
     prefetchResult.reason !== undefined &&
     CUSTOMER_ACTIONABLE_PREFETCH_REASONS.has(prefetchResult.reason);
-  jobLogger[customerActionable ? "warn" : "error"](
+  jobLogger[isCustomerActionable ? "warn" : "error"](
     {
       error: prefetchResult.error,
       reason: prefetchResult.reason,
       phase: "prefetch",
     },
-    customerActionable
+    isCustomerActionable
       ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
       : "Failed to prefetch scenario data",
   );

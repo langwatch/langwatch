@@ -9,7 +9,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-import { sendCanary } from "../health-checks";
+import { sendCanary } from "../canary.service";
 
 function canary() {
   return sendCanary({
