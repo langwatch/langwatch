@@ -128,59 +128,65 @@ class OpenAIModerationEvaluator(
             # time no entry has an answer.
             return [evaluation_timed_out_result(max_seconds)] * len(data)
 
+        # The same for every entry, so it is read once rather than per entry.
+        enabled_categories = self.settings.categories.model_dump()
+
         for i, (input_result, output_result) in enumerate(
             zip(response_input.results, response_output.results)
         ):
-
             if not contents_input[i] and not contents_output[i]:
                 results.append(
                     EvaluationResultSkipped(details="Input and output are both empty")
                 )
-            continue
+                continue
 
-        # Combine results by taking the maximum scores for each category
-        combined_category_scores = {
-            category: max(
-                input_result.category_scores.model_dump().get(category, 0),
-                output_result.category_scores.model_dump().get(category, 0),
-            )
-            for category in self.settings.categories.model_dump().keys()
-        }
-
-        detected_categories = {
-            category: score > 0.5  # You may want to adjust this threshold
-            for category, score in combined_category_scores.items()
-            if self.settings.categories.model_dump().get(category, False)
-        }
-
-        highest_categories = sorted(
-            combined_category_scores.items(),
-            key=lambda x: x[1],
-            reverse=True,
-        )
-        score = (
-            max(combined_category_scores.values()) if combined_category_scores else 0
-        )
-
-        passed = not any(detected_categories.values())
-
-        details = (
-            (
-                "Detected "
-                + ", ".join(
-                    [
-                        f"{category} ({score * 100:.2f}% confidence)"
-                        for category, score in highest_categories
-                        if detected_categories.get(category, False)
-                    ]
+            # Combine results by taking the maximum scores for each category
+            input_scores = input_result.category_scores.model_dump()
+            output_scores = output_result.category_scores.model_dump()
+            combined_category_scores = {
+                category: max(
+                    input_scores.get(category, 0),
+                    output_scores.get(category, 0),
                 )
-            )
-            if not passed
-            else None
-        )
+                for category in enabled_categories.keys()
+            }
 
-        results.append(
-            OpenAIModerationResult(score=score, passed=passed, details=details)
-        )
+            detected_categories = {
+                category: score > 0.5  # You may want to adjust this threshold
+                for category, score in combined_category_scores.items()
+                if enabled_categories.get(category, False)
+            }
+
+            highest_categories = sorted(
+                combined_category_scores.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+            score = (
+                max(combined_category_scores.values())
+                if combined_category_scores
+                else 0
+            )
+
+            passed = not any(detected_categories.values())
+
+            details = (
+                (
+                    "Detected "
+                    + ", ".join(
+                        [
+                            f"{category} ({score * 100:.2f}% confidence)"
+                            for category, score in highest_categories
+                            if detected_categories.get(category, False)
+                        ]
+                    )
+                )
+                if not passed
+                else None
+            )
+
+            results.append(
+                OpenAIModerationResult(score=score, passed=passed, details=details)
+            )
 
         return results
