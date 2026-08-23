@@ -218,11 +218,15 @@ async function syncPullProcessBestEffort({
  * service-level Prisma client, so this write-time check is the only gate.
  * ADR-088 v7, Decision 9.
  */
-async function assertTraceDestinationIsOwnLiveProject(
-  prisma: PrismaClient,
-  organizationId: string,
-  traceProjectId: string | null | undefined,
-): Promise<void> {
+async function assertTraceDestinationIsOwnLiveProject({
+  prisma,
+  organizationId,
+  traceProjectId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  traceProjectId: string | null | undefined;
+}): Promise<void> {
   if (!traceProjectId) return;
   const project = await prisma.project.findFirst({
     where: {
@@ -407,11 +411,11 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     assertPullDestinationAllowed(requestedParserConfig);
-    await assertTraceDestinationIsOwnLiveProject(
-      this.prisma,
-      input.organizationId,
-      input.traceProjectId,
-    );
+    await assertTraceDestinationIsOwnLiveProject({
+      prisma: this.prisma,
+      organizationId: input.organizationId,
+      traceProjectId: input.traceProjectId,
+    });
     const mergedParserConfig = encryptParserConfigCredentials(
       requestedParserConfig,
     )!;
@@ -488,11 +492,11 @@ export class IngestionSourceService {
       // Undefined stays put; null stops routing; a named destination is
       // re-validated exactly the way create validates it (the virtual-key
       // editing contract — ADR-088 v7, Decision 9).
-      await assertTraceDestinationIsOwnLiveProject(
-        this.prisma,
-        input.organizationId,
-        input.traceProjectId,
-      );
+      await assertTraceDestinationIsOwnLiveProject({
+        prisma: this.prisma,
+        organizationId: input.organizationId,
+        traceProjectId: input.traceProjectId,
+      });
       data.traceProjectId = input.traceProjectId;
     }
     if (input.teamId !== undefined) {
