@@ -25,7 +25,23 @@ const TOOL_SPAN = "claude_code.tool";
  * as a tool step — label is the query description, arg is the SQL itself.
  */
 const GENIE_QUERY_SPAN = "databricks_genie.query";
+const GENIE_MESSAGE_SPAN = "databricks_genie.message";
 const TOOL_SPAN_NAMES = new Set([TOOL_SPAN, GENIE_QUERY_SPAN]);
+
+/**
+ * Whether a conversation turn is a routed Genie message with steps worth
+ * opening. Genie turns carry no coding-agent service name, so the mount site
+ * cannot reuse its Claude Code check; the trace name is the reliable signal
+ * (the mapper names every root span `databricks_genie.message`). A spanCount
+ * of 1 is the root alone — a message that generated no SQL — and mounting the
+ * strip there would announce steps and then find none.
+ */
+export function turnHasGenieSteps(turn: {
+  traceName?: string | null;
+  spanCount: number;
+}): boolean {
+  return turn.traceName === GENIE_MESSAGE_SPAN && turn.spanCount > 1;
+}
 
 const CELL = { fontFamily: "mono", fontSize: "11px" } as const;
 
