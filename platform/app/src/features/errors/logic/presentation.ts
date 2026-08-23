@@ -356,9 +356,20 @@ const presentations = {
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
   lwql_reserved_parameter_supplied: {
-    title: "The time window isn't yours to set",
-    describe: () =>
-      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+    // One code covers three reserved names, so both halves of the copy are
+    // built from the ones actually supplied (`meta.parameters`, the same list
+    // the server's own sentence is built from). Naming the window pair
+    // unconditionally told a caller that sent only the granularity step to
+    // remove two parameters it had never sent.
+    title: "That setting isn't yours to set",
+    describe: (error) => {
+      const supplied = strList(error, "parameters");
+      if (supplied.length === 0) {
+        return "Some of these parameters come from the page showing this chart. Remove them from your parameters and change the page's settings instead.";
+      }
+      const plural = supplied.length > 1;
+      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.`;
+    },
   },
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",

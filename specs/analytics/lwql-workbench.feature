@@ -605,6 +605,13 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     And nothing reaches the database
 
   @unit
+  Scenario: The refusal names the reserved parameter the caller actually supplied
+    Given a request refused for supplying a reserved parameter of its own
+    When the workbench shows the refusal
+    Then the copy names the parameter that was supplied
+    And it does not name a reserved parameter the request never sent
+
+  @unit
   Scenario: A reserved period parameter declared as anything but a date-time is refused
     Given SQL declaring period_start as a string
     When the statement is validated
