@@ -35,6 +35,16 @@ Please note, all contributions should start with an issue first.
   - If builds or hot-reload feel slow and you're on a compose-based preset, ensure Docker has enough memory allocated (Docker Desktop → Settings → Resources)
   - Run `make quickstart` for an interactive picker that starts only the services your task needs; see `make quickstart-help` for the full non-interactive preset reference
 
+### Fresh checkout or new worktree
+
+Generated files (Prisma client, generated types, SDK versions) are not committed, so `pnpm typecheck` reports hundreds of "Cannot find module" errors until you generate them. After `pnpm install`, run:
+
+```bash
+pnpm prepare:files        # or: pnpm start:prepare:files
+```
+
+Both names work from the repository root and reach the same generator chain in `platform/app`. Run it again after pulling schema changes.
+
 ## How Can I Contribute?
 
 ### Reporting Bugs and Suggesting Enhancements
