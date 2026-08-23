@@ -88,7 +88,15 @@ const RELAYED_META_CODES = new Set(["missing_provider"]);
  * instead and do not enumerate it — which is exactly why the sibling
  * `langy_codex_session_expired` is absent from `APP_ERROR_CODES`.
  */
-const CLIENT_MINTED_CODES = new Set(["langy_codex_plan_limit"]);
+const CLIENT_MINTED_CODES = new Set([
+  "langy_codex_plan_limit",
+  // Same shape, from `promoteModelUnavailableError`: the gateway's
+  // `model_provider_not_bound` tells whoever configures a virtual key to bind
+  // a provider to it or drop the prefix from the model name. In the panel the
+  // model came from a menu, so the remediation is a different one and needs
+  // its own words.
+  "langy_model_unavailable",
+]);
 
 /**
  * Codes passed as a constructor PARAMETER — the shape the docblock above names

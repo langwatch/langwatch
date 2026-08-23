@@ -63,6 +63,7 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // promoted off the agent-errored reason chain by exact reason code.
       "langy_codex_session_expired",
       "langy_codex_plan_limit",
+      "langy_model_unavailable",
     ]);
   });
 
@@ -179,6 +180,44 @@ describe("explainLangyError", () => {
         );
 
         expect(presentation.kind).toBe("langy_codex_session_expired");
+      });
+    });
+  });
+
+  describe("given an agent failure whose model no provider serves", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario A model with no provider connected reads as a model to change */
+      it("names the model as the thing to change, and offers the settings", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "model_provider_not_bound" }],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_model_unavailable");
+        expect(presentation.description).toBe(
+          "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A disabled provider reads the same way */
+      it("reads the same for a provider that is switched off", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "model_provider_disabled" }],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_model_unavailable");
+        expect(presentation.description).toBe(
+          "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
+        );
       });
     });
   });

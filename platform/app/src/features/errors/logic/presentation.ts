@@ -746,6 +746,15 @@ const presentations = {
     describe: () =>
       "They're managed above where you can act. Ask an admin on your team to change them.",
   },
+  model_default_user_key_required: {
+    // Not a permission refusal like `model_default_scope_forbidden`: the
+    // person may well be allowed: the key just does not say who they are, so
+    // there is nobody to check. Only an API or CLI caller can reach this, so
+    // the copy names the two ways out rather than sending them to an admin.
+    title: "This API key can't change default models",
+    describe: () =>
+      "Default models are set per user, and this key is not tied to one. Use a user API key, or change the default in settings.",
+  },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
@@ -2025,6 +2034,17 @@ const presentations = {
     title: "Choose a model for Langy",
     describe: () =>
       "Langy needs a model to run. Pick one in your project's model settings, then try again.",
+  },
+  langy_model_unavailable: {
+    // The other half of `langy_model_not_configured`: there nothing is chosen,
+    // here something is and this project cannot serve it. The gateway's own
+    // `model_provider_not_bound` copy says to bind the provider to the key or
+    // drop the prefix from the model name, which is correct for whoever
+    // configures a virtual key and unusable in the panel, where the model came
+    // from a menu.
+    title: "Langy can't use that model",
+    describe: () =>
+      "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
   },
   langy_codex_plan_limit: {
     // fault: provider. The limit belongs to the customer's OpenAI plan, not to

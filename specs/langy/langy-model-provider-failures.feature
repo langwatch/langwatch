@@ -29,6 +29,32 @@ Feature: A turn that the model provider refused says so
       Then it says the provider is temporarily unavailable
       And it offers another model as a way around it
 
+  Rule: A model this project cannot serve says so, and offers the settings
+
+    Being refused by a provider and having no provider at all are different
+    problems with different next steps. A refusal can pass, so the card offers
+    another try. An unreachable model cannot pass on its own, so the card
+    offers the model settings instead.
+
+    The gateway already writes for this case, but it writes for whoever
+    configures a virtual key: bind the provider to the key, or drop the prefix
+    from the model name. In the panel the model came from a menu, and there is
+    no key and no prefix to edit, so the panel says it in its own words.
+
+    @unit
+    Scenario: A model with no provider connected reads as a model to change
+      Given a turn that failed because no provider serves the chosen model
+      When the customer reads the card
+      Then it says the model has no provider connected in this project
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    @unit
+    Scenario: A disabled provider reads the same way
+      Given a turn that failed because the provider for the chosen model is off
+      When the customer reads the card
+      Then it says the model has no provider connected in this project
+
   Rule: A more specific failure keeps its own card
 
     An expired sign-in and a spent plan allowance are refusals too, but each
