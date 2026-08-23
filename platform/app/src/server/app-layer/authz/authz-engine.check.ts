@@ -166,6 +166,43 @@ export function roleDrifted({
   );
 }
 
+/**
+ * Whether a live head already disagrees with the fact the migration would
+ * state. This is the staging filter's question, and deliberately the same
+ * field comparison the check reports on: a fact whose head already matches
+ * is one `attachGrant` would restate identically, so "safe to skip" and
+ * "neither outstanding nor a diff" must be the SAME condition, or a pass
+ * could skip work it then holds the organization for.
+ */
+export function grantDrifted({
+  fact,
+  head,
+}: {
+  fact: GrantFact;
+  head: GrantHeadRow;
+}): boolean {
+  return grantDiffs({ fact, head }).length > 0;
+}
+
+/**
+ * The same question for a share link against its RESOURCE head. Only the
+ * named diffs count: a head whose `viewCount` merely lags the legacy row is
+ * `outstanding`, and the budget it waits on rides `seedResourceGrantUsage`
+ * on every pass rather than the attach, so restating the attach would not
+ * carry it anyway.
+ */
+export function shareLinkDrifted({
+  organizationId,
+  link,
+  head,
+}: {
+  organizationId: string;
+  link: ExpectedShareLink;
+  head: ResourceGrantRow;
+}): boolean {
+  return resourceDiffs({ organizationId, link, head }).diffs.length > 0;
+}
+
 /** Field equality for one stated fact against its head row — against what
  *  the migration SAID, since that is what the head is supposed to hold. */
 function grantDiffs({

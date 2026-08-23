@@ -79,8 +79,10 @@ import {
   checkGrantHeads,
   checkResourceHeads,
   checkRoleHeads,
+  grantDrifted,
   type HeadState,
   roleDrifted,
+  shareLinkDrifted,
 } from "./authz-engine.check";
 import {
   assembleFacts,
@@ -236,7 +238,7 @@ export class AuthzEngineMigration implements SystemMigration {
     // design, not a shortcut.
     const heads = await this.readHeads(organizationId);
 
-    await this.state({ organizationId, expected, signal });
+    await this.state({ organizationId, expected, heads, signal });
     await this.reconcileStale({ organizationId, expected, heads, signal });
     await this.repairDrift({ organizationId, expected, heads, signal });
     // The budget handover rides every pass, monotonically upward: legacy
@@ -326,17 +328,49 @@ export class AuthzEngineMigration implements SystemMigration {
   }
 
   /** Roles before grants: a custom binding's roleKey names its role. */
+  /**
+   * State every fact the heads do not ALREADY carry identically.
+   *
+   * Restating a fact the head already matches is a no-op — the command id is
+   * content-derived, so the event store swallows it — but that dedupe happens
+   * downstream of the queue, which has already paid to enqueue, dispatch and
+   * fold-check it. A grant is its own aggregate since ADR-101, so a held
+   * organization re-drives one group per grant on every pass, and a pass runs
+   * on every worker boot. The organization that made this necessary restaged
+   * ~900k commands per pass, indefinitely, to converge on nothing.
+   *
+   * The filter is the check's own predicate, not a second opinion: a fact
+   * skipped here is exactly a fact `check` counts as neither `outstanding`
+   * nor a diff, so the pass's report is unchanged by the skipping. Anything
+   * the heads lack, hold revoked, or disagree with is still stated, so the
+   * first pass over an organization stages everything as before and drift
+   * repair is untouched. A projection that is behind under-reports the
+   * heads, which restates a fact needlessly — the pre-existing cost, and
+   * still idempotent.
+   */
   private async state({
     organizationId,
     expected,
+    heads,
     signal,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
+    heads: HeadState;
     signal?: AbortSignal;
   }): Promise<void> {
+    const roleHeadById = new Map(
+      heads.roleHeads.map((head) => [head.id, head]),
+    );
+    const grantHeadById = new Map(heads.grantRows.map((row) => [row.id, row]));
+    const resourceHeadById = new Map(
+      heads.resourceRows.map((row) => [row.grantId, row]),
+    );
     await this.each({
-      items: expected.roles,
+      items: expected.roles.filter((role) => {
+        const head = roleHeadById.get(role.roleId);
+        return head === undefined || roleDrifted({ role, head });
+      }),
       signal,
       send: (role) =>
         this.deps.ledger.defineRole({
@@ -350,13 +384,28 @@ export class AuthzEngineMigration implements SystemMigration {
           actor: ACTOR,
         }),
     });
-    const grants = [
+    const nonResourceGrants = [
       ...expected.bindingFacts,
       ...expected.teamFacts,
       ...expected.organizationFacts,
       ...expected.credentialFacts,
-      ...expected.shareLinks.map((link) => link.fact),
-    ];
+    ].filter((fact) => {
+      const head = grantHeadById.get(fact.grantId);
+      if (head === undefined) return true;
+      // A revoked head is not agreement: the fact says the grant is live, so
+      // it must be restated to bring the head back.
+      return head.revoked || grantDrifted({ fact, head });
+    });
+    // Share links are checked against the RESOURCE heads, keyed by the link's
+    // own id, so their filter cannot share the grant-head map above.
+    const shareLinkGrants = expected.shareLinks
+      .filter((link) => {
+        const head = resourceHeadById.get(link.row.id);
+        if (head === undefined) return true;
+        return shareLinkDrifted({ organizationId, link, head });
+      })
+      .map((link) => link.fact);
+    const grants = [...nonResourceGrants, ...shareLinkGrants];
     await this.each({
       items: grants,
       signal,
