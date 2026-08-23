@@ -96,7 +96,9 @@ describe("given the turn has ended", () => {
       const { rerender } = renderComposer(onSend);
 
       const midTurnField = screen.getByPlaceholderText(MID_TURN_PLACEHOLDER);
-      fireEvent.change(midTurnField, { target: { value: "try another version" } });
+      fireEvent.change(midTurnField, {
+        target: { value: "try another version" },
+      });
       fireEvent.keyDown(midTurnField, { key: "Enter" });
       expect(onSend).not.toHaveBeenCalled();
 

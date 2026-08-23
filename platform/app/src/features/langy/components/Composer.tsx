@@ -615,7 +615,9 @@ const ComposerInputRow = memo(function ComposerInputRow({
         // happened: the text sat in the field with no sign it had been
         // refused.
         placeholder={
-          turnActive ? "Langy is working. You can send when it stops." : placeholder
+          turnActive
+            ? "Langy is working. You can send when it stops."
+            : placeholder
         }
         disabled={disabled}
         rows={1}
