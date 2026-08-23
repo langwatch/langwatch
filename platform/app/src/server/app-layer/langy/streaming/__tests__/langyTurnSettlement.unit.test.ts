@@ -1,9 +1,9 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import {
-  NO_SETTLEMENT_STREAKS,
   advanceSettlement,
   decideSyntheticTerminal,
+  NO_SETTLEMENT_STREAKS,
   shouldAbandonWedgedTurn,
   WEDGED_TURN_PATIENCE_MS,
 } from "../langyTurnSettlement";
