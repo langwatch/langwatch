@@ -1,5 +1,6 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
   type EraseUserCommandData,
   eraseUserCommandDataSchema,
@@ -11,10 +12,7 @@ import {
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "../schemas/constants";
 import type { UserErasedEvent } from "../schemas/events";
-import {
-  eventIdempotencyKey,
-  type IdentityGuardReads,
-} from "./identityGuardReads";
+import type { IdentityGuardReads } from "./identityGuardReads";
 
 export class EraseUserCommand
   implements CommandHandler<Command<EraseUserCommandData>, UserErasedEvent>

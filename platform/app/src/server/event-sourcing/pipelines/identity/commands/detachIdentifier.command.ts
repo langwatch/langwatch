@@ -1,5 +1,6 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
   type DetachIdentifierCommandData,
   detachIdentifierCommandDataSchema,
@@ -15,10 +16,7 @@ import {
   IdentityIdentifierNotFoundError,
   IdentityPrimaryMustDemoteFirstError,
 } from "./identityCommandErrors";
-import {
-  eventIdempotencyKey,
-  type IdentityGuardReads,
-} from "./identityGuardReads";
+import type { IdentityGuardReads } from "./identityGuardReads";
 
 export class DetachIdentifierCommand
   implements

@@ -30,13 +30,3 @@ export interface IdentityGuardReads {
   /** The user's current identifier state, as the projection knows it. */
   loadIdentityState(params: { userId: string }): Promise<IdentityLedgerState>;
 }
-
-export function eventIdempotencyKey({
-  commandId,
-  index,
-}: {
-  commandId: string;
-  index: number;
-}): string {
-  return `${commandId}:${index}`;
-}

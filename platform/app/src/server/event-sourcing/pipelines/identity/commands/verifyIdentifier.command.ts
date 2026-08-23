@@ -1,5 +1,6 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
@@ -19,10 +20,7 @@ import {
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
 } from "./identityCommandErrors";
-import {
-  eventIdempotencyKey,
-  type IdentityGuardReads,
-} from "./identityGuardReads";
+import type { IdentityGuardReads } from "./identityGuardReads";
 
 export class VerifyIdentifierCommand
   implements

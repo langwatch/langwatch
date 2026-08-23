@@ -1,5 +1,6 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
   type MarkPrimaryCommandData,
   markPrimaryCommandDataSchema,
@@ -15,10 +16,7 @@ import {
   IdentityIdentifierNotFoundError,
   IdentityPrimaryRequiresVerifiedError,
 } from "./identityCommandErrors";
-import {
-  eventIdempotencyKey,
-  type IdentityGuardReads,
-} from "./identityGuardReads";
+import type { IdentityGuardReads } from "./identityGuardReads";
 
 export class MarkPrimaryCommand
   implements
