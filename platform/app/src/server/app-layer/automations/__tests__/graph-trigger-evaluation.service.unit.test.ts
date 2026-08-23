@@ -1166,4 +1166,40 @@ describe("evaluateGraphTrigger", () => {
       expect(result.detail).toContain("threshold");
     });
   });
+
+  describe("given a stored series whose aggregation the metric does not allow", () => {
+    /** @scenario "A graph trigger whose stored series pairs a disallowed aggregation skips instead of querying" */
+    it("skips with a detail naming the pairing, without querying", async () => {
+      harness = makeHarness({
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Trace count",
+                metric: "metadata.trace_id",
+                aggregation: "sum",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: undefined,
+            groupByKey: undefined,
+            timeScale: 60,
+          },
+        } as Partial<CustomGraph>),
+        series: timeseries(15),
+      });
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("skipped");
+      expect(result.detail).toContain("metadata.trace_id");
+      expect(harness.getTimeseries).not.toHaveBeenCalled();
+      expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
 });

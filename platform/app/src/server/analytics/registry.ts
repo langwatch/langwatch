@@ -386,29 +386,55 @@ export const getGroup = (
   return (analyticsGroups[group] as any)[field];
 };
 
-export const seriesInput = z.object({
-  metric: z.enum(flattenAnalyticsMetricsEnum),
-  key: z.optional(z.string()),
-  subkey: z.optional(z.string()),
-  aggregation: aggregationTypesEnum,
-  pipeline: z.optional(
-    z.object({
-      field: pipelineFieldsEnum,
-      aggregation: pipelineAggregationTypesEnum,
-    }),
-  ),
-  filters: z.optional(
-    z.record(
-      filterFieldsEnum,
-      z.union([
-        z.array(z.string()),
-        z.record(z.string(), z.array(z.string())),
-        z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-      ]),
+export const seriesInput = z
+  .object({
+    metric: z.enum(flattenAnalyticsMetricsEnum),
+    key: z.optional(z.string()),
+    subkey: z.optional(z.string()),
+    aggregation: aggregationTypesEnum,
+    pipeline: z.optional(
+      z.object({
+        field: pipelineFieldsEnum,
+        aggregation: pipelineAggregationTypesEnum,
+      }),
     ),
-  ),
-  asPercent: z.optional(z.boolean()),
-});
+    filters: z.optional(
+      z.record(
+        filterFieldsEnum,
+        z.union([
+          z.array(z.string()),
+          z.record(z.string(), z.array(z.string())),
+          z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+        ]),
+      ),
+    ),
+    asPercent: z.optional(z.boolean()),
+  })
+  // Each metric's `allowedAggregations` is the single source of truth for
+  // which pairings are valid — the aggregation dropdown reads it, and this
+  // refinement derives from the same declaration so the two cannot drift. An
+  // aggregation the metric does not allow would otherwise only fail inside
+  // ClickHouse (e.g. `sum` over a String column: ILLEGAL_TYPE_OF_ARGUMENT),
+  // after SQL was already built. `terms` is the legacy ES alias for
+  // `cardinality` — the whole query layer executes it as `uniq` and
+  // `buildSeriesName` rewrites it — so stored graphs that predate the rename
+  // must keep validating wherever `cardinality` is allowed.
+  .superRefine((series, ctx) => {
+    const allowed = getMetric(series.metric).allowedAggregations;
+    const aggregation =
+      series.aggregation === "terms" && allowed.includes("cardinality")
+        ? "cardinality"
+        : series.aggregation;
+    if (!allowed.includes(aggregation)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["aggregation"],
+        message: `metric ${series.metric} does not allow aggregation "${
+          series.aggregation
+        }"; allowed: ${allowed.join(", ")}`,
+      });
+    }
+  });
 
 export type SeriesInputType = z.infer<typeof seriesInput>;
 
