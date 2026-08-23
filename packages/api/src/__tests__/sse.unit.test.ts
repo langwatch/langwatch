@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ZodError, z } from "zod";
 
-import { createService } from "../builder.js";
+import { createTestService as createService } from "./test-service.js";
 import { getSSECompletion } from "../sse.js";
+import type { MountedRoute } from "../types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,35 +68,58 @@ function parseSSEEvents(
 // SSE endpoint tests
 // ---------------------------------------------------------------------------
 
-describe("SSE endpoints", () => {
+describe("registerSse", () => {
+  it("mounts a dotted name as a GET under the versioned namespace", async () => {
+    const mounted: MountedRoute[] = [];
+    createService({
+      name: "test",
+      basePath: "/api/test",
+      onRouteMounted: (route) => mounted.push(route),
+    })
+      .registerSse(
+        "things.watch",
+        "2025-03-15",
+        async (_c, stream) => {
+          stream.close();
+        },
+        (b) => b.withEvents({ tick: z.object({ n: z.number() }) }),
+      )
+      .build();
+
+    const watchMounts = mounted.filter((route) =>
+      route.path.endsWith("/things.watch"),
+    );
+    expect(watchMounts.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
+      "get /api/test/2025-03-15/things.watch",
+      "get /api/test/latest/things.watch",
+    ]);
+  });
+
   describe("when an SSE endpoint emits typed events", () => {
     it("streams events in SSE format", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" },
-              events: {
-                progress: z.object({ percent: z.number() }),
-                done: z.object({ total: z.number() }),
-              },
-            },
-            async (_c, _args, stream) => {
-              await stream.emit("progress", { percent: 50 });
-              await stream.emit("progress", { percent: 100 });
-              await stream.emit("done", { total: 2 });
-              stream.close();
-            },
-          );
-        })
+        .registerSse(
+          "things.watch",
+          "2025-03-15",
+          async (_c, stream) => {
+            await stream.emit("progress", { percent: 50 });
+            await stream.emit("progress", { percent: 100 });
+            await stream.emit("done", { total: 2 });
+            stream.close();
+          },
+          (b) =>
+            b.withEvents({
+              progress: z.object({ percent: z.number() }),
+              done: z.object({ total: z.number() }),
+            }),
+        )
         .build();
 
-      const res = await app.request("/api/test/2025-03-15/stream");
+      const res = await app.request("/api/test/2025-03-15/things.watch");
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/event-stream");
 
-      const chunks = await collectSSE(res);
-      const events = parseSSEEvents(chunks);
+      const events = parseSSEEvents(await collectSSE(res));
 
       expect(events).toHaveLength(3);
       expect(events[0]).toEqual({ event: "progress", data: { percent: 50 } });
@@ -107,34 +131,28 @@ describe("SSE endpoints", () => {
   describe("when SSE event data fails schema validation", () => {
     it("emits an error event and rejects instead of silently continuing", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" },
-              events: {
-                result: z.object({ score: z.number() }),
-              },
-            },
-            async (_c, _args, stream) => {
-              await expect(
-                stream.emit("result", {
-                  score: "invalid" as unknown as number,
-                }),
-              ).rejects.toBeInstanceOf(ZodError);
+        .registerSse(
+          "things.watch",
+          "2025-03-15",
+          async (_c, stream) => {
+            await expect(
+              stream.emit("result", {
+                score: "invalid" as unknown as number,
+              }),
+            ).rejects.toBeInstanceOf(ZodError);
 
-              // Callers may explicitly recover and continue the stream.
-              await stream.emit("result", { score: 0.95 });
-              stream.close();
-            },
-          );
-        })
+            // Callers may explicitly recover and continue the stream.
+            await stream.emit("result", { score: 0.95 });
+            stream.close();
+          },
+          (b) => b.withEvents({ result: z.object({ score: z.number() }) }),
+        )
         .build();
 
-      const res = await app.request("/api/test/2025-03-15/stream");
+      const res = await app.request("/api/test/2025-03-15/things.watch");
       expect(res.status).toBe(200);
 
-      const chunks = await collectSSE(res);
-      const events = parseSSEEvents(chunks);
+      const events = parseSSEEvents(await collectSSE(res));
 
       expect(events).toHaveLength(2);
 
@@ -153,30 +171,48 @@ describe("SSE endpoints", () => {
   });
 
   describe("when an SSE endpoint declares a query schema", () => {
-    it("parses query input on its GET route", async () => {
+    it("parses query input on its GET route and publishes it as a context variable", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" },
-              events: { ready: z.object({ channel: z.string() }) },
-              query: z.object({ channel: z.string() }),
-            },
-            async (_c, { query }, stream) => {
-              await stream.emit("ready", { channel: query.channel });
-            },
-          );
-        })
+        .registerSse(
+          "things.watch",
+          "2025-03-15",
+          async (c, stream) => {
+            await stream.emit("ready", { channel: c.get("query").channel });
+          },
+          (b) =>
+            b
+              .withQuery(z.object({ channel: z.string() }))
+              .withEvents({ ready: z.object({ channel: z.string() }) }),
+        )
         .build();
 
       const res = await app.request(
-        "/api/test/2025-03-15/stream?channel=updates",
+        "/api/test/2025-03-15/things.watch?channel=updates",
       );
       const events = parseSSEEvents(await collectSSE(res));
 
       expect(events).toEqual([
         { event: "ready", data: { channel: "updates" } },
       ]);
+    });
+
+    it("refuses a request body or path params at registration", () => {
+      const service = createService({ name: "test", basePath: "/api/test" });
+      expect(() =>
+        service.registerSse(
+          "things.watch",
+          "2025-03-15",
+          async (_c, stream) => {
+            stream.close();
+          },
+          (b) => {
+            (b as unknown as Record<string, (s: unknown) => void>).withInput(
+              z.object({ q: z.string() }),
+            );
+            return b;
+          },
+        ),
+      ).toThrow(/declares input/);
     });
   });
 
@@ -192,18 +228,17 @@ describe("SSE endpoints", () => {
         tracer: false,
         onError,
       })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" }, events: { result: z.object({ score: z.number() }) } },
-            async () => {
-              throw new Error("stream failed");
-            },
-          );
-        })
+        .registerSse(
+          "things.watch",
+          "2025-03-15",
+          async () => {
+            throw new Error("stream failed");
+          },
+          (b) => b.withEvents({ result: z.object({ score: z.number() }) }),
+        )
         .build();
 
-      const response = await app.request("/api/test/2025-03-15/stream");
+      const response = await app.request("/api/test/2025-03-15/things.watch");
       const events = parseSSEEvents(await collectSSE(response));
 
       expect(onError).toHaveBeenCalledWith(
@@ -223,19 +258,18 @@ describe("SSE endpoints", () => {
         logger: false,
         tracer: false,
       })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" }, events: { ready: z.object({ ok: z.boolean() }) } },
-            async (c) => {
-              requestContext = c;
-              await new Promise(() => {});
-            },
-          );
-        })
+        .registerSse(
+          "things.watch",
+          "2025-03-15",
+          async (c) => {
+            requestContext = c;
+            await new Promise(() => {});
+          },
+          (b) => b.withEvents({ ready: z.object({ ok: z.boolean() }) }),
+        )
         .build();
 
-      const response = await app.request("/api/test/2025-03-15/stream");
+      const response = await app.request("/api/test/2025-03-15/things.watch");
       expect(requestContext).toBeDefined();
       const completion = getSSECompletion(requestContext!);
 

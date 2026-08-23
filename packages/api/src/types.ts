@@ -1,11 +1,10 @@
-import type {
-  AccessDeclaration,
-  AuthzPermission,
-} from "@langwatch/authz";
+import type { AuthzPermission } from "@langwatch/authz";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
-import type { ZodType, z } from "zod";
+import type { ApiSchema } from "./schema.js";
+
+import type { RateLimiter, ResponseCache } from "./ports.js";
 
 // ---------------------------------------------------------------------------
 // Version primitives
@@ -16,6 +15,13 @@ export type DateVersion = string;
 
 export const VERSION_LATEST = "latest" as const;
 export const VERSION_PREVIEW = "preview" as const;
+
+/**
+ * The version argument of a registration: a real calendar date, or `"preview"`
+ * for an endpoint that lives only in the preview namespace. `"latest"` is
+ * derived, never registered.
+ */
+export type VersionLabel = DateVersion | typeof VERSION_PREVIEW;
 
 const DATE_VERSION_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
@@ -31,6 +37,22 @@ export function isDateVersion(value: string): value is DateVersion {
     date.getUTCMonth() === month! - 1 &&
     date.getUTCDate() === day
   );
+}
+
+/** Asserts the version argument of a registration call. */
+export function assertVersionLabel(version: string): void {
+  if (version === VERSION_PREVIEW) return;
+  if (version === VERSION_LATEST) {
+    throw new Error(
+      `API version "latest" is derived from the dated registrations and ` +
+        `cannot be registered; name a real date in YYYY-MM-DD form`,
+    );
+  }
+  if (!isDateVersion(version)) {
+    throw new RangeError(
+      `Invalid API version "${version}"; expected a real date in YYYY-MM-DD form`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -56,17 +78,20 @@ export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 export const ENDPOINT_ROUTE = "endpointRoute" as const;
 
 // ---------------------------------------------------------------------------
-// Base app context
+// Base app context (provider factories)
 // ---------------------------------------------------------------------------
 
 /**
- * The base application context available to every handler.
+ * The base request context handed to `.provide()` factories.
  *
- * Generic `TProject` lets consumers type `app.project` downstream:
+ * Generic `TProject` lets consumers type `base.project` downstream:
  *
  * ```ts
  * createService<Project>({ name: "things" })
  * ```
+ *
+ * Provided services themselves reach handlers as typed context variables
+ * (`c.get("things")`), not through this object.
  */
 export interface BaseApp<TProject = unknown> {
   project: TProject;
@@ -77,19 +102,21 @@ export interface BaseApp<TProject = unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Endpoint configuration
+// Endpoint documentation (withDocs)
 // ---------------------------------------------------------------------------
 
 /**
- * OpenAPI documentation options for an endpoint.
+ * OpenAPI documentation for an endpoint, declared via `.withDocs(...)`.
  *
- * Only the bare (unversioned) alias mount of an endpoint is ever documented;
- * dated, `latest`, and `preview` mounts serve traffic but never reach the
- * published spec. These options shape that one documented operation.
+ * Every dated mount of a documented endpoint — plus `latest` — reaches the
+ * published document; `preview` mounts serve traffic but are never documented.
+ * These options shape each documented operation.
  */
 export interface EndpointDocs {
   /** Short summary shown next to the operation in the reference. */
   summary?: string;
+  /** Long-form description of the operation. */
+  description?: string;
   /** Tags used to group the operation in the reference. */
   tags?: string[];
   /**
@@ -108,51 +135,33 @@ export interface EndpointDocs {
   responses?: DescribeRouteOptions["responses"];
 }
 
+// ---------------------------------------------------------------------------
+// Endpoint definition (what the definition chain produces)
+// ---------------------------------------------------------------------------
+
 /**
- * Per-endpoint configuration object -- the second argument to
- * `v.get(path, config, handler)`.
+ * The resolved definition of one endpoint, produced by merging the service
+ * defaults, the group defaults and the endpoint's own declaration chain
+ * (service < group < endpoint; middleware concatenates in that order).
  *
- * Merges schema declarations (input, output, params, query) with per-endpoint
- * options (auth, resourceLimit, middleware, etc.) and the mandatory
- * {@link AccessDeclaration}.
+ * This is what travels on `MountedRoute.config`: opt-outs are already resolved,
+ * so `rateLimit` / `cache` appear only when they actually apply.
  */
-export type EndpointConfig<
-  TInput extends ZodType = ZodType,
-  TOutput extends ZodType = ZodType,
-  TParams extends ZodType = ZodType,
-  TQuery extends ZodType = ZodType,
-> = BaseEndpointConfig<TInput, TOutput, TParams, TQuery> & AccessDeclaration;
-
-/** The access-independent half of {@link EndpointConfig}. */
-export interface BaseEndpointConfig<
-  TInput extends ZodType = ZodType,
-  TOutput extends ZodType = ZodType,
-  TParams extends ZodType = ZodType,
-  TQuery extends ZodType = ZodType,
-> {
+export interface EndpointDef {
   /** JSON body schema. */
-  input?: TInput;
+  input?: ApiSchema;
   /** Response body schema -- validated before serialization. */
-  output?: TOutput;
-  /** Path parameter schema. */
-  params?: TParams;
-  /** Query string schema. */
-  query?: TQuery;
-  /** OpenAPI description for the endpoint. */
-  description?: string;
-  /** OpenAPI documentation options (summary, tags, operationId, ...). */
-  docs?: EndpointDocs;
-  /** HTTP status code for successful responses (default: 200). */
+  output?: ApiSchema;
+  /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   status?: ContentfulStatusCode;
-  /**
-   * Opaque per-endpoint metadata. The framework never reads it; it travels on
-   * `MountedRoute.config` so `onRouteMounted` consumers (route policy
-   * registries, gates) can act on it.
-   */
-  meta?: unknown;
-
-  // -- per-endpoint options --------------------------------------------------
-
+  /** Path parameter schema (registerRoute only). */
+  params?: ApiSchema;
+  /** Query string schema (registerRoute and registerSse only). */
+  query?: ApiSchema;
+  /** SSE event payloads, event name to schema (registerSse only). */
+  events?: Record<string, ApiSchema>;
+  /** OpenAPI documentation. */
+  docs?: EndpointDocs;
   /**
    * Auth behaviour for this endpoint.
    * - `"default"` -- use the service-level auth middleware (default).
@@ -160,19 +169,71 @@ export interface BaseEndpointConfig<
    * - A `MiddlewareHandler` -- use a custom auth middleware for this endpoint.
    */
   auth?: "default" | "none" | MiddlewareHandler;
-  // The permission itself lives on {@link AccessDeclaration}, intersected into
-  // EndpointConfig: it is enforced by the FRAMEWORK (the service's
-  // `permissionEnforcer` middleware mounts between auth and the endpoint's
-  // own `middleware`, so a custom middleware array can never displace the
-  // check), and declaring one without an enforcer fails `build()`.
+  /** Permission enforced by the framework after authentication. */
+  permission?: AuthzPermission;
+  /** Written reason this endpoint deliberately has no permission check. */
+  noPermission?: { reason: string };
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */
   resourceLimit?: string;
-  /** Additional middleware to run for this endpoint (after auth, before handler). */
+  /** Endpoint middleware: service-level first, then group, then endpoint. */
   middleware?: MiddlewareHandler[];
+  /**
+   * Opaque per-endpoint metadata. The framework never reads it; it travels on
+   * `MountedRoute.config` so `onRouteMounted` consumers (route policy
+   * registries, gates) can act on it. Nothing in it is documentation.
+   */
+  meta?: unknown;
+  /** Rate limiting applies; requires the `rateLimiter` port on the service. */
+  rateLimit?: true;
+  /** Response caching applies; requires the `cache` port and a declared `output`. */
+  cache?: { tag: string; ttlSeconds: number };
+  /** Deprecation notice; the endpoint still answers, and warns. */
+  deprecated?: string;
+}
+
+/**
+ * The definition shape the chain builder accumulates before precedence is
+ * resolved: identical to {@link EndpointDef}, except the two capabilities with
+ * explicit opt-outs still carry their `false` markers.
+ *
+ * @internal
+ */
+export interface RawEndpointDef extends Omit<
+  EndpointDef,
+  "rateLimit" | "cache"
+> {
+  rateLimit?: boolean;
+  cache?: { tag: string; ttlSeconds: number } | false;
 }
 
 // ---------------------------------------------------------------------------
-// Service configuration (top-level)
+// Endpoint handler context
+// ---------------------------------------------------------------------------
+
+/**
+ * The context variables every handler can read. `.provide()` services widen
+ * this map through the service builder's type, so `c.get("things")` is typed.
+ *
+ * `params` and `query` carry the validated path params / query string of
+ * `registerRoute` (and `registerSse`) endpoints. They are typed loosely on
+ * purpose: they are declared on the definition chain, which TypeScript checks
+ * after the handler argument, so per-endpoint inference is not expressible.
+ * The declared schema is the runtime guarantee.
+ */
+export type EndpointVariables = {
+  // biome-ignore lint/suspicious/noExplicitAny: validated at runtime by the declared schema; per-endpoint inference from the trailing define callback is not expressible in TypeScript.
+  params?: any;
+  // biome-ignore lint/suspicious/noExplicitAny: same as params.
+  query?: any;
+};
+
+/** The Hono context a service handler receives, with typed variables. */
+export type ServiceContext<
+  TVariables extends Record<string, unknown> = EndpointVariables,
+> = Context<{ Variables: TVariables }>;
+
+// ---------------------------------------------------------------------------
+// Route-mounting report
 // ---------------------------------------------------------------------------
 
 /**
@@ -190,25 +251,38 @@ export interface MountedRoute {
   path: string;
   /**
    * The version namespace of this mount (`"2025-03-15"`, `"latest"`,
-   * `"preview"`), or `null` for the bare alias and the namespace guards.
+   * `"preview"`), or `null` for the namespace guards.
    */
   version: string | null;
-  /** Version status header value this mount responds with. */
-  status: VersionStatus;
+  /** Version status header value this mount responds with, or `null` for the guards. */
+  status: VersionStatus | null;
   /** True when this mount answers 410 Gone for a withdrawn endpoint. */
   withdrawn: boolean;
   /**
-   * True for the two catch-alls that 404 unknown version namespaces. They are
-   * real routes in the Hono route table and MUST be covered by any route
-   * policy registry built from this callback.
+   * True for the catch-alls that 404 unknown version namespaces (and the bare
+   * paths that no longer alias anything). They are real routes in the Hono
+   * route table and MUST be covered by any route policy registry built from
+   * this callback.
    */
   isNamespaceGuard?: boolean;
   /**
-   * The endpoint configuration behind this mount. Withdrawn mounts carry the
-   * inherited config (including `meta`); namespace guards carry `null`.
+   * True for the service's own `rpc.discover` catalogue mount: meta by
+   * construction, never documented, and carrying no endpoint config. Like the
+   * guards, it is a real route in the Hono route table and MUST be covered by
+   * any route policy registry built from this callback.
    */
-  config: EndpointConfig | null;
+  isDiscoverEndpoint?: boolean;
+  /**
+   * The resolved endpoint definition behind this mount. Withdrawn mounts carry
+   * the inherited definition (including `meta`); namespace guards and discover
+   * mounts carry `null`.
+   */
+  config: EndpointDef | null;
 }
+
+// ---------------------------------------------------------------------------
+// Service configuration (top-level)
+// ---------------------------------------------------------------------------
 
 /**
  * Top-level configuration for `createService()`.
@@ -220,13 +294,7 @@ export interface ServiceConfig {
   basePath?: string;
   /** Default auth middleware applied to every endpoint (unless overridden). */
   auth?: MiddlewareHandler;
-  /**
-   * Builds the enforcement middleware for an endpoint's declared
-   * `permission`. Injected by the host — the platform passes one backed by
-   * its app-composed permissions service — and mounted by the framework
-   * right after auth for every endpoint that declares a permission, so the
-   * declaration and its enforcement cannot be torn apart.
-   */
+  /** Builds the enforcement middleware for an endpoint's declared permission. */
   permissionEnforcer?: (permission: AuthzPermission) => MiddlewareHandler;
   /** Disable the built-in tracer middleware. Set to `false` to opt out. */
   tracer?: false;
@@ -234,13 +302,29 @@ export interface ServiceConfig {
   logger?: false;
   /** Additional global middleware applied to every request. */
   middleware?: MiddlewareHandler[];
+  /**
+   * Rate limiter port backing `.withRateLimit()`. Declaring the capability
+   * without the port fails the build. See `ports.ts`.
+   */
+  rateLimiter?: RateLimiter;
+  /**
+   * Response cache port backing `.withCache(...)`. Declaring the capability
+   * without the port fails the build. See `ports.ts`.
+   */
+  cache?: ResponseCache;
+  /**
+   * Where the full OpenAPI document lives (e.g. `/.well-known/openapi`). The
+   * service's `rpc.discover` catalogue points back at it; without it the
+   * catalogue omits the pointer.
+   */
+  openapiUrl?: string;
   /** Custom error handler. If omitted the framework default is used. */
   onError?: (err: Error, c: Context) => Response | Promise<Response>;
   /**
    * Called synchronously during `build()` for every route mounted on the app:
-   * each dated version, `latest`, `preview`, the bare alias, withdrawn (410)
-   * endpoints, and the two version-namespace guards. Lets the host register
-   * route policies without re-deriving the route table.
+   * each dated version, `latest`, `preview`, withdrawn (410) endpoints, and
+   * the namespace guards. Lets the host register route policies without
+   * re-deriving the route table.
    */
   onRouteMounted?: (route: MountedRoute) => void;
   /** Middleware that will be removed once services are fully migrated. */
@@ -253,63 +337,15 @@ export interface ServiceConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Handler types
-// ---------------------------------------------------------------------------
-
-/** Extract inferred input type from config, defaulting to undefined. */
-type InferInput<TConfig> = TConfig extends {
-  input: infer I extends ZodType;
-}
-  ? z.infer<I>
-  : undefined;
-
-/** Extract inferred params type from config, defaulting to undefined. */
-type InferParams<TConfig> = TConfig extends {
-  params: infer P extends ZodType;
-}
-  ? z.infer<P>
-  : undefined;
-
-/** Extract inferred query type from config, defaulting to undefined. */
-type InferQuery<TConfig> = TConfig extends {
-  query: infer Q extends ZodType;
-}
-  ? z.infer<Q>
-  : undefined;
-
-/** Extract inferred output type from config. */
-type InferOutput<TConfig> = TConfig extends { output: infer O extends ZodType }
-  ? z.infer<O>
-  : never;
-
-/**
- * The handler function signature.
- *
- * When `output` is defined the handler returns raw data (framework validates
- * and serializes). When `output` is *not* defined the handler returns a raw
- * Hono `Response`.
- */
-export type Handler<TApp, TConfig> = (
-  c: Context,
-  args: {
-    input: InferInput<TConfig>;
-    params: InferParams<TConfig>;
-    query: InferQuery<TConfig>;
-    app: TApp;
-  },
-) => TConfig extends { output: ZodType }
-  ? InferOutput<TConfig> | Promise<InferOutput<TConfig>>
-  : Response | Promise<Response>;
-
-// ---------------------------------------------------------------------------
 // Internal endpoint registration record
 // ---------------------------------------------------------------------------
 
-/** @internal Stored by the version builder when registering an endpoint. */
+/** @internal Stored by the service builder when registering an endpoint. */
 export interface EndpointRegistration {
   method: HttpMethod | "sse";
+  /** URL path fragment: `/${name}` for RPC and SSE, the path as-is for REST. */
   path: string;
-  config: EndpointConfig;
+  config: EndpointDef;
   handler: (...args: unknown[]) => unknown;
   withdrawn?: boolean;
 }
@@ -318,21 +354,4 @@ export interface EndpointRegistration {
 // Version status (set as response header)
 // ---------------------------------------------------------------------------
 
-export type VersionStatus = "stable" | "latest" | "preview" | "unversioned";
-
-/** HTTP status text lookup for error responses. */
-export function httpStatusText(status: ContentfulStatusCode): string {
-  const map: Record<number, string> = {
-    400: "Bad Request",
-    401: "Unauthorized",
-    403: "Forbidden",
-    404: "Not Found",
-    409: "Conflict",
-    410: "Gone",
-    422: "Unprocessable Entity",
-    500: "Internal Server Error",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-  };
-  return map[status] ?? "Error";
-}
+export type VersionStatus = "stable" | "latest" | "preview";

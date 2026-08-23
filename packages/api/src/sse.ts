@@ -1,9 +1,12 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
-import type { ZodType, z } from "zod";
 
-import type { AccessDeclaration } from "@langwatch/authz";
-import type { EndpointConfig } from "./types.js";
+import {
+  parseApiSchema,
+  type ApiSchema,
+  type ApiSchemaOutput,
+} from "./schema.js";
+import type { ServiceContext } from "./types.js";
 
 export interface SSECompletion {
   error?: Error;
@@ -11,7 +14,7 @@ export interface SSECompletion {
 
 const completions = new WeakMap<Context, Promise<SSECompletion>>();
 
-function createTypedStream<TEvents extends Record<string, ZodType>>({
+function createTypedStream<TEvents extends Record<string, ApiSchema>>({
   sseStream,
   events,
 }: {
@@ -20,9 +23,10 @@ function createTypedStream<TEvents extends Record<string, ZodType>>({
 }): TypedSSEStream<TEvents> {
   return {
     async emit(event, data) {
+      let value: unknown = data;
       const schema = events[event];
       if (schema) {
-        const result = schema.safeParse(data);
+        const result = await parseApiSchema(schema, data);
         if (!result.success) {
           await sseStream.writeSSE({
             event: "error",
@@ -33,53 +37,17 @@ function createTypedStream<TEvents extends Record<string, ZodType>>({
           });
           throw result.error;
         }
-        data = result.data;
+        value = result.data;
       }
       await sseStream.writeSSE({
         event: String(event),
-        data: JSON.stringify(data),
+        data: JSON.stringify(value),
       });
     },
     close() {
       sseStream.close();
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// SSE configuration
-// ---------------------------------------------------------------------------
-
-/**
- * Configuration object for SSE endpoints registered via `v.sse()`.
- *
- * SSE endpoints are mounted as GET routes and therefore accept query-string
- * input only, not a JSON request body.
- *
- * Each event type is declared with a Zod schema. The framework validates
- * event data against the schema before sending.
- */
-export type SSEConfig<
-  TEvents extends Record<string, ZodType>,
-  TQuery extends ZodType = ZodType,
-> = BaseSSEConfig<TEvents, TQuery> & AccessDeclaration;
-
-/** The access-independent half of {@link SSEConfig}. */
-export interface BaseSSEConfig<
-  TEvents extends Record<string, ZodType>,
-  TQuery extends ZodType = ZodType,
-> {
-  /** Map of event names to their payload schemas. */
-  events: TEvents;
-  /** Optional query string schema. */
-  query?: TQuery;
-  /** OpenAPI description. */
-  description?: string;
-
-  // -- per-endpoint options (same as EndpointConfig) -------------------------
-  auth?: EndpointConfig["auth"];
-  resourceLimit?: string;
-  middleware?: MiddlewareHandler[];
 }
 
 // ---------------------------------------------------------------------------
@@ -90,13 +58,15 @@ export interface BaseSSEConfig<
  * A typed wrapper around Hono's SSE streaming API.
  *
  * The `emit` method validates data against the declared event schema before
- * writing to the stream.
+ * writing to the stream: a non-conforming payload writes an `error` event
+ * carrying the issues and rejects, so the handler must catch to continue
+ * streaming.
  */
-export interface TypedSSEStream<TEvents extends Record<string, ZodType>> {
+export interface TypedSSEStream<TEvents extends Record<string, ApiSchema>> {
   /** Emit a typed event. Data is validated against the event's Zod schema. */
   emit<K extends string & keyof TEvents>(
     event: K,
-    data: z.infer<TEvents[K]>,
+    data: ApiSchemaOutput<TEvents[K]>,
   ): Promise<void>;
   /** Close the SSE stream. */
   close(): void;
@@ -107,22 +77,15 @@ export interface TypedSSEStream<TEvents extends Record<string, ZodType>> {
 // ---------------------------------------------------------------------------
 
 /**
- * Handler function for SSE endpoints.
- *
- * Receives the Hono context, parsed arguments, and a typed SSE stream.
+ * Handler function for SSE endpoints: `(c, stream)` — a stream has no body.
+ * Request data arrives through the chain's `withQuery` and is read as the
+ * typed context variable `c.get("query")`.
  */
 export type SSEHandler<
-  TApp,
-  TEvents extends Record<string, ZodType>,
-  TConfig,
+  TVariables extends Record<string, unknown>,
+  TEvents extends Record<string, ApiSchema>,
 > = (
-  c: Context,
-  args: {
-    query: TConfig extends { query: ZodType }
-      ? z.infer<TConfig["query"]>
-      : undefined;
-    app: TApp;
-  },
+  c: ServiceContext<TVariables>,
   stream: TypedSSEStream<TEvents>,
 ) => void | Promise<void>;
 
@@ -135,7 +98,7 @@ export type SSEHandler<
  *
  * @returns A streaming Response
  */
-export function createSSEResponse<TEvents extends Record<string, ZodType>>({
+export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
   c,
   events,
   handler,

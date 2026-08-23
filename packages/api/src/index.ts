@@ -2,11 +2,23 @@
 // @langwatch/api -- Public API
 // ---------------------------------------------------------------------------
 
-export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
-export { isRpcPath } from "./version-builder.js";
-export type { RpcConfig, RpcPath } from "./version-builder.js";
+export { createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
+export type {
+  DefaultsChain,
+  RouteChain,
+  RpcChain,
+  SseChain,
+} from "./definition.js";
+export {
+  DISCOVER_NAME,
+  type DiscoveredOperation,
+  type ServiceCatalogue,
+} from "./discover.js";
 export { createErrorHandler, formatError } from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+export type { RateLimiter, ResponseCache } from "./ports.js";
+export { isRpcPath, type RpcName } from "./rpc-name.js";
+export type { ApiSchema, ApiSchemaOutput } from "./schema.js";
 
 import type { Hono } from "hono";
 import { handle } from "hono/vercel";
@@ -17,30 +29,28 @@ export function routeHandlers(app: Hono) {
 }
 export {
   createSSEResponse,
-  type SSEConfig,
   type SSEHandler,
   type TypedSSEStream,
 } from "./sse.js";
 export {
   type BaseApp,
   type DateVersion,
-  type EndpointConfig,
+  type EndpointDef,
   type EndpointDocs,
   type EndpointRegistration,
-  type Handler,
+  type EndpointVariables,
   type HttpMethod,
-  httpStatusText,
   isDateVersion,
   type MountedRoute,
   type ServiceConfig,
+  type ServiceContext,
   VERSION_LATEST,
   VERSION_PREVIEW,
+  type VersionLabel,
   type VersionStatus,
 } from "./types.js";
 export {
+  type RegistrationEvent,
   type ResolvedEndpoint,
-  type ResolvedVersion,
-  resolveRequestVersion,
   resolveVersions,
-  type VersionDefinition,
 } from "./versioning.js";

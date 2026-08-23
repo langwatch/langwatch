@@ -7,14 +7,24 @@ import {
   uniqueSymbol,
   validator as zValidator,
 } from "hono-openapi";
-import { ZodError, type ZodIssue, type ZodType } from "zod";
 
+import {
+  cacheReadMiddleware,
+  rateLimitMiddleware,
+  writeCachedResponse,
+} from "./capabilities.js";
+import {
+  createApiSchemaError,
+  parseApiSchemaSync,
+  type ApiSchema,
+  type ApiSchemaIssue,
+} from "./schema.js";
 import { serializeEndpointResult } from "./response.js";
-import { createSSEResponse, type SSEConfig } from "./sse.js";
+import { createSSEResponse } from "./sse.js";
 import { ENDPOINT_ROUTE } from "./types.js";
 import type {
   BaseApp,
-  EndpointConfig,
+  EndpointDef,
   EndpointRegistration,
   ServiceConfig,
   VersionStatus,
@@ -29,33 +39,96 @@ type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 interface StackOptions<TProject> {
   ep: EndpointRegistration;
-  isVersioned: boolean;
   onError: ErrorHandler;
   providers: ProviderMap<TProject>;
   serviceConfig: ServiceConfig;
   status: VersionStatus;
-  version: string | null;
+  /** The version namespace being mounted; always set — there is no bare alias. */
+  version: string;
+  /**
+   * Where validated path params come from. `"route"` reads Hono's route match
+   * (the eager mounts); `"context"` reads the date-namespace fallback's own
+   * matcher, whose guard route never carried the endpoint's `:params`.
+   */
+  paramSource?: "route" | "context";
+  /**
+   * True for the date-namespace fallback stacks: they serve unregistered dates
+   * and must never reach the document.
+   */
+  suppressDocs?: boolean;
 }
 
-/** Composes the complete middleware pipeline for an active endpoint. */
+/**
+ * Composes the complete middleware pipeline for an active endpoint.
+ *
+ * The fixed order (ADR 003 §3): version context, auth, permission, rate limit,
+ * resource limit, endpoint middleware, OpenAPI documentation, validation,
+ * cache read, providers, handler.
+ */
 export function buildEndpointMiddlewareStack<TProject>(
   options: StackOptions<TProject>,
 ): MiddlewareHandler[] {
-  const { ep } = options;
+  const { ep, serviceConfig, status, version } = options;
+  const { config } = ep;
   const stack = [versionContextMiddleware(options)];
-  const documented = isDocumentedMount({
-    config: ep.config,
-    status: options.status,
-  });
+  const documented =
+    options.suppressDocs !== true && isDocumentedMount({ config, status });
 
-  appendAccessMiddleware({
+  appendAuthMiddleware({ stack, config, serviceConfig });
+  appendPermissionMiddleware({ stack, config, serviceConfig });
+
+  if (config.rateLimit) {
+    stack.push(
+      rateLimitMiddleware({
+        rateLimiter: serviceConfig.rateLimiter!,
+        keyParts: {
+          service: serviceConfig.name,
+          path: ep.path,
+          version,
+        },
+      }),
+    );
+  }
+
+  if (config.resourceLimit) {
+    const createResourceLimitMiddleware =
+      serviceConfig._legacy?.resourceLimitMiddleware;
+    if (!createResourceLimitMiddleware) {
+      throw new Error(
+        `Endpoint resource limit "${config.resourceLimit}" requires resourceLimitMiddleware`,
+      );
+    }
+    stack.push(createResourceLimitMiddleware(config.resourceLimit));
+  }
+
+  if (config.middleware) stack.push(...config.middleware);
+
+  appendOpenApiMiddleware({ stack, config, documented });
+  appendValidationMiddleware({
     stack,
-    config: ep.config,
-    includeResourceLimit: true,
-    serviceConfig: options.serviceConfig,
+    ep,
+    documented,
+    paramSource: options.paramSource ?? "route",
   });
-  appendOpenApiMiddleware({ stack, config: ep.config, documented });
-  appendValidationMiddleware({ stack, ep, documented });
+  stack.push(
+    contextVariablesMiddleware(config, options.paramSource ?? "route"),
+  );
+
+  if (config.cache && config.output && ep.method !== "sse") {
+    stack.push(
+      cacheReadMiddleware({
+        cache: serviceConfig.cache!,
+        keyParts: {
+          service: serviceConfig.name,
+          path: ep.path,
+          version,
+        },
+        hasInput: Boolean(config.input),
+        declaredStatus: config.status,
+      }),
+    );
+  }
+
   stack.push(providerMiddleware(options.providers));
   stack.push(handlerMiddleware(options));
 
@@ -63,25 +136,25 @@ export function buildEndpointMiddlewareStack<TProject>(
 }
 
 /**
- * Whether this mount is the one that reaches the OpenAPI document.
+ * Whether this mount reaches the OpenAPI document.
  *
- * Only the bare alias (`status === "unversioned"`) is ever documented; dated,
- * `latest`, and `preview` mounts serve traffic (with version headers) but stay
- * out of the published spec, so the document contains exactly one path per
- * endpoint. `docs.hide` opts the endpoint out entirely, and endpoints that
- * declare nothing documentable are skipped rather than published as bare
- * stubs.
+ * Every dated mount of a documented endpoint is published, plus `latest`, so a
+ * pinned client sees the schemas its version actually serves. `preview` is
+ * never documented: preview is where an endpoint may change without notice,
+ * and documenting it would promise stability it does not have. `docs.hide`
+ * opts the endpoint out entirely, and endpoints that declare nothing
+ * documentable are skipped rather than published as bare stubs.
  */
 function isDocumentedMount({
   config,
   status,
 }: {
-  config: EndpointConfig;
+  config: EndpointDef;
   status: VersionStatus;
 }): boolean {
-  if (status !== "unversioned") return false;
+  if (status === "preview") return false;
   if (config.docs?.hide === true) return false;
-  return Boolean(config.output || config.description || config.docs);
+  return Boolean(config.output || config.docs);
 }
 
 /** Composes the inherited access pipeline and 410 response for a withdrawal. */
@@ -95,12 +168,17 @@ export function buildWithdrawnMiddlewareStack({
   // endpoint like any other answer, and it is the mount most likely to have
   // someone asking who is still calling it.
   const stack = [versionContextMiddleware({ ...options, ep })];
-  appendAccessMiddleware({
+  appendAuthMiddleware({
     stack,
     config: ep.config,
-    includeResourceLimit: false,
     serviceConfig: options.serviceConfig,
   });
+  appendPermissionMiddleware({
+    stack,
+    config: ep.config,
+    serviceConfig: options.serviceConfig,
+  });
+  if (ep.config.middleware) stack.push(...ep.config.middleware);
   stack.push(async (c) =>
     c.json(
       {
@@ -115,43 +193,52 @@ export function buildWithdrawnMiddlewareStack({
 
 function versionContextMiddleware({
   ep,
-  isVersioned,
   status,
   version,
-}: Pick<StackOptions<unknown>, "isVersioned" | "status" | "version"> & {
+}: Pick<StackOptions<unknown>, "status" | "version"> & {
   // Only what the route identity is built from. A withdrawn endpoint has no
   // handler, and asking for the whole registration would exclude it from the
   // one field that says which endpoint its 410s belong to.
-  ep: Pick<EndpointRegistration, "method" | "path">;
+  ep: Pick<EndpointRegistration, "method" | "path"> & {
+    config?: Pick<EndpointDef, "deprecated">;
+  };
 }): MiddlewareHandler {
   // Built once per endpoint at mount time rather than per request: the
   // registered path and method cannot change after the app is built.
   const route = `${(ep.method === "sse" ? "get" : ep.method).toUpperCase()} ${
     ep.path || "/"
   }`;
+  const deprecated = ep.config?.deprecated;
 
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
-    c.set("isVersionedRequest", isVersioned);
-    if (version) c.set("apiVersion", version);
     try {
       await next();
     } finally {
-      if (version) c.header("X-API-Version", version);
+      // The date-namespace fallback serves an UNREGISTERED date with the
+      // effective version's stack: the header names the namespace that was
+      // asked for, not the one whose registration answered.
+      const answered =
+        (c.get("apiVersionRequest") as string | undefined) ?? version;
+      // Set in a `finally` so validation errors and 410 withdrawals carry the
+      // version headers — and the deprecation warning — too.
+      c.header("X-API-Version", answered);
       c.header("X-API-Version-Status", status);
+      if (deprecated) {
+        c.header("Deprecation", "true");
+        c.header("X-API-Deprecation-Notice", deprecated);
+      }
     }
   };
 }
 
-function appendAccessMiddleware({
+function appendAuthMiddleware({
   stack,
   config,
-  includeResourceLimit,
   serviceConfig,
 }: {
   stack: MiddlewareHandler[];
-  config: EndpointConfig;
-  includeResourceLimit: boolean;
+  config: EndpointDef;
   serviceConfig: ServiceConfig;
 }): void {
   const authSetting = config.auth ?? "default";
@@ -164,32 +251,25 @@ function appendAccessMiddleware({
   if (authSetting !== "none" && serviceConfig._legacy?.organizationMiddleware) {
     stack.push(serviceConfig._legacy.organizationMiddleware);
   }
+}
 
-  // Framework-mounted, deliberately BEFORE `config.middleware`: the check an
-  // endpoint declares cannot be displaced by the middleware array it also
-  // carries (the spread-overwrite that once left a declared policy
-  // unenforced).
-  if (config.permission) {
-    const enforce = serviceConfig.permissionEnforcer;
-    if (!enforce) {
-      throw new Error(
-        `Endpoint declares permission "${config.permission}" but the service has no permissionEnforcer`,
-      );
-    }
-    stack.push(enforce(config.permission));
+function appendPermissionMiddleware({
+  stack,
+  config,
+  serviceConfig,
+}: {
+  stack: MiddlewareHandler[];
+  config: EndpointDef;
+  serviceConfig: ServiceConfig;
+}): void {
+  if (!config.permission) return;
+  const enforce = serviceConfig.permissionEnforcer;
+  if (!enforce) {
+    throw new Error(
+      `Endpoint declares permission "${config.permission}" but the service has no permissionEnforcer`,
+    );
   }
-
-  if (includeResourceLimit && config.resourceLimit) {
-    const createResourceLimitMiddleware =
-      serviceConfig._legacy?.resourceLimitMiddleware;
-    if (!createResourceLimitMiddleware) {
-      throw new Error(
-        `Endpoint resource limit "${config.resourceLimit}" requires resourceLimitMiddleware`,
-      );
-    }
-    stack.push(createResourceLimitMiddleware(config.resourceLimit));
-  }
-  if (config.middleware) stack.push(...config.middleware);
+  stack.push(enforce(config.permission));
 }
 
 function appendOpenApiMiddleware({
@@ -198,7 +278,7 @@ function appendOpenApiMiddleware({
   documented,
 }: {
   stack: MiddlewareHandler[];
-  config: EndpointConfig;
+  config: EndpointDef;
   documented: boolean;
 }): void {
   if (!documented) return;
@@ -219,12 +299,20 @@ function appendOpenApiMiddleware({
   const options: DescribeRouteOptions = {
     responses: { [successStatus]: generatedSuccess, ...docs?.responses },
   };
-  if (config.description !== undefined)
-    options.description = config.description;
+  if (docs?.description !== undefined) options.description = docs.description;
   if (docs?.summary !== undefined) options.summary = docs.summary;
   if (docs?.tags !== undefined) options.tags = docs.tags;
   if (docs?.operationId !== undefined) options.operationId = docs.operationId;
   if (docs?.security !== undefined) options.security = docs.security;
+  if (config.deprecated !== undefined) {
+    // Deprecated still answers and warns — on every dated mount the
+    // registration serves, so SDK generators surface it per version.
+    options.deprecated = true;
+    const notice = `Deprecated: ${config.deprecated}`;
+    options.description = options.description
+      ? `${options.description}\n\n${notice}`
+      : notice;
+  }
 
   stack.push(describeRoute(options) as unknown as MiddlewareHandler);
 }
@@ -233,10 +321,12 @@ function appendValidationMiddleware({
   stack,
   ep,
   documented,
+  paramSource,
 }: {
   stack: MiddlewareHandler[];
   ep: EndpointRegistration;
   documented: boolean;
+  paramSource: "route" | "context";
 }): void {
   /**
    * The validation failure, as the error the boundary knows how to answer with.
@@ -251,11 +341,13 @@ function appendValidationMiddleware({
    * `ZodIssue`s, so re-wrapping restores exactly the error v0.4 threw.
    */
   const asZodError = (error: unknown): unknown =>
-    Array.isArray(error) ? new ZodError(error as ZodIssue[]) : error;
+    Array.isArray(error)
+      ? createApiSchemaError(error as ApiSchemaIssue[])
+      : error;
 
   const addValidator = (
     target: "param" | "query" | "json",
-    schema: ZodType | undefined,
+    schema: ApiSchema | undefined,
   ) => {
     if (!schema) return;
     const middleware = zValidator(target, schema, (result) => {
@@ -264,9 +356,9 @@ function appendValidationMiddleware({
     if (!documented) {
       // hono-openapi's validator carries OpenAPI metadata under uniqueSymbol,
       // and generateSpecs indexes EVERY handler carrying it, so an
-      // undocumented mount (dated, latest, preview, hidden) would otherwise
-      // still surface its path in the spec. Validation is not documentation:
-      // strip the metadata, keep the validator.
+      // undocumented mount (preview, hidden) would otherwise still surface its
+      // path in the spec. Validation is not documentation: strip the metadata,
+      // keep the validator.
       delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[
         uniqueSymbol
       ];
@@ -274,9 +366,42 @@ function appendValidationMiddleware({
     stack.push(middleware);
   };
 
-  addValidator("param", ep.config.params);
+  if (ep.config.params && paramSource === "context") {
+    // The date-namespace fallback matched the path itself, so Hono's route
+    // params belong to the guard, not the endpoint. Validate the matcher's
+    // extraction instead; the failure travels the same ZodError path.
+    const schema = ep.config.params;
+    stack.push(async (c, next) => {
+      const parsed = parseApiSchemaSync(schema, c.get("routeParams") ?? {});
+      if (!parsed.success) throw parsed.error;
+      c.set("params", parsed.data);
+      await next();
+    });
+  } else {
+    addValidator("param", ep.config.params);
+  }
   addValidator("query", ep.config.query);
   if (ep.method !== "sse") addValidator("json", ep.config.input);
+}
+
+/**
+ * Publishes the validated path params and query string as context variables —
+ * `c.get("params")` / `c.get("query")` — which is where Hono already puts
+ * request state. Runs after the validators, so only parsed values are
+ * published. Params validated by the date-namespace fallback are already
+ * published by its own validator.
+ */
+function contextVariablesMiddleware(
+  config: EndpointDef,
+  paramSource: "route" | "context",
+): MiddlewareHandler {
+  return async (c, next) => {
+    if (config.params && paramSource === "route") {
+      c.set("params", c.req.valid("param" as never));
+    }
+    if (config.query) c.set("query", c.req.valid("query" as never));
+    await next();
+  };
 }
 
 function providerMiddleware<TProject>(
@@ -297,15 +422,13 @@ function providerMiddleware<TProject>(
       userId: c.get("user")?.id,
     });
 
-    const resolved = Object.fromEntries(
-      await Promise.all(
-        Object.entries(providers).map(async ([key, factory]) => [
-          key,
-          await factory(base),
-        ]),
-      ),
+    // Provided services become typed context variables: `c.get("things")`.
+    const resolved = Object.entries(providers);
+    await Promise.all(
+      resolved.map(async ([key, factory]) => {
+        c.set(key, await factory(base));
+      }),
     );
-    c.set("app", { ...base, ...resolved });
     await next();
   };
 }
@@ -313,21 +436,19 @@ function providerMiddleware<TProject>(
 function handlerMiddleware<TProject>({
   ep,
   onError,
+  serviceConfig,
 }: StackOptions<TProject>): MiddlewareHandler {
   const { config } = ep;
   if (ep.method === "sse") {
-    const sseConfig = config as unknown as SSEConfig<Record<string, ZodType>>;
     return async (c) => {
-      const query = config.query ? c.req.valid("query" as never) : undefined;
-
       // The streaming response must reach the client before the producer can
       // safely write. createSSEResponse registers its lifecycle synchronously;
       // request logging and tracing defer finalization against that lifecycle.
       return createSSEResponse({
         c,
-        events: sseConfig.events,
+        events: (config.events ?? {}) as Record<string, ApiSchema>,
         handler: async (stream) => {
-          await ep.handler(c, { query, app: c.get("app") }, stream);
+          await ep.handler(c, stream);
         },
         onError: async (error) => {
           await onError(error, c);
@@ -337,12 +458,17 @@ function handlerMiddleware<TProject>({
   }
 
   return async (c: Context) => {
-    const result = await ep.handler(c, {
-      input: config.input ? c.req.valid("json" as never) : undefined,
-      params: config.params ? c.req.valid("param" as never) : undefined,
-      query: config.query ? c.req.valid("query" as never) : undefined,
-      app: c.get("app"),
-    });
-    return serializeEndpointResult({ c, config, result });
+    const input = config.input ? c.req.valid("json" as never) : undefined;
+    const result = await ep.handler(c, input);
+    const response = serializeEndpointResult({ c, config, result });
+    if (config.cache && config.output && !(result instanceof Response)) {
+      await writeCachedResponse({
+        c,
+        cache: serviceConfig.cache!,
+        cacheConfig: config.cache,
+        response,
+      });
+    }
+    return response;
   };
 }

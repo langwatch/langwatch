@@ -7,8 +7,6 @@ import {
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { httpStatusText } from "./types.js";
-
 // ---------------------------------------------------------------------------
 // Zod error mapping
 // ---------------------------------------------------------------------------
@@ -64,8 +62,6 @@ function validationErrorFromZod(err: ZodLikeError): ValidationError {
 // ---------------------------------------------------------------------------
 
 interface ErrorResponseBody {
-  /** Present only for unversioned (backwards-compat) responses. */
-  error?: string;
   code: string;
   /**
    * Always equal to `code`. The Go envelope calls the discriminant `type`
@@ -95,13 +91,10 @@ interface ErrorResponseBody {
 function finalizeErrorResponse({
   status,
   body,
-  isVersioned,
 }: {
   status: ContentfulStatusCode;
   body: ErrorResponseBody;
-  isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  if (!isVersioned) body.error = httpStatusText(status);
   // Emit the deprecated `kind` alias alongside `code` so clients still reading
   // the old discriminant keep working through the transition. See
   // ErrorResponseBody.kind. `type` mirrors the Go envelope's name for the same
@@ -111,17 +104,13 @@ function finalizeErrorResponse({
   return { status, body };
 }
 
-function handledErrorToResponse({
-  err,
-  isVersioned,
-}: {
-  err: HandledError;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+function handledErrorToResponse({ err }: { err: HandledError }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   const serialized = err.serialize();
   return finalizeErrorResponse({
     status: serialized.httpStatus as ContentfulStatusCode,
-    isVersioned,
     body: {
       code: serialized.code,
       // The code, never `err.message`. A HandledError's message is server copy
@@ -144,20 +133,17 @@ function handledErrorToResponse({
 /**
  * Formats an error into a JSON response body + status code.
  *
- * @param isVersioned - Whether the request was made through a versioned path.
- *   Versioned requests get the new format only; unversioned get a union
- *   format that includes the legacy `error` field.
+ * There is exactly one error format (ADR 002 §5): the version-gated union
+ * envelope carrying the legacy `error` field died with the bare alias that
+ * justified it.
  */
-function formatError({
-  err,
-  isVersioned,
-}: {
-  err: unknown;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+function formatError({ err }: { err: unknown }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   // 1. Handled errors -- the domain's own vocabulary, safe to show a caller.
   if (HandledError.isHandled(err)) {
-    return handledErrorToResponse({ err, isVersioned });
+    return handledErrorToResponse({ err });
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
@@ -167,7 +153,6 @@ function formatError({
   if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),
-      isVersioned,
     });
   }
 
@@ -177,7 +162,6 @@ function formatError({
     const status = errObj.status as ContentfulStatusCode;
     return finalizeErrorResponse({
       status,
-      isVersioned,
       body: {
         code: status >= 500 ? "internal_error" : "http_error",
         message: status >= 500 ? "An unknown error occurred" : err.message,
@@ -189,7 +173,6 @@ function formatError({
   const status: ContentfulStatusCode = 500;
   return finalizeErrorResponse({
     status,
-    isVersioned,
     body: { code: "internal_error", message: "An unknown error occurred" },
   });
 }
@@ -231,8 +214,7 @@ export interface ResolvedError {
 /**
  * Creates the `app.onError(...)` handler for the service framework.
  *
- * Reads `c.get("isVersionedRequest")` to decide the response format, and
- * records the error it sent plus the status it sent it as on the context, so
+ * Records the error it sent plus the status it sent it as on the context, so
  * the request logger reports what the caller actually received.
  *
  * This handler does not log. `loggerMiddleware` writes exactly one error
@@ -244,12 +226,11 @@ export function createErrorHandler(): (
   c: Context,
 ) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
-    const isVersioned = c.get("isVersionedRequest") === true;
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
     const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
-    const { status, body } = formatError({ err: effective, isVersioned });
+    const { status, body } = formatError({ err: effective });
 
     const resolved: ResolvedError = {
       status,

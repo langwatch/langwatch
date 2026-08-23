@@ -1,97 +1,296 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
+import type { ApiSchema } from "./schema.js";
 
+import {
+  ChainBuilder,
+  type DefaultsChain,
+  type RouteChain,
+  type RpcChain,
+  type SseChain,
+  assertRoutePath,
+  assertRpcDef,
+  assertSseDef,
+  assertStatusInvariant,
+  collectDef,
+  mergeDefs,
+} from "./definition.js";
 import { createErrorHandler } from "./errors.js";
 import { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+import { type RpcName, assertRpcName } from "./rpc-name.js";
 import { mountResolvedRoutes } from "./route-mounting.js";
-import type { BaseApp, EndpointRegistration, ServiceConfig } from "./types.js";
-import { isDateVersion } from "./types.js";
-import { VersionBuilder } from "./version-builder.js";
-import { resolveVersions, type VersionDefinition } from "./versioning.js";
+import type { TypedSSEStream } from "./sse.js";
+import type {
+  BaseApp,
+  EndpointDocs,
+  EndpointVariables,
+  HttpMethod,
+  RawEndpointDef,
+  ServiceConfig,
+  ServiceContext,
+  VersionLabel,
+} from "./types.js";
+import { assertVersionLabel } from "./types.js";
+import { type RegistrationEvent, resolveVersions } from "./versioning.js";
+
+// ---------------------------------------------------------------------------
+// Handler shapes
+//
+// The handler signature is positional: `(c, input)` — the Hono context and the
+// validated input. Everything else arrives through typed context variables:
+// `.provide()` services via `c.get("things")`, validated params and query via
+// `c.get("params")` / `c.get("query")`.
+//
+// A note on typing honesty: `input` is declared on the definition chain, which
+// is the argument AFTER the handler — and TypeScript checks arguments in
+// order, so the chain cannot flow back into the handler's parameter type (the
+// compiler checks the handler body before it infers from `define`). Annotate
+// the handler parameter (or delegate to a typed domain function) for a typed
+// `input`; the declared schema is always the runtime guarantee. An endpoint
+// registered without a chain gets `input: undefined` — that one IS enforced by
+// the no-chain overloads below.
+// ---------------------------------------------------------------------------
+
+/** RPC handler: `(c, input)`; returns data when `withOutput` is declared, else a Response. */
+// biome-ignore lint/suspicious/noExplicitAny: see the note above — the chain cannot flow back into the handler's parameters.
+type RpcHandler<TVariables extends Record<string, unknown>> = (
+  c: ServiceContext<TVariables>,
+  // biome-ignore lint/suspicious/noExplicitAny: see the note above.
+  input: any,
+  // biome-ignore lint/suspicious/noExplicitAny: see the note above.
+) => any;
+
+/** REST route handler: same shape as an RPC handler. */
+type RouteHandler<TVariables extends Record<string, unknown>> = (
+  c: ServiceContext<TVariables>,
+  // biome-ignore lint/suspicious/noExplicitAny: same as RpcHandler.
+  input: any,
+  // biome-ignore lint/suspicious/noExplicitAny: same as RpcHandler.
+) => any;
+
+/** SSE handler: `(c, stream)` — a stream has no body. */
+type SseHandler<TVariables extends Record<string, unknown>> = (
+  c: ServiceContext<TVariables>,
+  stream: TypedSSEStream<Record<string, ApiSchema>>,
+) => void | Promise<void>;
+
+/** Handler of an endpoint registered with no definition chain at all. */
+type BareHandler<TVariables extends Record<string, unknown>> = (
+  c: ServiceContext<TVariables>,
+  input: undefined,
+) => Response | Promise<Response>;
 
 /**
  * Fluent builder for constructing a versioned Hono service.
  *
- * @typeParam TProject - The project type for `app.project`.
- * @typeParam TProviders - The inferred provider map from `.provide()` calls.
+ * @typeParam TProject - The project type provider factories see as `base.project`.
+ * @typeParam TVariables - The context variable map: `EndpointVariables` widened
+ *   by each `.provide()` call, so `c.get("things")` is typed in every handler.
  */
-class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
+class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
   private readonly _config: ServiceConfig;
   private readonly _providers: Record<
     string,
     (base: BaseApp<TProject>) => unknown
   >;
-  private readonly _versions: VersionDefinition[];
-  private readonly _previewEndpoints: EndpointRegistration[];
+  private readonly _events: RegistrationEvent[];
+  private readonly _defaults: ChainBuilder;
 
   constructor(
     config: ServiceConfig,
     providers: Record<string, (base: BaseApp<TProject>) => unknown> = {},
-    versions: VersionDefinition[] = [],
-    previewEndpoints: EndpointRegistration[] = [],
+    events: RegistrationEvent[] = [],
+    defaults: ChainBuilder = new ChainBuilder(),
   ) {
     if (!config.name.trim()) {
       throw new Error("Service name must not be empty");
     }
     this._config = config;
     this._providers = providers;
-    this._versions = versions;
-    this._previewEndpoints = previewEndpoints;
+    this._events = events;
+    this._defaults = defaults;
   }
 
   /**
    * Register provider factories that resolve concurrently for each request.
    * Factories receive the base app context and cannot depend on one another.
+   * Provided services reach handlers as typed context variables.
    */
   provide<P extends Record<string, (base: BaseApp<TProject>) => unknown>>(
     providers: P,
   ): ServiceBuilder<
     TProject,
-    TProviders & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
+    TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
   > {
     for (const key of Object.keys(providers)) {
       if (key === "project" || key === "_legacy") {
         throw new Error(`Provider name "${key}" is reserved by BaseApp`);
       }
+      if (key === "params" || key === "query") {
+        throw new Error(
+          `Provider name "${key}" is reserved for validated request data`,
+        );
+      }
     }
 
     return new ServiceBuilder<
       TProject,
-      TProviders & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
+      TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
     >(
       this._config,
       { ...this._providers, ...providers },
-      [...this._versions],
-      [...this._previewEndpoints],
+      [...this._events],
+      this._defaults,
     );
   }
 
-  /** Register a dated version whose endpoints inherit from earlier versions. */
-  version(
-    date: string,
-    define: (v: VersionBuilder<BaseApp<TProject> & TProviders>) => void,
-  ): this {
-    if (!isDateVersion(date)) {
-      throw new RangeError(
-        `Invalid API version "${date}"; expected a real date in YYYY-MM-DD form`,
-      );
-    }
-    if (this._versions.some((definition) => definition.version === date)) {
-      throw new Error(`API version "${date}" is registered more than once`);
-    }
+  // -- service-level defaults (ADR 001 §4) -----------------------------------
+  //
+  // A `.withX()` on the service builder is the default for every endpoint.
+  // Endpoint-level re-declaration wins; `withMiddleware` stacks (service
+  // middleware runs first); `withAuth` keeps its override semantics including
+  // `"none"`; `withCache` / `withRateLimit` have per-endpoint opt-outs.
 
-    const builder = new VersionBuilder<BaseApp<TProject> & TProviders>();
-    define(builder);
-    this._versions.push({ version: date, endpoints: builder._endpoints });
+  withDocs(docs: EndpointDocs): this {
+    this._defaults.withDocs(docs);
     return this;
   }
 
-  /** Register preview-only endpoints that are excluded from `latest`. */
-  preview(
-    define: (v: VersionBuilder<BaseApp<TProject> & TProviders>) => void,
+  withAuth(auth: "default" | "none" | MiddlewareHandler): this {
+    this._defaults.withAuth(auth);
+    return this;
+  }
+
+  withPermission(permission: Parameters<DefaultsChain["withPermission"]>[0]): this {
+    this._defaults.withPermission(permission);
+    return this;
+  }
+
+  withoutPermission(reason: string): this {
+    this._defaults.withoutPermission(reason);
+    return this;
+  }
+
+  withResourceLimit(limitType: string): this {
+    this._defaults.withResourceLimit(limitType);
+    return this;
+  }
+
+  withMiddleware(...middleware: MiddlewareHandler[]): this {
+    this._defaults.withMiddleware(...middleware);
+    return this;
+  }
+
+  withMeta(meta: unknown): this {
+    this._defaults.withMeta(meta);
+    return this;
+  }
+
+  withRateLimit(): this {
+    this._defaults.withRateLimit();
+    return this;
+  }
+
+  withCache(tag: string, ttlSeconds: number): this {
+    this._defaults.withCache(tag, ttlSeconds);
+    return this;
+  }
+
+  withDeprecated(notice: string): this {
+    this._defaults.withDeprecated(notice);
+    return this;
+  }
+
+  // -- registration -----------------------------------------------------------
+
+  /**
+   * Register an RPC endpoint: a dotted lower-camelCase name, mounted as a POST
+   * at `/api/{service}/{version}/{name}`. Every argument travels in the JSON
+   * body. An endpoint with no required arguments declares no `withInput`, and
+   * a bodyless POST and a `{}` POST both succeed.
+   */
+  register<TName extends string>(
+    name: TName & RpcName<TName>,
+    version: VersionLabel,
+    handler: BareHandler<TVariables>,
+  ): this;
+  register<TName extends string>(
+    name: TName & RpcName<TName>,
+    version: VersionLabel,
+    handler: RpcHandler<TVariables>,
+    define: (b: RpcChain) => RpcChain,
+  ): this;
+  register(
+    name: string,
+    version: string,
+    handler: unknown,
+    define?: (b: ChainBuilder) => unknown,
   ): this {
-    const builder = new VersionBuilder<BaseApp<TProject> & TProviders>();
-    define(builder);
-    this._previewEndpoints.push(...builder._endpoints);
+    this._registerRpc(name, version, undefined, handler, define);
+    return this;
+  }
+
+  /**
+   * Register an SSE endpoint: a dotted name mounted as a GET. The handler
+   * takes `(c, stream)`; request data arrives through `withQuery` only.
+   */
+  registerSse<TName extends string>(
+    name: TName & RpcName<TName>,
+    version: VersionLabel,
+    handler: SseHandler<TVariables>,
+    define?: (b: SseChain) => SseChain,
+  ): this {
+    this._registerSse(name, version, undefined, handler, define);
+    return this;
+  }
+
+  /**
+   * Register a resource-REST endpoint with an explicit method and path, for
+   * the existing REST management families. New families use `register`.
+   */
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: VersionLabel,
+    handler: BareHandler<TVariables>,
+  ): this;
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: VersionLabel,
+    handler: RouteHandler<TVariables>,
+    define: (b: RouteChain) => RouteChain,
+  ): this;
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: string,
+    handler: unknown,
+    define?: (b: ChainBuilder) => unknown,
+  ): this {
+    this._registerRoute(method, path, version, undefined, handler, define);
+    return this;
+  }
+
+  /**
+   * A registrar sharing a chain across endpoints (ADR 001 §5). Dotted names
+   * registered through the group are prefixed with the group's name and
+   * grammar-checked on the full name; `registerRoute` paths are used as-is.
+   * Groups do not nest and carry no version.
+   */
+  group(
+    name: string,
+    define?: (b: DefaultsChain) => DefaultsChain,
+  ): GroupRegistrar<TVariables> {
+    return new GroupRegistrar<TVariables>(this, name, collectDef(define));
+  }
+
+  /**
+   * Withdraw an endpoint: 410 Gone from `version` onward, on every mount, with
+   * the withdrawn endpoint's config still on the mount report. Names a dotted
+   * RPC/SSE name or a REST route path.
+   */
+  withdraw(name: string, version: VersionLabel): this {
+    this._withdraw(name, version);
     return this;
   }
 
@@ -124,67 +323,259 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       onError,
       providers: this._providers,
       serviceConfig: this._config,
-      versionMap: resolveVersions({
-        definitions: this._versions,
-        previewEndpoints: this._previewEndpoints,
-      }),
+      versionMap: resolveVersions(this._events),
     });
     app.onError(onError);
     return app;
   }
 
+  // -- internal registration (shared with GroupRegistrar) ---------------------
+
+  /** @internal */
+  _registerRpc(
+    name: string,
+    version: string,
+    groupDefaults: RawEndpointDef | undefined,
+    handler: unknown,
+    define: ((b: ChainBuilder) => unknown) | undefined,
+  ): void {
+    assertVersionLabel(version);
+    assertRpcName(name);
+    const def = collectDef(define);
+    assertRpcDef({ name, def });
+    const config = mergeDefs(this._defaults._def, groupDefaults ?? {}, def);
+    assertStatusInvariant({ method: "post", path: `/${name}`, def: config });
+    this._events.push({
+      version,
+      endpoint: {
+        method: "post",
+        path: `/${name}`,
+        config,
+        handler: handler as (...args: unknown[]) => unknown,
+      },
+    });
+  }
+
+  /** @internal */
+  _registerSse(
+    name: string,
+    version: string,
+    groupDefaults: RawEndpointDef | undefined,
+    handler: unknown,
+    define: ((b: ChainBuilder) => unknown) | undefined,
+  ): void {
+    assertVersionLabel(version);
+    assertRpcName(name);
+    const def = collectDef(define);
+    assertSseDef({ name, def });
+    const config = mergeDefs(this._defaults._def, groupDefaults ?? {}, def);
+    this._events.push({
+      version,
+      endpoint: {
+        method: "sse",
+        path: `/${name}`,
+        config,
+        handler: handler as (...args: unknown[]) => unknown,
+      },
+    });
+  }
+
+  /** @internal */
+  _registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: string,
+    groupDefaults: RawEndpointDef | undefined,
+    handler: unknown,
+    define: ((b: ChainBuilder) => unknown) | undefined,
+  ): void {
+    assertVersionLabel(version);
+    assertRoutePath(path);
+    const def = collectDef(define);
+    const config = mergeDefs(this._defaults._def, groupDefaults ?? {}, def);
+    assertStatusInvariant({ method, path, def: config });
+    this._events.push({
+      version,
+      endpoint: {
+        method,
+        path,
+        config,
+        handler: handler as (...args: unknown[]) => unknown,
+      },
+    });
+  }
+
+  /** @internal */
+  _withdraw(name: string, version: string): void {
+    assertVersionLabel(version);
+    const path = name.startsWith("/") ? name : `/${name}`;
+    this._events.push({
+      version,
+      endpoint: {
+        method: "get",
+        path,
+        config: {},
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        handler: () => {},
+        withdrawn: true,
+      },
+    });
+  }
+
   private _validateConfiguration(): void {
-    const endpoints = [
-      ...this._versions.flatMap((definition) => definition.endpoints),
-      ...this._previewEndpoints,
-    ];
-    for (const endpoint of endpoints) {
+    for (const { endpoint } of this._events) {
+      if (endpoint.withdrawn) continue;
+      const route = `${(endpoint.method === "sse" ? "get" : endpoint.method).toUpperCase()} ${
+        endpoint.path
+      }`;
+      const { config } = endpoint;
+      const optedOut = config.noPermission;
+      if (Boolean(config.permission) === Boolean(optedOut)) {
+        throw new Error(
+          `Endpoint ${route} must declare exactly one of withPermission or ` +
+            `withoutPermission`,
+        );
+      }
+      if (optedOut && optedOut.reason.trim() === "") {
+        throw new Error(
+          `Endpoint ${route} opts out of its permission check with a blank reason`,
+        );
+      }
+      if (config.permission && !this._config.permissionEnforcer) {
+        throw new Error(
+          `Endpoint ${route} declares permission "${config.permission}" but ` +
+            `the service has no permissionEnforcer`,
+        );
+      }
       if (
-        endpoint.config.resourceLimit &&
+        config.resourceLimit &&
         !this._config._legacy?.resourceLimitMiddleware
       ) {
         throw new Error(
-          `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} declares resourceLimit ` +
-            `"${endpoint.config.resourceLimit}" but the service has no resourceLimitMiddleware`,
+          `Endpoint ${route} declares resourceLimit ` +
+            `"${config.resourceLimit}" but the service has no resourceLimitMiddleware`,
         );
       }
-      // The runtime half of AccessDeclaration (@langwatch/authz): exactly one
-      // of permission or a written opt-out, judged before the wiring checks so
-      // an invalid declaration is named as such rather than as missing
-      // plumbing. A withdrawal marker carries a placeholder config — its
-      // access came from the registration it withdraws, and its handler never
-      // runs.
-      if (!endpoint.withdrawn) {
-        const optedOut = endpoint.config.noPermission;
-        if (Boolean(endpoint.config.permission) === Boolean(optedOut)) {
-          throw new Error(
-            `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} must declare exactly one of ` +
-              `\`permission\` or \`noPermission: { reason }\``,
-          );
-        }
-        if (optedOut && optedOut.reason.trim() === "") {
-          throw new Error(
-            `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} opts out of its permission ` +
-              `check with a blank reason`,
-          );
-        }
-      }
-      if (endpoint.config.permission && !this._config.permissionEnforcer) {
+      if (config.rateLimit && !this._config.rateLimiter) {
         throw new Error(
-          `Endpoint ${endpoint.method.toUpperCase()} ${endpoint.path} declares permission ` +
-            `"${endpoint.config.permission}" but the service has no permissionEnforcer`,
+          `Endpoint ${route} declares withRateLimit but the service has no ` +
+            `"rateLimiter" port; pass one to createService({ rateLimiter })`,
+        );
+      }
+      if (config.cache && !this._config.cache) {
+        throw new Error(
+          `Endpoint ${route} declares withCache but the service has no ` +
+            `"cache" port; pass one to createService({ cache })`,
+        );
+      }
+      if (config.cache && !config.output) {
+        throw new Error(
+          `Endpoint ${route} declares withCache but no "output"; ` +
+            `unvalidated bytes may not be cached`,
         );
       }
     }
   }
 }
 
+/**
+ * The registrar returned by `service.group(name, define?)`: the same
+ * registration methods as the service, with the group's chain applied as
+ * defaults between the service defaults and the endpoint's own declaration.
+ */
+class GroupRegistrar<TVariables extends Record<string, unknown>> {
+  constructor(
+    // biome-ignore lint/suspicious/noExplicitAny: the registrar never touches provider factories, so the project type is irrelevant here and `unknown` would be invariant.
+    private readonly _service: ServiceBuilder<any, TVariables>,
+    private readonly _name: string,
+    private readonly _defaults: RawEndpointDef,
+  ) {}
+
+  register(
+    name: string,
+    version: VersionLabel,
+    handler: BareHandler<TVariables>,
+  ): void;
+  register(
+    name: string,
+    version: VersionLabel,
+    handler: RpcHandler<TVariables>,
+    define: (b: RpcChain) => RpcChain,
+  ): void;
+  register(
+    name: string,
+    version: string,
+    handler: unknown,
+    define?: (b: ChainBuilder) => unknown,
+  ): void {
+    this._service._registerRpc(
+      `${this._name}.${name}`,
+      version,
+      this._defaults,
+      handler,
+      define,
+    );
+  }
+
+  registerSse(
+    name: string,
+    version: VersionLabel,
+    handler: SseHandler<TVariables>,
+    define?: (b: SseChain) => SseChain,
+  ): void {
+    this._service._registerSse(
+      `${this._name}.${name}`,
+      version,
+      this._defaults,
+      handler,
+      define,
+    );
+  }
+
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: VersionLabel,
+    handler: BareHandler<TVariables>,
+  ): void;
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: VersionLabel,
+    handler: RouteHandler<TVariables>,
+    define: (b: RouteChain) => RouteChain,
+  ): void;
+  registerRoute(
+    method: HttpMethod,
+    path: string,
+    version: string,
+    handler: unknown,
+    define?: (b: ChainBuilder) => unknown,
+  ): void {
+    // REST paths are used as-is: they already carry their shape.
+    this._service._registerRoute(
+      method,
+      path,
+      version,
+      this._defaults,
+      handler,
+      define,
+    );
+  }
+
+  withdraw(name: string, version: VersionLabel): void {
+    this._service._withdraw(
+      name.startsWith("/") ? name : `${this._name}.${name}`,
+      version,
+    );
+  }
+}
+
 /** Creates a new typed service builder. */
 export function createService<TProject = unknown>(
   config: ServiceConfig,
-  // biome-ignore lint/complexity/noBannedTypes: the route map starts empty and is widened by each .route() call; Record<string, never> would reject them.
-): ServiceBuilder<TProject, {}> {
+): ServiceBuilder<TProject, EndpointVariables> {
   return new ServiceBuilder(config);
 }
 
-export { ServiceBuilder, VersionBuilder };
+export { ServiceBuilder, GroupRegistrar };

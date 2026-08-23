@@ -2,7 +2,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createService } from "../builder.js";
+import { createTestService as createService } from "./test-service.js";
 
 // ---------------------------------------------------------------------------
 // An RPC endpoint has to reach the published document exactly like a REST one.
@@ -19,30 +19,33 @@ const RPC_SPEC_OPTIONS = { excludeStaticFile: false } as const;
 
 function buildRpcService() {
   return createService({ name: "things", basePath: "/api/things" })
-    .version("2026-08-07", (v) => {
-      v.rpc(
-        "/things.create",
-        { noPermission: { reason: "framework test endpoint" },
-          input: z.object({ name: z.string() }),
-          output: z.object({ name: z.string() }),
-          status: 201,
-          description: "Create a thing",
-          docs: { operationId: "createThing", tags: ["Things"] },
-        },
-        async (_c, { input }) => input,
-      );
-    })
+    .register(
+      "things.create",
+      "2026-08-07",
+      async (_c, input: { name: string }) => input,
+      (b) =>
+        b
+          .withInput(z.object({ name: z.string() }))
+          .withOutput(z.object({ name: z.string() }))
+          .withDocs({
+            operationId: "createThing",
+            tags: ["Things"],
+            description: "Create a thing",
+          }),
+    )
     .build();
 }
 
-describe("v.rpc OpenAPI generation", () => {
+describe("RPC OpenAPI generation", () => {
   describe("given an RPC endpoint declaring docs", () => {
-    it("publishes it at the bare alias path", async () => {
+    it("publishes it at every dated version plus latest, never a bare path", async () => {
       const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
 
-      expect(Object.keys(spec.paths ?? {})).toContain(
-        "/api/things/things.create",
-      );
+      const paths = Object.keys(spec.paths ?? {});
+      expect(paths.filter((p) => p.includes("things.create")).sort()).toEqual([
+        "/api/things/2026-08-07/things.create",
+        "/api/things/latest/things.create",
+      ]);
     });
 
     it("publishes it as a POST carrying its operationId", async () => {
@@ -50,7 +53,7 @@ describe("v.rpc OpenAPI generation", () => {
 
       const operation = (
         spec.paths as Record<string, Record<string, { operationId?: string }>>
-      )["/api/things/things.create"]?.post;
+      )["/api/things/2026-08-07/things.create"]?.post;
 
       expect(operation?.operationId).toBe("createThing");
     });
@@ -59,23 +62,10 @@ describe("v.rpc OpenAPI generation", () => {
       const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
 
       const operation = (
-        spec.paths as Record<
-          string,
-          Record<string, { requestBody?: unknown }>
-        >
-      )["/api/things/things.create"]?.post;
+        spec.paths as Record<string, Record<string, { requestBody?: unknown }>>
+      )["/api/things/2026-08-07/things.create"]?.post;
 
       expect(operation?.requestBody).toBeDefined();
-    });
-
-    it("publishes the bare alias only, never the dated or latest mounts", async () => {
-      const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
-
-      const paths = Object.keys(spec.paths ?? {});
-
-      expect(paths.filter((p) => p.includes("things.create"))).toEqual([
-        "/api/things/things.create",
-      ]);
     });
   });
 

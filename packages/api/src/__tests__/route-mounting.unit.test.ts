@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createService } from "../builder.js";
+import { createTestService as createService } from "./test-service.js";
 import type { MountedRoute } from "../types.js";
 
 // ---------------------------------------------------------------------------
 // onRouteMounted contract: one callback per mounted route, with the absolute
 // path exactly as the Hono route table reports it. The app builds its route
 // policy registry from these callbacks, so completeness (guards and withdrawn
-// mounts included) is the whole point.
+// mounts included) is the whole point. With the bare alias gone (ADR 002),
+// every reported endpoint mount names its version namespace.
 // ---------------------------------------------------------------------------
 
 const GUARD_PATH =
@@ -36,7 +37,7 @@ function bySummary(a: Summary, b: Summary): number {
     a.path.localeCompare(b.path) ||
     a.method.localeCompare(b.method) ||
     (a.version ?? "").localeCompare(b.version ?? "") ||
-    a.status.localeCompare(b.status) ||
+    (a.status ?? "").localeCompare(b.status ?? "") ||
     Number(a.withdrawn) - Number(b.withdrawn) ||
     Number(a.isNamespaceGuard) - Number(b.isNamespaceGuard)
   );
@@ -51,23 +52,27 @@ describe("onRouteMounted", () => {
         basePath: "/api/test",
         onRouteMounted: (route) => mounted.push(route),
       })
-        .version("2025-03-15", (v) => {
-          v.get("/items", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => []);
-          v.post(
-            "/items",
-            { noPermission: { reason: "framework test endpoint" },
-              input: z.object({ name: z.string() }),
-              output: z.object({ name: z.string() }),
-              status: 201,
-            },
-            async (_c, { input }) => input,
-          );
-        })
+        .registerRoute(
+          "get",
+          "/items",
+          "2025-03-15",
+          async () => [] as string[],
+          (b) => b.withOutput(z.array(z.string())),
+        )
+        .register(
+          "items.create",
+          "2025-03-15",
+          async (_c, input: { name: string }) => input,
+          (b) =>
+            b
+              .withInput(z.object({ name: z.string() }))
+              .withOutput(z.object({ name: z.string() })),
+        )
         .build();
       return { app, mounted };
     }
 
-    it("fires exactly once per mount: dated, latest, bare, and both namespace guards", () => {
+    it("fires exactly once per mount: dated, latest, and both namespace guards", () => {
       const { mounted } = buildSingleVersionService();
 
       const expected: Summary[] = [
@@ -82,7 +87,7 @@ describe("onRouteMounted", () => {
         },
         {
           method: "post",
-          path: "/api/test/2025-03-15/items",
+          path: "/api/test/2025-03-15/items.create",
           version: "2025-03-15",
           status: "stable",
           withdrawn: false,
@@ -99,7 +104,7 @@ describe("onRouteMounted", () => {
         },
         {
           method: "post",
-          path: "/api/test/latest/items",
+          path: "/api/test/latest/items.create",
           version: "latest",
           status: "latest",
           withdrawn: false,
@@ -111,7 +116,7 @@ describe("onRouteMounted", () => {
           method: "all",
           path: GUARD_PATH,
           version: null,
-          status: "unversioned",
+          status: null,
           withdrawn: false,
           isNamespaceGuard: true,
         },
@@ -119,45 +124,50 @@ describe("onRouteMounted", () => {
           method: "all",
           path: GUARD_WILDCARD_PATH,
           version: null,
-          status: "unversioned",
+          status: null,
           withdrawn: false,
           isNamespaceGuard: true,
         },
-        // bare alias
-        {
-          method: "get",
-          path: "/api/test/items",
-          version: null,
-          status: "unversioned",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
-        {
-          method: "post",
-          path: "/api/test/items",
-          version: null,
-          status: "unversioned",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
       ];
 
+      // No bare alias: 4 endpoint mounts + 2 guards, plus one rpc.discover
+      // catalogue mount per namespace (dated and latest).
       expect(mounted).toHaveLength(8);
-      expect(mounted.map(summarize).sort(bySummary)).toEqual(
-        [...expected].sort(bySummary),
+      expect(
+        mounted
+          .filter((route) => !route.isDiscoverEndpoint)
+          .map(summarize)
+          .sort(bySummary),
+      ).toEqual([...expected].sort(bySummary));
+
+      const discoverMounts = mounted.filter(
+        (route) => route.isDiscoverEndpoint,
       );
+      expect(discoverMounts.map((route) => route.path).sort()).toEqual([
+        "/api/test/2025-03-15/rpc.discover",
+        "/api/test/latest/rpc.discover",
+      ]);
     });
 
-    it("carries the endpoint config on every mount and null only on the guards", () => {
+    it("carries the endpoint config on every mount and null only on guards and discover mounts", () => {
       const { mounted } = buildSingleVersionService();
 
       const guardPaths = mounted
         .filter((route) => route.config === null)
         .map((route) => route.path)
         .sort();
-      expect(guardPaths).toEqual([GUARD_PATH, GUARD_WILDCARD_PATH].sort());
+      expect(guardPaths).toEqual(
+        [
+          GUARD_PATH,
+          GUARD_WILDCARD_PATH,
+          "/api/test/2025-03-15/rpc.discover",
+          "/api/test/latest/rpc.discover",
+        ].sort(),
+      );
 
-      for (const route of mounted.filter((r) => !r.isNamespaceGuard)) {
+      for (const route of mounted.filter(
+        (r) => !r.isNamespaceGuard && !r.isDiscoverEndpoint,
+      )) {
         expect(route.config).not.toBeNull();
       }
     });
@@ -171,19 +181,23 @@ describe("onRouteMounted", () => {
         basePath: "/api/test",
         onRouteMounted: (route) => mounted.push(route),
       })
-        .version("2025-03-15", (v) => {
-          v.get("/", { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
-          v.get(
-            "/items/:id",
-            { noPermission: { reason: "framework test endpoint" },
-              params: z.object({ id: z.string() }),
-              output: z.object({ id: z.string() }),
-            },
-            async (_c, { params }) => ({ id: params.id }),
-          );
-        })
+        .registerRoute(
+          "get",
+          "/",
+          "2025-03-15",
+          async () => ({ ok: true }),
+          (b) => b.withOutput(z.object({ ok: z.boolean() })),
+        )
+        .registerRoute(
+          "get",
+          "/items/:id",
+          "2025-03-15",
+          async (c) => ({ id: c.get("params").id }),
+          (b) =>
+            b
+              .withParams(z.object({ id: z.string() }))
+              .withOutput(z.object({ id: z.string() })),
+        )
         .build();
 
       const table = new Set(
@@ -217,20 +231,19 @@ describe("onRouteMounted", () => {
         basePath: "/api/test",
         onRouteMounted: (route) => mounted.push(route),
       })
-        .version("2025-01-01", (v) => {
-          v.get(
-            "/old",
-            { noPermission: { reason: "framework test endpoint" }, meta, output: z.object({ ok: z.boolean() }) },
-            async () => ({ ok: true }),
-          );
-        })
-        .version("2025-06-01", (v) => {
-          v.withdraw("get", "/old");
-        })
+        .registerRoute(
+          "get",
+          "/old",
+          "2025-01-01",
+          async () => ({ ok: true }),
+          (b) => b.withMeta(meta).withOutput(z.object({ ok: z.boolean() })),
+        )
+        .withdraw("/old", "2025-06-01")
         .build();
 
-      // 1 dated 2025-01-01 + 1 dated 2025-06-01 + 1 latest + 2 guards + 1 bare
-      expect(mounted).toHaveLength(6);
+      // 1 dated 2025-01-01 + 1 dated 2025-06-01 + 1 latest + 2 guards, plus
+      // one rpc.discover mount per namespace (three).
+      expect(mounted).toHaveLength(8);
 
       const withdrawn = mounted.filter((route) => route.withdrawn);
       expect(
@@ -246,10 +259,9 @@ describe("onRouteMounted", () => {
           status: "stable",
         },
         { path: "/api/test/latest/old", version: "latest", status: "latest" },
-        { path: "/api/test/old", version: null, status: "unversioned" },
       ]);
       for (const route of withdrawn) {
-        expect(route.config?.meta).toBe(meta);
+        expect(route.config?.meta).toEqual(meta);
       }
 
       const live = mounted.find(
@@ -267,34 +279,38 @@ describe("onRouteMounted", () => {
         basePath: "/api/test",
         onRouteMounted: (route) => mounted.push(route),
       })
-        .version("2025-03-15", (v) => {
-          v.sse(
-            "/stream",
-            { noPermission: { reason: "framework test endpoint" }, events: { tick: z.object({ n: z.number() }) } },
-            async (_c, _args, stream) => {
-              stream.close();
-            },
-          );
-        })
-        .preview((v) => {
-          v.get(
-            "/beta",
-            { noPermission: { reason: "framework test endpoint" }, output: z.object({ beta: z.boolean() }) },
-            async () => ({ beta: true }),
-          );
-        })
+        .registerSse(
+          "things.stream",
+          "2025-03-15",
+          async (_c, stream) => {
+            stream.close();
+          },
+          (b) => b.withEvents({ tick: z.object({ n: z.number() }) }),
+        )
+        .register(
+          "things.beta",
+          "preview",
+          async () => ({ beta: true }),
+          (b) => b.withOutput(z.object({ beta: z.boolean() })),
+        )
         .build();
 
       expect(
         mounted
-          .filter((route) => route.status === "preview")
+          .filter(
+            (route) => route.status === "preview" && !route.isDiscoverEndpoint,
+          )
           .map(({ method, path, version }) => ({ method, path, version })),
       ).toEqual([
-        { method: "get", path: "/api/test/preview/beta", version: "preview" },
+        {
+          method: "post",
+          path: "/api/test/preview/things.beta",
+          version: "preview",
+        },
       ]);
 
       const streamMounts = mounted.filter((route) =>
-        route.path.endsWith("/stream"),
+        route.path.endsWith("/things.stream"),
       );
       expect(streamMounts.length).toBeGreaterThan(0);
       for (const route of streamMounts) {

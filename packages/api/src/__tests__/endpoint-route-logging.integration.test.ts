@@ -37,7 +37,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createService } = await import("../builder.js");
+const { createService: createRawService } = await import("../builder.js");
+const createService: typeof createRawService = ((config: Parameters<
+  typeof createRawService
+>[0]) =>
+  createRawService(config).withoutPermission(
+    "framework test endpoint",
+  )) as typeof createRawService;
 
 const requestRecords = () =>
   logRecords.filter(
@@ -55,13 +61,13 @@ describe("the endpoint a request matched", () => {
   describe("given an endpoint carrying a path parameter", () => {
     function buildService() {
       return createService({ name: "things", basePath: "/api/things" })
-        .version("2026-08-07", (v) => {
-          v.get(
-            "/things/:id",
-            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }) },
-            async (c) => ({ id: c.req.param("id") as string }),
-          );
-        })
+        .registerRoute(
+          "get",
+          "/things/:id",
+          "2026-08-07",
+          async (c) => ({ id: c.req.param("id") as string }),
+          (b) => b.withOutput(z.object({ id: z.string() })),
+        )
         .build();
     }
 
@@ -69,7 +75,7 @@ describe("the endpoint a request matched", () => {
       it("logs the registered pattern, not the path that arrived", async () => {
         const app = buildService();
 
-        const res = await app.request("/api/things/things/th_01J9Z");
+        const res = await app.request("/api/things/2026-08-07/things/th_01J9Z");
 
         expect(res.status).toBe(200);
         expect(routeOf()).toBe("GET /things/:id");
@@ -83,29 +89,33 @@ describe("the endpoint a request matched", () => {
       it("keeps the concrete path alongside it", async () => {
         const app = buildService();
 
-        await app.request("/api/things/things/th_01J9Z");
+        await app.request("/api/things/2026-08-07/things/th_01J9Z");
 
         expect(requestRecords()[0]?.payload.url).toBe(
-          "/api/things/things/th_01J9Z",
+          "/api/things/2026-08-07/things/th_01J9Z",
         );
       });
     });
   });
 
-  describe("given a dated version of an endpoint", () => {
-    describe("when the dated mount is called", () => {
-      it("reports the same route as the bare alias", async () => {
+  describe("given an endpoint mounted under two namespaces", () => {
+    describe("when the dated and latest mounts are called", () => {
+      it("reports the same route for both", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
-          .version("2026-08-07", (v) => {
-            v.get("/widgets", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => []);
-          })
+          .registerRoute(
+            "get",
+            "/widgets",
+            "2026-08-07",
+            async () => [] as string[],
+            (b) => b.withOutput(z.array(z.string())),
+          )
           .build();
 
         await app.request("/api/things/2026-08-07/widgets");
         const dated = routeOf();
         logRecords.length = 0;
 
-        await app.request("/api/things/widgets");
+        await app.request("/api/things/latest/widgets");
 
         expect(dated).toBe("GET /widgets");
         expect(routeOf()).toBe("GET /widgets");
@@ -117,12 +127,14 @@ describe("the endpoint a request matched", () => {
     describe("when a caller still on it is answered 410", () => {
       it("still says which endpoint they were calling", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
-          .version("2026-08-07", (v) => {
-            v.get("/legacy", { noPermission: { reason: "framework test endpoint" }, output: z.string() }, async () => "x");
-          })
-          .version("2026-09-01", (v) => {
-            v.withdraw("get", "/legacy");
-          })
+          .registerRoute(
+            "get",
+            "/legacy",
+            "2026-08-07",
+            async () => "x",
+            (b) => b.withOutput(z.string()),
+          )
+          .withdraw("/legacy", "2026-09-01")
           .build();
 
         const res = await app.request("/api/things/2026-09-01/legacy");
@@ -143,17 +155,17 @@ describe("the endpoint a request matched", () => {
     describe("when the response is serialised", () => {
       it("names the endpoint in the error", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
-          .version("2026-08-07", (v) => {
-            v.get(
-              "/broken",
-              { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number() }) },
-              // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
-              async () => ({ id: "not-a-number" }) as any,
-            );
-          })
+          .registerRoute(
+            "get",
+            "/broken",
+            "2026-08-07",
+            // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
+            async () => ({ id: "not-a-number" }) as any,
+            (b) => b.withOutput(z.object({ id: z.number() })),
+          )
           .build();
 
-        const res = await app.request("/api/things/broken");
+        const res = await app.request("/api/things/2026-08-07/broken");
 
         expect(res.status).toBe(500);
         const cause = requestRecords()[0]?.payload.error as
@@ -165,18 +177,18 @@ describe("the endpoint a request matched", () => {
 
       it("still answers the caller with an unknown error, not the detail", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
-          .version("2026-08-07", (v) => {
-            v.get(
-              "/broken",
-              { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number() }) },
-              // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
-              async () => ({ id: "not-a-number" }) as any,
-            );
-          })
+          .registerRoute(
+            "get",
+            "/broken",
+            "2026-08-07",
+            // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
+            async () => ({ id: "not-a-number" }) as any,
+            (b) => b.withOutput(z.object({ id: z.number() })),
+          )
           .build();
 
         const body = (await (
-          await app.request("/api/things/broken")
+          await app.request("/api/things/2026-08-07/broken")
         ).json()) as Record<string, unknown>;
 
         expect(JSON.stringify(body)).not.toContain("not-a-number");

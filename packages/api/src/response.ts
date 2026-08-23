@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 
-import { ENDPOINT_ROUTE, type EndpointConfig } from "./types.js";
+import { parseApiSchemaSync } from "./schema.js";
+import { ENDPOINT_ROUTE, type EndpointDef } from "./types.js";
 
 /** Validates and serializes the value returned by a regular endpoint handler. */
 export function serializeEndpointResult({
@@ -9,7 +10,7 @@ export function serializeEndpointResult({
   result,
 }: {
   c: Context;
-  config: EndpointConfig;
+  config: EndpointDef;
   result: unknown;
 }): Response {
   // A handler that builds its own `Response` owns it completely — status,
@@ -17,9 +18,9 @@ export function serializeEndpointResult({
   // bypassed output validation long before the status rule below existed; a
   // redirect, a file stream and a hand-built error all need it. So the
   // invariant that follows governs VALUE-returning handlers. It is not a
-  // guarantee about every byte an endpoint can emit, and `Handler` in
-  // `types.ts` in fact requires a `Response` when no `output` is declared,
-  // which makes the next branch unreachable from typed code.
+  // guarantee about every byte an endpoint can emit, and the no-chain
+  // registration overload in fact requires a `Response` when no `output` is
+  // declared, which makes the next branch unreachable from typed code.
   if (result instanceof Response) {
     return result;
   }
@@ -30,18 +31,13 @@ export function serializeEndpointResult({
   // present. Choosing here is what previously let one operation answer 200 on
   // the request that found something and 204 on the one that did not.
   //
-  // It also cost the declared status its meaning: the old undefined branch
-  // used `config.status ?? 204`, so an endpoint declaring `status: 201` with an
-  // optional output answered 201 with an empty body — a created response whose
-  // own schema promised a representation.
-  //
   // Reached only by an untyped caller, or a return type that drifted behind an
   // `any`: no declared body means no body.
   if (!config.output) {
     return c.body(null, config.status ?? 204);
   }
 
-  const validation = config.output.safeParse(result);
+  const validation = parseApiSchemaSync(config.output, result);
   if (!validation.success) {
     // Deliberately a plain `Error`, not a `HandledError`. We know the cause,
     // but the caller cannot act on it — the handler returned something its own
