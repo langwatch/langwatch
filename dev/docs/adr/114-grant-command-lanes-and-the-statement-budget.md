@@ -1,8 +1,9 @@
-# ADR-114: Grant commands share a sharded lane, and the statement budget is not first-come
+# ADR-114: Grant commands ride one ordered lane, and the statement budget is not first-come
 
 **Date:** 2026-08-23
 
-**Status:** Proposed
+**Status:** Accepted. **Decision 1 was amended the same day, before it ever ran
+in production** — see [Amendment](#amendment-2026-08-23--decision-1-traded-away-an-ordering-guarantee).
 
 **Builds on:** ADR-110 (a grant is its own aggregate), ADR-100 (the
 aggregate-scoped lane), ADR-066 pillar 2 (append coalescing).
@@ -74,54 +75,120 @@ migration was allowed to hold all 200 statement slots. The statement limiter
 total concurrency and bounds the wait queue, but it has no notion of what the
 statement is *for*. A bulk backfill and a customer's trace write are peers.
 
+## Amendment (2026-08-23) — decision 1 traded away an ordering guarantee
+
+The decision below originally sharded an organization's grant commands across
+32 lanes so their appends could coalesce. That shipped as #7435 and was
+withdrawn the same day, before the shape ever ran under load. This section
+records why, because the reasoning that justified it was wrong in a way worth
+keeping.
+
+The original text claimed: *"Different command **types** already sat in
+different lanes (the job path carries the command name), so nothing that was
+ordered stops being ordered."* The first half is true. The second half does
+not follow.
+
+`buildGroupKey` composes `${tenantId}/${jobPath}/${aggregateType}:${key}`, and
+for a command `jobPath` is `command/${commandName}`. So one grant's attach and
+its revoke have **always** lived in two different lanes:
+
+```text
+<org>/command/attachGrant/authz_grant:grant_7Hk2mQ
+<org>/command/revokeGrant/authz_grant:grant_7Hk2mQ    <- a different lane
+```
+
+Under the pre-existing shape both lanes held ~one command and drained
+immediately, so the skew between them was microseconds and the reordering was
+theoretical. Sharding was designed to make lanes **deep** — that was the whole
+point. A lane holding 1/32 of an organization's grant commands, next to a
+revoke lane holding almost none, makes the skew proportional to the backlog.
+The guarantee was formally unchanged and the *behaviour* was not, and the ADR
+described only the former.
+
+**The projection cannot recover the order downstream.** The `occurredAt` guard
+in `authz-grants-write.prisma.repository.ts` adjudicates between two writes to
+a row that exists; it cannot defend a row that does not:
+
+```text
+revoke lands first  ->  UPDATE ... WHERE id = g   ->  matches 0 rows, writes NOTHING
+attach lands second ->  INSERT ... ON CONFLICT    ->  inserts a LIVE row
+                                                      no revocation contradicts it
+```
+
+The repository's own docblock names this and assigns the fix elsewhere:
+*"There is no honest fix at this layer … The fix belongs to the migration."*
+That assignment is only sound while ordinary traffic does not reorder. Making
+lanes deep breaks the premise it rests on.
+
+The blast radius was bounded — `enforceGrantRevocation` writes `revokedAt` to
+the legacy row synchronously before the event is queued, so the enforcing path
+never waited on the queue, and the migration's own check reports a
+`grant_revoked` diff and holds the organization. So the exposure was a
+projection divergence that is detectable and eventually reconciled, not a
+silent grant of access. It was still a hazard the ADR had claimed not to
+introduce.
+
+**What replaced it is strictly stronger than what came before.**
+`serializeByAggregate: true` forces the key to the aggregate id *and* drops the
+command name from `jobPath`, so all three commands about one grant share one
+FIFO lane — closing a gap that predates this ADR entirely:
+
+```text
+BEFORE (ADR-110 default)     attach -> <org>/command/attachGrant/authz_grant:g
+                             revoke -> <org>/command/revokeGrant/authz_grant:g   two lanes
+
+#7435 (sharded, withdrawn)   attach -> <org>/command/attachGrant/authz_grant:14
+                             revoke -> <org>/command/revokeGrant/authz_grant:14  two DEEP lanes
+
+NOW (serializeByAggregate)   attach -> <org>/command/authz_grant:g
+                             revoke -> <org>/command/authz_grant:g               ONE lane, FIFO
+```
+
+It also changes how a lane is ordered. `serializeByAggregate` scores jobs by
+**arrival** (`Date.now()`) rather than by business time (`occurredAtScore`), so
+a grant's lane is strict enqueue-order FIFO. For a single aggregate that is the
+right meaning of "in order": a retry cannot sort itself ahead of a newer
+command by carrying an older timestamp.
+
+**What we gave up.** The 428,720 → ~8,500 statement reduction. That is a real
+loss and it is affordable for one reason: **#7429 removed the volume at
+source.** A pass now states only the facts the projection heads do not already
+carry, so the bulk producer that motivated the sharding no longer exists, and
+the migration itself has since finished. Buying throughput we no longer need
+with an ordering guarantee we do need is the wrong trade.
+
+Correspondingly, `commandShardKey.ts` moves back to
+`pipelines/trace-processing/commands/`, its only home again now that the
+grant lane no longer shares it.
+
 ## Decision
 
-### 1. Grant commands ride a sharded per-organization lane
+### 1. Every command about one grant rides one ordered lane
 
-`attachGrant`, `revokeGrant` and `changeGrantRole` take a `getGroupKey` that
-returns `hash(aggregateId) % 32` — the shard ALONE — plus a
-`coalesceMaxBatch` so that a lane's queued commands fold into one multi-row
-append.
+`attachGrant`, `revokeGrant` and `changeGrantRole` declare
+`serializeByAggregate: true`. The queue key becomes
+`<org>/command/authz_grant:<grantId>` — one FIFO lane per grant, holding every
+command type that can change it.
 
-The callback's result is not the queue key. `buildGroupKey`
-(`queueManager.ts`) composes `${tenantId}/${jobPath}/${aggregateType}:${key}`,
-so the organization is already in every key and the callback would only
-repeat it. That is what makes these lanes per-organization without the
-callback ever naming one:
+Distinct grants keep distinct lanes, so an organization's grant work is still
+as wide as the number of grants in flight; only the commands about *one* grant
+serialize, which is exactly the constraint the domain has.
 
-```text
-                    callback returns   final queue key
-BEFORE (aggregate)  "grant_7Hk2mQ"     <org>/command/attachGrant/authz_grant:grant_7Hk2mQ
-AFTER  (shard)      "14"               <org>/command/attachGrant/authz_grant:14
-```
-
-```text
-BEFORE                          AFTER
-one lane per grant              32 lanes per organization
-  grant_7Hk2mQ -> 1 insert        lane 14 -> [grant_7Hk2mQ, ...] 1 insert
-  grant_9Fs4tR -> 1 insert        lane 12 -> [grant_9Fs4tR, ...] 1 insert
-     x 428,720                    ...
-
-428,720 statements              ~8,500 statements at batch 50
-1,270-way parallelism           32-way parallelism per organization
-```
-
-The shard count is the trade: lanes buy parallelism, batches buy statement
-economy, and 32 is where an organization keeps enough of both. It is a
-constant with a name, not a tuned magic number, and the reasoning for
-changing it is recorded here.
+They also keep `coalesceMaxBatch`, which now means something narrower: it folds
+**one grant's** queued same-command jobs into a single insert. That is the
+`serializeByAggregate` shape `queueManager` explicitly names ("many commands,
+one aggregate"), and it is safe because those jobs share an aggregate and drain
+in order. It buys no cross-grant economy and is not meant to. Keeping it also
+keeps the registration out of the "grouped producer without append coalescing"
+gap the queue manager logs.
 
 **The fold is untouched.** ADR-110's aggregate stays the grant: fold state is
 still one grant, still `authz_grant:<grantId>`. What changes is only which
-queue lane a command *waits in* before it is handled. Aggregate identity and
-lane identity were the same string by default; this separates them, which is
-what the `getGroupKey` override on `CommandHandlerOptions` already exists for.
+queue lane a command *waits in* before it is handled.
 
-The commands qualify for coalescing on the ADR-066 contract without
-modification: `grantsLedgerCommands.ts` says it in its own docblock — "the
-grant commands are pure appends: validate, stamp identity, emit". Each handler
-derives its event from its own command alone and never reads back a same-batch
-append.
+Role commands keep the default per-aggregate lane. A role is a rare,
+human-sized entity, an organization has a handful, and no bulk producer emits
+them in volume.
 
 ### 2. The statement budget is shared per producer, not first-come
 
@@ -149,9 +216,8 @@ for without a parameter on every call site.
 
 This is deferred rather than sketched-and-shipped because it is a piece of
 work on the scale of the dispatch water-fill itself, and it sits on a hot
-path every ClickHouse caller in the app crosses. Decision 1 removes the
-pressure that made it urgent; this removes the class of incident. They are
-not substitutes and the second one should not be rushed behind the first.
+path every ClickHouse caller in the app crosses. It removes the *class* of
+incident; decision 1 no longer even attempts to.
 
 ## Rationale / Trade-offs
 
@@ -160,43 +226,56 @@ to what ClickHouse itself will accept; raising it moves the queue from our
 process into the database, where it is less visible and less recoverable. The
 budget is not the bug. Consuming all of it for restated facts is.
 
-**Why not just stop the restaging?** We are (PR #7429, the heads filter). But
-that fixes one producer. The lane shape is what made *any* bulk producer on
-this pipeline a platform-wide event, and the next migration would find it
-again. ADR-110's measurement and this one are the same pipeline's
-partitioning biting twice.
+**Why not keep sharding and fix the ordering elsewhere?** The two candidate
+homes both fail. The projection cannot: a revoke against an absent row writes
+nothing, and nothing in the `revoked` event carries the principal, scope and
+resource a tombstone row would need. The migration can be taught not to state
+a back-dated `attached` for an already-revoked grant — and should be, since
+that hazard predates all of this — but that only covers the migration, and the
+skew sharding introduces applies to ordinary interactive traffic too.
 
-**Why 32 shards and batch 50?** 428,720 facts ÷ (32 × 50) ≈ 268 rounds; at
-~1 s a statement that is a few minutes of appends rather than an afternoon,
-while leaving 32 concurrent lanes per organization. Both are constants that
-review may move; the ADR records the reasoning, not a claim of optimality.
+**Why is losing the batch factor acceptable?** Because #7429 deleted the
+demand rather than absorbing it. The 428,720 appends were a pass restating
+facts the heads already carried; a pass now states only what is missing, and
+the migration has finished. Should another bulk grant producer appear, the
+answer is decision 2 — bound what one producer may hold — not a wider lane
+that reorders a grant's own history.
 
-**What we give up.** An organization's grant commands no longer run
-1,270-wide. For interactive access changes this is invisible — they arrive
-one at a time and coalesce to batches of one, which is the pre-existing path
-unchanged. For bulk producers, 32 lanes of batched appends beats 1,270 lanes
-of single appends by roughly the batch factor, because the constraint is
-statements and never was slots.
+**Why not both — shard, and serialize a grant across command types?** The
+queue offers exactly two shapes and they are mutually exclusive.
+`serializeByAggregate` forces the key to the aggregate id and ignores
+`getGroupKey`; an explicit `getGroupKey` keeps the command name in the job
+path. There is no third option, and inventing one means changing
+`buildGroupKey` for every pipeline to buy back an economy we no longer need.
 
 ## Consequences
 
-- The migration's statement pressure falls by roughly the batch factor, so a
-  bulk import stops being visible to unrelated pipelines.
+- One grant's commands apply in the order they were issued, across command
+  types — a guarantee the pipeline did not have before this ADR, under either
+  of its versions.
+- A grant's lane is ordered by arrival rather than by business time. For a
+  single aggregate this is the stronger reading; nothing depended on the
+  previous one.
+- Grant append volume returns to one statement per event. Acceptable only
+  because #7429 removed the producer that made that expensive; if a new bulk
+  grant producer appears, decision 2 is the answer and this ADR is not.
 - Until decision 2 lands, one producer can still exhaust the statement
-  budget. Decision 1 makes that far harder for this pipeline and does
-  nothing for the next one; the containment gap stays open and named.
-- Grant commands for one organization serialize 32-ways rather than
-  arbitrarily wide. Anything that assumed unbounded per-grant command
-  parallelism would notice; nothing does today.
-- `gq_parked_groups` and the dispatch budget are unchanged. Parking was not
-  the constraint, and this ADR deliberately does not touch it.
+  budget. The containment gap stays open and named.
+- `commandShardKey.ts` returns to `pipelines/trace-processing/commands/`.
+  Trace-processing's own sharding is unaffected throughout — spans are
+  ReplacingMergeTree-deduplicated by business timestamp and carry no
+  cross-command ordering requirement, which is exactly why sharding is right
+  there and wrong here.
 
 ## References
 
 - `platform/app/src/server/event-sourcing/pipelines/authz-grants/pipeline.ts`
 - `platform/app/src/server/event-sourcing/services/queues/queueManager.ts`
-  (the group key: `${aggregateType}:${getAggregateId(payload)}`)
+  (the group key, and `serializeByAggregate`'s effect on `jobPath` and `scoreFn`)
+- `platform/app/src/server/app-layer/authz/repositories/authz-grants-write.prisma.repository.ts`
+  (the `occurredAt` guard, and the absent-row case it cannot defend)
 - `platform/app/src/server/clickhouse/statementLimit.ts`
 - `specs/event-sourcing/authz-grant-command-lanes.feature`
-- PR #7429 — the heads filter that stops the restaging at source
+- PR #7429 — the heads filter that stopped the restaging at source
+- PR #7435 — the sharded lane, superseded by the amendment above
 - ADR-110 — a grant is its own aggregate

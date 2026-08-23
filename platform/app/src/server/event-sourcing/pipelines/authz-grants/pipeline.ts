@@ -1,9 +1,5 @@
 import { definePipeline } from "../..";
 import {
-  GRANT_COALESCE_MAX_BATCH,
-  grantCommandLane,
-} from "./commands/grantCommandLane";
-import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
   ChangeRolePermissionsCommand,
@@ -25,6 +21,13 @@ import {
   type AuthzAuditTrailStore,
   createAuthzAuditTrailSubscriber,
 } from "./subscribers/authzAuditTrail.subscriber";
+
+/**
+ * How many of ONE grant's queued same-command jobs fold into a single insert.
+ * A ceiling on a redelivery or retry pile-up for one grant, not a throughput
+ * lever: distinct grants keep distinct lanes and never share a batch.
+ */
+export const GRANT_COALESCE_MAX_BATCH = 50;
 
 export interface AuthzGrantsPipelineDeps {
   /** Writes one guarded statement per event into the Grant and Role tables. */
@@ -60,31 +63,32 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
         "auditTrail",
         createAuthzAuditTrailSubscriber({ store: deps.authzAuditTrailStore }),
       )
-      // ADR-114: the three grant commands a bulk producer emits in volume share
-      // a sharded per-organization lane, so their appends coalesce instead of
-      // spending one ClickHouse statement each. The fold is untouched — state is
-      // still one grant, keyed by its own id (ADR-110). The role commands keep
-      // the default per-aggregate lane: a role is a rare, human-sized entity and
-      // an organization has a handful, so there is nothing to batch.
+      // ADR-114 (amended): every command about ONE grant rides ONE lane.
+      // `serializeByAggregate` keys the lane on the grant id AND drops the
+      // command NAME from the job path, so `attachGrant` and the `revokeGrant`
+      // that follows it queue behind each other instead of racing in two lanes.
+      //
+      // The projection's guard cannot recover that order on its own. `revoked`
+      // is a conditional UPDATE: a revoke that arrives before the row exists
+      // matches nothing and writes nothing, and the late `attached` then
+      // inserts a live row that no revocation contradicts. Ordering is the
+      // queue's job, and this option is what makes the queue do it.
+      //
+      // The batch bound stays, and means something narrower than it did: it
+      // folds ONE grant's own queued same-command jobs into a single insert —
+      // the `serializeByAggregate` shape `queueManager` names, safe precisely
+      // because those jobs share an aggregate. It buys no cross-grant economy,
+      // and is not meant to.
       .withCommand("attachGrant", AttachGrantCommand, {
-        getGroupKey: (payload) =>
-          grantCommandLane({
-            aggregateId: AttachGrantCommand.getAggregateId(payload),
-          }),
+        serializeByAggregate: true,
         coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })
       .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
-        getGroupKey: (payload) =>
-          grantCommandLane({
-            aggregateId: ChangeGrantRoleCommand.getAggregateId(payload),
-          }),
+        serializeByAggregate: true,
         coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })
       .withCommand("revokeGrant", RevokeGrantCommand, {
-        getGroupKey: (payload) =>
-          grantCommandLane({
-            aggregateId: RevokeGrantCommand.getAggregateId(payload),
-          }),
+        serializeByAggregate: true,
         coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })
       .withCommand("defineRole", DefineRoleCommand)
