@@ -23,11 +23,13 @@ import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
 
 /**
- * How many guarded budget raises are in flight at once while seeding an
- * organization's view budgets. Bounded so an organization with thousands of
- * share links cannot open thousands of concurrent connections.
+ * Seeds per budget statement. Four binds a row, so this sits well under
+ * Postgres' 65535-parameter ceiling and keeps one statement's memory modest.
+ * The seed rides EVERY pass, so what matters is that its cost scales with
+ * statements, not with rows: an organization with 428k share links was
+ * spending 17k sequential round trips per pass here and never finishing one.
  */
-const BUDGET_RAISE_CONCURRENCY = 25;
+const BUDGET_SEED_CHUNK = 5_000;
 
 /**
  * ADR-092 stage B - storage for the in-place TeamUser backfill, the genesis
@@ -393,24 +395,29 @@ export class PrismaAuthzMigrationRepository
    * The view budgets, handed over rather than restarted - and RAISED on a
    * re-run, never lowered (the port's own contract; decision 22).
    *
-   * Two writes, each safe on its own terms. The `createMany` with
-   * `skipDuplicates` lands missing rows without touching existing ones. The
-   * per-row guarded update then raises a row the legacy path has outgrown:
-   * while an organization is held, views keep landing on
-   * `ShareLink.viewCount`, and a usage row seeded on an earlier pass would
-   * otherwise sit permanently below it - wedging the import proof, which
-   * compares the two counts exactly. The `viewCount: { lt: ... }` predicate
-   * is the refund guard: a row already at or above the seeded count (a view
-   * consumed since the seed) is left exactly as it is.
+   * ONE guarded upsert per chunk, which is create-or-raise stated once: a
+   * missing row is inserted at the seeded count, and an existing row is
+   * updated only where the seeded count is strictly higher. That guard is
+   * the refund guard - a row already at or above the seed (a view consumed
+   * since) is left exactly as it is - and it lives in the UPDATE statement
+   * itself, so a consume landing mid-flight cannot be walked back by a
+   * filter resolved in an earlier SELECT.
    *
-   * The raise is `update` on the filtered unique, not `updateMany`, for the
-   * same reason the share consume paths are: the query compiler keeps a
-   * filtered-unique `update`'s full WHERE on the UPDATE statement itself,
-   * while `updateMany` resolves the filter in a prior SELECT - a consume
-   * landing between the two would be silently walked back. A raise the guard
-   * refuses surfaces as P2025 and is swallowed as the no-op it means. Raises
-   * run concurrently in bounded batches; each targets a distinct row, so
-   * they cannot contend with each other.
+   * It is one statement per chunk rather than one per row because this seed
+   * rides every pass, unfiltered, for as long as an organization is held:
+   * while it is, views keep landing on `ShareLink.viewCount`, and a usage
+   * row seeded on an earlier pass would otherwise sit permanently below it,
+   * wedging the proof, which compares the two counts exactly. The previous
+   * shape paid a round trip per share link - and on a converged organization
+   * every one of them matched nothing, so the pass spent hundreds of
+   * thousands of round trips, and the exceptions they raised, to change
+   * nothing. The organization that found it never finished a pass at all,
+   * and so never recorded a status of any kind.
+   *
+   * `organizationId` and `projectId` are matched in the guard rather than
+   * overwritten: a usage row that disagrees with the seed about where it
+   * lives is not this seed's to move, exactly as the per-row update's
+   * three-column WHERE had it.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -420,54 +427,37 @@ export class PrismaAuthzMigrationRepository
     seeds: readonly ResourceGrantUsageSeed[];
   }): Promise<void> {
     if (seeds.length === 0) return;
-    await this.prisma.grantUsage.createMany({
-      data: seeds.map((seed) => ({
-        grantId: seed.grantId,
+    for (let offset = 0; offset < seeds.length; offset += BUDGET_SEED_CHUNK) {
+      await this.raiseGrantUsageBudgets({
         organizationId,
-        projectId: seed.projectId,
-        viewCount: seed.viewCount,
-      })),
-      skipDuplicates: true,
-    });
-    for (
-      let offset = 0;
-      offset < seeds.length;
-      offset += BUDGET_RAISE_CONCURRENCY
-    ) {
-      await Promise.all(
-        seeds
-          .slice(offset, offset + BUDGET_RAISE_CONCURRENCY)
-          .map((seed) => this.raiseGrantUsageBudget({ organizationId, seed })),
-      );
+        seeds: seeds.slice(offset, offset + BUDGET_SEED_CHUNK),
+      });
     }
   }
 
-  private async raiseGrantUsageBudget({
+  private raiseGrantUsageBudgets({
     organizationId,
-    seed,
+    seeds,
   }: {
     organizationId: string;
-    seed: ResourceGrantUsageSeed;
-  }): Promise<void> {
-    try {
-      await this.prisma.grantUsage.update({
-        where: {
-          grantId: seed.grantId,
-          organizationId,
-          projectId: seed.projectId,
-          viewCount: { lt: seed.viewCount },
-        },
-        data: { viewCount: seed.viewCount },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
-        return;
-      }
-      throw error;
-    }
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Prisma.PrismaPromise<number> {
+    return this.prisma.$executeRaw`
+      INSERT INTO "GrantUsage" (
+        "grantId", "organizationId", "projectId", "viewCount", "updatedAt"
+      ) VALUES ${Prisma.join(
+        seeds.map(
+          (seed) =>
+            Prisma.sql`(${seed.grantId}, ${organizationId}, ${seed.projectId}, ${seed.viewCount}, NOW())`,
+        ),
+      )}
+      ON CONFLICT ("grantId") DO UPDATE SET
+        "viewCount" = EXCLUDED."viewCount",
+        "updatedAt" = NOW()
+      WHERE "GrantUsage"."viewCount" < EXCLUDED."viewCount"
+        AND "GrantUsage"."organizationId" = EXCLUDED."organizationId"
+        AND "GrantUsage"."projectId" = EXCLUDED."projectId"
+    `;
   }
 
   async findExternalMemberFacts({

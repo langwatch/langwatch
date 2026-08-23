@@ -1,0 +1,134 @@
+/** @vitest-environment node */
+
+/**
+ * The view-budget handover the authz-engine migration runs on every pass.
+ *
+ * It is the one step no head filter covers — while an organization is held,
+ * views keep landing on `ShareLink.viewCount`, so the seed has to ride each
+ * pass to let the count heal. That makes its COST per pass a correctness
+ * concern of its own: an organization with 428k share links spent a round
+ * trip per link here, matched nothing on almost all of them, and never
+ * finished a single pass — so it never recorded a status at all.
+ *
+ * A unit test, and named one: Prisma is a stub, so nothing here opens a
+ * socket. The guard is asserted as SQL because that is what it is; whether
+ * Postgres honours it is the integration lane's question.
+ */
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
+import { PrismaAuthzMigrationRepository } from "../authz-migration.prisma.repository";
+
+const ORG = "org_acme";
+
+function build() {
+  const executeRaw = vi.fn().mockResolvedValue(1);
+  const prisma = { $executeRaw: executeRaw } as never;
+  return {
+    executeRaw,
+    repository: new PrismaAuthzMigrationRepository(prisma),
+  };
+}
+
+/** The statement itself, flattened to one comparable string. */
+function statement(executeRaw: Mock, call = 0): string {
+  const strings = executeRaw.mock.calls[call]?.[0] as unknown as string[];
+  return strings.join("?").replace(/\s+/g, " ");
+}
+
+/** The seed rows the statement carries, as their bound values. */
+function boundValues(executeRaw: Mock, call = 0): unknown[] {
+  const rows = executeRaw.mock.calls[call]?.[1] as Prisma.Sql;
+  return rows.values;
+}
+
+function seeds(count: number, viewCount = 1) {
+  return Array.from({ length: count }, (_, index) => ({
+    grantId: `share_${index}`,
+    projectId: "project_1",
+    viewCount,
+  }));
+}
+
+describe("PrismaAuthzMigrationRepository budget seeding", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  describe("given an organization's share links", () => {
+    describe("when the budgets are seeded", () => {
+      /** @scenario "The view budget handover costs statements, not round trips" */
+      it("states every seed in one statement, not one statement per seed", async () => {
+        const { repository, executeRaw } = build();
+
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: seeds(400),
+        });
+
+        expect(executeRaw).toHaveBeenCalledTimes(1);
+        expect(boundValues(executeRaw)).toHaveLength(400 * 4);
+      });
+
+      /** @scenario "The view budget handover costs statements, not round trips" */
+      it("chunks past the parameter ceiling instead of growing one statement", async () => {
+        const { repository, executeRaw } = build();
+
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: seeds(5_001),
+        });
+
+        expect(executeRaw).toHaveBeenCalledTimes(2);
+        expect(boundValues(executeRaw, 1)).toHaveLength(1 * 4);
+      });
+
+      it("says nothing at all for an organization with no share links", async () => {
+        const { repository, executeRaw } = build();
+
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: [],
+        });
+
+        expect(executeRaw).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a seed would lower a budget", () => {
+      // Views are never refunded (decision 22). The guard lives in the UPDATE
+      // itself rather than a filter resolved by an earlier SELECT, so a
+      // consume landing mid-flight cannot be walked back.
+      /** @scenario "A view budget is raised on a re-run, never lowered" */
+      it("raises only where the seed is strictly higher", async () => {
+        const { repository, executeRaw } = build();
+
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: seeds(1),
+        });
+
+        const sql = statement(executeRaw);
+        expect(sql).toContain('ON CONFLICT ("grantId") DO UPDATE');
+        expect(sql).toContain(
+          'WHERE "GrantUsage"."viewCount" < EXCLUDED."viewCount"',
+        );
+      });
+
+      /** @scenario "A view budget is raised on a re-run, never lowered" */
+      it("leaves a usage row that disagrees about where it lives alone", async () => {
+        const { repository, executeRaw } = build();
+
+        await repository.seedResourceGrantUsage({
+          organizationId: ORG,
+          seeds: seeds(1),
+        });
+
+        const sql = statement(executeRaw);
+        expect(sql).toContain(
+          'AND "GrantUsage"."organizationId" = EXCLUDED."organizationId"',
+        );
+        expect(sql).toContain(
+          'AND "GrantUsage"."projectId" = EXCLUDED."projectId"',
+        );
+      });
+    });
+  });
+});

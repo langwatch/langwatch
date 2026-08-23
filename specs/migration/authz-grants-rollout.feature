@@ -134,6 +134,21 @@ Feature: Moving an organization onto the grants projection
     But a buried head whose legacy row is back is named as a disagreement
     And nothing is stated for it, because the projection has no un-delete
 
+  @unit
+  Scenario: A view budget is raised on a re-run, never lowered
+    Given a share link whose usage row was seeded on an earlier pass
+    When the migration seeds the budgets again
+    Then a usage row below the legacy count is raised to it
+    And a usage row already at or above it is left exactly as it is
+    And a usage row that disagrees about which project it belongs to is untouched
+
+  @unit
+  Scenario: The view budget handover costs statements, not round trips
+    Given an organization with more share links than one statement can carry
+    When the migration seeds the budgets
+    Then the seeds are stated in whole chunks, not one round trip per link
+    And an organization with no share links states nothing at all
+
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is
     Given the queue is unavailable
