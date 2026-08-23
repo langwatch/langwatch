@@ -18,7 +18,11 @@ function erroringStorage() {
   const boom = async () => {
     throw new Error("connection refused");
   };
-  return { get: vi.fn(boom), set: vi.fn(boom), delete: vi.fn(boom) };
+  return {
+    get: vi.fn(boom),
+    set: vi.fn(boom),
+    delete: vi.fn(async (_key: string) => boom()),
+  };
 }
 
 async function failOpenCount(operation: string): Promise<number> {

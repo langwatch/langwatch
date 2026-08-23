@@ -109,50 +109,67 @@ function createDeleteRetryQueue({
     );
   };
 
+  const stopTimerWhenIdle = () => {
+    if (pendingSince.size === 0 && timer !== undefined) {
+      clearInterval(timer);
+      timer = undefined;
+    }
+  };
+
+  const retryOne = async (
+    key: string,
+    firstFailedAtMs: number,
+    now: number,
+  ) => {
+    if (now - firstFailedAtMs > DELETE_RETRY_WINDOW_MS) {
+      abandon(key, "window_elapsed");
+      return;
+    }
+    try {
+      await deleteKey(key);
+    } catch {
+      // Still down; the key stays pending until its window closes.
+      return;
+    }
+    pendingSince.delete(key);
+    logger.info(
+      "better-auth secondary storage recovered a dropped delete on retry",
+    );
+  };
+
   const retryPass = async () => {
     if (isPassRunning) return;
     isPassRunning = true;
     try {
       const now = Date.now();
       for (const [key, firstFailedAtMs] of pendingSince) {
-        if (now - firstFailedAtMs > DELETE_RETRY_WINDOW_MS) {
-          abandon(key, "window_elapsed");
-          continue;
-        }
-        try {
-          await deleteKey(key);
-          pendingSince.delete(key);
-          logger.info(
-            "better-auth secondary storage recovered a dropped delete on retry",
-          );
-        } catch {
-          // Still down; the key stays pending until its window closes.
-        }
+        await retryOne(key, firstFailedAtMs, now);
       }
-      if (pendingSince.size === 0 && timer !== undefined) {
-        clearInterval(timer);
-        timer = undefined;
-      }
+      stopTimerWhenIdle();
     } finally {
       isPassRunning = false;
     }
   };
 
+  const startTimerIfStopped = () => {
+    if (timer !== undefined) return;
+    timer = setInterval(() => void retryPass(), DELETE_RETRY_INTERVAL_MS);
+    timer.unref?.();
+  };
+
+  const abandonOldestWhenFull = () => {
+    if (pendingSince.size < maxKeys) return;
+    const oldestKey: string | undefined = pendingSince.keys().next().value;
+    if (oldestKey !== undefined) abandon(oldestKey, "overflow");
+  };
+
   return {
     enqueue: (key: string) => {
       if (!pendingSince.has(key)) {
-        if (pendingSince.size >= maxKeys) {
-          const oldestKey: string | undefined = pendingSince
-            .keys()
-            .next().value;
-          if (oldestKey !== undefined) abandon(oldestKey, "overflow");
-        }
+        abandonOldestWhenFull();
         pendingSince.set(key, Date.now());
       }
-      if (timer === undefined) {
-        timer = setInterval(() => void retryPass(), DELETE_RETRY_INTERVAL_MS);
-        timer.unref?.();
-      }
+      startTimerIfStopped();
     },
   };
 }
