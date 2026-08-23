@@ -6,6 +6,7 @@
     "platform/*.mdx",
     "ai-gateway/*.mdx",
     "ai-governance/*.mdx",
+    "integration/*.mdx",
     "integration/overview.mdx",
     "integration/quick-start.mdx",
     "integration/code-examples.mdx",
@@ -40,6 +41,7 @@
     "api-reference/**/*.mdx",
     "status.mdx",
     "pricing.mdx",
+    "pricing/*.mdx",
     "support.mdx"
   ],
   "excludePaths": [

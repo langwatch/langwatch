@@ -219,11 +219,26 @@ function processImports(content, filePath) {
   return modifiedContent;
 }
 
-// Process each include path
-includePaths.forEach(includePath => {
+// Expand every include path into find patterns. A `dir/**/*.mdx` pattern
+// never matches a file directly inside `dir/` (`**` requires the slash before
+// it), which silently dropped every top-level page of such sections. Patterns
+// with `**` therefore also match their own depth-zero level.
+const allPatterns = includePaths.flatMap(includePath =>
+  includePath.includes('/**/')
+    ? [includePath, includePath.replace('/**/', '/*')]
+    : [includePath],
+);
+
+// Collect matches across every pattern into one set, so overlapping include
+// paths produce a single FILE block per page, then sort once for a stable
+// output order.
+const found = new Set();
+allPatterns.forEach(pattern => {
   try {
-    // Create a find command to locate the files (sort for stable cross-platform ordering)
-    let findCmd = `find . -type f -path "./${includePath}" 2>/dev/null | sort`;
+    // Create a find command to locate the files (sort for stable cross-platform ordering).
+    // `|| true` keeps a pattern that matches nothing from failing the run:
+    // grep exits 1 on zero selected lines.
+    let findCmd = `find . -type f -path "./${pattern}" 2>/dev/null | sort`;
 
     // Add exclude patterns if any
     if (excludePaths.length > 0) {
@@ -232,38 +247,39 @@ includePaths.forEach(includePath => {
       });
     }
 
-    // Execute the find command
-    const files = execSync(findCmd)
+    execSync(`${findCmd} || true`)
       .toString()
-      .trim()
       .split('\n')
-      .filter(file => file); // Remove empty lines
-
-    // Process each matching file
-    files.forEach(file => {
-      console.log(`Processing: ${file}`);
-      try {
-        let content = fs.readFileSync(file, 'utf8');
-
-        // Process imports for MDX files
-        if (file.endsWith('.mdx')) {
-          content = processImports(content, file);
-        }
-
-        // Remove trailing whitespaces
-        content = content.replace(/[ \t]+$/gm, '');
-
-        // Append to output file
-        fs.appendFileSync(outputFile, `# FILE: ${file}\n\n`);
-        fs.appendFileSync(outputFile, content);
-        fs.appendFileSync(outputFile, '\n---\n\n');
-      } catch (err) {
-        console.error(`Error reading ${file}: ${err.message}`);
-      }
-    });
+      .filter(file => file) // Remove empty lines
+      .forEach(file => found.add(file));
   } catch (error) {
     // If there's an error with the command, log and continue
-    console.log(`Error with pattern: ${includePath}: ${error.message}`);
+    console.log(`Error with pattern: ${pattern}: ${error.message}`);
+  }
+});
+
+const files = [...found].sort();
+
+// Process each matching file
+files.forEach(file => {
+  console.log(`Processing: ${file}`);
+  try {
+    let content = fs.readFileSync(file, 'utf8');
+
+    // Process imports for MDX files
+    if (file.endsWith('.mdx')) {
+      content = processImports(content, file);
+    }
+
+    // Remove trailing whitespaces
+    content = content.replace(/[ \t]+$/gm, '');
+
+    // Append to output file
+    fs.appendFileSync(outputFile, `# FILE: ${file}\n\n`);
+    fs.appendFileSync(outputFile, content);
+    fs.appendFileSync(outputFile, '\n---\n\n');
+  } catch (err) {
+    console.error(`Error reading ${file}: ${err.message}`);
   }
 });
 
