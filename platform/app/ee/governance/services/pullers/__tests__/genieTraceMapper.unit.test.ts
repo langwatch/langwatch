@@ -209,10 +209,10 @@ describe("given a completed Genie message from the capture shape", () => {
     // at `params.tool_name` / `params.full_command`. A `langwatch.params`
     // JSON blob would be dot-flattened at the trace door and never read.
     const stepAttrs = attrsOf(step);
-    expect(stepAttrs["tool_name"]).toBe("Total sales by region");
-    expect(stepAttrs["full_command"]).toContain("SELECT region");
-    expect(stepAttrs["row_count"]).toBe(4);
-    expect(stepAttrs["statement_id"]).toBe("stmt-1");
+    expect(stepAttrs.tool_name).toBe("Total sales by region");
+    expect(stepAttrs.full_command).toContain("SELECT region");
+    expect(stepAttrs.row_count).toBe(4);
+    expect(stepAttrs.statement_id).toBe("stmt-1");
     expect(stepAttrs["langwatch.params"]).toBeUndefined();
   });
 
