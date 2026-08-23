@@ -993,6 +993,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     promptCmd
+      .command("get <handle>")
+      .description("Show one prompt, with its model and messages")
+      .option("--version <version>", "Read a specific version instead of the latest")
+      .option("--tag <name>", "Read the version this tag points at")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string, options: { version?: string; tag?: string }) => {
+      const { promptGetCommand: impl } = await import("./commands/prompt/get.js");
+      return impl(handle, options);
+    },
+  );
+
+  emitsResult(
+    promptCmd
       .command("versions <handle>")
       .description("List all versions of a prompt")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),

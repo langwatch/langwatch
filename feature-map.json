@@ -483,6 +483,7 @@
                 "prompt tag rename",
                 "prompt tag assign",
                 "prompt tag delete",
+                "prompt get",
                 "prompt versions",
                 "prompt restore"
               ],
