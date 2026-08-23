@@ -59,7 +59,7 @@ function completedMessage(overrides: Record<string, unknown> = {}) {
   return {
     message_id: "msg-1",
     conversation_id: "conv-1",
-    user_id: 4502853071234567,
+    user_id: 90210,
     content: "Which region sold most in Q2?",
     status: "COMPLETED",
     created_timestamp: 1755684000, // seconds — the shape Databricks sends
@@ -220,7 +220,7 @@ describe("given a completed Genie message from the capture shape", () => {
     expect(rootAttrs["langwatch.source"]).toBe("databricks_genie");
     expect(rootAttrs["langwatch.origin.kind"]).toBe("ingestion_source");
     expect(rootAttrs["langwatch.ingestion_source.id"]).toBe("source-1");
-    expect(rootAttrs["langwatch.user.id"]).toBe("4502853071234567");
+    expect(rootAttrs["langwatch.user.id"]).toBe("90210");
     expect(rootAttrs["langwatch.thread.id"]).toBe("conv-1");
   });
 });
