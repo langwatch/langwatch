@@ -217,6 +217,97 @@ function finestFittingStep(windowSeconds: number): number {
 }
 
 /**
+ * The declaration- and value-level refusals, extracted from
+ * {@link resolveLangWatchQLGranularity} so that function reads as the
+ * decision it makes rather than the gauntlet it runs.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
+ *   declared as anything but `UInt32`, or when the surface's step is not a
+ *   positive whole number of seconds.
+ * @throws {LangWatchQLReservedParameterSuppliedError} when the request
+ *   carries a value for the reserved name.
+ */
+function assertSurfaceStepIsClean({
+  declaredName,
+  declaredType,
+  parameters,
+  granularitySeconds,
+}: {
+  readonly declaredName: string;
+  readonly declaredType: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  readonly granularitySeconds?: number;
+}): void {
+  if (!isLangWatchQLGranularityParameterType(declaredType)) {
+    throw new LangWatchQLReservedGranularityTypeError([declaredName]);
+  }
+
+  const supplied = Object.keys(parameters ?? {}).filter(
+    (name) => name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+  );
+  if (supplied.length > 0) {
+    throw new LangWatchQLReservedParameterSuppliedError(supplied);
+  }
+
+  if (
+    granularitySeconds !== undefined &&
+    (!Number.isInteger(granularitySeconds) || granularitySeconds <= 0)
+  ) {
+    // A zero or fractional step is a malformed surface value, not a caller
+    // choice -- the input schemas refuse it first; this is the backstop.
+    throw new LangWatchQLReservedGranularityTypeError([declaredName]);
+  }
+}
+
+/**
+ * The budget half: window seconds against the step at the ceiling. This is
+ * where the two designed overflow outcomes diverge -- refuse for the
+ * surfaces whose caller chose the step, coarsen for the dashboard whose
+ * caller did not.
+ *
+ * @throws {LangWatchQLGranularityTooFineError} on overflow when asked to
+ *   refuse.
+ */
+function resolveAgainstBudget({
+  declaredName,
+  granularitySeconds,
+  timeWindow,
+  onBudgetOverflow,
+}: {
+  readonly declaredName: string;
+  readonly granularitySeconds: number;
+  readonly timeWindow: LangWatchQLTimeWindow;
+  readonly onBudgetOverflow: "refuse" | "coarsen";
+}): LangWatchQLGranularityResolution {
+  const windowSeconds = Math.max(
+    0,
+    Math.ceil((timeWindow.end.getTime() - timeWindow.start.getTime()) / 1000),
+  );
+  const requestedBuckets = bucketCount(windowSeconds, granularitySeconds);
+
+  if (requestedBuckets <= LWQL_GRANULARITY_MAX_BUCKETS) {
+    return { followsGranularity: true, granularitySeconds };
+  }
+
+  if (onBudgetOverflow === "refuse") {
+    throw new LangWatchQLGranularityTooFineError({
+      requestedGranularitySeconds: granularitySeconds,
+      windowSeconds,
+      maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
+    });
+  }
+
+  const effective = finestFittingStep(windowSeconds);
+  return {
+    followsGranularity: true,
+    granularitySeconds: effective,
+    ...(effective !== granularitySeconds
+      ? { coarsenedFromSeconds: granularitySeconds }
+      : {}),
+  };
+}
+
+/**
  * Decides what the granularity declaration means for one request, and
  * refuses the ways it can be misused -- the granularity counterpart of
  * {@link resolveLangWatchQLTimeWindow}, kept separate because its failure
@@ -309,29 +400,12 @@ export function resolveLangWatchQLGranularity({
     return { followsGranularity: false };
   }
 
-  if (!isLangWatchQLGranularityParameterType(declaredGranularity.type)) {
-    throw new LangWatchQLReservedGranularityTypeError([
-      declaredGranularity.name,
-    ]);
-  }
-
-  const supplied = Object.keys(parameters ?? {}).filter(
-    (name) => name === LWQL_PERIOD_GRANULARITY_PARAMETER,
-  );
-  if (supplied.length > 0) {
-    throw new LangWatchQLReservedParameterSuppliedError(supplied);
-  }
-
-  if (
-    granularitySeconds !== undefined &&
-    (!Number.isInteger(granularitySeconds) || granularitySeconds <= 0)
-  ) {
-    // A zero or fractional step is a malformed surface value, not a caller
-    // choice -- the input schemas refuse it first; this is the backstop.
-    throw new LangWatchQLReservedGranularityTypeError([
-      declaredGranularity.name,
-    ]);
-  }
+  assertSurfaceStepIsClean({
+    declaredName: declaredGranularity.name,
+    declaredType: declaredGranularity.type,
+    parameters,
+    granularitySeconds,
+  });
 
   if (granularitySeconds === undefined) {
     // Declared but the surface offered no choice: the statement runs with
@@ -350,29 +424,10 @@ export function resolveLangWatchQLGranularity({
     return { followsGranularity: true, granularitySeconds };
   }
 
-  const windowSeconds = Math.max(
-    0,
-    Math.ceil((timeWindow.end.getTime() - timeWindow.start.getTime()) / 1000),
-  );
-  const requestedBuckets = bucketCount(windowSeconds, granularitySeconds);
-
-  if (requestedBuckets > LWQL_GRANULARITY_MAX_BUCKETS) {
-    if (onBudgetOverflow === "refuse") {
-      throw new LangWatchQLGranularityTooFineError({
-        requestedGranularitySeconds: granularitySeconds,
-        windowSeconds,
-        maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
-      });
-    }
-    const effective = finestFittingStep(windowSeconds);
-    return {
-      followsGranularity: true,
-      granularitySeconds: effective,
-      ...(effective !== granularitySeconds
-        ? { coarsenedFromSeconds: granularitySeconds }
-        : {}),
-    };
-  }
-
-  return { followsGranularity: true, granularitySeconds };
+  return resolveAgainstBudget({
+    declaredName: declaredGranularity.name,
+    granularitySeconds,
+    timeWindow,
+    onBudgetOverflow,
+  });
 }
