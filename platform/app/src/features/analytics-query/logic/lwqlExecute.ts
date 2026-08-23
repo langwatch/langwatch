@@ -35,6 +35,7 @@ type LangWatchQLQueryInput = {
   sql: string;
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: { start: Date; end: Date };
+  granularitySeconds?: number;
 };
 
 /**

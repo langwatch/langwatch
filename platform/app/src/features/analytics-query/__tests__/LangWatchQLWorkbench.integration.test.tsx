@@ -476,6 +476,144 @@ describe("the LangWatchQL workbench", () => {
       });
     });
 
+    describe("when a statement declares the granularity step", () => {
+      /** The refusal a first run of a granularity statement earns. */
+      const awaitingStep = () =>
+        handledErrorEnvelope({
+          code: "lwql_parameter_missing",
+          meta: { parameters: ["period_granularity_seconds"] },
+        });
+
+      /** Runs once so the workbench learns the statement declares the step. */
+      const revealPicker = async () => {
+        harness.mutation.mockRejectedValue(awaitingStep());
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("lwql-granularity");
+        return editor;
+      };
+
+      /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+      it("does not ask the member to fill the step in as a parameter", async () => {
+        harness.mutation.mockRejectedValue(awaitingStep());
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await screen.findByTestId("lwql-granularity");
+        // The catch-22 this pins: the step was listed as a value to type in,
+        // and typing it is itself refused as a reserved name.
+        const parameters = screen.getByTestId("lwql-parameters");
+        expect(
+          within(parameters).queryByText("Give these parameters a value"),
+        ).toBeNull();
+        expect(parameters).not.toHaveTextContent("period_granularity_seconds");
+      });
+
+      /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+      it("still prompts for the member's own missing names, without the step", async () => {
+        harness.mutation.mockRejectedValue(
+          handledErrorEnvelope({
+            code: "lwql_parameter_missing",
+            meta: { parameters: ["period_granularity_seconds", "since"] },
+          }),
+        );
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        const parameters = await screen.findByTestId("lwql-parameters");
+        const alert = await within(parameters).findByRole("alert");
+        // The member's own omission still has to be reported: filtering the
+        // reserved name must not take the rest of the refusal with it.
+        expect(alert).toHaveTextContent("Give these parameters a value");
+        expect(alert).toHaveTextContent("since");
+        expect(alert).not.toHaveTextContent("period_granularity_seconds");
+      });
+
+      /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
+      it("offers exactly the steps the contract admits", async () => {
+        await revealPicker();
+
+        const picker = screen.getByTestId("lwql-granularity");
+        for (const label of ["1 second", "1 minute", "1 hour"]) {
+          expect(
+            within(picker).getByRole("button", { name: label }),
+          ).toBeTruthy();
+        }
+      });
+
+      /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
+      it("sends the chosen step in its own field, never as a parameter", async () => {
+        await revealPicker();
+        harness.mutation.mockResolvedValue(
+          lwqlResult({ followsGranularity: true, granularitySeconds: 60 }),
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "1 minute" }));
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await waitFor(() => {
+          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          expect(input).toMatchObject({ granularitySeconds: 60 });
+        });
+        const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+        const sent = input as { parameters?: Record<string, unknown> };
+        // Sending it as a parameter is what the backend refuses outright.
+        expect(sent.parameters ?? {}).not.toHaveProperty(
+          "period_granularity_seconds",
+        );
+      });
+
+      /** @scenario "A step too fine for the window is refused where the member chose it" */
+      it("shows the too-fine refusal when the chosen step overflows the budget", async () => {
+        await revealPicker();
+        harness.mutation.mockRejectedValue(
+          handledErrorEnvelope({
+            code: "lwql_granularity_too_fine",
+            meta: {
+              granularitySeconds: 1,
+              maxBuckets: 10_000,
+            },
+          }),
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "1 second" }));
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        // Reachable at all is the point: before the picker there was no way to
+        // ask for a step, so this refusal could not be produced from the UI.
+        await waitFor(() => {
+          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          expect(input).toMatchObject({ granularitySeconds: 1 });
+        });
+        expect(
+          await screen.findByText(
+            "That granularity would return too many datapoints",
+          ),
+        ).toBeTruthy();
+      });
+
+      /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
+      it("sends no step for a statement that never declared one", async () => {
+        harness.mutation.mockResolvedValue(lwqlResult());
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await waitFor(() => expect(harness.mutation).toHaveBeenCalled());
+        expect(screen.queryByTestId("lwql-granularity")).toBeNull();
+        const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+        // A step sent for an undeclared statement is a reserved value the
+        // backend refuses.
+        expect(input).not.toHaveProperty("granularitySeconds");
+      });
+    });
+
     describe("when the workbench opens on a page whose period selector names a window", () => {
       /** @scenario "The workbench fills the period parameters from the page's period selector" */
       it("shows that window in the spelling the database is bound with", async () => {

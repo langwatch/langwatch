@@ -916,6 +916,26 @@ Scenario: A statement declaring the granularity parameter runs at the step the w
   And the result is labelled as following the granularity
 
 @unit
+Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
+  Given a statement whose first run is refused for an unfilled period_granularity_seconds
+  When the workbench shows the refusal
+  Then the step is not listed among the parameters to give a value
+  And a granularity control offers the steps the contract admits
+
+@unit
+Scenario: Choosing a step sends it beside the query rather than among its parameters
+  Given the workbench is showing the granularity control
+  When the member chooses a step and runs the query
+  Then the request carries that step in its own field
+  And no reserved name appears among the parameters sent
+
+@unit
+Scenario: A step too fine for the window is refused where the member chose it
+  Given the workbench is showing the granularity control
+  When the member chooses a step that would exceed the bucket ceiling
+  Then the refusal is shown against the query
+
+@unit
 Scenario: A granularity declared with no step supplied runs on its own authored bucketing
   Given SQL declaring period_granularity_seconds as UInt32
   And the surface supplies no step
