@@ -49,8 +49,6 @@ export const betterAuthSecondaryStorageFailOpenTotal = new Counter({
   labelNames: ["operation"] as const,
 });
 
-type SecondaryStorage = NonNullable<BetterAuthOptions["secondaryStorage"]>;
-
 class SecondaryStorageTimeoutError extends Error {
   constructor(operation: string) {
     super(

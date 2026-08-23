@@ -553,24 +553,11 @@ export class SystemMigrationsService {
     actorUserId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
     const migration = this.requireRegisteredMigration(migrationName);
-    if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
-      throw new MigrationNotAvailableOnInstallationError();
-    }
-    const organization = await this.deps.enrollments.findOrganizationById({
+    await this.requireRunnableForOrganization({
+      migration,
       organizationId,
+      migrationName,
     });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
-    }
-    if (this.deps.isSaaS()) {
-      const enrolled = await this.deps.enrollments.isEnrolled({
-        organizationId,
-        migrationName,
-      });
-      if (!enrolled) {
-        throw new MigrationRunRequiresEnrollmentError({ migrationName });
-      }
-    }
     await this.deps.audit({
       userId: actorUserId,
       organizationId,
@@ -588,6 +575,44 @@ export class SystemMigrationsService {
       // parked member keeps the organization on the operator's list.
       return { status: statusOfMemberSummary(summary), waiting: false };
     }
+    return this.organizationRecordStatus({ migrationName, organizationId });
+  }
+
+  private async requireRunnableForOrganization({
+    migration,
+    organizationId,
+    migrationName,
+  }: {
+    migration: { runsAutomaticallyOnSelfHosted: boolean };
+    organizationId: string;
+    migrationName: string;
+  }): Promise<void> {
+    if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
+      throw new MigrationNotAvailableOnInstallationError();
+    }
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
+    }
+    if (!this.deps.isSaaS()) return;
+    const enrolled = await this.deps.enrollments.isEnrolled({
+      organizationId,
+      migrationName,
+    });
+    if (!enrolled) {
+      throw new MigrationRunRequiresEnrollmentError({ migrationName });
+    }
+  }
+
+  private async organizationRecordStatus({
+    migrationName,
+    organizationId,
+  }: {
+    migrationName: string;
+    organizationId: string;
+  }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId: organizationId,

@@ -267,38 +267,40 @@ export async function userMigrationPassCohort(): Promise<
   if (env.IS_SAAS !== true) return () => true;
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
-  const membersByMigration = new Map<string, Set<string>>();
   // The same exclusion the organization cohort applies: a private-dataplane
   // organization is never swept up, and neither are its members - a user's
   // identity events would otherwise land in the shared platform log while
   // the organization's own data stays on its private instance.
   const privateOrganizationIds = [...getPrivateClickHouseUrls().keys()];
-  const privateMembers = new Set<string>();
-  if (privateOrganizationIds.length > 0) {
-    const rows = await prisma.organizationUser.findMany({
-      where: { organizationId: { in: privateOrganizationIds } },
-      select: { userId: true },
-    });
-    for (const row of rows) privateMembers.add(row.userId);
-  }
+  const privateMembers = await memberUserIds({
+    organizationIds: privateOrganizationIds,
+  });
+  const membersByMigration = new Map<string, Set<string>>();
   for (const migration of registeredUserMigrations()) {
     const organizationIds = [
       ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
     ].filter((id) => !privateOrganizationIds.includes(id));
-    const members = new Set<string>();
-    if (organizationIds.length > 0) {
-      const rows = await prisma.organizationUser.findMany({
-        where: { organizationId: { in: organizationIds } },
-        select: { userId: true },
-      });
-      for (const row of rows) {
-        if (!privateMembers.has(row.userId)) members.add(row.userId);
-      }
-    }
-    membersByMigration.set(migration.name, members);
+    const members = await memberUserIds({ organizationIds });
+    membersByMigration.set(
+      migration.name,
+      new Set([...members].filter((userId) => !privateMembers.has(userId))),
+    );
   }
   return ({ tenantId, migrationName }) =>
     membersByMigration.get(migrationName)?.has(tenantId) ?? false;
+}
+
+async function memberUserIds({
+  organizationIds,
+}: {
+  organizationIds: string[];
+}): Promise<Set<string>> {
+  if (organizationIds.length === 0) return new Set();
+  const rows = await prisma.organizationUser.findMany({
+    where: { organizationId: { in: organizationIds } },
+    select: { userId: true },
+  });
+  return new Set(rows.map((row) => row.userId));
 }
 
 function userMigrationsForThisInstallation(): SystemMigration[] {

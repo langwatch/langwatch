@@ -116,6 +116,14 @@ interface ExpectedIdentifier {
   expectedState: "ATTACHED" | "VERIFIED";
 }
 
+/** An identifier the backfill adopts, with the command that attaches it. */
+type Adoption = ExpectedIdentifier & {
+  commandId: string;
+  accountId: string | null;
+  providerAccountId: string | null;
+  occurredAtMs: number;
+};
+
 export interface IdentifierBackfillMigrationDeps {
   reads: IdentityBackfillReads;
   ceremonies: Pick<
@@ -174,46 +182,13 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
       accounts,
     });
 
-    for (const adoption of expected) {
-      await this.deps.ceremonies.attachIdentifier({
-        tenantId: userId,
-        userId,
-        commandId: adoption.commandId,
-        accountId: adoption.accountId,
-        provider: adoption.provider,
-        providerAccountId: adoption.providerAccountId,
-        value: user.email,
-        occurredAtMs: adoption.occurredAtMs,
-        ceremony: { flow: "backfill" },
-        actor: BACKFILL_ACTOR,
-      });
-    }
-
-    // The email identifier's establishment: a verified User.email means the
-    // mailbox ceremony (or an equivalent) already happened — recorded with
-    // method "creation", no Verification record to cite. A refusal here is
-    // a parity fact (the identifier dead-ended or detached), never a park:
-    // the diff below reports it and the user is held.
-    const emailExpectation = expected.find(
-      (candidate) => candidate.provider === "email",
-    );
-    if (emailExpectation && user.emailVerified) {
-      try {
-        await this.deps.ceremonies.verifyIdentifier({
-          tenantId: userId,
-          userId,
-          commandId: `backfill:verify-email:${userId}`,
-          identifierId: emailExpectation.identifierId,
-          verificationId: null,
-          method: "creation",
-          occurredAtMs: user.createdAtMs,
-          actor: BACKFILL_ACTOR,
-        });
-      } catch (error) {
-        if (!(error instanceof IdentityCommandRefusedError)) throw error;
-      }
-    }
-
+    await this.adoptExpected({ userId, email: user.email, expected });
+    await this.establishEmail({
+      userId,
+      emailVerified: user.emailVerified,
+      createdAtMs: user.createdAtMs,
+      expected,
+    });
     await this.detachOrphanedIdentifiers({ userId, accounts });
 
     const diffs = await this.proveParity({ userId, expected });
@@ -227,6 +202,67 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
       status: "finalized",
       report: { kind: "adopted", identifiers: expected.length },
     };
+  }
+
+  private async adoptExpected({
+    userId,
+    email,
+    expected,
+  }: {
+    userId: string;
+    email: string;
+    expected: Adoption[];
+  }): Promise<void> {
+    for (const adoption of expected) {
+      await this.deps.ceremonies.attachIdentifier({
+        tenantId: userId,
+        userId,
+        commandId: adoption.commandId,
+        accountId: adoption.accountId,
+        provider: adoption.provider,
+        providerAccountId: adoption.providerAccountId,
+        value: email,
+        occurredAtMs: adoption.occurredAtMs,
+        ceremony: { flow: "backfill" },
+        actor: BACKFILL_ACTOR,
+      });
+    }
+  }
+
+  /**
+   * The email identifier's establishment: a verified User.email means the
+   * mailbox ceremony (or an equivalent) already happened — recorded with
+   * method "creation", no Verification record to cite. A refusal here is
+   * a parity fact (the identifier dead-ended or detached), never a park:
+   * the parity check reports it and the user is held.
+   */
+  private async establishEmail({
+    userId,
+    emailVerified,
+    createdAtMs,
+    expected,
+  }: {
+    userId: string;
+    emailVerified: boolean;
+    createdAtMs: number;
+    expected: ExpectedIdentifier[];
+  }): Promise<void> {
+    const emailExpectation = expected.find(
+      (candidate) => candidate.provider === "email",
+    );
+    if (!emailExpectation || !emailVerified) return;
+    await tolerateRefusal(() =>
+      this.deps.ceremonies.verifyIdentifier({
+        tenantId: userId,
+        userId,
+        commandId: `backfill:verify-email:${userId}`,
+        identifierId: emailExpectation.identifierId,
+        verificationId: null,
+        method: "creation",
+        occurredAtMs: createdAtMs,
+        actor: BACKFILL_ACTOR,
+      }),
+    );
   }
 
   /**
@@ -246,21 +282,23 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   }): Promise<void> {
     const liveAccountIds = new Set(accounts.map((account) => account.id));
     const rows = await this.deps.reads.findIdentifierRows({ userId });
-    for (const row of rows) {
-      if (row.accountId === null || liveAccountIds.has(row.accountId)) continue;
-      if (!isLiveState(row.state)) continue;
-      try {
-        await this.deps.ceremonies.detachIdentifier({
+    const orphaned = rows.filter(
+      (row) =>
+        row.accountId !== null &&
+        !liveAccountIds.has(row.accountId) &&
+        isLiveState(row.state),
+    );
+    for (const row of orphaned) {
+      await tolerateRefusal(() =>
+        this.deps.ceremonies.detachIdentifier({
           tenantId: userId,
           userId,
           commandId: `backfill:detach:${row.id}:${row.accountId}`,
           identifierId: row.id,
           occurredAtMs: (this.deps.now ?? Date.now)(),
           actor: BACKFILL_ACTOR,
-        });
-      } catch (error) {
-        if (!(error instanceof IdentityCommandRefusedError)) throw error;
-      }
+        }),
+      );
     }
   }
 
@@ -307,6 +345,15 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   }
 }
 
+/** A command the pipeline refused is a parity fact, never a park. */
+async function tolerateRefusal(run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (!(error instanceof IdentityCommandRefusedError)) throw error;
+  }
+}
+
 function isLiveState(state: string): boolean {
   return state === "ATTACHED" || state === "VERIFIED" || state === "PRIMARY";
 }
@@ -328,14 +375,7 @@ function expectedIdentifiers({
 }: {
   user: BackfillUserRow & { email: string };
   accounts: BackfillAccountRow[];
-}): Array<
-  ExpectedIdentifier & {
-    commandId: string;
-    accountId: string | null;
-    providerAccountId: string | null;
-    occurredAtMs: number;
-  }
-> {
+}): Adoption[] {
   const normalizedValue = normalizeIdentifierValue(user.email);
   const expected = [
     {

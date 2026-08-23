@@ -198,8 +198,6 @@ export function createIdentityDatabase(
   deps: IdentityDatabaseDeps = {},
 ): (options: BetterAuthOptions) => DbAdapter {
   const prisma = deps.prisma ?? appPrisma;
-  const isLatched = deps.isLatched ?? isUserOnIdentityWrites;
-  const now = deps.now ?? Date.now;
   // Constructed lazily: the ceremonies service resolves the app handle per
   // call, and a bare script that never composes an App must still be able to
   // import this module (the gate answers false there and no ceremony runs).
@@ -211,179 +209,220 @@ export function createIdentityDatabase(
 
   return (options: BetterAuthOptions): DbAdapter => {
     const base = prismaAdapter(prisma, { provider: "postgresql" })(options);
-
-    async function mintUserHashKey(userId: string): Promise<void> {
-      try {
-        await mintUserHashKeyIfMissing({ prisma, userId });
-      } catch (error) {
-        // The mint is additive bookkeeping; a sign-up must not fail on it.
-        // A user without a key attaches identifiers with null hashes until
-        // the backfill (which mints missing keys) reaches them.
-        logger.warn(
-          { userId, error },
-          "could not mint userHashKey at user creation; identifier hashes stay null until the backfill mints it",
-        );
-      }
-    }
-
-    /**
-     * The live attach must derive the SAME identifier id the backfill will
-     * derive from the row later (ADR-101 §3: backfill and live emission
-     * converge). The id derives from `(userId, provider, providerAccountId,
-     * value, occurredAt)`, and the backfill takes `occurredAt` from
-     * `Account.createdAt` and links the row by `Account.id` — so the ceremony
-     * reads `createdAt` off the row better-auth is about to write and mints
-     * the row's id up front (the adapter factory honours a caller-set id on
-     * `create`), then hands both to the attach. Returns the data the row
-     * write must use, id included.
-     */
-    async function attachCeremonyForAccountCreate(
-      data: Record<string, unknown>,
-    ): Promise<Record<string, unknown>> {
-      const userId = data.userId;
-      const providerId = data.providerId;
-      const providerAccountId = data.accountId;
-      if (typeof userId !== "string" || typeof providerId !== "string") {
-        return data;
-      }
-      if (!(await isLatched({ userId }))) return data;
-      const accountId =
-        typeof data.id === "string" ? data.id : randomBytes(16).toString("hex");
-      const createdAt = data.createdAt;
-      const occurredAtMs =
-        createdAt instanceof Date ? createdAt.getTime() : now();
-
-      const user = await base.findOne<{ email: string | null }>({
-        model: "user",
-        where: [{ field: "id", value: userId }],
-      });
-      const value = user?.email;
-      if (!value) {
-        logger.warn(
-          { userId, providerId },
-          "latched user's account ceremony carries no email value; no identifier attached",
-        );
-        return data;
-      }
-      // Guards veto HERE, before the Account row exists; the events land
-      // durably (waited) and fold on the calling path before the row write.
-      await resolveCeremonies().attachIdentifier({
-        tenantId: userId,
-        userId,
-        commandId: newIdentityCommandId(),
-        accountId,
-        provider: identifierProviderFor(providerId),
-        providerAccountId:
-          typeof providerAccountId === "string" ? providerAccountId : null,
-        value,
-        occurredAtMs,
-        ceremony: { flow: "better-auth" },
-        actor: { type: "user", id: userId },
-      });
-      return { ...data, id: accountId };
-    }
-
-    async function detachCeremoniesForAccountRows(
-      rows: AccountRowShape[],
-    ): Promise<void> {
-      for (const row of rows) {
-        if (!(await isLatched({ userId: row.userId }))) continue;
-        const identifierId = await identifierIdForAccountRow({ prisma, row });
-        if (identifierId === null) {
-          // Nothing in the projection mirrors this row (adopted before the
-          // projection carried accountIds, or ambiguous). The protocol
-          // delete must still happen; the backfill's next pass detaches
-          // whatever the row's absence implies.
-          logger.warn(
-            {
-              userId: row.userId,
-              accountId: row.id,
-              providerId: row.providerId,
-            },
-            "no unambiguous Identifier mirrors the Account row being deleted; protocol delete proceeds, the backfill reconciles",
-          );
-          continue;
-        }
-        const state = await resolveCeremonies();
-        await state.detachIdentifier({
-          tenantId: row.userId,
-          userId: row.userId,
-          commandId: newIdentityCommandId(),
-          identifierId,
-          occurredAtMs: now(),
-          actor: { type: "user", id: row.userId },
-        });
-      }
-    }
-
+    const ctx: AdapterContext = {
+      base,
+      prisma,
+      isLatched: deps.isLatched ?? isUserOnIdentityWrites,
+      now: deps.now ?? Date.now,
+      resolveCeremonies,
+    };
     return {
       ...base,
-
-      create: async (args) => {
-        const route = routeWrite(args.model, "create");
-        let createArgs = args;
-        if (route === "domain" && args.model === "account") {
-          const data = await attachCeremonyForAccountCreate(
-            args.data as Record<string, unknown>,
-          );
-          createArgs = { ...args, data: data as never, forceAllowId: true };
-        }
-        const created = await base.create(createArgs);
-        if (route === "domain" && args.model === "user") {
-          const createdId = (created as { id?: unknown } | null)?.id;
-          if (typeof createdId === "string") await mintUserHashKey(createdId);
-        }
-        return created as never;
-      },
-
+      create: (args) => createRouted(ctx, args) as never,
       update: async (args) => {
         routeWrite(args.model, "update");
         return base.update(args) as never;
       },
-
       updateMany: async (args) => {
         routeWrite(args.model, "updateMany");
         return base.updateMany(args);
       },
-
       delete: async (args) => {
-        const route = routeWrite(args.model, "delete");
-        if (route === "domain" && args.model === "account") {
-          const rows = await base.findMany<AccountRowShape>({
-            model: "account",
-            where: args.where,
-          });
-          await detachCeremoniesForAccountRows(rows);
-        }
+        await detachBeforeAccountDelete(ctx, { operation: "delete", args });
         return base.delete(args);
       },
-
       deleteMany: async (args) => {
-        const route = routeWrite(args.model, "deleteMany");
-        if (route === "domain" && args.model === "account") {
-          const rows = await base.findMany<AccountRowShape>({
-            model: "account",
-            where: args.where,
-          });
-          await detachCeremoniesForAccountRows(rows);
-        }
+        await detachBeforeAccountDelete(ctx, { operation: "deleteMany", args });
         return base.deleteMany(args);
       },
-
       consumeOne: async (args) => {
         routeWrite(args.model, "consumeOne");
         return base.consumeOne(args) as never;
       },
-
       incrementOne: async (args) => {
         routeWrite(args.model, "incrementOne");
         return base.incrementOne(args) as never;
       },
-
       transaction: (callback) =>
         base.transaction((trx) => callback(guardTransaction(trx))),
     };
   };
+}
+
+interface AdapterContext {
+  base: DbAdapter;
+  prisma: PrismaClient;
+  isLatched: (params: { userId: string }) => Promise<boolean>;
+  now: () => number;
+  resolveCeremonies: () => Pick<
+    IdentityCeremonies,
+    "attachIdentifier" | "detachIdentifier"
+  >;
+}
+
+async function createRouted(
+  ctx: AdapterContext,
+  args: Parameters<DbAdapter["create"]>[0],
+): Promise<unknown> {
+  const route = routeWrite(args.model, "create");
+  const isDomainAccount = route === "domain" && args.model === "account";
+  const createArgs = isDomainAccount
+    ? {
+        ...args,
+        data: (await attachCeremonyForAccountCreate(
+          ctx,
+          args.data as Record<string, unknown>,
+        )) as never,
+        forceAllowId: true,
+      }
+    : args;
+  const created = await ctx.base.create(createArgs);
+  if (route === "domain" && args.model === "user") {
+    const createdId = (created as { id?: unknown } | null)?.id;
+    if (typeof createdId === "string") await mintUserHashKey(ctx, createdId);
+  }
+  return created;
+}
+
+async function detachBeforeAccountDelete(
+  ctx: AdapterContext,
+  {
+    operation,
+    args,
+  }: {
+    operation: "delete" | "deleteMany";
+    args: Parameters<DbAdapter["delete"]>[0];
+  },
+): Promise<void> {
+  const route = routeWrite(args.model, operation);
+  if (route !== "domain" || args.model !== "account") return;
+  const rows = await ctx.base.findMany<AccountRowShape>({
+    model: "account",
+    where: args.where,
+  });
+  await detachCeremoniesForAccountRows(ctx, rows);
+}
+
+async function mintUserHashKey(
+  ctx: AdapterContext,
+  userId: string,
+): Promise<void> {
+  try {
+    await mintUserHashKeyIfMissing({ prisma: ctx.prisma, userId });
+  } catch (error) {
+    // The mint is additive bookkeeping; a sign-up must not fail on it.
+    // A user without a key attaches identifiers with null hashes until
+    // the backfill (which mints missing keys) reaches them.
+    logger.warn(
+      { userId, error },
+      "could not mint userHashKey at user creation; identifier hashes stay null until the backfill mints it",
+    );
+  }
+}
+
+/** The fields an Account create carries that the ceremony needs, or null. */
+function accountCreateIntent(
+  data: Record<string, unknown>,
+  now: () => number,
+): {
+  userId: string;
+  providerId: string;
+  providerAccountId: string | null;
+  accountId: string;
+  occurredAtMs: number;
+} | null {
+  const { userId, providerId, accountId, id, createdAt } = data;
+  if (typeof userId !== "string" || typeof providerId !== "string") {
+    return null;
+  }
+  return {
+    userId,
+    providerId,
+    providerAccountId: typeof accountId === "string" ? accountId : null,
+    accountId: typeof id === "string" ? id : randomBytes(16).toString("hex"),
+    occurredAtMs: createdAt instanceof Date ? createdAt.getTime() : now(),
+  };
+}
+
+/**
+ * The live attach must derive the SAME identifier id the backfill will
+ * derive from the row later (ADR-101 §3: backfill and live emission
+ * converge). The id derives from `(userId, provider, providerAccountId,
+ * value, occurredAt)`, and the backfill takes `occurredAt` from
+ * `Account.createdAt` and links the row by `Account.id` — so the ceremony
+ * reads `createdAt` off the row better-auth is about to write and mints
+ * the row's id up front (the adapter factory honours a caller-set id on
+ * `create`), then hands both to the attach. Returns the data the row
+ * write must use, id included.
+ */
+async function attachCeremonyForAccountCreate(
+  ctx: AdapterContext,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const intent = accountCreateIntent(data, ctx.now);
+  if (!intent) return data;
+  const { userId, providerId } = intent;
+  if (!(await ctx.isLatched({ userId }))) return data;
+
+  const user = await ctx.base.findOne<{ email: string | null }>({
+    model: "user",
+    where: [{ field: "id", value: userId }],
+  });
+  const value = user?.email;
+  if (!value) {
+    logger.warn(
+      { userId, providerId },
+      "latched user's account ceremony carries no email value; no identifier attached",
+    );
+    return data;
+  }
+  // Guards veto HERE, before the Account row exists; the events land
+  // durably (waited) and fold on the calling path before the row write.
+  await ctx.resolveCeremonies().attachIdentifier({
+    tenantId: userId,
+    userId,
+    commandId: newIdentityCommandId(),
+    accountId: intent.accountId,
+    provider: identifierProviderFor(providerId),
+    providerAccountId: intent.providerAccountId,
+    value,
+    occurredAtMs: intent.occurredAtMs,
+    ceremony: { flow: "better-auth" },
+    actor: { type: "user", id: userId },
+  });
+  return { ...data, id: intent.accountId };
+}
+
+async function detachCeremoniesForAccountRows(
+  ctx: AdapterContext,
+  rows: AccountRowShape[],
+): Promise<void> {
+  for (const row of rows) {
+    if (!(await ctx.isLatched({ userId: row.userId }))) continue;
+    const identifierId = await identifierIdForAccountRow({
+      prisma: ctx.prisma,
+      row,
+    });
+    if (identifierId === null) {
+      // Nothing in the projection mirrors this row (adopted before the
+      // projection carried accountIds, or ambiguous). The protocol
+      // delete must still happen; the backfill's next pass detaches
+      // whatever the row's absence implies.
+      logger.warn(
+        { userId: row.userId, accountId: row.id, providerId: row.providerId },
+        "no unambiguous Identifier mirrors the Account row being deleted; protocol delete proceeds, the backfill reconciles",
+      );
+      continue;
+    }
+    await ctx.resolveCeremonies().detachIdentifier({
+      tenantId: row.userId,
+      userId: row.userId,
+      commandId: newIdentityCommandId(),
+      identifierId,
+      occurredAtMs: ctx.now(),
+      actor: { type: "user", id: row.userId },
+    });
+  }
 }
 
 /**
