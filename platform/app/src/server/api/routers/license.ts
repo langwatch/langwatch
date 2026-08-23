@@ -15,7 +15,6 @@ import {
   generateLicenseId,
   signLicense,
 } from "../../../../ee/licensing/signing";
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 
 const logger = createLogger("langwatch:api:licenseRouter");
 
@@ -59,7 +58,7 @@ export const licenseRouter = createTRPCRouter({
         organizationId: z.string().min(1),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input }): Promise<LicenseStatus> => {
       // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
       // shared middleware maps it to NOT_FOUND and keeps it as the cause.
@@ -94,7 +93,10 @@ export const licenseRouter = createTRPCRouter({
    */
   getSsoGateStatus: protectedProcedure
     .input(z.object({}))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "instance license status is deployment-wide and read-only for any signed-in user",
+    })
     .query(async () => {
       const configuredProvider = env.NEXTAUTH_PROVIDER;
       if (!configuredProvider || configuredProvider === "email") {
@@ -118,7 +120,7 @@ export const licenseRouter = createTRPCRouter({
         licenseKey: z.string().min(1, "License key is required"),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input }) => {
       const result = await getLicenseHandler().validateAndStoreLicense(
         input.organizationId,
@@ -147,7 +149,7 @@ export const licenseRouter = createTRPCRouter({
         organizationId: z.string().min(1),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input }) => {
       const result = await getLicenseHandler().removeLicense(
         input.organizationId,
@@ -171,7 +173,7 @@ export const licenseRouter = createTRPCRouter({
         })
         .merge(generateLicenseSchema),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ input }) => {
       const { privateKey, organizationName, email, expiresAt, planType, plan } =
         input;

@@ -71,6 +71,18 @@ gateway:
   replicaCount: 2
 
 app:
+  # The stored-objects upgrade hooks scale the workers Deployment through the
+  # Kubernetes API while the app rolls, so their pods need an automounted
+  # ServiceAccount token and a writable root for kubectl's discovery cache.
+  # They render only in local-filesystem stored-objects mode, where the app and
+  # the workers share one ReadWriteOnce volume. That mode is the documented
+  # hobby tier and is not what a locked-down cluster should run: enable
+  # app.dataplane (S3 / MinIO / Azure) instead, and the hooks never render at
+  # all. Pinned off here so the overlay is self-contained.
+  storedObjects:
+    localFilesystem:
+      serializeUpgrades: false
+
   telemetry:
     # Prometheus is off above, so don't expose app metrics either - nothing
     # would scrape them. This is already the default; pinned here so the two

@@ -124,6 +124,7 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   apiKeys: "API keys",
   modelProviders: "Model providers",
   gateway: "AI Gateway",
+  organization: "Organization",
   platform: "LangWatch",
 };
 
@@ -137,7 +138,7 @@ const nestedResourceHref = (base: string, resourceId: string) =>
   `${base}/${encodeURIComponent(resourceId)}`;
 
 const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
-  traces: { path: "messages", resourceHref: nestedResourceHref },
+  traces: { path: "traces", resourceHref: nestedResourceHref },
   analytics: { path: "analytics" },
   experiments: { path: "experiments", resourceHref: nestedResourceHref },
   evaluations: {
@@ -188,6 +189,10 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   apiKeys: { path: "settings/authentication", deepLink: false },
   modelProviders: { path: "settings/model-providers", deepLink: false },
   gateway: { path: "settings", deepLink: false },
+  // The provisioning pages live at `/settings/...`, outside the project-slug
+  // prefix every href here is built under, so there is no project-relative
+  // path to hand a card. It carries no link at all rather than one that 404s.
+  organization: { path: "settings/members", deepLink: false },
   platform: { path: "settings", deepLink: false },
 };
 
@@ -362,6 +367,13 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   triggers: "automations",
   "settings.projects": "projects",
   "settings.api-keys": "apiKeys",
+  "settings.organization": "organization",
+  "settings.members": "organization",
+  "settings.teams": "organization",
+  "settings.groups": "organization",
+  "settings.roles": "organization",
+  "settings.role-bindings": "organization",
+  "settings.scim": "organization",
   "settings.model-providers": "modelProviders",
   "settings.secrets": "secrets",
 };

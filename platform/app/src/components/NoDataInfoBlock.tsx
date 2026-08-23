@@ -1,4 +1,4 @@
-import { Box, Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
+import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
 
 export const NoDataInfoBlock = ({
   title,
@@ -21,15 +21,15 @@ export const NoDataInfoBlock = ({
             <Icon size={"lg"}>{icon}</Icon>
           </EmptyState.Indicator>
           <EmptyState.Title>{title}</EmptyState.Title>
-          <EmptyState.Description>
-            <Center>
-              <VStack align="center">
-                <Box>{description}</Box>
-                <Box>{docsInfo}</Box>
-                {children}
-              </VStack>
-            </Center>
-          </EmptyState.Description>
+          {/* EmptyState.Description renders a <p>, so anything block-level
+              (docsInfo, children) must sit beside it, not inside it. */}
+          <EmptyState.Description>{description}</EmptyState.Description>
+          {(docsInfo ?? children) != null && (
+            <VStack align="center" textStyle="sm" color="fg.muted">
+              {docsInfo}
+              {children}
+            </VStack>
+          )}
         </EmptyState.Content>
       </EmptyState.Root>
     </Center>

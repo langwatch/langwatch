@@ -8,10 +8,16 @@ import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
   projectCodingAgentSessionToRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CodingAgentSessionService } from "../coding-agent-session.service";
+import {
+  CodingAgentSessionService,
+  MAX_SESSION_EVENTS_PAGE_SIZE,
+} from "../coding-agent-session.service";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
+import type { CodingAgentSessionEventRow } from "../repositories/coding-agent-session-events.repository";
+import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,
@@ -21,6 +27,15 @@ import type {
 const PROJECT = "project-1";
 const SESSION = "sess-1";
 const TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+const STARTED_AT_MS = 1_700_000_000_000;
+
+/** One row back from a session-events read; only its presence is asserted. */
+const SESSION_EVENT = {
+  sessionId: SESSION,
+  timeUnixMs: STARTED_AT_MS,
+  recordId: "rec-1",
+  eventKind: "model_call",
+} as CodingAgentSessionEventRow;
 
 function makeRow(
   overrides?: Partial<CodingAgentSessionRow>,
@@ -32,7 +47,7 @@ function makeRow(
       ...emptyState(),
       sessionKeySource: "provider",
       traceIds: [TRACE],
-      startedAtMs: 1_700_000_000_000,
+      startedAtMs: STARTED_AT_MS,
       createdAt: 0,
       updatedAt: 0,
       LastEventOccurredAt: 0,
@@ -53,6 +68,16 @@ function emptyState() {
     entrypoint: null,
     finalRequestId: null,
     userId: "user-1" as string | null,
+    parentSessionId: null,
+    isFork: false,
+    repositoryHost: null,
+    repositoryOwner: null,
+    repositoryName: null,
+    gitBranch: null,
+    gitBranches: [] as string[],
+    gitWorktree: null,
+    title: null,
+    titleSource: null,
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
@@ -87,6 +112,7 @@ function emptyState() {
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: {},
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -96,6 +122,7 @@ function emptyState() {
     errorTypes: {},
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 0,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 0,
@@ -122,16 +149,25 @@ function emptyState() {
   };
 }
 
+/** The window a session-events read was bounded by, or undefined if unbounded. */
+type ReadWindow = { fromMs: number; toMs: number } | undefined;
+
 function makeService({
   row = null,
   rows,
   mapping = null,
   totals = [],
+  onEventsRead,
 }: {
   row?: CodingAgentSessionRow | null;
   rows?: CodingAgentSessionRow[];
   mapping?: { sessionId: string; occurredAtMs: number } | null;
   totals?: SessionMetricTotal[];
+  /** Answers a session-events read, so a test can observe the window it got. */
+  onEventsRead?: (args: { occurredAt: ReadWindow }) => {
+    events: CodingAgentSessionEventRow[];
+    nextCursor: null;
+  };
 }) {
   const listed = rows ?? (row ? [row] : []);
   const sessions: CodingAgentSessionRepository = {
@@ -140,6 +176,7 @@ function makeService({
     findBySessionIdWithApplied: async () =>
       row ? { row, appliedEventIds: [] } : null,
     findManyRecent: async () => listed,
+    listByRepositoryBranch: async () => [],
   };
   const traceSessions: CodingAgentTraceSessionRepository = {
     ensure: async () => {},
@@ -150,10 +187,186 @@ function makeService({
     ensure: async () => {},
     findTotalsBySessionIds: async () => totals,
   };
-  return new CodingAgentSessionService(sessions, traceSessions, metricSeries);
+  return new CodingAgentSessionService({
+    sessions,
+    traceSessions,
+    metricSeries,
+    sessionEvents: onEventsRead
+      ? {
+          ensure: async () => {},
+          findBySessionId: async ({ occurredAt }) =>
+            onEventsRead({ occurredAt }),
+          sumTokensByModelPerSession: async () => [],
+        }
+      : new NullCodingAgentSessionEventsRepository(),
+  });
 }
 
 describe("CodingAgentSessionService", () => {
+  describe("when a caller asks for more session events than one page holds", () => {
+    it("clamps the limit the repository sees to the page ceiling", async () => {
+      const seen: number[] = [];
+      const service = new CodingAgentSessionService({
+        sessions: {
+          upsert: async () => {},
+          findBySessionId: async () => null,
+          findBySessionIdWithApplied: async () => null,
+          findManyRecent: async () => [],
+          listByRepositoryBranch: async () => [],
+        },
+        traceSessions: {
+          ensure: async () => {},
+          findByTraceId: async () => null,
+        },
+        metricSeries: {
+          ensure: async () => {},
+          findTotalsBySessionIds: async () => [],
+        },
+        sessionEvents: {
+          ensure: async () => {},
+          findBySessionId: async ({ limit }) => {
+            seen.push(limit);
+            return { events: [], nextCursor: null };
+          },
+          sumTokensByModelPerSession: async () => [],
+        },
+      });
+
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 10_000_000,
+      });
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 0,
+      });
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 25,
+      });
+
+      expect(seen).toEqual([MAX_SESSION_EVENTS_PAGE_SIZE, 1, 25]);
+    });
+  });
+
+  describe("given a session whose events are asked for without a window", () => {
+    /** @scenario reading a session's events prunes to the session's own weeks */
+    it("bounds the read on the session's start instead of every partition", async () => {
+      const windows: ReadWindow[] = [];
+      const service = makeService({
+        row: makeRow(),
+        onEventsRead: ({ occurredAt }) => {
+          windows.push(occurredAt);
+          return { events: [SESSION_EVENT], nextCursor: null };
+        },
+      });
+
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 25,
+      });
+
+      expect(windows).toEqual([
+        {
+          fromMs: STARTED_AT_MS - CODING_AGENT_SESSION_READ_WINDOW_MS,
+          toMs: STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS,
+        },
+      ]);
+    });
+
+    describe("when the session outlived the window we guessed", () => {
+      /** @scenario a session longer than the guessed window still answers in full */
+      it("pushes the upper edge out to now rather than answering empty", async () => {
+        const windows: ReadWindow[] = [];
+        const service = makeService({
+          row: makeRow(),
+          onEventsRead: ({ occurredAt }) => {
+            windows.push(occurredAt);
+            // Empty until the read reaches past the guessed upper edge.
+            const reachesNow =
+              occurredAt !== undefined &&
+              occurredAt.toMs >
+                STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS;
+            return reachesNow
+              ? { events: [SESSION_EVENT], nextCursor: null }
+              : { events: [], nextCursor: null };
+          },
+        });
+
+        const page = await service.getSessionEvents({
+          projectId: PROJECT,
+          sessionId: SESSION,
+          limit: 25,
+        });
+
+        expect(windows).toHaveLength(2);
+        expect(page.events).toHaveLength(1);
+        // The retry stays bounded: only the upper edge moves, so the read
+        // still prunes every partition older than the session itself.
+        expect(windows[1]?.fromMs).toBe(windows[0]?.fromMs);
+        expect(windows[1]!.toMs).toBeGreaterThan(windows[0]!.toMs);
+      });
+
+      // The retry fires on ANY empty first page, and `kinds` can empty one on
+      // its own. Were the retry unbounded, asking for a kind the session never
+      // produced would walk the whole retention on every single read.
+      /** @scenario a session longer than the guessed window still answers in full */
+      it("stays bounded when a kinds filter is what emptied the page", async () => {
+        const windows: ReadWindow[] = [];
+        const service = makeService({
+          row: makeRow(),
+          onEventsRead: ({ occurredAt }) => {
+            windows.push(occurredAt);
+            return { events: [], nextCursor: null };
+          },
+        });
+
+        const page = await service.getSessionEvents({
+          projectId: PROJECT,
+          sessionId: SESSION,
+          kinds: ["compaction"],
+          limit: 25,
+        });
+
+        expect(page.events).toEqual([]);
+        expect(windows).toHaveLength(2);
+        expect(windows[1]).toBeDefined();
+        expect(windows[1]?.fromMs).toBe(
+          STARTED_AT_MS - CODING_AGENT_SESSION_READ_WINDOW_MS,
+        );
+      });
+    });
+  });
+
+  describe("given a caller that named its own window", () => {
+    /** @scenario a caller's own window is never widened behind its back */
+    it("passes it through and never retries unbounded", async () => {
+      const windows: ReadWindow[] = [];
+      const service = makeService({
+        row: makeRow(),
+        onEventsRead: ({ occurredAt }) => {
+          windows.push(occurredAt);
+          return { events: [], nextCursor: null };
+        },
+      });
+
+      const asked = { fromMs: 1_000, toMs: 2_000 };
+      const page = await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        occurredAt: asked,
+        limit: 25,
+      });
+
+      expect(windows).toEqual([asked]);
+      expect(page.events).toEqual([]);
+    });
+  });
+
   describe("when a trace belongs to a coding-agent session", () => {
     /** @scenario the trace view shows its session */
     it("resolves the session through the trace mapping", async () => {
@@ -190,12 +403,20 @@ describe("CodingAgentSessionService", () => {
           },
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
+          listByRepositoryBranch: async () => [],
         };
-        const service = new CodingAgentSessionService(
+        const service = new CodingAgentSessionService({
           sessions,
-          { ensure: async () => {}, findByTraceId: async () => null },
-          { ensure: async () => {}, findTotalsBySessionIds: async () => [] },
-        );
+          traceSessions: {
+            ensure: async () => {},
+            findByTraceId: async () => null,
+          },
+          metricSeries: {
+            ensure: async () => {},
+            findTotalsBySessionIds: async () => [],
+          },
+          sessionEvents: new NullCodingAgentSessionEventsRepository(),
+        });
 
         const session = await service.getBySessionId({
           projectId: PROJECT,

@@ -19,7 +19,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -191,8 +191,27 @@ let annotationScoreFindMany: ReturnType<typeof vi.fn>;
 const QUALITY_SCORE_ID = "annscore-quality-id";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
 }));
+
+// The service resolves its client through getApp().clickhouse now (two-door
+// access); this App stub delegates to the clickhouseClient mock above, so
+// the suite's existing per-tenant wiring keeps working unchanged.
+vi.mock("~/server/app-layer/app", async () => {
+  const clients = await import("~/server/clickhouse/clickhouseClient");
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (tenantId: string) =>
+        clients.getClickHouseClientForTenant(tenantId),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -240,13 +259,15 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
 
-  vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
+  vi.mocked(getClickHouseClientForTenant).mockResolvedValue(ch);
 
   annotationFindMany = vi.mocked(prisma.annotation.findMany);
   annotationScoreFindMany = vi.mocked(prisma.annotationScore.findMany);
-  service = new ClickHouseTraceService(
-    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-  );
+  service = new ClickHouseTraceService({
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
+  });
 
   await insert({
     table: "trace_summaries",
@@ -416,7 +437,10 @@ describe("trace search projection (integration)", () => {
         expect(row).toEqual({
           trace_id: traceId,
           metadata: { user_id: "u_42" },
-          metrics: { total_cost: 0.0031 },
+          // Approximate: ClickHouse's float text parser may land one ULP off
+          // the literal (platform-dependent), and the projection passes the
+          // stored value through untouched.
+          metrics: { total_cost: expect.closeTo(0.0031, 12) },
         });
         expect(row).not.toHaveProperty("input");
         expect(row).not.toHaveProperty("output");
@@ -444,7 +468,7 @@ describe("trace search projection (integration)", () => {
         expect(row).toMatchObject({
           trace_id: traceId,
           metadata: { user_id: "u_42" },
-          metrics: { total_cost: 0.0031 },
+          metrics: { total_cost: expect.closeTo(0.0031, 12) },
           events: [{ type: "thumbs_up_down" }],
           annotations: [{ is_thumbs_up: true }],
           evaluations: [{ score: 0.91 }],

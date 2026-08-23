@@ -58,6 +58,9 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
+const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
+  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -81,6 +84,14 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/schema":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -197,6 +208,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Coding Agents",
+    dirName: "coding-agents",
+    pathPrefixes: ["/api/coding-agent"],
+    overviewDescription:
+      "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
+  },
+  {
     name: "Triggers",
     dirName: "triggers",
     pathPrefixes: ["/api/triggers", "/api/trigger"],
@@ -279,6 +297,96 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage groups: named sets of members that carry role bindings and can hold a per-member spend allowance.",
   },
   {
+    name: "Organization",
+    dirName: "organization",
+    // Members and invites live under this prefix but read as families of their
+    // own, so they carry longer prefixes below and win ownership of their paths.
+    pathPrefixes: ["/api/organization"],
+    overviewDescription:
+      "Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage.",
+  },
+  {
+    name: "Members",
+    dirName: "members",
+    pathPrefixes: ["/api/organization/members"],
+    overviewDescription:
+      "Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach.",
+  },
+  {
+    name: "Invites",
+    dirName: "invites",
+    pathPrefixes: ["/api/organization/invites"],
+    overviewDescription:
+      "Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted.",
+  },
+  {
+    name: "Roles",
+    dirName: "roles",
+    pathPrefixes: ["/api/roles"],
+    overviewDescription:
+      "Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere.",
+    // The catalog comes first because it is where the permission keys a role is
+    // built from come from, and the overview walks a reader in that order.
+    endpointOrder: [
+      "GET /api/roles/permissions",
+      "GET /api/roles",
+      "POST /api/roles",
+      "GET /api/roles/{id}",
+      "PATCH /api/roles/{id}",
+      "DELETE /api/roles/{id}",
+    ],
+  },
+  {
+    name: "Role Bindings",
+    dirName: "role-bindings",
+    pathPrefixes: ["/api/role-bindings"],
+    overviewDescription:
+      "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project. Role bindings are how every kind of access in LangWatch is expressed.",
+  },
+  {
+    name: "SCIM Tokens",
+    dirName: "scim-tokens",
+    pathPrefixes: ["/api/scim-tokens"],
+    overviewDescription:
+      "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
+  },
+  {
+    name: "SCIM",
+    dirName: "scim",
+    pathPrefixes: ["/api/scim/v2"],
+    overviewDescription:
+      "The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups. Point Okta, Entra ID or any other SCIM 2.0 provider at this base URL with a SCIM token.",
+    // Discovery first, then the two resource types whole, because a provider
+    // reads the service provider configuration before it calls anything else,
+    // and the default sort would interleave Users and Groups.
+    endpointOrder: [
+      "GET /api/scim/v2/ServiceProviderConfig",
+      "GET /api/scim/v2/ResourceTypes",
+      "GET /api/scim/v2/Schemas",
+      "GET /api/scim/v2/Users",
+      "POST /api/scim/v2/Users",
+      "GET /api/scim/v2/Users/{id}",
+      "PUT /api/scim/v2/Users/{id}",
+      "PATCH /api/scim/v2/Users/{id}",
+      "DELETE /api/scim/v2/Users/{id}",
+      "GET /api/scim/v2/Groups",
+      "POST /api/scim/v2/Groups",
+      "GET /api/scim/v2/Groups/{id}",
+      "PUT /api/scim/v2/Groups/{id}",
+      "PATCH /api/scim/v2/Groups/{id}",
+      "DELETE /api/scim/v2/Groups/{id}",
+    ],
+  },
+  {
+    name: "Organizations (Self-Hosted)",
+    dirName: "organizations",
+    // Plural, and a different family from `/api/organization`: this one
+    // authenticates against the instance, before any organization exists.
+    pathPrefixes: ["/api/organizations"],
+    overviewDescription:
+      "Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there. This is where an infrastructure-as-code run starts, because it hands back the first organization admin API key.",
+  },
+  {
     name: "API Keys",
     dirName: "api-keys",
     pathPrefixes: ["/api/api-keys"],
@@ -336,7 +444,7 @@ function slugify(text: string): string {
 function generateTitle(
   method: string,
   apiPath: string,
-  op: OpenAPIOperation
+  op: OpenAPIOperation,
 ): string {
   if (op.summary) return op.summary;
 
@@ -360,7 +468,9 @@ function generateTitle(
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
+    .filter(
+      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
+    )
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -372,7 +482,7 @@ function getResourceName(apiPath: string): string {
 function generateFileName(
   method: string,
   apiPath: string,
-  op: OpenAPIOperation
+  op: OpenAPIOperation,
 ): string {
   if (op.summary) {
     const s = slugify(op.summary);
@@ -488,23 +598,93 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   const unowned = Object.keys(spec.paths).filter(
-    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath)
+    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
   );
   if (unowned.length > 0) {
     const noun = unowned.length === 1 ? "spec path has" : "spec paths have";
     console.error(
-      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`
+      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`,
     );
     for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
     console.error(
-      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:"
+      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:",
     );
     console.error(
-      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or"
+      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or",
     );
     console.error(
-      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference."
+      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference.",
     );
+    process.exit(1);
+  }
+
+  // An `endpointOrder` key only sorts the group that declares it, so a key is
+  // invisible unless it names an operation THAT group owns: the sort silently
+  // falls back to the default for it. A drifted path parameter name, a casing
+  // slip, or a key naming a sibling group's path therefore reshuffles the
+  // sidebar with no diagnostic at all, which is exactly what a hand-written
+  // key list is prone to. The two failures get separate reports because their
+  // remedies differ: one is a typo, the other is a key in the wrong group.
+  const specOperations = new Set<string>();
+  const operationOwner = new Map<string, EndpointGroup>();
+  const groupOperations = new Map<EndpointGroup, Set<string>>(
+    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()]),
+  );
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    const owner = owners.get(apiPath);
+    for (const method of Object.keys(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      const key = `${method.toUpperCase()} ${apiPath}`;
+      specOperations.add(key);
+      if (owner) {
+        operationOwner.set(key, owner);
+        groupOperations.get(owner)?.add(key);
+      }
+    }
+  }
+
+  const unknownOrder: string[] = [];
+  const misownedOrder: string[] = [];
+  for (const group of ENDPOINT_GROUPS) {
+    for (const key of group.endpointOrder ?? []) {
+      if (groupOperations.get(group)?.has(key)) continue;
+      if (!specOperations.has(key)) {
+        unknownOrder.push(`${group.name}: ${key}`);
+        continue;
+      }
+      const owner = operationOwner.get(key);
+      misownedOrder.push(
+        `${group.name}: ${key} (${
+          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
+        })`,
+      );
+    }
+  }
+
+  if (unknownOrder.length > 0) {
+    const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
+    console.error(
+      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`,
+    );
+    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts.",
+    );
+  }
+  if (misownedOrder.length > 0) {
+    const noun =
+      misownedOrder.length === 1
+        ? "key names an operation"
+        : "keys name operations";
+    console.error(
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
+    );
+    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered.",
+    );
+  }
+  if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
 
@@ -560,7 +740,7 @@ function main() {
     if (!fs.existsSync(overviewPath)) {
       fs.writeFileSync(
         overviewPath,
-        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`
+        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
       );
       totalCreated++;
     } else {
@@ -587,8 +767,7 @@ function main() {
         fileName = `${ep.method}-${fileName}`;
       }
       if (usedNames.has(fileName)) {
-        const suffix =
-          ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
+        const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
         fileName = `${fileName}-${suffix}`;
       }
       usedNames.add(fileName);
@@ -599,7 +778,7 @@ function main() {
       if (!fs.existsSync(mdxPath)) {
         fs.writeFileSync(
           mdxPath,
-          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`
+          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`,
         );
         totalCreated++;
       } else {
@@ -622,7 +801,7 @@ function main() {
 
   // Update docs.json navigation
   const apiRefAnchor = docsJson.navigation.anchors.find(
-    (a: { anchor: string }) => a.anchor === "API Reference"
+    (a: { anchor: string }) => a.anchor === "API Reference",
   );
   if (apiRefAnchor) {
     apiRefAnchor.groups = allNavGroups;
@@ -654,14 +833,7 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
     "summarization-score",
   ],
   "RAG Quality": [
-    "ragas-answer-correctness",
-    "ragas-answer-relevancy",
-    "ragas-context-precision",
-    "ragas-context-recall",
-    "ragas-context-relevancy",
-    "ragas-context-utilization",
     "ragas-faithfulness",
-    "ragas-faithfulness-1",
     "ragas-response-context-precision",
     "ragas-response-context-recall",
     "ragas-response-relevancy",
@@ -692,10 +864,12 @@ function buildBuiltInEvaluatorNav(): (
   | { group: string; pages: string[] }
 )[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
+  const pages: (string | { group: string; pages: string[] })[] = [
+    p("overview"),
+  ];
 
   for (const [category, evaluators] of Object.entries(
-    BUILTIN_EVALUATOR_CATEGORIES
+    BUILTIN_EVALUATOR_CATEGORIES,
   )) {
     pages.push({
       group: category,

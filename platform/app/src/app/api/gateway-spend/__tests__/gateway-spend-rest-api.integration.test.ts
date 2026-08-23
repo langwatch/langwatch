@@ -7,15 +7,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
@@ -42,27 +42,40 @@ const resolveTestClickHouseClient = async () => chClient;
 // route takes its ClickHouse-backed repositories from `getApp().gateway`
 // too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    planProvider: {
-      getActivePlan: async () => ({
-        webhookEndpointsEnabled: planHasWebhookEndpoints,
-      }),
-    },
-    gateway: {
-      budgets: new GatewayBudgetClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-      virtualKeySpend: undefined,
-      spendEvents: new GatewaySpendEventsRepository(
-        resolveTestClickHouseClient,
-      ),
-      webhookEvents: new WebhookEventsClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  // The REST org-auth middleware decides through
+  // appFromContext(c).permissions (ADR-092); the fake carries the real
+  // composition over the real test database so requests reach the routes.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const permissions = permissionsServiceFor(dbForPermissions);
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({
+          webhookEndpointsEnabled: planHasWebhookEndpoints,
+        }),
+      },
+      gateway: {
+        budgets: new GatewayBudgetClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+        virtualKeySpend: undefined,
+        spendEvents: new GatewaySpendEventsRepository(
+          resolveTestClickHouseClient,
+        ),
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+      },
+    }),
+  };
+});
 
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
@@ -71,10 +84,11 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...original,
-    getClickHouseClientForProject: resolveTestClickHouseClient,
+    getClickHouseClientForTenant: resolveTestClickHouseClient,
   };
 });
 
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { app } from "../[[...route]]/app";
 
 const ns = `billing-api-${nanoid(8)}`;
@@ -110,6 +124,11 @@ async function deleteOrganizationDependents(
     });
   }
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;
@@ -191,6 +210,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
             cache_read_input_tokens: row.tokensCacheRead,
             cache_creation_input_tokens: row.tokensCacheWrite,
             reasoning_tokens: row.tokensReasoning,
+            cache_creation_1h_tokens: 0,
+            input_audio_tokens: 0,
+            output_audio_tokens: 0,
+            input_chars: 0,
+            audio_ms: 0,
           },
           rateVersion: row.rateVersion,
           // Overrides set the display string; derive the integer so both
@@ -328,6 +352,59 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       status: 401,
       type: "unauthenticated",
       code: "missing_credentials",
+    });
+  });
+
+  describe("when the window runs backwards", () => {
+    /** @scenario "An inverted window is refused on both reads" */
+    it("refuses the rollups the same way the events already were", async () => {
+      const inverted = "from=1768046410000&to=1768046400000";
+
+      for (const path of [
+        `/api/gateway/v1/spend-summaries?group_by=virtual_key&${inverted}`,
+        `/api/gateway/v1/spend-events?${inverted}`,
+      ]) {
+        const res = await app.request(path, { headers: headers() });
+        await expectCanonicalError(res, {
+          status: 400,
+          code: "validation_error",
+        });
+      }
+    });
+  });
+
+  describe("when the credential is the wrong class for this surface", () => {
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
+    it("names both the class required and the class presented", async () => {
+      const res = await app.request("/api/gateway/v1/spend-summaries", {
+        headers: { Authorization: `Bearer test-key-${ns}` },
+      });
+
+      const body = await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "credential_class_mismatch",
+      });
+      expect(body.meta).toMatchObject({
+        required: "organization_api_key",
+        presented: "project_api_key",
+      });
+    });
+
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
+    it("says only that a token matching no key was not accepted", async () => {
+      const res = await app.request("/api/gateway/v1/spend-summaries", {
+        headers: { Authorization: `Bearer sk-lw-nosuchkey_${ns}` },
+      });
+
+      const body = await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "invalid_credentials",
+      });
+      // Naming a credential class here would send someone holding a typo to
+      // swap a key that was never the problem.
+      expect(body.message).not.toContain("roject");
     });
   });
 
@@ -982,5 +1059,305 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     };
     expect(body.data.cost.total_usd).toBe("0.01");
     expect(body.data.request_count).toBe(1);
+  });
+
+  // Through the route, because the guard has two halves and only one of them
+  // is the grouping rule. The other is reading `allow_unstable` off a query
+  // string, and that half shipped inverted: `z.coerce.boolean()` is
+  // JavaScript `Boolean()`, so `allow_unstable=false` served the unstable read
+  // it asked not to have. A test that calls the grouping check directly with a
+  // boolean argument cannot see that, and the three scenarios below used to be
+  // bound to exactly such a test.
+  describe("when the grouping's key can move under the walk", () => {
+    /** A window whose end is far enough back that outcomes can no longer arrive. */
+    const settled = () => ({
+      from: baseTime,
+      to: baseTime + 60_000,
+    });
+
+    /** A window reaching now, so the fold can still rewrite model and provider. */
+    const live = () => {
+      const to = Date.now();
+      return { from: to - 60_000, to };
+    };
+
+    const summaries = async (query: Record<string, string | number>) =>
+      await app.request(
+        `/api/gateway/v1/spend-summaries?${new URLSearchParams(
+          Object.entries(query).map(([k, v]) => [k, String(v)]),
+        ).toString()}`,
+        { headers: headers() },
+      );
+
+    /** @scenario "Grouping on a movable key is refused while the window is still settling" */
+    it("refuses a model grouping over a live window, naming which grouping moved", async () => {
+      const res = await summaries({ group_by: "model", ...live() });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+      // The dimension and the moment it settles, so a caller can retry
+      // deliberately rather than guess how long to wait.
+      expect(error.meta?.group_by).toEqual(["model"]);
+      expect(Date.parse(String(error.meta?.settles_at))).toBeGreaterThan(
+        Date.now(),
+      );
+    });
+
+    /** @scenario "The same grouping is served once the window has settled" */
+    it("serves the same grouping over a settled window", async () => {
+      const res = await summaries({ group_by: "model", ...settled() });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "Grouping on a key that cannot move is never refused" */
+    it("never refuses a grouping whose key is fixed at admission", async () => {
+      const res = await summaries({ group_by: "end_user", ...live() });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "A caller who accepts the risk can ask for it anyway" */
+    it("serves the movable grouping when the caller opts out", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "true",
+        ...live(),
+      });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "Declining an unstable read is not the same as accepting one" */
+    it("still refuses when the caller spells the opt-out as false", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "false",
+        ...live(),
+      });
+
+      await expectCanonicalError(res, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+    });
+
+    /** @scenario "The opt-out is read however the caller's HTTP library spells a boolean" */
+    it("accepts the capitalised boolean a Python client sends", async () => {
+      // `requests` renders a Python `True` as the string `True`, and the
+      // documentation for this parameter is written for Python callers.
+      for (const spelling of ["True", "TRUE", "Yes", "1"]) {
+        const res = await summaries({
+          group_by: "model",
+          allow_unstable: spelling,
+          ...live(),
+        });
+
+        expect(res.status, `allow_unstable=${spelling}`).toBe(200);
+      }
+
+      // And `False` still means no, which is the whole point of folding case
+      // rather than accepting anything non-empty.
+      const declined = await summaries({
+        group_by: "model",
+        allow_unstable: "False",
+        ...live(),
+      });
+      await expectCanonicalError(declined, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+    });
+
+    /** @scenario "A spelling the surface does not know is refused by name" */
+    it("refuses a spelling it cannot read rather than guessing", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "maybe",
+        ...live(),
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      // Named, so a client can put the message on the field the caller got
+      // wrong instead of on a toast that says something failed.
+      expect(error.meta?.fields).toEqual(["allow_unstable"]);
+    });
+
+    /** @scenario "A cursor from another grouping is refused, not silently restarted" */
+    it("refuses a cursor whose arity belongs to a different grouping", async () => {
+      // Page one under a single dimension, then hand its cursor back asking
+      // for two. Serving that would re-run page one under a fresh cursor with
+      // nothing saying the walk reset, and the checksum would count those
+      // groups twice.
+      const first = await summaries({
+        group_by: "end_user",
+        limit: 1,
+        ...settled(),
+      });
+      expect(first.status).toBe(200);
+      const cursor = ((await first.json()) as { next_cursor: string | null })
+        .next_cursor;
+      expect(cursor).not.toBeNull();
+
+      const res = await summaries({
+        group_by: "end_user,virtual_key",
+        cursor: cursor!,
+        ...settled(),
+      });
+
+      await expectCanonicalError(res, { status: 400 });
+
+      // A bucket adds a dimension too, so the same cursor is equally wrong
+      // against a bucketed walk over the very grouping that minted it.
+      const bucketed = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        cursor: cursor!,
+        ...settled(),
+      });
+      await expectCanonicalError(bucketed, { status: 400 });
+
+      // The control: the cursor still works for the walk it belongs to.
+      const resumed = await summaries({
+        group_by: "end_user",
+        limit: 1,
+        cursor: cursor!,
+        ...settled(),
+      });
+      expect(resumed.status).toBe(200);
+    });
+
+    /** @scenario "A time zone the store cannot load is refused at the door" */
+    it("refuses a fixed offset in place of a named zone, naming the field", async () => {
+      // The runtime builds a formatter for `+05:00` happily; ClickHouse loads
+      // zones by name only and answers "Cannot load time zone +05:00". Left to
+      // reach the store, a value the caller chose comes back as an unknown
+      // error from somewhere they cannot see.
+      const res = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        timezone: "+05:00",
+        ...settled(),
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      expect(error.meta?.fields).toEqual(["timezone"]);
+
+      const named = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        timezone: "Europe/Amsterdam",
+        ...settled(),
+      });
+      expect(named.status).toBe(200);
+    });
+  });
+
+  // Through both routes, because the contradiction only exists between them:
+  // the rollup query drops in-flight rows with a fixed predicate, so a status
+  // filter naming that status is the intersection of two disjoint sets. Read
+  // one route at a time and everything looks consistent.
+  describe("when the caller narrows to a status the rollups cannot answer", () => {
+    const window = { from: baseTime + 890_000, to: baseTime + 910_000 };
+    const virtualKeyId = `vk-inflight-${ns}`;
+
+    /** One request still in flight, and one that completed and priced. */
+    beforeAll(async () => {
+      await seed([
+        spendRow(`${ns}-inflight`, {
+          status: "admitted" as const,
+          virtualKeyId,
+          // An admitted row carries no quantities and no cost: the fold sets
+          // them only when an outcome lands. That is exactly why a rollup has
+          // nothing to sum for it.
+          tokensInput: 0,
+          tokensOutput: 0,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          costUsd: "0.000000",
+          httpStatus: 0,
+          occurredAt: new Date(baseTime + 900_000),
+        }),
+        spendRow(`${ns}-completed`, {
+          virtualKeyId,
+          occurredAt: new Date(baseTime + 901_000),
+        }),
+      ]);
+    });
+
+    const read = async ({
+      path,
+      query,
+    }: {
+      path: string;
+      query: Record<string, string | number>;
+    }): Promise<Response> =>
+      await app.request(
+        `/api/gateway/v1/${path}?${new URLSearchParams(
+          Object.entries({
+            ...window,
+            virtual_key_id: virtualKeyId,
+            ...query,
+          }).map(([k, v]) => [k, String(v)]),
+        ).toString()}`,
+        { headers: headers() },
+      );
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("serves the in-flight envelopes on the events read", async () => {
+      const res = await read({
+        path: "spend-events",
+        query: { status: "admitted" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: Array<{ data: { gateway_request_id: string; status: string } }>;
+      };
+      expect(body.data.map((e) => e.data.gateway_request_id)).toEqual([
+        `${ns}-inflight`,
+      ]);
+      expect(body.data[0]?.data.status).toBe("admitted");
+    });
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("refuses the identical narrowing on the rollups, naming the field", async () => {
+      const res = await read({
+        path: "spend-summaries",
+        query: { status: "admitted", group_by: "virtual_key" },
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      // A 200 with an empty page would be the real bug: a reconciliation that
+      // checksums against that zero decides the books agree.
+      expect(error.meta?.fields).toEqual(["status"]);
+    });
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("still accepts a completed status on the rollups", async () => {
+      const res = await read({
+        path: "spend-summaries",
+        query: { status: "confirmed", group_by: "virtual_key" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: Array<{ key: string; event_count: number }>;
+      };
+      expect(body.data).toEqual([
+        expect.objectContaining({ key: virtualKeyId, event_count: 1 }),
+      ]);
+    });
   });
 });

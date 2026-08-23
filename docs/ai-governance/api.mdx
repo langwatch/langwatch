@@ -6,11 +6,11 @@ sidebarTitle: REST API
 
 <Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
-LangWatch's dashboard already uses tRPC, type-safe, but coupled to the Next.js, React render path. The Hono-mounted REST API exists for the surfaces that *aren't* the dashboard:
+LangWatch's dashboard already uses tRPC, type-safe, but coupled to the Vite React app that renders it. The Hono-mounted REST API exists for the surfaces outside the dashboard:
 
 - **Agentic workflows**: Claude Code, Codex, Cursor running `langwatch governance …` commands need a stable, OpenAPI-described surface they can call directly.
 - **CI, scripting**: the same OpenAPI spec is consumed by the TypeScript and Python SDKs (auto-regen on build), so any pipeline language with a generated client gets the full governance feature set.
@@ -31,7 +31,7 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 ## Resource × verb matrix
 
-Every governance resource exposes the full CRUD triple, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
@@ -79,7 +79,7 @@ The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `52
 | `install` | tRPC `ingestionKey.install` | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once) | `aiTools:manage` |
 | `rotate` | tRPC `ingestionKey.rotate` | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `aiTools:manage` |
 
-Two consequences worth noting:
+Two consequences:
 
 - **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `sk-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.

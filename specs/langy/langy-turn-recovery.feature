@@ -85,6 +85,114 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And the customer reads copy written by LangWatch for that case
     And the provider's own sentence still appears nowhere
 
+  # Provider bodies are untrusted on every surface, including logs: an invalid
+  # credential response can quote the credential. The relay therefore extracts
+  # only bounded identifier-shaped discriminants from known JSON paths. When
+  # there is no code, the HTTP status supplies a stable handled reason and the
+  # body contributes only its kind (json, html, text, binary, or empty).
+  #
+  # See dev/docs/adr/045-domain-errors-handled-boundary.md for the handled-
+  # error contract this block follows.
+  #
+  # Bindings: services/langyagent/adapters/otelrelay/llmproxy_body_test.go
+
+  @unit
+  Scenario: Provider JSON discriminants become handled error reasons
+    Given a relayed model call is rejected with provider JSON
+    When the JSON names a code or type in a known provider dialect
+    Then that bounded identifier becomes the reason under "llm_upstream_error"
+    And a specific code wins over a broad type
+    And no message field enters the handled error or logs
+
+  @unit
+  Scenario: Observed upstream response shapes become safe handled errors
+    Given the relay receives usage-limit JSON, message-only invalid-model JSON,
+      a plain proxy 502, a Cloudflare HTML interstitial, or a binary body
+    When it captures the failed model call
+    Then each failure has a stable provider or HTTP-derived handled reason
+    And its metadata contains only the HTTP status and body kind
+    And operators can distinguish the shapes without recording their contents
+
+  @unit
+  Scenario: Every upstream HTTP status maps to a stable reason code
+    Given a provider rejection carries no identifier-shaped discriminant
+    When the relay derives the handled reason from the HTTP status
+    Then every client-error and server-error status yields a named reason
+    And two failures with the same status always carry the same reason
+
+  @unit
+  Scenario: A provider body's shape is classified for safe logging
+    Given a provider rejection arrives as JSON, HTML, plain text, binary, or empty
+    When the relay classifies the body
+    Then the classification records only the kind, never the contents
+    And HTML is recognised whether declared by the header or sniffed from the body
+
+  @unit
+  Scenario: A stream error with no HTTP status still carries a reason
+    Given a model call fails inside a 200 event stream
+    When the relay captures the in-stream failure
+    Then the capture carries a stable stream-error reason
+    And it never leaves the failure without a reason to classify on
+
+  @unit
+  Scenario: The gateway's provider header rides into an untyped capture
+    Given the gateway names the provider that produced a forwarded rejection
+    When the relay captures that rejection as an upstream error
+    Then the provider's name is kept in the capture's metadata
+    And an operator can tell which provider said no without the body
+
+  # A provider can coincidentally emit the same type/code/message triplet as
+  # herr. Shape is not provenance. herr.WriteHTTP marks LangWatch-authored
+  # envelopes with a response header whose value must match the body code; the
+  # gateway strips that header from every forwarded provider response.
+  @unit
+  Scenario: Only a marked LangWatch envelope is trusted as a handled error
+    Given a provider body looks exactly like a LangWatch handled-error envelope
+    When it has no matching LangWatch handled-error response marker
+    Then the relay treats it as untrusted provider JSON
+    And its message and metadata are discarded
+    But a marked LangWatch envelope round-trips losslessly
+
+  # The marker proves who wrote the envelope, not who wrote the sentence
+  # inside it: the gateway's own upstream-relay codes carry text derived from
+  # the provider's response, so the relay drops their prose while keeping the
+  # typed code and reasons.
+  @unit
+  Scenario: Upstream-relayed prose is scrubbed from marked provider_error envelopes
+    Given a marked LangWatch envelope carries a gateway upstream-relay code
+    When the relay decodes it as a trusted handled error
+    Then its message and tips are dropped before the capture
+    And a marked envelope for a gateway-authored rejection keeps its message
+
+  # A chain that exhausted its credentials says so in its own harmless
+  # sentence, and holds what each provider actually said one level down, in a
+  # per-attempt reason. Scrubbing only the outermost message would keep every
+  # sentence that was worth scrubbing.
+  @unit
+  Scenario: Upstream-relayed prose is scrubbed from nested attempt reasons too
+    Given a marked LangWatch envelope wraps per-attempt upstream-relay reasons
+    When the relay decodes it as a trusted handled error
+    Then every relayed message in the reason chain is dropped, at any depth
+    And the typed codes of those reasons survive intact
+
+  # A real envelope can arrive unmarked: an older gateway pod mid-rollout, or
+  # a hop that strips the header. Trust stays strict, but the mismatch must be
+  # diagnosable rather than a silent downgrade to generic copy.
+  @unit
+  Scenario: A stripped or mismatched marker on an envelope-shaped body is diagnosable
+    Given a rejection body has the exact shape of a LangWatch envelope
+    But its marker is absent or names a different code
+    When the relay refuses to trust it
+    Then a warning records the body's code and the marker's value
+    And no message content enters that warning
+
+  @unit
+  Scenario: Untrusted provider prose never enters relay logs
+    Given a provider rejection contains an API key or other untrusted prose
+    When the relay normalizes the rejection as a handled upstream error
+    Then its logs contain only the HTTP status, body kind, and bounded reason
+    And the provider prose is absent from every log field
+
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the
   # retry timer armed. The card must not appear at all when an automatic retry is
@@ -245,13 +353,27 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the agent's SDK retries the call
     Then the relay answers the retry with a failure the SDK does not retry
     And it carries the provider's own error payload
-    And the turn fails with the provider's message instead of spinning
+    And the turn fails with the plan-limit card selected by the in-stream reason code
 
   @unit
   Scenario: A clean stream clears the in-stream failure capture
     Given a conversation's relayed call previously ended with an in-stream error event
     When a later relayed call streams to completion without an error event
     Then the capture is cleared and later calls pass through untouched
+
+  # The gateway can also forward an upstream rejection as a 200 whose
+  # Content-Type says event-stream but whose body is ONE bare JSON error
+  # object, with no event framing at all (seen live: Anthropic rejecting a
+  # request parameter). A sniffer that only reads framed events sees nothing,
+  # and the clean-end rule then CLEARS the capture, so the turn fails with no
+  # cause on record.
+  @unit
+  Scenario: A bare JSON error body under a stream content type is captured as the cause
+    Given the model provider rejects a relayed call
+    And the gateway forwards the rejection as a 200 stream whose body is one bare JSON error object
+    When the agent's SDK reads that body to its end
+    Then the rejection's reason code is captured as the turn's LLM cause
+    And the provider's own prose stays out of the capture
 
   # The turn stream's terminal error entry shares its `type: "error"`
   # discriminant with the SSE transport's own protocol failure frame. The

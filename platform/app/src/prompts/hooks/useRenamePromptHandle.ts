@@ -27,7 +27,7 @@ export const useRenamePromptHandle = ({
 }: UseRenamePromptHandleOptions) => {
   const { triggerChangeHandle } = usePromptConfigContext();
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
@@ -48,7 +48,6 @@ export const useRenamePromptHandle = ({
         title: "Couldn't change the prompt handle",
         description: "Save this prompt before renaming its handle.",
         type: "error",
-        meta: { closable: true },
       });
       return;
     }

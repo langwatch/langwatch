@@ -205,7 +205,6 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               onClick: () => window.open("/settings/model-providers", "_blank"),
             }
           : undefined,
-        meta: { closable: true },
       });
     }
   }, [

@@ -4,55 +4,101 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   So that PR feedback is faster and CI minutes are not wasted
 
   Background:
-    Given the repository uses complementary workflow pairs
-    And each real workflow has a matching "-unmodified" stub
-    And stub job names match real workflow job names exactly
+    Given a workflow filtered out by "on.paths" never reports a status at all
+    And a required status check that never reports blocks the pull request forever
+    And so a workflow whose aggregator is required must run unconditionally instead
 
   # ============================================================================
-  # Stub job name alignment (Phase 1 — fix pre-existing bugs)
+  # Two ways to skip work, and which one a workflow is allowed to use
   # ============================================================================
+  #
+  # The "-unmodified" stub pairs this spec used to describe are gone. They were
+  # replaced (#3223) by "always run, gate internally, report through an
+  # alls-green aggregator", because a stub that drifts from its real workflow's
+  # job names is a silently unsatisfiable required check.
+  #
+  # That pattern costs a runner lease to decide "nothing to do". Workflows with
+  # no required check avoid the lease entirely by filtering in "on:", which
+  # GitHub evaluates before allocating anything.
 
-  Scenario: langwatch-app-ci stub matches real workflow job names
-    Given langwatch-app-ci.yml defines jobs "typecheck", "test-unit", "test-integration", "lint", "build"
-    When a PR does not touch platform/app/ files
-    Then langwatch-app-ci-unmodified.yml reports success for the same job names
+  Scenario: A workflow whose aggregator is required runs on every pull request
+    Given the ruleset requires that workflow's "-complete" check
+    When a pull request touches none of the paths it cares about
+    Then the workflow still runs
+    And its real jobs are skipped
+    And its aggregator reports success, so the required check resolves
 
-  Scenario: mcp-javascript-ci stub matches real workflow job names
-    Given mcp-javascript-ci.yml defines jobs "typecheck", "build_and_test"
-    When a PR does not touch mcp/typescript/ files
-    Then mcp-javascript-ci-unmodified.yml reports success for the same job names
+  @unit
+  Scenario: A workflow that filters in on.paths declares no aggregator
+    Given a workflow declares "on.pull_request.paths"
+    When it also declares a job whose name ends in "-complete"
+    Then the path-filter guard fails
+    And it says the aggregator and the filter contradict each other
 
-  Scenario: sdk-javascript-ci stub matches real workflow job names
-    Given sdk-javascript-ci.yml defines jobs "ci", "e2e"
-    When a PR does not touch sdks/typescript/ files
-    Then sdk-javascript-ci-unmodified.yml reports success for the same job names
+  @unit
+  Scenario: A path filter covers every path the workflow's gate consults
+    Given a workflow keeps an internal gate for per-job filters
+    And it also declares "on.pull_request.paths"
+    When the gate filters on a path the "on.paths" list does not cover
+    Then the path-filter guard fails
+    And it names the uncovered path
+    And it says the job that filter guards would silently not run
 
-  # ============================================================================
-  # Missing stubs (Phase 2)
-  # ============================================================================
+  @unit
+  Scenario: A negated path filter entry removes the coverage it appears to grant
+    Given a workflow's "on.pull_request.paths" contains "pkg/**" and "!pkg/ssrf/**"
+    When its gate filters on a path under "pkg/ssrf"
+    Then the path-filter guard fails
+    # GitHub applies the exclusion, so the workflow never starts for that path.
+    # Checking each entry independently would let the exact R1 failure through
+    # the rule written to catch it.
 
-  Scenario: e2e-ci has a complementary stub
-    Given e2e-ci.yml triggers on platform/app/, sdks/python/, and tests/agentic-e2e/ changes
-    When a PR does not touch those directories
-    Then e2e-ci-unmodified.yml reports success for all e2e-ci job names
+  @unit
+  Scenario: A filter the guard cannot read is reported, never passed
+    Given a workflow declares a pull-request path filter
+    When the guard cannot decompose it into entries
+    Then the guard fails and says which shape it could not read
+    # The guard hand-parses YAML, because it runs on a bare runner with no
+    # dependencies. Hand parsing has blind spots, and returning "not filtered"
+    # for one would make the guard's own green meaningless — the same silent
+    # pass that R1 and R2 exist to prevent, reproduced inside the guard.
 
-  Scenario: codeql has a complementary stub
-    Given codeql.yml triggers on code file changes only
-    When a PR touches only documentation or config files
-    Then codeql-unmodified.yml reports success for analyze jobs
-
-  # ============================================================================
-  # Path filter behavior
-  # ============================================================================
+  @unit
+  Scenario: A push filter is not treated as a pull-request filter
+    Given a workflow declares "paths" under "push" but not under "pull_request"
+    Then the path-filter guard does not treat it as filtered
 
   Scenario: CodeQL skips docs-only PRs
     When a PR changes only files in docs/, .claude/, specs/, or markdown files
-    Then codeql.yml does not run
-    And codeql-unmodified.yml reports success for required checks
+    Then codeql.yml does not run its analysis
+    And its aggregator still reports success for the required check
 
   Scenario: Push to main always runs all workflows
     When a commit is pushed to the main branch
     Then all workflows run regardless of which files changed
+
+  # ============================================================================
+  # Live ingest coverage
+  # ============================================================================
+
+  @unit
+  Scenario: A change to the app's HTTP ingest spine runs the SDK end-to-end job
+    Given the SDK end-to-end job is the only check that posts real telemetry to a running server
+    When a PR changes the app's ingest routes, their router, their OpenTelemetry body reader, or the server entrypoint
+    Then the SDK end-to-end job runs even though no SDK file changed
+
+  @unit
+  Scenario: A change to the app's HTTP ingest spine does not run the paid SDK test job
+    Given the SDK test job drives live model traffic through the AI Gateway
+    When a PR changes app code and no SDK file
+    Then the SDK test job stays skipped
+
+  @unit
+  Scenario: Every path filter the SDK workflow reads is declared by the change detector
+    Given the change detector exposes only the outputs it declares
+    And an undeclared output reads as an empty string rather than failing
+    When the SDK workflow gates a job on a path filter
+    Then that filter is declared as an output of the change detector and forced true on non-diff events
 
   # ============================================================================
   # Dependency scanners are path-gated, secret and SAST scanners are not
@@ -81,11 +127,6 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # ============================================================================
 
   Scenario: No PR is permanently blocked by missing status checks
-    Given all workflow pairs have matching job names
+    Given every required check is a "-complete" aggregator on an always-run workflow
     When any combination of files is changed in a PR
-    Then every required status check receives a result from either the real workflow or its stub
-
-  Scenario: Negation patterns are not used in path filters
-    Given the complementary pair system cannot support negation
-    Then no workflow uses negation patterns like "!path" in paths filters
-    And path exclusions are achieved only through the stub's paths-ignore
+    Then every required status check receives a result

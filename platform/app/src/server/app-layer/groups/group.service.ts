@@ -1,47 +1,110 @@
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type {
   Group,
   GroupMembership,
-  RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
+import type { RoleService } from "~/server/role";
+import { RoleNotAssignableError } from "~/server/role/errors";
+import { RoleBindingAlreadyExistsError } from "~/server/role-bindings/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+import {
+  BindingNotFoundError,
+  CustomRoleRequiredError,
+  DuplicateMemberError,
+  GroupNotFoundError,
+  GroupRoleNotAssignableError,
+  ScimManagedGroupError,
+  ScopeNotInOrganizationError,
+  UserNotInOrganizationError,
+} from "./errors";
 import type {
+  CreatedBinding,
   GroupRepository,
   GroupWithDetails,
   GroupWithMembers,
   PaginatedResult,
 } from "./repositories/group.repository";
 
-export class GroupNotFoundError extends Error {
-  name = "GroupNotFoundError" as const;
-}
-
-export class ScimManagedGroupError extends Error {
-  name = "ScimManagedGroupError" as const;
-}
-
-export class UserNotInOrganizationError extends Error {
-  name = "UserNotInOrganizationError" as const;
-}
-
-export class BindingNotFoundError extends Error {
-  name = "BindingNotFoundError" as const;
-}
-
-export class DuplicateMemberError extends Error {
-  name = "DuplicateMemberError" as const;
-}
-
-export class ScopeNotInOrganizationError extends Error {
-  name = "ScopeNotInOrganizationError" as const;
-}
-
 export class GroupRestService {
-  constructor(readonly repo: GroupRepository) {}
+  readonly repo: GroupRepository;
+  private readonly roleService: RoleService;
+
+  constructor({
+    repo,
+    roleService,
+  }: {
+    repo: GroupRepository;
+    roleService: RoleService;
+  }) {
+    this.repo = repo;
+    this.roleService = roleService;
+  }
+
+  /**
+   * A CUSTOM binding is only as trustworthy as the role it points at, and the
+   * resolver grants whatever that role says, so the ids are validated here,
+   * before anything persists: they must exist, belong to this organization,
+   * and be user-created roles (an API key's private `system_api_key` role is
+   * never assignable to a group). Same rule the tRPC group router applies.
+   *
+   * The scope matters as well as the role: an organization-exclusive
+   * permission never resolves from a team or project binding, so a group
+   * binding carrying one below organization scope is refused rather than
+   * stored as a grant that does nothing.
+   */
+  private async assertCustomRolesAssignable({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: Array<{
+      role: TeamUserRole;
+      customRoleId?: string;
+      scopeType: RoleBindingScopeType;
+    }>;
+  }): Promise<void> {
+    const customBindings = bindings.filter(
+      (binding) => binding.role === ("CUSTOM" as TeamUserRole),
+    );
+    if (customBindings.length === 0) return;
+
+    if (customBindings.some((binding) => !binding.customRoleId)) {
+      throw new CustomRoleRequiredError();
+    }
+
+    const customRoleIds = [
+      ...new Set(
+        customBindings.map((binding) => binding.customRoleId as string),
+      ),
+    ];
+    try {
+      await this.roleService.validateRolesAssignable({
+        roleIds: customRoleIds,
+        organizationId,
+      });
+    } catch (error) {
+      // `RoleService` is shared with surfaces that predate the code contract,
+      // so it still refuses with a plain error. Named here rather than there,
+      // so this family answers with a code without changing what the others
+      // already publish.
+      if (error instanceof RoleNotAssignableError) {
+        throw new GroupRoleNotAssignableError(customRoleIds[0]);
+      }
+      throw error;
+    }
+    await this.roleService.assertNoOrgExclusivePermissionsBelowOrgScope({
+      organizationId,
+      customBindings: customBindings.map((binding) => ({
+        customRoleId: binding.customRoleId as string,
+        scopeType: binding.scopeType,
+      })),
+    });
+  }
 
   /**
    * A personal team holds exactly its owner, which is why plan limits exempt
@@ -83,9 +146,11 @@ export class GroupRestService {
     name,
     bindings,
     memberIds,
+    actor,
   }: {
     organizationId: string;
     name: string;
+    actor: LedgerActor;
     bindings?: Array<{
       role: TeamUserRole;
       customRoleId?: string;
@@ -100,10 +165,13 @@ export class GroupRestService {
       userIds: uniqueMemberIds,
     });
     if (!allMembersInOrganization) {
-      throw new UserNotInOrganizationError(
-        "All users must belong to the organization before joining a group",
-      );
+      throw new UserNotInOrganizationError();
     }
+    await this.assertCustomRolesAssignable({
+      organizationId,
+      bindings: bindings ?? [],
+    });
+
     const baseSlug = slugify(name, { lower: true, strict: true });
     const slug = await this.repo.findUniqueSlug({
       organizationId,
@@ -133,9 +201,7 @@ export class GroupRestService {
         scopeId: binding.scopeId,
       });
       if (!scopeValid) {
-        throw new ScopeNotInOrganizationError(
-          "Scope does not belong to this organization",
-        );
+        throw new ScopeNotInOrganizationError(binding.scopeType);
       }
     }
     await this.assertNoPersonalTeamScope(bindingInputs);
@@ -144,6 +210,7 @@ export class GroupRestService {
       group: { id: groupId, organizationId, name, slug },
       bindings: bindingInputs,
       memberIds: memberIds ?? [],
+      actor,
     });
   }
 
@@ -157,9 +224,9 @@ export class GroupRestService {
     name: string;
   }): Promise<Group> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
-      throw new ScimManagedGroupError("Cannot rename a SCIM-managed group");
+      throw new ScimManagedGroupError(id);
     }
 
     const baseSlug = slugify(name, { lower: true, strict: true });
@@ -170,22 +237,41 @@ export class GroupRestService {
     });
 
     const renamed = await this.repo.rename({ id, organizationId, name, slug });
-    if (!renamed) throw new GroupNotFoundError("Group not found");
+    if (!renamed) throw new GroupNotFoundError();
     return renamed;
   }
 
   async delete({
     id,
     organizationId,
+    actor,
+    shouldBypassDirectoryManagement = false,
   }: {
     id: string;
     organizationId: string;
+    actor: LedgerActor;
+    /**
+     * Whether a directory-owned group may be deleted anyway. The API surface
+     * says no: a caller automating against it cannot be asked. The settings
+     * page says yes, because it asks first — its confirmation reads "This
+     * SCIM group will be re-created by your IdP on next sync. Delete anyway?"
+     * and the admin answers it.
+     */
+    shouldBypassDirectoryManagement?: boolean;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
+    // Deleting is the most destructive thing that can happen to a group the
+    // directory owns: every grant it carries goes with it, and the next sync
+    // pushes the group back without them.
+    if (group.scimSource && !shouldBypassDirectoryManagement) {
+      throw new ScimManagedGroupError(id);
+    }
 
+    // The grants go first, so the deny is enforced before the group row
+    // that carries them disappears.
+    await this.repo.deleteAllBindings({ groupId: id, organizationId, actor });
     await this.repo.deleteAllMemberships({ groupId: id });
-    await this.repo.deleteAllBindings({ groupId: id });
     await this.repo.delete({ id, organizationId });
   }
 
@@ -206,11 +292,9 @@ export class GroupRestService {
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
-      throw new ScimManagedGroupError(
-        "Cannot manually add members to a SCIM-managed group",
-      );
+      throw new ScimManagedGroupError(groupId);
     }
 
     const isOrgMember = await this.repo.isUserInOrganization({
@@ -218,9 +302,7 @@ export class GroupRestService {
       organizationId,
     });
     if (!isOrgMember) {
-      throw new UserNotInOrganizationError(
-        "User must belong to the organization before joining a group",
-      );
+      throw new UserNotInOrganizationError(userId);
     }
 
     try {
@@ -231,9 +313,7 @@ export class GroupRestService {
         "code" in error &&
         (error as { code: string }).code === "P2002"
       ) {
-        throw new DuplicateMemberError(
-          "User is already a member of this group",
-        );
+        throw new DuplicateMemberError(userId);
       }
       throw error;
     }
@@ -252,7 +332,7 @@ export class GroupRestService {
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
       throw new ScimManagedGroupError(
         "Cannot manually remove members from a SCIM-managed group",
@@ -262,8 +342,14 @@ export class GroupRestService {
     await this.repo.removeMember({ groupId, userId });
   }
 
-  async getBindings({ groupId }: { groupId: string }) {
-    return this.repo.findBindings({ groupId });
+  async getBindings({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }) {
+    return this.repo.findBindings({ organizationId, groupId });
   }
 
   async addBinding({
@@ -273,6 +359,7 @@ export class GroupRestService {
     customRoleId,
     scopeType,
     scopeId,
+    actor,
   }: {
     groupId: string;
     organizationId: string;
@@ -280,12 +367,13 @@ export class GroupRestService {
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
-  }): Promise<RoleBinding> {
+    actor: LedgerActor;
+  }): Promise<CreatedBinding> {
     const group = await this.repo.findGroupOnly({
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
 
     const scopeValid = await this.repo.validateScopeInOrganization({
       organizationId,
@@ -298,34 +386,63 @@ export class GroupRestService {
       );
     }
 
+    await this.assertCustomRolesAssignable({
+      organizationId,
+      bindings: [{ role, customRoleId, scopeType }],
+    });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
-    return this.repo.createBinding({
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      groupId,
-      role,
-      customRoleId:
-        role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
-      scopeType,
-      scopeId,
-    });
+    try {
+      return await this.repo.createBinding({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          groupId,
+          role,
+          customRoleId:
+            role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
+          scopeType,
+          scopeId,
+        },
+        actor,
+      });
+    } catch (error) {
+      // The repository rejects duplicate identities rather than skipping
+      // them: a skipped duplicate would return a binding id for a row that
+      // was never created. Matched by CODE, never `instanceof`: the ledger's
+      // `DuplicateBindingError` arrives from `@langwatch/authz-server`, and
+      // identity stops being reliable the moment that package is bundled or
+      // serialised separately (the rule its declaration states).
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: unknown }).code === "role_binding_already_exists"
+      ) {
+        throw new RoleBindingAlreadyExistsError({
+          meta: { scopeType, scopeId },
+        });
+      }
+      throw error;
+    }
   }
 
   async removeBinding({
     bindingId,
     organizationId,
+    actor,
   }: {
     bindingId: string;
     organizationId: string;
+    actor: LedgerActor;
   }): Promise<void> {
     const binding = await this.repo.findBinding({
       id: bindingId,
       organizationId,
     });
-    if (!binding) throw new BindingNotFoundError("Binding not found");
+    if (!binding) throw new BindingNotFoundError();
     await this.assertNoPersonalTeamScope([binding]);
 
-    await this.repo.deleteBinding({ id: bindingId });
+    await this.repo.deleteBinding({ id: bindingId, organizationId, actor });
   }
 }

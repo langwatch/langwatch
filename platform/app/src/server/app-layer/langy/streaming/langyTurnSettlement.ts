@@ -8,7 +8,7 @@ import type { LangyStreamEntry } from "./langyTokenBuffer";
  * `onTurnStream` tails the token buffer; when a refresh mid-turn misses the
  * worker's terminal frame (its relay connection dropped before it), the buffer
  * has no `end`/`error` and `follow()` would block until the hard per-turn
- * deadline — leaving the UI on "Starting up…" for minutes though the turn already
+ * deadline — leaving the UI on the startup status for minutes though the turn already
  * finished server-side.
  *
  * We synthesize a terminal ONLY when BOTH hold, so a live or still-starting turn

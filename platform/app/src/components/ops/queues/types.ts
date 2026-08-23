@@ -1,1 +1,7 @@
-export type StatusFilter = "all" | "ok" | "blocked" | "stale" | "active";
+export type StatusFilter =
+  | "all"
+  | "ok"
+  | "blocked"
+  | "stale"
+  | "active"
+  | "retrying";

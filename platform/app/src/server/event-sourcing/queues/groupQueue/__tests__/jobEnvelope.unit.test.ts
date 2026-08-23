@@ -608,6 +608,28 @@ describe("jobEnvelope", () => {
         ).toEqual(big);
       });
 
+      /** @scenario "Provider migration does not change the durable queue reference format" */
+      it("keeps the durable reference on the existing GQ2 wire shape", async () => {
+        const { tieredBlobs } = makeTiered(8);
+
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        const lease = readEnvelopeLease(encoded);
+
+        expect(encoded.startsWith("GQ2|")).toBe(true);
+        expect(lease?.ref).toEqual({
+          tier: "s3",
+          projectId: PROJECT,
+          hash: expect.any(String),
+        });
+        expect(
+          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).toEqual(big);
+      });
+
       it("exposes routing meta from the header without resolving the blob", async () => {
         const { tieredBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -667,7 +689,7 @@ describe("jobEnvelope", () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const payload = { evt: "x".repeat(8 * 1024) }; // > 4 KiB → offloads
 
-        // Same user payload, two distinct fan-out reactors over the same event.
+        // Same user payload, two distinct fan-out subscribers over the same event.
         const v1 = await encodeJobEnvelope({
           jobData: {
             ...payload,

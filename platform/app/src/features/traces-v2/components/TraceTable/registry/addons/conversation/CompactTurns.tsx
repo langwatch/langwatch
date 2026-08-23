@@ -8,7 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type { Cell } from "@tanstack/react-table";
-import { AlertTriangle, Bot, Clock, GitBranch, User, Zap } from "lucide-react";
+import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -233,6 +233,24 @@ function turnCellContent({
       return <MonoCell>{formatCost(trace.totalCost)}</MonoCell>;
     case "tokens":
       return <MonoCell>{formatTokens(trace.totalTokens)}</MonoCell>;
+    case "contextSize":
+      // Nullish, not falsy: a reported zero is an answer, not a gap.
+      return trace.contextSizeTokens == null ? (
+        dash
+      ) : (
+        <MonoCell>
+          {trace.contextSizeTokens === 0
+            ? "0"
+            : formatTokens(trace.contextSizeTokens)}
+        </MonoCell>
+      );
+    // Session-level coding-agent facts have no per-turn meaning: the
+    // repository and the pull request belong to the whole session.
+    case "modelCalls":
+    case "compactions":
+    case "repository":
+    case "pullRequest":
+      return dash;
     case "model":
       return (
         <MonoCell truncate whiteSpace={undefined}>
@@ -316,13 +334,6 @@ const TurnPreviewCell: React.FC<{
         textStyleOverride="xs"
       />
     ) : null}
-    {trace.spanCount > 1 && (
-      <CountChip
-        icon={<GitBranch />}
-        iconColor="fg.subtle"
-        value={trace.spanCount}
-      />
-    )}
     {trace.events.totalCount > 0 && (
       <CountChip
         icon={<Zap />}

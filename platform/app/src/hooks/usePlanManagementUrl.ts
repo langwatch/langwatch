@@ -1,4 +1,4 @@
-import { PricingModel } from "@prisma/client";
+import { PricingModel } from "~/generated/prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 
 /**

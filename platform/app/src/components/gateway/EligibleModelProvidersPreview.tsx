@@ -55,6 +55,8 @@ export function EligibleModelProvidersPreview({
   availableProjects,
   isLoading,
   providers,
+  providersAllowed,
+  routingPolicyProviderIds,
   selectedModel,
   onSelectProviderModel,
 }: {
@@ -65,6 +67,18 @@ export function EligibleModelProvidersPreview({
   availableProjects: Array<{ id: string; name: string; teamId?: string }>;
   isLoading?: boolean;
   providers: OrgModelProvider[];
+  /**
+   * The key's own provider allowlist, for a read-only view of a key that
+   * already exists. Omitted by the pickers, which have to offer providers
+   * the key does not hold yet.
+   */
+  providersAllowed?: string[] | null;
+  /**
+   * The providers the key's routing policy names, when it is pinned to one.
+   * A provider the key may hold but the policy leaves out is tagged, since
+   * the policy is what dispatch actually walks.
+   */
+  routingPolicyProviderIds?: string[] | null;
   /**
    * When provided, rows render as clickable. Clicking writes the
    * provider's vendor-prefixed default model back via the callback
@@ -91,8 +105,15 @@ export function EligibleModelProvidersPreview({
   }, [availableTeams, availableProjects, organizationName]);
 
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy),
-    [scopes, providers, hierarchy],
+    () => resolveEligible({ scopes, providers, hierarchy, providersAllowed }),
+    [scopes, providers, hierarchy, providersAllowed],
+  );
+  const inRoutingPolicy = useMemo(
+    () =>
+      routingPolicyProviderIds && routingPolicyProviderIds.length > 0
+        ? new Set(routingPolicyProviderIds)
+        : null,
+    [routingPolicyProviderIds],
   );
 
   if (scopes.length === 0) {
@@ -201,6 +222,15 @@ export function EligibleModelProvidersPreview({
                 {mp.defaultModel}
               </Text>
             )}
+            {inRoutingPolicy && !inRoutingPolicy.has(mp.id) && (
+              <Text
+                fontSize="2xs"
+                color="fg.muted"
+                data-testid={`vk-provider-outside-policy-${mp.id}`}
+              >
+                Not in routing policy
+              </Text>
+            )}
             <Box flex={1} />
             <ProviderScopeChips
               size="xs"
@@ -236,6 +266,7 @@ export function EligibleModelProvidersSummary({
   availableProjects,
   isLoading,
   providers,
+  providersAllowed,
 }: {
   scopes: VirtualKeyScopeEntry[];
   organizationId: string | undefined;
@@ -244,6 +275,8 @@ export function EligibleModelProvidersSummary({
   availableProjects: Array<{ id: string; name: string; teamId?: string }>;
   isLoading?: boolean;
   providers: OrgModelProvider[];
+  /** The key's own provider allowlist; see the preview's own prop. */
+  providersAllowed?: string[] | null;
 }) {
   const hierarchy = useMemo(
     () => buildScopeHierarchy(availableProjects, organizationId),
@@ -262,8 +295,8 @@ export function EligibleModelProvidersSummary({
   }, [availableTeams, availableProjects, organizationName]);
 
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy),
-    [scopes, providers, hierarchy],
+    () => resolveEligible({ scopes, providers, hierarchy, providersAllowed }),
+    [scopes, providers, hierarchy, providersAllowed],
   );
 
   if (scopes.length === 0 || isLoading || eligible.length === 0) return null;

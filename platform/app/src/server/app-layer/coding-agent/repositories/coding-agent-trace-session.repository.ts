@@ -99,7 +99,7 @@ export class CodingAgentTraceSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: records.length },
         "failed to write coding agent trace-session mappings",
       );

@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   checkRoleBindingPermission,
   type ScopeRef,
@@ -38,7 +38,7 @@ function makePrisma({
       findFirst: vi.fn().mockResolvedValue(teamUser),
     },
     customRole: {
-      findUnique: vi
+      findFirst: vi
         .fn()
         .mockResolvedValue(
           customRolePermissions !== null

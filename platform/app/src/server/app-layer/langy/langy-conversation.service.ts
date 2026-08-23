@@ -44,6 +44,7 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
+  LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
@@ -148,6 +149,12 @@ export type ConversationDetail = ConversationListItem & {
    */
   lastError: string | null;
   /**
+   * The model the latest accepted turn ran on, or null before any turn
+   * recorded one. Reopening the conversation seeds the composer's picker
+   * from it, so a conversation keeps the model it was last used with.
+   */
+  lastModel: string | null;
+  /**
    * The projection's event cursor (ADR-059): the snapshot position the client
    * seeds its local fold from before folding the durable tail.
    */
@@ -192,6 +199,37 @@ export interface LangyConversationCommands {
 
 function newConversationId(): string {
   return generate(KSUID_RESOURCES.LANGY_CONVERSATION).toString();
+}
+
+/**
+ * Shape gate for ADOPTED conversation ids (`ensureConversation` with
+ * `adoptUnknownId`). Caller-chosen ids become aggregate keys, so keep them to
+ * the same alphabet our own KSUID-prefixed ids use; long enough to make
+ * accidental cross-caller collisions implausible, short enough for every index
+ * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
+ */
+export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
+
+/**
+ * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
+ * becomes an aggregate key, so its shape is gated before anything durable is
+ * written under it. Archived is a refusal, not a resume: adopting would append
+ * fresh events to a closed aggregate.
+ */
+function adoptConversationId(
+  conversationId: string,
+  ownership: "archived" | "missing",
+): { id: string; isNew: boolean } {
+  if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
+    throw new LangyConversationIdUnadoptableError(
+      conversationId,
+      "invalid_shape",
+    );
+  }
+  if (ownership === "archived") {
+    throw new LangyConversationIdUnadoptableError(conversationId, "archived");
+  }
+  return { id: conversationId, isNew: true };
 }
 
 function newMessageId(): string {
@@ -329,6 +367,7 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      lastModel: row.lastModel,
       eventCursor: row.eventCursor ?? null,
     };
   }
@@ -510,33 +549,48 @@ export class LangyConversationService {
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `message_recorded`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
+   *
+   * With `adoptUnknownId`, an id that never existed is ADOPTED — returned as a
+   * new conversation under the caller's chosen id instead of a minted one. This
+   * is how a caller that binds continuity to an externally-chosen id (a
+   * scenario run's `{{ threadId }}`, fixed once per run) gets a stable
+   * conversation across turns: turn 1 adopts, turns 2+ find it `owned`.
+   * Adoption never falls back to minting — an id that cannot be adopted
+   * (bad shape, archived collision) fails the turn loudly, because a silently
+   * minted fresh id degrades a multi-turn run to single-turn with no signal.
    */
   async ensureConversation({
     projectId,
     userId,
     conversationId,
+    adoptUnknownId = false,
   }: {
     projectId: string;
     userId: string;
     conversationId?: string | null;
+    adoptUnknownId?: boolean;
   }): Promise<{ id: string; isNew: boolean }> {
-    if (conversationId) {
-      // Resolve straight from the repo (not the share-aware getById): visibility
-      // of a shared conversation does not grant continuation rights.
-      const ownership = await this.repository.findOwnership({
-        id: conversationId,
-        projectId,
-        userId,
-      });
-      if (ownership === "owned") {
-        return { id: conversationId, isNew: false };
-      }
-      if (ownership === "other") {
-        throw new LangyConversationNotOwnedError(conversationId);
-      }
-      // Archived / never existed: fall through and mint a fresh id — a stale id
-      // is legitimate client state, unlike one owned by another user.
+    if (!conversationId) {
+      return { id: newConversationId(), isNew: true };
     }
+    // Resolve straight from the repo (not the share-aware getById): visibility
+    // of a shared conversation does not grant continuation rights.
+    const ownership = await this.repository.findOwnership({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (ownership === "owned") {
+      return { id: conversationId, isNew: false };
+    }
+    if (ownership === "other") {
+      throw new LangyConversationNotOwnedError(conversationId);
+    }
+    if (adoptUnknownId) {
+      return adoptConversationId(conversationId, ownership);
+    }
+    // Archived / never existed: mint a fresh id — a stale id is legitimate
+    // client state, unlike one owned by another user.
     return { id: newConversationId(), isNew: true };
   }
 
@@ -656,6 +710,9 @@ export class LangyConversationService {
         // An import runs no turn — there is nothing in flight to stop.
         currentTurnId: null,
         lastError: null,
+        // No turn ran here yet, so the fork carries no model of its own and
+        // the composer falls back to the resolved default.
+        lastModel: null,
         // The fork's projection has not landed yet, so there is no snapshot
         // position to seed from — the client folds from the start.
         eventCursor: null,
@@ -730,6 +787,7 @@ export class LangyConversationService {
     conversationId,
     turnId = crypto.randomUUID(),
     questionParts,
+    model,
     conversationStart,
     userMessage,
     consumeHandoffTurnId,
@@ -739,6 +797,8 @@ export class LangyConversationService {
     turnId?: string;
     /** The user's question that opened the turn — folded into the turn document. */
     questionParts?: LangyMessagePart[];
+    /** The model this turn runs on — the fold keeps the latest as `LastModel`. */
+    model?: string;
     /** Optional first-event marker, committed atomically before acceptance. */
     conversationStart?: Omit<
       LangyConversationStartedEventData,
@@ -755,6 +815,7 @@ export class LangyConversationService {
       conversationId,
       turnId,
       ...(questionParts !== undefined ? { questionParts } : {}),
+      ...(model !== undefined ? { model } : {}),
       ...(conversationStart ? { conversationStart } : {}),
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),

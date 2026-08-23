@@ -1,4 +1,3 @@
-import { Box } from "@chakra-ui/react";
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
 import type { modelProviders } from "~/server/modelProviders/registry";
@@ -16,6 +15,7 @@ import { Groq } from "../icons/Groq";
 import { OpenAI } from "../icons/OpenAI";
 import { Voyage } from "../icons/Voyage";
 import { Xai } from "../icons/Xai";
+import { IconGlyph } from "../ui/IconGlyph";
 
 export const modelProviderIcons: Record<
   keyof typeof modelProviders,
@@ -29,9 +29,8 @@ export const modelProviderIcons: Record<
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
-  // The Cloud mark rather than the Gemini one: the models are Gemini, but the
-  // credential and console are Google Cloud's, and that is the distinction a
-  // customer is picking between in this list.
+  // Deprecated fold-window provider (see registry.ts): stored rows still
+  // render in the providers table until the migration folds them.
   google_agent_platform: <GoogleCloud />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
@@ -59,10 +58,7 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
 
 /**
  * Wraps a `modelProviderIcons[provider]` glyph so it stays legible in dark
- * mode. Wrapper-level (not fixed in the SVGs themselves) because those
- * components are shared across surfaces (model picker, docs site, trace
- * table) that render on different backgrounds — inverting only the
- * monochrome ones here keeps brand-coloured marks untouched.
+ * mode.
  */
 export function ProviderIconGlyph({
   provider,
@@ -73,26 +69,11 @@ export function ProviderIconGlyph({
 }) {
   const icon = modelProviderIcons[provider];
   if (!icon) return null;
-  const isMonochrome = MONOCHROME_PROVIDER_ICONS.has(provider);
   return (
-    <Box
-      width={size}
-      height={size}
-      flexShrink={0}
-      display="inline-flex"
-      alignItems="center"
-      justifyContent="center"
-      css={{ "& > svg": { width: "100%", height: "100%" } }}
-      // Pure invert(1) — the monochrome marks are flat black on
-      // transparent; rotating hue afterwards would tint the result away
-      // from neutral. brightness(0.92) tones the result to off-white so
-      // it doesn't hard-burn against the dark surface.
-      _dark={
-        isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined
-      }
-      aria-hidden="true"
-    >
-      {icon}
-    </Box>
+    <IconGlyph
+      icon={icon}
+      monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)}
+      size={size}
+    />
   );
 }

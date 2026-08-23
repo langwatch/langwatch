@@ -172,11 +172,11 @@ Feature: Payload cost governs the scheduling plane
   # derivation can carry the derivation instead — cheap for the same reason a
   # pointer is cheap, and with nothing left to race.
   #
-  # This is the PRODUCER half, and it is deliberately not live yet: the
-  # deploy-order rule two scenarios up means the consumer half below must be on
-  # every worker for a full release before anything stages this shape. Flip to
-  # @unit when the producer ships (R2).
-  @unimplemented
+  # This is the PRODUCER half. It is live: the deploy-order rule two scenarios
+  # up required the consumer half to be on every worker for a full release
+  # first, which it has been since #6621, so the seam now stages this shape
+  # instead of the pointer.
+  @unit
   Scenario: work whose result is a bounded derivation carries it instead of a pointer
     Given a relevant event whose payload is large
     And the subscriber's whole result is a derivation drawn from a fixed, closed vocabulary

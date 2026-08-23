@@ -23,7 +23,8 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
 
   Background:
     Given user "platform-admin@acme.com" is signed in to organization "acme"
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "activityMonitor:view" permission
     And the feature flag "release_ui_ai_governance_enabled" is enabled
 
   # ---------------------------------------------------------------------------
@@ -31,23 +32,26 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # ---------------------------------------------------------------------------
 
   @bdd @ui @admin-oversight @permission
-  Scenario: A non-admin user is redirected away from the dashboard
+  Scenario: A user without the governance read grant is refused the dashboard
+    # The page gate is `governance:view`, the same grant the Governance
+    # product is offered on. Delegation of the panels inside it is covered by
+    # specs/ai-governance/rbac/delegated-governance-viewer.feature.
     Given user "engineer@acme.com" is signed in but does NOT have
-      "organization:manage"
-    When she navigates to "/settings/governance"
-    Then she is redirected (or shown the existing settings-permission
-      "Not allowed" page)
+      "governance:view"
+    When she navigates to "/governance"
+    Then she is shown the existing settings-permission "Access Restricted"
+      page
 
   @bdd @ui @admin-oversight @permission
   Scenario: An org admin reaches the dashboard
-    When the admin navigates to "/settings/governance"
+    When the admin navigates to "/governance"
     Then the page renders with the heading "Governance Overview"
-    And the URL stays at "/settings/governance"
+    And the URL stays at "/governance"
 
   @bdd @ui @admin-oversight @feature-flag
   Scenario: Without the governance preview flag the page is hidden
     Given the feature flag "release_ui_ai_governance_enabled" is disabled
-    When the admin navigates to "/settings/governance"
+    When the admin navigates to "/governance"
     Then the page renders the standard NotFoundScene (default-off for
       non-flagged orgs)
     And no telemetry is emitted that reveals the page exists
@@ -74,7 +78,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     And below the cards a tile prompts "Connect a provider, enable a
       RoutingPolicy, or set up an IngestionSource to start collecting data"
     And the prompt links to /settings/model-providers,
-      /settings/routing-policies, /settings/governance/ingestion-sources
+      /gateway/routing-policies, /governance/ingestion-sources
 
   # ---------------------------------------------------------------------------
   # Per-user breakdown
@@ -92,12 +96,12 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
       | Trend vs last month   | yes      |              |
       | Most-used model       | no       |              |
     And each row links to a per-user drill-down at
-      "/settings/governance/users/<userId>" (route wiring follows in a
+      "/governance/users/<userId>" (route wiring follows in a
       sibling slice; v0 link can be a no-op)
 
   @bdd @ui @admin-oversight @per-user @permissions
   Scenario: Per-user rows respect the admin's RBAC scope
-    Given the admin has "organization:manage" but only on org "acme"
+    Given the admin has "activityMonitor:view" but only on org "acme"
     When the dashboard renders
     Then only users in "acme" appear in the table
     And users from sibling orgs (where the admin has no permission) are
@@ -142,7 +146,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
       | status       | "healthy" / "degraded" / "stale" / "down"  |
       | last event   | relative timestamp                         |
     And clicking a chip navigates to that source's detail page at
-      "/settings/governance/ingestion-sources/<sourceId>" (link wiring
+      "/governance/ingestion-sources/<sourceId>" (link wiring
       follows in a sibling slice)
 
   @bdd @ui @admin-oversight @ingestion-health @empty
@@ -151,7 +155,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     When the dashboard renders
     Then the strip reads "No ingestion sources configured." with a CTA
       "+ Add your first source" linking to
-      "/settings/governance/ingestion-sources/new"
+      "/governance/ingestion-sources"
 
   # ---------------------------------------------------------------------------
   # Mocked-data caveat (for v0; real-data wire-up follows D2)

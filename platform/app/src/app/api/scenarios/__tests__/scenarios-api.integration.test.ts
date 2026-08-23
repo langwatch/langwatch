@@ -1,10 +1,18 @@
-import type { Organization, Project, Scenario, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import type {
+  Organization,
+  Project,
+  Scenario,
+  Team,
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Scenarios API", () => {
   let testApiKey: string;

@@ -7,6 +7,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { useSelectionStore } from "../../../../stores/selectionStore";
 import type { TraceListItem } from "../../../../types/trace";
 import type { ConversationGroup } from "../../conversationGroups";
+import { withoutPlaceholderTraceIds } from "../../skeletonPlaceholders";
 import type { CellDef } from "../types";
 import type { TraceGroup } from "./group/types";
 
@@ -18,10 +19,18 @@ interface RowCheckboxProps {
   ariaLabel: string;
 }
 
-const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds, ariaLabel }) => {
+const RowCheckbox: React.FC<RowCheckboxProps> = ({
+  traceIds: candidateTraceIds,
+  ariaLabel,
+}) => {
   const traceIdSet = useSelectionStore((s) => s.traceIds);
   const mode = useSelectionStore((s) => s.mode);
   const setMany = useSelectionStore((s) => s.setMany);
+
+  // A loading row renders a skeleton instead of this checkbox, so a placeholder
+  // id reaching here means the row tree got ahead of the loading flag. Dropping
+  // them keeps a click on such a row from selecting a trace that does not exist.
+  const traceIds = withoutPlaceholderTraceIds(candidateTraceIds);
 
   const totalCount = traceIds.length;
   const checkedCount =

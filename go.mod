@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/0xdeafcafe/moron v1.0.1-0.20260714030656-2b32ef25bff8
@@ -15,6 +15,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/grafana/pyroscope-go v1.4.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/klauspost/compress v1.18.7
 	github.com/langwatch/langwatch/sdks/go v0.2.0
@@ -24,7 +25,6 @@ require (
 	github.com/openai/openai-go v1.12.0
 	github.com/osteele/liquid v1.8.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/redis/go-redis/v9 v9.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/thessem/zap-prettyconsole v0.6.0
 	github.com/tidwall/gjson v1.18.0
@@ -108,6 +108,7 @@ require (
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.11 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
@@ -159,7 +160,6 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.151.0 // indirect
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.starlark.net v0.0.0-20260102030733-3fee463870c9 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/arch v0.23.0 // indirect

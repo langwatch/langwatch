@@ -1,5 +1,7 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { TraceEventRollup } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
@@ -59,7 +61,7 @@ export function useTraceListEvents({
       enabled,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       trpc: { context: { skipBatch: true } },
     },
   );
@@ -69,27 +71,46 @@ export function useTraceListEvents({
   // already false, so a row on the new page would find no entry of its own and
   // read as eventless. It is still waiting, and says so until its own answer
   // arrives.
-  const isLoading = enabled && (query.isLoading || query.isPreviousData);
+  const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
   const isUnavailable = enabled && query.isError;
 
-  return useMemo(() => {
-    if (!rollups && !isLoading && !isUnavailable) return rows;
-    return rows.map((row) => {
-      const rollup = rollups?.[row.traceId];
-      return {
-        ...row,
-        events: rollup
-          ? {
-              groups: rollup.names,
-              totalCount: rollup.totalCount,
-              distinctCount: rollup.distinctCount,
-            }
-          : NO_TRACE_EVENTS,
-        eventsLoading: isLoading,
-        eventsUnavailable: isUnavailable,
-      };
-    });
-  }, [rows, rollups, isLoading, isUnavailable]);
+  return useMemo(
+    () => mergeTraceEvents({ rows, rollups, isLoading, isUnavailable }),
+    [rows, rollups, isLoading, isUnavailable],
+  );
+}
+
+/**
+ * Puts each row's rollup on the row. Shared with the conversation view, whose
+ * turns are trace rows read outside the list and need the same merge.
+ */
+export function mergeTraceEvents({
+  rows,
+  rollups,
+  isLoading,
+  isUnavailable,
+}: {
+  rows: TraceListItem[];
+  rollups: Record<string, TraceEventRollup> | undefined;
+  isLoading: boolean;
+  isUnavailable: boolean;
+}): TraceListItem[] {
+  if (!rollups && !isLoading && !isUnavailable) return rows;
+  return rows.map((row) => {
+    const rollup = rollups?.[row.traceId];
+    return {
+      ...row,
+      events: rollup
+        ? {
+            groups: rollup.names,
+            totalCount: rollup.totalCount,
+            distinctCount: rollup.distinctCount,
+          }
+        : NO_TRACE_EVENTS,
+      eventsLoading: isLoading,
+      eventsUnavailable: isUnavailable,
+    };
+  });
 }
 
 /**

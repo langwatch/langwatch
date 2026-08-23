@@ -12,29 +12,36 @@
  */
 
 import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
+import { TRPCError } from "@trpc/server";
+import { randomBytes } from "crypto";
+import { z } from "zod";
 import type {
   GatewayBudget,
   Prisma,
   PrismaClient,
   VirtualKey,
   VirtualKeyRoutingMode,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { randomBytes } from "crypto";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
-import { translateExternalIdConflict } from "./errors";
+import {
+  GatewayTraceProjectAmbiguousError,
+  GatewayTraceProjectRequiredError,
+  GatewayTraceProjectUnknownError,
+  translateExternalIdConflict,
+  VirtualKeyExpiryInPastError,
+} from "./errors";
 import {
   identityPatchData,
   metadataPatch,
   type ResourceMetadata,
 } from "./resourceMetadata";
 import {
-  eligibleModelProvidersForVk,
-  resolveTraceProject,
+  decideTraceDestination,
+  scopeReachableModelProvidersForVk,
+  type TraceDestinationInput,
 } from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
@@ -126,8 +133,10 @@ export type CreateVirtualKeyInput = {
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata?: ResourceMetadata;
   /**
-   * Explicit trace destination for org- and team-owned keys. NOT a scope:
-   * it grants no visibility and no operate rights on the key.
+   * Where this key's traces and costs should land. NOT a scope: it grants
+   * no visibility and no operate rights on the key. Omit it and the
+   * destination is decided from what the key is scoped to; either way the
+   * answer is stored on the key.
    */
   traceProjectId?: string | null;
   /**
@@ -136,6 +145,13 @@ export type CreateVirtualKeyInput = {
    * time. Policy must belong to `organizationId`.
    */
   routingPolicyId?: string | null;
+  /**
+   * When the key stops serving. Absent or null means it never expires. A
+   * date that has already passed is refused rather than stored: the key
+   * would be dead on arrival and nothing about its first refusal would
+   * point back at this field.
+   */
+  expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
@@ -157,9 +173,21 @@ export type UpdateVirtualKeyInput = {
   externalId?: string | null;
   /** Undefined leaves the stored map alone; a value REPLACES it wholesale. */
   metadata?: ResourceMetadata;
+  /**
+   * Undefined leaves the stored destination where it is, scope edits
+   * included; a value moves it, validated as on create; null asks for it to
+   * be worked out again from what the key is now.
+   */
   traceProjectId?: string | null;
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
+  /**
+   * Undefined leaves the expiration where it is; null clears it, so the key
+   * never expires; a date moves it. Extending an expired key is the whole
+   * reason expiry is a date rather than a status, so a key whose date has
+   * already passed accepts this edit like any other.
+   */
+  expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
   /**
    * Undefined leaves the key's budget alone; a value creates or updates
@@ -277,11 +305,20 @@ export class VirtualKeyService {
       input.routingPolicyId ?? null,
     );
     assertProvidersAllowedShape(input.config?.providersAllowed);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const id = this.nextVirtualKeyId();
 
     const created = await this.prisma
       .$transaction(async (tx) => {
+        const traceProjectId = await this.resolveStoredTraceDestination(
+          {
+            organizationId: input.organizationId,
+            scopes: input.scopes,
+            traceProjectId: input.traceProjectId ?? null,
+          },
+          tx,
+        );
         const vk = await this.repository.create(
           {
             id,
@@ -296,14 +333,14 @@ export class VirtualKeyService {
             metadata: metadataPatch(input.metadata),
             createdById: input.actorUserId,
             scopes: input.scopes,
-            traceProjectId: input.traceProjectId ?? null,
+            traceProjectId,
+            expiresAt: input.expiresAt ?? null,
             routingPolicyId: input.routingPolicyId ?? null,
             routingMode,
             purpose: input.purpose,
           },
           tx,
         );
-        await this.assertTraceProjectResolvable(vk, tx);
         await this.assertProvidersAllowedReachable(
           vk,
           config.providersAllowed,
@@ -399,6 +436,7 @@ export class VirtualKeyService {
           )
         : existing.routingMode;
     assertProvidersAllowedShape(input.config?.providersAllowed);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const updated = await this.prisma
       .$transaction(async (tx) => {
@@ -412,6 +450,11 @@ export class VirtualKeyService {
           await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
 
+        const traceProjectId = await this.nextStoredTraceDestination(
+          { existing, input },
+          tx,
+        );
+
         const vk = await tx.virtualKey.update({
           where: { id: input.id, organizationId: input.organizationId },
           data: {
@@ -422,16 +465,16 @@ export class VirtualKeyService {
             ...(input.routingPolicyId !== undefined
               ? { routingPolicyId: input.routingPolicyId }
               : {}),
-            ...(input.traceProjectId !== undefined
-              ? { traceProjectId: input.traceProjectId }
+            ...(input.expiresAt !== undefined
+              ? { expiresAt: input.expiresAt }
               : {}),
+            traceProjectId,
             routingMode,
             revision: { increment: 1n },
           },
           include: { scopes: true },
         });
 
-        await this.assertTraceProjectResolvable(vk, tx);
         await this.assertProvidersAllowedReachable(
           vk,
           config.providersAllowed,
@@ -449,7 +492,12 @@ export class VirtualKeyService {
               tx,
             );
           } else {
-            await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+            await this.archiveKeyBudgets({
+              vk,
+              actorUserId: input.actorUserId,
+              tx,
+              include: "drawerManaged",
+            });
           }
         }
 
@@ -585,7 +633,12 @@ export class VirtualKeyService {
         // cost us before we killed it" needs the budget row to read them
         // against. Archiving also stops the budget from showing up as an
         // active control that nothing can ever spend against.
-        await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+        await this.archiveKeyBudgets({
+          vk,
+          actorUserId: input.actorUserId,
+          tx,
+          include: "scopedToKey",
+        });
         await this.changeEvents.append(
           {
             organizationId: input.organizationId,
@@ -848,22 +901,59 @@ export class VirtualKeyService {
   }
 
   /**
-   * Archive the drawer-managed budget of this key, and only that one.
-   * Budgets created independently on the Budgets page also target the
-   * key, but their lifecycle carries its own permission
-   * (gatewayBudgets:delete); archiving them from a key update would let
-   * virtualKeys:update silently remove an admin's enforcement control.
+   * Archive the budgets a key's lifecycle carries, which is a different set
+   * depending on what just happened to the key.
+   *
+   * `drawerManaged` is the key still being alive: the drawer's budget field
+   * was cleared, so that one row goes and nothing else does. Budgets created
+   * independently on the Budgets page also target the key, but their
+   * lifecycle carries its own permission (gatewayBudgets:delete); archiving
+   * them from a key update would let virtualKeys:update silently remove an
+   * admin's enforcement control.
+   *
+   * `scopedToKey` is the key being dead. REVOKED is terminal, so a budget
+   * whose scope is this key and nothing else can never count spend or refuse
+   * a request again, whoever created it. Leaving it active does not preserve
+   * an enforcement control, because there is nothing left to enforce against;
+   * it just leaves a row that reads as a live cap and shows up on the budgets
+   * list warning that no key sends traffic to it. The permission argument
+   * above does not carry over, because nothing is being taken away.
+   *
+   * Both cases archive rather than delete, so the ledger rows stay readable
+   * against the cap they accrued under.
    */
-  private async archiveKeyBudgets(
-    vk: VirtualKey,
-    actorUserId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<void> {
+  private async archiveKeyBudgets({
+    vk,
+    actorUserId,
+    tx,
+    include,
+  }: {
+    vk: VirtualKey;
+    actorUserId: string;
+    tx: Prisma.TransactionClient;
+    include: "drawerManaged" | "scopedToKey";
+  }): Promise<void> {
     const budgets = await tx.gatewayBudget.findMany({
       where: {
         organizationId: vk.organizationId,
-        managedByVirtualKeyId: vk.id,
         archivedAt: null,
+        ...(include === "drawerManaged"
+          ? { managedByVirtualKeyId: vk.id }
+          : {
+              OR: [
+                { managedByVirtualKeyId: vk.id },
+                // Scoped to this key and nothing else. ATTRIBUTED_USER counts
+                // when the key is its anchor: the per-end-user allowance hangs
+                // off the key's traffic, so a dead key means a template that
+                // can never open another bucket. The same scope type anchored
+                // on a project is untouched, and so is every PROJECT, TEAM or
+                // ORGANIZATION budget, because those outlive any one key.
+                {
+                  scopeType: { in: ["VIRTUAL_KEY", "ATTRIBUTED_USER"] },
+                  scopeId: vk.id,
+                },
+              ],
+            }),
       },
     });
     for (const budget of budgets) {
@@ -897,44 +987,92 @@ export class VirtualKeyService {
   }
 
   /**
-   * Every key must resolve a project for its traces to land in. Debits no
-   * longer depend on it (they ride the gateway's spend commands), but a
-   * key whose traces land nowhere is invisible in every usage view, and
-   * per-key spend is read from the trace path rather than the ledger.
-   * Project-owned and personal keys resolve a project structurally, and
-   * org/team-owned keys resolve the organization's governance project when
-   * one exists. What is
-   * refused is the remaining shape: ownership above a project in an org
-   * with no governance project, which is exactly the shape that used to
-   * drop traces on the floor.
+   * Every key must SAY where its traces land, rather than have it guessed,
+   * and the answer is written down rather than worked out again on each read.
    *
-   * Runs on create and on every update (not only scope changes), so a key
-   * that predates the rule cannot keep being edited around the hole: the
-   * next touch either gives its traces a home or does not go through.
-   * Revocation is intentionally not guarded, killing the key must always
-   * be possible.
+   * Per-key spend is read off the trace path, so the project a key traces
+   * into is the project its spend is attributed to. The four cases live in
+   * `decideTraceDestination`; what belongs here is what each refusal means
+   * to the person who asked for the key:
+   *
+   *   - `gateway_trace_project_unknown`: the destination named is not a live
+   *     project of this organization. Deleted, or somebody else's.
+   *   - `gateway_trace_project_ambiguous`: nothing was named while the
+   *     organization has projects to choose from. The governance inbox would
+   *     take the traffic and every project budget the creator had in mind
+   *     would count none of it.
+   *   - `trace_project_required`: nothing was named and there is no
+   *     governance project either, so there is no destination to give.
+   *
+   * Revocation is intentionally not guarded: killing a key must always be
+   * possible.
    *
    * Spec: specs/ai-gateway/virtual-key-creation.feature
    */
-  private async assertTraceProjectResolvable(
-    vk: VirtualKeyWithScopes,
+  private async resolveStoredTraceDestination(
+    input: TraceDestinationInput,
     tx: Prisma.TransactionClient,
-  ): Promise<void> {
-    const traceProject = await resolveTraceProject(this.prisma, vk, tx);
-    if (!traceProject) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in; without one its spend could not be capped by any budget. Scope the key to a project, or set up the organization's governance project first.",
-      });
+  ): Promise<string> {
+    const decision = await decideTraceDestination(tx, input);
+    switch (decision.outcome) {
+      case "resolved":
+        return decision.project.id;
+      case "unknown":
+        throw new GatewayTraceProjectUnknownError();
+      case "ambiguous":
+        throw new GatewayTraceProjectAmbiguousError({
+          projectScopeCount: decision.projectScopeCount,
+        });
+      case "no_destination":
+        throw new GatewayTraceProjectRequiredError();
     }
   }
 
   /**
-   * An explicit provider allowlist may only name providers the key can
-   * actually reach through its scope graph. Without this a key could be
-   * saved pointing at another team's provider row and the mistake would
-   * only surface as an unexplained "model not available" at dispatch.
+   * What an update leaves in the destination column.
+   *
+   * An untouched destination stays exactly where it is, including when the
+   * edit moves the key's scopes around. Re-deriving it from the scopes is
+   * what used to let an access change silently move where a key's money was
+   * counted: two decisions, made on two screens, one of which never
+   * mentioned the other.
+   *
+   * A destination that IS named on the update is validated the way create
+   * validates it, so an edit can never point a key somewhere a create could
+   * not. Clearing it (an explicit null) re-runs the whole decision, which is
+   * the only way to say "work it out from what the key is now".
+   *
+   * The remaining case is a key that has no stored destination at all: one
+   * written before the column was filled, in an organization that had no
+   * governance project to fall back to. Those resolve like a create, so the
+   * next touch either gives the key's traces a home or does not go through.
+   */
+  private async nextStoredTraceDestination(
+    args: { existing: VirtualKeyWithScopes; input: UpdateVirtualKeyInput },
+    tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    const { existing, input } = args;
+    if (input.traceProjectId === undefined && existing.traceProjectId) {
+      return existing.traceProjectId;
+    }
+    return this.resolveStoredTraceDestination(
+      {
+        organizationId: input.organizationId,
+        scopes: input.scopes ?? existing.scopes,
+        traceProjectId: input.traceProjectId ?? null,
+      },
+      tx,
+    );
+  }
+
+  /**
+   * An explicit provider allowlist may only name providers the key can reach
+   * through its SCOPE graph. It is validated against the scope-reachable set,
+   * not the routing-policy-narrowed dispatch set: a provider the scope reaches
+   * but the key's routing policy omits is still a valid allowlist entry,
+   * because the policy blocks it at dispatch, not at save. Blocking the save
+   * too would be over-strict. A provider the scope does not reach at all still
+   * fails here, so a key can never point at another team's provider row.
    */
   private async assertProvidersAllowedReachable(
     vk: VirtualKeyWithScopes,
@@ -942,9 +1080,13 @@ export class VirtualKeyService {
     tx: Prisma.TransactionClient,
   ): Promise<void> {
     if (!providersAllowed) return;
-    const eligible = await eligibleModelProvidersForVk(this.prisma, vk, tx);
-    const eligibleIds = new Set(eligible.map((mp) => mp.id));
-    const unreachable = providersAllowed.filter((id) => !eligibleIds.has(id));
+    const reachable = await scopeReachableModelProvidersForVk(
+      this.prisma,
+      vk,
+      tx,
+    );
+    const reachableIds = new Set(reachable.map((mp) => mp.id));
+    const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -1024,6 +1166,25 @@ function assertProvidersAllowedShape(
       message:
         "providers_allowed_empty: select at least one provider, or allow all providers",
     });
+  }
+}
+
+/**
+ * A key is never written already expired.
+ *
+ * Absence leaves the stored date alone and null clears it, so only a real
+ * date is checked. The comparison is against the moment of the write, which
+ * makes "now" itself a refusal: a key that expires at the instant it is
+ * saved serves nothing and reads as a bug in whatever wrote it.
+ */
+function assertExpiryInFuture({
+  expiresAt,
+}: {
+  expiresAt: Date | null | undefined;
+}): void {
+  if (!expiresAt) return;
+  if (expiresAt.getTime() <= Date.now()) {
+    throw new VirtualKeyExpiryInPastError();
   }
 }
 

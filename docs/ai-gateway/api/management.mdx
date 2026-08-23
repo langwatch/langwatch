@@ -162,7 +162,8 @@ Response:
       "purpose": "user",
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "trace_project_id": null,
+      "trace_project_id": "proj_01HZ...",
+      "trace_project_archived": false,
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
@@ -171,7 +172,8 @@ Response:
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
       "last_used_at": "2026-04-18T21:03:12Z",
-      "revoked_at": null
+      "revoked_at": null,
+      "expires_at": null
     }
   ]
 }
@@ -179,7 +181,9 @@ Response:
 
 `purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
 
-`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys nobody is using.
+`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys with no recent use.
+
+`expires_at` is the date the key stops serving, or `null` for a key that never expires. `status` stays `active` past that date, so compare `expires_at` with the current time to tell an expired key apart.
 
 ### Create
 
@@ -197,15 +201,19 @@ Body (only `name` is required):
   "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
   "routing_mode": "none",
   "routing_policy_id": null,
+  "expires_at": "2026-09-01T00:00:00.000Z",
   "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
   "config": { "providersAllowed": ["mp_openai..."] }
 }
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
+- `expires_at` is when the key stops serving. Omit it and the key never expires. A date already in the past is refused with `virtual_key_expiry_in_past`. After the date, requests are refused with `virtual_key_expired` while `status` stays `active`, so read `expires_at` rather than the status to tell an expired key apart.
 
 Response `201`:
 
@@ -248,13 +256,15 @@ Body (all fields optional):
 {
   "name": "new-name",
   "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
+  "trace_project_id": "proj_01HZ...", // or null to re-resolve it
   "routing_mode": "fallback_all",
+  "expires_at": "2026-10-01T00:00:00.000Z", // or null so it never expires
   "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
 
 ### Rotate, disable, enable, revoke
 

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { nanoid } from "nanoid";
+import { z } from "zod";
 /**
  * AiToolEntryService - owns the AI Tools Portal catalog (Phase 7).
  *
  * The portal lives at /me as a card grid (3 sections - coding
  * assistants, model providers, external tools) and is managed by org
- * admins at /settings/governance/tool-catalog.
+ * admins at /governance/tool-catalog.
  *
  * Scoping (read resolution):
  *   - org-scoped entries ("scope":"organization") are visible to ALL
@@ -33,11 +35,17 @@
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { z } from "zod";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
+
+import {
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  PLATFORM_TOOL_SLUGS,
+  type PlatformToolPolicy,
+  type PlatformToolPolicyMap,
+  type PlatformToolSlug,
+} from "./platformToolPolicy.service";
 
 export const SUPPORTED_TILE_TYPES = [
   "coding_assistant",
@@ -72,18 +80,20 @@ export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
 /**
  * Maps a coding-assistant tile's `assistantKind` to the CLI tool slug the
  * `langwatch <tool>` wrapper uses (and the slug PlatformToolPolicy keyed on).
- * Only the five wrapped tools map; kinds with no CLI wrapper (github_copilot,
- * custom) are absent and contribute no toolPolicies entry. cliBootstrap reads
- * this to derive the login `toolPolicies` map from tile config.
+ * Only the wrapped tools map; kinds with no CLI wrapper (custom) are absent
+ * and contribute no toolPolicies entry. cliBootstrap reads this to derive
+ * the login `toolPolicies` map from tile config.
  */
 export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
-  Record<AssistantKind, "claude" | "codex" | "gemini" | "opencode" | "cursor">
+  Record<AssistantKind, PlatformToolSlug>
 > = {
   claude_code: "claude",
   codex: "codex",
   gemini: "gemini",
   opencode: "opencode",
   cursor: "cursor",
+  // GitHub Copilot CLI wrapper (`langwatch copilot`), ADR-039.
+  github_copilot: "copilot",
 };
 
 const codingAssistantConfig = z.object({
@@ -353,6 +363,18 @@ export const STARTER_PACK_TILES: ReadonlyArray<{
     },
   },
   {
+    type: "coding_assistant",
+    slug: "github-copilot",
+    displayName: "GitHub Copilot CLI",
+    iconAsset: "preset:github_copilot",
+    config: {
+      assistantKind: "github_copilot",
+      setupCommand: "langwatch copilot",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
     type: "model_provider",
     slug: "openai",
     displayName: "OpenAI",
@@ -459,10 +481,7 @@ export class AiToolEntryService {
     userId: string;
   }): Promise<
     Partial<
-      Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor",
-        { allowVk: boolean; allowOtelDirect: boolean }
-      >
+      Record<PlatformToolSlug, { allowVk: boolean; allowOtelDirect: boolean }>
     >
   > {
     const tiles = await this.resolveVisibleTilesForUser({
@@ -478,10 +497,7 @@ export class AiToolEntryService {
     );
 
     const overrides: Partial<
-      Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor",
-        { allowVk: boolean; allowOtelDirect: boolean }
-      >
+      Record<PlatformToolSlug, { allowVk: boolean; allowOtelDirect: boolean }>
     > = {};
 
     for (const tile of sorted) {
@@ -493,7 +509,16 @@ export class AiToolEntryService {
       // First (lowest-order) tile per slug wins.
       if (overrides[slug]) continue;
 
-      const allowVk = config.allowVk === undefined ? true : !!config.allowVk;
+      // Structural forces, immune to tile config: cursor has no terminal
+      // env path (no direct OTLP), and `code` (VS Code Copilot Chat) has no
+      // BYOK gateway env (no VK path) — a tile default of `true` would
+      // enable a path that cannot exist. ADR-039 §Extension #2.
+      const allowVk =
+        slug === "code"
+          ? false
+          : config.allowVk === undefined
+            ? true
+            : !!config.allowVk;
       const allowOtelDirect =
         slug === "cursor"
           ? false
@@ -504,6 +529,44 @@ export class AiToolEntryService {
     }
 
     return overrides;
+  }
+
+  /**
+   * {@link resolveToolPolicyOverrides} merged over
+   * {@link PLATFORM_TOOL_POLICY_DEFAULTS}, so every known slug carries a
+   * policy whether or not the org publishes a tile for it. This is the
+   * effective policy: the login ceremony caches it for the CLI to gate on,
+   * and the ingestion-key mint enforces it against a CLI that did not.
+   */
+  async resolveToolPolicyMap({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PlatformToolPolicyMap> {
+    const overrides = await this.resolveToolPolicyOverrides({
+      organizationId,
+      userId,
+    });
+    const map = {} as PlatformToolPolicyMap;
+    for (const slug of PLATFORM_TOOL_SLUGS) {
+      map[slug] = overrides[slug] ?? { ...PLATFORM_TOOL_POLICY_DEFAULTS[slug] };
+    }
+    return map;
+  }
+
+  /** One slug's effective policy. See {@link resolveToolPolicyMap}. */
+  async resolveToolPolicy({
+    organizationId,
+    userId,
+    slug,
+  }: {
+    organizationId: string;
+    userId: string;
+    slug: PlatformToolSlug;
+  }): Promise<PlatformToolPolicy> {
+    return (await this.resolveToolPolicyMap({ organizationId, userId }))[slug];
   }
 
   /**
@@ -1033,7 +1096,8 @@ export class AiToolEntryService {
         // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void,
         // which $queryRaw fails to deserialize. The lock releases at
         // commit / rollback.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
+        await tx.$executeRaw`-- @tenancy: advisory-lock helper, key is organization-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
         const countUnderLock = await tx.aiToolEntry.count({
           where: { organizationId },
         });

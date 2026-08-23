@@ -17,6 +17,7 @@ import { agentContextChip } from "~/features/langy/logic/langyContextChips";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
+import { agentHasDevTunnel, LocalTunnelBadge } from "./LocalTunnelBadge";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -190,9 +191,12 @@ export function AgentCard({
             <Spacer />
 
             {/* Name */}
-            <Text color="fg.muted" fontSize="sm" fontWeight={500}>
-              {agent.name}
-            </Text>
+            <HStack gap={2}>
+              <Text color="fg.muted" fontSize="sm" fontWeight={500}>
+                {agent.name}
+              </Text>
+              {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+            </HStack>
 
             {/* Metadata */}
             <Text color="fg.subtle" fontSize="12px">

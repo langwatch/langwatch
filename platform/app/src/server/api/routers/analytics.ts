@@ -2,6 +2,8 @@ import { createTRPCRouter } from "~/server/api/trpc";
 import { dataForFilter } from "./analytics/dataForFilter";
 import { topUsedDocuments } from "./analytics/documents";
 import { feedbacks } from "./analytics/feedbacks";
+import { lwqlRouter } from "./analytics/lwql";
+import { savedWorkbenchChartsRouter } from "./analytics/savedWorkbenchCharts";
 import { getTimeseries } from "./analytics/timeseries";
 
 export const analyticsRouter = createTRPCRouter({
@@ -9,4 +11,6 @@ export const analyticsRouter = createTRPCRouter({
   dataForFilter,
   topUsedDocuments,
   feedbacks,
+  lwql: lwqlRouter,
+  savedWorkbenchCharts: savedWorkbenchChartsRouter,
 });

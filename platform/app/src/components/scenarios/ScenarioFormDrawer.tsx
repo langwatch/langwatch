@@ -1,20 +1,31 @@
 import {
+  Box,
   Button,
+  chakra,
   Grid,
   GridItem,
   Heading,
   HStack,
+  Skeleton,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import type { Scenario } from "@prisma/client";
+import { Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type UseFormReturn, useWatch } from "react-hook-form";
+import {
+  type FieldErrors,
+  type UseFormReturn,
+  useFormState,
+  useWatch,
+} from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
+  HandledErrorState,
   showErrorToast,
 } from "~/features/errors";
+import type { Scenario } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   clearFlowCallbacks,
@@ -28,6 +39,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -43,6 +55,7 @@ import {
   type ScenarioFormData,
   type ScenarioInitialData,
 } from "./ScenarioForm";
+import { ScenarioParametersDialog } from "./ScenarioParametersDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import type { TargetValue } from "./TargetSelector";
 
@@ -100,7 +113,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     rawComplexProps && "initialFormData" in rawComplexProps
       ? (rawComplexProps as Partial<ScenarioInitialData>)
       : {};
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({
@@ -115,6 +128,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+  const [parametersDialogOpen, setParametersDialogOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
   // confirms which user-simulator and judge models to run with. null = follow
@@ -151,7 +165,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         title: "Agent created",
         description: `"${agent.name}" is now selected as the target.`,
         type: "success",
-        meta: { closable: true },
       });
     };
     setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
@@ -162,10 +175,37 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
-  const { data: scenario } = api.scenarios.getById.useQuery(
+  const {
+    data: scenario,
+    isLoading: isScenarioLoading,
+    isError: isScenarioReadFailed,
+    error: scenarioReadError,
+    refetch: refetchScenario,
+  } = api.scenarios.getById.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: !!project && !!scenarioId },
   );
+  // Editing an existing scenario means the fields are empty until the query
+  // answers. Without this the drawer renders a complete, blank form, which
+  // reads as "the scenario has no name and no criteria" rather than "not
+  // loaded yet", and the person who just asked an agent to write it cannot
+  // tell the difference.
+  //
+  // The project is part of the wait. The read stays disabled until the project
+  // resolves, and a disabled query does not report itself as loading, so
+  // `isScenarioLoading` alone leaves that window uncovered and shows the blank
+  // form it exists to prevent.
+  const isHydrating = !!scenarioId && (!project || isScenarioLoading);
+  // A read that fails ends the wait without producing a record, so the form
+  // would come back with every field at its default. That is the blank form
+  // the skeleton exists to prevent, and worse: the fields are editable, so
+  // the person can fill in what looks like their scenario and save it.
+  //
+  // Only when there is no record to show. A background refetch that fails
+  // keeps the record it read before, and the form the person is typing in
+  // stays as it is rather than being replaced by an error with their edits
+  // inside it.
+  const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -302,16 +342,35 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const projectId = project?.id;
       if (!projectId) return null;
 
-      return scenario
-        ? await updateExisting({
-            projectId,
-            scenarioId: scenario.id,
-            data,
-            models,
-          })
-        : await createScenario({ projectId, data, skipTransition, models });
+      // Branching on the loaded record alone made "we have not read it yet"
+      // and "there is nothing to read" the same condition, so a save during
+      // the read, or after one that failed, created a second scenario
+      // instead of updating the one being edited. Being pointed at a scenario
+      // is what decides this; the record only decides whether we can act yet.
+      if (scenarioId) {
+        if (!scenario) return null;
+        return await updateExisting({
+          projectId,
+          scenarioId: scenario.id,
+          data,
+          models,
+        });
+      }
+
+      return await createScenario({ projectId, data, skipTransition, models });
     },
-    [project?.id, scenario, updateExisting, createScenario],
+    [project?.id, scenarioId, scenario, updateExisting, createScenario],
+  );
+  /**
+   * Parameter rows are edited in their own dialog, and the message for a bad
+   * row shows on the row. When parameter validation rejects a submit, open the
+   * dialog again. The reader can then see which row is wrong.
+   */
+  const openParametersOnInvalid = useCallback(
+    (errors: FieldErrors<ScenarioFormData>) => {
+      if (errors.parameters) setParametersDialogOpen(true);
+    },
+    [],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -323,7 +382,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           description:
             "Please select a prompt or agent to run the scenario against.",
           type: "warning",
-          meta: { closable: true },
         });
         return;
       }
@@ -359,7 +417,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                   label: "Open agent editor",
                   onClick: openAgentEditor,
                 },
-                meta: { closable: true },
               });
               // Auto-open the editor now; the toast action above is the manual
               // fallback if this auto-open races, is dismissed, or fails.
@@ -377,14 +434,25 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       // scenario's stored choices (null = follow the project default) and open
       // it — the actual save + run happens on confirm.
       const valid = await form.trigger();
-      if (!valid) return;
+      if (!valid) {
+        openParametersOnInvalid(form.formState.errors);
+        return;
+      }
 
       setRunSimulatorModel(scenario?.simulatorModel ?? null);
       setRunJudgeModel(scenario?.judgeModel ?? null);
       setPendingRunTarget(target);
       setRunModelDialogOpen(true);
     },
-    [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
+    [
+      project?.id,
+      project?.slug,
+      formInstance,
+      utils,
+      openDrawer,
+      scenario,
+      openParametersOnInvalid,
+    ],
   );
 
   const confirmRunWithModels = useCallback(async () => {
@@ -454,28 +522,38 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           toaster.create({
             title: scenario ? "Scenario updated" : "Scenario created",
             type: "success",
-            meta: { closable: true },
           });
           onClose();
         }
       } catch {
         // Error already handled by mutation onError callback
       }
-    })();
-  }, [handleSave, scenario, formInstance, onClose]);
-  const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
-    setFormInstance(form);
-  }, []);
+    }, openParametersOnInvalid)();
+  }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
+  const setFormRef = useCallback(
+    (form: UseFormReturn<ScenarioFormData> | null) => {
+      setFormInstance(form);
+    },
+    [],
+  );
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || isRunning;
 
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? initialFormData ?? undefined,
-    [scenario, initialFormData],
-  );
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
+    // A stored scenario carries its parameters as JSON, including the null a
+    // scenario that never declared any has, so they are read through the
+    // tolerant parser before the form sees them.
+    if (scenario) {
+      return {
+        ...scenario,
+        parameters: parseScenarioParameterDefinitions(scenario.parameters),
+      };
+    }
+    return initialFormData ?? undefined;
+  }, [scenario, initialFormData]);
 
   return (
     <Drawer.Root
@@ -486,8 +564,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
+          {/* Being pointed at a scenario is enough to be editing one. Keying
+              this off the loaded record alone retitled the drawer "Create
+              Scenario" for the whole of the read. */}
           <Heading size="md">
-            {scenario ? "Edit Scenario" : "Create Scenario"}
+            {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
           </Heading>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
@@ -499,12 +580,23 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
-              {formInstance && <FormServerError form={formInstance} />}
-              <ScenarioForm
-                key={scenarioId ?? "new"}
-                defaultValues={defaultValues}
-                formRef={setFormRef}
-              />
+              {hasReadFailed ? (
+                <ScenarioReadError
+                  error={scenarioReadError}
+                  onRetry={() => void refetchScenario()}
+                />
+              ) : isHydrating ? (
+                <ScenarioFormSkeleton />
+              ) : (
+                <>
+                  {formInstance && <FormServerError form={formInstance} />}
+                  <ScenarioForm
+                    key={scenarioId ?? "new"}
+                    defaultValues={defaultValues}
+                    formRef={setFormRef}
+                  />
+                </>
+              )}
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="bg.muted">
@@ -514,23 +606,48 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && <FooterLabels form={formInstance} />}
+          {formInstance && !isHydrating && !hasReadFailed && (
+            <HStack gap={6} flex={1} overflow="hidden" flexWrap="wrap">
+              <FooterLabels form={formInstance} />
+              <FooterParameters
+                form={formInstance}
+                onOpen={() => setParametersDialogOpen(true)}
+              />
+            </HStack>
+          )}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <SaveAndRunMenu
-              selectedTarget={selectedTarget}
-              onTargetChange={handleTargetChange}
-              onSaveAndRun={handleSaveAndRun}
-              onSaveWithoutRunning={handleSaveWithoutRunning}
-              onCreateAgent={handleCreateAgent}
-              onCreatePrompt={() => setPromptDrawerOpen(true)}
-              isLoading={isSubmitting}
-            />
+            {/* There is nothing to save while the scenario is still being read,
+                and nothing to save at all once the read has failed: the body
+                is an error state, not a form. `handleSave` refuses either way,
+                so this is what says so rather than what enforces it. */}
+            {!hasReadFailed && (
+              <SaveAndRunMenu
+                selectedTarget={selectedTarget}
+                onTargetChange={handleTargetChange}
+                onSaveAndRun={handleSaveAndRun}
+                onSaveWithoutRunning={handleSaveWithoutRunning}
+                onCreateAgent={handleCreateAgent}
+                onCreatePrompt={() => setPromptDrawerOpen(true)}
+                isLoading={isSubmitting || isHydrating}
+              />
+            )}
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Parameter declarations: edited on the form, saved with the scenario.
+          The form is gone while the scenario is being read and once the read
+          has failed, so the dialog goes with it. */}
+      {formInstance && !isHydrating && !hasReadFailed && (
+        <ScenarioParametersDialog
+          open={parametersDialogOpen}
+          onOpenChange={setParametersDialogOpen}
+          form={formInstance}
+        />
+      )}
 
       {/* Run-model dialog: choose user-simulator + judge models before running */}
       <ScenarioRunModelDialog
@@ -565,7 +682,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             title: "Prompt created",
             description: `"${prompt.name}" is now selected as the target.`,
             type: "success",
-            meta: { closable: true },
           });
         }}
       />
@@ -573,11 +689,68 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
 }
 
+/**
+ * Stands in for the form when the scenario could not be read.
+ *
+ * The alternative is the form at its defaults, which invites the person to
+ * retype a scenario that already exists, and the save would have created a
+ * second copy of it. Copy comes from the code-keyed registry like every other
+ * error surface; the way forward is to read it again.
+ */
+function ScenarioReadError({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  return (
+    <Box data-testid="scenario-read-error">
+      <HandledErrorState
+        error={error}
+        fallbackTitle="Couldn't load this scenario"
+        fullHeight={false}
+      >
+        <Button size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </HandledErrorState>
+    </Box>
+  );
+}
+
+/**
+ * Stands in for the form while an existing scenario is being read.
+ *
+ * Shaped like the form it replaces (name, situation, criteria) so the drawer
+ * does not reflow when the real fields arrive.
+ */
+function ScenarioFormSkeleton() {
+  return (
+    <VStack align="stretch" gap={6} data-testid="scenario-form-skeleton">
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="48px" />
+        <Skeleton height="40px" />
+      </VStack>
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="72px" />
+        <Skeleton height="32px" />
+        <Skeleton height="120px" />
+      </VStack>
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="60px" />
+        <Skeleton height="32px" />
+        <Skeleton height="96px" />
+      </VStack>
+    </VStack>
+  );
+}
+
 function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
   const labels = useWatch({ control: form.control, name: "labels" });
 
   return (
-    <HStack gap={2} flex={1} overflow="hidden" flexWrap="wrap">
+    <HStack gap={2} overflow="hidden" flexWrap="wrap">
       <Text fontSize="xs" fontWeight="medium" color="fg.muted" flexShrink={0}>
         Labels
       </Text>
@@ -592,5 +765,103 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
         onAdd={(label) => form.setValue("labels", [...labels, label])}
       />
     </HStack>
+  );
+}
+
+/**
+ * The declared parameter names, next to the labels, as the way into their
+ * editor. Names are not removed here: a name can be read as "params.NAME" by
+ * the situation, the criteria and the target, so removing one is a decision
+ * taken in the editor with the rest of the declaration in view.
+ */
+function FooterParameters({
+  form,
+  onOpen,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  onOpen: () => void;
+}) {
+  const parameters = useWatch({ control: form.control, name: "parameters" });
+  const { errors } = useFormState({ control: form.control });
+  const invalid = !!errors.parameters;
+  const declared = (parameters ?? []).filter(
+    (definition) => definition.name.length > 0,
+  );
+
+  return (
+    <HStack
+      gap={2}
+      overflow="hidden"
+      flexWrap="wrap"
+      data-testid="scenario-parameters-footer"
+      data-invalid={invalid ? "true" : undefined}
+    >
+      <Text
+        fontSize="xs"
+        fontWeight="medium"
+        color={invalid ? "fg.error" : "fg.muted"}
+        flexShrink={0}
+      >
+        Parameters
+      </Text>
+      <HStack gap={1} flexWrap="wrap">
+        {declared.map((definition, index) => (
+          <ParameterChip
+            key={`${definition.name}-${index}`}
+            name={definition.name}
+            isSecret={definition.secret === true}
+            onOpen={onOpen}
+          />
+        ))}
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          borderRadius="full"
+          borderColor={invalid ? "fg.error" : "border"}
+          color={invalid ? "fg.error" : undefined}
+          onClick={onOpen}
+          data-testid="edit-scenario-parameters"
+        >
+          + add
+        </Button>
+      </HStack>
+    </HStack>
+  );
+}
+
+const ChipButton = chakra("button");
+
+function ParameterChip({
+  name,
+  isSecret,
+  onOpen,
+}: {
+  name: string;
+  isSecret: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <ChipButton
+      type="button"
+      onClick={onOpen}
+      aria-label={
+        isSecret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
+      }
+      data-testid={`scenario-parameter-chip-${name}`}
+      bg="bg.muted"
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="full"
+      fontSize="xs"
+      cursor="pointer"
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      _hover={{ bg: "bg.emphasized" }}
+    >
+      {isSecret && <Lock size={10} />}
+      {name}
+    </ChipButton>
   );
 }

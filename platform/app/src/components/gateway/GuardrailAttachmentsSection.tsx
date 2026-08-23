@@ -144,7 +144,7 @@ export function GuardrailAttachmentsSection({
           No guardrails defined in this project yet.{" "}
           {projectSlug ? (
             <Link
-              href="/settings/gateway/guardrails"
+              href="/gateway/guardrails"
               color="blue.solid"
               fontWeight="medium"
             >

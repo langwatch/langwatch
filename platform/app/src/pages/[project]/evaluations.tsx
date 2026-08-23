@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ExperimentType } from "@prisma/client";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Copy, MoreVertical } from "react-feather";
 import {
@@ -29,6 +29,7 @@ import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListP
 import { Link } from "~/components/ui/link";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { experimentContextChip } from "~/features/langy/logic/langyContextChips";
+import type { ExperimentType } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
@@ -70,7 +71,7 @@ export function ExperimentsPage() {
     },
     {
       enabled: !!project && router.isReady,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     },
@@ -85,9 +86,6 @@ export function ExperimentsPage() {
         toaster.create({
           title: "Experiment deleted",
           type: "success",
-          meta: {
-            closable: true,
-          },
         });
       },
       onError: (error) => {
@@ -97,9 +95,6 @@ export function ExperimentsPage() {
           description:
             "Please try again. If the problem persists, contact support.",
           type: "error",
-          meta: {
-            closable: true,
-          },
         });
       },
     },
@@ -503,7 +498,7 @@ export function ExperimentsPage() {
         }"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`}
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteExperimentMutation.isLoading}
+        loading={deleteExperimentMutation.isPending}
         onConfirm={() => {
           if (!experimentToDelete) return;
           deleteExperimentMutation.mutate(

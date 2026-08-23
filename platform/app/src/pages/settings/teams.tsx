@@ -20,7 +20,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -28,6 +28,7 @@ import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import {
@@ -39,6 +40,10 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { RouterOutputs } from "../../utils/api";
 import { api } from "../../utils/api";
+import {
+  isBindingRoleAllowedForOrganizationRole,
+  type TeamRoleValue,
+} from "../../utils/memberRoleConstraints";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
@@ -138,7 +143,7 @@ function AddToTeamDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -175,20 +180,42 @@ function AddToTeamDialog({
     [userItems],
   );
 
-  const allRoleItems = useMemo(
-    () => [
+  const selectedMemberRole = useMemo(
+    () =>
+      (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
+    [orgMembers.data, userId],
+  );
+
+  const allRoleItems = useMemo(() => {
+    const items = [
       ...BASE_ROLE_ITEMS,
       ...(customRoles.data ?? []).map((r) => ({
         label: r.name,
         value: `CUSTOM:${r.id}`,
       })),
-    ],
-    [customRoles.data],
-  );
+    ];
+    if (!selectedMemberRole) return items;
+    return items.filter((item) =>
+      isBindingRoleAllowedForOrganizationRole({
+        organizationRole: selectedMemberRole,
+        role: (item.value.startsWith("CUSTOM:")
+          ? `custom:${item.value.slice(7)}`
+          : item.value) as TeamRoleValue,
+      }),
+    );
+  }, [customRoles.data, selectedMemberRole]);
   const allRoleCollection = useMemo(
     () => createListCollection({ items: allRoleItems }),
     [allRoleItems],
   );
+
+  useEffect(() => {
+    if (selectedMemberRole !== OrganizationUserRole.EXTERNAL) return;
+    if (role !== "VIEWER" || customRoleId) {
+      setRole("VIEWER");
+      setCustomRoleId(undefined);
+    }
+  }, [selectedMemberRole, role, customRoleId]);
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -302,7 +329,7 @@ function AddToProjectDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -451,7 +478,7 @@ function ProjectSection({
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const { openDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -728,7 +755,7 @@ function TeamCard({
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const department = useDepartmentColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({

@@ -145,6 +145,27 @@ export const clearDrawerStack = () => {
 };
 
 /**
+ * The drawer currently on top of the stack, or `undefined` when nothing is
+ * stacked. A drawer that mounts from its own store rather than from the URL
+ * (the Trace Explorer) checks this before asking for a back navigation: the
+ * stack is module-global and outlives any single drawer, so going back on a
+ * stack that no longer describes the open drawer walks into an unrelated one.
+ */
+export const getTopDrawer = (): DrawerType | undefined =>
+  drawerStack[drawerStack.length - 1]?.drawer;
+
+/**
+ * The drawer the browser URL has open right now. `router.query` is a render
+ * snapshot and can lag a navigation that already landed, so a decision about
+ * what the reader is looking at *at this moment* reads the address bar.
+ */
+const openDrawerInLocation = (): DrawerType | undefined => {
+  if (typeof window === "undefined") return undefined;
+  const open = new URLSearchParams(window.location.search).get("drawer.open");
+  return (open ?? undefined) as DrawerType | undefined;
+};
+
+/**
  * Navigate to a drawer from module-level code (e.g., flow callbacks).
  * This is useful when the callback is captured from a component that may not be mounted.
  *
@@ -449,16 +470,13 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
-      // The Trace Explorer drawer is the default for every trace open, from
-      // every entry point — not only the call sites that go through
-      // useTraceDetailsDrawer. Only the legacy Traces page keeps the legacy
-      // drawer, so operators who deliberately navigated there get a coherent
-      // legacy view until the page is removed. See routeTraceDrawerForV2.
+      // The Trace Explorer drawer is where every trace open lands, from every
+      // entry point — not only the call sites that go through
+      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
       const { drawer: effectiveDrawer, props: effectiveProps } =
         routeTraceDrawerForV2(
           drawer,
           props as Record<string, unknown> | undefined,
-          router.pathname === "/[project]/messages",
         );
 
       // Extract urlParams and merge with props
@@ -489,11 +507,16 @@ export const useDrawer = () => {
         drawerStack.pop();
         drawerStack.push({ drawer: effectiveDrawer, params: allParams });
       } else {
-        // A drawer is already open - navigating forward, push to stack
-        // If stack is empty but currentDrawer exists (e.g., opened via direct URL),
-        // add currentDrawer to stack first so we can go back to it
-        if (drawerStack.length === 0 && currentDrawerNow) {
-          drawerStack.push({ drawer: currentDrawerNow, params: {} });
+        // A drawer is already open - navigating forward, push to stack.
+        // An empty stack means the open drawer came from a deep link or
+        // outlived a reload, so seed it from the URL the browser is actually
+        // on and back navigation can return there. It has to be the address
+        // bar and not the router snapshot: the snapshot can still name a
+        // drawer the reader has since dismissed, and seeding that one lets
+        // back navigation bring a dismissed drawer back.
+        if (drawerStack.length === 0) {
+          const openInUrl = openDrawerInLocation();
+          if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
         }
 
         // Snapshot current URL params for the top-of-stack drawer so goBack
@@ -508,6 +531,18 @@ export const useDrawer = () => {
           }
           topEntry.params = currentUrlParams;
         }
+
+        // A drawer appears in the stack once: opening one that is already in
+        // it returns to that entry instead of stacking a second copy. Drawers
+        // are non-modal, so the page behind one stays clickable. Without
+        // this, reading a trace, adding it to a dataset and then clicking
+        // another trace in the table leaves trace → dataset → trace, and
+        // closing that trace walks back into a dataset drawer the reader had
+        // already left behind.
+        const existingIndex = drawerStack.findIndex(
+          (entry) => entry.drawer === effectiveDrawer,
+        );
+        if (existingIndex !== -1) drawerStack.length = existingIndex;
 
         drawerStack.push({ drawer: effectiveDrawer, params: allParams });
       }

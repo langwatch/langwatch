@@ -38,24 +38,89 @@ func endpointFor(t *testing.T, srv *httptest.Server) app.Endpoint {
 
 // Agent.OpenSession must dial the EXTERNAL port (what CreateSession keys on); a
 // slip to InternalPort would silently point sessions at the wrong listener.
+// With nothing on disk (the list answers empty) it creates a fresh session.
 func TestAgent_OpenSession_UsesExternalPortAndReturnsID(t *testing.T) {
-	var gotPath string
+	var gotPaths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
+		gotPaths = append(gotPaths, r.Method+" "+r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`[]`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"id":"sess-xyz"}`))
 	}))
 	defer srv.Close()
 
-	id, err := NewAgent(time.Second).OpenSession(context.Background(), endpointFor(t, srv))
+	id, resumed, err := NewAgent(time.Second).OpenSession(context.Background(), endpointFor(t, srv))
 	if err != nil {
 		t.Fatalf("OpenSession: %v", err)
+	}
+	if resumed {
+		t.Error("resumed = true, want false for an empty session list")
 	}
 	if id != "sess-xyz" {
 		t.Errorf("session id = %q, want sess-xyz", id)
 	}
-	if gotPath != "/session" {
-		t.Errorf("path = %q, want /session", gotPath)
+	if len(gotPaths) != 2 || gotPaths[0] != "GET /session" || gotPaths[1] != "POST /session" {
+		t.Errorf("paths = %v, want [GET /session, POST /session]", gotPaths)
+	}
+}
+
+// The worker home outlives the process on an idle reap or a crash, and
+// opencode persists its sessions inside it. A respawn must RESUME the newest
+// one — no fresh session, so the manager also skips the history seed — and a
+// failed list must degrade to the fresh-session path rather than fail the
+// spawn.
+//
+// @scenario "A respawned worker resumes the session its home still holds"
+func TestAgent_OpenSession_ResumesNewestExistingSession(t *testing.T) {
+	var posts int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(
+				`[{"id":"sess-old","time":{"updated":100}},{"id":"sess-new","time":{"updated":200}}]`,
+			))
+			return
+		}
+		posts++
+		_, _ = w.Write([]byte(`{"id":"sess-fresh"}`))
+	}))
+	defer srv.Close()
+
+	id, resumed, err := NewAgent(time.Second).OpenSession(context.Background(), endpointFor(t, srv))
+	if err != nil {
+		t.Fatalf("OpenSession: %v", err)
+	}
+	if !resumed {
+		t.Error("resumed = false, want true when a session exists on disk")
+	}
+	if id != "sess-new" {
+		t.Errorf("session id = %q, want the newest sess-new", id)
+	}
+	if posts != 0 {
+		t.Errorf("created %d fresh sessions, want 0 on a resume", posts)
+	}
+}
+
+func TestAgent_OpenSession_FallsBackToCreateWhenListFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"sess-fresh"}`))
+	}))
+	defer srv.Close()
+
+	id, resumed, err := NewAgent(time.Second).OpenSession(context.Background(), endpointFor(t, srv))
+	if err != nil {
+		t.Fatalf("OpenSession: %v", err)
+	}
+	if resumed || id != "sess-fresh" {
+		t.Errorf("got (%q, %v), want a fresh sess-fresh", id, resumed)
 	}
 }
 

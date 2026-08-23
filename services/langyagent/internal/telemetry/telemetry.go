@@ -49,80 +49,65 @@ type Telemetry struct {
 // never fails: an instrument that can't be created falls back to a no-op so
 // telemetry is always safe to call.
 func New() *Telemetry {
-	meter := otel.Meter(instrumentationName)
-	t := &Telemetry{tracer: otel.Tracer(instrumentationName)}
+	f := instrumentFactory{
+		meter:    otel.Meter(instrumentationName),
+		fallback: noop.NewMeterProvider().Meter(instrumentationName),
+	}
+	return &Telemetry{
+		tracer:           otel.Tracer(instrumentationName),
+		workerSpawns:     f.int64Counter("langy.worker.spawns", "Count of worker spawn attempts, tagged by outcome."),
+		workerKills:      f.int64Counter("langy.worker.kills", "Count of worker kills, tagged by reason."),
+		workerExits:      f.int64Counter("langy.worker.exits", "Count of workers that exited on their own (crash / self-exit, not an explicit kill), tagged by cause."),
+		workersActive:    f.int64UpDownCounter("langy.workers.active", "Number of live workers in the pool."),
+		atCapacity:       f.int64Counter("langy.pool.at_capacity", "Count of requests rejected because MAX_WORKERS is reached."),
+		turnDuration:     f.float64Histogram("langy.turn.duration", "Wall-clock duration of a chat turn, tagged by outcome."),
+		spawnDuration:    f.float64Histogram("langy.worker.spawn_duration", "Wall-clock duration of a worker spawn, tagged by outcome."),
+		readinessSeconds: f.float64Histogram("langy.worker.readiness_duration", "Wall-clock time until a spawned worker's harness is ready, tagged by outcome."),
+	}
+}
 
-	var err error
-	fallback := noop.NewMeterProvider().Meter(instrumentationName)
+// instrumentFactory creates instruments on the real meter and downgrades each
+// failure to a no-op instrument (with a warning), so Telemetry construction
+// never fails.
+type instrumentFactory struct {
+	meter    metric.Meter
+	fallback metric.Meter
+}
 
-	if t.workerSpawns, err = meter.Int64Counter(
-		"langy.worker.spawns",
-		metric.WithDescription("Count of worker spawn attempts, tagged by outcome."),
-	); err != nil {
-		slog.Warn("langy telemetry: worker.spawns instrument", "err", err)
-		t.workerSpawns, _ = fallback.Int64Counter("langy.worker.spawns")
+func (f instrumentFactory) int64Counter(name, description string) metric.Int64Counter {
+	c, err := f.meter.Int64Counter(name, metric.WithDescription(description))
+	if err != nil {
+		slog.Warn("langy telemetry: instrument", "name", name, "err", err)
+		c, _ = f.fallback.Int64Counter(name)
 	}
-	if t.workerKills, err = meter.Int64Counter(
-		"langy.worker.kills",
-		metric.WithDescription("Count of worker kills, tagged by reason."),
-	); err != nil {
-		slog.Warn("langy telemetry: worker.kills instrument", "err", err)
-		t.workerKills, _ = fallback.Int64Counter("langy.worker.kills")
-	}
-	if t.workerExits, err = meter.Int64Counter(
-		"langy.worker.exits",
-		metric.WithDescription("Count of workers that exited on their own (crash / self-exit, not an explicit kill), tagged by cause."),
-	); err != nil {
-		slog.Warn("langy telemetry: worker.exits instrument", "err", err)
-		t.workerExits, _ = fallback.Int64Counter("langy.worker.exits")
-	}
-	if t.workersActive, err = meter.Int64UpDownCounter(
-		"langy.workers.active",
-		metric.WithDescription("Number of live workers in the pool."),
-	); err != nil {
-		slog.Warn("langy telemetry: workers.active instrument", "err", err)
-		t.workersActive, _ = fallback.Int64UpDownCounter("langy.workers.active")
-	}
-	if t.atCapacity, err = meter.Int64Counter(
-		"langy.pool.at_capacity",
-		metric.WithDescription("Count of requests rejected because MAX_WORKERS is reached."),
-	); err != nil {
-		slog.Warn("langy telemetry: pool.at_capacity instrument", "err", err)
-		t.atCapacity, _ = fallback.Int64Counter("langy.pool.at_capacity")
-	}
-	if t.turnDuration, err = meter.Float64Histogram(
-		"langy.turn.duration",
-		metric.WithUnit("s"),
-		metric.WithDescription("Wall-clock duration of a chat turn, tagged by outcome."),
-	); err != nil {
-		slog.Warn("langy telemetry: turn.duration instrument", "err", err)
-		t.turnDuration, _ = fallback.Float64Histogram("langy.turn.duration")
-	}
-	if t.spawnDuration, err = meter.Float64Histogram(
-		"langy.worker.spawn_duration",
-		metric.WithUnit("s"),
-		metric.WithDescription("Wall-clock duration of a worker spawn, tagged by outcome."),
-	); err != nil {
-		slog.Warn("langy telemetry: worker.spawn_duration instrument", "err", err)
-		t.spawnDuration, _ = fallback.Float64Histogram("langy.worker.spawn_duration")
-	}
-	if t.readinessSeconds, err = meter.Float64Histogram(
-		"langy.worker.readiness_duration",
-		metric.WithUnit("s"),
-		metric.WithDescription("Wall-clock time until a spawned worker's opencode is ready, tagged by outcome."),
-	); err != nil {
-		slog.Warn("langy telemetry: worker.readiness_duration instrument", "err", err)
-		t.readinessSeconds, _ = fallback.Float64Histogram("langy.worker.readiness_duration")
-	}
+	return c
+}
 
-	return t
+func (f instrumentFactory) int64UpDownCounter(name, description string) metric.Int64UpDownCounter {
+	c, err := f.meter.Int64UpDownCounter(name, metric.WithDescription(description))
+	if err != nil {
+		slog.Warn("langy telemetry: instrument", "name", name, "err", err)
+		c, _ = f.fallback.Int64UpDownCounter(name)
+	}
+	return c
+}
+
+// float64Histogram always records seconds; every histogram this package owns
+// is a wall-clock duration.
+func (f instrumentFactory) float64Histogram(name, description string) metric.Float64Histogram {
+	h, err := f.meter.Float64Histogram(name, metric.WithUnit("s"), metric.WithDescription(description))
+	if err != nil {
+		slog.Warn("langy telemetry: instrument", "name", name, "err", err)
+		h, _ = f.fallback.Float64Histogram(name)
+	}
+	return h
 }
 
 // StartTurn opens the per-turn span. Callers defer span.End(). turnID is the
 // control plane's idempotency key (so a trace pins to exactly one turn) and intent
 // is the caller's create/revive/continue worker-turn label.
 func (t *Telemetry) StartTurn(ctx context.Context, conversationID, turnID, intent string) (context.Context, trace.Span) {
-	return t.tracer.Start(ctx, "langy.turn",
+	return t.tracer.Start(ctx, "langy.turn", //nolint:spancheck // span is returned; the caller defers End()
 		trace.WithAttributes(
 			attribute.String("langy.conversation_id", conversationID),
 			attribute.String("langy.turn_id", turnID),
@@ -133,7 +118,7 @@ func (t *Telemetry) StartTurn(ctx context.Context, conversationID, turnID, inten
 
 // StartSpawn opens the worker-spawn span. Callers defer span.End().
 func (t *Telemetry) StartSpawn(ctx context.Context, conversationID string) (context.Context, trace.Span) {
-	return t.tracer.Start(ctx, "langy.worker.spawn",
+	return t.tracer.Start(ctx, "langy.worker.spawn", //nolint:spancheck // span is returned; the caller defers End()
 		trace.WithAttributes(attribute.String("langy.conversation_id", conversationID)),
 	)
 }
@@ -145,7 +130,7 @@ func (t *Telemetry) StartSpawn(ctx context.Context, conversationID string) (cont
 // method per phase. Callers defer span.End() and set any per-phase attribute (e.g.
 // the runner name) at the call site.
 func (t *Telemetry) StartPhase(ctx context.Context, name string) (context.Context, trace.Span) {
-	return t.tracer.Start(ctx, name)
+	return t.tracer.Start(ctx, name) //nolint:spancheck // span is returned; the caller defers End()
 }
 
 // TurnObserved records a completed turn's duration, outcome, and intent.

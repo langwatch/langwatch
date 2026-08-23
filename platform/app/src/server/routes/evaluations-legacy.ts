@@ -13,21 +13,23 @@
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
+import type { JsonArray } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
-import { bodyLimit } from "hono/body-limit";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
+import type { Project } from "~/generated/prisma/client";
+import {
+  CostReferenceType,
+  CostType,
+  ExperimentType,
+} from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
@@ -57,7 +59,10 @@ import {
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
-import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type CustomEvaluatorDefinition,
+  getEvaluatorDefaultSettings,
+} from "~/server/evaluations/getEvaluator";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -95,6 +100,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
+import { bodyLimit } from "./_lib/body-limit";
 import {
   datasetEvaluateRequestSchema,
   evaluateErrorSchema,
@@ -174,7 +180,7 @@ async function authenticateRequest(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the descriptor
@@ -340,7 +346,7 @@ secured.access(legacyEvaluationAuth).post(
       params = eSBatchEvaluationRESTParamsSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, payloadSize, projectId: project.id },
         "invalid log_results data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
@@ -377,11 +383,11 @@ secured.access(legacyEvaluationAuth).post(
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "failed to validate data for batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         const validationError = fromZodError(error);
         return c.json({ error: validationError.message }, 400);
@@ -396,11 +402,11 @@ secured.access(legacyEvaluationAuth).post(
         );
       } else {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "internal server error processing batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         return c.json(
           {
@@ -567,7 +573,7 @@ secured.access(legacyEvaluationAuth).post(
   describeRoute({
     summary: "Evaluate a dataset",
     description:
-      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.",
+      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
     tags: ["Datasets"],
     requestBody: {
       required: true,
@@ -609,8 +615,16 @@ secured.access(legacyEvaluationAuth).post(
           "application/json": { schema: resolver(evaluateErrorSchema) },
         },
       },
+      413: {
+        description:
+          "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+        content: {
+          "text/plain": { schema: { type: "string" } },
+        },
+      },
     },
   }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
@@ -638,7 +652,7 @@ secured.access(legacyEvaluationAuth).post(
       params = batchEvaluationInputSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, projectId: project.id },
         "invalid evaluation params received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
@@ -977,14 +991,15 @@ export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
 ): Promise<
-  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
+  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
+  | CustomEvaluatorDefinition
+  | undefined
 > => {
   const availableCustomEvaluators = await getCustomEvaluators({
     projectId,
   });
 
-  const customEntries: [string, { name: string; requiredFields: string[] }][] =
-    [];
+  const customEntries: [string, CustomEvaluatorDefinition][] = [];
   for (const evaluator of availableCustomEvaluators ?? []) {
     const dsl = evaluator.versions[0]?.dsl;
     if (!dsl) {
@@ -1053,6 +1068,29 @@ export const resolveEvaluatorSettingsDefaults = async (
 };
 
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
+
+/**
+ * The verdict fields of a `reportEvaluation` payload, gated on the run
+ * actually completing. A verdict is only real when the evaluator ran to
+ * completion — an errored/skipped run's stray passed/score/label must not
+ * reach analytics or triggers as a real result (#6833). Same gate as the
+ * shared verdictGate helpers applied at the executeEvaluation command
+ * boundary. Property presence is no defense: the custom-evaluator error
+ * path spreads the raw evaluator result, so score/passed survive on it.
+ */
+function gatedVerdictFields(result: {
+  status: string;
+  score?: number | null;
+  passed?: boolean | null;
+  label?: string | null;
+}): { score?: number; passed?: boolean; label?: string } {
+  if (result.status !== "processed") return {};
+  return {
+    score: typeof result.score === "number" ? result.score : undefined,
+    passed: result.passed ?? undefined,
+    label: result.label ?? undefined,
+  };
+}
 
 async function handleEvaluatorCall(
   c: Context,
@@ -1245,9 +1283,12 @@ async function handleEvaluatorCall(
     // flips silently on reroute. Narrow enough (and low-impact enough) to
     // document rather than special-case.
     const mergedSettings = {
+      // Custom evaluator definitions have no `settings` to derive defaults
+      // from — getEvaluatorDefaultSettings returns {} for that arm instead of
+      // crashing. (Workflow evaluators never reach it: this branch.)
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
-            evaluatorDefinition as any,
+            evaluatorDefinition,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),
@@ -1440,9 +1481,10 @@ async function handleEvaluatorCall(
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
         status: result!.status,
-        score: "score" in result! ? result!.score : undefined,
-        passed: "passed" in result! ? result!.passed : undefined,
-        label: "label" in result! ? result!.label : undefined,
+        // The custom-evaluator error path spreads the raw evaluator result
+        // (`{ ...result, status: "error" }`), so `"score" in result` is NOT
+        // protective here — gate on status instead (#6833).
+        ...gatedVerdictFields(result!),
         details: "details" in result! ? result!.details : undefined,
         costId: costId ?? null,
         occurredAt: Date.now(),
@@ -1480,6 +1522,11 @@ async function handleEvaluatorCall(
         ? {
             status: "skipped",
             details: result!.details,
+            // An evaluation that declines to score can still have spent
+            // money: the comparison judge pays for both of its passes before
+            // finding they disagree. Only the fields named here leave the
+            // boundary, so the cost is carried across explicitly.
+            ...(result!.cost ? { cost: result!.cost } : {}),
             ...(isGuardrail ? { passed: true } : {}),
           }
         : {
@@ -1703,10 +1750,7 @@ const dispatchToClickHouse = async (
           evaluatorType: evaluation.evaluator,
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
+          ...gatedVerdictFields(evaluation),
           details: evaluation.details ?? undefined,
           occurredAt: Date.now(),
         })

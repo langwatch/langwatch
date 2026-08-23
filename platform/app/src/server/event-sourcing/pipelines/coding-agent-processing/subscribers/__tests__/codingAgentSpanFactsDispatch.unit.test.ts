@@ -47,6 +47,7 @@ function rawSpanEvent({
   endMs = 2_000,
   statusCode = 0,
   traceId = TRACE_ID,
+  scopeName = "com.anthropic.claude_code.tracing",
 }: {
   name: string;
   spanId: string;
@@ -54,6 +55,8 @@ function rawSpanEvent({
   eventId?: string;
   resourceAttributes?: Record<string, string>;
   attributes?: Record<string, string | number>;
+  /** The instrumentation scope, which backs the gate for bare span names. */
+  scopeName?: string;
   startMs?: number;
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
@@ -94,7 +97,7 @@ function rawSpanEvent({
           value: { stringValue: value },
         })),
       },
-      instrumentationScope: { name: "com.anthropic.claude_code.tracing" },
+      instrumentationScope: { name: scopeName },
     },
   } as unknown as TraceProcessingEvent;
 }
@@ -255,6 +258,24 @@ function makeSubscriber(
 
 const context = { tenantId: "tenant-1", aggregateId: TRACE_ID };
 
+/**
+ * A coding-agent span whose body passes the raw name gate but that the
+ * normalizer cannot read, so the seam cannot lift it.
+ */
+function unliftableSpanEvent(): SpanReceivedEvent {
+  const event = rawSpanEvent({
+    name: "claude_code.tool",
+    spanId: "tool-broken",
+  }) as SpanReceivedEvent;
+  (event.data as { span: unknown }).span = {
+    name: "claude_code.tool",
+    spanId: "tool-broken",
+    startTimeUnixNano: {},
+    endTimeUnixNano: {},
+  };
+  return event;
+}
+
 describe("codingAgentSpanFactsDispatch", () => {
   describe("when a coding-agent span carries the session key", () => {
     /** @scenario a session assembles from spans, logs and metrics */
@@ -369,6 +390,190 @@ describe("codingAgentSpanFactsDispatch", () => {
             rawSpanEvent({ name: "openai.chat", spanId: "s-1" }),
           ),
         ).toBe(false);
+      });
+    });
+
+    describe("when the raw span is codex's bare-named turn span", () => {
+      it("passes the filter on the codex scope", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "session_task.turn",
+              spanId: "turn-1",
+              scopeName: "codex_exec",
+            }),
+          ),
+        ).toBe(true);
+      });
+
+      /** @scenario "a foreign span reusing codex's bare turn name is declined at the gate" */
+      it("fails the filter when the scope names no coding agent", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "session_task.turn",
+              spanId: "turn-2",
+              scopeName: "com.acme.pipeline",
+            }),
+          ),
+        ).toBe(false);
+      });
+
+      // handle_responses repeats the turn's token counts and stamps a tokio
+      // thread.id the session-key resolution would read as the session, so
+      // it is not a gated name at all.
+      it("fails the filter for handle_responses even on the codex scope", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "handle_responses",
+              spanId: "hr-1",
+              scopeName: "codex_exec",
+            }),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given the enqueue-time stage hook (ADR-069 R2)", () => {
+    describe("when a matched coding-agent span is staged", () => {
+      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      it("stages the lifted facts, not a pointer to the span", () => {
+        const { subscriber } = makeSubscriber();
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-lift",
+          attributes: { tool_name: "Bash", "session.id": "sess-1" },
+        });
+
+        const payload = subscriber.options?.enqueue?.stage?.(event);
+
+        const lifted = parseSpanFactsLiftedPayload(payload);
+        expect(lifted).not.toBeNull();
+        expect(lifted!.type).toBe(SPAN_FACTS_LIFTED_PAYLOAD_TYPE);
+        expect(lifted!.version).toBe(SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST);
+        expect(lifted!.data.facts.tool_name).toBe("Bash");
+        expect(lifted!.data.sessionId).toBe("sess-1");
+      });
+
+      // The point of the shape: a job that carries its result cannot race the
+      // sibling spanStorage write, because it never reads it.
+      /** @scenario work carrying its finished result completes without reading anything back */
+      it("resolves through the handler with no span-store read at all", async () => {
+        const { subscriber, dispatched, reads } = makeSubscriber(async () => {
+          throw new Error("the span store must not be read");
+        });
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-noread",
+          attributes: { tool_name: "Edit", "session.id": "sess-2" },
+        });
+
+        const payload = subscriber.options?.enqueue?.stage?.(event);
+        await subscriber.handle(staged(payload), context);
+
+        expect(reads).toHaveLength(0);
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.facts.tool_name).toBe("Edit");
+      });
+
+      // The staged payload must not grow with the span it came from: the
+      // vocabulary is closed, so large content stays in the canonical store.
+      /** @scenario a carried derivation never carries content */
+      it("carries the small facts and none of the span's content", () => {
+        const { subscriber } = makeSubscriber();
+        const bulk = "x".repeat(50_000);
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-fat",
+          attributes: { tool_name: "Bash", "gen_ai.prompt": bulk },
+        });
+
+        const payload = subscriber.options?.enqueue?.stage?.(event);
+
+        const lifted = parseSpanFactsLiftedPayload(
+          payload,
+        ) as SpanFactsLiftedPayload | null;
+        expect(lifted).not.toBeNull();
+        expect(JSON.stringify(lifted)).not.toContain(bulk);
+        expect(lifted!.data.facts["gen_ai.prompt"]).toBeUndefined();
+      });
+
+      // The dedup identity has to survive the shape change, or a redelivery
+      // staged by an older build stops collapsing onto the new one.
+      /** @scenario a redelivered event resolves to the unit of work already queued */
+      it("keys identically whether staged as a lift or as a claim-check", () => {
+        const { subscriber } = makeSubscriber();
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-dedup",
+          attributes: { tool_name: "Bash" },
+        });
+        // `deduplication` is the `"aggregate" | DeduplicationConfig` union;
+        // this subscriber uses the custom-key form. Narrowing here also stops
+        // the comparison below degrading into undefined === undefined, which
+        // would pass even if the subscriber stopped declaring a strategy.
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        const liftedId = dedup.makeId(
+          staged(subscriber.options?.enqueue?.stage?.(event)),
+        );
+        const referencedId = dedup.makeId(
+          staged(makeSpanReferencedPayload(event as SpanReceivedEvent)),
+        );
+
+        expect(liftedId).toBe(referencedId);
+        expect(liftedId).toContain("tool-dedup");
+      });
+    });
+
+    describe("when the span cannot be lifted at the seam", () => {
+      // The seam has no retry, so an unliftable span must degrade to the
+      // full-event path — never to a throw, and never to a claim-check, which
+      // is the racing shape this flip exists to stop producing.
+      /** @scenario an event whose payload cannot be pointed at is still processed */
+      it("stages the whole event rather than throwing on the routing path", () => {
+        const { subscriber } = makeSubscriber();
+        const event = unliftableSpanEvent();
+
+        const payload = subscriber.options?.enqueue?.stage?.(event);
+
+        expect(parseSpanFactsLiftedPayload(payload)).toBeNull();
+        expect((payload as { type?: string }).type).toBe(
+          SPAN_RECEIVED_EVENT_TYPE,
+        );
+      });
+
+      // The staged fallback is only safe if the handler can actually finish it.
+      // Normalization is a pure function of the span's bytes, so the full-event
+      // path re-derives the SAME failure: throwing there would spend all 25
+      // attempts and then park the trace's group, losing every other span's
+      // facts in that group — the exact class this change exists to remove.
+      // Driving `handle` is the point; asserting on the staged shape alone
+      // cannot observe it.
+      /** @scenario an event the subscriber declines is still completed quietly */
+      it("completes the staged fallback instead of retrying it into a blocked group", async () => {
+        const { subscriber, dispatched, reads } = makeSubscriber();
+        const payload = subscriber.options?.enqueue?.stage?.(
+          unliftableSpanEvent(),
+        );
+
+        await expect(
+          subscriber.handle(staged(payload), context),
+        ).resolves.toBeUndefined();
+
+        expect(dispatched).toHaveLength(0);
+        expect(reads).toHaveLength(0);
       });
     });
   });

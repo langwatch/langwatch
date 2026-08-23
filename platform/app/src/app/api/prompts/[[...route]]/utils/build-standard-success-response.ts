@@ -1,4 +1,4 @@
-import { resolver } from "hono-openapi/zod";
+import { resolver } from "hono-openapi";
 import type { ZodSchema } from "zod";
 
 import type { RouteResponse } from "../../../shared/types";

@@ -74,8 +74,19 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              {
+                "group": "Connect your agent",
+                "pages": [
+                  "agent-simulations/connect-your-agent",
+                  "agent-simulations/remote-traces",
+                  "agent-simulations/local-development",
+                  "agent-simulations/scenario-parameters",
+                  "agent-simulations/authenticated-agents"
+                ]
+              },
+              "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
-              "agent-simulations/authenticated-agents",
+              "agent-simulations/run-suites-from-ci",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -329,6 +340,27 @@
                     ]
                   },
                   {
+                    "group": "Capturing Images",
+                    "pages": [
+                      "integration/python/tutorials/capturing-images",
+                      "integration/typescript/tutorials/capturing-images"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Documents",
+                    "pages": [
+                      "integration/python/tutorials/capturing-documents",
+                      "integration/typescript/tutorials/capturing-documents"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Audio and Voice",
+                    "pages": [
+                      "integration/python/tutorials/capturing-audio",
+                      "integration/typescript/tutorials/capturing-audio"
+                    ]
+                  },
+                  {
                     "group": "Tracking LLM Costs",
                     "pages": [
                       "integration/python/tutorials/tracking-llm-costs",
@@ -456,6 +488,9 @@
             "group": "Tools",
             "pages": [
               "integration/tools/integrations/claude-code",
+              "integration/tools/integrations/openai-codex",
+              "integration/tools/integrations/github-copilot-cli",
+              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -636,6 +671,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -961,14 +997,7 @@
               {
                 "group": "RAG Quality",
                 "pages": [
-                  "api-reference/evaluators/ragas-answer-correctness",
-                  "api-reference/evaluators/ragas-answer-relevancy",
-                  "api-reference/evaluators/ragas-context-precision",
-                  "api-reference/evaluators/ragas-context-recall",
-                  "api-reference/evaluators/ragas-context-relevancy",
-                  "api-reference/evaluators/ragas-context-utilization",
                   "api-reference/evaluators/ragas-faithfulness",
-                  "api-reference/evaluators/ragas-faithfulness-1",
                   "api-reference/evaluators/ragas-response-context-precision",
                   "api-reference/evaluators/ragas-response-context-recall",
                   "api-reference/evaluators/ragas-response-relevancy",
@@ -1094,7 +1123,8 @@
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
               "api-reference/simulation-runs/list-list",
-              "api-reference/simulation-runs/get-simulation-runs"
+              "api-reference/simulation-runs/get-simulation-runs",
+              "api-reference/simulation-runs/get-batches"
             ]
           },
           {
@@ -1119,6 +1149,14 @@
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
               "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Coding Agents",
+            "pages": [
+              "api-reference/coding-agents/overview",
+              "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/list-coding-agent-session-events"
             ]
           },
           {
@@ -1251,11 +1289,102 @@
             ]
           },
           {
+            "group": "Organization",
+            "pages": [
+              "api-reference/organization/overview",
+              "api-reference/organization/get-organization",
+              "api-reference/organization/update-organization"
+            ]
+          },
+          {
+            "group": "Members",
+            "pages": [
+              "api-reference/members/overview",
+              "api-reference/members/list-members",
+              "api-reference/members/get-member",
+              "api-reference/members/get-member-access",
+              "api-reference/members/update-member",
+              "api-reference/members/remove-member"
+            ]
+          },
+          {
+            "group": "Invites",
+            "pages": [
+              "api-reference/invites/overview",
+              "api-reference/invites/list-invites",
+              "api-reference/invites/create-invites",
+              "api-reference/invites/revoke-invite"
+            ]
+          },
+          {
+            "group": "Roles",
+            "pages": [
+              "api-reference/roles/overview",
+              "api-reference/roles/list-permissions",
+              "api-reference/roles/list-roles",
+              "api-reference/roles/create-role",
+              "api-reference/roles/get-role",
+              "api-reference/roles/update-role",
+              "api-reference/roles/delete-role"
+            ]
+          },
+          {
+            "group": "Role Bindings",
+            "pages": [
+              "api-reference/role-bindings/overview",
+              "api-reference/role-bindings/list-role-bindings",
+              "api-reference/role-bindings/create-role-binding",
+              "api-reference/role-bindings/update-role-binding",
+              "api-reference/role-bindings/delete-role-binding"
+            ]
+          },
+          {
+            "group": "SCIM Tokens",
+            "pages": [
+              "api-reference/scim-tokens/overview",
+              "api-reference/scim-tokens/list-scim-tokens",
+              "api-reference/scim-tokens/create-scim-token",
+              "api-reference/scim-tokens/revoke-scim-token"
+            ]
+          },
+          {
+            "group": "SCIM",
+            "pages": [
+              "api-reference/scim/overview",
+              "api-reference/scim/service-provider-config",
+              "api-reference/scim/resource-types",
+              "api-reference/scim/schemas",
+              "api-reference/scim/list-users",
+              "api-reference/scim/create-user",
+              "api-reference/scim/get-user",
+              "api-reference/scim/replace-user",
+              "api-reference/scim/update-user",
+              "api-reference/scim/delete-user",
+              "api-reference/scim/list-groups",
+              "api-reference/scim/create-group",
+              "api-reference/scim/get-group",
+              "api-reference/scim/replace-group",
+              "api-reference/scim/update-group",
+              "api-reference/scim/delete-group"
+            ]
+          },
+          {
+            "group": "Organizations (Self-Hosted)",
+            "pages": [
+              "api-reference/organizations/overview",
+              "api-reference/organizations/list-organizations",
+              "api-reference/organizations/create-organization",
+              "api-reference/organizations/get-organization"
+            ]
+          },
+          {
             "group": "API Keys",
             "pages": [
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/get-api-key",
+              "api-reference/api-keys/update-api-key",
               "api-reference/api-keys/revoke-api-key"
             ]
           },
@@ -1391,7 +1520,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786100755",
+      "source": "/ci/cache/busted/1787409592",
       "destination": "/"
     },
     {

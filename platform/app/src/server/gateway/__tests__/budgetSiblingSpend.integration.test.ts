@@ -25,14 +25,14 @@ import {
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
 
@@ -94,6 +94,11 @@ function servedRequest(options: {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       reasoning_tokens: 0,
+      cache_creation_1h_tokens: 0,
+      input_audio_tokens: 0,
+      output_audio_tokens: 0,
+      input_chars: 0,
+      audio_ms: 0,
     },
     cost_nano_usd: COST_USD * NANO_USD_PER_USD,
     rate_version: "catalog@test",
@@ -178,6 +183,11 @@ async function listedSpentUsdFor(budgetIds: string[]): Promise<string[]> {
     (id) => listed.find((b) => b.id === id)?.spentUsd.toString() ?? "missing",
   );
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 beforeAll(async () => {
   await startTestContainers();
@@ -307,7 +317,7 @@ beforeAll(async () => {
   });
 
   chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   });

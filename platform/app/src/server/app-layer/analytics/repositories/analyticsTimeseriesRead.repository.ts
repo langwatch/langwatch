@@ -42,6 +42,39 @@ export interface RunTimeseriesParams {
   readonly series: readonly SeriesInputType[];
   readonly groupBy?: string;
   readonly originalTimeScale?: number | "full";
+  /**
+   * Hard ceiling on rows this query may return, enforced by ClickHouse itself
+   * ({@link maxResultRowsSettings}). Omitted for interactive reads, which a
+   * human is waiting on and whose shape the UI already bounds.
+   */
+  readonly maxResultRows?: number;
+}
+
+/**
+ * ClickHouse settings that make an oversized result a fast query ERROR rather
+ * than a client-side memory event.
+ *
+ * The time axis of a timeseries is already capped (`adjustTimeScaleForBucketCap`
+ * — 1,000 buckets). The GROUP BY axis is not: its cardinality comes from the
+ * data, so `buckets x distinct values` is unbounded, and every row is
+ * materialised into JS objects by `result.json()` before any caller can measure
+ * it. A post-hoc row count cannot help — the memory is already spent by the
+ * time it could run. Only the server can refuse cheaply, so the ceiling belongs
+ * here.
+ *
+ * `result_overflow_mode: "throw"` is the load-bearing half. ClickHouse's
+ * DEFAULT is `break`, which silently returns a TRUNCATED result — for the
+ * graph-alert evaluator that would mean thresholds quietly computed on partial
+ * data, which is worse than a failed evaluation because nothing reports it.
+ */
+export function maxResultRowsSettings(
+  maxResultRows: number | undefined,
+): Record<string, number | string> {
+  if (maxResultRows === undefined) return {};
+  return {
+    max_result_rows: maxResultRows,
+    result_overflow_mode: "throw",
+  };
 }
 
 type TimeseriesBuilder = (input: AnalyticsTimeseriesBuilderInput) => {
@@ -85,7 +118,14 @@ class AnalyticsTimeseriesClickHouseReadRepository
         query: sql,
         query_params: queryParams,
         format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+        clickhouse_settings: {
+          ...ANALYTICS_CLICKHOUSE_SETTINGS,
+          // Attributes this read in `clickhouse_result_rows` AND in
+          // `system.query_log`. `targetLabel` is one of four compile-time
+          // constants, so the label set stays closed.
+          log_comment: `analytics:timeseries:${this.targetLabel}`,
+          ...maxResultRowsSettings(params.maxResultRows),
+        },
       });
       const rows = (await result.json()) as AnalyticsTimeseriesRow[];
       return parseTimeseriesRows({
@@ -95,7 +135,7 @@ class AnalyticsTimeseriesClickHouseReadRepository
         timeScale: params.originalTimeScale,
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId: params.tenantId,
           error: error instanceof Error ? error.message : String(error),

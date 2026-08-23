@@ -30,7 +30,8 @@ const virtualKey = (id: string): VirtualKey => ({
   purpose: "user",
   display_prefix: `vk-lw-${id}`,
   principal_user_id: null,
-  trace_project_id: null,
+  trace_project_id: "proj_1",
+  trace_project_archived: false,
   scopes: [{ scope_type: "project", scope_id: "proj_1" }],
   routing_policy_id: null,
   routing_mode: "none",
@@ -40,6 +41,7 @@ const virtualKey = (id: string): VirtualKey => ({
   updated_at: "2026-06-01T00:00:00.000Z",
   last_used_at: null,
   revoked_at: null,
+  expires_at: null,
 });
 
 const page = (ids: string[], next_cursor: string | null): unknown => ({

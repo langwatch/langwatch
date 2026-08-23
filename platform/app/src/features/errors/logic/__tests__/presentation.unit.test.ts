@@ -97,6 +97,37 @@ describe("explainHandledError", () => {
 
       expect(description).toBe("");
     });
+
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
+    it.each([
+      ["chat", "POST /v1/chat/completions"],
+      ["messages", "POST /v1/messages"],
+      ["responses", "POST /v1/responses"],
+      ["embeddings", "POST /v1/embeddings"],
+      ["speech", "POST /v1/audio/speech"],
+      ["transcription", "multipart form"],
+      ["passthrough", "Gemini request URL"],
+    ])("explains where a %s request expects its model", (requestType, expected) => {
+      const { description } = explainHandledError(
+        shape({ code: "missing_model", meta: { request_type: requestType } }),
+      );
+
+      expect(description).toContain(expected);
+    });
+
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
+    it("uses surface-neutral missing-model copy for an unknown request type", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "missing_model",
+          meta: { request_type: "future_surface" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Set the model where this endpoint expects it, then try again.",
+      );
+    });
   });
 
   describe("when a seat allowance is what ran out", () => {
@@ -288,6 +319,58 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a mediated LLM call the gateway forwarded from a provider", () => {
+    const reason = (code: string) => ({ code, kind: code });
+
+    /** @scenario "A provider-refused credential gets its own remediation copy" */
+    it.each([
+      "upstream_unauthorized",
+      "upstream_forbidden",
+    ])("explains a %s reason as a rejected credential", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("key or its permissions");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("upstream_rate_limited")],
+        }),
+      );
+
+      expect(description).toContain("rate-limiting");
+    });
+
+    /** @scenario "A provider outage gets its own remediation copy" */
+    it.each([
+      "upstream_unavailable",
+      "upstream_timeout",
+    ])("explains a %s reason as a provider outage", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("temporarily unavailable");
+    });
+
+    /** @scenario "An unrecognised upstream reason falls back to the generic retry line" */
+    it("falls back to the generic line for a reason it does not classify", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("some_new_provider_code")],
+        }),
+      );
+
+      expect(description).toBe("Try again, or pick a different model.");
+    });
+  });
+
   describe("given a validation error naming fields", () => {
     it("never names a field the customer can't see", () => {
       // zod flattens to the INPUT SCHEMA's keys, so every procedure's
@@ -346,6 +429,27 @@ describe("explainHandledError", () => {
       expect(description).toBe(
         "Map all of its required fields before running it.",
       );
+    });
+
+    it("names the model when the rejected field is the per-send modelOverride", () => {
+      // The Langy composer sends the picked model as `modelOverride`; the
+      // customer is looking at a model picker, so the card says "the model".
+      const { title, description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: {
+              modelOverride: [
+                "modelOverride must be in 'provider/model' shape",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("There's a problem with the model.");
     });
 
     it("names them the way the screen does, not the way the schema does", () => {

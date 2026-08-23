@@ -15,6 +15,14 @@
  *  - `file_data`    → OpenAI ChatCompletion file payloads
  *  - `mediaType`    → AI-SDK file/image parts
  *  - `mimeType`     → AG-UI binary parts and media source shapes
+ *  - `media_type`   → Anthropic image/document blocks with a base64 source
+ *  - `mime_type`    → Gemini and Vertex `inline_data` parts
+ *
+ * The two underscore spellings are separate entries on purpose: they are not
+ * substrings of the camelCase ones, so a payload naming only `media_type`
+ * matched nothing before. Instrumentation for the Anthropic and Google SDKs
+ * records the request as the customer wrote it, which is where those
+ * spellings come from.
  *
  * A rare false positive (e.g. ordinary JSON that mentions `mediaType`) costs
  * one JSON.parse and a walk that finds no parts — cheap and harmless.
@@ -25,6 +33,8 @@ const MEDIA_MARKERS = [
   "file_data",
   "mediaType",
   "mimeType",
+  "media_type",
+  "mime_type",
 ] as const;
 
 export function containsMediaMarkers(value: string): boolean {

@@ -7,9 +7,13 @@
 
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { Prisma, PrismaClient, SimulationSuite } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
+import type {
+  Prisma,
+  PrismaClient,
+  SimulationSuite,
+} from "~/generated/prisma/client";
 import { ARCHIVED_SLUG_SUFFIX } from "./constants";
 
 const tracer = getLangWatchTracer("langwatch.suites.repository");

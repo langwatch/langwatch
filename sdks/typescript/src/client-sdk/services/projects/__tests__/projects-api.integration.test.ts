@@ -171,6 +171,7 @@ describe("ProjectsApiService", () => {
         );
       });
 
+      /** @scenario Creating a project from the SDK returns the service API key minted with it */
       it("creates project and returns service API key", async () => {
         const result = await service.create({
           name: "New Project",

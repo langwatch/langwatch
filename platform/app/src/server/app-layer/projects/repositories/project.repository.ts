@@ -1,10 +1,29 @@
-import type { Project, Team } from "@prisma/client";
+import type { Project, Team } from "~/generated/prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 
 export type UpdateProjectMetadataInput = {
   id: string;
   data: { firstMessage: boolean; integrated: boolean; language: string };
+};
+
+/**
+ * One touch of a coding-agent recency column, under a staleness guard.
+ *
+ * `staleBefore` is what keeps the write rare. Both columns feed a recency
+ * window measured in days, so recording the exact moment of every session and
+ * every mapped pull request would buy nothing and cost one row update per fold
+ * on a busy project. The caller names how stale the stored value has to be
+ * before it is worth rewriting, and the repository does the whole decision in
+ * the database: a row whose stored value is still newer than `staleBefore`
+ * matches no filter and is not written at all.
+ */
+export type TouchCodingAgentActivityInput = {
+  projectId: string;
+  /** The moment being recorded. */
+  at: Date;
+  /** Write only when the stored value is null or at or before this. */
+  staleBefore: Date;
 };
 
 export interface CreateProjectInput {
@@ -73,6 +92,20 @@ export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void>;
+  /**
+   * Record that a coding-agent session was folded for this project, unless the
+   * stored moment is still newer than `staleBefore`.
+   */
+  touchCodingAgentSessionSeen(
+    input: TouchCodingAgentActivityInput,
+  ): Promise<void>;
+  /**
+   * Record that a pull request was mapped for a branch a session in this
+   * project ran on, under the same staleness guard.
+   */
+  touchCodingAgentPullRequestSeen(
+    input: TouchCodingAgentActivityInput,
+  ): Promise<void>;
   getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
   /**
    * Returns the presence-enabled flags for a project + its org, or null when
@@ -105,6 +138,12 @@ export interface ProjectRepository {
     organizationId: string;
     page: number;
     limit: number;
+    /**
+     * When set, restricts the listing (and its total) to these project ids —
+     * the filtered listing a credential without organization-wide
+     * `project:view` receives. An empty array lists nothing.
+     */
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>>;
   findBySlugInTeam(params: {
     slug: string;
@@ -135,6 +174,18 @@ export class NullProjectRepository implements ProjectRepository {
   }
 
   async updateMetadata(_input: UpdateProjectMetadataInput): Promise<void> {
+    // no-op
+  }
+
+  async touchCodingAgentSessionSeen(
+    _input: TouchCodingAgentActivityInput,
+  ): Promise<void> {
+    // no-op
+  }
+
+  async touchCodingAgentPullRequestSeen(
+    _input: TouchCodingAgentActivityInput,
+  ): Promise<void> {
     // no-op
   }
 
@@ -181,6 +232,7 @@ export class NullProjectRepository implements ProjectRepository {
     organizationId: string;
     page: number;
     limit: number;
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
   }

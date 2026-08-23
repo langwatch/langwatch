@@ -2,12 +2,13 @@
  * Unit tests for the app-layer AnalyticsService (ADR-034 Phase 3 rewrite).
  *
  * Drives the service with stub repositories + a stub legacy backend so the
- * test exercises ONLY the orchestration logic — flag check, routing, dispatch
- * — without touching ClickHouse, Prisma, or the feature flag service.
+ * test exercises ONLY the orchestration logic — routing and dispatch —
+ * without touching ClickHouse, Prisma, or the feature flag service.
  *
- * The default mock sets the feature flag to OFF, so getTimeseries goes
- * through the legacy shim. Routed paths get separate coverage via the
- * route-table unit + integration tests.
+ * `release_event_sourced_analytics_read` is gone: it is permanently on, so the
+ * service no longer asks. Which table answers a query is purely a function of
+ * the query's SHAPE, and the legacy shim still serves the shapes the slim and
+ * rollup builders cannot express. The only flag left here is the tripwire.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,16 +25,14 @@ vi.mock("~/server/featureFlag", () => ({
 const isEnabled = vi.mocked(featureFlagService.isEnabled);
 
 /**
- * Turn the read flag on (and, optionally, the tripwire flag). The service
- * resolves them by name, so key off the flag string rather than call order.
+ * Turn the tripwire flag on. The service resolves flags by name, so key off
+ * the flag string rather than call order.
  */
-function enableReadFlag({ tripwire = false }: { tripwire?: boolean } = {}) {
-  isEnabled.mockImplementation(async (flag: string) => {
-    if (flag === "release_event_sourced_analytics_read") return true;
-    if (flag === "release_event_sourced_analytics_read_tripwire")
-      return tripwire;
-    return false;
-  });
+function enableTripwire() {
+  isEnabled.mockImplementation(
+    async (flag: string) =>
+      flag === "release_event_sourced_analytics_read_tripwire",
+  );
 }
 
 function fakeResult(value: number): TimeseriesResult {
@@ -114,19 +113,19 @@ describe("AnalyticsService", () => {
       timeZone: "UTC",
     };
 
-    it("falls back to the legacy trace_summaries shim when the flag is OFF", async () => {
-      const { deps, spies } = makeDeps();
-      const service = new AnalyticsService(deps);
+    // Routing must not consult the feature-flag service at all any more: a
+    // flag read per query bought nothing once the flag was permanently on,
+    // and leaving the call in invites the OFF branch growing back.
+    it("routes without asking whether the event-sourced read flag is on", async () => {
+      const { deps } = makeDeps();
 
-      const result = await service.getTimeseries(input);
+      await new AnalyticsService(deps).getTimeseries(input);
 
-      expect(result.currentPeriod).toHaveLength(1);
-      expect(spies.runLegacy).toHaveBeenCalledTimes(1);
-      expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
-      expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+      const flagsAsked = isEnabled.mock.calls.map(([flag]) => flag);
+      expect(flagsAsked).not.toContain("release_event_sourced_analytics_read");
     });
 
-    describe("when release_event_sourced_analytics_read is ON", () => {
+    describe("when the query shape decides the table", () => {
       const sumCost = {
         ...input,
         series: [
@@ -136,8 +135,6 @@ describe("AnalyticsService", () => {
           },
         ],
       };
-
-      beforeEach(() => enableReadFlag());
 
       it("dispatches an ungrouped additive sum to the rollup repository", async () => {
         const { deps, spies } = makeDeps();
@@ -195,7 +192,7 @@ describe("AnalyticsService", () => {
     });
 
     describe("when the tripwire flag is ON", () => {
-      beforeEach(() => enableReadFlag({ tripwire: true }));
+      beforeEach(() => enableTripwire());
 
       it("runs BOTH the routed query and the legacy query, returning the routed one", async () => {
         const { deps, spies } = makeDeps();

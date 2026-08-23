@@ -1,8 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
+import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardOrganizationId,
   ORG_SCOPED_MODEL_NAMES,
@@ -16,22 +18,9 @@ import {
  * partition test keeps the regime classification honest as the schema grows.
  */
 
-async function runGuard(
-  params: Partial<Prisma.MiddlewareParams> & {
-    model: string;
-    action: Prisma.MiddlewareParams["action"];
-    args: Prisma.MiddlewareParams["args"];
-  },
-): Promise<unknown> {
+async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
-  return guardOrganizationId(
-    {
-      dataPath: [],
-      runInTransaction: false,
-      ...params,
-    } as Prisma.MiddlewareParams,
-    next,
-  );
+  return guardOrganizationId(params, next);
 }
 
 describe("guardOrganizationId — original three models preserved", () => {
@@ -301,6 +290,120 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
   });
 });
 
+describe("guardOrganizationId — the GitHub connection's tables", () => {
+  describe("when looking a pull request up by repository alone", () => {
+    it("THROWS — a repository name is not unique across organizations", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when the same lookup names the organization", () => {
+    it("does NOT throw — the query is bounded to one tenant", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org-1",
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when sweeping branch checks due for a recheck", () => {
+    it("THROWS without an organization, resolves with one", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: { notFoundAt: { not: null } } },
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: {
+            where: { organizationId: "org-1", notFoundAt: { not: null } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the background sweep reads every organization's due branches", () => {
+    const sweepWhere = () => ({
+      notFoundAt: { not: null },
+      recheckAfter: { lte: new Date() },
+      lastRequestedAt: { gt: new Date(Date.now() - 7 * 86_400_000) },
+    });
+
+    it("does NOT throw, the sweep's own shape is the bound", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: sweepWhere() },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("THROWS when the same shape is replayed as a write", async () => {
+      for (const action of ["updateMany", "deleteMany"] as const) {
+        await expect(
+          runGuard({
+            model: "GithubBranchPullRequestCheck",
+            action,
+            args: { where: sweepWhere() },
+          }),
+        ).rejects.toThrow();
+      }
+    });
+
+    it("THROWS when the activity clause is dropped, widening the read", async () => {
+      const { lastRequestedAt: _dropped, ...narrower } = sweepWhere();
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: narrower },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when reading the connection by its GitHub installation id", () => {
+    it("does NOT throw — an installation id names exactly one organization", async () => {
+      await expect(
+        runGuard({
+          model: "GithubInstallation",
+          action: "findUnique",
+          args: { where: { installationId: "555" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 describe("guardOrganizationId — unguarded models are ignored", () => {
   describe("when querying a model not in the org-scoped regime", () => {
     it("does NOT throw — Project is governed by guardProjectId, not here", async () => {
@@ -323,10 +426,8 @@ describe("guardOrganizationId — unguarded models are ignored", () => {
  * tenancy decision instead of a silent leak.
  */
 describe("organization-tenancy regime partition", () => {
-  const orgBearingModels = Prisma.dmmf.datamodel.models
-    .filter((model) =>
-      model.fields.some((field) => field.name === "organizationId"),
-    )
+  const orgBearingModels = parsePrismaDatamodel()
+    .filter((model) => model.fields.includes("organizationId"))
     .map((model) => model.name);
 
   it("covers every org-bearing model with exactly one regime", () => {
@@ -383,13 +484,7 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
         updateMany: async (args: unknown) => {
           calls.push(args);
           return guardOrganizationId(
-            {
-              model: "ApiKey",
-              action: "updateMany",
-              args,
-              dataPath: [],
-              runInTransaction: false,
-            } as Prisma.MiddlewareParams,
+            { model: "ApiKey", action: "updateMany", args },
             async () => ({ count: rowsAffected }),
           );
         },
@@ -543,6 +638,102 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
           args: {
             where: { name: { contains: "Langy session" } },
             data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+});
+
+describe("guardOrganizationId — the migration rollout's enrollment rows", () => {
+  /**
+   * A Prisma stand-in that installs the SAME middleware the real client does
+   * (`db.ts` → `prisma.$use(guardOrganizationId)`), so every call the real
+   * repository makes is subject to the guard exactly as it is in production.
+   * No database: the guard is a pure function of the query arguments.
+   *
+   * The repository's reads are what this exists to drive. They were admitted
+   * only alongside a `stage` predicate; enrollment then went per-migration and
+   * dropped that column, and nothing failed, because no test put the repository
+   * and the guard in the same room. The ops page and every migration pass threw
+   * in production instead. Driving the ACTUAL repository through the ACTUAL
+   * middleware means drift on either side fails here.
+   */
+  function guardedEnrollmentRepository() {
+    const calls: Array<{ action: string; args: unknown }> = [];
+    const through = (action: string) => async (args: unknown) => {
+      calls.push({ action, args });
+      return guardOrganizationId(
+        { model: "SystemMigrationEnrollment", action, args },
+        async () => [],
+      );
+    };
+    const prisma = {
+      systemMigrationEnrollment: {
+        findMany: through("findMany"),
+        findUnique: through("findUnique"),
+        groupBy: through("groupBy"),
+        create: through("create"),
+        delete: through("delete"),
+      },
+      organization: { findMany: async () => [], findUnique: async () => null },
+      user: { findMany: async () => [] },
+    };
+    return {
+      repository: new PrismaSystemMigrationEnrollmentRepository(
+        prisma as unknown as PrismaClient,
+      ),
+      calls,
+    };
+  }
+
+  describe("when the ops page lists every enrollment", () => {
+    it("passes the guard — the listing is platform-scope by design", async () => {
+      const { repository, calls } = guardedEnrollmentRepository();
+
+      await expect(repository.findAll()).resolves.toEqual([]);
+
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe("when a migration pass reads the organizations it processes", () => {
+    it("passes the guard — one read covers every tenant and every migration", async () => {
+      const { repository } = guardedEnrollmentRepository();
+
+      await expect(
+        repository.findEnrolledOrganizationIdsByMigration(),
+      ).resolves.toEqual(new Map());
+    });
+  });
+
+  describe("when the rollout gauge counts enrollments per migration", () => {
+    it("passes the guard — the groupBy reads across organizations", async () => {
+      const { repository } = guardedEnrollmentRepository();
+
+      await expect(repository.countEnrolledByMigration()).resolves.toEqual(
+        new Map(),
+      );
+    });
+  });
+
+  describe("when a bulk write names a migration but no organization", () => {
+    it("THROWS — the hatch is granted to reads, never to a fleet-wide withdrawal", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationEnrollment",
+          action: "deleteMany",
+          args: { where: { migrationName: "authz-cutover" } },
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        runGuard({
+          model: "SystemMigrationEnrollment",
+          action: "updateMany",
+          args: {
+            where: { migrationName: "authz-cutover" },
+            data: { migrationName: "authz-team-user-backfill" },
           },
         }),
       ).rejects.toThrow();

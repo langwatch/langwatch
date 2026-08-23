@@ -188,10 +188,85 @@ export interface ScheduledJobRepository {
     targetType: string;
   }): Promise<ScheduledJobRecord[]>;
 
+  // ── Operator control (ADR-091) ──────────────────────────────────────
+  //
+  // Cross-tenant, like `listForOps`, and gated at the router on `ops:manage`.
+  // Every mutation carries `projectId` alongside the id: these are the only
+  // writes in the codebase that reach a project-level row without a tenant in
+  // scope, so the predicate is what keeps a stale or guessed id from touching
+  // another project's schedule.
+  //
+  // `releaseSlotForOps` and `requestImmediateRunForOps` are additionally
+  // CONDITIONAL on `expectedNextRunAt` for the same reason `claim` is: it is
+  // the row's fencing token. An operator acting on a row the loop has since
+  // claimed affects zero rows and is told so, rather than overwriting a live
+  // lease. `setActiveForOps` is not fenced that way — see its own note.
+
+  /** One schedule by id, across projects. Null when it no longer exists. */
+  findByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
+
+  /** Pause or resume a schedule. Never touches an in-flight slot. */
+  setActiveForOps(params: {
+    id: string;
+    projectId: string;
+    active: boolean;
+  }): Promise<boolean>;
+
+  /**
+   * Release a slot whose worker never settled it, and make the schedule
+   * claimable again.
+   *
+   * Clears `currentSlot` and the retry bookkeeping, and pulls `nextRunAt` to
+   * now so the next due-scan picks the row up. Guarded on the lease instant the
+   * operator was looking at.
+   */
+  releaseSlotForOps(params: {
+    id: string;
+    projectId: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean>;
+
+  /**
+   * Make a schedule due immediately.
+   *
+   * Deliberately does NOT claim or execute: pulling `nextRunAt` to now hands
+   * the slot to the ordinary due-scan, so the calendar loop claims it through
+   * `claim` and runs it through the same path a scheduled fire takes —
+   * inheriting its exactly-once lease, retry ladder and settlement. Racing the
+   * loop is therefore safe: whichever of the two conditional updates lands
+   * first wins, and the loser affects zero rows.
+   */
+  requestImmediateRunForOps(params: {
+    id: string;
+    projectId: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean>;
+
+  // Refuses while a slot is claimed — see the note on the implementation. A
+  // leased `nextRunAt` looks like an ordinary future timestamp, so without that
+  // predicate an operator can re-arm a schedule whose worker is mid-run and the
+  // target delivers twice.
+
   /**
    * Cross-tenant read for the ops dashboard: the most-imminent scheduled jobs
    * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only
    * operator visibility — never a firing path.
    */
   listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
+
+  /**
+   * Cross-tenant read of the schedules that are switched OFF, with the total
+   * so a bounded page can say what it left out.
+   *
+   * Deliberately not a filter over `listForOps`: that read orders
+   * `active DESC`, which sorts inactive rows to the very end, so any caller
+   * filtering its bounded page client-side finds zero paused schedules the
+   * moment the fleet has more schedules than the page holds — while appearing
+   * to report on all of them.
+   */
+  listPausedForOps(params: {
+    limit: number;
+  }): Promise<{ rows: ScheduledJobRecord[]; total: number }>;
 }

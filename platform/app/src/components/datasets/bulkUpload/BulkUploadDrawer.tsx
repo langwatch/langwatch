@@ -552,8 +552,8 @@ function BulkFileRow({
     {
       enabled: isPolling,
       refetchOnWindowFocus: false,
-      refetchInterval: (data: { status?: string } | null | undefined) =>
-        data?.status === "processing" ? 3000 : false,
+      refetchInterval: (query) =>
+        query.state.data?.status === "processing" ? 3000 : false,
     },
   );
   const polledStatus = statusQuery.data?.status;

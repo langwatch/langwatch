@@ -1,10 +1,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { AnnotationService } from "~/server/annotations/annotation.service";
+import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
+import { getApp } from "~/server/app-layer/app";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -15,7 +18,9 @@ import {
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
+import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -58,6 +63,7 @@ import type {
   TopicCountsResult,
   TraceDateField,
   TracesForProjectResult,
+  TraceWithGuardrail,
 } from "./types";
 
 /**
@@ -101,6 +107,23 @@ interface ClickHouseScrollCursor {
   sortDirection: "asc" | "desc";
   /** Time axis the cursor pages on. Absent = legacy "occurred". */
   dateField?: TraceDateField;
+  /**
+   * Epoch ms at which this scroll started, pinned on the first page and carried
+   * unchanged through every later one. Updated-axis only.
+   *
+   * UpdatedAt is a mutable sort key, so without this the dedup re-resolves each
+   * trace to its CURRENT latest version on every page while the cursor still
+   * points at a position computed from an earlier one. A trace bumped above the
+   * cursor mid-scroll then matches no page — later thresholds only move further
+   * away — and is dropped from the scroll entirely. Capping the dedup at this
+   * timestamp makes every page resolve the same versions the first page saw, so
+   * the trace keeps its original position and is still delivered; the newer
+   * version belongs to the next incremental window.
+   *
+   * Absent on cursors minted before this field existed — those keep the old
+   * uncapped behaviour rather than breaking mid-scroll on deploy.
+   */
+  scrollStart?: number;
 }
 
 /**
@@ -186,6 +209,27 @@ const JOINED_SPAN_READ_SETTINGS = {
 const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
+
+/**
+ * How many spans the traces-with-spans OOM fallback will hold in memory before
+ * it gives up on the read.
+ *
+ * The fallback re-runs a memory-capped ClickHouse query in batches of 25 and
+ * merges every batch into one map. That bounds ClickHouse's peak memory and
+ * not ours: the same full result set is materialised, just on this side of the
+ * socket. On 2026-08-12..16 that turned a single MEMORY_LIMIT_EXCEEDED on a
+ * 980-trace read into 50 V8 heap deaths — the whole worker fleet, 16:48 UTC,
+ * every day, because every pod ran the same sweep at the same time.
+ *
+ * The read that triggers the fallback has ALREADY failed once in ClickHouse, so
+ * refusing it here costs that caller nothing it had: it fails either way. What
+ * it buys is that the failure stays inside one job instead of taking the
+ * process — a failed job is retried and visible, a dead pod is neither.
+ *
+ * Sized well above any legitimate trace-detail read (10k spans is one very
+ * large trace) and far below a heap-filling sweep.
+ */
+const MAX_SPANS_PER_JOINED_FALLBACK = 50_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
 const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -362,20 +406,38 @@ export class ClickHouseTraceService {
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
-  ) {
+  private readonly prisma: PrismaClient;
+
+  constructor({
+    prisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver,
+  }: {
+    prisma: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    /**
+     * Widens the span read's retention floor to this tenant's own policy.
+     * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
+     */
+    retentionResolver?: RetentionPolicyResolver;
+  }) {
+    this.prisma = prisma;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
+    this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
+
+  private readonly retentionFloor: ReturnType<
+    typeof createRetentionFloorService
+  >;
 
   /**
    * Resolve the ClickHouse client for a given project.
    *
    * The returned client is already wrapped with wrapWithDefaultSettings
-   * by getClickHouseClientForProject, so every query automatically receives
+   * by the App's per-tenant resolver, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    *
    * @throws ClickHouseClientUnavailableError when no client resolves —
@@ -383,26 +445,46 @@ export class ClickHouseTraceService {
    *   configuration error, never a signal to fall back.
    */
   private async resolveClient(projectId: string): Promise<ClickHouseClient> {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
+    const { clickhouse } = getApp();
+    if (!clickhouse.enabled) {
       throw new ClickHouseClientUnavailableError(projectId);
     }
-    return client;
+    return clickhouse.resolveClient(projectId);
   }
 
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
+   *
+   * The retention resolver defaults to a live cascade over the same Prisma
+   * client, which is what makes the span read's floor actually tenant-aware in
+   * production. Left to the constructor's optional parameter it never was:
+   * every production path reaches the service through here, none of them
+   * passed a resolver, and the floor quietly stayed at the fixed
+   * {@link SPAN_READ_FLOOR_LOOKBACK_MS} for every project — including the ones
+   * on a longer policy that this exists to serve.
+   *
+   * `new ClickHouseTraceService({...})` stays resolver-free, so unit tests keep
+   * the platform default without a database in the graph.
    */
-  static create(
-    prisma: PrismaClient = defaultPrisma,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
-  ): ClickHouseTraceService {
-    return new ClickHouseTraceService(
+  static create({
+    prisma = defaultPrisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver = new RetentionPolicyCache(
+      new DataRetentionPolicyRepository(prisma),
+    ),
+  }: {
+    prisma?: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    retentionResolver?: RetentionPolicyResolver;
+  } = {}): ClickHouseTraceService {
+    return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
-    );
+      retentionResolver,
+    });
   }
 
   /**
@@ -479,14 +561,19 @@ export class ClickHouseTraceService {
           // message and losing the mismatch.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
             },
             "Failed to fetch traces from ClickHouse",
           );
-          throw new Error("Failed to fetch traces with spans");
+          // Keep the cause. Without it the only record of WHY this failed is
+          // the warn line above, so a caller that logs the throw — or a test
+          // that asserts on it — sees a message that could mean anything.
+          throw new Error("Failed to fetch traces with spans", {
+            cause: error,
+          });
         }
       },
     );
@@ -552,7 +639,7 @@ export class ClickHouseTraceService {
           const rows = (await result.json()) as Array<{ TraceId: string }>;
           return rows.map((r) => r.TraceId);
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               prefix,
@@ -561,6 +648,76 @@ export class ClickHouseTraceService {
             "Failed to resolve trace ID by prefix from ClickHouse",
           );
           throw new Error("Failed to resolve trace ID by prefix");
+        }
+      },
+    );
+  }
+
+  /**
+   * Narrow a set of candidate trace IDs down to the ones this project actually
+   * holds a trace for. Reads IDs only, so it stays cheap enough to sit in front
+   * of a write path that would otherwise store references to nothing.
+   *
+   * Deliberately unbounded on the partition key, unlike every other read here,
+   * so the cold-scan detector flags it and that is correct rather than an
+   * oversight: callers hold a bare list of IDs of unknown age (a queue hand-off,
+   * an automation firing on a trace someone picked weeks ago) and have no time
+   * range to bound it with. Guessing one would report an old-but-live trace as
+   * missing, which is the failure this guard exists to prevent. What keeps the
+   * cost down is the sort key: `TraceId` follows `TenantId`, so each partition's
+   * primary index narrows to the candidate IDs without reading their rows.
+   *
+   * No dedup: several unmerged versions of a row all prove the same thing, and
+   * the answer is set membership, not a value.
+   *
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
+   */
+  async findExistingTraceIds({
+    projectId,
+    traceIds,
+  }: {
+    /** The project ID (scoped via TenantId) */
+    projectId: string;
+    /** Candidate trace IDs to check */
+    traceIds: string[];
+  }): Promise<string[]> {
+    if (traceIds.length === 0) return [];
+
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.findExistingTraceIds",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "trace.id.candidate_count": traceIds.length,
+        },
+      },
+      async () => {
+        const clickHouseClient = await this.resolveClient(projectId);
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT DISTINCT TraceId
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+            `,
+            query_params: { tenantId: projectId, traceIds },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          return rows.map((row) => row.TraceId);
+        } catch (error) {
+          this.logger.warn(
+            {
+              projectId,
+              traceIdCount: traceIds.length,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to check trace existence in ClickHouse",
+          );
+          throw new Error("Failed to check which traces exist");
         }
       },
     );
@@ -658,7 +815,7 @@ export class ClickHouseTraceService {
           // not a fetch failure — surface it verbatim.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadId,
@@ -765,7 +922,7 @@ export class ClickHouseTraceService {
           // thread router and the evaluation-execution service.)
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadIds,
@@ -853,6 +1010,26 @@ export class ClickHouseTraceService {
                 cursor = null;
               } else if (
                 cursor &&
+                cursor.scrollStart !== undefined &&
+                (typeof cursor.scrollStart !== "number" ||
+                  !Number.isSafeInteger(cursor.scrollStart) ||
+                  cursor.scrollStart <= 0)
+              ) {
+                // scrollId is client-supplied base64 JSON parsed without a shape
+                // check, and scrollStart binds as {scrollStart:UInt64}. A string,
+                // a null or a negative would fail the query outright instead of
+                // degrading, so a malformed one drops the cursor like every other
+                // mismatch here and the scroll restarts uncapped.
+                //
+                // Safe INTEGER, not merely finite: an epoch is whole, and both
+                // 1.5 and 2**53 are finite positives that UInt64 will not take.
+                this.logger.warn(
+                  { cursorScrollStart: cursor.scrollStart },
+                  "Invalid scrollStart in cursor, ignoring cursor",
+                );
+                cursor = null;
+              } else if (
+                cursor &&
                 (cursor.dateField ?? "occurred") !== dateField
               ) {
                 this.logger.warn(
@@ -907,6 +1084,34 @@ export class ClickHouseTraceService {
             );
           }
 
+          // The scroll's snapshot point. Pinned once, on the page that starts
+          // the scroll, then carried by the cursor so every later page resolves
+          // the same versions. Only the updated axis needs it — OccurredAt is
+          // immutable, so the occurred cursor is stable on its own.
+          const scrollStart =
+            dateField === "updated"
+              ? // A cursor minted before this field existed carries no snapshot.
+                // Leave that scroll uncapped rather than pinning it to a point
+                // after its earlier pages were already served — a bound taken
+                // now would describe a moment that scroll never read from.
+                cursor
+                ? cursor.scrollStart
+                : Date.now()
+              : undefined;
+
+          // The window this scroll can honestly claim. Version resolution is
+          // pinned at scrollStart, so nothing written after it is in the scroll
+          // — and a request may legitimately ask for an endDate beyond that
+          // point. Reporting the requested window while delivering a shorter
+          // one is how a client loses rows: it resumes from the end it asked
+          // for and steps straight over the difference. Clamp instead, and
+          // return the bound as `updatedThrough` so the next pull can start
+          // exactly where this one stopped.
+          const effectiveEndDate =
+            scrollStart !== undefined
+              ? Math.min(input.endDate ?? scrollStart, scrollStart)
+              : input.endDate;
+
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination({
@@ -916,7 +1121,7 @@ export class ClickHouseTraceService {
               cursor,
               protections,
               startDate: input.startDate,
-              endDate: input.endDate,
+              endDate: effectiveEndDate,
               filterConditions,
               filterParams,
               traceIds: input.traceIds,
@@ -924,6 +1129,7 @@ export class ClickHouseTraceService {
               fetchInput,
               fetchOutput,
               dateField,
+              scrollStart,
             });
 
           // Spans are fetched when the caller wants them OR when it wants full
@@ -981,6 +1187,9 @@ export class ClickHouseTraceService {
               pageSize,
               sortDirection,
               dateField,
+              // Carried forward unchanged: the snapshot must be the one the
+              // scroll started from, not a fresh reading per page.
+              ...(scrollStart !== undefined ? { scrollStart } : {}),
             };
             newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
               "base64",
@@ -1076,9 +1285,12 @@ export class ClickHouseTraceService {
             totalHits,
             traceChecks,
             scrollId: newScrollId,
+            ...(effectiveEndDate !== undefined && scrollStart !== undefined
+              ? { updatedThrough: effectiveEndDate }
+              : {}),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1180,7 +1392,7 @@ export class ClickHouseTraceService {
             ),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1291,7 +1503,7 @@ export class ClickHouseTraceService {
             labels: Array.from(labelsSet),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1443,7 +1655,7 @@ export class ClickHouseTraceService {
 
           return result;
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               spanId,
@@ -1676,7 +1888,7 @@ export class ClickHouseTraceService {
 
           return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
@@ -1708,6 +1920,7 @@ export class ClickHouseTraceService {
     fetchInput = true,
     fetchOutput = true,
     dateField = "occurred",
+    scrollStart,
   }: {
     projectId: string;
     pageSize: number;
@@ -1726,6 +1939,12 @@ export class ClickHouseTraceService {
     fetchOutput?: boolean;
     /** Time axis for the date window + keyset cursor. Default "occurred". */
     dateField?: TraceDateField;
+    /**
+     * Updated-axis snapshot point (epoch ms). Caps version resolution so every
+     * page of one scroll sees the same latest-versions. Undefined on the
+     * occurred axis, and on updated-axis cursors minted before it existed.
+     */
+    scrollStart?: number;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1819,8 +2038,22 @@ export class ClickHouseTraceService {
           " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
         // Collapses ts to each trace's latest version (global max UpdatedAt) so
         // the updated-axis window/filters/cursor evaluate on the latest row.
-        const latestVersionOnly =
-          " AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} GROUP BY TenantId, TraceId)";
+        //
+        // "Latest" is bounded by the scroll's start when one is in play. The
+        // cursor pins a position derived from the versions visible when the
+        // scroll began, and UpdatedAt keeps moving underneath it: re-resolving
+        // to the current latest on every page lets a trace bumped above the
+        // cursor mid-scroll fall outside every remaining page's range, which
+        // drops it from the export with no error and no missing-row signal.
+        // Capping here — inside the dedup rather than on the outer rows, since
+        // it is version RESOLUTION that has to be stable, not just which rows
+        // survive — holds each trace at the version the scroll started with.
+        // The newer version is picked up by the next incremental window.
+        const scrollSnapshotBound =
+          scrollStart !== undefined
+            ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
+            : "";
+        const latestVersionOnly = ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String}${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
 
         let occurredCursor = "";
         let updatedCursor = "";
@@ -1840,6 +2073,11 @@ export class ClickHouseTraceService {
                 searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
               }
             : {}),
+          // Shared rather than cursor-scoped: the count query embeds
+          // `latestVersionOnly` too and is bound with sharedParams alone, so a
+          // cursor-scoped binding would leave {scrollStart} unbound there.
+          // Only present when the SQL references it.
+          ...(scrollStart !== undefined ? { scrollStart } : {}),
         };
 
         const cursorParams = {
@@ -1949,6 +2187,7 @@ export class ClickHouseTraceService {
           fetchInput,
           fetchOutput,
           dateColumn,
+          scrollStart,
         });
 
         const traces: Trace[] = summaryRows.map((row) => {
@@ -1983,6 +2222,7 @@ export class ClickHouseTraceService {
     fetchInput = true,
     fetchOutput = true,
     dateColumn = "OccurredAt",
+    scrollStart,
   }: {
     clickHouseClient: ClickHouseClient;
     projectId: string;
@@ -1996,6 +2236,14 @@ export class ClickHouseTraceService {
     fetchOutput?: boolean;
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
+    /**
+     * Updated-axis snapshot point (epoch ms), and it must be the SAME one the
+     * id-query used. This query re-resolves each trace's latest version, so an
+     * uncapped read here would hand back a newer version than the one the page
+     * was selected on — wrong sort position, and a cursor minted from a
+     * timestamp that never appeared in the id-query's ordering.
+     */
+    scrollStart?: number;
   }): Promise<TraceSummaryRow[]> {
     // dateColumn is interpolated into SQL. The surface validates it via a zod
     // enum, but this method is also reachable from tRPC/internal paths whose
@@ -2020,6 +2268,13 @@ export class ClickHouseTraceService {
       ? ""
       : `AND ${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
+    // Same snapshot bound the id-query applied, so both stages resolve the same
+    // version of every trace. Updated axis only; the occurred axis has no
+    // scrollStart and its SQL is unchanged.
+    const dedupScrollBound =
+      isUpdatedAxis && scrollStart !== undefined
+        ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
+        : "";
     const runQuery = async (ids: string[]) => {
       const result = await clickHouseClient.query({
         query: `
@@ -2062,6 +2317,7 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 ${dedupWindow}
+                ${dedupScrollBound}
                 AND TraceId IN ({pageTraceIds:Array(String)})
               GROUP BY TenantId, TraceId
             )
@@ -2072,6 +2328,7 @@ export class ClickHouseTraceService {
           startDate,
           endDate,
           pageTraceIds: ids,
+          ...(dedupScrollBound !== "" ? { scrollStart } : {}),
         },
         format: "JSONEachRow",
       });
@@ -2245,6 +2502,12 @@ export class ClickHouseTraceService {
    * Annotations are Postgres-only (Prisma), never carried by the ClickHouse
    * read path. Fetched scoped to the page's trace IDs (multitenancy: projectId
    * is the first predicate). Mutates each trace's `annotations` in place.
+   *
+   * Every comment left on those traces, anchored ones included: this one read
+   * feeds the trace table, the export and the dataset columns, and a comment on
+   * one span of a trace is part of what reviewers said about it. A suggestion
+   * only reads as the trace's expected output when that is what it suggested;
+   * a correction proposed for a span or for the trace's input is not one.
    */
   private async enrichTracesWithAnnotationsForProjection({
     projectId,
@@ -2260,20 +2523,9 @@ export class ClickHouseTraceService {
     // name-addressable (annotations.scores.<name>), so fetch the score
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
+    const annotations = AnnotationService.create({ prisma: this.prisma });
     const [rows, scoreDefs] = await Promise.all([
-      this.prisma.annotation.findMany({
-        where: { projectId, traceId: { in: traceIds } },
-        select: {
-          id: true,
-          traceId: true,
-          isThumbsUp: true,
-          comment: true,
-          expectedOutput: true,
-          scoreOptions: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
+      annotations.getAllForProjection({ projectId, traceIds }),
       this.prisma.annotationScore.findMany({
         where: { projectId },
         select: { id: true, name: true },
@@ -2288,7 +2540,11 @@ export class ClickHouseTraceService {
         id: row.id,
         is_thumbs_up: row.isThumbsUp ?? null,
         comment: row.comment ?? null,
-        expected_output: row.expectedOutput ?? null,
+        expected_output:
+          annotationSuggestedOutput({
+            annotation: row,
+            traceId: row.traceId,
+          }) ?? null,
         scores: remapScoreOptionsToNames(row.scoreOptions, scoreNameById),
         created_at: row.createdAt.getTime(),
       });
@@ -2811,10 +3067,31 @@ export class ClickHouseTraceService {
         // large list can exceed the per-query memory cap and fail with
         // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
         // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
-        // / fetchEvaluationRows) so peak memory is bounded without dropping data.
-        const runBatch = async (
-          batchTraceIds: string[],
-        ): Promise<
+        // / fetchEvaluationRows).
+        //
+        // That bounds CLICKHOUSE's peak memory only. The batches merge back into
+        // one map here, so this process still materialises the whole result set —
+        // which is how a 980-trace read became 50 V8 heap deaths across the worker
+        // fleet. The merge is therefore capped too; see
+        // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+        const runBatch = async ({
+          batchTraceIds,
+          maxSpanRows,
+        }: {
+          batchTraceIds: string[];
+          /**
+           * Rows the span read may return before ClickHouse refuses it.
+           *
+           * Set only by the OOM fallback below, which is the path with a heap
+           * budget to spend. Checking the merged total AFTER a batch is decoded
+           * is too late: one batch is `SUMMARY_BATCH_SIZE` traces at up to
+           * {@link MAX_SPANS_PER_TRACE} spans each — 250,000 heavy rows, five
+           * times the cap it is supposed to be enforcing — and materialising
+           * that is the heap death the cap exists to prevent. Bounding the
+           * query means the rows never cross the socket.
+           */
+          maxSpanRows?: number;
+        }): Promise<
           Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
         > => {
           // When the caller knows the traces' approximate time, bound the
@@ -3004,13 +3281,41 @@ export class ClickHouseTraceService {
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
+          // Resolved here rather than inside `run` below: the callback is
+          // re-invoked per window attempt and the budget does not vary with the
+          // window.
+          //
+          // `throw`, never `break`: `break` truncates the result and returns
+          // it, which would silently hand back a partial span list as if it
+          // were complete. One row of headroom so an exactly-at-budget batch
+          // still succeeds and only a genuine overrun trips it.
+          const spanReadSettings =
+            maxSpanRows === undefined
+              ? JOINED_SPAN_READ_SETTINGS
+              : {
+                  ...JOINED_SPAN_READ_SETTINGS,
+                  max_result_rows: String(maxSpanRows + 1),
+                  result_overflow_mode: "throw" as const,
+                };
+
           const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
             windowMs: spanWindowMs,
             fallback: spanRange
               ? "none"
-              : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS },
+              : {
+                  // Per tenant, floored at the historical 90-day reach so this
+                  // can only widen. A project on a 400-day policy previously
+                  // got 90 days here and simply could not see its own older
+                  // spans; one on a short policy no longer pays for a reach it
+                  // has no rows in. See {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
+                  lookbackMs: await this.retentionFloor.getLookbackMs({
+                    table: "stored_spans",
+                    tenantId: projectId,
+                    minLookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS,
+                  }),
+                },
             isEmpty: (rows) => rows.length === 0,
             run: async (window) => {
               // Always present now: a hint yields the hinted fragment, and the
@@ -3069,7 +3374,7 @@ export class ClickHouseTraceService {
                   traceIds: batchTraceIds,
                   ...(window?.params ?? {}),
                 },
-                clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
+                clickhouse_settings: spanReadSettings,
                 format: "JSONEachRow",
               });
               return (await spansResult.json()) as SpanRow[];
@@ -3119,7 +3424,7 @@ export class ClickHouseTraceService {
         };
 
         try {
-          return await runBatch(traceIds);
+          return await runBatch({ batchTraceIds: traceIds });
         } catch (error) {
           if (!isClickHouseMemoryLimitError(error)) {
             throw error;
@@ -3133,6 +3438,7 @@ export class ClickHouseTraceService {
             string,
             { summary: TraceSummaryData; spans: NormalizedSpan[] }
           >();
+          let mergedSpanCount = 0;
           for (
             let i = 0;
             i < traceIds.length;
@@ -3142,9 +3448,50 @@ export class ClickHouseTraceService {
               i,
               i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
             );
-            const batchMap = await runBatch(batch);
+
+            // Batching caps ClickHouse's peak memory, not ours — the merge
+            // rebuilds the whole result set here. Stop before the heap does,
+            // and stop at the QUERY rather than after decoding its rows: the
+            // budget goes into the read so an over-budget batch is refused by
+            // ClickHouse instead of arriving in this process first.
+            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            const remainingSpanBudget =
+              MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
+            let batchMap: Map<
+              string,
+              { summary: TraceSummaryData; spans: NormalizedSpan[] }
+            >;
+            try {
+              batchMap = await runBatch({
+                batchTraceIds: batch,
+                maxSpanRows: remainingSpanBudget,
+              });
+            } catch (batchError) {
+              if (!isClickHouseResultOverflowError(batchError))
+                throw batchError;
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
+                  `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
+                  `refusing to materialise the rest`,
+                { cause: batchError },
+              );
+            }
+
             for (const [traceId, value] of batchMap) {
               merged.set(traceId, value);
+              mergedSpanCount += value.spans.length;
+            }
+
+            // Belt to the query's braces: the read is bounded per batch, so
+            // this only trips if a batch landed exactly on its budget and the
+            // total still cleared the cap.
+            if (mergedSpanCount > MAX_SPANS_PER_JOINED_FALLBACK) {
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} across ${merged.size} of ${traceIds.length} traces); ` +
+                  `refusing to materialise the rest`,
+              );
             }
           }
           return merged;
@@ -3398,6 +3745,29 @@ interface PromptStudioCandidateRow {
   ParentSpanId: string | null;
   SpanAttributes: Record<string, unknown>;
   StartTime: number;
+}
+
+/**
+ * ClickHouse refused a query because its result exceeded `max_result_rows`
+ * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
+ *
+ * That is a deliberate refusal on our side, not a fault: the joined-span
+ * fallback sets the limit from its own remaining heap budget so an over-budget
+ * batch never reaches this process. Matched by code and by name because the
+ * driver surfaces one or the other depending on how far the error has been
+ * wrapped.
+ */
+export function isClickHouseResultOverflowError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (HandledError.isHandled(error)) {
+    return (error.reasons ?? []).some(isClickHouseResultOverflowError);
+  }
+  return (
+    error.message.includes("TOO_MANY_ROWS_OR_BYTES") ||
+    (error as { type?: string }).type === "TOO_MANY_ROWS_OR_BYTES" ||
+    (error as { code?: string | number }).code === 396 ||
+    (error as { code?: string | number }).code === "396"
+  );
 }
 
 export function isClickHouseMemoryLimitError(error: unknown): boolean {

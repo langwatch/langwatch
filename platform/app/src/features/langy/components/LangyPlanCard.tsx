@@ -21,11 +21,15 @@
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyPlan, LangyPlanItem } from "../logic/langyPlan";
+import type {
+  LangyPlan,
+  LangyPlanItem,
+  LangyPlanItemStatus,
+} from "../logic/langyPlan";
 import { LangyActivityParts } from "./LangyToolActivity";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 
@@ -33,6 +37,14 @@ const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.4; transform: scale(0.72); }
 `;
+
+/** What each step marker says to a reader who gets no shape and no colour. */
+const PLAN_STATUS_LABEL: Record<LangyPlanItemStatus, string> = {
+  completed: "Completed",
+  in_progress: "In progress",
+  pending: "Not started",
+  cancelled: "Cancelled",
+};
 
 export function LangyPlanCard({
   plan,
@@ -74,7 +86,7 @@ export function LangyPlanCard({
       {cardOpen ? (
         <>
           {plan.preamble.length > 0 ? (
-            <LangyActivityParts parts={plan.preamble} />
+            <LangyActivityParts parts={plan.preamble} live={isStreaming} />
           ) : null}
           <VStack align="stretch" gap={1.5} role="list">
             {plan.items.map((item, index) => (
@@ -123,7 +135,14 @@ export function LangyPlanCard({
   );
 }
 
-/** The compact "PLAN · 3 OF 7 · 4 LEFT" status and detail toggle. */
+/**
+ * The compact "PLAN · 3 OF 7 DONE" status and detail toggle.
+ *
+ * The count is DONE out of total — never "N left". "Left" counted the step
+ * currently running, so "0 of 4 · 4 left" sat above a list where only three
+ * steps looked outstanding, and the numbers read as wrong. "Done" agrees with
+ * the checked boxes below it by definition.
+ */
 function PlanOverline({
   completed,
   total,
@@ -136,9 +155,7 @@ function PlanOverline({
   expanded: boolean;
 }) {
   const left = Math.max(0, total - completed);
-  const label = `Plan · ${completed} of ${total} · ${
-    left === 0 ? "done" : `${left} left`
-  }`;
+  const label = `Plan · ${completed} of ${total} done`;
 
   const content = (
     <HStack gap={1.5} align="center">
@@ -217,17 +234,40 @@ function PlanStep({
     ? { ...langyThinkingShimmerStyles, animation: "none" }
     : langyThinkingShimmerStyles;
 
+  // Every step reads as a checkbox: checked when done, a filled square while
+  // it runs, an empty square before it starts. Without the empty squares the
+  // upcoming steps read as loose prose and the header's count has nothing
+  // visible to agree with. The status is shape and colour on screen, so the
+  // marker carries the same answer as a label for anyone not reading either.
+  const statusLabel = PLAN_STATUS_LABEL[item.status];
   const marker =
     item.status === "completed" ? (
-      <Box color="green.fg" display="flex" flexShrink={0} width="12px">
-        <Check size={11} />
+      <Box
+        color="green.fg"
+        display="flex"
+        flexShrink={0}
+        width="12px"
+        role="img"
+        aria-label={statusLabel}
+        data-plan-marker="completed"
+      >
+        <SquareCheck size={12} />
       </Box>
     ) : item.status === "in_progress" ? (
-      <Box width="12px" display="flex" justifyContent="center" flexShrink={0}>
+      <Box
+        width="12px"
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        flexShrink={0}
+        role="img"
+        aria-label={statusLabel}
+        data-plan-marker="in_progress"
+      >
         <Box
-          width="6px"
-          height="6px"
-          borderRadius="full"
+          width="8px"
+          height="8px"
+          borderRadius="2px"
           background="orange.solid"
           css={
             pulsing
@@ -237,7 +277,17 @@ function PlanStep({
         />
       </Box>
     ) : (
-      <Box width="12px" flexShrink={0} />
+      <Box
+        color="fg.subtle"
+        display="flex"
+        flexShrink={0}
+        width="12px"
+        role="img"
+        aria-label={statusLabel}
+        data-plan-marker={item.status}
+      >
+        <Square size={12} />
+      </Box>
     );
 
   const rowText = (
@@ -306,7 +356,7 @@ function PlanStep({
       )}
       {showNested ? (
         <Box paddingLeft="20px" paddingTop={2}>
-          <LangyActivityParts parts={nestedParts} />
+          <LangyActivityParts parts={nestedParts} live={isStreaming} />
         </Box>
       ) : null}
     </Box>

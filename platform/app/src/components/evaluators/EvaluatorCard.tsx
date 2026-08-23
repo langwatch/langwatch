@@ -1,5 +1,4 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
 import {
   ArrowUp,
   CheckSquare,
@@ -14,6 +13,7 @@ import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Evaluator } from "~/generated/prisma/client";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Menu } from "../ui/menu";

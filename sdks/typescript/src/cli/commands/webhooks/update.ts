@@ -1,4 +1,5 @@
 import { createSpinner } from "../../utils/spinner";
+import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,6 +9,9 @@ export const updateWebhookCommand = async (
   id: string,
   options: {
     url?: string;
+    queueUrl?: string;
+    roleArn?: string;
+    accessKeyId?: string;
     events?: string;
     maxBatchSize?: string;
     maxBatchDelay?: string;
@@ -15,15 +19,56 @@ export const updateWebhookCommand = async (
   },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  // Which mode was asked for comes first. Asking for the missing secret of a
+  // key pair the caller cannot use anyway sends them to set a secret and then
+  // refuses the command a second time, for the real reason.
+  if (options.roleArn !== undefined && options.accessKeyId !== undefined) {
+    console.error(
+      "--role-arn and --access-key-id select different credential modes. Pass one of them; the other mode's fields are cleared for you.",
+    );
+    process.exit(1);
+  }
+  // The secret is read from the environment, never from an argument: an
+  // argument lands in shell history, in ps output, and in CI logs.
+  const secretAccessKey = sqsSecretFromEnv();
+  if (options.accessKeyId !== undefined && !secretAccessKey) {
+    console.error(
+      `--access-key-id needs its secret in ${SQS_SECRET_ENV}. A secret passed as an argument ends up in shell history, in ps output, and in CI logs.`,
+    );
+    process.exit(1);
+  }
+  // A credential flag names a mode, and the mode it leaves has to be cleared
+  // on the same request. Sending only the new fields would leave the old
+  // mode's stored beside them: an encrypted key nothing reads, or a role that
+  // goes on winning over the key that was just set.
+  const sqsFields = {
+    ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
+    ...(options.roleArn !== undefined
+      ? {
+          role_arn: options.roleArn,
+          access_key_id: null,
+          secret_access_key: null,
+        }
+      : {}),
+    ...(options.accessKeyId !== undefined
+      ? {
+          access_key_id: options.accessKeyId,
+          secret_access_key: secretAccessKey,
+          role_arn: null,
+          external_id: null,
+        }
+      : {}),
+  };
   if (
     options.url === undefined &&
+    Object.keys(sqsFields).length === 0 &&
     options.events === undefined &&
     options.maxBatchSize === undefined &&
     options.maxBatchDelay === undefined &&
     options.maxInFlight === undefined
   ) {
     console.error(
-      "Nothing to update: pass at least one of --url, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+      "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
     );
     process.exit(1);
   }
@@ -52,6 +97,9 @@ export const updateWebhookCommand = async (
   try {
     const endpoint = await service.update(id, {
       url: options.url,
+      // An endpoint keeps the destination it was created with, so these only
+      // ever adjust a queue endpoint's own queue and credentials.
+      ...(Object.keys(sqsFields).length > 0 ? { sqs: sqsFields } : {}),
       max_batch_size: maxBatchSize,
       max_batch_delay_ms: maxBatchDelayMs,
       max_in_flight: maxInFlight,
@@ -65,7 +113,13 @@ export const updateWebhookCommand = async (
       table: () => {
         console.log();
         console.log(`Endpoint:    ${endpoint.id}`);
-        console.log(`URL:         ${endpoint.url}`);
+        // A queue endpoint has no URL, so printing `url` alone would show
+        // "null" right after a successful queue change.
+        console.log(
+          endpoint.destination_kind === "sqs"
+            ? `Queue URL:   ${endpoint.sqs?.queue_url ?? ""}`
+            : `URL:         ${endpoint.url}`,
+        );
         console.log(`Events:      ${endpoint.enabled_events.join(", ")}`);
         console.log(`Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`);
         console.log();

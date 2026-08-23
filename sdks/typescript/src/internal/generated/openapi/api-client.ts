@@ -32,7 +32,10 @@ export interface paths {
         /** @description Returns all annotations for project */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -77,7 +80,10 @@ export interface paths {
         /** @description Returns all annotations for single trace */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path: {
                     /** @description ID of trace to fetch */
@@ -644,238 +650,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
-        get: operations["getApiModel-defaults"];
-        put?: never;
-        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
-        post: operations["postApiModel-defaults"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/model-defaults/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
-        put: operations["putApiModel-defaultsById"];
-        post?: never;
-        /** @description Delete a default-model config. Scope attachments cascade. */
-        delete: operations["deleteApiModel-defaultsById"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List all non-archived teams for the organization (paginated) */
-        get: operations["getApiTeams"];
-        put?: never;
-        /** @description Create a new team that can group projects and members */
-        post: operations["postApiTeams"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get a team by its id */
-        get: operations["getApiTeamsById"];
-        put?: never;
-        post?: never;
-        /** @description Archive a team (soft-delete) */
-        delete: operations["deleteApiTeamsById"];
-        options?: never;
-        head?: never;
-        /** @description Update a team by its id */
-        patch: operations["patchApiTeamsById"];
-        trace?: never;
-    };
-    "/api/teams/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List members of a team */
-        get: operations["getApiTeamsByIdMembers"];
-        put?: never;
-        /** @description Add a member to a team */
-        post: operations["postApiTeamsByIdMembers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}/members/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a member from a team */
-        delete: operations["deleteApiTeamsByIdMembersByUserId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List projects in a team */
-        get: operations["getApiTeamsByIdProjects"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List all groups for the organization */
-        get: operations["getApiGroups"];
-        put?: never;
-        /** @description Create a new group */
-        post: operations["postApiGroups"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get a group with members and bindings */
-        get: operations["getApiGroupsById"];
-        put?: never;
-        post?: never;
-        /** @description Delete a group */
-        delete: operations["deleteApiGroupsById"];
-        options?: never;
-        head?: never;
-        /** @description Rename a group */
-        patch: operations["patchApiGroupsById"];
-        trace?: never;
-    };
-    "/api/groups/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List members of a group */
-        get: operations["getApiGroupsByIdMembers"];
-        put?: never;
-        /** @description Add a member to a group */
-        post: operations["postApiGroupsByIdMembers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/members/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a member from a group */
-        delete: operations["deleteApiGroupsByIdMembersByUserId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/bindings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List role bindings for a group */
-        get: operations["getApiGroupsByIdBindings"];
-        put?: never;
-        /** @description Add a role binding to a group */
-        post: operations["postApiGroupsByIdBindings"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/bindings/{bindingId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a role binding from a group */
-        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -928,7 +702,7 @@ export interface paths {
         put?: never;
         /**
          * Create an API key
-         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.
+         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.
          */
         post: operations["createApiKey"];
         delete?: never;
@@ -944,7 +718,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get an API key
+         * @description Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.
+         */
+        get: operations["getApiKey"];
         put?: never;
         post?: never;
         /**
@@ -954,7 +732,11 @@ export interface paths {
         delete: operations["revokeApiKey"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update an API key
+         * @description Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.
+         */
+        patch: operations["updateApiKey"];
         trace?: never;
     };
     "/api/analytics/timeseries": {
@@ -968,6 +750,138 @@ export interface paths {
         put?: never;
         /** @description Query analytics timeseries data with metrics, aggregations, and filters */
         post: operations["postApiAnalyticsTimeseries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run LangWatchQL analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the LangWatchQL analytics schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/charts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List saved workbench charts
+         * @description Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsCharts"];
+        put?: never;
+        /**
+         * Save a workbench chart
+         * @description Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsCharts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a saved workbench chart
+         * @description Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a saved workbench chart
+         * @description Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a saved workbench chart
+         * @description Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.
+         */
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        trace?: never;
+    };
+    "/api/coding-agent/sessions/{sessionId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List coding agent session events
+         * @description List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).
+         */
+        get: operations["getApiCodingAgentSessionsBySessionIdEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/coding-agent/pull-request-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get pull request coding agent usage
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         */
+        get: operations["getApiCodingAgentPullRequestUsage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1073,7 +987,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Start a direct browser→S3 dataset upload (returns a presigned PUT) */
-        post: operations["postApiDatasetDirect-upload"];
+        post: operations["postApiDatasetDirectUpload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1089,7 +1003,7 @@ export interface paths {
         };
         get?: never;
         /** @description Stream a heavy upload into staging when there is no browser-reachable S3 */
-        put: operations["putApiDatasetDirect-uploadStagingByUploadId"];
+        put: operations["putApiDatasetDirectUploadStagingByUploadId"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1107,7 +1021,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Finalize a direct upload: size-check and start processing */
-        post: operations["postApiDatasetDirect-uploadByDatasetIdFinalize"];
+        post: operations["postApiDatasetDirectUploadByDatasetIdFinalize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1124,7 +1038,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Retry normalization of a failed or stuck dataset */
-        post: operations["postApiDatasetDirect-uploadByDatasetIdRetry"];
+        post: operations["postApiDatasetDirectUploadByDatasetIdRetry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1142,7 +1056,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** @description Abort a still-pending direct upload and clean up its row */
-        delete: operations["deleteApiDatasetDirect-uploadByDatasetId"];
+        delete: operations["deleteApiDatasetDirectUploadByDatasetId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1360,7 +1274,7 @@ export interface paths {
          * Report batch evaluation results
          * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
          */
-        post: operations["postApiEvaluationsBatchLog_results"];
+        post: operations["postApiEvaluationsBatchLogResults"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1438,7 +1352,7 @@ export interface paths {
         put?: never;
         /**
          * Evaluate a dataset
-         * @description Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.
+         * @description Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.
          */
         post: operations["postApiDatasetEvaluate"];
         delete?: never;
@@ -1560,7 +1474,7 @@ export interface paths {
          * Report DSPy optimizer steps
          * @description Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.
          */
-        post: operations["postApiDspyLog_steps"];
+        post: operations["postApiDspyLogSteps"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1620,7 +1534,7 @@ export interface paths {
          * Track an event (legacy path)
          * @description Record a customer event against a trace or thread. Identical to `POST /api/events/track`, which is the path to use in new integrations; this one stays for callers written against it. Supply `event_id` yourself to make the call idempotent.
          */
-        post: operations["postApiTrack_event"];
+        post: operations["postApiTrackEvent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1698,13 +1612,13 @@ export interface paths {
          * List virtual keys
          * @description Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.
          */
-        get: operations["getApiGatewayV1Virtual-keys"];
+        get: operations["getApiGatewayV1VirtualKeys"];
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
-        post: operations["postApiGatewayV1Virtual-keys"];
+        post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1719,7 +1633,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get virtual key */
-        get: operations["getApiGatewayV1Virtual-keysById"];
+        get: operations["getApiGatewayV1VirtualKeysById"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1727,9 +1641,9 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
-        patch: operations["patchApiGatewayV1Virtual-keysById"];
+        patch: operations["patchApiGatewayV1VirtualKeysById"];
         trace?: never;
     };
     "/api/gateway/v1/virtual-keys/{id}/spend": {
@@ -1743,7 +1657,7 @@ export interface paths {
          * Read a virtual key's spend
          * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
-        get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
+        get: operations["getApiGatewayV1VirtualKeysByIdSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1765,7 +1679,7 @@ export interface paths {
          * Rotate virtual key secret
          * @description Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdRotate"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRotate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1785,7 +1699,7 @@ export interface paths {
          * Disable virtual key
          * @description Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdDisable"];
+        post: operations["postApiGatewayV1VirtualKeysByIdDisable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1805,7 +1719,7 @@ export interface paths {
          * Enable virtual key
          * @description Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdEnable"];
+        post: operations["postApiGatewayV1VirtualKeysByIdEnable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1825,7 +1739,7 @@ export interface paths {
          * Revoke virtual key
          * @description Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.
          */
-        post: operations["postApiGatewayV1Virtual-keysByIdRevoke"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRevoke"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1871,7 +1785,7 @@ export interface paths {
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -1963,13 +1877,13 @@ export interface paths {
          * List cache-control rules
          * @description Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.
          */
-        get: operations["getApiGatewayV1Cache-rules"];
+        get: operations["getApiGatewayV1CacheRules"];
         put?: never;
         /**
          * Create a cache rule
          * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.
          */
-        post: operations["postApiGatewayV1Cache-rules"];
+        post: operations["postApiGatewayV1CacheRules"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1987,21 +1901,21 @@ export interface paths {
          * Get a cache rule
          * @description Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).
          */
-        get: operations["getApiGatewayV1Cache-rulesById"];
+        get: operations["getApiGatewayV1CacheRulesById"];
         put?: never;
         post?: never;
         /**
          * Archive a cache rule
          * @description Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
          */
-        delete: operations["deleteApiGatewayV1Cache-rulesById"];
+        delete: operations["deleteApiGatewayV1CacheRulesById"];
         options?: never;
         head?: never;
         /**
          * Update a cache rule
          * @description Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.
          */
-        patch: operations["patchApiGatewayV1Cache-rulesById"];
+        patch: operations["patchApiGatewayV1CacheRulesById"];
         trace?: never;
     };
     "/api/governance/ingestion-templates": {
@@ -2015,13 +1929,13 @@ export interface paths {
          * List ingestion templates
          * @description Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.
          */
-        get: operations["getApiGovernanceIngestion-templates"];
+        get: operations["getApiGovernanceIngestionTemplates"];
         put?: never;
         /**
          * Create org-authored ingestion template
          * @description Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.
          */
-        post: operations["postApiGovernanceIngestion-templates"];
+        post: operations["postApiGovernanceIngestionTemplates"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2039,7 +1953,7 @@ export interface paths {
          * List ingestion templates (admin shape, includes OTTL)
          * @description Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.
          */
-        get: operations["getApiGovernanceIngestion-templatesAdmin"];
+        get: operations["getApiGovernanceIngestionTemplatesAdmin"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2059,14 +1973,14 @@ export interface paths {
          * Get ingestion template
          * @description Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).
          */
-        get: operations["getApiGovernanceIngestion-templatesById"];
+        get: operations["getApiGovernanceIngestionTemplatesById"];
         put?: never;
         post?: never;
         /**
          * Soft-archive an org-authored template
          * @description Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.
          */
-        delete: operations["deleteApiGovernanceIngestion-templatesById"];
+        delete: operations["deleteApiGovernanceIngestionTemplatesById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2089,7 +2003,7 @@ export interface paths {
          * Replace ottl_rules on an org-authored template
          * @description Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.
          */
-        patch: operations["patchApiGovernanceIngestion-templatesByIdOttl-rules"];
+        patch: operations["patchApiGovernanceIngestionTemplatesByIdOttlRules"];
         trace?: never;
     };
     "/api/governance/ingestion-templates/clone": {
@@ -2105,7 +2019,7 @@ export interface paths {
          * Clone a platform-published template into the caller's org
          * @description Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
          */
-        post: operations["postApiGovernanceIngestion-templatesClone"];
+        post: operations["postApiGovernanceIngestionTemplatesClone"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2324,6 +2238,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
+        get: operations["getApiModelDefaults"];
+        put?: never;
+        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
+        post: operations["postApiModelDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
+        put: operations["putApiModelDefaultsById"];
+        post?: never;
+        /** @description Delete a default-model config. Scope attachments cascade. */
+        delete: operations["deleteApiModelDefaultsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/model-providers": {
         parameters: {
             query?: never;
@@ -2332,7 +2282,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all model providers for a project with masked API keys */
-        get: operations["getApiModel-providers"];
+        get: operations["getApiModelProviders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2350,7 +2300,7 @@ export interface paths {
         };
         get?: never;
         /** @description Create or update a model provider */
-        put: operations["putApiModel-providersByProvider"];
+        put: operations["putApiModelProvidersByProvider"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2412,6 +2362,453 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned. */
+        get: operations["getOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns. */
+        patch: operations["updateOrganization"];
+        trace?: never;
+    };
+    "/api/organization/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true. */
+        get: operations["listOrganizationMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages. */
+        get: operations["getOrganizationMember"];
+        put?: never;
+        post?: never;
+        /** @description Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves. */
+        delete: operations["removeOrganizationMember"];
+        options?: never;
+        head?: never;
+        /** @description Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan. */
+        patch: operations["updateOrganizationMember"];
+        trace?: never;
+    };
+    "/api/organization/members/{userId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on. */
+        get: operations["getOrganizationMemberAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open. */
+        get: operations["listOrganizationInvites"];
+        put?: never;
+        /** @description Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered. */
+        post: operations["createOrganizationInvites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404. */
+        delete: operations["revokeOrganizationInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List organizations
+         * @description Self-hosted only. Lists every organization on this instance, newest first.
+         */
+        get: operations["listOrganizations"];
+        put?: never;
+        /**
+         * Create an organization
+         * @description Self-hosted only. Creates an organization with a default team and returns an organization-scoped admin API key, so provisioning can continue through the management APIs without a browser step: the instance key creates the organization, the returned key does everything else. The slug is the natural key; a taken slug answers 409 organization_slug_taken.
+         */
+        post: operations["provisionOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an organization
+         * @description Self-hosted only. Reads one organization's summary by id.
+         */
+        get: operations["getOrganizationById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
+        get: operations["listRoleBindings"];
+        put?: never;
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
+        post: operations["createRoleBinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. */
+        delete: operations["deleteRoleBinding"];
+        options?: never;
+        head?: never;
+        /** @description Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. */
+        patch: operations["updateRoleBinding"];
+        trace?: never;
+    };
+    "/api/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's custom roles with their permission sets. */
+        get: operations["listRoles"];
+        put?: never;
+        /** @description Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken. */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding). */
+        get: operations["listRolePermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one custom role. An id from another organization answers 404 custom_role_not_found. */
+        get: operations["getRole"];
+        put?: never;
+        post?: never;
+        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        /** @description Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. */
+        patch: operations["updateRole"];
+        trace?: never;
+    };
+    "/api/scim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        get: operations["listScimTokens"];
+        put?: never;
+        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        post: operations["createScimToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found. */
+        delete: operations["revokeScimToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ServiceProviderConfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the SCIM service provider configuration
+         * @description What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.
+         */
+        get: operations["scimGetServiceProviderConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ResourceTypes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource types
+         * @description The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListResourceTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource schemas
+         * @description The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListSchemas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned users
+         * @description The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq "someone@example.com"`, matched against the member's email without regard to case.
+         */
+        get: operations["scimListUsers"];
+        put?: never;
+        /**
+         * Provision a user
+         * @description Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.
+         */
+        post: operations["scimCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned user
+         * @description Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.
+         */
+        get: operations["scimGetUser"];
+        /**
+         * Replace a provisioned user
+         * @description Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.
+         */
+        put: operations["scimReplaceUser"];
+        post?: never;
+        /**
+         * Deprovision a user
+         * @description Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.
+         */
+        delete: operations["scimDeleteUser"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned user
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.
+         */
+        patch: operations["scimPatchUser"];
+        trace?: never;
+    };
+    "/api/scim/v2/Groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned groups
+         * @description The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq "Engineering"`, matched without regard to case.
+         */
+        get: operations["scimListGroups"];
+        put?: never;
+        /**
+         * Provision a group
+         * @description Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.
+         */
+        post: operations["scimCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned group
+         * @description Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.
+         */
+        get: operations["scimGetGroup"];
+        /**
+         * Replace a provisioned group
+         * @description Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.
+         */
+        put: operations["scimReplaceGroup"];
+        post?: never;
+        /**
+         * Deprovision a group
+         * @description Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.
+         */
+        delete: operations["scimDeleteGroup"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned group
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.
+         */
+        patch: operations["scimPatchGroup"];
+        trace?: never;
+    };
     "/api/scenario-events": {
         parameters: {
             query?: never;
@@ -2422,9 +2819,9 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Create a new scenario event */
-        post: operations["postApiScenario-events"];
+        post: operations["postApiScenarioEvents"];
         /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
-        delete: operations["deleteApiScenario-events"];
+        delete: operations["deleteApiScenarioEvents"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2440,7 +2837,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it. */
-        post: operations["postApiScenario-eventsBrowser-tab"];
+        post: operations["postApiScenarioEventsBrowserTab"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2621,7 +3018,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
-        get: operations["getApiSimulation-runs"];
+        get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2638,7 +3035,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a single simulation run by its ID */
-        get: operations["getApiSimulation-runsByScenarioRunId"];
+        get: operations["getApiSimulationRunsByScenarioRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2655,7 +3052,24 @@ export interface paths {
             cookie?: never;
         };
         /** @description List batch summaries for a scenario set (pass/fail counts per batch) */
-        get: operations["getApiSimulation-runsBatchesList"];
+        get: operations["getApiSimulationRunsBatchesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/batches/{batchRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get the summary of a single batch run, including its completion flag */
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2730,6 +3144,202 @@ export interface paths {
         /** @description Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount. */
         post: operations["postApiSuitesByIdRun"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2858,7 +3468,7 @@ export interface paths {
         put?: never;
         /**
          * Create a webhook endpoint
-         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
@@ -2890,7 +3500,7 @@ export interface paths {
         head?: never;
         /**
          * Update a webhook endpoint
-         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
          */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
@@ -2908,7 +3518,7 @@ export interface paths {
          * Roll an endpoint's signing secret
          * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
          */
-        post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
+        post: operations["postApiWebhooksV1EndpointsByIdRollSecret"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2986,7 +3596,7 @@ export interface paths {
          * List subscribable event types
          * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
          */
-        get: operations["getApiWebhooksV1Event-types"];
+        get: operations["getApiWebhooksV1EventTypes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3004,7 +3614,7 @@ export interface paths {
         };
         /**
          * List emitted events
-         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
          */
         get: operations["getApiWebhooksV1Events"];
         put?: never;
@@ -3044,9 +3654,9 @@ export interface paths {
         };
         /**
          * List spend summaries
-         * @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.
+         * @description Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.
          */
-        get: operations["getApiGatewayV1Spend-summaries"];
+        get: operations["getApiGatewayV1SpendSummaries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3064,9 +3674,9 @@ export interface paths {
         };
         /**
          * List spend events
-         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.
          */
-        get: operations["getApiGatewayV1Spend-events"];
+        get: operations["getApiGatewayV1SpendEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3084,9 +3694,9 @@ export interface paths {
         };
         /**
          * Read one end user's spend
-         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.
          */
-        get: operations["getApiGatewayV1End-usersByIdSpend"];
+        get: operations["getApiGatewayV1EndUsersByIdSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3108,7 +3718,7 @@ export interface paths {
          * Replay spend events to an endpoint
          * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
          */
-        post: operations["postApiGatewayV1Spend-eventsReplay"];
+        post: operations["postApiGatewayV1SpendEventsReplay"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3525,646 +4135,6 @@ export interface operations {
             };
         };
     };
-    "getApiModel-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        scope: {
-                            projectId: string;
-                            teamId: string | null;
-                            organizationId: string | null;
-                            organizationName: string | null;
-                        };
-                        effective: {
-                            DEFAULT: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                            FAST: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                            EMBEDDINGS: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                        };
-                        configs: {
-                            id: string;
-                            config: {
-                                [key: string]: string;
-                            };
-                            scopes: {
-                                /** @enum {string} */
-                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
-                                id: string;
-                                name: string;
-                            }[];
-                            createdAt: string;
-                            updatedAt: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiModel-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    config: {
-                        [key: string]: string;
-                    };
-                    scopes: {
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "putApiModel-defaultsById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    config?: {
-                        [key: string]: string;
-                    };
-                    scopes?: {
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Updated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "deleteApiModel-defaultsById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getApiTeams: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiTeams: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    deleteApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name?: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiTeamsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiTeamsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    userId: string;
-                    /**
-                     * @default MEMBER
-                     * @enum {string}
-                     */
-                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiTeamsByIdMembersByUserId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiTeamsByIdProjects: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiGroups: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroups: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                    bindings?: {
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                        customRoleId?: string;
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                    memberIds?: string[];
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    deleteApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiGroupsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroupsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    userId: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiGroupsByIdMembersByUserId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiGroupsByIdBindings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroupsByIdBindings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                    customRoleId?: string;
-                    /** @enum {string} */
-                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                    scopeId: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiGroupsByIdBindingsByBindingId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                bindingId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
     getApiAgents: {
         parameters: {
             query?: {
@@ -4185,7 +4155,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -4233,7 +4203,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -4291,7 +4261,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /**
@@ -4305,10 +4275,23 @@ export interface operations {
                     description?: string;
                     /** @description ISO 8601 timestamp after which the key stops working */
                     expiresAt?: string;
+                    /** @description Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller. */
+                    assignedToUserId?: string;
+                    /**
+                     * @description 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+                     * @default all
+                     * @enum {string}
+                     */
+                    permissionMode?: "all" | "readonly" | "restricted";
+                    /** @description Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant. */
+                    permissions?: string[];
                     /** @description What this key may do, and where. Required for a personal key. */
                     bindings?: {
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER";
+                        /**
+                         * @description CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+                         * @enum {string}
+                         */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
                         /** @enum {string} */
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
@@ -4344,15 +4327,95 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Requested binding exceeds the creator's own permissions, or scope does not belong to this organization */
+            /** @description Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (insufficient_permissions) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Validation error (missing name, empty bindings, etc.) */
+            /** @description Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name) */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API key ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        name?: string;
+                        description?: string | null;
+                        /** @enum {string} */
+                        keyType?: "personal" | "service";
+                        /** @description The member who owns the key; null for a service key. */
+                        assignedToUserId?: string | null;
+                        createdByUserId?: string | null;
+                        /** @enum {string} */
+                        permissionMode?: "all" | "readonly" | "restricted";
+                        /** @description The resource:action permissions a restricted key grants. Empty for the other modes. */
+                        permissions?: string[];
+                        /** Format: date-time */
+                        createdAt?: string;
+                        /** Format: date-time */
+                        expiresAt?: string | null;
+                        /** Format: date-time */
+                        lastUsedAt?: string | null;
+                        /** Format: date-time */
+                        revokedAt?: string | null;
+                        roleBindings?: {
+                            id?: string;
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                        bindings?: {
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires organization:view) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key not found (api_key_not_found) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4390,22 +4453,141 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not authorized to revoke this API key (owned by another user) */
+            /** @description Not authorized to revoke this API key, which belongs to another member (api_key_not_owned) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key not found */
+            /** @description API key not found (api_key_not_found) */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key is already revoked */
+            /** @description API key is already revoked (api_key_already_revoked) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API key ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    /**
+                     * @description 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+                     * @enum {string}
+                     */
+                    permissionMode?: "all" | "readonly" | "restricted";
+                    /** @description Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant. */
+                    permissions?: string[];
+                    /** @description Replaces the key's bindings outright. Whatever is accepted here is exactly what a subsequent GET returns. */
+                    bindings?: {
+                        /**
+                         * @description CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+                         * @enum {string}
+                         */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The updated API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        name?: string;
+                        description?: string | null;
+                        /** @enum {string} */
+                        keyType?: "personal" | "service";
+                        /** @description The member who owns the key; null for a service key. */
+                        assignedToUserId?: string | null;
+                        createdByUserId?: string | null;
+                        /** @enum {string} */
+                        permissionMode?: "all" | "readonly" | "restricted";
+                        /** @description The resource:action permissions a restricted key grants. Empty for the other modes. */
+                        permissions?: string[];
+                        /** Format: date-time */
+                        createdAt?: string;
+                        /** Format: date-time */
+                        expiresAt?: string | null;
+                        /** Format: date-time */
+                        lastUsedAt?: string | null;
+                        /** Format: date-time */
+                        revokedAt?: string | null;
+                        roleBindings?: {
+                            id?: string;
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                        bindings?: {
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key not found, or not yours to edit (api_key_not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key is already revoked (api_key_already_revoked) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error, for example restricted mode without a permissions list (validation_error) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4420,7 +4602,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     startDate: number | string;
@@ -4915,6 +5097,1189 @@ export interface operations {
             };
         };
     };
+    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    timeWindow?: {
+                        start: string | number;
+                        end: string | number;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran, and the result is scoped to the caller's project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        followsTimeWindow: boolean;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsSchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The LangWatchQL schema, scoped to the caller's permissions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsCharts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's saved workbench charts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                sql: string;
+                                parameters: {
+                                    [key: string]: unknown;
+                                };
+                                vegaLiteSpec?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsCharts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    definition?: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The chart was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved chart */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chart was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    definition?: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated chart */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiCodingAgentSessionsBySessionIdEvents: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated event kinds to include. Known kinds: model_call, compaction, rate_limit, api_error, retries_exhausted, tool_result, tool_decision, user_prompt, subagent_completed. */
+                kinds?: string;
+                /** @description Opaque keyset cursor from the previous response's nextCursor. */
+                cursor?: string;
+                limit?: number;
+                /** @description Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads. */
+                from?: number;
+                /** @description Epoch ms upper bound on event time. */
+                to?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The agent's own session id (session.id / conversation id). */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of session events plus the cursor for the next page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        events: {
+                            sessionId: string;
+                            timeUnixMs: number;
+                            recordId: string;
+                            eventKind: string;
+                            agent: string;
+                            sessionKeySource: string;
+                            traceId: string;
+                            spanId: string;
+                            promptId: string;
+                            querySource: string;
+                            agentType: string;
+                            eventSequence: number;
+                            requestId: string;
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            costUsd: number;
+                            durationMs: number;
+                            ttftMs: number;
+                            attempt: number;
+                            speed: string;
+                            stopReason: string;
+                            preTokens: number;
+                            postTokens: number;
+                            compactionTrigger: string;
+                            precomputeReuse: string;
+                            statusCode: string;
+                            errorType: string;
+                            rateLimitCarrier: string;
+                            retryDurationMs: number;
+                            toolName: string;
+                            success: string;
+                            decision: string;
+                            decisionSource: string;
+                            toolInputBytes: number;
+                            toolResultBytes: number;
+                            promptChars: number;
+                            totalTokens: number;
+                        }[];
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiCodingAgentPullRequestUsage: {
+        parameters: {
+            query: {
+                /** @description The repository as "owner/name". */
+                repository: string;
+                /** @description The pull request number. */
+                pullRequest: number;
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pull request's usage rollup */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pullRequest: {
+                            repositoryHost: string;
+                            repositoryFullName: string;
+                            prNumber: number;
+                            headBranch: string;
+                            htmlUrl: string;
+                            state: string;
+                            isDraft: boolean;
+                            authorLogin: string | null;
+                            prCreatedAtMs: number;
+                            prClosedAtMs: number | null;
+                            prMergedAtMs: number | null;
+                        };
+                        rows: {
+                            projectId: string;
+                            projectSlug: string;
+                            contributorLabel: string;
+                            contributorIsProject: boolean;
+                            agent: string;
+                            models: string[];
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        }[];
+                        totals: {
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        };
+                        modelBreakdown: {
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            tokensKnown: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     getApiDashboards: {
         parameters: {
             query?: never;
@@ -4932,7 +6297,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -4948,7 +6313,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     dashboardIds: string[];
@@ -4990,7 +6355,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5019,7 +6384,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5043,7 +6408,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-upload": {
+    postApiDatasetDirectUpload: {
         parameters: {
             query?: never;
             header?: never;
@@ -5053,7 +6418,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "putApiDatasetDirect-uploadStagingByUploadId": {
+    putApiDatasetDirectUploadStagingByUploadId: {
         parameters: {
             query?: never;
             header?: never;
@@ -5065,7 +6430,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-uploadByDatasetIdFinalize": {
+    postApiDatasetDirectUploadByDatasetIdFinalize: {
         parameters: {
             query?: never;
             header?: never;
@@ -5077,7 +6442,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "postApiDatasetDirect-uploadByDatasetIdRetry": {
+    postApiDatasetDirectUploadByDatasetIdRetry: {
         parameters: {
             query?: never;
             header?: never;
@@ -5089,7 +6454,7 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
-    "deleteApiDatasetDirect-uploadByDatasetId": {
+    deleteApiDatasetDirectUploadByDatasetId: {
         parameters: {
             query?: never;
             header?: never;
@@ -5137,7 +6502,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     entries: {
@@ -5157,7 +6522,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     recordIds: string[];
@@ -5175,7 +6540,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": components["schemas"]["DatasetPostEntries"];
             };
@@ -5296,7 +6661,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -5319,7 +6684,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     entry: {
@@ -5432,7 +6797,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -5647,7 +7012,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -6052,7 +7417,7 @@ export interface operations {
             };
         };
     };
-    postApiEvaluationsBatchLog_results: {
+    postApiEvaluationsBatchLogResults: {
         parameters: {
             query?: never;
             header?: never;
@@ -6248,6 +7613,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6399,6 +7769,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6548,6 +7923,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6693,6 +8073,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6771,6 +8156,15 @@ export interface operations {
                             [key: string]: unknown;
                         };
                     };
+                };
+            };
+            /** @description The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
         };
@@ -7767,7 +9161,7 @@ export interface operations {
             };
         };
     };
-    postApiDspyLog_steps: {
+    postApiDspyLogSteps: {
         parameters: {
             query?: never;
             header?: never;
@@ -8108,7 +9502,7 @@ export interface operations {
             };
         };
     };
-    postApiTrack_event: {
+    postApiTrackEvent: {
         parameters: {
             query?: never;
             header?: never;
@@ -8674,11 +10068,12 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keys": {
+    getApiGatewayV1VirtualKeys: {
         parameters: {
             query?: {
                 cursor?: string;
                 limit?: number;
+                /** @description Exact match on the resource's `external_id`. */
                 external_id?: string;
             };
             header?: never;
@@ -8705,7 +10100,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -8720,10 +10118,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
                         next_cursor: string | null;
@@ -8812,7 +10219,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keys": {
+    postApiGatewayV1VirtualKeys: {
         parameters: {
             query?: never;
             header?: {
@@ -8822,7 +10229,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -8837,6 +10244,8 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
+                    expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -8867,26 +10276,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -8911,6 +10304,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -8953,7 +10355,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -8968,10 +10373,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -9079,7 +10493,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keysById": {
+    getApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9108,7 +10522,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9123,10 +10540,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -9233,7 +10659,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGatewayV1Virtual-keysById": {
+    patchApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9242,7 +10668,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -9252,10 +10678,13 @@ export interface operations {
                         scope_type: "organization" | "team" | "project";
                         scope_id: string;
                     }[];
+                    /** @description Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when exactly one names a live project, and otherwise on the organization's oldest live governance project when there are no other live projects to choose from. An organization with live projects that could have been named refuses with `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with `trace_project_required`. */
                     trace_project_id?: string | null;
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
+                    /** @description When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`. */
+                    expires_at?: string | null;
                     budget?: {
                         limit_usd: number | string;
                         /** @enum {string} */
@@ -9286,26 +10715,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -9330,6 +10743,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -9368,7 +10790,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9383,10 +10808,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -9473,7 +10907,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Virtual-keysByIdSpend": {
+    getApiGatewayV1VirtualKeysByIdSpend: {
         parameters: {
             query?: {
                 from?: number;
@@ -9627,7 +11061,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdRotate": {
+    postApiGatewayV1VirtualKeysByIdRotate: {
         parameters: {
             query?: never;
             header?: never;
@@ -9656,7 +11090,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9671,10 +11108,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                         secret: string;
                     };
@@ -9762,7 +11208,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdDisable": {
+    postApiGatewayV1VirtualKeysByIdDisable: {
         parameters: {
             query?: never;
             header?: never;
@@ -9798,7 +11244,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9813,10 +11262,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -9903,7 +11361,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdEnable": {
+    postApiGatewayV1VirtualKeysByIdEnable: {
         parameters: {
             query?: never;
             header?: never;
@@ -9932,7 +11390,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9947,10 +11408,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10037,7 +11507,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Virtual-keysByIdRevoke": {
+    postApiGatewayV1VirtualKeysByIdRevoke: {
         parameters: {
             query?: never;
             header?: never;
@@ -10066,7 +11536,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10081,10 +11554,19 @@ export interface operations {
                             routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
+                            /** Format: date-time */
                             created_at: string;
+                            /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
+                            expires_at: string | null;
                         };
                     };
                 };
@@ -10398,7 +11880,9 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
+                /** @description Comma-separated subset of the scope types, lowercase, e.g. `virtual_key,principal`. */
                 scope_type?: string;
+                /** @description Exact match on the resource's `external_id`. */
                 external_id?: string;
             };
             header?: never;
@@ -10452,6 +11936,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         }[];
                         spend_available: boolean;
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
@@ -10551,7 +12040,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     scope: {
@@ -10602,6 +12091,8 @@ export interface operations {
                      * @description Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
                      */
                     cycle_anchor_at?: string;
+                    /** @description Keeps a `team`, `project` or `group` budget that no active key can produce traffic for, which is otherwise refused with `gateway_budget_scope_unreachable`. Send it to provision ahead of the keys that will use the budget. An organization with no active keys is never refused, so this is not needed during first setup. */
+                    allow_unreachable?: boolean;
                 };
             };
         };
@@ -10653,6 +12144,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -10815,6 +12311,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                         spend_available: boolean;
                     };
@@ -10978,6 +12479,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11073,7 +12579,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -11135,6 +12641,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11224,6 +12735,7 @@ export interface operations {
     postApiGatewayV1BudgetsByIdReset: {
         parameters: {
             query?: {
+                /** @description Resets ONE end-user bucket on an attributed-user template, leaving the template period untouched. */
                 end_user_id?: string;
             };
             header?: never;
@@ -11286,6 +12798,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11598,7 +13115,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Cache-rules": {
+    getApiGatewayV1CacheRules: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -11726,7 +13243,7 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Cache-rules": {
+    postApiGatewayV1CacheRules: {
         parameters: {
             query?: never;
             header?: {
@@ -11736,7 +13253,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -11899,7 +13416,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Cache-rulesById": {
+    getApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12024,7 +13541,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiGatewayV1Cache-rulesById": {
+    deleteApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12149,7 +13666,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGatewayV1Cache-rulesById": {
+    patchApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12158,7 +13675,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -12299,7 +13816,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templates": {
+    getApiGovernanceIngestionTemplates: {
         parameters: {
             query?: never;
             header?: never;
@@ -12381,7 +13898,7 @@ export interface operations {
             };
         };
     };
-    "postApiGovernanceIngestion-templates": {
+    postApiGovernanceIngestionTemplates: {
         parameters: {
             query?: never;
             header?: never;
@@ -12466,7 +13983,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templatesAdmin": {
+    getApiGovernanceIngestionTemplatesAdmin: {
         parameters: {
             query?: never;
             header?: never;
@@ -12548,7 +14065,7 @@ export interface operations {
             };
         };
     };
-    "getApiGovernanceIngestion-templatesById": {
+    getApiGovernanceIngestionTemplatesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12647,7 +14164,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiGovernanceIngestion-templatesById": {
+    deleteApiGovernanceIngestionTemplatesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12750,7 +14267,7 @@ export interface operations {
             };
         };
     };
-    "patchApiGovernanceIngestion-templatesByIdOttl-rules": {
+    patchApiGovernanceIngestionTemplatesByIdOttlRules: {
         parameters: {
             query?: never;
             header?: never;
@@ -12864,7 +14381,7 @@ export interface operations {
             };
         };
     };
-    "postApiGovernanceIngestion-templatesClone": {
+    postApiGovernanceIngestionTemplatesClone: {
         parameters: {
             query?: never;
             header?: never;
@@ -13054,7 +14571,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -13340,7 +14857,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -13775,7 +15292,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     handle: string;
@@ -13994,7 +15511,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     versionId: string;
@@ -14157,7 +15674,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -14237,7 +15754,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -14911,7 +16428,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     model?: string;
@@ -15221,7 +16738,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     configData: {
@@ -15559,7 +17076,345 @@ export interface operations {
             };
         };
     };
-    "getApiModel-providers": {
+    getApiModelDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        scope: {
+                            projectId: string;
+                            teamId: string | null;
+                            organizationId: string | null;
+                            organizationName: string | null;
+                        };
+                        effective: {
+                            DEFAULT: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            FAST: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            EMBEDDINGS: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                        };
+                        configs: {
+                            id: string;
+                            config: {
+                                [key: string]: string;
+                            };
+                            scopes: {
+                                /** @enum {string} */
+                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                id: string;
+                                name: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiModelDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    config: {
+                        [key: string]: string;
+                    };
+                    scopes: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    putApiModelDefaultsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    config?: {
+                        [key: string]: string;
+                    };
+                    scopes?: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiModelDefaultsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiModelProviders: {
         parameters: {
             query?: never;
             header?: never;
@@ -15662,7 +17517,7 @@ export interface operations {
             };
         };
     };
-    "putApiModel-providersByProvider": {
+    putApiModelProvidersByProvider: {
         parameters: {
             query?: never;
             header?: never;
@@ -15671,7 +17526,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     enabled: boolean;
@@ -15892,7 +17747,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -16214,7 +18069,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -16354,7 +18209,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     enabled: boolean;
@@ -16436,14 +18291,2330 @@ export interface operations {
             };
         };
     };
-    "postApiScenario-events": {
+    getOrganization: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    supportContact?: string | null;
+                    presenceEnabled?: boolean;
+                    traceSharingEnabled?: boolean;
+                    /** @enum {string|null} */
+                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                    s3Endpoint?: string | null;
+                    s3AccessKeyId?: string | null;
+                    s3SecretAccessKey?: string | null;
+                    s3Bucket?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationMembers: {
+        parameters: {
+            query?: {
+                includeDisabled?: "true" | "false";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        members: {
+                            userId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            disabled: boolean;
+                            disabledAt: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            user: {
+                                id: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teams: {
+                            teamId: string;
+                            teamName: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    removeOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    disabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teamsLeftWithoutAdmin?: {
+                            id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMemberAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                            orgRole: string;
+                            orgRolePermissions: string[];
+                        };
+                        groups: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            scimSource: string | null;
+                            bindings: {
+                                id: string;
+                                role: string;
+                                customRoleName: string | null;
+                                /** @enum {string} */
+                                scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                scopeId: string;
+                                scopeName: string | null;
+                                permissions: string[];
+                            }[];
+                        }[];
+                        directBindings: {
+                            id: string;
+                            role: string;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            permissions: string[];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createOrganizationInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    invites: {
+                        /** Format: email */
+                        email: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        teams: {
+                            teamId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId?: string;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                            emailNotSent: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    revokeOrganizationInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Organizations on this instance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organizations?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                            /** Format: date-time */
+                            createdAt?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    provisionOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    slug?: string;
+                    adminApiKeyName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Organization created. adminApiKey.token is the bootstrap credential and is only shown once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organization?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                        };
+                        team?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                        };
+                        adminApiKey?: {
+                            id?: string;
+                            /** @description Plaintext organization admin API key (sk-lw-...). Store securely: shown only once. */
+                            token?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description An organization with this slug already exists (organization_slug_taken) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body did not match the schema, for example a slug that is not lowercase letters, numbers and single hyphens */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organization?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                            /** Format: date-time */
+                            createdAt?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listRoleBindings: {
+        parameters: {
+            query?: {
+                userId?: string;
+                groupId?: string;
+                apiKeyId?: string;
+                scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                scopeId?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bindings: {
+                            id: string;
+                            principal: {
+                                /** @enum {string} */
+                                type: "user" | "group" | "apiKey";
+                                id: string;
+                                name: string | null;
+                            };
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            createdAt: string;
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    createRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    userId?: string;
+                    groupId?: string;
+                    apiKeyId?: string;
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                        hasLegacyAccessNotice?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    deleteRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roles: {
+                            id: string;
+                            name: string;
+                            description: string | null;
+                            permissions: string[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string;
+                    permissions: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resources: {
+                            resource: string;
+                            organizationExclusive: boolean;
+                            actions: string[];
+                            permissions: string[];
+                        }[];
+                        actions: string[];
+                    };
+                };
+            };
+        };
+    };
+    getRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    permissions?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listScimTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tokens: {
+                            id: string;
+                            description: string | null;
+                            createdAt: string;
+                            lastUsedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createScimToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    description?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        token: string;
+                        description: string | null;
+                    };
+                };
+            };
+        };
+    };
+    revokeScimToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    scimGetServiceProviderConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The supported capabilities. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        documentationUri?: string;
+                        patch?: {
+                            supported?: boolean;
+                        };
+                        bulk?: {
+                            supported?: boolean;
+                            maxOperations?: number;
+                            maxPayloadSize?: number;
+                        };
+                        filter?: {
+                            supported?: boolean;
+                            maxResults?: number;
+                        };
+                        changePassword?: {
+                            supported?: boolean;
+                        };
+                        sort?: {
+                            supported?: boolean;
+                        };
+                        etag?: {
+                            supported?: boolean;
+                        };
+                        authenticationSchemes?: {
+                            type?: string;
+                            name?: string;
+                            description?: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListResourceTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The User and Group resource types. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            id?: string;
+                            name?: string;
+                            endpoint?: string;
+                            /** @description The URN of the schema this resource type is defined by. */
+                            schema?: string;
+                            meta?: {
+                                resourceType?: string;
+                                location?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListSchemas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The User and Group schema definitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The schema URN. */
+                            id?: string;
+                            name?: string;
+                            description?: string;
+                            /** @description The attribute definitions, in the shape RFC 7643 section 7 gives them. */
+                            attributes?: Record<string, never>[];
+                            meta?: {
+                                resourceType?: string;
+                                location?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListUsers: {
+        parameters: {
+            query?: {
+                /** @description A SCIM filter. Only `userName eq "..."` is applied; anything else is ignored and the full page is returned. */
+                filter?: string;
+                /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
+                startIndex?: number;
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of provisioned users. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                            id?: string;
+                            /**
+                             * Format: email
+                             * @description The member's email address, which is their login.
+                             */
+                            userName?: string;
+                            name?: {
+                                givenName?: string;
+                                familyName?: string;
+                            };
+                            emails?: {
+                                /** Format: email */
+                                value?: string;
+                                primary?: boolean;
+                                type?: string;
+                            }[];
+                            /** @description False once the account is deactivated. */
+                            active?: boolean;
+                            meta?: {
+                                resourceType?: string;
+                                /** Format: date-time */
+                                created?: string;
+                                /** Format: date-time */
+                                lastModified?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The provisioned user. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description A member with this userName already exists in the organization. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimGetUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deprovisioned. No body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimPatchUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimListGroups: {
+        parameters: {
+            query?: {
+                /** @description A SCIM filter. Only `displayName eq "..."` is applied; anything else is ignored and the full page is returned. */
+                filter?: string;
+                /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
+                startIndex?: number;
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
+                count?: number;
+                /** @description Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership. */
+                excludedAttributes?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of provisioned groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The LangWatch group id. */
+                            id?: string;
+                            displayName?: string;
+                            /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                            members?: {
+                                value?: string;
+                                display?: string;
+                            }[];
+                            meta?: {
+                                resourceType?: string;
+                                /** Format: date-time */
+                                created?: string;
+                                /** Format: date-time */
+                                lastModified?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The provisioned group. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description A provisioned group with this displayName already exists in the organization. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimGetGroup: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership. */
+                excludedAttributes?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deprovisioned. No body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimPatchGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiScenarioEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
             content: {
                 "application/json": {
                     /** @constant */
@@ -16957,7 +21128,7 @@ export interface operations {
             };
         };
     };
-    "deleteApiScenario-events": {
+    deleteApiScenarioEvents: {
         parameters: {
             query: {
                 scenarioSetId: string;
@@ -17031,14 +21202,14 @@ export interface operations {
             };
         };
     };
-    "postApiScenario-eventsBrowser-tab": {
+    postApiScenarioEventsBrowserTab: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     tabKey: string;
@@ -17131,6 +21302,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -17193,7 +21372,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -17202,6 +21381,15 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                        defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
+                    }[];
                 };
             };
         };
@@ -17218,6 +21406,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -17296,6 +21492,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -17372,13 +21576,22 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                        defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
+                    }[];
                 };
             };
         };
@@ -17395,6 +21608,14 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                            defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -17594,7 +21815,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @description Project name */
@@ -17765,7 +21986,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -17984,7 +22205,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -18167,7 +22388,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     value: string;
@@ -18337,7 +22558,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runs": {
+    getApiSimulationRuns: {
         parameters: {
             query?: {
                 scenarioSetId?: string;
@@ -18438,7 +22659,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runsByScenarioRunId": {
+    getApiSimulationRunsByScenarioRunId: {
         parameters: {
             query?: never;
             header?: never;
@@ -18544,7 +22765,7 @@ export interface operations {
             };
         };
     };
-    "getApiSimulation-runsBatchesList": {
+    getApiSimulationRunsBatchesList: {
         parameters: {
             query: {
                 scenarioSetId: string;
@@ -18570,11 +22791,18 @@ export interface operations {
                             passCount: number;
                             failCount: number;
                             runningCount: number;
+                            settledCount: number;
                             stalledCount: number;
                             lastRunAt: number;
                             lastUpdatedAt: number;
                             firstCompletedAt: number | null;
+                            /**
+                             * @deprecated
+                             * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                             */
                             allCompletedAt: number | null;
+                            /** @description True when every run of the batch reached a terminal status. */
+                            isComplete: boolean;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -18595,6 +22823,106 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSimulationRunsBatchesByBatchRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        batchRunId: string;
+                        totalCount: number;
+                        passCount: number;
+                        failCount: number;
+                        runningCount: number;
+                        settledCount: number;
+                        stalledCount: number;
+                        lastRunAt: number;
+                        lastUpdatedAt: number;
+                        firstCompletedAt: number | null;
+                        /**
+                         * @deprecated
+                         * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                         */
+                        allCompletedAt: number | null;
+                        /** @description True when every run of the batch reached a terminal status. */
+                        isComplete: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Batch run not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18723,7 +23051,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -19011,7 +23339,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -19224,10 +23552,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -19322,6 +23654,308 @@ export interface operations {
             };
         };
     };
+    getApiTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiTeamsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiTeamsByIdProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroups: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId?: string;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    memberIds?: string[];
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    userId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdBindingsByBindingId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                bindingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
     postApiTracesSearch: {
         parameters: {
             query?: never;
@@ -19329,7 +23963,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     query?: string;
@@ -19534,6 +24168,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
                     pageOffset?: number;
                     pageSize?: number;
                     groupBy?: string;
@@ -19582,6 +24217,8 @@ export interface operations {
                             scrollId?: string;
                             /** @description Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set. */
                             skipped?: number;
+                            /** @description Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate. */
+                            updatedThrough?: number;
                         };
                         /** @description Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader. */
                         schema?: {
@@ -19864,7 +24501,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     metadata: {
@@ -20031,7 +24668,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name: string;
@@ -20041,7 +24678,6 @@ export interface operations {
                     actionParams?: {
                         [key: string]: unknown;
                     };
-                    /** @default {} */
                     filters?: {
                         [key: string]: unknown;
                     };
@@ -20325,7 +24961,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -20449,9 +25085,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data: {
-                            id: string;
+                        data: ({
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -20465,7 +25104,36 @@ export interface operations {
                             max_in_flight: number;
                             created_at: string;
                             updated_at: string;
-                        }[];
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        })[];
                     };
                 };
             };
@@ -20561,10 +25229,19 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
-                    url: string;
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
+                    url?: string;
+                    sqs?: {
+                        queue_url: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events: string[];
                     max_batch_size?: number;
                     max_batch_delay_ms?: number;
@@ -20583,8 +25260,41 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                            secret: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -20724,8 +25434,40 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -20981,10 +25723,19 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
                     url?: string;
+                    sqs?: {
+                        queue_url?: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events?: string[];
                     /** @enum {string} */
                     status?: "active" | "disabled";
@@ -21003,8 +25754,40 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -21124,7 +25907,7 @@ export interface operations {
             };
         };
     };
-    "postApiWebhooksV1EndpointsByIdRoll-secret": {
+    postApiWebhooksV1EndpointsByIdRollSecret: {
         parameters: {
             query?: never;
             header?: never;
@@ -21143,8 +25926,41 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            id: string;
+                            /** @constant */
+                            destination_kind: "http";
                             url: string;
+                            sqs: null;
+                            id: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                            secret: string;
+                        } | {
+                            /** @constant */
+                            destination_kind: "sqs";
+                            url: null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            };
+                            id: string;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -21670,7 +26486,7 @@ export interface operations {
             };
         };
     };
-    "getApiWebhooksV1Event-types": {
+    getApiWebhooksV1EventTypes: {
         parameters: {
             query?: never;
             header?: never;
@@ -21780,10 +26596,10 @@ export interface operations {
     };
     getApiWebhooksV1Events: {
         parameters: {
-            query?: {
+            query: {
                 type?: string;
-                from?: number;
-                to?: number;
+                from: number;
+                to: number;
                 cursor?: string;
                 limit?: number;
             };
@@ -22028,16 +26844,34 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Spend-summaries": {
+    getApiGatewayV1SpendSummaries: {
         parameters: {
             query: {
-                group_by: "virtual_key" | "end_user";
+                /** @description One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key. */
+                group_by: string;
+                bucket?: "none" | "hour" | "day";
+                timezone?: string;
+                /** @description true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent. */
+                allow_unstable?: string;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 to: number;
-                project_id?: string;
                 cursor?: string;
                 limit?: number;
-                virtual_key_id?: string;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                /** @description Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those. */
+                status?: "success" | "error" | "confirmed" | "failed" | "settled";
             };
             header?: never;
             path?: never;
@@ -22054,6 +26888,10 @@ export interface operations {
                     "application/json": {
                         data: {
                             key: string;
+                            group: {
+                                [key: string]: string;
+                            };
+                            bucket_start: string | null;
                             event_count: number;
                             settled_count: number;
                             usage: {
@@ -22156,17 +26994,26 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1Spend-events": {
+    getApiGatewayV1SpendEvents: {
         parameters: {
             query: {
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
                 to: number;
                 cursor?: string;
                 limit?: number;
-                virtual_key_id?: string;
-                end_user_id?: string;
-                project_id?: string;
-                model?: string;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
                 status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
             };
             header?: never;
@@ -22307,7 +27154,7 @@ export interface operations {
             };
         };
     };
-    "getApiGatewayV1End-usersByIdSpend": {
+    getApiGatewayV1EndUsersByIdSpend: {
         parameters: {
             query?: {
                 window?: "day" | "week" | "month";
@@ -22447,14 +27294,14 @@ export interface operations {
             };
         };
     };
-    "postApiGatewayV1Spend-eventsReplay": {
+    postApiGatewayV1SpendEventsReplay: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     from: number;
@@ -22831,7 +27678,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     name?: string;
@@ -22932,7 +27779,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
                 "application/json": {
                     /** @description Committed version to evaluate; defaults to the latest commit */

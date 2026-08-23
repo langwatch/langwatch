@@ -167,23 +167,45 @@ make service-watch svc=nlpgo # live reload via air
 
 ## Commands
 
-Inside langwatch/
+From the repo root (it proxies these to `@langwatch/web`)
 
 ```bash
-pnpm typecheck        # Type check (uses tsgo, fast)
+pnpm typecheck        # Type check (TypeScript 7's native tsc, fast)
 pnpm test:unit        # Unit tests
-pnpm test:integration # Integration tests
+pnpm test:component   # Integration tests that need no datastore (jsdom, parallel)
+pnpm test:integration # Integration tests that do (Postgres/ClickHouse/Redis)
 pnpm test:e2e         # E2E tests
 ```
 
-**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
-GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+**`.integration.test.ts` files run in one of two lanes, chosen by their
+dependencies rather than by their name.** The suffix states a test LEVEL —
+renders a component, mocks its boundaries — and that is still the right name for
+such a test. But 540 of the 1017 integration files declare jsdom and name no
+database, queue or cache, and they were running on a shard that booted three
+datastores and migrated two schemas first. A file lands in the **component**
+lane when it declares `@vitest-environment jsdom` **and** mentions no datastore;
+everything else stays in the **datastore** lane. The rule lives in
+`src/test-utils/integrationLanes.ts`, both vitest configs call it, so the lanes
+are exact complements and no file can drop out of CI. Default is the datastore
+lane, so a new test is never silently run without the infrastructure it needs —
+and if you move one across and it turns out to reach a database transitively, it
+fails loudly on the first run rather than passing for the wrong reason. See
+`specs/ci/integration-test-lanes.feature`.
+
+**Whole-repo checks take a machine-wide slot.** A typecheck holds a 2.3 to
+3.5 GiB working set and uses every core — though what you see in Activity
+Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
+gave it (ADR-100); a biome run over 6,800 files spends 38 CPU-seconds in 4
 seconds of wall clock. That is fine once and ruinous four times over, so
-`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`typecheck`, `typecheck:tests`, `lint`, `lint:fix`,
 `lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
-limit waits its turn instead of piling on. With a slot free it prints nothing
+limit waits its turn instead of piling on. With haven installed the wrapper
+delegates the run to `haven slot run`, which gates on the same flock semaphore
+`haven typecheck` holds — the queue's decisions are Go code in
+`tools/thuishaven`, and the JS queue is only the fallback for machines without
+haven (`CHECK_QUEUE_IMPL=js` forces it). With a slot free it prints nothing
 and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
 `CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
@@ -193,18 +215,39 @@ unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
+**Going around the scripts does not go around the queue.** `platform/app`'s
+`node_modules/.bin/{tsc,tsgo,biome}` are shims installed by
+`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsc
+--noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/biome check ./src` take
+a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
+no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
+and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
+for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
+everything it spawns, so it can't queue behind itself. The installer stands
+down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
+`false`, so an image build or a server install keeps pnpm's own bin entries.
+
+One catch on targeted runs: with a `tsconfig.json` present, `tsc --noEmit
+<file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
+pushes people to widen the command to `-p tsconfig.tsgo.json`, which is a full
+whole-tree run. Prefer `pnpm typecheck` for a whole-project check now that it
+queues, and keep `--ignoreConfig` for the single-file case.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
 ```
 platform/app/        # Vite app (main product)
-langwatch_server/    # Python server
 services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-charts/gateway/ # Helm sub-chart for the gateway
+services/langevals/  # Python evaluators
+charts/gateway/      # Helm sub-chart for the gateway
+packages/            # Shared TypeScript workspace packages
 sdks/python/         # Python SDK
 sdks/typescript/     # TypeScript SDK
+sdks/go/             # Go SDK
+mcp/typescript/      # MCP server
 specs/               # BDD feature specs
 ```
 
@@ -224,6 +267,7 @@ specs/               # BDD feature specs
 | Building settings UI without reading the UX guidelines | Read `dev/docs/best_practices/` first (`scope-selector-and-badges.md`, `drawers.md`, `row-actions-overflow-menu.md`, `scoped-resources.md`). Scope selection ALWAYS uses `ScopeChipPicker` (multi-scope, `personalScopes` for personal-project variants), never a hand-rolled Select |
 | Exposing internal technical details in user-facing copy ("in-process", "uses the analysis service") | Read `dev/docs/best_practices/copywriting.md`. Copy says what the feature does for the customer, never how it is built; descriptions stay short, full lists go in a `(?)` tooltip pinned to the code by a test |
 | Abbreviating words in user-facing copy ("156.8K tok", "oai", "req", "ctx") | Spell them out: "tokens", "OpenAI", "requests", "context". A shortened word saves a few pixels and costs the reader a guess, and the guess is often wrong. Applies to labels, tooltips, chart axes, empty states and error copy. Identifiers, units with a standard symbol (ms, KB, USD) and vendor names written the vendor's own way are not abbreviations |
+| Repeating the frontmatter `title` as the first body heading of a `docs/` page | The frontmatter renders as part of the page: `title` becomes the H1 and `description` the visible lede under it, so a body heading or opening sentence with the same text shows twice. Never restate either. Give the first section its own name for what it covers, for example "Getting Started" or "What are Run Parameters" |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
@@ -235,7 +279,9 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:component run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running a component-lane test with `pnpm test:integration` and finding it "missing" | The two lanes are complements: `test:integration` only includes files that need a datastore, so a jsdom file naming none is not in it. Use `pnpm test:component`. If you meant it to have a database, name the dependency — that is what moves it back |
+| Adding a datastore to an existing jsdom integration test and expecting CI to notice | It does, automatically: the lane is recomputed from the file's source on every run, so mentioning Prisma/ClickHouse/Redis moves it to the datastore lane with no config change. The reverse also holds — removing the last mention moves it out, so check that is what you wanted |
 | Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
 | Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
 | Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
@@ -252,7 +298,9 @@ specs/               # BDD feature specs
 | Using `gh api graphql -f`/`-F` variable parameters for GraphQL queries | Inline the values directly in the query string (replace `OWNER`, `REPO`, `NUMBER` literals). The `-f`/`-F` flags cause escaping issues with multiline queries and special characters |
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
+| Dogfooding agent-usage tracking features with `claude -p` or other headless modes | Never. Spin up a sub-tmux session (`tmux new-session -d`, `send-keys`, `capture-pane`) and drive the agent interactively, the way a user runs it: headless mode skips or reorders the session lifecycle (hooks, prompts, settings reads) that these features exist to observe. Verify the captured data landed in the product afterward, not just that the process exited |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
+| Mounting a drawer component from inside another drawer (`useState`/`useDisclosure`) | Drawers are URL-routed singletons with a navigation stack. A sub-flow navigates: `openDrawer("target", { onSuccess, onClose: goBack })`, and `goBack` returns to the caller. Pass `onClose`, never let the target call `closeDrawer` (it clears the whole stack), and keep the caller's draft in a store that survives its unmount. See `dev/docs/best_practices/drawers.md` |
 | Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 | Relying solely on `gh pr checks` to assess CI status | Use `gh run list --branch <branch>` to see all workflow runs — `gh pr checks` deduplicates by check name and can mask failing runs behind passing ones from earlier commits |
 | Toasting a raw `error.message` from a mutation `onError` | Since #5984 the wire message for a handled error **is the code slug** — `description: error.message` shows the customer `validation_error`. Read the handled payload (`readHandledError`) and render copy from the code-keyed registry. See `dev/docs/best_practices/error-handling.md` |
@@ -269,20 +317,21 @@ specs/               # BDD feature specs
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* cross the prompt-cache TTL | A wait that crosses the TTL forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). **The TTL depends on where you are running: main sessions get 1h, subagents get 5min.** In a main session cap each poll cycle at ~15 min; inside a subagent cap it at **4.5 min (270s)** — re-check, then re-arm either way. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
 | Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
-| Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
+| Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. Iterate with it, and run `pnpm typecheck:all` once before you push: it is what CI runs, and it is the only one that checks tests |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions |
-| Installing from inside `langwatch/`, `typescript-sdk/`, `mcp-server/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
+| Installing from inside `platform/app/`, `sdks/typescript/`, `mcp/typescript/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
 | Adding a security `override` to a single project's `package.json` | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots |
-| Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `langwatch/`). `langwatch` is the published TypeScript SDK, in `typescript-sdk/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
-| `cd langwatch` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
+| Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `platform/app/`). `langwatch` is the published TypeScript SDK, in `sdks/typescript/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
+| `cd platform/app` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
 | Importing a component into server code to reuse a constant it happens to export | **Enforced:** no *value*-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel) — `src/server/__tests__/frontend-boundary.unit.test.ts` walks the real graph transitively and fails the build. One such import pulled 2,020 modules / 212 MB RSS into every backend process. `src/server/mailer/**` is the one exception, since react-email renders templates server-side. **Convention on top (not enforced):** don't value-import a `**/components/**` file at all, even a framework-free one — it invites exactly that chain later. A few such imports predate the guard (`server/datasets/upload-utils.ts`, `server/app-layer/langy/streaming/langyTurnRelay.ts`, `server/scenarios/execution/data-prefetcher.ts`); don't add more. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
 
 ## TypeScript
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
-| Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
+| Using npm tsc to compile | Use `pnpm typecheck` instead — it names the right project and the right compiler. Locally, a **whole-tree** `tsc` reached any other way still queues, because the bin shim sees to it; a file-targeted run, a `--watch`/`--lsp` session and CI do not (see "Going around the scripts" above). So the reason to go through the script is correctness, not the queue |
+| Importing the TypeScript compiler API from `typescript` | TypeScript 7's root export is a version constant; the compiler lives behind `typescript/unstable/*`, and nothing parses a string in-process any more. Static scans go through `src/test-utils/tsAst.ts`, which owns the one API session. See ADR-099 |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
@@ -300,6 +349,7 @@ specs/               # BDD feature specs
 | Using `LIMIT 1 BY` with heavy columns in subqueries | Use the IN-tuple dedup pattern (`GROUP BY key + max(UpdatedAt)` in subquery). `LIMIT 1 BY` forces ClickHouse to materialize ALL selected columns for entire granules (~8K rows), causing OOM with heavy payloads (Messages, SpanAttributes, ComputedInput/Output) |
 | Using `max(column)` for pagination sort keys on deduped tables | Use `argMax(column, UpdatedAt)` to derive sort keys from the latest version only. `max()` may pick values from stale versions, causing cursor pagination to skip/duplicate rows |
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
+| Using a `_count` relation include on a Prisma list query | Prisma builds `_count` as an uncorrelated join that aggregates the whole related table, and the planner can re-run that aggregate once per listed row (2.3s per call on a 192k-row table in production, see the prompt list). Run a second `groupBy` count restricted to the listed row ids instead |
 | Writing down migrations in ClickHouse migration files | Always comment out down migrations to prevent accidental data loss. Add a note: "To roll back, uncomment and run manually" |
 | Putting multiple ALTER TABLE statements in one StatementBegin block | ClickHouse does not support multi-statement queries. Each ALTER TABLE needs its own `-- +goose StatementBegin` / `-- +goose StatementEnd` block |
-| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals) — run it in the `platform/app/` directory. This is needed after fresh clones, worktree creation, or any schema changes |
+| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `platform/app/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals). This is needed after fresh clones, worktree creation, or any schema changes |

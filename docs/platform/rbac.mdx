@@ -5,11 +5,15 @@ sidebarTitle: Access Control (RBAC)
 keywords: rbac, langwatch, llm, ai, rbac, role-based access control
 ---
 
+<Note>
+  **Custom roles are available on Enterprise plans.** The built-in organization, team and project roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
 
 # Role-Based Access Control (RBAC) System
 
-LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
+LangWatch implements a Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
 
 <Info>
   For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
@@ -75,7 +79,7 @@ Full administrative access to all team resources and settings.
 Same permissions as Admin but cannot manage team settings.
 
 #### Viewer
-Read-only access to most resources for observation and reporting purposes.
+Read-only access to the resources listed below, for observation and reporting.
 
 | Resource | Permissions |
 |----------|-------------|
@@ -228,5 +232,3 @@ Role bindings can be assigned to users directly from **Settings → Members**, o
 - **Separation of Duties**: Use different roles for different functions
 - **Access Reviews**: Implement regular access reviews for sensitive roles
 - **Monitoring**: Track permission usage and changes for security auditing
-
-This RBAC system provides the flexibility to implement complex organizational structures while maintaining security and ease of management.

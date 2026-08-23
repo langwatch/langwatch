@@ -30,7 +30,7 @@ export function DepartmentEditDrawer({
   const renameMutation = api.departments.rename.useMutation();
 
   const close = () => {
-    if (renameMutation.isLoading) return;
+    if (renameMutation.isPending) return;
     onOpenChange(false);
   };
 
@@ -93,14 +93,14 @@ export function DepartmentEditDrawer({
             <Button
               variant="ghost"
               onClick={close}
-              disabled={renameMutation.isLoading}
+              disabled={renameMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               colorPalette="orange"
               onClick={() => void submit()}
-              loading={renameMutation.isLoading}
+              loading={renameMutation.isPending}
               disabled={!name.trim() || name.trim() === department?.name}
             >
               Save changes

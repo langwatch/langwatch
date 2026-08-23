@@ -1,4 +1,4 @@
-import IORedis from "ioredis";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
@@ -41,6 +41,7 @@ const MAP_TARGET_TABLE: Record<string, string> = {
   metricDataPointStorage: "metric_data_points",
   metricSeriesCatalog: "metric_series",
   metricTimeRollup: "metric_time_rollups",
+  codingAgentSessionEvents: "coding_agent_session_events",
 };
 
 /** Pipelines with no fold store whose map projections still replay. */
@@ -58,7 +59,21 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 export function createReplayRuntime(config: {
   redisUrl: string;
 }): ReplayRuntime {
-  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+  // Replay runs its own connection rather than the App's on purpose: a full
+  // rebuild should not share a socket with live traffic. It is still built by
+  // the client package, so a `rediss://` target gets TLS and the dev database
+  // index applies — building it by hand here silently dropped both (ADR-093).
+  //
+  // Standalone specifically: ReplayService runs multi-key operations that a
+  // Redis Cluster rejects with CROSSSLOT.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: config.redisUrl,
+  });
+  if (!redis) {
+    throw new Error(
+      "Replay requires a Redis URL — none was resolved from the supplied config.",
+    );
+  }
 
   const clientResolver = getApp().clickhouse.resolveClient;
 
@@ -73,7 +88,9 @@ export function createReplayRuntime(config: {
     [
       "evaluation_processing",
       new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository(clientResolver),
+        new EvaluationRunClickHouseRepository({
+          resolveClient: clientResolver,
+        }),
       ),
     ],
     [

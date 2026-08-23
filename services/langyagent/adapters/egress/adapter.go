@@ -103,7 +103,10 @@ func startEgressAdapter(port int, cfg egressAdapterConfig) (*egressAdapter, erro
 	}
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	listener, err := net.Listen("tcp", addr)
+	// The bind is instantaneous and the listener is pool-lifetime, so there is
+	// no cancellation to thread through; Background keeps noctx satisfied
+	// without widening the constructor signature.
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("egress adapter listen %s: %w", addr, err)
 	}

@@ -81,7 +81,7 @@ readinessProbe:
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
 - **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
 The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
@@ -128,7 +128,7 @@ GET /health
 
 The body is deliberately smaller than the probes': no `version`, no `uptime_s`. This endpoint is polled by the public internet, and restart cadence and build identity are not something to publish.
 
-### What it covers, and what it never will
+### What it covers, and what it does not
 
 The verdict covers the gateway process and the dependencies you own: the control plane. It is structurally independent of model providers.
 
@@ -159,7 +159,7 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS` — see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS`; see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
 2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.

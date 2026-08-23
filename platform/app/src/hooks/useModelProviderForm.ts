@@ -5,8 +5,8 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import {
-  hasUserEnteredNewApiKey,
-  hasUserModifiedNonApiKeyFields,
+  hasUserModifiedAnyCredential,
+  headerSignature,
 } from "../utils/modelProviderHelpers";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
@@ -79,6 +79,12 @@ export type UseModelProviderFormState = {
    * so the list and model-selector groups stay distinguishable.
    */
   name: string;
+  /**
+   * The slug that addresses this instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Empty when the operator set none, in which case
+   * the provider is reached by its family prefix like any other.
+   */
+  routingHandle: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
@@ -117,6 +123,7 @@ export type UseModelProviderFormState = {
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
   setName: (name: string) => void;
+  setRoutingHandle: (routingHandle: string) => void;
   setScopes: (scopes: ScopeSelection[]) => void;
   setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
@@ -163,6 +170,13 @@ export function useModelProviderForm(
     (provider as { name?: string }).name ??
     humanizeProviderName(provider.provider);
   const [name, setName] = useState<string>(initialName);
+
+  // Routing handle — stored lowercased, so the input shows what the gateway
+  // will actually answer to rather than what was typed.
+  const initialRoutingHandle =
+    (provider as { routingHandle?: string | null }).routingHandle ?? "";
+  const [routingHandle, setRoutingHandle] =
+    useState<string>(initialRoutingHandle);
 
   // Scope state — defaults to the stored provider's scope set when
   // editing. For brand-new providers we open at the widest scope the
@@ -251,6 +265,7 @@ export function useModelProviderForm(
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -271,6 +286,7 @@ export function useModelProviderForm(
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -295,15 +311,23 @@ export function useModelProviderForm(
       humanizeProviderName(provider.provider);
     if (name.trim() !== initialName.trim()) return true;
 
-    if (hasUserEnteredNewApiKey(credentialKeysHook.customKeys)) return true;
+    const storedHandle =
+      (provider as { routingHandle?: string | null }).routingHandle ?? "";
+    if (routingHandle.trim().toLowerCase() !== storedHandle) return true;
+
+    // The same helper the submit path uses to decide whether to send
+    // credentials at all, so the button and the payload cannot disagree.
+    // Reading only "a new api key was typed" plus "a non-key field changed"
+    // left one edit invisible: emptying a key field is a change, and with
+    // Save disabled there was no way to remove a credential at all.
     if (
-      hasUserModifiedNonApiKeyFields(
-        credentialKeysHook.customKeys,
-        credentialKeysHook.originalStoredKeysRef.current as Record<
+      hasUserModifiedAnyCredential({
+        customKeys: credentialKeysHook.customKeys,
+        initialKeys: credentialKeysHook.originalStoredKeysRef.current as Record<
           string,
           unknown
         >,
-      )
+      })
     ) {
       return true;
     }
@@ -332,9 +356,14 @@ export function useModelProviderForm(
     // Headers and models: order-sensitive JSON compare. Reordering a list
     // counts as dirty here, which matches user intent (the user dragged
     // them on purpose).
+    //
+    // Headers are compared on key and value only. The form carries a
+    // `concealed` flag the stored header has no idea about, so comparing the
+    // objects whole made every provider that holds a header read as dirty the
+    // moment its drawer opened, with Save enabled over an untouched form.
     if (
-      JSON.stringify(extraHeadersHook.extraHeaders) !==
-      JSON.stringify(provider.extraHeaders ?? [])
+      headerSignature(extraHeadersHook.extraHeaders) !==
+      headerSignature(provider.extraHeaders)
     ) {
       return true;
     }
@@ -359,6 +388,7 @@ export function useModelProviderForm(
   }, [
     provider,
     name,
+    routingHandle,
     credentialKeysHook.customKeys,
     credentialKeysHook.originalStoredKeysRef,
     credentialKeysHook.useApiGateway,
@@ -396,6 +426,9 @@ export function useModelProviderForm(
       (provider as { name?: string }).name ??
         humanizeProviderName(provider.provider),
     );
+    setRoutingHandle(
+      (provider as { routingHandle?: string | null }).routingHandle ?? "",
+    );
   }, [
     provider.provider,
     provider.id,
@@ -428,6 +461,7 @@ export function useModelProviderForm(
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       isSaving: formSubmitHook.isSaving,
@@ -437,6 +471,7 @@ export function useModelProviderForm(
     {
       setEnabled: formSubmitHook.setEnabled,
       setName,
+      setRoutingHandle,
       setScopes,
       setScopeType,
       setUseApiGateway,

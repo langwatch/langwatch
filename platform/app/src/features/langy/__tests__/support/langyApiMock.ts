@@ -26,9 +26,8 @@
 export const idleQuery = () => ({
   data: undefined,
   isLoading: false,
-  isInitialLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isFetched: true,
   isError: false,
   error: null,
@@ -58,6 +57,30 @@ export const routerProxy: unknown = new Proxy(
     },
   },
 );
+
+/**
+ * The `modelProvider` router as a panel suite needs it, rather than as the
+ * suite's subject: a resolved Langy model (without one the sidebar draws the
+ * inline model-setup screen over the panel), an empty provider list, and the
+ * two default-model mutations the make-default dialog holds at render. A suite
+ * that IS about one of these passes its own value for that key.
+ */
+export const modelProviderRouter = (
+  explicit: Record<string, unknown> = {},
+) => ({
+  getResolvedDefault: {
+    useQuery: () => ({
+      data: { model: "openai/gpt-5-mini" },
+      isLoading: false,
+    }),
+  },
+  listAllForProjectForFrontend: {
+    useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+  },
+  setRoleAssignmentForScope: { useMutation: noopMutation },
+  setFeatureOverrideForScope: { useMutation: noopMutation },
+  ...explicit,
+});
 
 /** Explicitly declared procedures win; anything else on the router is inert. */
 export const withFallback = (explicit: Record<string, unknown>) =>
@@ -94,5 +117,5 @@ export const createTrpcUtils = ({
     messages: { invalidate: () => Promise.resolve() },
     detail: { setData: () => undefined },
   },
-  langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
+  github: { getConnectionStatus: { invalidate: () => Promise.resolve() } },
 });

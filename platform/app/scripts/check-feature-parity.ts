@@ -66,14 +66,32 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // The Langy dogfood scenario suite (e2e/langy) runs against a live stack, so
+  // it is not in any CI vitest lane — but its scenario tests are still the
+  // binding surface for @e2e-tagged specs about Langy's conversational
+  // behavior. Without this root those specs could only be @unimplemented.
+  "platform/app/e2e",
   "packages",
+  // Langy's pi-harness wrapper: the process that turns the manager's config
+  // into pi's model registry and speaks the stdio protocol. Scenarios about
+  // what the wrapper generates can only bind from its own vitest suite.
+  "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The agent plugin is hand-authored manifests plus a bundle, so its only
+  // tests are the ones that read those manifests and spawn that bundle. Without
+  // this root, every scenario describing what the published plugin does could
+  // only be @unimplemented.
+  "plugins",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // CI guards run under `node --test` from the workflow that uses them, not
+  // vitest, and their tests live beside them. Without this root, a scenario
+  // describing what a guard refuses could only ever be @unimplemented.
+  ".github/scripts",
 ];
 
 /**
@@ -133,9 +151,26 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
+  // binary content parts, metadata hoisting, data capture) are satisfied by Go
+  // tests and by nothing else, so without this root those scenarios could only
+  // ever be @unimplemented or bound to a TS test that exercises a different
+  // SDK — a binding that reads green while proving nothing about Go.
+  "sdks/go",
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",
+  // CI's own behaviour is behaviour too — how a job checks out, which
+  // toolchain it compiles with. The ciguard tests are the only thing that
+  // asserts it, so scenarios under specs/ci/ can only bind from this root.
+  // Without it those feature files report "all bound" while binding nothing.
+  "tools/ciguard",
+  // The README link checker, for the same reason: specs/ci/readme-link-check.feature
+  // describes what CI asserts about the README, and only these Go tests assert it.
+  "tools/linkcheck",
+  // The CLI half of the same tool: the verdict-to-exit-code step is the part
+  // CI gates on, so the "check fails" / "check passes" scenarios bind here.
+  "cmd/linkcheck",
 ];
 
 /**
@@ -148,7 +183,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "services/langevals",
-  "langwatch_server",
   "sdks/python",
 ];
 
@@ -194,7 +228,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-feedback.feature",
   "specs/langy/langy-followup-suggestions.feature",
   "specs/langy/langy-frontend-realtime.feature",
-  "specs/langy/langy-github-install.feature",
   "specs/langy/langy-github-prs.feature",
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
@@ -230,28 +263,23 @@ const LEGACY_UNBOUND: string[] = [
 const LEGACY_INERT: string[] = [
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
-  "specs/ai-gateway/advanced-routing.feature",
   "specs/ai-gateway/azure-endpoint-from-api-base.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
   "specs/ai-gateway/cache-control-rules.feature",
   "specs/ai-gateway/caching-passthrough.feature",
   "specs/ai-gateway/cli-integrations.feature",
   "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/admin-oversight.feature",
-  "specs/ai-gateway/governance/admin-routing-policies.feature",
   "specs/ai-gateway/governance/anomaly-detection.feature",
   "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/architecture-invariants.feature",
   "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
-  "specs/ai-gateway/governance/budget-exceeded.feature",
   "specs/ai-gateway/governance/c3-alert-dispatch.feature",
   "specs/ai-gateway/governance/cli-402-license-gate.feature",
   "specs/ai-gateway/governance/cli-deep-links.feature",
   "specs/ai-gateway/governance/cli-ingest-debug.feature",
-  "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
   "specs/ai-gateway/governance/event-log-durability.feature",
@@ -260,9 +288,7 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
   "specs/ai-gateway/governance/governance-home-routing.feature",
   "specs/ai-gateway/governance/guardrails-project-scope.feature",
-  "specs/ai-gateway/governance/ingest-api-key-lifecycle.feature",
   "specs/ai-gateway/governance/ingestion-attribution.feature",
-  "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/me-usage-rest-api.feature",
   "specs/ai-gateway/governance/my-settings.feature",
   "specs/ai-gateway/governance/no-spy-mode.feature",
@@ -287,28 +313,20 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/model-disambiguation.feature",
-  "specs/ai-gateway/model-provider-scoping.feature",
-  "specs/ai-gateway/payload-capture.feature",
-  "specs/ai-gateway/policy-rules.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
   "specs/ai-gateway/self-hosting/gateway-finds-its-control-plane.feature",
   "specs/ai-gateway/self-hosting/personal-keys-deployment.feature",
   "specs/ai-gateway/semantic-caching.feature",
-  "specs/ai-gateway/span-shape.feature",
   "specs/ai-gateway/trace-propagation.feature",
   "specs/ai-gateway/wrapper-e2e/claude.feature",
   "specs/ai-gateway/wrapper-e2e/codex.feature",
   "specs/ai-gateway/wrapper-e2e/cursor.feature",
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
-  "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
-  "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
   "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
@@ -339,10 +357,12 @@ const LEGACY_INERT: string[] = [
   "specs/auth/sign-in-failure-messages.feature",
   "specs/auth/sso-orphan-user-linking.feature",
   "specs/auth/sso-wrong-provider-recovery.feature",
-  "specs/automations/authoring-drawer.feature",
   "specs/automations/dispatch-timing.feature",
   "specs/automations/notification-templates.feature",
-  "specs/automations/process-manager-dispatch.feature",
+  // ADR-093's design contract, every scenario @unimplemented on purpose: the
+  // ADR ships ahead of the implementation, and the reference PR (R0) binds
+  // these as it lands. Remove this entry with the first binding.
+  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
   "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
@@ -351,7 +371,6 @@ const LEGACY_INERT: string[] = [
   "specs/ci/migration-order.feature",
   "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
-  "specs/ci/path-filters.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
   "specs/claude/telemetry-turn-bounding.feature",
@@ -366,7 +385,6 @@ const LEGACY_INERT: string[] = [
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
-  "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/supply-chain-age-gates.feature",
   "specs/evaluations/evaluation-payload-offload.feature",
   "specs/evaluations/experiments-online-evaluations-separation.feature",
@@ -384,10 +402,7 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/oversized-attribute-value-preview.feature",
   "specs/event-sourcing/payload-envelope.feature",
   "specs/event-sourcing/pipeline-model.feature",
-  "specs/event-sourcing/poison-group-park-guard.feature",
   "specs/event-sourcing/process-roles.feature",
-  "specs/event-sourcing/producer-append-coalescing.feature",
-  "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
   "specs/event-sourcing/work-conserving-fair-dispatch.feature",
   "specs/experiments-v3/autosave-status.feature",
@@ -402,7 +417,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/runner-configuration.feature",
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
-  "specs/experiments/comparison.feature",
   "specs/features/agent-cli.feature",
   "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
@@ -444,12 +458,9 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-card-taxonomy.feature",
   "specs/langy/langy-choice-questions.feature",
   "specs/langy/langy-command-bar-activation.feature",
-  "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
-  "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-native-skills.feature",
@@ -457,7 +468,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
   "specs/langy/langy-session-key-lifecycle.feature",
-  "specs/langy/langy-session-key.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
@@ -470,7 +480,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/license-status-ui.feature",
   "specs/licensing/notification-coverage-gaps.feature",
   "specs/licensing/resource-limit-notifications.feature",
-  "specs/licensing/subscription-page.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
@@ -501,7 +510,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/navigation/child-drawer-nesting.feature",
   "specs/navigation/home-navigation.feature",
-  "specs/navigation/shared-section-navigation-layout.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
@@ -516,7 +524,6 @@ const LEGACY_INERT: string[] = [
   "specs/npx-installer/04-validation.feature",
   "specs/npx-installer/05-publish.feature",
   "specs/npx-installer/06-langy.feature",
-  "specs/npx-installer/07-lean-install.feature",
   "specs/observability/browser-rum-trace-correlation.feature",
   "specs/observability/process-substrate-alerting.feature",
   "specs/ops/clickhouse-backup-metrics.feature",
@@ -539,7 +546,6 @@ const LEGACY_INERT: string[] = [
   "specs/python-sdk/experiment-print-summary.feature",
   "specs/rbac/fetch-org-role-permission-resolution.feature",
   "specs/scenarios/ai-create-modal.feature",
-  "specs/scenarios/event-driven-execution-prep.feature",
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
@@ -549,10 +555,7 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-deletion.feature",
   "specs/scenarios/scenario-drawer-close-on-save.feature",
   "specs/scenarios/scenario-editor-new-agent-flow.feature",
-  "specs/scenarios/scenario-editor.feature",
-  "specs/scenarios/scenario-execution.feature",
   "specs/scenarios/scenario-library.feature",
-  "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
@@ -571,7 +574,6 @@ const LEGACY_INERT: string[] = [
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
-  "specs/skills/empty-state-skill-setup.feature",
   "specs/skills/onboarding-skills-architecture.feature",
   "specs/skills/platform-integration.feature",
   "specs/skills/prompt-compiler.feature",
@@ -588,15 +590,11 @@ const LEGACY_INERT: string[] = [
   "specs/trace-processing/oversized-trace-lighter-processing.feature",
   "specs/trace-processing/sdk-timing-and-metrics-canonicalisation.feature",
   "specs/traces-v2/accessibility.feature",
-  "specs/traces-v2/annotations.feature",
   "specs/traces-v2/attribute-value-readability.feature",
-  "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/column-configuration.feature",
   "specs/traces-v2/conditional-formatting.feature",
   "specs/traces-v2/conversation-context-turn-counts.feature",
   "specs/traces-v2/conversation-message-expand.feature",
-  "specs/traces-v2/conversation-turn-ledger.feature",
-  "specs/traces-v2/data-layer.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "specs/traces-v2/flame-graph.feature",
@@ -605,7 +603,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/lens-preset-groups.feature",
   "specs/traces-v2/light-mode-contrast.feature",
   "specs/traces-v2/live-tail.feature",
-  "specs/traces-v2/message-translation.feature",
   "specs/traces-v2/metadata-facet.feature",
   "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",

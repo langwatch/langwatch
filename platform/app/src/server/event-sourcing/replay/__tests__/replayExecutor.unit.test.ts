@@ -548,21 +548,29 @@ describe("MapAccumulator", () => {
   });
 
   describe("when buffered records reach the configured writeBatchSize", () => {
-    it("flushes full chunks via bulkAppend during apply, before flush() is called", async () => {
+    it("flushes full chunks via drainIfNeeded during the stream, before flush() is called", async () => {
+      // `apply` is synchronous (push only); the streaming driver awaits
+      // `drainIfNeeded()` after each apply, which is a no-op until the buffer
+      // reaches writeBatchSize — mirrored here.
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
 
-      await acc.apply(makeEvent({ data: { value: 1 } }));
+      acc.apply(makeEvent({ data: { value: 1 } }));
+      expect(acc.drainIfNeeded()).toBeUndefined();
       expect(bulkAppendSpy).not.toHaveBeenCalled();
 
-      await acc.apply(makeEvent({ data: { value: 2 } }));
+      acc.apply(makeEvent({ data: { value: 2 } }));
+      await acc.drainIfNeeded();
       expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
 
-      await acc.apply(makeEvent({ data: { value: 3 } }));
-      await acc.apply(makeEvent({ data: { value: 4 } }));
+      acc.apply(makeEvent({ data: { value: 3 } }));
+      await acc.drainIfNeeded();
+      acc.apply(makeEvent({ data: { value: 4 } }));
+      await acc.drainIfNeeded();
       expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
 
-      await acc.apply(makeEvent({ data: { value: 5 } }));
+      acc.apply(makeEvent({ data: { value: 5 } }));
+      await acc.drainIfNeeded();
       await acc.flush();
 
       expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
@@ -586,8 +594,10 @@ describe("MapAccumulator", () => {
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
 
-      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
-      await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      await acc.drainIfNeeded();
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+      await acc.drainIfNeeded();
 
       // Incremental write fired: ONE tenant-scoped call carrying both
       // aggregates' records — not one call per aggregate.
@@ -617,9 +627,11 @@ describe("MapAccumulator", () => {
 
   // Regression: map replay used to transform the RAW event, so replayed
   // spans/logs kept oversized full content instead of the previews live
-  // dispatch produces. The accumulator must lean the event before map().
+  // dispatch produces. Events now arrive at the accumulators already leaned —
+  // rowToEvent leans once at materialization; that contract is pinned in
+  // replayEventLoader.unit.test.ts ("leans oversized IO attributes …").
   describe("when a map event carries an oversized IO attribute", () => {
-    it("leans the event before mapping, matching live dispatch parity", async () => {
+    it("maps the pre-leaned event as delivered, matching live dispatch parity", async () => {
       const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
       const projection: MapProjectionDefinition<{ outLen: number }, any> = {
         name: "spanOutputLen",
@@ -635,14 +647,14 @@ describe("MapAccumulator", () => {
       };
       const acc = new MapAccumulator(projection);
 
-      const oversized = "x".repeat(200_000); // well over the 64 KB IO preview
-      await acc.apply(
+      const preview = "x".repeat(1_000); // what rowToEvent's lean delivers
+      acc.apply(
         makeEvent({
           type: SPAN_RECEIVED_EVENT_TYPE,
           data: {
             span: {
               attributes: [
-                { key: "langwatch.output", value: { stringValue: oversized } },
+                { key: "langwatch.output", value: { stringValue: preview } },
               ],
             },
           },
@@ -651,9 +663,7 @@ describe("MapAccumulator", () => {
       await acc.flush();
 
       const record = bulkAppendSpy.mock.calls[0]![0][0] as { outLen: number };
-      // Leaned: the mapped record saw the truncated preview, not the full 200 KB.
-      expect(record.outLen).toBeGreaterThan(0);
-      expect(record.outLen).toBeLessThan(oversized.length);
+      expect(record.outLen).toBe(preview.length);
     });
   });
 });

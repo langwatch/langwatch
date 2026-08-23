@@ -144,7 +144,7 @@ def chatbot(user_input):
 
 ### Combined Guardrails
 
-Use both for comprehensive protection:
+Use both to check the input and the output:
 
 ```python
 import langwatch
@@ -362,7 +362,7 @@ Always handle potential errors in guardrail execution:
 import langwatch
 
 @langwatch.trace()
-def robust_chatbot(user_input):
+def chatbot_with_error_handling(user_input):
     try:
         guardrail = langwatch.evaluation.evaluate(
             "azure/jailbreak",

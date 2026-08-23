@@ -8,8 +8,8 @@ description: Run experiments programmatically from notebooks or scripts to batch
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-LangWatch makes it easy to run experiments from code.
-Just add a few lines to start tracking your experiments.
+The LangWatch SDK runs experiments from your Python or TypeScript code and tracks
+each run in LangWatch.
 
 Not using Python or TypeScript? The SDKs call the same REST endpoints you can call
 yourself: [create an experiment](/api-reference/experiments/create-an-experiment),
@@ -46,7 +46,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to login or create an account on the link that will be displayed, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
   </Tab>
   <Tab title="Environment Variable">
 ```bash
@@ -111,7 +111,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   </Tab>
 </Tabs>
 
-That's it! Your evaluation metrics are now being tracked and visualized in LangWatch.
+Your evaluation metrics are now tracked and visualized in LangWatch.
 
 <Frame>
 <img src="/images/offline-evaluation/evaluation-sample.png" alt="Evaluation Results Sample" />
@@ -200,6 +200,7 @@ evaluation.log("coherence", {
 
 When comparing different models, prompts, or configurations, use targets to organize your results.
 Both SDKs provide a `target()`, `withTarget()` context that automatically captures latency and enables context inference.
+Once a row's targets have each produced an output, [Comparison](#comparison) judges them against each other and names a winner.
 
 <Tabs>
   <Tab title="Python">
@@ -421,11 +422,11 @@ await evaluation.run(dataset, async ({ item, index }) => {
 
 ## Built-in Evaluators
 
-LangWatch provides a comprehensive suite of evaluation metrics out of the box.
+LangWatch provides a library of evaluation metrics out of the box.
 
 <Tabs>
   <Tab title="Python">
-Use `evaluation.run()` to leverage pre-built evaluators:
+Use `evaluation.evaluate()` with pre-built evaluators:
 
 ```python
 for index, row in evaluation.loop(df.iterrows()):
@@ -454,7 +455,7 @@ for index, row in evaluation.loop(df.iterrows()):
 ```
   </Tab>
   <Tab title="TypeScript">
-Use `evaluation.evaluate()` to leverage pre-built evaluators:
+Use `evaluation.evaluate()` with pre-built evaluators:
 
 ```typescript
 await evaluation.run(dataset, async ({ item, index }) => {
@@ -485,50 +486,241 @@ await evaluation.run(dataset, async ({ item, index }) => {
   Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
 </Info>
 
-### Pairwise Compare
+## Comparison
 
-`langevals/pairwise_compare` compares two candidate outputs for the same input and asks a judge model to pick the better one. This is useful when you want to compare two prompts, models, or agent configurations directly instead of scoring each one independently.
+Scoring each target on its own leaves you calibrating numbers: is `0.78` better than `0.74` for your users, or is that noise? Comparison asks the easier question instead. It shows a judge every target output for the same row and asks which one is best.
 
-The example below was verified against the live SDK path using `evaluation.evaluate("langevals/pairwise_compare", ...)`.
+`compare()` is the code-first way in. It uses the same judge as the [Comparison evaluator](/evaluations/experiments/ui/pairwise-compare) in the workbench, so a comparison you run from a notebook and one you set up in the UI read the same way on the results page.
+
+### Comparing a row
+
+Every target that produced a non-empty output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call. There is no candidate list to assemble, and no judge prompt you have to choose, since the shipped one runs unless you [write your own](#customizing-the-judge-prompt):
 
 <Tabs>
   <Tab title="Python">
 ```python
 import langwatch
 
-ROWS = [
-    {
-        "input": "Write a function that checks if a given integer is a prime number.",
-        "golden": "def is_prime(n): ...",
-        "candidate_a_id": "variant-a",
-        "candidate_a_output": "def is_prime(n: int) -> bool: ...",
-        "candidate_b_id": "variant-b",
-        "candidate_b_output": "def is_prime(n: int) -> bool: ...",
-    }
-]
+evaluation = langwatch.experiment.init("model-comparison")
 
-evaluation = langwatch.experiment.init("pairwise-sdk-verification")
+for index, row in evaluation.loop(df.iterrows()):
+    with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+        evaluation.log_response(ask_gpt(row["question"]))
 
-for index, row in evaluation.loop(list(enumerate(ROWS))):
-    evaluation.evaluate(
-        "langevals/pairwise_compare",
-        index=index,
-        data={
-            "input": row["input"],
-            "golden": row["golden"],
-            "candidate_a_id": row["candidate_a_id"],
-            "candidate_a_output": row["candidate_a_output"],
-            "candidate_b_id": row["candidate_b_id"],
-            "candidate_b_output": row["candidate_b_output"],
-        },
-        settings={
-            "model": "openai/gpt-5-mini",
-            "has_golden_answer": True,
-            "swap_and_confirm": True,
-            "allow_tie": True,
-            "include_metrics": ["cost", "duration"],
-        },
-    )
+    with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+        evaluation.log_response(ask_claude(row["question"]))
+
+    verdict = evaluation.compare(index, input=row["question"])
+    print(verdict.winner, verdict.reasoning)
+```
+
+The candidates are whatever `log_response()` recorded inside each `target()` block.
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const evaluation = await langwatch.experiments.init("model-comparison");
+
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner, verdict.reasoning);
+});
+```
+
+The candidates are whatever each `withTarget()` callback returned.
+  </Tab>
+</Tabs>
+
+The winner comes back named with the target name you registered. `compare()` judges however many candidates the row has, and a target that produced nothing for the row, or only an empty output, is not a candidate.
+
+<Info>
+  Compare a row once its targets have finished. In Python that is after the row's last `target()` block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the usual `Promise.all` is right after the `await`.
+</Info>
+
+<Note>
+  `compare()` names the row the way `log()` does in the same SDK. Python is handed the index by `loop()`, so it passes it on as the first argument, and it needs a whole number. TypeScript infers it from the iteration the comparison runs in, so `index` is only needed when you compare outside a `run()` callback, and it is a whole number there too.
+
+  Candidate order is shuffled per row by default, seeded by the row index, so re-comparing the same row presents the candidates in the same order and a different row shuffles differently. `randomize_order` / `randomizeOrder` governs it: turn it off and the judge sees the candidates in the order their targets were registered.
+</Note>
+
+### Judging against a reference answer
+
+By default the judge compares the candidates on their own merits, with no reference answer involved. Pass `golden` to have it judge each candidate against a reference instead. That one option is the whole switch, so there is no second flag to forget:
+
+<Tabs>
+  <Tab title="Python">
+```python
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    golden=row["expected_answer"],
+)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const verdict = await evaluation.compare({
+  input: item.question,
+  golden: item.expectedAnswer,
+});
+```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Use a reference answer when correctness is the question. Leave it out for open-ended work, where tone, completeness, structure or policy adherence decide the winner and no single answer is the right one.
+</Tip>
+
+### Customizing the judge prompt
+
+Leave `prompt` unset and the judge picks the shipped prompt matching what the row actually carries: a reference answer, task context, both, or neither. The framing for whatever the row lacks is dropped rather than left empty, which is why the default is worth keeping unless you have a rubric of your own.
+
+When you do have one, pass it and it is used exactly as written. Three placeholders are filled in for you:
+
+| Placeholder | Filled with |
+|-------------|-------------|
+| `{input}` | The `input` you passed, or nothing when you passed none |
+| `{golden}` | The `golden` you passed, or nothing when you passed none |
+| `{candidates}` | The candidate outputs, one per line, each behind a slot label |
+
+<Tabs>
+  <Tab title="Python">
+```python
+SUPPORT_RUBRIC = """\
+Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.
+"""
+
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    prompt=SUPPORT_RUBRIC,
+)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const supportRubric = `Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.`;
+
+const verdict = await evaluation.compare({
+  input: item.question,
+  prompt: supportRubric,
+});
+```
+  </Tab>
+</Tabs>
+
+<Note>
+  Only those three placeholders are substituted, and they are substituted literally. Any other braces in your prompt reach the judge as written, so a rubric that says `score out of {10}` is passed through unchanged.
+</Note>
+
+### Options
+
+Every option is optional, because the judge already has a default for each one. An option you do not set is not sent at all, so the judge's default applies to it.
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `targets` | Every target that produced a non-empty output for the row | Restricts the comparison to the targets you name |
+| `input` | No task context | The task the candidates were answering, for the judge to weigh them against |
+| `golden` | No reference answer, so candidates are judged on their own merits | A reference answer to judge each candidate against, and the switch that turns reference judging on |
+| `prompt` | The shipped prompt matching what the row carries | Your own judge prompt, used exactly as written |
+| `model` | Your project's configured evaluator model | The judge model, for example `openai/gpt-5-mini` |
+| `allow_tie` / `allowTie` | `true` | Lets the judge answer "tie" when no candidate is clearly better |
+| `randomize_order` / `randomizeOrder` | `true` | Shuffles candidate order per row, seeded by the row index, so a candidate's position never sways the verdict |
+| `swap_and_reconcile` / `swapAndReconcile` | `true` | Judges each row a second time with the candidate order reversed, and establishes no winner when the two passes disagree. Doubles the judge cost per row |
+| `include_metrics` / `includeMetrics` | Nothing | Puts each candidate's `"duration"` in front of the judge, so it can prefer a faster candidate when quality is comparable. The time each target took is recorded for you. Cost is not on offer: the platform works a target's cost out from its traces after the run, so the SDK has none to show at the moment it asks for a verdict |
+| `temperature` | `0` | The judge's sampling temperature. Models that only run at their own fixed temperature, the gpt-5 family among them, ignore it |
+| `name` | `"comparison"` | The name the verdict is recorded under. Give each one its own name if you compare a row more than once |
+
+### The verdict
+
+A verdict carries four things: the `status`, the `winner`, the judge's `reasoning`, and `candidates`, the target names it actually judged.
+
+| Status | What it means |
+|--------|---------------|
+| `decided` | The judge picked a winner, named in `winner` |
+| `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
+| `inconclusive` | The judge ran and no winner came out of it. Under swap and reconcile that is usually its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good. It also covers a judge that answered with nothing usable in it, which `reasoning` says plainly. Either way the calls were made and billed, so the row still reports its cost |
+| `skipped` | Fewer than two targets produced a non-empty output, so no judge ran. `reasoning` names the targets that produced nothing |
+| `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
+
+<Note>
+  A comparison never raises when a judge fails, and never raises on a row too thin to judge. One unreachable judge in a thousand-row run costs you that row, not the run.
+</Note>
+
+<Warning>
+  Naming a target in `targets` that recorded no output for the row does raise. Comparing whatever remains would hand you a two-way verdict where you asked for a three-way one, which is worse than a failure.
+</Warning>
+
+### Seeing the results
+
+Verdicts show up on the experiment's results page:
+
+- A **Winner** column names the winning target on each row, with the judge's reasoning underneath it, so you can see why a row went the way it did.
+- A **win-rate chart** gives each target its share of the wins, plus a bar for ties. A target that never won a single row is still charted, with zero wins.
+
+With three or more targets there is also a leaderboard that ranks them from every matchup at once, with a confidence interval so the ranking's own uncertainty is visible. It is being rolled out gradually, so ask us to turn it on for your organization if you want it.
+
+### A complete comparison
+
+Three variants, one comparison per row, and a closing summary that fails a [CI build](/evaluations/experiments/ci-cd) when the run had failures:
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
+
+evaluation = langwatch.experiment.init("support-reply-comparison")
+
+for index, row in evaluation.loop(df.iterrows(), threads=4):
+    def task(index, row):
+        with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+            evaluation.log_response(ask_gpt(row["question"]))
+
+        with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+            evaluation.log_response(ask_claude(row["question"]))
+
+        with evaluation.target("gemini-flash", {"model": "gemini/gemini-2.5-flash"}):
+            evaluation.log_response(ask_gemini(row["question"]))
+
+        verdict = evaluation.compare(
+            index,
+            input=row["question"],
+            golden=row["expected_answer"],
+            include_metrics=["duration"],
+        )
+        print(f"row {index}: {verdict.status} {verdict.winner or ''}")
+
+    evaluation.submit(task, index, row)
 
 evaluation.print_summary()
 ```
@@ -539,50 +731,81 @@ import { LangWatch } from 'langwatch';
 
 const langwatch = new LangWatch();
 
-const rows = [
-  {
-    input: "Write a function that checks if a given integer is a prime number.",
-    golden: "function isPrime(n) { ... }",
-    candidateAId: "variant-a",
-    candidateAOutput: "function isPrime(n) { ... }",
-    candidateBId: "variant-b",
-    candidateBOutput: "function isPrime(n) { ... }",
-  },
-];
+const dataset = await loadDataset();
 
-const evaluation = await langwatch.experiments.init("pairwise-sdk-verification");
+const evaluation = await langwatch.experiments.init("support-reply-comparison");
 
-await evaluation.run(rows, async ({ item, index }) => {
-  await evaluation.evaluate("langevals/pairwise_compare", {
-    index,
-    data: {
-      input: item.input,
-      golden: item.golden,
-      candidate_a_id: item.candidateAId,
-      candidate_a_output: item.candidateAOutput,
-      candidate_b_id: item.candidateBId,
-      candidate_b_output: item.candidateBOutput,
-    },
-    settings: {
-      model: "openai/gpt-5-mini",
-      has_golden_answer: true,
-      swap_and_confirm: true,
-      allow_tie: true,
-      include_metrics: ["cost", "duration"],
-    },
+await evaluation.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+    evaluation.withTarget("gemini-flash", { model: "gemini/gemini-2.5-flash" }, () =>
+      askGemini(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({
+    input: item.question,
+    golden: item.expectedAnswer,
+    includeMetrics: ["duration"],
   });
-});
+  console.log(`row ${index}: ${verdict.status} ${verdict.winner ?? ""}`);
+}, { concurrency: 4 });
 
 evaluation.printSummary();
 ```
   </Tab>
 </Tabs>
 
-`swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
+### Comparing from an async loop
 
-The SDK result also records the pairwise judge's own evaluator cost and duration. In exported results, those appear under the evaluator columns for `langevals/pairwise_compare`; they are separate from `include_metrics`, which injects each candidate target's cost or duration into the judge prompt.
+<Tabs>
+  <Tab title="Python">
+In async-native mode, use `acompare()` so the judge is awaited rather than blocked on, leaving the event loop free for the rows running alongside it. It takes the same options and records the same verdict:
 
-If you already have your own local pairwise judge, publish its result with `evaluation.log(...)` by sending a `score`, `label`, and `details`. Those custom results are tracked like any other SDK metric. The dedicated pairwise column visualization currently comes from the built-in Pairwise Compare evaluator configuration.
+```python
+evaluation = langwatch.experiment.init("async-comparison")
+
+async def task(index, row):
+    with evaluation.target("gpt-5-mini"):
+        evaluation.log_response(await ask_gpt(row["question"]))
+
+    with evaluation.target("claude-sonnet-5"):
+        evaluation.log_response(await ask_claude(row["question"]))
+
+    verdict = await evaluation.acompare(index, input=row["question"])
+    print(verdict.winner)
+
+index = 0
+async for row in evaluation.aloop(dataset, concurrency=4):
+    evaluation.asubmit(task, index, row)
+    index += 1
+```
+  </Tab>
+  <Tab title="TypeScript">
+`compare()` is already awaited, so nothing changes: awaiting one row's verdict never holds up the rows running beside it. Raise `concurrency` and every row reaches the judge as soon as its own targets have settled.
+
+```typescript
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", () => askGpt(item.question)),
+    evaluation.withTarget("claude-sonnet-5", () => askClaude(item.question)),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner);
+}, { concurrency: 8 });
+```
+  </Tab>
+</Tabs>
+
+<Note>
+  The older `langevals/pairwise_compare` evaluator is deprecated. Existing calls keep working, because they are routed to the same judge described here, but new code should use `compare()`: it takes any number of candidates, names the winner with your own target name, and needs no candidate columns to assemble.
+</Note>
 
 ## Complete Example
 
@@ -739,7 +962,7 @@ Click the **Export to CSV** button in the top-right corner of the evaluation res
 
 ### CSV Structure
 
-The exported CSV contains comprehensive data organized by dataset rows and targets. Here's the complete column structure:
+The exported CSV organizes the data by dataset rows and targets. Here's the complete column structure:
 
 #### Row Index
 
@@ -780,7 +1003,31 @@ For each evaluator applied to a target:
 | `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
 | `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
 
-For `langevals/pairwise_compare`, the evaluator cost and duration columns describe the pairwise judge run itself. When `swap_and_confirm` is enabled, that judge run may include two model calls.
+#### Comparison Columns (per comparison)
+
+A comparison grades the row as a whole rather than one target, so it gets its own block of columns after every target block, named after the comparison:
+
+| Column Pattern | Description | Example |
+|----------------|-------------|---------|
+| `{comparison}_winner` | Name of the winning target, `tie`, `no_verdict`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_candidates` | The targets compared on this row, comma separated | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
+| `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
+
+What each [verdict](#the-verdict) writes into those three cells:
+
+| Verdict | `{comparison}_winner` | `{comparison}_candidates` | `{comparison}_reasoning` |
+|---------|-----------------------|---------------------------|--------------------------|
+| `decided` | The winning target's name | The targets judged on this row | The judge's explanation |
+| `tie` | `tie` | The targets judged on this row | The judge's explanation |
+| `inconclusive` | `no_verdict` | The targets judged on this row | Why the verdict did not hold |
+| `skipped` | `no_verdict` | The candidates the row did have | Why the row could not be compared |
+| `error` | Empty | Empty | Empty |
+
+An empty winner is never a tie. The three cells go empty together for `error` and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+
+`no_verdict` is the shared export token for `inconclusive` and `skipped`. The two are separate in code, on the `verdict.status` your call returns, but they are recorded under one status, so a row read back from a completed run cannot be sorted into one or the other and naming either in the export would be a guess. The reasoning cell explains why no verdict was recorded, either in the judge's own words or, when the judge itself never answered, in the evaluator's account of what came back. Keep the two apart by reading `verdict.status` at the point of comparison.
+
+A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 
 ### Example CSV Output
 
@@ -794,7 +1041,7 @@ index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gp
 
 ### Using the Data
 
-The CSV export enables powerful analysis workflows:
+The CSV export supports these analysis workflows:
 
 <AccordionGroup>
 <Accordion title="Filter and compare models">

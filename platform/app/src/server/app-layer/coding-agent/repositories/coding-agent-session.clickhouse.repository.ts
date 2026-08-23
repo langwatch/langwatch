@@ -1,8 +1,10 @@
 import { performance } from "node:perf_hooks";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
+import { groupTenantsByClient } from "~/server/clickhouse/tenantClientGroups";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   CodingAgentSessionMetricSeriesRow,
@@ -14,7 +16,10 @@ import {
   type CodingAgentSessionListReadOutcome,
   observeCodingAgentSessionListReadDuration,
 } from "~/server/metrics";
-import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
+import type {
+  CodingAgentBranchSessionRow,
+  CodingAgentSessionRepository,
+} from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 
@@ -59,6 +64,16 @@ interface ClickHouseWriteRecord {
   UserId: string;
   TerminalType: string;
   Entrypoint: string;
+  ParentSessionId: string;
+  IsFork: boolean;
+  RepositoryHost: string;
+  RepositoryOwner: string;
+  RepositoryName: string;
+  GitBranch: string;
+  GitBranches: string[];
+  GitWorktree: string;
+  Title: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -97,6 +112,7 @@ interface ClickHouseWriteRecord {
   Compactions: number;
   CompactionTokensBefore: string;
   CompactionTokensAfter: string;
+  CompactionTriggers: Record<string, number>;
   PeakContextTokens: string;
   CacheRebuildCount: number;
   LargestCacheRebuildTokens: string;
@@ -105,6 +121,7 @@ interface ClickHouseWriteRecord {
   ErrorTypes: Record<string, number>;
   ApiErrors: number;
   RateLimited: number;
+  RateLimitEvents: number;
   RetriesExhausted: number;
   RetryMs: string;
   Attempts: number;
@@ -153,6 +170,30 @@ interface ClickHouseWriteRecord {
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
+function toBranchSessionRow(
+  record: Record<string, unknown>,
+): CodingAgentBranchSessionRow {
+  return {
+    sessionId: String(record.SessionId ?? ""),
+    tenantId: String(record.TenantId ?? ""),
+    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
+    lastEventOccurredAtMs: parseClickHouseDateTimeMs(
+      String(record.LastEventOccurredAt ?? ""),
+    ),
+    inputTokens: asNumber(record.InputTokens),
+    outputTokens: asNumber(record.OutputTokens),
+    cacheReadTokens: asNumber(record.CacheReadTokens),
+    cacheCreationTokens: asNumber(record.CacheCreationTokens),
+    costUsd: asNumber(record.CostUsd),
+    agent: String(record.Agent ?? ""),
+    models: asStringArray(record.Models),
+    userId: String(record.UserId ?? ""),
+    gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
+    title: String(record.Title ?? ""),
+  };
+}
+
 function toRecord({
   row,
   retentionDays,
@@ -184,6 +225,16 @@ function toRecord({
     UserId: row.userId,
     TerminalType: row.terminalType,
     Entrypoint: row.entrypoint,
+    ParentSessionId: row.parentSessionId,
+    IsFork: row.isFork,
+    RepositoryHost: row.repositoryHost,
+    RepositoryOwner: row.repositoryOwner,
+    RepositoryName: row.repositoryName,
+    GitBranch: row.gitBranch,
+    GitBranches: row.gitBranches,
+    GitWorktree: row.gitWorktree,
+    Title: row.title,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -224,6 +275,7 @@ function toRecord({
     Compactions: row.compactions,
     CompactionTokensBefore: big(row.compactionTokensBefore),
     CompactionTokensAfter: big(row.compactionTokensAfter),
+    CompactionTriggers: row.compactionTriggers,
     PeakContextTokens: big(row.peakContextTokens),
     CacheRebuildCount: row.cacheRebuildCount,
     LargestCacheRebuildTokens: big(row.largestCacheRebuildTokens),
@@ -232,6 +284,7 @@ function toRecord({
     ErrorTypes: row.errorTypes,
     ApiErrors: row.apiErrors,
     RateLimited: row.rateLimited,
+    RateLimitEvents: row.rateLimitEvents,
     RetriesExhausted: row.retriesExhausted,
     RetryMs: big(row.retryMs),
     Attempts: row.attempts,
@@ -332,7 +385,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId: row.tenantId, sessionId: row.sessionId },
         "failed to upsert coding agent session",
       );
@@ -638,6 +691,181 @@ export class CodingAgentSessionClickHouseRepository
       .slice(0, limit);
   }
 
+  /**
+   * The sessions that ran on one repository's branches, across several
+   * projects of ONE organization: the read behind pull-request usage.
+   *
+   * `TenantId IN (...)` comes first, as every read of this table does. Several
+   * tenants share one query here because a pull request's cost spans the
+   * projects of the organization that owns it, and ClickHouse routing is
+   * per-ORGANIZATION, so those all resolve to one endpoint and one query. A
+   * list that did span organizations fans out per endpoint and the answers
+   * merge, so the read stays whole either way.
+   *
+   * `startedAtFromMs` is required. `StartedAt` is the partition key, and this
+   * read is not anchored on a session id, so without a lower bound it opens
+   * every partition the retention holds, cold storage included. The caller
+   * passes a bound wide enough to cover a pull request's whole life; there is
+   * no upper bound, because a pull request open today is still accruing.
+   *
+   * The dedup is the table's own IN-tuple pattern, unwindowed for the reason
+   * `findManyRecent` documents at length: `StartedAt` moves, so bounding the
+   * dedup scope can resolve a session to a superseded version.
+   *
+   * A session matches on the branch it ENDED on or on any branch it drove
+   * (`GitBranches`, migration 00077). Matching the scalar alone would charge a
+   * session that landed one change and moved on entirely to its last pull
+   * request, leaving the one it opened first reading as free. The set is
+   * selected as well as matched on, because attribution runs the tenure rule
+   * over it again on the way out: a row fetched on a branch it no longer sits
+   * on is only useful if the caller can still see which branch that was.
+   *
+   * Only the columns the rollup adds up are selected, plus the session's title
+   * and the scalar keys the shared tie-break ranks on. The two array-length
+   * keys it also knows about
+   * are deliberately absent, because they would mean reading `MetricSeries` and
+   * `AppliedEventIds` for every session of a busy repository to break a tie
+   * that `nextVersionStamp` already makes unreachable. `preferredOf` treats an
+   * absent column as "no progress", so the ranking degrades to its scalar keys
+   * rather than to arbitrary.
+   */
+  async listByRepositoryBranch({
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    startedAtFromMs,
+  }: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    if (tenantIds.length === 0 || branches.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionClickHouseRepository.listByRepositoryBranch",
+      );
+    }
+
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const rows: CodingAgentBranchSessionRow[] = [];
+    for (const group of groups) {
+      rows.push(
+        ...(await this.listBranchSessionsForClient({
+          ...group,
+          repositoryHost,
+          repositoryOwner,
+          repositoryName,
+          branches,
+          startedAtFromMs,
+        })),
+      );
+    }
+    return rows;
+  }
+
+  /** One endpoint's share of a repository's branch sessions. */
+  private async listBranchSessionsForClient({
+    client,
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    startedAtFromMs,
+  }: {
+    client: ClickHouseClient;
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    const result = await client.query({
+      query: `
+        SELECT
+          SessionId,
+          TenantId,
+          StartedAt,
+          InputTokens,
+          OutputTokens,
+          CacheReadTokens,
+          CacheCreationTokens,
+          CostUsd,
+          Agent,
+          Models,
+          UserId,
+          GitBranch,
+          GitBranches,
+          Title,
+          LastEventOccurredAt,
+          ModelCalls,
+          ToolCalls,
+          Prompts
+        FROM ${TABLE_NAME}
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND lower(RepositoryHost) = {repositoryHost:String}
+          AND lower(RepositoryOwner) = {repositoryOwner:String}
+          AND lower(RepositoryName) = {repositoryName:String}
+          AND (
+            GitBranch IN {branches:Array(String)}
+            OR hasAny(GitBranches, {branches:Array(String)})
+          )
+          AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
+          AND (TenantId, SessionId, UpdatedAt) IN (
+            SELECT TenantId, SessionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId IN {tenantIds:Array(String)}
+            GROUP BY TenantId, SessionId
+          )
+        ORDER BY StartedAt ASC
+      `,
+      query_params: {
+        tenantIds,
+        // Case-folded on both sides. A session stores the remote's casing
+        // verbatim, while the pull-request mapping stores its host and
+        // repository lowercased, so an exact match here would silently drop
+        // every remote whose host, owner or name is not already lower case.
+        // All three come from the same remote URL, and none of them is in the
+        // sort key, so folding costs no pruning; `TenantId` and `StartedAt`
+        // still do all of it.
+        repositoryHost: repositoryHost.toLowerCase(),
+        repositoryOwner: repositoryOwner.toLowerCase(),
+        repositoryName: repositoryName.toLowerCase(),
+        // NOT folded: git branch names are case sensitive, and `feat/X` is a
+        // different branch from `feat/x`.
+        branches,
+        from: startedAtFromMs,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, unknown>>();
+    // Deduped per tenant, not across the whole result: the shared helper keys
+    // on SessionId alone, which is right for a single-tenant read but would
+    // collapse two organizations' projects that happen to share a provider
+    // session id into one row here, silently dropping the other's cost.
+    const byTenant = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const tenantId = String(row.TenantId ?? "");
+      const list = byTenant.get(tenantId) ?? [];
+      list.push(row);
+      byTenant.set(tenantId, list);
+    }
+    return [...byTenant.values()].flatMap((tenantRows) =>
+      dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+    );
+  }
+
   async upsertBatch(
     entries: Array<{
       row: CodingAgentSessionRow;
@@ -680,7 +908,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: entries.length },
         "failed to upsert coding agent session batch",
       );
@@ -748,7 +976,7 @@ const asNumberMap = (value: unknown): Record<string, number> =>
  * Insertion order is not relied on — the caller re-sorts — so this only has to
  * pick the right version, not preserve a position.
  */
-function dedupToLatestPerSession(
+export function dedupToLatestPerSession(
   records: Record<string, unknown>[],
 ): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();
@@ -839,6 +1067,16 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     userId: String(record.UserId ?? ""),
     terminalType: String(record.TerminalType ?? ""),
     entrypoint: String(record.Entrypoint ?? ""),
+    parentSessionId: String(record.ParentSessionId ?? ""),
+    isFork: Boolean(record.IsFork),
+    repositoryHost: String(record.RepositoryHost ?? ""),
+    repositoryOwner: String(record.RepositoryOwner ?? ""),
+    repositoryName: String(record.RepositoryName ?? ""),
+    gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
+    gitWorktree: String(record.GitWorktree ?? ""),
+    title: String(record.Title ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -884,6 +1122,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     compactions: asNumber(record.Compactions),
     compactionTokensBefore: asNumber(record.CompactionTokensBefore),
     compactionTokensAfter: asNumber(record.CompactionTokensAfter),
+    compactionTriggers: asNumberMap(record.CompactionTriggers),
     peakContextTokens: asNumber(record.PeakContextTokens),
     cacheRebuildCount: asNumber(record.CacheRebuildCount),
     largestCacheRebuildTokens: asNumber(record.LargestCacheRebuildTokens),
@@ -892,6 +1131,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     errorTypes: asNumberMap(record.ErrorTypes),
     apiErrors: asNumber(record.ApiErrors),
     rateLimited: asNumber(record.RateLimited),
+    rateLimitEvents: asNumber(record.RateLimitEvents),
     retriesExhausted: asNumber(record.RetriesExhausted),
     retryMs: asNumber(record.RetryMs),
     attempts: asNumber(record.Attempts),

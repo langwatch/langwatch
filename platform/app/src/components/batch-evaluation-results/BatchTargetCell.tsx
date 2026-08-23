@@ -14,6 +14,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 import {
@@ -104,7 +105,7 @@ export function BatchTargetCell({
   const handleViewTrace = useCallback(() => {
     if (!targetOutput.traceId) return;
     setIsOutputExpanded(false);
-    openDrawer("traceDetails", { traceId: targetOutput.traceId });
+    openDrawer("traceV2Details", { traceId: targetOutput.traceId });
   }, [targetOutput.traceId, openDrawer]);
 
   // Handler to expand output
@@ -140,6 +141,8 @@ export function BatchTargetCell({
   const handleCloseExpanded = useCallback(() => {
     setIsOutputExpanded(false);
   }, []);
+
+  useEscapeKey({ enabled: isOutputExpanded, onEscape: handleCloseExpanded });
 
   // Copy output to clipboard
   const handleCopyOutput = useCallback(() => {

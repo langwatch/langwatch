@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { Workflow } from "@prisma/client";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type { Workflow } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
@@ -328,7 +327,7 @@ secured.access(requires("workflows:create")).post(
   // The caller polls the run + reads results on /api/experiments/runs/:runId(/results),
   // which require evaluations:view. Enforce it here too so a workflows-only key
   // cannot start a run it would then get 403 trying to read.
-  requireApiKeyPermission({ prisma, permission: "evaluations:view" }),
+  requireApiKeyPermission({ permission: "evaluations:view" }),
   zValidator("json", evaluateBodySchema),
   async (c) => {
     const project = c.get("project");

@@ -35,7 +35,11 @@ import type {
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { OtlpBodyTooLargeError } from "./errors";
+import {
+  OtlpBodyTooLargeError,
+  OtlpBodyUnreadableError,
+  OtlpUnsupportedEncodingError,
+} from "./errors";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
@@ -104,41 +108,101 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
 }
 
 /**
+ * Release the reader without letting it throw.
+ *
+ * A reader whose stream was torn down mid-read can throw from `releaseLock()`
+ * itself, and thrown from a `finally` block that error REPLACES the one already
+ * on its way out. That is how a client disconnect came to be reported as an
+ * unrelated stream-internals TypeError, and — being unclassified — answered
+ * 500. Nothing here is worth reporting: the stream is already gone, and the
+ * failure that matters has been raised.
+ */
+function releaseQuietly(reader: { releaseLock: () => void }): void {
+  try {
+    reader.releaseLock();
+  } catch {
+    // Deliberately swallowed; see above.
+  }
+}
+
+/** Same reasoning as {@link releaseQuietly}, for the over-size cancel path. */
+async function cancelQuietly(reader: {
+  cancel: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await reader.cancel();
+  } catch {
+    // The refusal we are about to throw is the diagnosis, not this.
+  }
+}
+
+/**
  * Read the wire body, refusing it the moment it passes
  * {@link OTLP_MAX_BODY_BYTES}.
  *
  * Consuming the stream by hand rather than calling `req.arrayBuffer()` is the
  * point: `arrayBuffer()` buffers the whole body and only then hands it over, so
  * measuring afterwards would concede exactly the memory being defended.
+ *
+ * Every way this can fail is the sender's: the body was already consumed, the
+ * connection ended mid-read, or it passed the size bound. None of them is a
+ * server fault, and leaving them unclassified is what had them answered 500.
  */
+/**
+ * "Body is unusable" — the body was already consumed, or another reader holds
+ * the lock. Nothing can be read, and it is not a server fault.
+ */
+function acquireReader(
+  stream: ReadableStream<Uint8Array>,
+): ReadableStreamDefaultReader<Uint8Array> {
+  try {
+    return stream.getReader();
+  } catch (error) {
+    throw new OtlpBodyUnreadableError({ cause: error });
+  }
+}
+
+/** Drain the reader, refusing the body the moment it passes the byte bound. */
+async function drainWithinLimit(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  let held = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    held += value.byteLength;
+    if (held > OTLP_MAX_BODY_BYTES) {
+      await cancelQuietly(reader);
+      throw new OtlpBodyTooLargeError({
+        maxBytes: OTLP_MAX_BODY_BYTES,
+        encoding: null,
+      });
+    }
+    chunks.push(value);
+  }
+
+  return Buffer.concat(chunks);
+}
+
 async function readWireBody(req: Request): Promise<Buffer> {
   const stream = req.body;
   if (!stream) return Buffer.alloc(0);
 
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let held = 0;
+  const reader = acquireReader(stream);
 
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      held += value.byteLength;
-      if (held > OTLP_MAX_BODY_BYTES) {
-        await reader.cancel();
-        throw new OtlpBodyTooLargeError({
-          maxBytes: OTLP_MAX_BODY_BYTES,
-          encoding: null,
-        });
-      }
-      chunks.push(value);
-    }
+    return await drainWithinLimit(reader);
+  } catch (error) {
+    // The size refusal is our own verdict and keeps its own status; anything
+    // else ended the read from the other end of the connection.
+    if (error instanceof OtlpBodyTooLargeError) throw error;
+    throw new OtlpBodyUnreadableError({ cause: error });
   } finally {
-    reader.releaseLock();
+    releaseQuietly(reader);
   }
-
-  return Buffer.concat(chunks);
 }
 
 /**
@@ -159,7 +223,7 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   // Settled before the body is read, so a request we are going to refuse
   // outright does not get to spend the read budget first.
   if (!isSupportedEncoding(encoding)) {
-    throw new Error(`Unsupported Content-Encoding: ${encoding}`);
+    throw new OtlpUnsupportedEncodingError({ encoding });
   }
 
   // Widened to the shared signature deliberately: the three entries differ in
@@ -179,7 +243,10 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
         encoding,
       });
     }
-    throw error;
+    // Anything else zlib raises here is a body that does not decompress —
+    // truncated by a disconnect, or not the encoding it claimed. Both are the
+    // sender's, and neither is a reason to answer 500.
+    throw new OtlpBodyUnreadableError({ cause: error });
   }
 }
 
@@ -265,10 +332,81 @@ function parseWithFallback<T>(
       );
       return { ok: true, request };
     } catch (jsonErr) {
+      // The size is context for the numbers printed beside it, not a verdict of
+      // its own: `index out of range: 57 + 1307648 > 2070` only means something
+      // against how much actually arrived, and a JSON position says little
+      // without the end it stopped short of. It is also the one fact about the
+      // body we can state without quoting a byte of it.
       return {
         ok: false,
-        error: `Failed to parse OTLP body: ${(firstErr as Error).message} (json fallback: ${(jsonErr as Error).message})`,
+        error: (
+          `Failed to parse OTLP body (${body.byteLength} bytes): ` +
+          `${describeParseFailure(firstErr)}` +
+          ` (json fallback: ${describeParseFailure(jsonErr)})`
+        ).slice(0, MAX_FAILURE_MESSAGE),
       };
     }
   }
+}
+
+/** Long enough to keep a decoder's structural detail, short enough to log. */
+const MAX_FAILURE_DETAIL = 120;
+
+/**
+ * The whole reported failure is bounded here rather than left to add up from
+ * the parts. Two details and a byte count already sum to within a few
+ * characters of this, so the guarantee is stated once instead of re-derived
+ * every time one of the pieces changes width.
+ */
+const MAX_FAILURE_MESSAGE = 300;
+
+/**
+ * A parser's error message, reduced to the part that is ours to repeat.
+ *
+ * Nothing here logs the request body — and the body reached the log sink
+ * anyway, because V8's `JSON.parse` SyntaxError quotes about ten characters of
+ * its input inside the message and we passed that message straight through.
+ * Those characters are arbitrary bytes, so they were routinely not valid UTF-8,
+ * which broke consumers that parse a log record's own metadata.
+ *
+ * A JSON failure is therefore rebuilt rather than filtered: only a fixed phrase
+ * and, where the parser gives one, a numeric position. Nothing from the input
+ * can survive a construction that never reads it.
+ *
+ * A protobuf failure keeps its own words, because "index out of range: 57 +
+ * 1307648 > 2070" is the sentence that says whether the sender truncated the
+ * body or we mis-read it — and protobufjs describes structure, never content.
+ * It is still stripped of quoted spans and anything unprintable, so a future
+ * decoder that starts echoing bytes cannot reopen this.
+ */
+function describeParseFailure(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (err instanceof SyntaxError || /is not valid JSON/.test(message)) {
+    return describeJsonFailure(message);
+  }
+
+  return message
+    .replace(/"(?:[^"\\]|\\.)*"/g, '"…"')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "'…'")
+    .replace(/`(?:[^`\\]|\\.)*`/g, "`…`")
+    .replace(/[^\x20-\x7e]/g, "")
+    .trim()
+    .slice(0, MAX_FAILURE_DETAIL);
+}
+
+/**
+ * Built from the parser's verdict, never from its quotation of the input.
+ * The position is the one detail worth keeping: it says how far into the body
+ * the sender got before the bytes stopped making sense.
+ */
+function describeJsonFailure(message: string): string {
+  if (/Unexpected end of JSON input/.test(message)) {
+    return "invalid JSON: unexpected end of input";
+  }
+
+  const position = /position (\d+)/.exec(message)?.[1];
+  return position
+    ? `invalid JSON at position ${position}`
+    : "invalid JSON: unexpected token";
 }

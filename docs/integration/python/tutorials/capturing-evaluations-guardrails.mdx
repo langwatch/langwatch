@@ -1,7 +1,7 @@
 ---
 title: Capturing Evaluations & Guardrails
 sidebarTitle: Evaluations & Guardrails
-description: Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
+description: LangWatch logs custom evaluations, triggers managed evaluations, and runs guardrails.
 keywords: Custom Evaluations, Managed Evaluations, Guardrails, LangWatch Evaluations, add_evaluation, evaluate, async_evaluate, Evaluation Metric, Evaluation Score, Evaluation Pass/Fail, Evaluation Label, Evaluation Details, Evaluation Cost, Evaluation Status, Evaluation Error, Evaluation Timestamps, Evaluation Type, Guardrail
 ---
 
@@ -235,5 +235,3 @@ These spans will contain the evaluation's name, result (score, passed, label), d
     - **Server-Side**: Evaluate RAG system outputs for ["Context Relevancy" and "Faithfulness"](/evaluations/evaluators/list) using managed evaluators.
 - **A/B Testing**: Log custom metrics or trigger standard evaluations for different model versions or prompts to compare their performance.
 - **Feedback Integration**: `add_evaluation` can be used to pipe scores from an external human review platform directly into the relevant trace.
-
-By combining these methods, you can build a robust evaluation and guardrailing strategy tailored to your application's needs, all observable within LangWatch.

@@ -35,6 +35,88 @@ Feature: Conversation turn ledger
       Given a turn with 4500 input and 538 output tokens
       Then the separator does not show a "4.5K→538" token figure
 
+  Rule: A turn that recorded events says how many
+
+    The events a turn's spans recorded are worth scanning for while reading: a
+    turn that recorded three of them reads differently from one that recorded
+    none. Only the count is shown. The legacy thread view also drew the
+    thumbs-up / thumbs-down vote an event carried, and the conversation's turn
+    data holds no event metrics to draw it from, so that display is left out
+    rather than guessed at.
+
+    A turn arrives without its events, which are read back for the whole thread
+    in one go, the same way the trace table reads them for a page.
+
+    @integration
+    Scenario: A turn with events shows how many it recorded
+      Given a turn that recorded two events
+      Then its separator shows "2 events"
+
+    @integration
+    Scenario: A single event reads in the singular
+      Given a turn that recorded one event
+      Then its separator shows "1 event"
+
+    @integration
+    Scenario: A turn with no events shows no events segment
+      Given a turn that recorded no events
+      Then its separator says nothing about events
+
+    @integration
+    Scenario: Each turn in a thread carries the events it recorded
+      Given a conversation whose turns recorded different events
+      When the thread reads its events back
+      Then every turn carries its own count
+
+    @integration
+    Scenario: A turn still waiting on its events reports none
+      Given a conversation whose events have not arrived yet
+      Then no turn claims to have recorded any
+
+  Rule: The annotation badge never covers the ledger
+
+    A turn that carries an annotation shows a count badge on its separator. The
+    hover actions may float over the end of the line, since they are only on
+    screen while the pointer is on the turn, but the badge is there the whole
+    time and takes its own room instead.
+
+    @integration
+    Scenario: The annotation badge takes its own room on the separator
+      Given a turn that carries an annotation
+      Then its badge sits in the separator row rather than over it
+      And the hover actions still float over the end of the line
+
+  Rule: The turn's actions arrive with the pointer, on a surface of their own
+
+    The separator carries the annotation badge and one action of its own,
+    Edit trace, which stays off the ledger while the reader is reading and
+    arrives when the pointer is on the turn. It lands over the end of the
+    ledger on an opaque surface: the ledger keeps its place and sits
+    underneath rather than reading through it. The annotate, suggest and
+    translate actions live on the messages themselves
+    (specs/traces-v2/annotations.feature).
+
+    @integration
+    Scenario: The turn's actions stay away until the pointer is on the turn
+      Given a turn the reader's pointer is not on
+      Then its actions are not on screen
+
+    @integration
+    Scenario: The turn's actions arrive when the pointer is on the turn
+      Given the reader's pointer is on a turn
+      Then its actions are on screen
+      And they are drawn on a surface of their own, over the ledger
+
+    # A ticked session checkbox stays visible so its state can be scanned, and
+    # that must not drag Edit trace along with it: state persists, actions come
+    # and go with the pointer.
+    @integration
+    Scenario: The turn's actions leave with the pointer even on a counted turn
+      Given a turn whose session checkbox is ticked
+      And the reader's pointer has left the turn
+      Then the Edit trace action is not on screen
+      And the ticked checkbox still is
+
   Rule: A long inter-turn pause is surfaced as a gap divider
 
     A noticeable wall-clock gap since the previous turn finished is drawn as an

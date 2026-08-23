@@ -192,7 +192,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const complexProps = getComplexProps();
   const flowCallbacks = getFlowCallbacks("promptEditor");
   const drawerParams = useDrawerParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const openLiteMemberRestriction = useUpgradeModalStore(
     (state) => state.openLiteMemberRestriction,

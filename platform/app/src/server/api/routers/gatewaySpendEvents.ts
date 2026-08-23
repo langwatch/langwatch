@@ -9,8 +9,8 @@ import { z } from "zod";
 
 import { getApp } from "~/server/app-layer/app";
 import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
+import { spendFiltersSchema } from "~/server/gateway/spendFilters";
 
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const gatewaySpendEventsRouter = createTRPCRouter({
@@ -20,19 +20,11 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         projectId: z.string(),
         fromMs: z.number().int(),
         toMs: z.number().int(),
-        virtualKeyId: z.string().optional(),
-        endUserId: z.string().optional(),
-        model: z.string().optional(),
-        status: z
-          .enum([
-            "success",
-            "error",
-            "admitted",
-            "confirmed",
-            "failed",
-            "settled",
-          ])
-          .optional(),
+        // The same filter set the REST reads narrow on, in the structured
+        // spelling rather than the query-string one, so the screen and a
+        // reconciliation script cannot come to mean different things by the
+        // same narrowing.
+        filters: spendFiltersSchema.optional(),
         cursor: z
           .object({
             occurredAtMs: z.number().int(),
@@ -42,7 +34,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).optional(),
       }),
     )
-    .use(checkProjectPermission("gatewayUsage:view"))
+    .permission("gatewayUsage:view")
     .query(async ({ ctx, input }) => {
       const repository = getApp().gateway.spendEvents;
       if (!repository) {
@@ -58,12 +50,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         tenantId: input.projectId,
         fromMs: input.fromMs,
         toMs: input.toMs,
-        filters: {
-          virtualKeyId: input.virtualKeyId,
-          endUserId: input.endUserId,
-          model: input.model,
-          status: input.status,
-        },
+        filters: input.filters ?? {},
         cursor: input.cursor,
         limit: input.limit ?? 50,
       });

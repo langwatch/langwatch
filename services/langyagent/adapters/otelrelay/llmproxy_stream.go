@@ -21,6 +21,14 @@ import (
 // handleLLM answer the conversation's NEXT call with a terminal 400 carrying
 // the provider's own error payload. A stream that ends cleanly (EOF with no
 // error event) clears the capture, mirroring the 2xx-clears-capture rule.
+//
+// One more shape rides under the SSE content type: the gateway can forward an
+// upstream REJECTION as a 200 whose body is a single bare JSON error object
+// with no event framing at all (seen live: Anthropic refusing a request
+// parameter). A body whose first byte is `{` is not SSE, so the sniffer
+// buffers it whole (bounded) and inspects it at EOF as the same error-event
+// payload — without this, the clean-end rule would CLEAR the capture and the
+// turn would fail with no cause on record.
 type llmStreamSniffer struct {
 	body     io.ReadCloser
 	entry    *workerEntry
@@ -31,6 +39,11 @@ type llmStreamSniffer struct {
 	// remainder is discarded unscanned (token deltas never get that big, and
 	// a bounded buffer keeps a pathological stream from ballooning memory).
 	lineOverflow bool
+	// started flips on the first non-whitespace byte, when the body commits to
+	// one of two shapes: SSE framing, or one bare JSON object (bareJSON), which
+	// accumulates whole into `line` and is inspected at EOF.
+	started  bool
+	bareJSON bool
 }
 
 func newLLMStreamSniffer(body io.ReadCloser, entry *workerEntry, logger *zap.Logger) io.ReadCloser {
@@ -42,9 +55,16 @@ func (s *llmStreamSniffer) Read(p []byte) (int, error) {
 	if n > 0 {
 		s.scan(p[:n])
 	}
-	if err == io.EOF && !s.sawError {
-		// The stream ended without a terminal error event: a healthy call.
-		s.entry.clearLLMError()
+	if err == io.EOF {
+		if s.bareJSON && !s.sawError && !s.lineOverflow {
+			// The whole body was one unframed JSON object; only now is it
+			// complete enough to inspect.
+			s.inspectPayload(s.line)
+		}
+		if !s.sawError {
+			// The stream ended without a terminal error event: a healthy call.
+			s.entry.clearLLMError()
+		}
 	}
 	return n, err
 }
@@ -54,9 +74,22 @@ func (s *llmStreamSniffer) Close() error {
 }
 
 // scan accumulates the passthrough bytes into SSE lines and inspects each
-// complete `data: ...` payload for a terminal error event.
+// complete `data: ...` payload for a terminal error event. A body that opens
+// with `{` instead of SSE framing is buffered whole for the EOF inspection.
 func (s *llmStreamSniffer) scan(chunk []byte) {
 	if s.sawError {
+		return
+	}
+	if !s.started {
+		content := bytes.TrimLeft(chunk, " \t\r\n")
+		if len(content) == 0 {
+			return // pure whitespace decides nothing; keep waiting
+		}
+		s.started = true
+		s.bareJSON = content[0] == '{'
+	}
+	if s.bareJSON {
+		s.buffer(chunk)
 		return
 	}
 	for len(chunk) > 0 {
@@ -91,13 +124,29 @@ func (s *llmStreamSniffer) buffer(part []byte) {
 }
 
 var (
-	sseDataLinePrefix  = []byte("data: ")
-	errorEventTypeMark = []byte(`"type":"error"`)
+	sseDataLinePrefix = []byte("data: ")
+	// A cheap gate in front of the gjson parse, which would otherwise run on
+	// every chunk of every healthy stream. It matches the quoted VALUE alone,
+	// not `"type":"error"`, because a provider is free to emit
+	// `{"type": "error"}` with the space and the byte-exact form would then
+	// drop a real terminal error on the floor. gjson below is the
+	// discriminator; this only decides what is worth parsing.
+	errorEventTypeMark = []byte(`"error"`)
 )
 
 func (s *llmStreamSniffer) inspectLine(line []byte) {
 	payload, ok := bytes.CutPrefix(line, sseDataLinePrefix)
-	if !ok || !bytes.Contains(payload, errorEventTypeMark) {
+	if !ok {
+		return
+	}
+	s.inspectPayload(payload)
+}
+
+// inspectPayload captures a terminal error payload — a framed `data:` event's
+// JSON, or the whole bare-JSON body at EOF. Both carry the same
+// `{"type":"error","error":{...}}` object.
+func (s *llmStreamSniffer) inspectPayload(payload []byte) {
+	if !bytes.Contains(payload, errorEventTypeMark) {
 		return
 	}
 	if gjson.GetBytes(payload, "type").Str != "error" {
@@ -115,7 +164,7 @@ func (s *llmStreamSniffer) inspectLine(line []byte) {
 	// there is no envelope to find here — and OpenAI's quota body would satisfy
 	// that test by coincidence and carry its prose through as though we had
 	// written it.
-	e := decodeProviderErrorBody(payload)
+	e := decodeProviderErrorBody(payload, 0, "text/event-stream")
 	s.entry.setLLMError(e)
 
 	hard := hasHardLimitReason(e)

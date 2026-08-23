@@ -150,6 +150,12 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
 			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+		// Backup-status gauges query system.backup_log, which only exists once
+		// backups are configured, a production concern. The app collects them by
+		// default (unset must not disarm the production alerts that read them), so
+		// haven's container, which has no backups, opts out explicitly. Otherwise
+		// every 15s stats tick would fail on a missing table for nothing.
+		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.
@@ -199,9 +205,25 @@ func (s Stack) observabilityEnv() []string {
 		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
-	// Loopback: the link is followed by the developer's own browser on this machine.
-	if s.ObservabilityGrafanaPort != 0 {
+	// The proxied hostname when the portless proxy carries the route (stable,
+	// matches every other haven surface); loopback otherwise — either way the
+	// link is followed by the developer's own browser on this machine.
+	if s.ObservabilityGrafanaURL != "" {
+		env = append(env, "GRAFANA_BASE_URL="+s.ObservabilityGrafanaURL)
+	} else if s.ObservabilityGrafanaPort != 0 {
 		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
+	}
+	// Continuous profiling. Named only while Pyroscope is actually listening,
+	// because the profiler is a push: with nowhere to push to, a process that
+	// started one would sample itself on a timer, fail every upload, and pay the
+	// native profiler's boot cost for nothing. Absence of this variable is the off
+	// switch, exactly as OTEL_EXPORTER_OTLP_ENDPOINT's absence is for traces.
+	//
+	// The service name and the worktree tag come from the OTel variables above, so
+	// a flame graph is attributable to the same service and worktree as the trace
+	// beside it without a second set of identity variables to keep in step.
+	if s.ObservabilityPyroscopePort != 0 {
+		env = append(env, fmt.Sprintf("PYROSCOPE_SERVER_ADDRESS=http://127.0.0.1:%d", s.ObservabilityPyroscopePort))
 	}
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {

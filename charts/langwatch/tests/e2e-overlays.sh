@@ -488,11 +488,16 @@ test_backup_metrics_gate() {
 
   local backup_flags="--set autogen.enabled=true --set clickhouse.objectStorage.bucket=b --set clickhouse.objectStorage.region=us-east-1"
 
-  # Off by default: no backups configured -> no backup-log querying.
+  # No backups configured -> the chart opts OUT explicitly. The app defaults to
+  # collecting (an unset var must never disarm production monitoring), so the
+  # chart has to say "false" to stop the workers querying a table that this
+  # deployment does not have.
   local off
-  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
-  assert_not_contains "default: workers do not set backup metrics" \
-    "$off" "CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true \
+    | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
+  assert_contains "default: workers opt out of backup metrics" \
+    "$off" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "default: backup metrics value false" "$off" '"false"'
 
   # Chart-managed backups on -> metrics auto-enabled on the workers (which emit
   # the gauges), so the alert never fires spuriously against a live backup setup.
@@ -512,6 +517,7 @@ test_backup_metrics_gate() {
     | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
   assert_contains "metricsEnabled override: workers set backup metrics" \
     "$forced" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "metricsEnabled override: backup metrics value true" "$forced" '"true"'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -546,6 +552,50 @@ test_component_toggles() {
 
   # The app must still render — disabling a component must not take it down.
   assert_contains "toggles: app still renders with both disabled" "$off" "${RELEASE}-app"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Langy opt-out — one values key removes the assistant completely
+# ─────────────────────────────────────────────────────────────────────────────
+# langyagent.chartManaged is the single documented opt-out, and it has to be
+# genuinely single. An operator who sets it and still finds the agent's Service,
+# its shared secret key, or the rollout flag forced on has been told something
+# untrue — and this is the escape hatch we point locked-down clusters at, so a
+# leak here is a support call rather than a cosmetic bug.
+#
+# Worth asserting on all four surfaces rather than the Deployment alone: the
+# subchart disappears via a Chart.yaml `condition:`, while the app's and
+# workers' references to it are separate `if` guards in the umbrella chart.
+# Nothing links them. Each is its own edit, and each can be forgotten on its
+# own while the Deployment correctly vanishes and the render stays green.
+test_langy_disabled() {
+  sep; info "Suite: langy opt-out"
+
+  local on off
+  on=$(tmpl --set autogen.enabled=true)
+  off=$(tmpl --set autogen.enabled=true -f "${OVERLAYS}/langy-disabled.yaml")
+
+  # Negative controls, and not a formality here: a failed render arrives as an
+  # error string (tmpl folds stderr into stdout), and every absence assertion
+  # below would pass against it. These are what stop this suite reporting a
+  # clean opt-out for a chart that rendered nothing at all.
+  assert_contains "langy: agent Deployment present when enabled"  "$on" "name: ${RELEASE}-langyagent"
+  assert_contains "langy: agent URL wired when enabled"           "$on" "OPENCODE_AGENT_URL"
+  assert_contains "langy: rollout flag forced when enabled"       "$on" "release_langy_enabled"
+  assert_contains "langy: shared secret key present when enabled" "$on" "LANGY_INTERNAL_SECRET"
+
+  # The subchart itself — Deployment, Service, ConfigMap and NetworkPolicy all
+  # carry this name, so one assertion covers every object it contributes.
+  assert_not_contains "langy: no agent resources when disabled" "$off" "${RELEASE}-langyagent"
+
+  # The umbrella chart's own references, each behind its own guard.
+  assert_not_contains "langy: agent URL not wired when disabled"      "$off" "OPENCODE_AGENT_URL"
+  assert_not_contains "langy: rollout flag not forced when disabled"  "$off" "release_langy_enabled"
+  assert_not_contains "langy: shared secret key absent when disabled" "$off" "LANGY_INTERNAL_SECRET"
+
+  # Opting out of the assistant must not take anything else with it.
+  assert_contains "langy: app still renders when disabled"    "$off" "${RELEASE}-app"
+  assert_contains "langy: workers still render when disabled" "$off" "${RELEASE}-workers"
 }
 
 test_size_overlays() {
@@ -646,6 +696,12 @@ EXEMPT_WORKLOADS=(
   # Runs kubectl against Secrets, so it needs its token and a writable root for
   # kubectl's discovery cache. Only renders on the operator-owned-Secret path.
   "charts/clickhouse/templates/preflight-secrets-job.yaml:clickhouse.preflight.enabled"
+  # Same shape: the upgrade hooks scale the workers Deployment through the
+  # Kubernetes API, so they need their token and a writable root. Only render
+  # in local-filesystem stored-objects mode, which a strict cluster should not
+  # be running anyway: that mode shares one ReadWriteOnce volume between the
+  # app and the workers and is the documented hobby tier. Use app.dataplane.
+  "templates/app/stored-objects-serialize-upgrade.yaml:app.storedObjects.localFilesystem.serializeUpgrades"
 )
 
 # Every emptyDir in the rendered manifest must declare a sizeLimit: they are
@@ -1292,6 +1348,7 @@ main() {
   test_backup_metrics_gate
   test_size_overlays
   test_component_toggles
+  test_langy_disabled
   test_pod_security
   test_infra_overlays
   test_overlay_stacking

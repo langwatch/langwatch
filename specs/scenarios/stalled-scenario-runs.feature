@@ -3,42 +3,45 @@ Feature: Detect and display stalled scenario runs
   I want stalled scenario runs to be detected and clearly distinguished from active runs
   So that I understand when a run will never complete due to infrastructure issues
 
-  # Per AUDIT_MANIFEST.md: 12 scenarios → 10 DUPLICATE (now bound via @scenario
-  # JSDoc against stall-detection.unit.test.ts, stall-detection-batch.unit.test.ts,
-  # stalled-status-display.integration.test.ts) + 1 UPDATE (10min vs 30min
-  # threshold drift) + 1 KEEP-E2E. The 2 remaining @unimplemented scenarios
-  # are pending rewrite/E2E coverage in PR #3458.
+  # Historical audit context lives in AUDIT_MANIFEST.md; the read-time
+  # scenarios it mapped to stall-detection.unit.test.ts are gone with that
+  # file. The one remaining @unimplemented scenario is pending E2E coverage
+  # in PR #3458.
 
   # Context: When a worker dies (OOM, container kill, stalled job) the RUN_FINISHED
   # event never reaches the event store. Without detection, these runs appear as
-  # "in progress" forever. This feature derives a STALLED status at read time
-  # when a run has RUN_STARTED but no RUN_FINISHED and enough time has passed.
+  # "in progress" forever.
   #
-  # The stall threshold is ~10 minutes (job timeout is 5 minutes, so 2x covers
-  # all reasonable completion scenarios). No new events are written, no
-  # cron jobs, no extra infrastructure.
+  # The simulation_run_execution process manager's stall watchdog is the only
+  # mechanism (ADR-094): queued/started/activity events arm a wake at
+  # lastActivity + STALL_THRESHOLD_MS (2x the child-process timeout, so it
+  # covers all reasonable completion scenarios), and a wake that finds the run
+  # quiet past the threshold writes a real terminal finished(ERROR, "stalled")
+  # event. Stored status is the only truth — the legacy read-time STALLED
+  # derivation (stall-detection.ts) is deleted; the STALLED enum member
+  # remains only for external API/UI compatibility and legacy stored rows.
 
   # ============================================================================
-  # Stall Detection Logic - Unit Tests
+  # Stall Watchdog Logic - Unit Tests
   # ============================================================================
-  # Pure logic: given event timestamps and current time, derive the correct status.
+  # Pure logic: given a run quiet past the deadline, the wake finishes it.
 
-  @unit @unimplemented
-  Scenario: Run at exactly the threshold boundary becomes STALLED
-    Given a scenario run has RUN_STARTED at exactly 10 minutes ago
+  @unit
+  Scenario: Run quiet past the stall threshold finishes ERROR
+    Given a scenario run has had no activity for longer than the stall threshold
     And no RUN_FINISHED event exists
-    When the service resolves the run status
-    Then the status is STALLED
+    When the stall watchdog wake fires
+    Then the run finishes with status ERROR and reason "stalled"
 
-  # ============================================================================
-  # Batch Status Resolution - Unit Tests
-  # ============================================================================
-  # The batch query path must also apply stall detection consistently.
-
-  # ============================================================================
-  # UI Display - Integration Tests
-  # ============================================================================
-  # Verify that STALLED status renders with the correct visual treatment.
+  # The watchdog only puts the reason on its finish command; the command is
+  # what must carry it onto the recorded event, or the run shows an error
+  # with no explanation.
+  @unit
+  Scenario: The stall reason is recorded on the terminal event
+    Given the stall watchdog finishes a run with a bare error reason
+    And no judge results accompany the finish command
+    When the finish command emits the terminal event
+    Then the event carries failure results encoding that reason
 
   # ============================================================================
   # End-to-End - User Workflow
@@ -46,11 +49,10 @@ Feature: Detect and display stalled scenario runs
   # Full user-visible flow: user sees a stalled run and understands what happened.
 
   @e2e @unimplemented
-  Scenario: User sees stalled indicator for a run that never completed
+  Scenario: User sees a stalled run as errored, not spinning forever
     Given I am logged into project "my-project"
-    And scenario "Flaky Agent" had a run that started over 10 minutes ago
-    And no RUN_FINISHED event was recorded for that run
+    And scenario "Flaky Agent" had a run that stopped making progress
+    And that run has since been recorded as errored
     When I view the run history for "Flaky Agent"
-    Then I see the run displayed with a stalled warning indicator
+    Then I see the run displayed with an error indicator
     And the run is not shown as actively in progress
-    And I can distinguish it from runs that failed with an error

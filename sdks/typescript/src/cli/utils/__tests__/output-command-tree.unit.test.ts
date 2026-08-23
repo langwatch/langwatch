@@ -85,6 +85,24 @@ describe("the real command tree", () => {
     });
   });
 
+  describe("when a command deliberately emits nothing at all", () => {
+    /**
+     * The session context hook runs as a coding agent's own hook, where stdout
+     * is injected into the user's session context, so it prints nothing in any
+     * format. That honours every format, and the registration is what keeps the
+     * auto-detected agent mode (Claude Code sets CLAUDECODE in its children)
+     * from annotating every session start and stop with a note about a table
+     * that does not exist.
+     */
+    it("marks `ingest hook` as speaking the output contract", async () => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), ["ingest", "hook"]);
+
+      expect(command).toBeDefined();
+      expect(isOutputAware(command!)).toBe(true);
+    });
+  });
+
   /**
    * The exhaustive counterpart to the per-command lists above: EVERY leaf in
    * the real tree is either wired to the port or named here as a deliberate
@@ -114,22 +132,31 @@ describe("the real command tree", () => {
       ["suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 
+      // A live session that runs until Ctrl-C: it produces status prose and
+      // exits via process.exit, never a result document.
+      ["agent dev", "live tunnel session until Ctrl-C, no result document"],
+
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "open"] as const
+        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
+      // Local machine setup: mints a key and installs an OS login agent;
+      // progress prose, no structured result document.
+      ["copilot-app connect", "interactive install flow: writes an OS login agent"],
       // Agent-only signal: prints the resource id for the relay to intercept;
       // it has no -o json data mode because it returns no platform result.
       ["navigate open", "signal command: prints the resource id, no data payload"],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
-      ["init-shell", "emits shell script for eval"],
 
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
       ["whoami", "interactive credential flow"],
-      ["request-increase", "interactive support flow"],
+      // The output contract covers commands that return a platform document.
+      // This one reports what it wrote to the local machine, so there is no
+      // document for `--json` to carry.
+      ["instrument", "local setup flow: writes telemetry wiring files"],
       ["help", "renders help text"],
 
       // Own their key/value or `--json` output, predating the contract.
@@ -140,7 +167,7 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        ["ingest health", "ingest install", "ingest list", "ingest tail"] as const
+        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(

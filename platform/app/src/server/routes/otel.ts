@@ -9,6 +9,7 @@
 
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import {
+  dropForeignScopesForVscodeKey,
   enforceApiKeyIdOnLogRequest,
   enforceApiKeyIdOnMetricRequest,
   enforceApiKeyIdOnTraceRequest,
@@ -20,7 +21,6 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { bodyLimit } from "hono/body-limit";
 import { getLangWatchTracer } from "langwatch";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -36,6 +36,10 @@ import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+} from "~/server/otel/otlpPathCanonicalisation";
+import {
   OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -44,6 +48,7 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { bodyLimit } from "./_lib/body-limit";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -156,7 +161,6 @@ async function authenticate(
   // access on OTLP ingestion — same semantics as the collector path.
   try {
     await enforceApiKeyCeiling({
-      prisma,
       resolved,
       permission: "traces:create",
     });
@@ -178,7 +182,70 @@ async function authenticate(
     };
   }
 
+  logCorrectedPath({ c, projectId: resolved.project.id, logger });
+
   return { project: resolved.project, resolved };
+}
+
+/**
+ * A misconfigured exporter fleet posts continuously and the signal — which
+ * project, which path — is identical on every batch, so a pair is reported at
+ * most once a window. Repetition costs money on an ingestion hot path and
+ * carries no information the first line did not.
+ *
+ * The map is bounded rather than grown: past the cap it is cleared wholesale,
+ * which costs one extra line per live pair afterwards and cannot leak.
+ */
+const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
+const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
+const correctedPathLastLoggedAt = new Map<string, number>();
+
+function correctedPathIsDueToLog({
+  pair,
+  now,
+}: {
+  pair: string;
+  now: number;
+}): boolean {
+  const last = correctedPathLastLoggedAt.get(pair);
+  if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS)
+    return false;
+
+  if (correctedPathLastLoggedAt.size >= CORRECTED_PATH_LOG_MAX_PAIRS) {
+    correctedPathLastLoggedAt.clear();
+  }
+  correctedPathLastLoggedAt.set(pair, now);
+  return true;
+}
+
+/**
+ * Records that this request reached us on a path a misconfigured exporter
+ * produced (see otel-path-aliases). Logged here rather than at the alias
+ * because the project is what makes it actionable: it is the difference
+ * between "somebody's exporter is misconfigured" and knowing whose.
+ */
+function logCorrectedPath({
+  c,
+  projectId,
+  logger,
+}: {
+  c: RouteContext;
+  projectId: string;
+  logger: ReturnType<typeof createLogger>;
+}): void {
+  const originalPath = readCorrectedPath(
+    c.req.header(OTLP_CORRECTED_PATH_HEADER),
+  );
+  if (!originalPath) return;
+  // NUL joins the pair because it cannot appear in a URL pathname, so no
+  // project and path can collide with a different pair.
+  const pair = `${projectId}\u0000${originalPath}`;
+  if (!correctedPathIsDueToLog({ pair, now: Date.now() })) return;
+
+  logger.warn(
+    { projectId, originalPath, canonicalPath: c.req.path },
+    "OTLP exporter posted to a non-canonical path; served from the canonical route",
+  );
 }
 
 /**
@@ -224,6 +291,9 @@ async function enforcePlanLimit({
       .usageLimits.notifyPlanLimitReached({
         organizationId: project.team.organizationId,
         planName: activePlan.name ?? "free",
+        usageUnit: limitResult.usageUnit,
+        current: limitResult.count,
+        max: limitResult.maxMessagesPerMonth,
       })
       .catch((error: unknown) => {
         logger.error(
@@ -295,6 +365,22 @@ async function applyReceiverProvenanceToTraces({
 
   if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
 
+  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived
+  // editor; processes VS Code spawns outside integrated terminals (js-debug
+  // internal console, extension children) inherit it, so a developer's own
+  // instrumented service could POST here under this key. Only Copilot's
+  // instrumentation scopes pass.
+  const droppedForeign = dropForeignScopesForVscodeKey(
+    request as unknown as Parameters<typeof dropForeignScopesForVscodeKey>[0],
+    resolved.ingestSourceType,
+  );
+  if (droppedForeign > 0) {
+    loggerTraces.warn(
+      { droppedForeign, apiKeyId: resolved.apiKeyId },
+      "dropped non-copilot instrumentation scopes posted on a copilot_vscode ingest key",
+    );
+  }
+
   // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
   // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
   // billed cost split. Gateway usage never reaches here.
@@ -365,6 +451,19 @@ function applyReceiverProvenanceToMetrics({
   );
 
   if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Same foreign-scope gate as the traces signal: the code() env enables
+  // OTEL_METRICS_EXPORTER too, so an inherited env can push foreign metrics.
+  const droppedForeign = dropForeignScopesForVscodeKey(
+    request as Parameters<typeof dropForeignScopesForVscodeKey>[0],
+    resolved.ingestSourceType,
+  );
+  if (droppedForeign > 0) {
+    loggerMetrics.warn(
+      { droppedForeign, apiKeyId: resolved.apiKeyId },
+      "dropped non-copilot instrumentation scopes posted on a copilot_vscode ingest key",
+    );
+  }
 
   stampIngestKeyProvenanceOnMetricRequest(
     request as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0],

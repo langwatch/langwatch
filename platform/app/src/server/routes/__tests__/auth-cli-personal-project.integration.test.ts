@@ -21,6 +21,7 @@
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+import type { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const ids = vi.hoisted(() => {
@@ -41,25 +42,37 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The approval route reads probeProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/api/rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+
+wireDefaultTestApp();
+
+/** The container's connection, handed to the test App the CLI routes read. */
+let redisConnection: Redis | null = null;
 
 const suffix = ids.suffix;
 const USER_ID = ids.USER_ID;
@@ -275,11 +288,14 @@ let exchange: ExchangeSuccess;
 
 beforeAll(async () => {
   await startTestContainers();
+  redisConnection = getTestRedisConnection();
   // The routes and workers under test take their ClickHouse repositories
   // from the App rather than resolving a client, so the fixture has to
   // provide one or they fail with "App not initialized".
   installClickHouseTestApp({
     resolveClient: async () => getTestClickHouseClient(),
+    // The CLI device flow writes its codes and tokens to Redis.
+    redis: redisConnection,
   });
   await seedCallerOrg();
   await seedOtherMemberWorkspace();
@@ -300,27 +316,22 @@ afterAll(async () => {
     select: { id: true },
   });
   const teamIds = personalTeams.map((t) => t.id);
-  await prisma.roleBinding
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.project
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.teamUser
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { id: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.organizationUser
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { id: ORG_ID } })
-    .catch(() => {});
+  await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+  // The device-session exchange mints a user-scoped CLI ApiKey (plus its
+  // private custom role); ApiKey→Organization is a Restrict relation, so
+  // these must go before the organization delete or it silently no-ops.
+  await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.teamUser.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.team.deleteMany({ where: { id: { in: teamIds } } });
+  await prisma.organizationUser.deleteMany({
+    where: { organizationId: ORG_ID },
+  });
+  await prisma.user.deleteMany({
+    where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+  });
+  await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   await stopTestContainers().catch(() => {});
 });
 
@@ -526,7 +537,7 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
   /** @scenario the project-key endpoint refuses a project the caller cannot write to */
   it("denies a project the caller cannot write, without leaking the key", async () => {
-    vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
       exchange.access_token,

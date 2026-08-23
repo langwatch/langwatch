@@ -88,6 +88,21 @@ func testBundle() *domain.Bundle {
 	}
 }
 
+// geminiBundle is testBundle plus the Google slot the /v1beta surface needs.
+// That surface hands the caller's body and URL path to Google unchanged, so
+// the gateway refuses it on a key with no Google credential rather than
+// forwarding the body to another vendor. A test whose subject is anything
+// else on that route binds the slot its own scenario implies; leaving it
+// unbound only proved that a mock provider ignores the credential it is
+// handed.
+func geminiBundle() *domain.Bundle {
+	bundle := testBundle()
+	bundle.Credentials = append(bundle.Credentials, domain.Credential{
+		ID: "cred-gemini", ProviderID: domain.ProviderGemini, APIKey: "goog-test",
+	})
+	return bundle
+}
+
 func successResponse() *domain.Response {
 	return &domain.Response{
 		Body:       []byte(`{"choices":[{"message":{"content":"hello"}}]}`),
@@ -602,7 +617,7 @@ func TestGeminiModelFromPath(t *testing.T) {
 func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 
@@ -651,7 +666,7 @@ func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 
@@ -865,4 +880,48 @@ func TestRouter_ModelsEndpoint_AttributesUnownedModelsToGateway(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
 	require.Len(t, parsed.Data, 1)
 	assert.Equal(t, "langwatch", parsed.Data[0].OwnedBy)
+}
+
+// `owned_by` names the vendor a client groups its model picker by, so an
+// instance carrying a routing handle keeps its family there. The handle goes
+// in the id, which is the string a caller sends.
+func TestRouter_ModelsEndpoint_KeepsTheFamilyInOwnedBy(t *testing.T) {
+	bundle := testBundle()
+	bundle.Credentials = []domain.Credential{
+		{ID: "cred-1", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+	}
+	bundle.Config.AllowedModels = nil
+
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{
+					{ID: "claude-sonnet-5", ProviderID: domain.ProviderAnthropic, Handle: "eu"},
+				}, nil, nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var parsed struct {
+		Data []struct {
+			ID      string `json:"id"`
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
+	require.Len(t, parsed.Data, 1)
+	assert.Equal(t, "eu/claude-sonnet-5", parsed.Data[0].ID)
+	assert.Equal(t, "anthropic", parsed.Data[0].OwnedBy)
 }

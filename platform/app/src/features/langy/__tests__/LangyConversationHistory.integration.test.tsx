@@ -205,7 +205,7 @@ vi.mock("~/utils/api", async () => {
   // pull their own tRPC queries these tests do not care about; the shared
   // harness answers every one of them inert. Only the langy surface and the
   // model picker below are explicit.
-  const { createTrpcUtils, withFallback } = await import(
+  const { createTrpcUtils, modelProviderRouter, withFallback } = await import(
     "./support/langyApiMock"
   );
 
@@ -262,14 +262,13 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      // isInitialLoading, not isLoading: React Query v4 reports a DISABLED
+      // isLoading, not isLoading: React Query v4 reports a DISABLED
       // query as status "loading" forever, and the panel deliberately disables
-      // the list while closed — so the production hook reads isInitialLoading.
+      // the list while closed — so the production hook reads isLoading.
       // Mirror that: only a query that is BOTH enabled AND still loading counts.
-      isInitialLoading: enabled && state.status === "loading",
       isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -395,11 +394,10 @@ vi.mock("~/utils/api", async () => {
 
     return {
       data: state.data,
-      isInitialLoading:
+      isLoading:
         enabled && state.status === "loading" && state.data === undefined,
-      isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: state.status === "loading" && state.data !== undefined,
+      isPlaceholderData: state.status === "loading" && state.data !== undefined,
       isFetched: state.fetched,
       isError: state.status === "error",
       error: state.error,
@@ -493,6 +491,9 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
       stopTurn: {
         useMutation: () => ({
           mutateAsync: async (variables: {
@@ -526,30 +527,14 @@ vi.mock("~/utils/api", async () => {
     // no-ops that only need to EXIST at render time.
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        // A resolved model is configured: these tests exercise conversation
-        // history on a usable Langy, so langyNeedsModel must be false (else
-        // LangySidebar renders the inline model-setup screen over the panel).
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({
-          data: { providers: [] },
-          isLoading: false,
-        }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         // Feature off in these tests — the header GitHub button hides
         // itself (isLoading=false, data=undefined) and stays out of the way.
         useQuery: () => ({

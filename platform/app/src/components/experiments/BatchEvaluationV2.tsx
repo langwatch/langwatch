@@ -12,7 +12,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -24,6 +23,7 @@ import React, {
   useState,
 } from "react";
 import { Download, ExternalLink } from "react-feather";
+import type { Experiment, Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";

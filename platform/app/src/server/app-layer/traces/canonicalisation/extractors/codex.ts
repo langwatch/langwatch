@@ -35,7 +35,7 @@
  *   - codex.turn.token_usage.reasoning_output_tokens (a.k.a. reasoning)
  *   - codex.turn.token_usage.total_tokens
  *   - codex.turn.reasoning_effort (the request setting, e.g. "high")
- *   - turn.id (a.k.a. thread / turn identifier)
+ *   - thread.id (the session) and turn.id (this one turn)
  * This extractor lifts those to gen_ai.* canonical so the trace
  * summary fold mirrors them to the top-level columns and the
  * receiver-side pricing lookup computes cost (codex never emits cost
@@ -49,7 +49,7 @@
  * - langwatch.input_tokens
  * - langwatch.output_tokens
  * - langwatch.cache_read_tokens
- * - langwatch.thread.id (from conversation.id OR turn.id)
+ * - langwatch.thread.id (the session: thread.id, or turn.id when absent)
  * - langwatch.principal.email (from user.email)
  * - langwatch.input (from codex.user_prompt prompt)
  */
@@ -69,16 +69,19 @@ const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 /**
  * codex sets its instrumentation scope to the originator: the interactive TUI
- * is `codex_cli_rs`, `codex exec` is `codex_exec`. The exec wire has NO
- * `session_task.turn` rollup, `handle_responses` response spans are its only
- * usage record, so the redundant-usage skip below must never fire for it.
+ * is `codex_cli_rs`, `codex exec` is `codex_exec`. On the exec wire the
+ * `handle_responses` response spans are the authoritative usage record: older
+ * codex emits no `session_task.turn` rollup there at all, and when a newer
+ * codex does emit one it repeats the response spans' summed totals. So under
+ * exec the response-span skip below must never fire, and it is the rollup
+ * that defers instead.
  */
 const CODEX_EXEC_SCOPE_NAME = "codex_exec";
 const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
   CODEX_RUST_SCOPE_NAME,
   CODEX_EXEC_SCOPE_NAME,
 ]);
-const CODEX_TURN_SPAN_NAME = "session_task.turn";
+export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
 // into the `session_task.turn` rollup, so the fold must count the usage on
@@ -104,6 +107,74 @@ const positiveOrNull = (n: number | null): number | null =>
 
 /** A canonical key and the codex-spelled value to lift onto it, if reported. */
 type CanonicalLift = readonly [string, string | number | null];
+
+/**
+ * Which conversation a turn belongs to. The turn span carries two ids, and
+ * they are one character apart to read: `thread.id` is the SESSION, the same
+ * id codex's log records spell `conversation.id` and the id its transcript
+ * on disk is filed under, while `turn.id` names this one turn. Both are
+ * time-ordered UUIDs minted seconds apart, so they share a prefix.
+ *
+ * Filing the trace under the turn gave every turn a conversation of its own:
+ * a codex session's turns never grouped, and a coding-agent session, which is
+ * keyed by the session id, resolved none of its own traces and read as having
+ * stored nothing. The session id is what groups them.
+ *
+ * Guarded to the full UUID shape because codex's other spans stamp the tokio
+ * worker id under the same key, and those are not session ids. A bare "10"
+ * fails any check, but "worker-10" would pass a looser one and then become a
+ * conversation id no session could ever resolve, which is the same defect
+ * this function exists to fix. Anything that is not UUID-shaped, or absent,
+ * leaves the turn id as the answer.
+ */
+const UUID_SHAPE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function conversationIdOf(attrs: {
+  get: (key: string) => unknown;
+  take: (key: string) => unknown;
+}): string | null {
+  // Read, not taken: the coding-agent pipeline keys a codex session off this
+  // same attribute.
+  const sessionId = asString(attrs.get("thread.id"));
+  const turnId = asString(attrs.take("turn.id"));
+  return sessionId !== null && UUID_SHAPE.test(sessionId) ? sessionId : turnId;
+}
+
+/**
+ * The input tokens the turn actually paid full price for.
+ *
+ * The canonical key is the DISJOINT non-cached bucket: the cache buckets are
+ * reported beside it and priced at their own rates, so they add on top rather
+ * than overlap. Codex's `input_tokens` is the WHOLE input, cache included
+ * (43001 = 36096 cache-read + 6905 non-cached on a live turn), so lifting it
+ * straight across charged the cached tokens twice, once at the full input
+ * rate and again at the cache rate, and priced such a turn about four times
+ * over.
+ *
+ * Codex's own non-cached count is preferred; when a build omits it, the
+ * subtraction recovers it. The same re-derivation the session fold does, so a
+ * codex turn's trace and its session state one figure.
+ */
+function nonCachedInput({
+  attrs,
+  cacheRead,
+  cacheCreation,
+}: {
+  attrs: { get: (key: string) => unknown; take: (key: string) => unknown };
+  cacheRead: number | null;
+  cacheCreation: number | null;
+}): number | null {
+  // Read, not taken: the coding-agent session fold reads codex's own count
+  // off the same span.
+  const own = asNumber(
+    attrs.get("codex.turn.token_usage.non_cached_input_tokens"),
+  );
+  const whole = asNumber(attrs.take("codex.turn.token_usage.input_tokens"));
+  if (own !== null) return own;
+  if (whole === null) return null;
+  return Math.max(0, whole - (cacheRead ?? 0) - (cacheCreation ?? 0));
+}
 
 /**
  * Write every reported lift onto its canonical key, leaving an already-present
@@ -160,9 +231,10 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       // call on both wires, and the drawer renders an untyped span as a
       // generic row rather than under the agent turn.
       this.typeUsageSpanAsModelCall(ctx);
-      // The skip marker does not. `codex exec` emits no turn rollup at all,
-      // so its response spans are the trace's ONLY usage record, and skipping
-      // them there would zero the trace totals.
+      // The skip marker does not. On the exec wire the response spans are
+      // the authoritative usage record (older codex emits no turn rollup
+      // there at all), so skipping them would zero those traces' totals;
+      // the exec-side duplicate is the rollup, handled below.
       if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
         this.markRedundantUsageSpan(ctx);
       }
@@ -177,6 +249,12 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
+    const cacheRead = asNumber(
+      attrs.take("codex.turn.token_usage.cached_input_tokens"),
+    );
+    const cacheCreation = asNumber(
+      attrs.take("codex.turn.token_usage.cache_write_input_tokens"),
+    );
     // codex spells cache creation "cache_write"; the canonical keys follow the
     // Anthropic-derived semconv names.
     const lifts: CanonicalLift[] = [
@@ -184,20 +262,14 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
       [
         ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.input_tokens")),
+        nonCachedInput({ attrs, cacheRead, cacheCreation }),
       ],
       [
         ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
         asNumber(attrs.take("codex.turn.token_usage.output_tokens")),
       ],
-      [
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens")),
-      ],
-      [
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        asNumber(attrs.take("codex.turn.token_usage.cache_write_input_tokens")),
-      ],
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead],
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheCreation],
       [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
         asNumber(attrs.take("codex.turn.token_usage.reasoning_output_tokens")),
@@ -206,11 +278,23 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
         asString(attrs.take("codex.turn.reasoning_effort")),
       ],
-      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, asString(attrs.take("turn.id"))],
+      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversationIdOf(attrs)],
     ];
 
     if (applyCanonicalLifts(ctx, lifts)) {
       ctx.recordRule("codex/session_task.turn");
+    }
+
+    // Under `codex_exec` the response spans always accumulate (above), so a
+    // usage-bearing exec rollup is the same totals a second time and must
+    // defer, exactly as the response spans defer to the rollup on the TUI
+    // wire. Checked after the lifts so a rollup whose usage arrives only
+    // codex-spelled is still recognised. If a future codex exec drops its
+    // response spans, this zeroes those traces' totals; today every exec
+    // trace carries both records and counting both doubles all of them.
+    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+      ctx.recordRule("codex/skip-exec-rollup-usage");
     }
   }
 

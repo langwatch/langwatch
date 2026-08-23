@@ -75,7 +75,7 @@ type gateToolFrame struct {
 }
 
 // Observe inspects one emitted frame. Inspect-only from the sink's point of
-// view — it never blocks or fails the emit; a trip is surfaced by cancelling
+// view, it never blocks or fails the emit; a trip is surfaced by canceling
 // the stream and answering Tripped().
 func (g *githubGate) Observe(f frames.Frame) {
 	g.mu.Lock()

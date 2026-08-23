@@ -27,6 +27,12 @@ export type FormSnapshot = {
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
   /**
+   * The slug that addresses this instance in a gateway model string. Empty
+   * means the operator wants no handle, which is a real choice: it releases
+   * the name for another provider in the organization.
+   */
+  routingHandle: string;
+  /**
    * Tenant anchor for the write. A provider belongs to an organization
    * and reaches the scopes attached to it, so the organization is always
    * the answer and the project is the narrower handle when there is one.
@@ -101,7 +107,7 @@ export function useProviderFormSubmit({
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 }): UseProviderFormSubmitReturn {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const updateMutation = api.modelProvider.update.useMutation();
   // B3 redesign: the user's onboarding picks for the three role models
   // need to win over the additive seed (which fills in the registry
@@ -165,6 +171,7 @@ export function useProviderFormSubmit({
       projectTopicClusteringModel,
       projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -235,7 +242,6 @@ export function useProviderFormSubmit({
             } before saving.`,
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           setIsSaving(false);
           return;
@@ -269,24 +275,18 @@ export function useProviderFormSubmit({
         customKeysToSend = undefined;
       }
 
-      // Merge azure headers when applicable
-      if (!isUsingEnvVars && provider.provider === "azure") {
-        const headerMap: Record<string, string> = {};
-        (extraHeaders ?? []).forEach((header) => {
-          if (header.key.trim() && header.value.trim()) {
-            const sanitizedKey = header.key
-              .trim()
-              .replace(/[^a-zA-Z0-9_-]/g, "_");
-            if (sanitizedKey) headerMap[sanitizedKey] = header.value.trim();
-          }
-        });
-        customKeysToSend = { ...customKeysToSend, ...headerMap };
-      }
+      // Headers are not credentials. They have their own column, their own
+      // masked-placeholder merge (`mergeExtraHeaders`), and both readers take
+      // them from there: `prepareLitellmParams` builds `extra_headers` from
+      // `modelProvider.extraHeaders`, and the gateway materialiser reads
+      // `mp.extraHeaders`. Nothing reads a header out of `customKeys`, so
+      // folding them in wrote a value no one consumed and, when no credential
+      // had changed, replaced the whole credential bag with the headers.
 
-      // Safety net: if the steps above (placeholder stripping, azure-header
-      // merge) leave an empty customKeys object, send `undefined` so the
-      // server treats it as "no key change" and preserves the stored key,
-      // rather than validating `{}` against the provider's keysSchema.
+      // Safety net: if placeholder stripping leaves an empty customKeys
+      // object, send `undefined` so the server treats it as "no key change"
+      // and preserves the stored key, rather than validating `{}` against the
+      // provider's keysSchema.
       if (
         customKeysToSend !== undefined &&
         Object.keys(customKeysToSend).length === 0
@@ -318,6 +318,9 @@ export function useProviderFormSubmit({
         organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
+        // Always sent, because an empty string is how the operator clears the
+        // handle. Leaving it out on a clear would keep the old one.
+        routingHandle: (routingHandle ?? "").trim(),
         enabled: true,
         customKeys: customKeysToSend,
         customModels,
@@ -435,7 +438,6 @@ export function useProviderFormSubmit({
             description: reasons,
             type: "warning",
             duration: 8000,
-            meta: { closable: true },
           });
         }
       }
@@ -467,7 +469,6 @@ export function useProviderFormSubmit({
         title: "Model Provider Updated",
         type: "success",
         duration: 3000,
-        meta: { closable: true },
       });
       onSuccess?.();
     } catch (err) {

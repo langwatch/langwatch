@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_TOOL_ORIGIN_VALUE,
   CODING_AGENT_ORIGIN_VALUE,
+  dropForeignScopesForVscodeKey,
   enforceApiKeyIdOnMetricRequest,
   enforceApiKeyIdOnTraceRequest,
   originForIngestSourceType,
@@ -343,5 +344,89 @@ describe("enforceApiKeyIdOnTraceRequest", () => {
 
     const map = attrMap(request.resourceSpans[0]!.resource.attributes);
     expect(map["service.name"]).toBe("acme-api");
+  });
+});
+
+describe("dropForeignScopesForVscodeKey", () => {
+  const traceRequest = (scopes: (string | undefined)[]) => ({
+    resourceSpans: [
+      {
+        resource: { attributes: [] },
+        scopeSpans: scopes.map((name) => ({
+          scope: name === undefined ? undefined : { name },
+          spans: [{ attributes: [] }],
+        })),
+      },
+    ],
+  });
+
+  describe("given a copilot_vscode key carrying foreign instrumentation scopes", () => {
+    /** @scenario Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver */
+    it("drops every non-copilot scope and keeps copilot's own", () => {
+      const request = traceRequest([
+        "github.copilot",
+        "my-own-service",
+        "@opentelemetry/instrumentation-http",
+        undefined,
+      ]);
+
+      const dropped = dropForeignScopesForVscodeKey(request, "copilot_vscode");
+
+      expect(dropped).toBe(3);
+      expect(
+        request.resourceSpans[0]!.scopeSpans.map((s) => s.scope?.name),
+      ).toEqual(["github.copilot"]);
+    });
+
+    it("drops a resource group entirely when nothing copilot remains", () => {
+      const request = traceRequest(["my-own-service"]);
+
+      dropForeignScopesForVscodeKey(request, "copilot_vscode");
+
+      expect(request.resourceSpans).toEqual([]);
+    });
+
+    it("accepts the legacy @github/copilot scope alias", () => {
+      const request = traceRequest(["@github/copilot"]);
+
+      const dropped = dropForeignScopesForVscodeKey(request, "copilot_vscode");
+
+      expect(dropped).toBe(0);
+      expect(request.resourceSpans).toHaveLength(1);
+    });
+  });
+
+  describe("given any other ingest source type", () => {
+    it("is a strict no-op — other keys are not scope-gated", () => {
+      const request = traceRequest(["my-own-service"]);
+
+      const dropped = dropForeignScopesForVscodeKey(request, "copilot_cli");
+
+      expect(dropped).toBe(0);
+      expect(request.resourceSpans[0]!.scopeSpans).toHaveLength(1);
+    });
+  });
+
+  describe("given a copilot_vscode metrics request", () => {
+    it("gates scope-metrics the same way", () => {
+      const request = {
+        resourceMetrics: [
+          {
+            resource: { attributes: [] },
+            scopeMetrics: [
+              { scope: { name: "github.copilot" }, metrics: [] },
+              { scope: { name: "my-own-service" }, metrics: [] },
+            ],
+          },
+        ],
+      };
+
+      const dropped = dropForeignScopesForVscodeKey(request, "copilot_vscode");
+
+      expect(dropped).toBe(1);
+      expect(
+        request.resourceMetrics[0]!.scopeMetrics.map((s) => s.scope?.name),
+      ).toEqual(["github.copilot"]);
+    });
   });
 });

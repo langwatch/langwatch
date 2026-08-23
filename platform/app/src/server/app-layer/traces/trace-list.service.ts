@@ -4,6 +4,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
@@ -18,6 +19,8 @@ import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
+import { deriveTraceTimestamp } from "./derive-trace-timestamp";
+import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
@@ -512,6 +515,16 @@ export class TraceListService {
   async getList(params: ListParams): Promise<TraceListPage> {
     const sortColumn = SORT_COLUMN_MAP[params.sort.columnId] ?? "OccurredAt";
 
+    // Position reads pay for every skipped row, so their depth is bounded;
+    // cursor reads are keyset and stay open-ended. The pagination bar greys
+    // out the pages this refuses, so the error is for callers that bypass it.
+    const offset = params.cursor
+      ? 0
+      : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize;
+    if (offset + params.pageSize > TRACE_LIST_MAX_OFFSET_ROWS) {
+      throw new PageTooDeepError(TRACE_LIST_MAX_OFFSET_ROWS);
+    }
+
     const result = await this.repository.findAll({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
@@ -520,9 +533,7 @@ export class TraceListService {
       // totalHits (which may change under a live range between requests).
       limit: params.pageSize + 1,
       cursor: params.cursor,
-      offset: params.cursor
-        ? 0
-        : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize,
+      offset,
       filterWhere: params.filterWhere,
     });
 
@@ -1301,7 +1312,7 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1309,7 +1320,10 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
-    timestamp: row.occurredAt,
+    timestamp: deriveTraceTimestamp({
+      occurredAt: row.occurredAt,
+      storageAnchorMs: row.storageAnchorMs,
+    }),
     name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,

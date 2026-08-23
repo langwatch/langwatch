@@ -33,6 +33,15 @@ export const ScenarioInfraErrorCode = {
   ModelToolReasoningConflict: "scenario_model_tool_reasoning_conflict",
   /** The run exceeded its time budget. */
   ExecutionTimeout: "scenario_execution_timeout",
+  /** The runner process itself couldn't boot (a broken build or deployment). */
+  RunnerUnavailable: "scenario_runner_unavailable",
+  /**
+   * The target agent points at a `langwatch agent dev` tunnel whose session
+   * seems to have ended. Same code as the app-level handled error
+   * (`AgentDevTunnelUnreachableError`) so the two surfaces name the failure
+   * identically.
+   */
+  AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -54,6 +63,19 @@ export interface ScenarioErrorEnvelope {
 
 /** Longest message we keep for the generic fallback; raw dumps get trimmed. */
 const MAX_GENERIC_MESSAGE_LENGTH = 300;
+
+/** Shown when there is no raw error at all — nothing ever reported a reason. */
+const GENERIC_FAILURE_MESSAGE = "The simulation failed before it could run.";
+
+/**
+ * Shown when there IS a raw error but none of it can be shown safely.
+ *
+ * Deliberately not GENERIC_FAILURE_MESSAGE: that one asserts the run never
+ * started, which is false for a failure suppressed mid-run and lands in the
+ * verdict a customer reads. A vaguer true sentence beats a precise false one.
+ */
+const UNREADABLE_FAILURE_MESSAGE =
+  "The simulation failed, but it didn't report a reason we can show.";
 
 /** Case-insensitive substring test that tolerates undefined. */
 function contains(haystack: string, needle: string): boolean {
@@ -80,30 +102,249 @@ function extractProviderMessage(raw: string): string | undefined {
 }
 
 /**
+ * Lines that carry no meaning for a user and expose our internals: stack
+ * frames, the interpreter's own source locations, the `throw err; ^` preamble
+ * Node prints above an uncaught throw, `Require stack:` path lists, and the
+ * trailing runtime-version footer.
+ *
+ * The generic fallback picks the first line that survives this filter, so an
+ * unclassified crash dump degrades to a plain sentence rather than leaking a
+ * path like `node:internal/modules/cjs/loader:1520` — which is what the
+ * fallback used to show for a runner that failed to boot.
+ */
+const NOISE_LINE_PATTERNS = [
+  /^at\s/,
+  /^node:/,
+  /^\^+$/,
+  /^throw\s/,
+  /^Require stack:/i,
+  // A `Require stack:` entry is a bare path and nothing else. Without the
+  // end anchor this also ate prose bullets like "- /webhooks/agent is down".
+  /^-\s*[/\\]\S*$/,
+  /^[/\\][^\s]*$/,
+  /^Node\.js\s+v?\d/i,
+  // Markup: an upstream's HTML error page (a gateway's 502 body, Cloudflare's
+  // tunnel page) travels inside adapter errors, and none of it is a sentence
+  // a user should read as the failure reason.
+  /^<[!/a-zA-Z]/,
+] as const;
+
+/** True when a line is pure runtime noise rather than a human explanation. */
+function isNoiseLine(line: string): boolean {
+  return NOISE_LINE_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+/**
+ * Anything that betrays where OUR code lives or how it is built: an
+ * interpreter source location, a stack frame, our container root, or our build
+ * tree and bundle filenames.
+ *
+ * This is the final guard on the generic bucket — the line filter above works
+ * by enumeration, and enumeration always lags the next crash shape, so a
+ * candidate that still matches here is dropped for a generic sentence rather
+ * than shown.
+ *
+ * These name our own artefacts deliberately. An earlier cut matched ANY
+ * two-segment slash path, which also swallowed the single most diagnostic
+ * string the runner produces — the HTTP adapter's
+ * `HTTP 502: … from <url> (request-id: …): <body>` (http-agent.adapter.ts).
+ * That line is all the customer's own data, so suppressing it cost them the
+ * status, the URL, the request id and their own error body to hide nothing.
+ * A path is only an internal when it is ours.
+ */
+const INTERNALS_PATTERNS = [
+  /\bnode:[a-z_]+/,
+  // `at Foo (…)` and `at async Foo.bar (…)` — the async form has an extra
+  // token, which a fixed `\S+\s+\(` shape missed.
+  /\bat\s+(?:async\s+)?\S+\s*\(/,
+  /(?:^|[\s'"(])\/app\//,
+  /(?:^|[\s'"(/\\])(?:dist|node_modules)[/\\]/,
+  /\bscenario-child-process\b/,
+  /\.cjs\b/,
+] as const;
+
+/** True when a candidate message would expose our internals to the user. */
+function exposesInternals(message: string): boolean {
+  return INTERNALS_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+/** Net bracket depth a line opens (negative when it closes more than it opens). */
+function bracketDelta(line: string): number {
+  return (
+    (line.match(/[{[]/g)?.length ?? 0) - (line.match(/[}\]]/g)?.length ?? 0)
+  );
+}
+
+/**
+ * The first line of a crash dump that reads as a human explanation.
+ *
+ * Node prints the error's own properties as a brace block under the stack
+ * (`{ code: 'MODULE_NOT_FOUND', requireStack: [ '/app/…' ] }`). Skipping only
+ * the opening brace would leave its inner lines as candidates, so the block is
+ * skipped whole by depth.
+ *
+ * A block opens ONLY on a line that starts with `{`, which is how Node prints
+ * it. Counting brackets on every line instead let a stray `[` in prose — or
+ * the truncated JSON the HTTP adapter's body preview can emit — open a block
+ * that never closed, swallowing the real sentence underneath it.
+ */
+function findMeaningfulLine(text: string): string | undefined {
+  const lines = text.split("\n").map((line) => line.trim());
+
+  let depth = 0;
+  let endedInsideBlock = false;
+  for (const line of lines) {
+    if (depth > 0) {
+      depth = Math.max(0, depth + bracketDelta(line));
+      endedInsideBlock = depth > 0;
+      continue;
+    }
+    if (line.startsWith("{")) {
+      depth = Math.max(0, bracketDelta(line));
+      endedInsideBlock = depth > 0;
+      continue;
+    }
+    if (line.length === 0 || isNoiseLine(line)) continue;
+    return line;
+  }
+
+  // A block that never closed ate the rest of the dump. That happens for real:
+  // the HTTP adapter truncates response bodies mid-string, so unbalanced JSON
+  // arrives as a matter of course. Rescan without depth — still skipping lines
+  // that open an object, so a balanced block's innards can't surface — rather
+  // than lose a genuine sentence sitting under the truncation.
+  if (!endedInsideBlock) return undefined;
+  return lines.find(
+    (line) => line.length > 0 && !line.startsWith("{") && !isNoiseLine(line),
+  );
+}
+
+/**
+ * Where an HTML error document starts inside an otherwise-prose line. The
+ * HTTP adapter appends the upstream's response body after its own prose
+ * (`HTTP 502: … (request-id: …): <body>`), so a gateway's HTML error page
+ * lands mid-line. Only the unambiguous document openers match — a bare `<`
+ * also appears in legitimate prose like `expected <value>`.
+ */
+const HTML_DOCUMENT_MARKER = /<!doctype\s+html|<html[\s>]/i;
+
+/**
  * Collapse a raw error blob (often a multi-line child-process dump) into a
  * single concise line: strip the "Child process exited with code N:" wrapper
- * and any JSON-log noise, keep the first meaningful line, and cap the length.
+ * and any runtime noise, keep the first meaningful line, drop an inline HTML
+ * error document, and cap the length.
+ *
+ * Returns undefined when nothing but noise is left, so the caller falls back to
+ * a generic sentence instead of surfacing a stack frame.
  */
-function summarize(raw: string): string {
+function summarize(raw: string): string | undefined {
   const withoutWrapper = raw
     .replace(/^Child process exited with code \d+:\s*/i, "")
     .trim();
-  const firstMeaningfulLine =
-    withoutWrapper
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.length > 0 && !line.startsWith("{")) ??
-    withoutWrapper;
-  const collapsed = firstMeaningfulLine.replace(/\s+/g, " ").trim();
+  const meaningful = findMeaningfulLine(withoutWrapper);
+  if (!meaningful || exposesInternals(meaningful)) return undefined;
+  let collapsed = meaningful.replace(/\s+/g, " ").trim();
+  const markupStart = collapsed.search(HTML_DOCUMENT_MARKER);
+  if (markupStart >= 0) {
+    // The prose before the document (status, URL, request id) is all the
+    // customer's own data and stays; the page itself never reads as a reason.
+    collapsed = collapsed.slice(0, markupStart).trimEnd();
+  }
+  if (collapsed.length === 0) return undefined;
   if (collapsed.length <= MAX_GENERIC_MESSAGE_LENGTH) return collapsed;
   return `${collapsed.slice(0, MAX_GENERIC_MESSAGE_LENGTH - 1).trimEnd()}…`;
+}
+
+/** Markers of a connection that failed outright (refused / DNS / reset / undici fetch). */
+const NETWORK_UNREACHABLE_NEEDLES = [
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNRESET",
+  "fetch failed",
+  "network error",
+] as const;
+
+/**
+ * What a Cloudflare quick tunnel returns once its local `cloudflared` process
+ * has ended: the edge still resolves the hostname but answers HTTP 530 with
+ * Cloudflare's "error code: 1033" (tunnel error) body.
+ */
+const TUNNEL_GONE_NEEDLES = ["HTTP 530", "error code: 1033"] as const;
+
+/**
+ * True when the raw text carries BOTH Cloudflare markers. Requiring both is
+ * what makes the signal unambiguous: an origin can answer 530 for its own
+ * reasons, and "1033" can appear in an ordinary payload, but only the
+ * Cloudflare edge answers 530 with the 1033 tunnel-error body.
+ */
+function isTunnelGoneFailure(text: string): boolean {
+  return TUNNEL_GONE_NEEDLES.every((needle) => contains(text, needle));
+}
+
+/**
+ * True when a raw run failure is transport-level: the connection itself
+ * failed (or the tunnel edge reported its origin gone) rather than the target
+ * rejecting the request. This is the gate for naming a failure a dead dev
+ * tunnel: the caller supplies the "target has a devTunnel" fact, this module
+ * supplies the "the failure looks like the tunnel is gone" half.
+ */
+export function isTransportLevelScenarioFailure(
+  raw: string | undefined,
+): boolean {
+  const text = (raw ?? "").trim();
+  if (text.length === 0) return false;
+  return (
+    NETWORK_UNREACHABLE_NEEDLES.some((needle) => contains(text, needle)) ||
+    isTunnelGoneFailure(text)
+  );
 }
 
 interface ClassificationRule {
   /** Any one of these appearing in the raw error selects this rule. */
   needles: string[];
+  /**
+   * Optional second condition — the rule then needs a needle AND this. Used
+   * where the needle words alone don't say whose process actually failed.
+   */
+  alsoRequires?: (text: string) => boolean;
   /** Build the envelope for a matched raw error. */
   build: (text: string) => ScenarioErrorEnvelope;
+}
+
+/** Markers that only an uncaught Node crash prints. */
+const NODE_CRASH_MARKERS = [
+  "node:internal/modules",
+  "Require stack:",
+  "at Module._",
+] as const;
+
+/**
+ * The wrapper `scenario.processor.ts` puts on a child that exited non-zero
+ * WITHOUT reporting a structured error — which is exactly the case where our
+ * own runner died before it could say anything. When the runner does report
+ * (an adapter failure, a judge error), its own text is used and this wrapper
+ * never appears.
+ */
+const CHILD_EXIT_WRAPPER = /Child process exited with code \d+/i;
+
+/**
+ * True when OUR runner process died in Node's module loader.
+ *
+ * Both halves are load-bearing. A Node crash dump says a Node process failed
+ * to load something, not WHICH process: `http-agent.adapter.ts` embeds the
+ * customer's HTTP response body verbatim in the error it throws, so a customer
+ * agent that boots with its own `Cannot find module` — stack frames,
+ * `Require stack:` and all — reaches this classifier looking identical.
+ * Claiming "the fault is on our side" for their missing dependency would send
+ * them looking in the wrong place, so the crash must ALSO carry the wrapper
+ * only our own dead child gets.
+ */
+function isOurRunnerCrash(text: string): boolean {
+  return (
+    CHILD_EXIT_WRAPPER.test(text) &&
+    NODE_CRASH_MARKERS.some((marker) => contains(text, marker))
+  );
 }
 
 /**
@@ -177,6 +418,30 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     },
   },
   {
+    // The runner process died before it could run anything — a module missing
+    // from the production bundle, a native addon that won't load, an ESM/CJS
+    // mismatch. Always our deployment, never the customer's scenario, so the
+    // copy says so plainly instead of dumping the loader's stack. The build
+    // gate in scripts/build-server.mjs is what stops the common cause (an
+    // external require that isn't declared in dependencies) from shipping;
+    // this rule is the user-facing half for anything that still gets through.
+    needles: [
+      "MODULE_NOT_FOUND",
+      "ERR_MODULE_NOT_FOUND",
+      "Cannot find module",
+      "Cannot find package",
+      "ERR_REQUIRE_ESM",
+      "ERR_DLOPEN_FAILED",
+    ],
+    alsoRequires: isOurRunnerCrash,
+    build: () => ({
+      code: ScenarioInfraErrorCode.RunnerUnavailable,
+      message:
+        "The simulation runner couldn't start, so the scenario never ran.",
+      hint: "This is a fault on our side, not a problem with your scenario. Retry the run, and contact support if it keeps happening.",
+    }),
+  },
+  {
     needles: ["timed out", "ETIMEDOUT"],
     build: () => ({
       code: ScenarioInfraErrorCode.ExecutionTimeout,
@@ -185,15 +450,25 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     }),
   },
   {
+    // A Cloudflare quick tunnel whose local `cloudflared` process ended: the
+    // edge answers HTTP 530 with the "error code: 1033" body. Named here,
+    // without any devTunnel config lookup, so failures the scenario SDK
+    // records itself (which never pass through the failure handler) still
+    // read as a dead tunnel instead of a generic error carrying raw HTML.
+    needles: ["HTTP 530"],
+    alsoRequires: isTunnelGoneFailure,
+    build: () => ({
+      code: ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      message:
+        "The agent points at a local development tunnel that is no longer " +
+        "responding. The `langwatch agent dev` session that created it has " +
+        "probably ended.",
+      hint: "Run `langwatch agent dev` again on the machine that started the tunnel, or restore the agent's URL in its settings.",
+    }),
+  },
+  {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
-    needles: [
-      "ECONNREFUSED",
-      "ENOTFOUND",
-      "EAI_AGAIN",
-      "ECONNRESET",
-      "fetch failed",
-      "network error",
-    ],
+    needles: [...NETWORK_UNREACHABLE_NEEDLES],
     build: () => ({
       code: ScenarioInfraErrorCode.PlatformUnreachable,
       message: "Couldn't reach the endpoint while running the simulation.",
@@ -216,19 +491,22 @@ export function classifyScenarioInfraError(
   if (text.length === 0) {
     return {
       code: ScenarioInfraErrorCode.Infra,
-      message: "The simulation failed before it could run.",
+      message: GENERIC_FAILURE_MESSAGE,
     };
   }
 
   for (const rule of CLASSIFICATION_RULES) {
-    if (rule.needles.some((needle) => contains(text, needle))) {
+    const hasMatchingNeedle = rule.needles.some((needle) =>
+      contains(text, needle),
+    );
+    if (hasMatchingNeedle && (rule.alsoRequires?.(text) ?? true)) {
       return rule.build(text);
     }
   }
 
   return {
     code: ScenarioInfraErrorCode.Infra,
-    message: summarize(text),
+    message: summarize(text) ?? UNREADABLE_FAILURE_MESSAGE,
   };
 }
 
@@ -333,6 +611,10 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Judge model configuration conflict";
     case ScenarioInfraErrorCode.ExecutionTimeout:
       return "Simulation timed out";
+    case ScenarioInfraErrorCode.RunnerUnavailable:
+      return "Simulation runner unavailable";
+    case ScenarioInfraErrorCode.AgentDevTunnelUnreachable:
+      return "Local tunnel not responding";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

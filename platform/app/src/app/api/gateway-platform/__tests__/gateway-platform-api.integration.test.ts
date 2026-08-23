@@ -26,13 +26,13 @@
 import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import {
   readStoredBody,
@@ -40,6 +40,7 @@ import {
   withIdempotency,
 } from "~/server/api/idempotency";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -346,6 +347,11 @@ async function seedUserWithRole(args: {
   });
   return created.token;
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("gateway platform REST API (real PG + real CH)", () => {
   beforeAll(async () => {
@@ -667,6 +673,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         {
           name: `org-scoped-${suffix}`,
           scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
+          // An organization with projects to choose from must say which
+          // one its shared key traces into, rather than leave it to the
+          // governance fallback. RBAC stays the only thing under test.
+          trace_project_id: PROJECT_ID,
         },
         apiKeyAuth(adminToken),
       );
@@ -1304,6 +1314,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           name: `group-budget-${suffix}`,
           window: "month",
           limit_usd: "40",
+          // None of these members hold a key, so the budget is unreachable
+          // and would be refused. What is under test is the per-member
+          // labelling, and reach has its own tests.
+          allow_unreachable: true,
         },
         legacyAuth(),
       );

@@ -6,8 +6,8 @@ description: >-
   credential injection. Internal-only service consumed by the LangWatch control
   plane.
 type: application
-version: 3.9.0
-appVersion: 3.9.0
+version: 3.16.0
+appVersion: 3.16.0
 keywords:
   - langwatch
   - langy

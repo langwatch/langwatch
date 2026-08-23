@@ -38,7 +38,7 @@ export default function SecretsPage() {
   const createMutation = api.secrets.create.useMutation();
   const updateMutation = api.secrets.update.useMutation();
   const deleteMutation = api.secrets.delete.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSecretName, setNewSecretName] = useState("");

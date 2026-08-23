@@ -1,8 +1,6 @@
 import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
-import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import {
   createProjectApp,
   requires,
@@ -15,6 +13,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import { baseResponses } from "../../shared/base-responses";
+import { resolvePersonalCaller } from "../../shared/personal-project-caller";
 import {
   meProjectResponseSchema,
   meUsageQuerySchema,
@@ -79,27 +78,14 @@ function registerUsageRoute(
     async (c) => {
       const project = c.get("project");
 
-      // /api/me/usage is principal-scoped: it only makes sense for a
-      // personal project, where ownerUserId identifies whose usage to
-      // roll up. A shared/team project key has no single owner, so we
-      // reject it rather than guess.
-      if (!project.isPersonal || !project.ownerUserId) {
-        throw new HTTPException(400, {
-          message:
-            "GET /api/me/usage requires a personal-project API key (Project.isPersonal must be true). Use the API key from your personal workspace.",
-        });
-      }
-
-      // Ownership guard: a user-bound key must own the personal project it
-      // targets. A legacy project key has no `apiKeyUserId` — it is that
-      // project's own key, so the caller is the owner by construction.
-      const callerUserId = c.get("apiKeyUserId");
-      if (callerUserId && callerUserId !== project.ownerUserId) {
-        throw new HTTPException(403, {
-          message:
-            "This API key cannot read another user's personal usage. Use a key scoped to your own personal workspace.",
-        });
-      }
+      // /api/me/usage is principal-scoped: it only makes sense for a personal
+      // workspace, whose owner identifies whose usage to roll up. Both guards
+      // and both refusals are shared with the coding agent's pull-request
+      // usage read, which needs a person for the same reason.
+      const ownerUserId = resolvePersonalCaller({
+        project,
+        apiKeyUserId: c.get("apiKeyUserId"),
+      });
 
       const { windowStartMs, windowEndMs } = c.req.valid("query");
       const window =
@@ -130,7 +116,7 @@ function registerUsageRoute(
       );
       const input = {
         personalProjectId: project.id,
-        userId: project.ownerUserId,
+        userId: ownerUserId,
         ingestionTenantId: governanceProject?.id,
         window,
       };

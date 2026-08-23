@@ -1,5 +1,5 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { hasProjectPermission, type Permission } from "../rbac";
 
 // Helper function to test permission hierarchy logic
@@ -95,7 +95,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["workflows:manage"],
       });
@@ -113,7 +113,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["workflows:manage"],
       });
@@ -131,7 +131,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["workflows:manage"],
       });
@@ -149,7 +149,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["workflows:manage"],
       });
@@ -167,7 +167,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["workflows:view"],
       });
@@ -187,7 +187,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: [
           "workflows:manage",
@@ -304,7 +304,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: [], // No permissions — falls back to built-in role
       });
@@ -323,7 +323,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: ["invalid-permission", "workflows:view"],
       });
@@ -344,7 +344,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN, customRoleId: null },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue(null);
+      mockPrisma.customRole.findFirst.mockResolvedValue(null);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -359,7 +359,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         id: "custom-role-123",
         permissions: null,
       });
@@ -377,7 +377,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.VIEWER, customRoleId: null },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue(null);
+      mockPrisma.customRole.findFirst.mockResolvedValue(null);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },

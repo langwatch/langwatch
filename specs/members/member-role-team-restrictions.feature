@@ -259,8 +259,80 @@ Feature: Member Role Team Restrictions
     And the refusal names the team
 
   @integration
+  Scenario: Saving the team form cannot take its last admin away
+    Given a member is the only admin of a shared team
+    When the team is saved with that member demoted or dropped from the list
+    Then the save is refused
+    And the refusal names the team
+    And the team keeps its admin
+
+  @integration
+  Scenario: The team form hands the admin role to somebody else in one save
+    Given a member is the only admin of a shared team
+    When the team is saved promoting somebody else to admin and demoting them
+    Then the save goes through
+
+  @integration
+  Scenario: A team already without a team admin stays editable
+    Given a seat correction left a team with no team admin
+    When its members are changed, from the team form or one member at a time
+    Then the changes are saved
+    And promoting a member back to Admin repairs the team
+
+  @integration
   Scenario: Editing one team's members still refuses to remove its last admin
     Given a member is the only admin of a shared team
     When an organization admin changes that team role from the team's own members
     Then the change is refused
     And the refusal names the team
+
+  @integration
+  Scenario: Two team admins removed at the same time cannot both succeed
+    Given a team whose only two admins are being removed concurrently
+    When both removals race each other
+    Then at most one of them commits
+    And the team keeps at least one admin
+
+  # "Has an admin" counts people. A group given the Admin role on a team
+  # administers it through every one of its members, so a change the group can
+  # absorb is not taking the team's last admin away, and a team administered
+  # entirely through a group is not a team without an admin.
+
+  @integration
+  Scenario: A group that administers the team counts as its admin
+    Given a member is the only directly assigned admin of a shared team
+    And a group with at least one member holds the Admin role on that team
+    When they are demoted, from the team form or from the team's own members
+    Then the save goes through
+
+  @integration
+  Scenario: A group with no members does not keep a team administered
+    Given a member is the only directly assigned admin of a shared team
+    And a group with no members holds the Admin role on that team
+    When the team is saved with that member demoted
+    Then the save is refused
+    And the refusal names the team
+
+  @integration
+  Scenario: A team administered only through a group accepts member edits
+    Given a team whose only Admin role is held by a group with members
+    When an organization admin changes another member's role on that team
+    Then the change is saved
+
+  # The seat correction reaches everything the seat caps: team access and
+  # project access alike, on the surfaces the organization shares. The member's
+  # own personal workspace is the documented exception, held by
+  # specs/ai-gateway/governance/personal-workspace-integrity.feature.
+
+  @integration
+  Scenario: Moving a member to a Lite Member seat corrects their project access rows to Viewer
+    Given a member holds project access above Viewer on a shared project
+    When an organization admin moves them to a Lite Member seat
+    Then their project access on that project becomes Viewer
+    And moving them back to a full seat leaves project access as it is
+
+  @integration
+  Scenario: A seat correction leaves the personal workspace access row alone
+    Given a member with a personal workspace
+    When an organization admin moves them to a Lite Member seat
+    Then their personal workspace access rows are untouched

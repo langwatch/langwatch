@@ -32,15 +32,15 @@ This means: rotating the raw OpenAI key rotates it everywhere; changing a rate l
 | [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
 | [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream) | Bearer, custom header | opaque |
 
-Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. These will light up in the UI as LangWatch ships the per-provider configuration forms.
+Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. Each appears in the UI once LangWatch ships its configuration form.
 
 ## Picking a primary + fallback
 
-Most VKs end up with 1-2 fallback providers. Guidelines:
+Pick one or two fallback providers. Guidelines:
 
 - **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
 - **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
-- **Azure-first** with OpenAI direct fallback. Pins traffic inside Azure data-residency most of the time but tolerates regional Azure outages.
+- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency until a configured fallback trigger (by default `5xx`, `timeout`, `rate_limit`) moves it to OpenAI direct.
 
 See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
 

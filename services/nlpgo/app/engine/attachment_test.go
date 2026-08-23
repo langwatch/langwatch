@@ -179,7 +179,7 @@ func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
 	assert.Equal(t, "You are a vision grader. Image:", strings.TrimSpace(systemText),
 		"the system message keeps only the text before the image, not the image link")
 	assert.Equal(t, "user", out[1].Role)
-	firstPartOfType(t, out[1], "image_url") // the image rode into the user message
+	firstPartOfType(t, out[1], "image_url")
 }
 
 // @scenario "An unreachable attachment URL fails the run with a clear message naming the URL"
@@ -401,28 +401,80 @@ func TestAttachmentErrorStripsUserinfoCredentials(t *testing.T) {
 	assert.Contains(t, ne.Message, "cdn.example.com/private/file.png", "the attachment stays identifiable by host + path")
 }
 
-func TestRedactAttachmentsForTracingStripsInlineBytes(t *testing.T) {
-	bigB64 := strings.Repeat("A", 4096)
+// base64OfDecodedSize returns a base64 string that approxBase64Bytes reads as
+// roughly `decoded` bytes, so the tests below are written in the same units as
+// the budget constants rather than in encoded length.
+func base64OfDecodedSize(decoded int) string {
+	return strings.Repeat("A", decoded*4/3+4)
+}
+
+// @scenario "An attachment small enough to carry reaches the trace as real content"
+// @scenario "Audio and documents follow the same budget as images"
+func TestMessagesForTracingCarriesAttachmentsThatFit(t *testing.T) {
+	smallB64 := base64OfDecodedSize(64 << 10)
 	messages := []app.ChatMessage{{Role: "user", Content: []any{
 		map[string]any{"type": "text", "text": "describe these"},
-		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + bigB64}},
-		map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": bigB64, "format": "mp3"}},
-		map[string]any{"type": "file", "file": map[string]any{"filename": "doc.pdf", "file_data": "data:application/pdf;base64," + bigB64}},
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + smallB64}},
+		map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": smallB64, "format": "mp3"}},
+		map[string]any{"type": "file", "file": map[string]any{"filename": "doc.pdf", "file_data": "data:application/pdf;base64," + smallB64}},
 	}}}
 
-	traced := redactAttachmentsForTracing(messages)
+	traced := messagesForTracing(messages)
 	tracedJSON, err := json.Marshal(traced)
 	require.NoError(t, err)
-	assert.NotContains(t, string(tracedJSON), bigB64, "the base64 payload must not survive into the trace copy")
-	assert.Contains(t, string(tracedJSON), "image/png", "the media-type summary is kept for the trace")
-	assert.Contains(t, string(tracedJSON), "bytes]", "a size summary is kept for the trace")
+	assert.Contains(t, string(tracedJSON), smallB64, "an attachment that fits reaches the trace as real content")
+	assert.NotContains(t, string(tracedJSON), "bytes]", "nothing is summarized when everything fits")
 	assert.Contains(t, string(tracedJSON), "describe these", "text content is preserved")
+	assert.Equal(t, 3, strings.Count(string(tracedJSON), smallB64), "image, audio and document are all carried")
+}
+
+// @scenario "An attachment too large to carry keeps a summary naming its type and size"
+func TestMessagesForTracingSummarizesAttachmentsThatDoNotFit(t *testing.T) {
+	hugeB64 := base64OfDecodedSize(maxTracedAttachmentBytes + (1 << 20))
+	messages := []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "text", "text": "describe this"},
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + hugeB64}},
+	}}}
+
+	traced := messagesForTracing(messages)
+	tracedJSON, err := json.Marshal(traced)
+	require.NoError(t, err)
+	assert.NotContains(t, string(tracedJSON), hugeB64, "an oversized payload must not reach the trace")
+	assert.Contains(t, string(tracedJSON), "image/png", "the summary names the media type")
+	assert.Contains(t, string(tracedJSON), "bytes]", "the summary names the byte count")
+	assert.Contains(t, string(tracedJSON), "describe this", "text content is preserved")
 
 	// The original messages still carry the full bytes — the model gets the real
-	// attachment, only the traced copy is shrunk.
+	// attachment either way, only the traced copy is bounded.
 	origJSON, err := json.Marshal(messages)
 	require.NoError(t, err)
-	assert.Contains(t, string(origJSON), bigB64, "the original messages must keep the full bytes for the model")
+	assert.Contains(t, string(origJSON), hugeB64, "the original messages must keep the full bytes for the model")
+}
+
+// @scenario "The budget counts every attachment in the message, not each one alone"
+func TestMessagesForTracingSpendsOneBudgetAcrossParts(t *testing.T) {
+	// Each part is under the per-attachment ceiling, so only the shared budget
+	// can stop the second one.
+	half := maxTracedAttachmentBudgetBytes/2 + (64 << 10)
+	require.Less(t, half, maxTracedAttachmentBytes, "each part must fit on its own")
+	first := base64OfDecodedSize(half)
+	second := base64OfDecodedSize(half) + "B"
+
+	messages := []app.ChatMessage{
+		{Role: "user", Content: []any{
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + first}},
+		}},
+		{Role: "user", Content: []any{
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/jpeg;base64," + second}},
+		}},
+	}
+
+	traced := messagesForTracing(messages)
+	tracedJSON, err := json.Marshal(traced)
+	require.NoError(t, err)
+	assert.Contains(t, string(tracedJSON), first, "the first attachment is carried while the budget holds")
+	assert.NotContains(t, string(tracedJSON), second, "the budget is spent, so the rest keep their summaries")
+	assert.Contains(t, string(tracedJSON), "image/jpeg", "the summary still names what was left out")
 }
 
 func TestNormalizeMediaType(t *testing.T) {

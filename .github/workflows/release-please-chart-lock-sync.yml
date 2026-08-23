@@ -12,12 +12,18 @@ name: release-please-chart-lock-sync
 # with `can't get a valid version for dependency langwatch-gateway` /
 # `the lock file (Chart.lock) is out of sync with the dependencies file`.
 #
-# This workflow watches release-please's umbrella PR, runs
-# `helm dependency update`, and pushes the regenerated Chart.lock back to the
-# PR branch so the lock stays meaningful end-to-end. We push with a PAT
-# (RELEASE_PLEASE_TOKEN — same one release-please-sdks.yml uses) so the new
-# commit re-triggers the chart CI; pushes authored by the default GITHUB_TOKEN
-# do NOT trigger downstream workflows.
+# clickhouse-serverless reaches the same lock from its own release PR rather
+# than the umbrella one, because it versions independently. Its release only
+# touches charts/clickhouse-serverless, so without the branch and path below
+# the umbrella lock keeps the superseded version and every chart job fails
+# the same way, which is what happened on 0.2.0 and again on 0.3.0.
+#
+# This workflow watches those release PRs, runs `helm dependency update`, and
+# pushes the regenerated Chart.lock back to the PR branch so the lock stays
+# meaningful end-to-end. We push with a PAT (RELEASE_PLEASE_TOKEN — same one
+# release-please-sdks.yml uses) so the new commit re-triggers the chart CI;
+# pushes authored by the default GITHUB_TOKEN do NOT trigger downstream
+# workflows.
 
 on:
   pull_request_target:
@@ -25,6 +31,15 @@ on:
     paths:
       - "charts/gateway/Chart.yaml"
       - "charts/langwatch/Chart.yaml"
+      - "charts/clickhouse-serverless/Chart.yaml"
+
+# A writer, so it queues rather than cancels: the job pushes a Chart.lock
+# commit to the release PR's branch, and two runs doing that at once is a
+# force-push race rather than wasted minutes. Serialized, the second run finds
+# the lock already in sync and does nothing.
+concurrency:
+  group: release-please-chart-lock-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -39,7 +54,8 @@ jobs:
     # the upstream repo, so this is the right tightening.
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'release-please--branches--main--components--langwatch')
+      (startsWith(github.head_ref, 'release-please--branches--main--components--langwatch') ||
+       startsWith(github.head_ref, 'release-please--branches--main--components--clickhouse-serverless'))
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

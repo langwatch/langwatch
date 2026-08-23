@@ -1,7 +1,8 @@
 Feature: Token Created modal command snippets
   As a user who has just minted an API key
-  I want syntax-highlighted, PostHog-style command snippets in the Token Created modal
-  So that the code I am about to paste into a terminal or config file is easy to read, copy, and trust
+  I want the Token Created modal's snippets rendered through the same shared,
+  labelled code-preview surface the traces empty state and onboarding use
+  So that the code I am about to paste into a terminal or config file is easy to read, copy, and trust — and looks like the rest of the product
 
   Background:
     Given I am signed in as a user in an organization with at least one project
@@ -9,71 +10,89 @@ Feature: Token Created modal command snippets
     And the Token Created dialog is open with the newly minted token
 
   # ============================================================================
-  # Highlighting engine — Shiki, github-light, singleton highlighter
+  # Highlighting engine — the shared CodePreview (Chakra CodeBlock + Shiki)
   # ============================================================================
-  # No new syntax-highlighting library is introduced. Shiki v3.x is already a
-  # dependency; the singleton highlighter lives in shikiAdapter.ts.
+  # No new syntax-highlighting library is introduced. The dialog renders its
+  # snippets through the same CodePreview component the onboarding and traces
+  # empty-state surfaces already use; CodePreview loads Shiki lazily inside its
+  # adapter, so the engine never enters the settings page bundle statically.
 
   @integration
   Scenario: All command snippets are syntax-highlighted
     When the Token Created dialog renders any of its command/config blocks
     Then each snippet renders with token-level colour (not flat monospace text)
-    And the rendered colours use a light theme that matches the settings UI
+    And the rendered theme follows the active colour mode (github-light in light mode, github-dark in dark mode)
 
   @unit
-  Scenario: Highlight engine wiring — Shiki singleton with the required languages registered
+  Scenario: Highlight engine wiring — CodePreview registers the languages the dialog needs
     # Structural invariant rather than user-observable behaviour, hence `@unit`.
-    # Asserted by grepping shikiAdapter.ts + the call sites in TokenCreatedDialog.
-    Given today's shikiAdapter registers: markdown, json, bash, typescript, python, xml, html, yaml
+    Given CodePreview's shiki adapter registers: typescript, python, go, yaml, bash, json
     When this feature is implemented
-    Then shikiAdapter additionally registers `ini` (for the .env tab) and keeps `bash` for terminal commands and `json` for the config block
-    And the Bearer / Basic Auth tabs use `shellscript` (which Shiki ships as a bash alias) — no `http` or `curl` grammar is required
-    And language registration happens inside shikiAdapter, not inline at the call site
+    Then the adapter additionally registers `ini` (for the .env tab) and `shellscript` (for the Bearer / Basic Auth tabs)
+    And language registration happens inside CodePreview's adapter, not inline at the call site
     And no language is loaded with a hopeful "(or fallback)" — every block declares one concrete language
     And no second syntax-highlighting library is added to package.json
 
   # ============================================================================
   # "Use in Code" section — three tabs (.env / Bearer / Basic Auth)
   # ============================================================================
-  # Today these render via the plain CodeBlock.tsx (monospace, no highlighting).
-  # After this change they share the new PostHog-style command-box look.
 
   @integration
-  Scenario: .env tab renders as a highlighted ini command box
+  Scenario: .env tab renders in the shared labelled code preview
     When I select the ".env" tab inside "Use in Code"
-    Then the snippet renders inside the new highlighted command-box style
+    Then the snippet renders inside the shared CodePreview box
+    And the box header carries the label ".env"
     And LANGWATCH_API_KEY, LANGWATCH_PROJECT_ID, and LANGWATCH_ENDPOINT keys are visually distinct from their string values
-    # (Highlighting language is `ini` — locked in by the `@unit` "Highlight engine wiring" scenario.)
 
   @integration
-  Scenario: Bearer tab renders as a highlighted shell command box
+  Scenario: Bearer tab renders in the shared labelled code preview
     When I select the "Bearer" tab inside "Use in Code"
-    Then the snippet renders inside the new highlighted command-box style
+    Then the snippet renders inside the shared CodePreview box with a header label naming the snippet
     And the snippet shows an `Authorization: Bearer <token>` line plus an `X-Project-Id` line
 
   @integration
-  Scenario: Basic Auth tab renders as a highlighted shell command box
+  Scenario: Basic Auth tab renders in the shared labelled code preview
     When I select the "Basic Auth" tab inside "Use in Code"
-    Then the snippet renders inside the new highlighted command-box style
-    And the snippet shows an `Authorization: Basic base64(projectId:token)` line
+    Then the snippet renders inside the shared CodePreview box with a header label naming the snippet
+    And the snippet shows an `Authorization: Basic <base64 of projectId:token>` line
+
+  # ============================================================================
+  # Masking — the encoded credential is the secret, not just the raw token
+  # ============================================================================
+  # CodePreview masks by substring-replacing its `sensitiveValue` inside the
+  # rendered code. A raw token is NOT a substring of its own base64 encoding,
+  # so the Basic Auth block must declare the encoded blob as the sensitive
+  # value — otherwise masking silently fails open.
+
+  @integration
+  Scenario: Basic Auth masking hides the encoded credential
+    Given the Basic Auth tab is showing its masked form
+    Then the base64-encoded credential is not readable in the snippet
+    And toggling reveal shows the full encoded credential
+
+  @integration
+  Scenario: Basic Auth tab without a resolvable project still explains itself
+    # The encoded header needs a project id, so without one there is no
+    # snippet to show — but a silently blank tab reads as broken.
+    Given no project is resolvable for the freshly minted key
+    When I select the "Basic Auth" tab inside "Use in Code"
+    Then the helper text explaining the base64(projectId:token) format is still shown
+    And instead of a snippet box the tab asks the user to select a project
 
   # ============================================================================
   # "Use with Code Assistants" section — terminal command + JSON config
   # ============================================================================
 
   @integration
-  Scenario: Claude Code tab shows a PostHog-style terminal command snippet
+  Scenario: Claude Code tab shows a labelled terminal command snippet
     When I select the "Claude Code" tab inside "Use with Code Assistants"
-    Then the "Run in your terminal" snippet renders inside the new command-box style
-    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (this glyph is decorative and must not enter the copy buffer — see the "prompt glyph is not in the copied value" scenario)
+    Then the "Run in your terminal" snippet renders inside the shared CodePreview box with a header label naming the snippet
     And the executable name "claude" is visually distinct from its flags and arguments
-    And the `--api-key` flag and its value are visually distinct from the rest of the line
 
   @integration
-  Scenario: Codex tab shows a PostHog-style terminal command snippet
+  Scenario: Codex tab shows a labelled terminal command snippet
     When I select the "Codex" tab inside "Use with Code Assistants"
-    Then the "Run in your terminal" snippet renders inside the new command-box style
-    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (decorative — must not enter the copy buffer)
+    Then the "Run in your terminal" snippet renders inside the shared CodePreview box with a header label naming the snippet
     And the executable name "codex" is visually distinct from its `--env` / `--` / `npx` flags and arguments
 
   # A customer reported that only Claude Code and Codex appeared here, while the
@@ -90,7 +109,7 @@ Feature: Token Created modal command snippets
   @integration
   Scenario: An assistant with an install command shows a terminal snippet
     When I select a tab for an assistant that installs the MCP server from the terminal
-    Then the "Run in your terminal" snippet renders inside the command-box style
+    Then the "Run in your terminal" snippet renders inside the shared CodePreview box
     And the snippet is that assistant's own command, carrying the freshly minted token
 
   @integration
@@ -107,14 +126,6 @@ Feature: Token Created modal command snippets
     When this feature is implemented
     Then the tab labels and the config-file paths are derived from a single list
     And adding an assistant to that list is the only edit needed to surface it
-
-  @integration
-  Scenario: Terminal prompt glyph is not included in the copied value
-    Given any terminal command snippet rendered with the ">_" prompt glyph
-    When I click the copy button on that snippet
-    Then the clipboard receives ONLY the executable command (e.g. `claude mcp add langwatch --env … -- npx -y @langwatch/mcp-server --api-key …`)
-    And the clipboard does NOT contain ">_" or any leading prompt characters
-    And the prompt glyph is asserted to be rendered via a CSS pseudo-element / sibling DOM node, not the source string passed to shikiAdapter or to `copyValue`
 
   @integration
   Scenario: JSON config block keeps the existing JsonHighlight wiring
@@ -135,12 +146,25 @@ Feature: Token Created modal command snippets
     And clicking it copies the unmasked value (real token, real project id, real endpoint) to the clipboard
 
   @integration
+  Scenario: Copy delivers the real value even while the snippet is masked
+    # The default CodeBlock copy trigger copies whatever string is rendered,
+    # which is the masked form when the snippet is hidden. The dialog's boxes
+    # must feed the clipboard the real value regardless of reveal state — a
+    # user who copies "sk-l***...***X6RA" into their .env gets a broken SDK
+    # with no error pointing here.
+    Given a command box currently shows a masked value
+    When I click the copy button without revealing the snippet first
+    Then the clipboard receives the real, unmasked value
+
+  @integration
   Scenario: Copy button flashes a success state on click
     # Timing assertions use fake timers in the integration test (e.g. vi.useFakeTimers + vi.advanceTimersByTime).
     # Do NOT write sleep() assertions.
     When I click the copy button on a command box
-    Then the button enters a success state (check icon and success colour)
-    And after advancing timers by 1 second the button returns to its default copy state
+    Then the button enters a success state (check icon)
+    And after advancing timers by 2 seconds the button returns to its default copy state
+    # 2 seconds is the shared InlineCopyButton's flash — the dialog reuses it
+    # rather than carrying its own timing.
 
   @integration
   Scenario: Reveal toggle still works for masked secret values
@@ -150,22 +174,11 @@ Feature: Token Created modal command snippets
     When I click the hide (eye-off) toggle
     Then the masked value is shown again
 
-  @unit
-  Scenario: Reveal toggle does not re-tokenize on every click
-    # Structural invariant — preserves UI responsiveness when a user toggles
-    # reveal rapidly. Asserted by spying on shikiAdapter.codeToHtml call count
-    # (vi.spyOn) — not directly user-visible, hence `@unit`.
-    Given the Token Created dialog has pre-computed Shiki token streams for both the masked and the unmasked form of each command box
-    When I toggle the reveal eye N times rapidly
-    Then shikiAdapter.codeToHtml is called at most twice per command box per dialog open (once for masked, once for unmasked — asserted via spy call count)
-    And the toggle swaps between the two pre-computed token streams, not re-tokenizes from scratch on each click
-
   @integration
-  Scenario: Copy and reveal buttons coexist in the existing header bar without overlap
-    Given today's CodeBlock keeps the copy button and the reveal (eye) toggle in a header bar above the snippet
-    When the box is rewritten in the PostHog-style command-box look
-    Then both controls remain in a single header / control row above the highlighted code (NOT floated into the same top-right corner of the code area)
-    And neither button overlaps the other or the leading ">_" prompt glyph
+  Scenario: Copy and reveal buttons coexist in the box header without overlap
+    When a command box with a maskable value renders
+    Then the box header carries the snippet label on the left and the reveal (eye) toggle plus copy button on the right, in a single header row above the highlighted code
+    And neither button overlaps the other or the header label
 
   @integration
   Scenario: Amber warning between .env block and Code Assistants section stays
@@ -186,38 +199,37 @@ Feature: Token Created modal command snippets
     And the snippet is NOT truncated with an ellipsis
 
   # ============================================================================
-  # Surface unification — one styled command box, not two
+  # Surface unification — the dialog uses the product's shared snippet surface
   # ============================================================================
-  # TokenCreatedDialog today renders code via TWO distinct surfaces:
-  #   - CodeBlock.tsx (.env / Bearer / Basic Auth)
-  #   - QuickCommand (Claude Code / Codex one-line commands)
-  # After this work the visible surface is one styled box; copy/reveal controls
-  # stay where users expect them.
+  # TokenCreatedDialog previously rendered code via a dialog-local component
+  # (ShikiCommandBox) that diverged visually from every other snippet surface:
+  # no filename label in the header, its own theming. The traces empty state
+  # and onboarding screens render through CodePreview. One product, one
+  # snippet surface.
 
   @unit
-  Scenario: A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog
-    # Verifiable by grepping TokenCreatedDialog imports: one command-box component imported for all snippet blocks;
-    # no direct import of CodeBlock or QuickCommand for snippet rendering; accentCredentialSegments imported from
-    # its original location (not re-implemented).
+  Scenario: The dialog renders snippets through the same component as the traces empty state
+    # Verifiable by grepping TokenCreatedDialog imports: CodePreview imported
+    # for all snippet blocks; ShikiCommandBox no longer exists in the repo.
     When this feature is implemented
-    Then TokenCreatedDialog imports ONE shared command-box component and uses it for every snippet block (.env / Bearer / Basic Auth / Claude Code / Codex)
-    And TokenCreatedDialog does not directly import CodeBlock or QuickCommand for snippet rendering
+    Then TokenCreatedDialog imports the shared CodePreview and uses it for every snippet block (.env / Bearer / Basic Auth / terminal commands)
+    And the dialog does not import any dialog-local command-box component
+    And the ShikiCommandBox component is deleted from the codebase
     And the JSON config block continues to be rendered by JsonHighlight (which is itself Shiki-backed)
-    And credential token visual distinction is achieved by Shiki's bash tokenization (the `--api-key` flag and its value render as distinct tokens via the github-light theme) — no regex decoration pass
 
   # ============================================================================
-  # Bundle cost — lazy-load Shiki so the settings page stays light
+  # Bundle cost — Shiki stays out of the settings page's static bundle
   # ============================================================================
 
   @unit
-  Scenario: TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open
-    # First two Then-clauses are static import checks (grep-verifiable).
-    # Third clause (chunk loads on dialog open) is a runtime bundle behaviour; verify in a
-    # browser devtools Network audit or an @integration test that spies on dynamic import resolution.
-    Given /settings/api-keys today does not statically import shikiAdapter (the Shiki bundle is ~hundreds of KB)
+  Scenario: The Shiki engine loads only when a code block renders
+    # Static import checks (grep-verifiable): CodePreview's adapter performs
+    # `await import("shiki")` inside its load() callback, so importing
+    # CodePreview does not statically pull the engine.
+    Given /settings/api-keys today does not statically import the Shiki engine (the bundle is ~hundreds of KB)
     When this feature is implemented
-    Then the new shared command-box component is imported into TokenCreatedDialog via `dynamic(() => import('...'), { ssr: false })` (or equivalent React.lazy boundary)
-    And /settings/api-keys/index.tsx does NOT contain a static top-level import of shikiAdapter
+    Then /settings/api-keys does not gain a static top-level import of the shiki package or of shikiAdapter
+    And the engine is loaded by CodePreview's adapter only when a code block mounts
 
   # ============================================================================
   # Accessibility
@@ -232,12 +244,11 @@ Feature: Token Created modal command snippets
   # ============================================================================
   # Out of scope guardrail — keep the change surface honest
   # ============================================================================
-  # Out of scope: CreateApiKeyDrawer.tsx — this work touches only TokenCreatedDialog and its
-  # highlighted snippet surfaces. CreateApiKeyDrawer must not be modified.
+  # Out of scope: CreateApiKeyDrawer.tsx, the amber banner's visual styling,
+  # and the onboarding/traces surfaces themselves (they are the reference).
 
   @unit
   Scenario: No new highlighting library is added
     # Verifiable by grepping platform/app/package.json: no new syntax-highlighting dependency added.
-    # Per-render instantiation guard is covered by the Shiki singleton integration scenario above.
     When this feature is implemented
     Then no syntax-highlighting library other than Shiki appears in platform/app/package.json

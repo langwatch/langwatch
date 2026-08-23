@@ -173,6 +173,33 @@ export function flattenTree(
 }
 
 /**
+ * The spans a row is nested under, nearest parent first.
+ *
+ * A collapsed ancestor keeps its whole subtree out of the flattened list, so
+ * bringing one span into view means knowing which rows are folded over it.
+ * Stops at a parent the trace does not carry, the same way `buildTree` treats
+ * an orphan as a root.
+ */
+export function ancestorSpanIds({
+  spans,
+  spanId,
+}: {
+  spans: SpanTreeNode[];
+  spanId: string;
+}): string[] {
+  const byId = new Map(spans.map((span) => [span.spanId, span]));
+  const ancestors: string[] = [];
+  const seen = new Set<string>([spanId]);
+  let cursor = byId.get(spanId)?.parentSpanId ?? null;
+  while (cursor && !seen.has(cursor) && byId.has(cursor)) {
+    ancestors.push(cursor);
+    seen.add(cursor);
+    cursor = byId.get(cursor)?.parentSpanId ?? null;
+  }
+  return ancestors;
+}
+
+/**
  * Total number of descendant spans under a node (children, grandchildren,
  * …) — drives the "+N" hidden-span count shown on collapsed parents.
  */

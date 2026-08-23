@@ -28,6 +28,7 @@ describe("createAdapter", () => {
         promptId: "prompt_123",
         systemPrompt: "You are helpful.",
         messages: [],
+        inputs: [],
       };
 
       const adapter = createAdapter({
@@ -49,6 +50,7 @@ describe("createAdapter", () => {
         url: "https://api.example.com/chat",
         method: "POST",
         headers: [],
+        secrets: {},
       };
 
       const adapter = createAdapter({

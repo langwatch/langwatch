@@ -107,7 +107,7 @@ function AuditLogPage() {
   const organizationId = organization?.id ?? "";
 
   // Initialize query client (must be before early return)
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   // Get users for search - we'll search by user ID or name/email
   const { data: organizationMembers } =

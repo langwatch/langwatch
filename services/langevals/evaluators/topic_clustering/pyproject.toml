@@ -11,14 +11,12 @@ dependencies = [
     "langevals-core>=0.1.0",
     "fastapi>=0.111.1,<1",
     # Pinned to match the rest of the langevals workspace (>=1.79.0 across
-    # langevals-core, ragas, langevals, legacy). Tightening to >=1.81.3 forced
-    # uv to look for pre-releases of langchain-openai (constrained <0.3.0 by
-    # the legacy evaluator), which broke the workspace lock resolution.
+    # langevals-core, ragas and langevals).
     "litellm>=1.79.0",
     "numpy>=1.26.4,<3",
     "scikit-learn>=1.5.2,<2",
     "scipy>=1.14.1,<2",
-    "tenacity>=8.5.0,<9",
+    "tenacity>=8.5.0,<10",
     "structlog>=24.1.0",
     "nanoid>=2.0.0,<3",
 ]
@@ -36,7 +34,7 @@ test = [
     # ModuleNotFoundError. Pinning here keeps the test deps scoped to
     # the topic_clustering workspace member.
     "pytest-httpx>=0.30.0",
-    "pandas>=2.2.3,<3",
+    "pandas>=2.2.3,<4",
     "httpx>=0.27.0",
 ]
 dev = ["ipykernel>=6.29.4"]

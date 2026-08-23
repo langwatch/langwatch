@@ -36,6 +36,11 @@ export function AnomaliesCard() {
     [anomalies],
   );
 
+  // Nothing to report collapses onto the dashboard's health line rather than
+  // spending a whole card saying so. An ERROR still renders: "we could not
+  // check" is emphatically not "all clear", and hiding it would imply it was.
+  if (!hasAny && !hasError) return null;
+
   return (
     <Card.Root borderColor={hardCount > 0 ? "red.emphasized" : undefined}>
       <Card.Body padding={0}>
@@ -58,11 +63,6 @@ export function AnomaliesCard() {
           <Text paddingX={4} paddingBottom={3} color="red.solid" textStyle="xs">
             Could not load anomalies — Redis may be unavailable. Retrying every
             30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
-          </Text>
-        )}
-        {!hasAny && !query.isLoading && !hasError && (
-          <Text paddingX={4} paddingBottom={3} color="fg.subtle" textStyle="xs">
-            No active anomalies in the last 60 minutes.
           </Text>
         )}
         {hasAny && (

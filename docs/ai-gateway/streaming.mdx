@@ -4,7 +4,7 @@ description: SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
 sidebarTitle: Streaming
 ---
 
-LLM streaming over Server-Sent Events is a surprisingly load-bearing surface: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
+Clients read LLM streams as Server-Sent Events: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
 
 ## The streaming contract
 
@@ -20,7 +20,7 @@ At this point no client-visible byte has been emitted yet, so changes are safe.
 
 - SSE events are forwarded to the client **byte-for-byte**, in order, without merging, splitting, or reordering.
 - No header injection (except the ones already emitted on the first frame).
-- No mid-stream provider switch, even if the primary dies after chunk N, the gateway will NOT fall back to a secondary provider silently. Instead it terminates the stream.
+- No mid-stream provider switch, even if the primary dies after chunk N, the gateway does NOT fall back to a secondary provider silently. Instead it terminates the stream.
 
 Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta`, `input_json_delta` ordering; any reformat breaks their tool-call parser.
 
@@ -158,7 +158,7 @@ The gateway watches every chunk for a non-zero usage block and debits the budget
 
 ### Setting `stream_options.include_usage` in your client
 
-Auto-injection means you don't have to. But for clarity and robustness when you change gateways, the explicit form is identical to direct-OpenAI usage:
+Auto-injection means you don't have to. To keep the call explicit and portable across gateways, the form is identical to direct-OpenAI usage:
 
 ```python
 for chunk in client.chat.completions.create(

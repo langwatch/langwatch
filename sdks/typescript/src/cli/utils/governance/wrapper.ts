@@ -16,17 +16,31 @@
 
 import { spawn } from "node:child_process";
 import { normalizeEndpoint } from "../../../internal/endpoint";
+import { createSpinner } from "../spinner";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
+import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
+import {
+	copilotGatewayModelPreflight,
+	copilotPrespawnWarnings,
+} from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
-import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
+import { clearToolProjectPin, pinToolToProject } from "./project-scope";
+import {
+	maybeOfferIngestionShellRcPersist,
+	SHELL_FUNCTION_TOOLS,
+} from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { resolveWrapperMode } from "./wrapper-mode";
-import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
+import {
+	parseProjectScopeFlags,
+	parseToolModeFlag,
+	resolveWrapperPath,
+} from "./wrapper-path-choice";
 import {
 	classifyIngestionSetupError,
 	recoverExpiredSession,
@@ -37,6 +51,9 @@ import {
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
+
+/** Single-quote a string for safe interpolation into a `sh -c` command. */
+const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * Provider families the tool needs upstream. Used by `preflightWrapper`
@@ -52,6 +69,12 @@ const TOOL_PROVIDER_FAMILIES: Record<string, string[]> = {
 	cursor: ["anthropic", "openai"],
 	gemini: ["google", "gemini"],
 	opencode: ["anthropic", "openai"],
+	// copilot always speaks the OpenAI wire format to the gateway
+	// (ADR-039 Decision 4), but the gateway can translate to either
+	// upstream, so both families satisfy preflight. Model-level
+	// servability (a Claude-family model against an openai-only org)
+	// cannot be validated here — see ADR-039 open questions.
+	copilot: ["openai", "anthropic"],
 };
 
 export interface PreflightResult {
@@ -203,7 +226,7 @@ export async function preflightWrapper(
 					`The gateway isn't enabled for \`${tool}\` in your organization.\n` +
 					`An admin needs to publish a ${tool} coding-assistant tile in the\n` +
 					`AI Tools catalog (with the gateway path enabled):\n` +
-					`  ${cp}/settings/governance/tool-catalog\n` +
+					`  ${cp}/governance/tool-catalog\n` +
 					renderContactFooter(adminEmail),
 			};
 		}
@@ -252,6 +275,72 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
+ * The env re-application prefix for the interactive-shell spawn. Runs
+ * INSIDE `$SHELL -i -c` after the rc has been sourced, so the wrapper's
+ * mode vars win over anything the rc exported.
+ *
+ * For scoped-function tools (gemini / opencode / copilot) the prefix
+ * additionally `unset -f`s the tool in EVERY mode: a previously
+ * persisted Path-B rc function re-applies its frozen env AT INVOCATION
+ * TIME — after these exports — so leaving it in place lets stale state
+ * win over this run's resolution. Concretely: on gateway runs the
+ * function re-injects OTel exporter env on top of gateway capture
+ * (double trace, double cost); on ingestion runs it overrides a
+ * freshly-minted token with a stale one (silent 401s) and re-enables
+ * content capture the user explicitly opted out of. `unset -f` removes
+ * only the function FROM THIS SHELL SESSION — user aliases survive
+ * (the whole reason for the interactive shell) and the rc file is
+ * never touched, so bare `<tool>` runs keep capturing.
+ */
+export function buildShellReapply(args: {
+	tool: string;
+	clears: string[];
+	vars: Record<string, string>;
+}): string {
+	const parts: string[] = [];
+	if (SHELL_FUNCTION_TOOLS.includes(args.tool)) {
+		parts.push(`unset -f ${args.tool} 2>/dev/null`);
+	}
+	parts.push(...args.clears.map((k) => `unset ${k}`));
+	parts.push(
+		...Object.entries(args.vars).map(
+			([k, v]) => `export ${k}=${shellQuote(v)}`,
+		),
+	);
+	return parts.join("; ");
+}
+
+/**
+ * Run one telemetry setup step behind a spinner. Setting a tool up can
+ * reach the control plane (confirming the cached ingest key is live, minting
+ * a fresh one after a logout), and that used to happen in silence long
+ * enough to read as a hang. The spinner is stopped before the result, or the
+ * error, reaches the caller, so everything printed after it lands on a clean
+ * line.
+ *
+ * discardStdin:false for the same reason login-flow sets it: ora's default
+ * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
+ */
+export async function withTelemetrySetupSpinner<T>({
+	tool,
+	run,
+}: {
+	tool: string;
+	run: () => Promise<T>;
+}): Promise<T> {
+	const spinner = createSpinner({
+		text: `Setting up telemetry for ${tool}...`,
+		discardStdin: false,
+	});
+	spinner.start();
+	try {
+		return await run();
+	} finally {
+		spinner.stop();
+	}
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -281,27 +370,54 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		}
 	}
 
-	// Budget pre-check - render Screen-8 box + exit 2 BEFORE exec.
-	const exceeded = await checkBudget(cfg);
-	if (exceeded) {
-		process.stderr.write(renderBudgetExceeded(exceeded));
-		if (exceeded.request_increase_url) {
-			cfg.last_request_increase_url = exceeded.request_increase_url;
-			try {
-				saveConfig(cfg);
-			} catch {
-				// Config write failure shouldn't change the spec'd exit
-				// code - the next `langwatch request-increase` falls back
-				// to the static page.
-			}
-		}
+	// Wrapper-only telemetry-scope flags, stripped before anything reaches
+	// the child. `--project` pins this tool's telemetry to a team project
+	// (minting a project ingest key); `--personal` clears the pin.
+	const scopeFlags = parseProjectScopeFlags(args);
+	if (scopeFlags.personal && scopeFlags.project) {
+		process.stderr.write(
+			`${lwTag()} pass either --project or --personal, not both.\n`,
+		);
 		process.exit(2);
+	}
+	if (scopeFlags.personal) {
+		const cleared = clearToolProjectPin({ cfg, tool });
+		process.stderr.write(
+			cleared
+				? `${lwTag()} cleared the project pin for ${tool}; telemetry goes to your personal workspace again.\n`
+				: `${lwTag()} ${tool} has no project pin; telemetry already goes to your personal workspace.\n`,
+		);
+	}
+	if (scopeFlags.project) {
+		try {
+			const pinned = await pinToolToProject({
+				cfg,
+				tool,
+				project: scopeFlags.project,
+			});
+			process.stderr.write(
+				`${lwTag()} pinned ${tool} telemetry to project ${pinned.label}.\n`,
+			);
+		} catch (err) {
+			process.stderr.write(
+				`${lwTag()} could not pin ${tool} to project ${scopeFlags.project}: ` +
+					`${(err as Error).message}\n`,
+			);
+			process.exit(2);
+		}
 	}
 
 	// Strip the wrapper-only `--tool-mode` flag from the args BEFORE anything
 	// forwards them to the real tool, and resolve any explicit override.
 	// Everything else stays verbatim + in order for the child invocation.
-	const { args: toolArgs, override: pathOverride } = parseToolModeFlag(args);
+	const parsedMode = parseToolModeFlag(scopeFlags.args);
+	const toolArgs = parsedMode.args;
+	// A project pin means telemetry-only by definition, so it behaves like
+	// an explicit direct-OTLP override: no gateway-vs-subscription prompt,
+	// no tool_mode persistence. A literal --tool-mode flag still wins.
+	const pathOverride =
+		parsedMode.override ??
+		(cfg.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
 
 	// Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
 	// (and remembers the answer) only when the org policy allows BOTH paths,
@@ -334,13 +450,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	const gatewayClears = toolEnv.clears ?? [];
 	let modeResult;
 	try {
-		modeResult = await resolveWrapperMode(
-			cfg,
+		modeResult = await withTelemetrySetupSpinner({
 			tool,
-			gatewayVars,
-			gatewayClears,
-			pathChoice.mode,
-		);
+			run: () =>
+				resolveWrapperMode(
+					cfg,
+					tool,
+					gatewayVars,
+					gatewayClears,
+					pathChoice.mode,
+				),
+		});
 	} catch (err) {
 		// Direct-OTLP setup can fail at mint time: an expired device session,
 		// no personal workspace yet, an unreachable control plane. None of
@@ -363,13 +483,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// derived from the expired session.
 			const refreshedEnv = envForTool(cfg, tool);
 			try {
-				modeResult = await resolveWrapperMode(
-					cfg,
+				modeResult = await withTelemetrySetupSpinner({
 					tool,
-					refreshedEnv.vars,
-					refreshedEnv.clears ?? [],
-					"ingestion",
-				);
+					run: () =>
+						resolveWrapperMode(
+							cfg,
+							tool,
+							refreshedEnv.vars,
+							refreshedEnv.clears ?? [],
+							"ingestion",
+						),
+				});
 			} catch (err2) {
 				process.stderr.write(
 					`${lwTag()} still could not set up direct OTLP telemetry for ` +
@@ -379,7 +503,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			}
 		} else {
 			process.stderr.write(
-				`mode resolution failed: ${(err as Error).message}\n`,
+				`${lwTag()} could not set up telemetry for ${tool}: ` +
+					`${(err as Error).message}\n`,
 			);
 			process.exit(2);
 		}
@@ -427,7 +552,42 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		);
 	}
 
+	// Copilot-only pre-spawn warnings (enterprise managed-settings OTel
+	// pin + version gate). Deliberately OUTSIDE the gateway-only preflight
+	// below — copilot defaults to ingestion, and both conditions make
+	// capture silently incomplete on either path (ADR-039 D8/D9).
+	if (tool === "copilot") {
+		for (const warning of copilotPrespawnWarnings()) {
+			process.stderr.write(`${warning}\n`);
+		}
+	}
+
+	// Copilot BYOK (gateway) requires a model; fail fast with an actionable
+	// message instead of copilot's opaque downstream error.
+	if (modeResult.mode === "gateway" && tool === "copilot") {
+		const modelError = copilotGatewayModelPreflight({
+			args: toolArgs,
+			env: process.env,
+		});
+		if (modelError) {
+			process.stderr.write(`${lwTag()} ${modelError}\n`);
+			process.exit(1);
+		}
+	}
+
 	if (modeResult.mode === "gateway") {
+		// Budget pre-check - render Screen-8 box + exit 2 BEFORE exec. Gateway
+		// runs only: the budget gates gateway spend, and an ingestion run
+		// spends nothing through us, so subscription users skip the call.
+		const exceeded = await checkBudget(cfg);
+		if (exceeded) {
+			process.stderr.write(
+				renderBudgetExceeded(exceeded, {
+					fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
+				}),
+			);
+			process.exit(2);
+		}
 		const probe = await preflightWrapper(cfg, tool);
 		if (!probe.ok) {
 			process.stderr.write(probe.message ?? "preflight failed\n");
@@ -469,6 +629,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	} else {
 		// ingestion mode side-effect feedback so the user sees what
 		// the wrapper just did on their behalf.
+		if (modeResult.projectScope) {
+			process.stderr.write(
+				`${lwTag()} telemetry goes to project ` +
+					`${modeResult.projectScope.label ?? "(pinned ingest key)"}.\n`,
+			);
+		}
 		if (modeResult.newKeyMinted) {
 			process.stderr.write(
 				`${lwTag()} minted a personal ingestion key for ${tool}.\n`,
@@ -489,6 +655,35 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			tool,
 			vars: modeResult.vars,
 		});
+	}
+
+	// Keep the installed plugin current, whichever tool this run wraps. The
+	// plugin is installed once per machine, not once per tool, so tying its
+	// upkeep to `langwatch claude` would leave it to rot on a machine whose
+	// owner mostly wraps something else. It is stamped to once a day, so nearly
+	// every run reads one config field and moves on, and it runs BEFORE the
+	// spawn so a new version reaches the session this launch is about to start
+	// rather than the one after it. Housekeeping, so it warns and continues.
+	const pluginUpdate = updateLangwatchClaudePlugin({
+		// Said before the work, not after it: the check fetches from a network
+		// that may be slow or half-open, and a launch that pauses without
+		// explanation reads as the wrapper having hung.
+		onCheckStart: () =>
+			process.stderr.write(
+				`${lwTag()} checking whether the LangWatch plugin for Claude Code ` +
+					`is up to date.\n`,
+			),
+	});
+	if (pluginUpdate.action === "updated") {
+		process.stderr.write(
+			`${lwTag()} updated the LangWatch plugin for Claude Code, ` +
+				`${pluginUpdate.from} to ${pluginUpdate.to}.\n`,
+		);
+	} else if (pluginUpdate.action === "failed") {
+		process.stderr.write(
+			`${lwTag()} couldn't update the LangWatch plugin for Claude Code ` +
+				`(best-effort, continuing): ${pluginUpdate.reason}\n`,
+		);
 	}
 
 	// Scrub conflicting twins from the inherited parent env BEFORE merging
@@ -516,7 +711,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// live; the wrapper's env (mode vars + clears) is re-applied *after* that
 	// so a user's rc can't clobber the gateway / OTLP wiring. Args ride
 	// positional params ("$@") and are never re-quoted. `tool` is whitelisted
-	// (claude/codex/cursor/gemini/opencode) so the command string is safe.
+	// (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
 	const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
 	const aliasShell =
 		process.platform !== "win32" &&
@@ -545,6 +740,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			? createCodexIOStreamer({
 					sinceMs: sessionStartMs,
 					endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
+					logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
 					token: modeResult.ingestionToken,
 				})
 			: null;
@@ -570,16 +766,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
 	let child;
 	if (aliasShell) {
-		const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-		const reapply = [
-			...(modeResult.clears ?? []).map((k) => `unset ${k}`),
-			...Object.entries(modeResult.vars).map(([k, v]) => `export ${k}=${q(v)}`),
-		].join("; ");
+		const reapply = buildShellReapply({
+			tool,
+			clears: modeResult.clears ?? [],
+			vars: modeResult.vars,
+		});
 		// Resolve the tool inside the same login shell before handing over so a
 		// missing tool surfaces our actionable message rather than a bare
 		// `command not found`. `command -v` honors the aliases/functions/PATH the
 		// spawn below would use. The direct-spawn branch relies on ENOENT instead.
-		const guard = `command -v -- ${q(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${q(notFoundMessage)} >&2; exit 127; }`;
+		const guard = `command -v -- ${shellQuote(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${shellQuote(notFoundMessage)} >&2; exit 127; }`;
 		const command = `${reapply ? `${reapply}; ` : ""}${guard}; ${tool} "$@"`;
 		child = spawn(aliasShell, ["-i", "-c", command, tool, ...finalArgs], {
 			stdio: "inherit",

@@ -36,7 +36,7 @@ Feature: AI Gateway Governance — Architecture Invariants
        Reserved namespaces; not user-settable.
     5. Governance fold projections derive KPIs + OCSF read shape
        from the unified store. governance_kpis fold powers the
-       /governance dashboard + anomaly reactor.
+       /governance dashboard + anomaly subscriber.
        governance_ocsf_events fold/view powers SIEM forwarding.
     6. Public ingest URLs may stay separate (different auth /
        tenancy / UX) but internally they all hand to the unified
@@ -256,10 +256,10 @@ Feature: AI Gateway Governance — Architecture Invariants
       sources that DO have a teamId)
 
   @bdd @architecture @folds
-  Scenario: Anomaly reactor reads from the governance fold, not raw spans
+  Scenario: Anomaly subscriber reads from the governance fold, not raw spans
     Given an active AnomalyRule of type "spend_spike"
     When the trace-processing pipeline appends new events to event_log
-    Then the anomaly reactor evaluates the rule against the
+    Then the anomaly subscriber evaluates the rule against the
       governance_kpis fold (cheap rolling-window aggregation)
     And NOT against raw recorded_spans (which would require
       partition scans per evaluation)
@@ -314,7 +314,7 @@ Feature: AI Gateway Governance — Architecture Invariants
     Given any receiver accepts a payload (OTLP, webhook, S3 pull)
     When the receiver hands data to the trace/log pipeline
     Then an append-only event in event_log records the receipt
-      (per the existing PR #3351 reactor pattern)
+      (per the existing PR #3351 subscriber pattern)
     And projections (recorded_spans, log_records, governance_kpis,
       governance_ocsf_events) are rebuilt from event_log if needed
     And event_log is the durability source of truth (delete a
@@ -374,5 +374,5 @@ Feature: AI Gateway Governance — Architecture Invariants
       - registerActivityMonitorPipeline + activityEventStorage
         wiring from pipelineRegistry + presets
     And subsequent commits rewire receivers, queries, anomaly
-      reactor against the unified-store + governance fold
+      subscriber against the unified-store + governance fold
       projections per the locked architecture above

@@ -2,7 +2,7 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 
@@ -53,6 +53,18 @@ export async function findPersonalTeamInScopes({
   client: Client;
   scopes: RoleBindingScope[];
 }): Promise<{ name: string } | null> {
+  return findPersonalTeamMatching({ client, scopes, teamWhere: {} });
+}
+
+async function findPersonalTeamMatching({
+  client,
+  scopes,
+  teamWhere,
+}: {
+  client: Client;
+  scopes: RoleBindingScope[];
+  teamWhere: Prisma.TeamWhereInput;
+}): Promise<{ name: string } | null> {
   const idsOfType = (scopeType: RoleBindingScopeType) => [
     ...new Set(
       scopes
@@ -64,7 +76,7 @@ export async function findPersonalTeamInScopes({
   const teamIds = idsOfType(RoleBindingScopeType.TEAM);
   if (teamIds.length > 0) {
     const personalTeam = await client.team.findFirst({
-      where: { id: { in: teamIds }, isPersonal: true },
+      where: { id: { in: teamIds }, isPersonal: true, AND: [teamWhere] },
       select: { name: true },
     });
     if (personalTeam) return personalTeam;
@@ -79,6 +91,7 @@ export async function findPersonalTeamInScopes({
       where: {
         id: { in: projectIds },
         OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+        team: { AND: [teamWhere] },
       },
       select: { team: { select: { name: true } } },
     });
@@ -86,6 +99,20 @@ export async function findPersonalTeamInScopes({
   }
 
   return null;
+}
+
+/**
+ * A team filter matching personal teams that do NOT belong to the given user.
+ * `null` (a credential acting as nobody, e.g. a service key) matches every
+ * personal team. A personal team with no recorded owner also matches, so the
+ * check fails closed on incomplete provisioning: the explicit `ownerUserId:
+ * null` arm matters because Prisma's `not` comparison would otherwise skip
+ * NULL rows.
+ */
+function foreignOwnerFilter(ownerUserId: string | null): Prisma.TeamWhereInput {
+  return ownerUserId
+    ? { OR: [{ ownerUserId: null }, { ownerUserId: { not: ownerUserId } }] }
+    : {};
 }
 
 export async function scopesTouchPersonalTeam({
@@ -138,5 +165,41 @@ export async function assertNoPersonalTeamScope({
   const personalTeam = await findPersonalTeamInScopes({ client, scopes });
   if (personalTeam) {
     throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
+  }
+}
+
+/**
+ * Refuse a role-binding write that reaches a personal workspace belonging to
+ * anyone but the user the credential acts as.
+ *
+ * The API-key mint path needs this shape rather than
+ * {@link assertNoPersonalTeamScope}: a key OWNED by the workspace's owner is
+ * that owner acting programmatically (the Langy session key and a member's
+ * own SDK key are both minted against the owner's personal project), so a
+ * blanket refusal would take the owner's own workspace away from their own
+ * credentials. What must never happen is the workspace admitting a SECOND
+ * principal: a service key (owned by nobody) or a key owned by anyone else,
+ * which is the escalation the blanket guard exists to stop.
+ */
+export async function assertPersonalTeamScopesOwnedBy({
+  client,
+  scopes,
+  ownerUserId,
+}: {
+  client: Client;
+  scopes: RoleBindingScope[];
+  /**
+   * The user the credential acts as. `null` owns no personal workspace, so
+   * every personal scope is refused.
+   */
+  ownerUserId: string | null;
+}): Promise<void> {
+  const foreignPersonalTeam = await findPersonalTeamMatching({
+    client,
+    scopes,
+    teamWhere: foreignOwnerFilter(ownerUserId),
+  });
+  if (foreignPersonalTeam) {
+    throw new PersonalWorkspaceNotManagedHereError(foreignPersonalTeam.name);
   }
 }

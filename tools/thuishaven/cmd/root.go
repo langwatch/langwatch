@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,14 +19,17 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procmetrics"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
@@ -33,6 +37,24 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// tsgoLimits resolves the tsgo governor's knobs (ADR-095) from the machine
+// with env overrides; a knob set to 0 disables its rule, and
+// HAVEN_TSGO_RUN_MAX_RSS_MB=0 disables the governor entirely.
+func tsgoLimits(ram uint64) domain.TsgoLimits {
+	l := domain.DefaultTsgoLimits(ram)
+	if mb := envInt("HAVEN_TSGO_RUN_MAX_RSS_MB", -1); mb >= 0 {
+		l.RunMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_LSP_MAX_RSS_MB", -1); mb >= 0 {
+		l.LSPMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_TOTAL_BUDGET_MB", -1); mb >= 0 {
+		l.TotalBudget = int64(mb) << 20
+	}
+	l.LSPIdleTTL = envDuration("HAVEN_TSGO_LSP_IDLE_TTL", l.LSPIdleTTL)
+	return l
+}
 
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
@@ -43,8 +65,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	args, hasAgentFlag = stripFlag(args, "--agent")
 	isAgent := hasAgentFlag || resolveAgent()
 
-	if handled := runMetaCommand(args, version); handled {
-		return nil
+	if handled, err := runMetaCommand(args, version); handled {
+		return err
 	}
 
 	d := wire(logger, isAgent)
@@ -67,19 +89,30 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
 // help` works in a directory where git or the adapters would fail.
-func runMetaCommand(args []string, version string) bool {
+func runMetaCommand(args []string, version string) (handled bool, err error) {
 	if len(args) == 0 {
-		return false
+		return false, nil
 	}
 	switch args[0] {
 	case "help", "-h", "--help":
-		fmt.Print(helpText)
-		return true
+		// `haven help <topic>` drills in; bare help stays short enough to read.
+		topic := ""
+		if len(args) > 1 {
+			topic = args[1]
+		}
+		body, ok := helpTopic(topic)
+		if !ok {
+			// An unknown topic is a failed request, not help. Returning it as an
+			// error puts the list on stderr and the failure in the exit code.
+			return true, errors.New(strings.TrimSpace(body))
+		}
+		fmt.Print(body)
+		return true, nil
 	case "version", "-v", "--version":
 		fmt.Println(version)
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
 // deps is the wired object graph a command runs against.
@@ -158,17 +191,28 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	disableDLP, disableDLPSet := operatorEnvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
 
 	cfg := app.Config{
-		Naming:                   naming,
-		Home:                     havenHome(),
-		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
-		DBIdleTTL:                envDuration("HAVEN_DB_TTL", 14*24*time.Hour),
-		HeartbeatEvery:           30 * time.Second,
-		DaemonArgv:               selfArgv(trustedRepoRoot(), "daemon"),
-		IsAgent:                  isAgent,
-		ShouldManageClickHouse:   devEnv("LANGWATCH_HAVEN_CH") != "0",
+		Naming:  naming,
+		Home:    havenHome(),
+		IdleTTL: envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		// Four days spans a long weekend away from a worktree; a fortnight (the
+		// old default) meant a dozen dead stacks' databases sat on the shared
+		// ClickHouse's small memory cap before the first prune ever fired.
+		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
+		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
+		Tsgo:                    tsgoLimits(ram),
+		HeartbeatEvery:          30 * time.Second,
+		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
+		IsAgent:                 isAgent,
+		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
+		// Opt-in on purpose: "no stack registered" does not mean nobody is
+		// querying — the documented native test mode (LANGWATCH_TEST_CLICKHOUSE_URL)
+		// and `haven db url clickhouse` both reach this server with no stack up,
+		// and a default-on stop would yank it out from under them.
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
+		RedisDBOverride:          app.RedisDBOverrideFromEnv(devEnv("LANGWATCH_HAVEN_REDIS_DB")),
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
 		ShouldStartObservability:  devEnv("LANGWATCH_HAVEN_OBS") != "0",
@@ -178,13 +222,23 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 	}
 
+	orch := app.New(app.Deps{
+		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
+		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+		Container: rt, Janitor: dockerjanitor.New(rt),
+		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
+		Claude:  claudesettings.New(), Log: logger,
+	})
 	return deps{
-		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, rt, logger),
-		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
-			PortInUse:    sys.PortInUse,
-			ProcessAlive: sys.ProcessAlive,
-			GroupRSS:     sys.GroupRSS,
-			TotalMemory:  sys.TotalMemory,
+		orch: orch,
+		dash: dashboard.New(dashboard.Config{
+			Stacks:    store.Stacks,
+			SharedURL: sharedURL,
+			Probes: dashboard.Probes{
+				PortInUse:    sys.PortInUse,
+				ProcessAlive: sys.ProcessAlive,
+			},
+			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -201,6 +255,7 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 	e.GrafanaPort = envInt("LW_OBS_GRAFANA_PORT", e.GrafanaPort)
 	e.OTLPHTTPPort = envInt("LW_OBS_OTLP_HTTP_PORT", e.OTLPHTTPPort)
 	e.OTLPGRPCPort = envInt("LW_OBS_OTLP_GRPC_PORT", e.OTLPGRPCPort)
+	e.PyroscopePort = envInt("LW_OBS_PYROSCOPE_PORT", e.PyroscopePort)
 	return e
 }
 
@@ -627,6 +682,16 @@ func preferredGroup(rest []string) string {
 // decides between the attached log view and plain foreground streaming.
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// stdinIsTTY reports whether there is a human at the other end of stdin.
+//
+// Separate from stdoutIsTTY because the two travel apart: a terminal keeps
+// stdout while stdin comes from a pipe that never closes, and anything that
+// reads a line then waits forever with its prompt already on screen.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 

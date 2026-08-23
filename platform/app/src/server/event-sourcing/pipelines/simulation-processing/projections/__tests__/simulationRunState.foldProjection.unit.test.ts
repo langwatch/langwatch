@@ -333,6 +333,64 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
+  describe("when an event carries secret parameters on its metadata", () => {
+    // The queued command puts the encrypted values beside the metadata, not
+    // inside it. The started event is the one a caller can shape: the SDK
+    // ingestion route forwards external metadata as it arrives.
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a started event", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          metadata: {
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+            environment: "staging",
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        secretParameterNames: ["api_token"],
+        environment: "staging",
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a queued event", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: {
+            parameters: { region: "eu-central" },
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        parameters: { region: "eu-central" },
+        secretParameterNames: ["api_token"],
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("stores nothing from the encrypted values beside the metadata", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: { parameters: { region: "eu-central" } },
+          secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      expect(state.Metadata).not.toContain("api_token");
+    });
+  });
+
   describe("when MessageSnapshot event is applied", () => {
     it("updates Messages, TraceIds, and UpdatedAt", () => {
       const state = foldEvents([
@@ -501,6 +559,62 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.UnmetCriteria).toEqual([]);
       expect(state.DurationMs).toBe(5000);
       expect(state.FinishedAt).toBe(3000);
+    });
+
+    it("derives DurationMs from the run's own timestamps when the event omits it", () => {
+      // Every real run takes this path: the SDK ingest dispatches finishRun
+      // with results and status only, so an underived DurationMs was null for
+      // every run a customer executed and set only for seeded ones.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.StartedAt).toBe(1000);
+      expect(state.FinishedAt).toBe(3000);
+      expect(state.DurationMs).toBe(2000);
+    });
+
+    it("prefers a supplied duration over the derived one", () => {
+      // The runner knows its own elapsed time better than two projected
+      // timestamps do.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          durationMs: 42,
+        }),
+      ]);
+
+      expect(state.DurationMs).toBe(42);
+    });
+
+    it("leaves DurationMs null when the run never started", () => {
+      const state = foldEvents([
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
+    });
+
+    it("leaves DurationMs null when the finish event precedes the start", () => {
+      // Events can arrive out of order. Subtracting these two timestamps would
+      // report a negative duration, so the derivation declines instead.
+      const state = foldEvents([
+        createRunStartedEvent({}, { occurredAt: 4000 }),
+        createRunFinishedEvent(
+          {
+            results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          },
+          { occurredAt: 3000 },
+        ),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
     });
 
     it("sets FAILURE status for failure verdict", () => {
@@ -967,8 +1081,8 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
   // applies in-order (no re-fold, since occurredAt is not strictly less than
   // LastEventOccurredAt) and would otherwise clobber Status back to a
   // non-terminal value while FinishedAt stays set — an unrecoverable zombie
-  // the read-time stall path can no longer rescue. Once FinishedAt is set,
-  // Status must stay terminal.
+  // nothing can rescue: stored status is the only truth at read time. Once
+  // FinishedAt is set, Status must stay terminal.
   describe("given a run that already finished", () => {
     describe("when a later started event arrives", () => {
       it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
@@ -1017,7 +1131,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     // The fourth non-terminal Status writer. A `queued` event is in the fold
     // set, so one arriving after `finished` resurrected Status=QUEUED while
     // FinishedAt stayed set -- an unrecoverable run: the orphan reconciler skips
-    // it (FinishedAt IS NULL) and read-time stall detection skips it too.
+    // it (FinishedAt IS NULL) and no read-time derivation remains to mask it.
     describe("when a later queued event arrives", () => {
       it("keeps the terminal status instead of resurrecting QUEUED", () => {
         const state = foldEvents([
@@ -1031,7 +1145,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     });
 
     // A late child that outlived the parent this run's reconciliation already
-    // failed must not rewrite the terminal record the downstream reactors have
+    // failed must not rewrite the terminal record the downstream subscribers have
     // already acted on -- nor split it into an ERROR status carrying the late
     // child's SUCCESS verdict.
     describe("when a second finished event arrives", () => {
@@ -1062,8 +1176,8 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
   // The scenario-events ingest route types the finished status as the full
   // ScenarioRunStatus enum, non-terminal members included. Writing one straight
   // through would set a non-terminal Status alongside FinishedAt -- a run the
-  // orphan reconciler skips (FinishedAt IS NULL) and read-time stall detection
-  // skips (it only resolves unfinished runs). Nothing could ever recover it.
+  // orphan reconciler skips (FinishedAt IS NULL) and no read-time derivation
+  // remains to mask. Nothing could ever recover it.
   describe("given a finished event carrying a non-terminal status", () => {
     describe("when it is folded", () => {
       it("refuses the non-terminal status and finishes the run terminally", () => {

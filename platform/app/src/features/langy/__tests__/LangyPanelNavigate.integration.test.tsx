@@ -99,11 +99,18 @@ const subscription = vi.fn(
 
 vi.mock("~/utils/api", () => ({
   trpcClient: {
-    mutation(path: string, input: unknown) {
-      return mutation(path, input);
-    },
-    subscription(path: string, input: unknown, options: unknown) {
-      return subscription(path, input, options);
+    langy: {
+      createConversation: {
+        mutate: (input: unknown) => mutation("langy.createConversation", input),
+      },
+      continueConversation: {
+        mutate: (input: unknown) =>
+          mutation("langy.continueConversation", input),
+      },
+      onTurnStream: {
+        subscribe: (input: unknown, options: unknown) =>
+          subscription("langy.onTurnStream", input, options),
+      },
     },
   },
   api: {
@@ -112,8 +119,8 @@ vi.mock("~/utils/api", () => ({
         list: { invalidate: () => Promise.resolve() },
         messages: { invalidate: () => Promise.resolve() },
       },
-      langyGithub: {
-        getInstallStatus: { invalidate: () => Promise.resolve() },
+      github: {
+        getConnectionStatus: { invalidate: () => Promise.resolve() },
       },
     }),
     useContext: () => ({
@@ -128,8 +135,8 @@ vi.mock("~/utils/api", () => ({
         detail: { setData: () => undefined },
       },
     }),
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {
@@ -153,6 +160,9 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       onConversationUpdate: { useSubscription: () => undefined },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
       stopTurn: {
         useMutation: () => ({
           mutate: () => undefined,
@@ -174,9 +184,9 @@ vi.mock("~/utils/api", () => ({
       list: {
         useInfiniteQuery: () => ({
           data: { pages: [{ items: [], nextCursor: null }] },
-          isInitialLoading: false,
+          isLoading: false,
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
           isFetched: true,
           isError: false,
           error: null,
@@ -188,6 +198,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: { model: "openai/gpt-5-mini" },

@@ -8,6 +8,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [labeled]
   merge_group:
@@ -28,6 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
+      ingest: ${{ steps.detect.outputs.ingest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -56,11 +64,40 @@ jobs:
               - 'package.json'
               - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
+            # Gates `e2e` only, never `ci`. The e2e job boots a real server
+            # and posts real SDK telemetry at it, so it is the only check in
+            # the repo that watches the ingest routes answer over a socket,
+            # and app-only changes are exactly what `relevant` misses. It
+            # cannot be folded into `relevant`: `ci` shares that filter and
+            # `ci` spends LLM budget on every match.
+            #
+            # Scoped to the HTTP transport spine the SDK traffic crosses
+            # before any of it becomes business logic. Everything those
+            # handlers go on to call has unit and integration coverage of its
+            # own; what has none is the seam between a socket and a handler,
+            # which only a live request can exercise.
+            ingest:
+              # The Hono route modules the SDK posts to, and the shared
+              # middleware under `_lib/` that the capped ones mount:
+              # /api/otel/v1/{traces,logs,metrics} and /api/collector.
+              - 'platform/app/src/server/routes/**'
+              # Mounts those modules and fixes their order. A route that
+              # resolves in the router but not on the wire is a mount bug,
+              # and mount order has silently swallowed API surfaces before.
+              - 'platform/app/src/server/api-router.ts'
+              # Reads the OTLP request body for those routes and decodes it,
+              # including the byte ceiling they enforce on it.
+              - 'platform/app/src/server/otel/**'
+              # Wires the Node bridge into Hono and decides whether the
+              # process keeps its own global Request/Response. Behaviour that
+              # depends on that seam is invisible to every test that does not
+              # go over a real socket.
+              - 'platform/app/src/start.ts'
 
   ci:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -118,8 +155,13 @@ jobs:
 
   e2e:
     needs: changes
+    # `heavy` matters more here than on the sibling `ci` job: this one boots the
+    # application and three datastores, so a draft push was paying for the most
+    # expensive job in the workflow while the rest of it deferred.
     if: >
-      needs.changes.outputs.relevant == 'true'
+      (needs.changes.outputs.relevant == 'true'
+       || needs.changes.outputs.ingest == 'true')
+      && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -204,12 +246,23 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
-      # its postinstall always falls back to `node-gyp rebuild`. With
-      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
-      # by default — install it globally before any install that hits
-      # mcp-server's onlyBuiltDependencies allowlist.
+      # its postinstall always falls back to `node-gyp rebuild`, which pnpm
+      # runs with its own vendored node-gyp. That copy ships `gyp/gyp_main.py`
+      # mode 644, so an mtime-driven Makefile regeneration executes it and
+      # dies with "Permission denied" / error 126. Installing node-gyp
+      # globally does not displace it on its own: pnpm exports
+      # `npm_config_node_gyp` at its vendored copy and that wins over PATH.
+      # Point the variable at the published node-gyp, which ships the script
+      # executable. npx-server-smoke.yml does the same.
       - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
       # One install covering the app, the MCP server (a workspace dependency
       # of the app) and the SDK under test. See ADR-076.
@@ -263,10 +316,14 @@ jobs:
           # ingest guard in langwatchPlatformGuard.ts), so blank it here.
           LANGWATCH_API_KEY: ""
         run: |
-          NODE_ENV=production pnpm run start &
+          # Capture both processes' output: background-process stdout is lost
+          # once this step ends, which has already hidden one real regression
+          # (a server-side 500 on the visibility poll shows up only as SDK
+          # test timeouts). The failure step below tails these files.
+          NODE_ENV=production pnpm run start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
-          pnpm run start:workers &
+          pnpm run start:workers > /tmp/langwatch-workers.log 2>&1 &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
@@ -296,6 +353,14 @@ jobs:
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
+
+      - name: Dump server and worker logs on failure
+        if: failure()
+        run: |
+          echo "===== langwatch server (last 300 lines) ====="
+          tail -300 /tmp/langwatch-server.log || true
+          echo "===== langwatch workers (last 300 lines) ====="
+          tail -300 /tmp/langwatch-workers.log || true
 
   sdk-javascript-complete:
     needs: [changes, ci, e2e]

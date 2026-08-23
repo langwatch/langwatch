@@ -5,30 +5,29 @@ import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
 import {
   printResult,
   type RawOutputFlags,
 } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { cliAuthHeaders } from "../../utils/authHeaders";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
 
-const transcriptEntrySchema = z
-  .object({
-    kind: z.string(),
-    atMs: z.number(),
-    text: z.string().nullable().optional(),
-    chars: z.number().optional(),
-    model: z.string().nullable().optional(),
-    tokens: z.number().optional(),
-    costUsd: z.number().optional(),
-    name: z.string().nullable().optional(),
-  })
-  .passthrough();
+const transcriptEntrySchema = z.looseObject({
+  kind: z.string(),
+  atMs: z.number(),
+  text: z.string().nullable().optional(),
+  chars: z.number().optional(),
+  model: z.string().nullable().optional(),
+  tokens: z.number().optional(),
+  costUsd: z.number().optional(),
+  name: z.string().nullable().optional(),
+});
 
 const transcriptDocumentSchema = z.object({
   agent: z.string(),
@@ -41,7 +40,7 @@ const transcriptDocumentSchema = z.object({
     costUsd: z.number(),
   }),
   subAgents: z.array(
-    z.object({ agentId: z.string(), toolCalls: z.number() }).passthrough(),
+    z.looseObject({ agentId: z.string(), toolCalls: z.number() }),
   ),
 });
 
@@ -50,9 +49,9 @@ type TranscriptDocument = z.infer<typeof transcriptDocumentSchema>;
 
 export const transcriptTraceCommand = async (
   traceId: string,
-  options: RawOutputFlags,
+  options: RawOutputFlags & { project?: string },
 ): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -66,7 +65,7 @@ export const transcriptTraceCommand = async (
     const response = await fetch(
       `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
       {
-        headers: buildAuthHeaders({ apiKey }),
+        headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );
@@ -117,7 +116,13 @@ const plural = (count: number, singular: string, pluralForm?: string): string =>
 /** Human rendering: one line per entry, economics dimmed, prompts loud. */
 const renderTranscript = (doc: TranscriptDocument): void => {
   console.log();
+  let day = "";
   for (const entry of doc.entries) {
+    const entryDay = localDay(entry.atMs);
+    if (entryDay !== day) {
+      day = entryDay;
+      console.log(chalk.gray(dayHeading(entry.atMs)));
+    }
     console.log(renderEntry(entry));
   }
   console.log();
@@ -130,8 +135,7 @@ const renderTranscript = (doc: TranscriptDocument): void => {
 };
 
 const renderEntry = (entry: TranscriptEntry): string => {
-  const time = new Date(entry.atMs).toISOString().slice(11, 19);
-  const stamp = chalk.gray(time);
+  const stamp = chalk.gray(clockTime(entry.atMs));
 
   switch (entry.kind) {
     case "system_prompt":

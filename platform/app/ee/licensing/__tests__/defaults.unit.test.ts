@@ -134,7 +134,7 @@ describe("resolvePlanDefaults", () => {
       maxMembersLite: 3,
       maxMessagesPerMonth: 50_000,
       canPublish: false,
-      webhookEndpointsEnabled: false,
+      webhookEndpointsEnabled: undefined,
       usageUnit: "traces",
     });
     expect("maxProjects" in resolved).toBe(false);
@@ -167,7 +167,7 @@ describe("resolvePlanDefaults", () => {
     expect(allFields).toEqual(resolved);
   });
 
-  it("defaults the webhook entitlement to false and honors an explicit true", () => {
+  it("leaves the webhook entitlement unanswered and honors an explicit true", () => {
     const withoutFlag = resolvePlanDefaults({
       type: "TEST",
       name: "Test",
@@ -177,8 +177,9 @@ describe("resolvePlanDefaults", () => {
       maxWorkflows: 10,
       canPublish: false,
     });
-    // A paid feature must never leak by default.
-    expect(withoutFlag.webhookEndpointsEnabled).toBe(false);
+    // A paid feature never leaks by default: an unanswered entitlement is
+    // decided by the plan's tier, and no tier grants it below enterprise.
+    expect(withoutFlag.webhookEndpointsEnabled).toBeUndefined();
 
     const withFlag = resolvePlanDefaults({
       type: "TEST",
@@ -191,5 +192,43 @@ describe("resolvePlanDefaults", () => {
       webhookEndpointsEnabled: true,
     });
     expect(withFlag.webhookEndpointsEnabled).toBe(true);
+  });
+});
+
+describe("resolvePlanDefaults and the webhook endpoints entitlement", () => {
+  const licenseWith = (
+    overrides: Partial<LicensePlanLimits> = {},
+  ): LicensePlanLimits => ({
+    type: "ENTERPRISE",
+    name: "Enterprise",
+    maxMembers: 100,
+    maxMessagesPerMonth: 1_000_000,
+    canPublish: true,
+    ...overrides,
+  });
+
+  describe("given a payload that omits it", () => {
+    /** @scenario A licensed webhook entitlement survives the PlanInfo mapping */
+    it("says nothing rather than no, leaving the tier to decide", () => {
+      expect(
+        resolvePlanDefaults(licenseWith()).webhookEndpointsEnabled,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a payload that answers explicitly", () => {
+    it("keeps a stated false", () => {
+      expect(
+        resolvePlanDefaults(licenseWith({ webhookEndpointsEnabled: false }))
+          .webhookEndpointsEnabled,
+      ).toBe(false);
+    });
+
+    it("keeps a stated true", () => {
+      expect(
+        resolvePlanDefaults(licenseWith({ webhookEndpointsEnabled: true }))
+          .webhookEndpointsEnabled,
+      ).toBe(true);
+    });
   });
 });

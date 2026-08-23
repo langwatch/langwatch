@@ -13,10 +13,13 @@
  * when the page was replaced by this dialog.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import type { PendingBinding } from "../GroupBindingInputRow";
 
 const {
@@ -43,6 +46,7 @@ const {
     current: [] as Array<{
       id: string;
       role: string;
+      customRoleId: string | null;
       customRoleName: string | null;
       scopeType: RoleBindingScopeType;
       scopeId: string;
@@ -56,7 +60,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       roleBinding: {
         listForUser: { invalidate: mockInvalidateListForUser },
         listForOrg: { invalidate: mockInvalidateListForOrg },
@@ -123,32 +127,87 @@ vi.mock("../GroupBindingInputRow", async () => {
   const actual = await vi.importActual<
     typeof import("../GroupBindingInputRow")
   >("../GroupBindingInputRow");
-  return {
-    ...actual,
-    BindingInputRow: ({
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  const STUB_BINDING: PendingBinding = {
+    roleValue: "MEMBER",
+    role: "MEMBER",
+    customRoleId: undefined,
+    customRoleName: undefined,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: "team-1",
+    scopeName: "Team One",
+  };
+
+  const STUB_CUSTOM_BINDING: PendingBinding = {
+    roleValue: "CUSTOM:role-1",
+    role: "CUSTOM",
+    customRoleId: "role-1",
+    customRoleName: "Data Scientist",
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: "team-2",
+    scopeName: "Team Two",
+  };
+
+  // Mirrors the real row's two paths: Add commits the draft, while a filled
+  // but never-added draft reports readiness and hands itself over on flush.
+  // The seat prop is surfaced as text so tests can prove the dialog passes
+  // the live pending seat, not the member's stored one.
+  const BindingInputRow = React.forwardRef(function StubBindingInputRow(
+    {
       onAdd,
+      onReadyChange,
+      organizationRole,
     }: {
       organizationId: string;
       onAdd: (binding: PendingBinding) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="stub-add-binding"
-        onClick={() =>
-          onAdd({
-            roleValue: "MEMBER",
-            role: "MEMBER",
-            customRoleId: undefined,
-            customRoleName: undefined,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: "team-1",
-            scopeName: "Team One",
-          })
-        }
-      >
-        Stage binding
-      </button>
-    ),
+      onReadyChange?: (isReady: boolean) => void;
+      organizationRole?: OrganizationUserRole;
+    },
+    ref: React.Ref<{ flush: () => PendingBinding | null }>,
+  ) {
+    const isFilled = React.useRef(false);
+    React.useImperativeHandle(ref, () => ({
+      flush: () => {
+        if (!isFilled.current) return null;
+        isFilled.current = false;
+        return STUB_BINDING;
+      },
+    }));
+    return (
+      <>
+        <span data-testid="stub-organization-role">{organizationRole}</span>
+        <button
+          type="button"
+          data-testid="stub-add-binding"
+          onClick={() => onAdd(STUB_BINDING)}
+        >
+          Stage binding
+        </button>
+        <button
+          type="button"
+          data-testid="stub-add-custom-binding"
+          onClick={() => onAdd(STUB_CUSTOM_BINDING)}
+        >
+          Stage custom binding
+        </button>
+        <button
+          type="button"
+          data-testid="stub-fill-draft"
+          onClick={() => {
+            isFilled.current = true;
+            onReadyChange?.(true);
+          }}
+        >
+          Fill draft
+        </button>
+      </>
+    );
+  });
+
+  return {
+    ...actual,
+    BindingInputRow,
   };
 });
 
@@ -314,6 +373,7 @@ describe("<MemberDetailDialog/>", () => {
         {
           id: "binding-1",
           role: "MEMBER",
+          customRoleId: null,
           customRoleName: null,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-1",
@@ -381,6 +441,303 @@ describe("<MemberDetailDialog/>", () => {
         );
       });
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the member already holds the staged access row", () => {
+    beforeEach(() => {
+      mockListForUserData.current = [
+        {
+          id: "binding-1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team-1",
+          scopeName: "Team One",
+        },
+      ];
+    });
+
+    describe("when the admin stages it again", () => {
+      /** @scenario An access row the member already holds appears once */
+      it("keeps a single row for that access", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+        // A staged row would carry an "Undo add" action; the existing row is
+        // the only one there.
+        expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      });
+
+      /** @scenario An access row the member already holds appears once */
+      it("leaves nothing to save", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+        const save = screen.getByRole("button", { name: /^save$/i });
+        expect(save.hasAttribute("disabled")).toBe(true);
+      });
+    });
+  });
+
+  describe("given the member holds the organization row their seat grants", () => {
+    beforeEach(() => {
+      mockListForUserData.current = [
+        {
+          id: "mirror-1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: "org-1",
+          scopeName: "Acme",
+        },
+        {
+          id: "extra-1",
+          role: "VIEWER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: "org-1",
+          scopeName: "Acme",
+        },
+      ];
+    });
+
+    describe("when the admin looks for a way to remove it", () => {
+      /** @scenario The seat's own organization access is changed through the seat selector */
+      it("offers none on the mirror row, and keeps it on other organization rows", () => {
+        renderDialog();
+
+        // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
+        // the member's seat and is managed by the seat selector.
+        expect(
+          screen.getAllByRole("button", { name: /remove binding/i }),
+        ).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("when the same access row is staged twice", () => {
+    /** @scenario An access row the member already holds appears once */
+    it("keeps a single staged row", () => {
+      renderDialog();
+
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+      expect(screen.getAllByRole("button", { name: /undo add/i })).toHaveLength(
+        1,
+      );
+    });
+  });
+
+  describe("when a complete access row was filled in but never added", () => {
+    /** @scenario A picked access row saves without pressing Add */
+    it("enables Save and includes the row in the save", async () => {
+      renderDialog();
+
+      const save = screen.getByRole("button", { name: /^save$/i });
+      expect(save.hasAttribute("disabled")).toBe(true);
+
+      fireEvent.click(screen.getByTestId("stub-fill-draft"));
+      expect(save.hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(save);
+
+      await vi.waitFor(() => {
+        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+      });
+      expect(mockApplyMemberBindings.mock.calls[0]?.[0]).toMatchObject({
+        bindingsToCreate: [
+          {
+            role: "MEMBER",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: "team-1",
+          },
+        ],
+      });
+    });
+  });
+
+  describe("given the access batch fails after the seat change landed", () => {
+    beforeEach(() => {
+      mockApplyMemberBindings.mockRejectedValue(new Error("boom"));
+    });
+
+    describe("when the admin saves both changes", () => {
+      /** @scenario A failed save shows the member's access as it now is */
+      it("re-reads the member's access instead of trusting the staged view", async () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await vi.waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: "Couldn't update this member",
+              type: "error",
+            }),
+          );
+        });
+        // The seat change landed before the failure, so what the dialog shows
+        // must come from the server, not from the staged rows.
+        expect(mockUpdateMemberRole).toHaveBeenCalledTimes(1);
+        expect(mockInvalidateListForUser).toHaveBeenCalled();
+        expect(mockInvalidateOrgWithMembers).toHaveBeenCalled();
+        expect(mockInvalidateGetUsage).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when the seat selector switches to a Lite Member seat", () => {
+    /** @scenario The dialog offers only the Viewer role for a member on a Lite Member seat */
+    it("hands the live seat to the access input row", () => {
+      renderDialog();
+
+      expect(screen.getByTestId("stub-organization-role").textContent).toBe(
+        OrganizationUserRole.MEMBER as string,
+      );
+
+      fireEvent.click(screen.getByTestId("org-role-field"));
+
+      expect(screen.getByTestId("stub-organization-role").textContent).toBe(
+        OrganizationUserRole.EXTERNAL as string,
+      );
+    });
+  });
+
+  describe("given access rows were staged before the seat changed", () => {
+    describe("when the admin picks a Lite Member seat and saves", () => {
+      /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
+      it("saves every staged row as Viewer with no custom role", async () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await vi.waitFor(() => {
+          expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        });
+        expect(mockApplyMemberBindings).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          userId: "user-1",
+          bindingIdsToDelete: [],
+          bindingsToCreate: [
+            {
+              role: "VIEWER",
+              customRoleId: undefined,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+            },
+            {
+              role: "VIEWER",
+              customRoleId: undefined,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-2",
+            },
+          ],
+        });
+      });
+
+      /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
+      it("shows the staged rows as Viewer before the save", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
+        expect(screen.getByText("Data Scientist")).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.queryByText("Data Scientist")).toBeNull();
+        expect(screen.getByText("VIEWER")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given the member holds access above Viewer through a group", () => {
+    beforeEach(() => {
+      mockListForMemberData.current = [
+        {
+          id: "group-1",
+          name: "Platform",
+          bindings: [
+            {
+              id: "gb-1",
+              role: "ADMIN",
+              customRoleId: null,
+              customRoleName: null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+              scopeName: "Team One",
+            },
+          ],
+        },
+      ];
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("keeps the group's stored role and names the ceiling on a Lite Member seat", () => {
+      renderDialog({
+        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
+      });
+
+      expect(screen.getByText("ADMIN")).toBeTruthy();
+      expect(
+        screen.getByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeTruthy();
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("adds the note the moment a Lite Member seat is picked", () => {
+      renderDialog();
+
+      expect(
+        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeNull();
+
+      fireEvent.click(screen.getByTestId("org-role-field"));
+
+      expect(
+        screen.getByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeTruthy();
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("leaves custom group roles unlabeled, their grant needs no correction", () => {
+      mockListForMemberData.current = [
+        {
+          id: "group-1",
+          name: "Platform",
+          bindings: [
+            {
+              id: "gb-2",
+              role: "CUSTOM",
+              customRoleId: "role-1",
+              customRoleName: "Data Scientist",
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+              scopeName: "Team One",
+            },
+          ],
+        },
+      ];
+
+      renderDialog({
+        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
+      });
+
+      expect(screen.getByText("Data Scientist")).toBeTruthy();
+      expect(
+        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeNull();
     });
   });
 

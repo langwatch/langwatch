@@ -140,12 +140,12 @@ export const updateVirtualKeyCommand = async (
       data: updated,
       table: () => {
         console.log();
-        console.log(`${chalk.bold("ID:")}           ${updated.id}`);
-        console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
-        if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
-        console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-        console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-        console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
+        console.log(`${chalk.bold("ID:")}             ${updated.id}`);
+        console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
+        if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
+        console.log(`${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+        console.log(`${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
+        console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
         console.log();
         console.log(chalk.gray("Config after update:"));
         console.log(JSON.stringify(updated.config, null, 2));

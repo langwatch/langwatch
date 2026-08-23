@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -23,7 +22,9 @@ import {
   useWatch,
 } from "react-hook-form";
 import { Checkbox } from "~/components/ui/checkbox";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
+import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
@@ -163,7 +164,7 @@ export function AddMembersForm({
     if (available.length > 0) {
       appendTeam({
         teamId: available[0]?.value ?? "",
-        role: getDefaultTeamRole(orgRole),
+        role: getDefaultTeamRoleForOrganizationRole(orgRole),
       });
     }
   };
@@ -464,12 +465,6 @@ function getFilteredTeamRoles(
     ];
   }
   return [...baseRoles, ...customRoleOptions];
-}
-
-function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
-  return orgRole === OrganizationUserRole.EXTERNAL
-    ? TeamUserRole.VIEWER
-    : TeamUserRole.MEMBER;
 }
 
 function TeamRoleSelect({

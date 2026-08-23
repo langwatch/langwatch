@@ -5,13 +5,14 @@ import {
   expandSetIdFilter,
   INTERNAL_SET_PREFIX,
 } from "~/server/scenarios/internal-set-id";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type {
   BatchHistoryItem,
+  BatchSummary,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
-import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -43,6 +44,86 @@ export const RUN_ID_CAP = 10000;
  */
 const EXPORT_SORT_KEY =
   "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+
+/**
+ * Every status a run carries while the batch still owes work.
+ *
+ * QUEUED and RUNNING belong here beside PENDING and IN_PROGRESS: the queue
+ * writes them, and a batch that still holds one of the four is not finished.
+ */
+const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
+
+/**
+ * Batch-level aggregate SELECT list, shared by the batch history page and the
+ * single-batch summary so the two queries cannot drift.
+ *
+ * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
+ * names: ClickHouse stores a raw FAILURE status that the terminal status enum
+ * does not carry, so a positive list would report a failed batch as unfinished
+ * forever.
+ */
+const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
+        toString(count())                                               AS TotalCount,
+        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
+        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        toString(countIf(Status IN (${RUNNING_STATUSES})))             AS RunningCount,
+        toString(countIf(Status NOT IN (${RUNNING_STATUSES})))         AS SettledCount,
+        toString(countIf(Status = 'STALLED'))                          AS StalledCount,
+        toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
+        toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
+        toString(toUnixTimestamp64Milli(
+          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
+        )) AS FirstCompletedAt,
+        toString(if(
+          countIf(Status IN (${RUNNING_STATUSES})) = 0,
+          toUnixTimestamp64Milli(max(UpdatedAt)),
+          0
+        )) AS AllCompletedAt,
+        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt`;
+
+/** One row of BATCH_AGGREGATE_COLUMNS. Every value arrives as a string. */
+type BatchAggregateRow = {
+  BatchRunId: string;
+  TotalCount: string;
+  PassCount: string;
+  FailCount: string;
+  RunningCount: string;
+  SettledCount: string;
+  StalledCount: string;
+  LastUpdatedAt: string;
+  LastRunAt: string;
+  FirstCompletedAt: string;
+  AllCompletedAt: string;
+  MinStartedAt: string;
+  MaxStartedAt: string;
+};
+
+/**
+ * Maps a batch aggregate row to the shared summary counts.
+ *
+ * stalledCount stays out: the history page counts it from the preview items it
+ * already holds, and the single-batch summary reads the StalledCount column.
+ */
+function mapBatchAggregateRow(
+  row: BatchAggregateRow,
+): Omit<BatchSummary, "stalledCount"> {
+  const firstCompletedAt = Number(row.FirstCompletedAt);
+  const allCompletedAt = Number(row.AllCompletedAt);
+
+  return {
+    batchRunId: row.BatchRunId,
+    totalCount: Number(row.TotalCount),
+    passCount: Number(row.PassCount),
+    failCount: Number(row.FailCount),
+    runningCount: Number(row.RunningCount),
+    settledCount: Number(row.SettledCount),
+    lastRunAt: Number(row.LastRunAt),
+    lastUpdatedAt: Number(row.LastUpdatedAt),
+    firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
+    allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
+  };
+}
 
 /**
  * Returns an IN-tuple dedup predicate for simulation_runs.
@@ -443,35 +524,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
 
     // Step 1: fetch batch-level aggregates
-    const batchRowsPromise = this.queryRows<{
-      BatchRunId: string;
-      TotalCount: string;
-      PassCount: string;
-      FailCount: string;
-      RunningCount: string;
-      LastUpdatedAt: string;
-      LastRunAt: string;
-      FirstCompletedAt: string;
-      AllCompletedAt: string;
-      MinStartedAt: string;
-      MaxStartedAt: string;
-    }>(
-      `SELECT
-        BatchRunId,
-        toString(count())                                               AS TotalCount,
-        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
-        toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
-        toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
-        toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
-        toString(toUnixTimestamp64Milli(
-          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
-        )) AS FirstCompletedAt,
-        toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
-        )) AS AllCompletedAt,
-        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
-        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
+    const batchRowsPromise = this.queryRows<BatchAggregateRow>(
+      `SELECT ${BATCH_AGGREGATE_COLUMNS}
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -581,7 +635,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       itemsByBatch.set(row.BatchRunId, list);
     }
 
-    const now = Date.now();
     let globalLastUpdatedAt = 0;
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
@@ -593,13 +646,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         const baseStatus = mapStatus(r.Status);
         const durationMs =
           r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const perRunUpdatedAt = Number(r.UpdatedAt);
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        const resolvedStatus = resolveRunStatus({
-          finishedStatus: hasFinished ? baseStatus : undefined,
-          lastEventTimestamp: perRunUpdatedAt,
-          now,
-        });
+        // Stored status is the only truth: unfinished runs collapse to
+        // IN_PROGRESS; stalled runs arrive as stored ERROR via the
+        // process-manager stall watchdog.
+        const resolvedStatus = hasFinished
+          ? baseStatus
+          : ScenarioRunStatus.IN_PROGRESS;
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
@@ -614,22 +667,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       });
 
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
-      const runningCount = Number(b.RunningCount) - stalledCount;
-
-      const firstCompletedAt = Number(b.FirstCompletedAt);
-      const allCompletedAt = Number(b.AllCompletedAt);
 
       return {
-        batchRunId: b.BatchRunId,
-        totalCount: Number(b.TotalCount),
-        passCount: Number(b.PassCount),
-        failCount: Number(b.FailCount),
-        runningCount: Math.max(0, runningCount),
+        ...mapBatchAggregateRow(b),
         stalledCount,
-        lastRunAt: Number(b.LastRunAt),
-        lastUpdatedAt,
-        firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
-        allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
         items,
       };
     });
@@ -643,6 +684,42 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     };
   }
 
+  /**
+   * One batch's counts, addressed by its batch run id alone.
+   *
+   * The batch run id is unique inside the tenant, so the read needs no scenario
+   * set and skips the preview items the history page fetches. Returns null when
+   * the tenant holds no run for that batch.
+   */
+  async getBatchSummary({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<BatchSummary | null> {
+    const whereFilters =
+      "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
+
+    const rows = await this.queryRows<BatchAggregateRow>(
+      `SELECT ${BATCH_AGGREGATE_COLUMNS}
+       FROM ${TABLE_NAME}
+       WHERE ${whereFilters}
+         AND ArchivedAt IS NULL
+         ${simulationRunDedupPredicate(whereFilters)}
+       GROUP BY BatchRunId`,
+      { tenantId: projectId, batchRunId },
+    );
+
+    const row = rows[0];
+    if (!row) return null;
+
+    return {
+      ...mapBatchAggregateRow(row),
+      stalledCount: Number(row.StalledCount),
+    };
+  }
+
   async getRunDataForBatchRun({
     projectId,
     scenarioSetId,
@@ -650,7 +727,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     sinceTimestamp,
   }: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<
@@ -672,6 +749,18 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       }
     }
 
+    // The batch id identifies the batch within the tenant on its own; the
+    // scenario set id narrows the scan when the caller sends one. The CLI's
+    // --wait polls with just the batch id. An empty string is a real value
+    // that selects the default set, so only an absent id drops the predicate.
+    const scenarioSetIds =
+      scenarioSetId === undefined
+        ? undefined
+        : expandSetIdFilter(scenarioSetId);
+    const setFilter = (alias: string) =>
+      scenarioSetIds
+        ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})`
+        : "";
     const rows = await this.queryRows<
       ClickHouseSimulationRunRow & { ExportSortKey: string }
     >(
@@ -679,27 +768,26 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${setFilter("t.")}
          AND t.BatchRunId = {batchRunId:String}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
-             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+             ${setFilter("")}
              AND BatchRunId = {batchRunId:String}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY CreatedAt ASC`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...(scenarioSetIds ? { scenarioSetIds } : {}),
         batchRunId,
       },
     );
 
-    const now = Date.now();
-    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
@@ -765,8 +853,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
   async getRunDataForScenarioSet({
@@ -1328,10 +1415,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ? this.encodeExportCursor(lastRow.ExportSortKey, lastRow.ScenarioRunId)
         : undefined;
 
-    const now = Date.now();
     return {
       runs: pageRows.map((row) => ({
-        ...mapClickHouseRowToScenarioRunData(row, now),
+        ...mapClickHouseRowToScenarioRunData(row),
         scenarioSetId:
           row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
         traceIds: row.TraceIds ?? [],
@@ -1366,9 +1452,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
    * the trade: an export that is cheaper but occasionally wrong around a range
    * boundary is not worth having.
    *
-   * Note the pass/fail filter is deliberately absent: STALLED is derived from
-   * timestamps by resolveRunStatus at map time, not stored in the table, so it
-   * cannot be expressed in SQL. Category filtering happens after mapping.
+   * Note the pass/fail filter is deliberately absent: outcome categories
+   * (success/failure/stalled/…) are derived from the mapped status by
+   * categorizeRunStatus, so filtering happens after mapping, keeping the
+   * export consistent with what the run history shows.
    */
   private buildExportFilters({
     scenarioSetId,
@@ -1514,7 +1601,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 }

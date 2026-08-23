@@ -30,17 +30,18 @@ const statusHairline = (color: string) =>
   `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
 
 /**
- * The neutral card material every toast wears, whatever its status — the same
+ * The card material a toast wears in dark mode, whatever its status — the same
  * panel + hairline pair as `INSET` in `features/asaplangy/tokens.ts`. It is
  * repeated per `&[data-type=…]` because that is the shape (and specificity) of
  * Chakra's own filled defaults, which set `bg: red.solid` / `color:
- * red.contrast` and would otherwise survive the deep merge.
+ * red.contrast` and would otherwise survive the deep merge. Light mode keeps
+ * those fills.
  */
 const toastPanel = {
   bg: "bg.panel",
   color: "fg",
   // Those same filled defaults hand the action trigger a white border and a
-  // white hover wash, both of which disappear on a light panel.
+  // white hover wash, both of which disappear on a panel.
   "--toast-trigger-bg": "colors.bg.muted",
   "--toast-border-color": "colors.border.muted",
 } as const;
@@ -617,6 +618,11 @@ const appConfig = defineConfig({
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
           },
+          // Navigation rail: one step off the page, so the rail reads as
+          // its own surface next to the sidebar
+          rail: {
+            value: { _light: "{colors.gray.150}", _dark: "{colors.zinc.850}" },
+          },
           // Emphasized background for active states
           emphasized: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
@@ -889,6 +895,12 @@ const appConfig = defineConfig({
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
             background: "bg.panel",
+            // Clip children to the rounded border. Square child paints —
+            // table row hover/selection/tints, header bands, code blocks —
+            // otherwise overlap the border's curve at the corners. Floating
+            // content (menus, tooltips, popovers) renders in portals, so
+            // clipping the card never cuts it off.
+            overflow: "hidden",
           },
         },
         variants: {
@@ -1052,9 +1064,16 @@ const appConfig = defineConfig({
       table: defineSlotRecipe({
         slots: ["root", "row", "cell", "columnHeader"],
         base: {
+          // Deliberately NO borderRadius and NO background on root. The table
+          // is border-collapse: collapse, where border-radius does not apply
+          // to internal elements, so a rounded root renders its square
+          // header/row/own paints as a clipped-corner artifact; and an opaque
+          // root background is a square slab that covers the containing
+          // card's rounded BORDER at the corners (cards don't clip their
+          // children). Tables inherit their surface; rounding and clipping
+          // belong to the container.
           root: {
-            borderRadius: "lg",
-            background: "bg.panel",
+            background: "transparent",
           },
           row: {
             _hover: {
@@ -1074,7 +1093,7 @@ const appConfig = defineConfig({
             // add grid variant following previous pattern
             grid: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
               },
               columnHeader: {
                 border: "1px solid",
@@ -1088,7 +1107,19 @@ const appConfig = defineConfig({
             },
             line: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
+                // The final row's cell border doubles up against the
+                // container's own bottom edge — drop it.
+                "& tbody tr:last-of-type td": { borderBottomWidth: "0" },
+              },
+              // Chakra's stock line variant paints every row bg="bg" (the PAGE
+              // background) — darker than the card surface in dark mode, so
+              // the whole body rendered as a mismatched slab. The override must
+              // use the same `bg` KEY the stock recipe uses: a `background`
+              // key merges alongside `bg` instead of replacing it, and the
+              // stock paint wins.
+              row: {
+                bg: "transparent",
               },
               columnHeader: {
                 borderColor: "border",
@@ -1100,7 +1131,7 @@ const appConfig = defineConfig({
             },
             outline: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
               },
               header: {
                 background: "none",
@@ -1340,67 +1371,71 @@ const appConfig = defineConfig({
         },
       }),
       /**
-       * Toasts are surface cards, not coloured slabs.
+       * Light mode keeps Chakra's own filled toast: a solid status colour with
+       * contrast text. On a light page a white card reads as dead, and the
+       * status then has nowhere to show but a hairline nobody sees.
        *
-       * They used to be a translucent wash of the status colour with white
-       * text — the message set on the paint, which is both loud and harder to
-       * read than the colour behind it. This follows the language Langy
-       * already established (`features/asaplangy/tokens.ts`,
-       * `features/langy/components/LangyError.tsx`): panel material, ONE
-       * hairline carrying the tone, the status colour spent on a small icon,
-       * and the accent reserved for the way forward — never on the trouble.
+       * Dark mode keeps the panel material instead, where a saturated slab is
+       * heavy against a dark page: one hairline carries the tone and the status
+       * colour is spent on the small icon.
        *
-       * It has to live here rather than as props on `<Toast.Root>`: Chakra's
-       * defaults are attribute selectors (`&[data-type=error]`), which a style
-       * prop cannot outrank — so both the neutral material and the per-status
-       * hairline are declared here. `components/ui/toaster.tsx` renders the
-       * status icon.
+       * The dark rules have to live here rather than as props on
+       * `<Toast.Root>`: Chakra's fills are attribute selectors
+       * (`&[data-type=error]`), which a style prop cannot outrank, so each one
+       * is answered with the same selector under `_dark`.
+       * `components/ui/toaster.tsx` renders the icon and the close button.
        */
       toast: defineSlotRecipe({
         slots: ["root", "title", "description"],
         base: {
           root: {
             borderRadius: "xl",
-            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+            boxShadow: "lg",
             border: "1px solid",
             borderColor: "border.muted",
-            boxShadow: "lg",
-            // The same neutral material for every status; ONE hairline carries
-            // the tone.
-            "&[data-type=info]": {
+            // The icon, the title and the close button share the title's line,
+            // so a one-line toast is as tall as its text plus the padding.
+            alignItems: "flex-start",
+            gap: "2.5",
+            paddingBlock: "3",
+            // The close button holds 2px of slack around its glyph, so 3 here
+            // lands it as far from the right edge as the icon is from the left.
+            paddingInlineStart: "3.5",
+            paddingInlineEnd: "3",
+            // A hairline around a solid fill reads as an outline; the fill is
+            // already the edge.
+            "&:is([data-type=error], [data-type=warning], [data-type=success])":
+              {
+                borderColor: "transparent",
+              },
+            _dark: {
               ...toastPanel,
-              borderColor: "border.muted",
-            },
-            "&[data-type=loading]": {
-              ...toastPanel,
-              borderColor: "border.muted",
-            },
-            "&[data-type=error]": {
-              ...toastPanel,
-              borderColor: statusHairline("red-solid"),
-            },
-            "&[data-type=warning]": {
-              ...toastPanel,
-              borderColor: statusHairline("yellow-solid"),
-            },
-            "&[data-type=success]": {
-              ...toastPanel,
-              borderColor: statusHairline("green-solid"),
+              backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+              "&[data-type=info]": {
+                ...toastPanel,
+                borderColor: "border.muted",
+              },
+              "&[data-type=loading]": {
+                ...toastPanel,
+                borderColor: "border.muted",
+              },
+              "&[data-type=error]": {
+                ...toastPanel,
+                borderColor: statusHairline("red-solid"),
+              },
+              "&[data-type=warning]": {
+                ...toastPanel,
+                borderColor: statusHairline("yellow-solid"),
+              },
+              "&[data-type=success]": {
+                ...toastPanel,
+                borderColor: statusHairline("green-solid"),
+              },
             },
           },
-          title: {
-            fontSize: "13.5px",
-            fontWeight: "640",
-            lineHeight: "1.35",
-            letterSpacing: "-0.005em",
-            marginEnd: "0",
-          },
-          description: {
-            fontSize: "13px",
-            lineHeight: "1.5",
-            color: "fg.muted",
-            opacity: "1",
-          },
+          // Chakra reserves room after the title for a close button it places
+          // absolutely. Ours sits in the row, with the row's own gap.
+          title: { marginEnd: "0" },
         },
       }),
       progress: defineSlotRecipe({

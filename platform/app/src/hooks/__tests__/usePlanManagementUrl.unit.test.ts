@@ -1,5 +1,5 @@
-import { PricingModel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { PricingModel } from "~/generated/prisma/client";
 import {
   getPlanActionLabel,
   getPlanManagementButtonLabel,

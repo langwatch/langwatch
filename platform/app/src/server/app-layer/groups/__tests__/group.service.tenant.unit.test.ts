@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { GroupRestService, UserNotInOrganizationError } from "../group.service";
+import type { RoleService } from "~/server/role";
+import { GroupRestService } from "../group.service";
 import type { GroupRepository } from "../repositories/group.repository";
 
 describe("GroupRestService.create", () => {
@@ -11,15 +12,21 @@ describe("GroupRestService.create", () => {
         areUsersInOrganization,
         createAtomic,
       } as unknown as GroupRepository;
-      const service = new GroupRestService(repository);
+      const service = new GroupRestService({
+        repo: repository,
+        roleService: {
+          validateRolesAssignable: vi.fn(),
+        } as unknown as RoleService,
+      });
 
       await expect(
         service.create({
           organizationId: "org_1",
           name: "Reviewers",
           memberIds: ["member_1", "foreign_user", "member_1"],
+          actor: { type: "user", id: "actor_1" },
         }),
-      ).rejects.toBeInstanceOf(UserNotInOrganizationError);
+      ).rejects.toMatchObject({ code: "user_not_in_organization" });
 
       expect(areUsersInOrganization).toHaveBeenCalledTimes(1);
       expect(areUsersInOrganization).toHaveBeenCalledWith({

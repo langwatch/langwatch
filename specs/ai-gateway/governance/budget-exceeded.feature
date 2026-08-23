@@ -6,7 +6,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
 
   Per gateway.md "screen 8":
       The CLI surfaces "Budget limit reached" with a clear amount + admin email
-      + a `langwatch request-increase` command.
+      + the budget-request page URL (the gateway-signed one when available).
   The dashboard surfaces a red banner at the top of /me with the same info
   and a primary CTA to request an increase.
   The gateway returns a structured 402 (Payment Required) so any consuming
@@ -61,11 +61,13 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
 
          Admin: platform-team@acme.com
 
-         Need urgent access? Run:
-           langwatch request-increase
+         Need urgent access? Request an increase:
+           https://app.langwatch.example.com/me/budget/request
       """
     And the CLI exits with status 2 (configuration / quota error, not 1 generic)
     And no Claude/Codex/Cursor process is exec'd
+    # The printed URL is the gateway-signed `request_increase_url` from the
+    # 402 payload, so the request form arrives pre-filled with user/limit/spend.
 
   @bdd @cli @budget-exceeded @ux
   Scenario: `langwatch claude` lets a passthrough error reach the underlying tool when not personal-budget related
@@ -75,11 +77,14 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
     And it exec's claude with the env vars
     And claude renders its own error message based on the upstream response
 
-  @bdd @cli @budget-exceeded @request
-  Scenario: `langwatch request-increase` opens the request page in the browser
-    When jane runs `langwatch request-increase`
-    Then the CLI opens the URL printed by the gateway in `request_increase_url`
-    And the URL includes the user's id and current limit/spend as query params (signed/HMAC'd to prevent tampering)
+  @unit @cli @budget-exceeded @request
+  Scenario: The box falls back to the static request page when the payload has no signed URL
+    Given the 402 payload carries an empty `request_increase_url`
+    When jane runs `langwatch claude`
+    Then the box's "Request an increase" line prints `<control_plane_url>/me/budget/request`
+    # There is no `langwatch request-increase` command anymore: the box
+    # prints the URL directly, so the one thing the command did happens
+    # without a second step.
 
   # ---------------------------------------------------------------------------
   # Dashboard banner

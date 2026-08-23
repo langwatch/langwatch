@@ -1,5 +1,5 @@
-import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
+import type { ModelProvider } from "~/generated/prisma/client";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
@@ -67,6 +67,19 @@ type ModelProviderDefinition = {
    * only. Absent = unrestricted. See allowedCodexFeatures.ts.
    */
   restrictedToFeatureKeys?: readonly string[];
+  /**
+   * The provider no longer accepts new rows. The Add menu hides it and
+   * `updateModelProvider` refuses to create one — hiding a tile is not
+   * enforcement, and the stored population has to be able to reach zero
+   * or this entry can never be deleted. Stored rows stay readable,
+   * editable, validatable and dispatchable, so no deployment is ever
+   * stranded mid-fold.
+   *
+   * `replacedBy` names the provider that absorbed it
+   * (google_agent_platform → gemini), which is what turns the refusal
+   * into something the caller can act on.
+   */
+  deprecated?: { replacedBy: string };
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -77,6 +90,9 @@ export type MaybeStoredModelProvider = Omit<
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
+  // Persisted rows carry the routing handle; the registry defaults the form
+  // seeds from have no row yet, so widen it to optional here.
+  | "routingHandle"
   // Advanced (gateway) fields land on persisted rows; form-time shapes
   // omit them, so widen the type to make them optional here.
   | "rateLimitRpm"
@@ -112,6 +128,12 @@ export type MaybeStoredModelProvider = Omit<
    * the humanized provider name with auto-suffixing for collisions.
    */
   name?: string;
+  /**
+   * The slug that addresses this instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Null or absent when the operator set none, in
+   * which case the provider is reached by its family prefix.
+   */
+  routingHandle?: string | null;
   /** Registry model IDs (populated from the model registry, not user-managed) */
   models?: string[] | null;
   /** Registry embedding model IDs (populated from the model registry) */
@@ -146,6 +168,15 @@ export type MaybeStoredModelProvider = Omit<
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
+  /**
+   * True when this row's credential cannot serve embedding models, so a
+   * picker must not offer them. Derived server-side (see
+   * `modelProviders/geminiDoor.ts`) because the answer can depend on the
+   * server's own env, which the frontend cannot read, and on the API key,
+   * which it must never receive. Only Gemini's Agent Platform door has
+   * this shape today.
+   */
+  embeddingsUnsupported?: boolean;
 };
 
 // ============================================================================
@@ -236,6 +267,36 @@ export const getRegistryMetadata = () => ({
   updatedAt: llmModels.updatedAt,
   modelCount: llmModels.modelCount,
 });
+
+/** The one domain an ElevenLabs base URL may point at. */
+export const ELEVENLABS_HOST_SUFFIX = "elevenlabs.io";
+
+/**
+ * Answers whether a configured ElevenLabs base URL is one of the vendor's own
+ * hosts.
+ *
+ * The suffix rather than a fixed list of residency hosts: ElevenLabs adds
+ * regions, and a customer on a new one should not have to wait for a release.
+ * The `.` in the suffix test is what stops `notelevenlabs.io` matching.
+ *
+ * Empty, null and undefined pass, because the field is optional and the
+ * default host applies when it is unset.
+ */
+export function isElevenLabsHost(value: string | null | undefined): boolean {
+  if (value === null || value === undefined || value.trim() === "") return true;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  return (
+    host === ELEVENLABS_HOST_SUFFIX ||
+    host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`)
+  );
+}
 
 // ============================================================================
 // Provider Definitions
@@ -345,18 +406,58 @@ export const modelProviders = {
     type: "llm",
     apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
-    keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
-    }),
+    // One provider, two Google doors. An AI Studio key answers on
+    // generativelanguage.googleapis.com; a key minted for Gemini Enterprise
+    // Agent Platform is refused there (API_KEY_SERVICE_BLOCKED) and answers
+    // on aiplatform.googleapis.com at a path naming the project and
+    // location. Same models, same wire shape, same auth header — verified
+    // live with one key of each kind. So the door is a property of the
+    // credential, not a provider of its own: project + location present
+    // means the Agent Platform door, absent means the Gemini API. See
+    // specs/model-providers/google-agent-platform.feature.
+    keysSchema: z
+      .object({
+        GEMINI_API_KEY: z.string().min(1),
+        // Trimmed at the schema so a whitespace-only value stores as ""
+        // and every layer (validation, materialiser, Go header parser)
+        // agrees on whether the pair is present — they all test emptiness.
+        GEMINI_PROJECT: z.string().trim().nullable().optional(),
+        // Both `global` and a region such as `us-central1` resolve; the
+        // Agent Platform path requires one either way, so it is asked for
+        // rather than guessed.
+        GEMINI_LOCATION: z.string().trim().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        // The Agent Platform path needs both or neither: a project without
+        // a location (or the reverse) cannot be probed or dispatched, and
+        // silently ignoring the lone field would validate a credential
+        // through a different door than traffic would later use. The issue
+        // lands on the EMPTY side of the pair so the form renders it under
+        // the field the customer has to fill — a pathless issue gets
+        // re-anchored under the first field (the API key), which reads as
+        // the wrong field complaining.
+        if (!!data.GEMINI_PROJECT !== !!data.GEMINI_LOCATION) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: data.GEMINI_PROJECT
+              ? ["GEMINI_LOCATION"]
+              : ["GEMINI_PROJECT"],
+            message:
+              "Fill in both the project and the location, or leave both empty for an AI Studio key.",
+          });
+        }
+      }),
+    optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
     enabledSince: new Date("2023-01-01"),
   },
-  // Gemini models served by Gemini Enterprise Agent Platform rather than by
-  // AI Studio. Its own provider, not a mode of `gemini`, for the same reason
-  // `vertex_ai` is: different host, different auth header, and a path that
-  // names the project and location. A key minted for it is refused by
-  // generativelanguage.googleapis.com, which is what made this look like an
-  // invalid key rather than the wrong service. See
-  // specs/model-providers/google-agent-platform.feature.
+  // Compatibility for rows stored while Agent Platform was its own
+  // provider. Deprecated: hidden from the Add menu, but the rows stay
+  // visible, editable, validatable and dispatchable — without this entry,
+  // application pods running this version would treat them as an unknown
+  // provider and hide them. Converting them into `gemini` rows is a
+  // separate, per-deployment data migration; delete this entry (and its
+  // validation + materialiser branches) only in a release after that
+  // migration has run everywhere.
   google_agent_platform: {
     name: "Google Agent Platform",
     type: "llm",
@@ -365,24 +466,45 @@ export const modelProviders = {
     keysSchema: z.object({
       GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
       GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
-      // Both `global` and a region such as `us-central1` resolve; the path
-      // requires one either way, so it is asked for rather than guessed.
       GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
     }),
     enabledSince: new Date("2026-07-29"),
+    deprecated: { replacedBy: "gemini" },
   },
   elevenlabs: {
     name: "ElevenLabs",
-    // Ships audio only (TTS + STT through the gateway's /v1/audio routes).
-    // Registered like every provider so the key lives in Settings -> Model
-    // Providers; the LLM model catalog carries no elevenlabs chat models, so
-    // it never shows up in chat model selectors.
+    // Audio (TTS + STT through the gateway's /v1/audio routes) plus brokered
+    // Conversational AI sessions. Registered like every provider so the key
+    // lives in Settings -> Model Providers; the LLM model catalog carries no
+    // elevenlabs chat models, so it never shows up in chat model selectors.
     type: "llm",
     apiKey: "ELEVENLABS_API_KEY",
-    endpointKey: undefined,
+    endpointKey: "ELEVENLABS_BASE_URL",
     keysSchema: z.object({
       ELEVENLABS_API_KEY: z.string().min(1),
+      // The workspace post-call webhook secret. A brokered voice
+      // conversation reports nothing over its socket: cost and duration
+      // arrive on that webhook, and without this secret its signature
+      // cannot be verified, so the calls settle as cost-unknown.
+      ELEVENLABS_WEBHOOK_SECRET: z.string().nullable().optional(),
+      // The regional API host. ElevenLabs publishes residency endpoints, and
+      // a session minted against the default host is signed in the wrong
+      // region for a customer who chose one.
+      //
+      // Restricted to ElevenLabs' own domain. The mint and the reconciler
+      // both send the customer's xi-api-key to this host, and the gateway's
+      // endpoint policy only refuses private addresses, so without this any
+      // public host would be a place to have the key delivered.
+      ELEVENLABS_BASE_URL: z
+        .string()
+        .nullable()
+        .optional()
+        .refine(isElevenLabsHost, {
+          message:
+            "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
+        }),
     }),
+    optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: new Date("2026-07-25"),
     blurb:
       "Voice models for lifelike text to speech and accurate transcription.",
@@ -501,6 +623,47 @@ export const modelProviders = {
       "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },
 } satisfies Record<string, ModelProviderDefinition>;
+
+/**
+ * Whether the gateway's chat dispatcher can route to this provider — the ONE
+ * predicate behind both the server-side eligibility walk
+ * (`gateway/scopeResolver.eligibleModelProvidersForVk`) and the client-side
+ * mirror (`components/gateway/eligibleModelProviders.isRoutable`), so the
+ * binding picker never offers a provider the dispatch chain would drop.
+ *
+ * Non-LLM providers (registry type "safety", e.g. azure_safety) hold
+ * credentials for evaluators, not chat dispatch; the Go gateway's Bifrost
+ * router has no adapter for them, so letting one into a VK chain makes
+ * fallback attempts fail with "unsupported provider: azure_safety".
+ *
+ * This dimension deliberately fails OPEN for ids absent from the registry:
+ * they may be newer than this build's registry snapshot, and the
+ * materialiser's default branch still knows how to shape their credentials.
+ * (The enabled/disabledAt dimension, checked elsewhere, fails closed.)
+ */
+export function isDispatchableProvider(providerId: string): boolean {
+  const entry = modelProviders[providerId as keyof typeof modelProviders];
+  return !entry || entry.type === "llm";
+}
+
+/**
+ * The deprecation on a provider, or undefined when it still accepts new
+ * rows.
+ *
+ * `modelProviders` is a literal typed by `satisfies`, so each entry keeps
+ * its own exact shape and `.deprecated` is only reachable on the entries
+ * that declare it — reading it off an arbitrary key needs a cast. One
+ * narrowing here beats a cast at every caller, and it is the single place
+ * that has to change when the flag grows a field.
+ */
+export const providerDeprecation = (
+  provider: string,
+): { replacedBy: string } | undefined =>
+  (
+    modelProviders[provider as keyof typeof modelProviders] as
+      | ModelProviderDefinition
+      | undefined
+  )?.deprecated;
 
 // ============================================================================
 // Parameter Constraints

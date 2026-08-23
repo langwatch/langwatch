@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -8,8 +9,14 @@ import { PersonalUsageClickHouseRepository } from "@ee/governance/services/perso
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import {
+  LwqlKeyMapClickHouseRepository,
+  NullLwqlKeyMapRepository,
+} from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -19,6 +26,7 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
+import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -30,13 +38,16 @@ import {
   clearCustomClientCache,
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
-  getClickHouseClientForProject,
-  getSharedClickHouseClient,
+  getClickHouseClientForTenant,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { closeClickHouseClient } from "~/server/clickhouse/client";
+import {
+  _getSharedClickHouseClient,
+  closeClickHouseClient,
+} from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { FilterService } from "~/server/filters/filter.service";
@@ -47,6 +58,7 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
+  getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
@@ -57,7 +69,6 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -85,10 +96,12 @@ import { DataRetentionPolicyService } from "../data-retention/policy/dataRetenti
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { EventSourcing } from "../event-sourcing";
+import { Deferred } from "../event-sourcing/deferred";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
   PipelineRegistry,
+  type ScenarioExecutionPoolHolder,
 } from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -99,8 +112,9 @@ import {
   NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { SimulationRunMetricsAppendStore } from "../event-sourcing/pipelines/simulation-processing/projections";
 import {
+  SimulationRunMetricsRepositoryClickHouse,
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
@@ -115,8 +129,10 @@ import {
 import { ExperimentService } from "../experiments/experiment.service";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { InviteService } from "../invites/invite.service";
+import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "../subscriptionHandler";
+import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
@@ -124,6 +140,10 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
+import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
+import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -142,12 +162,17 @@ import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.serv
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
-import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
+import { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
+import {
+  CodingAgentSessionEventsClickHouseRepository,
+  NullCodingAgentSessionEventsRepository,
+} from "./coding-agent/repositories/coding-agent-session-events.repository";
 import {
   CodingAgentTraceSessionClickHouseRepository,
   NullCodingAgentTraceSessionRepository,
@@ -184,26 +209,32 @@ import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositori
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
 import { TraceEvaluationsClickHouseRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
+import {
+  runBranchRecheckPass,
+  runBranchRetentionPrune,
+} from "./github/github-branch-recheck.worker";
+import { GithubInstallationsService } from "./github/github-installations.service";
+import { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
+import { getGithubAppConfig } from "./github/githubAppConfig";
+import { GithubAppTokenService, type RedisLike } from "./github/githubAppToken";
+import { PrismaGithubInstallationsRepository } from "./github/repositories/github-installations.prisma.repository";
+import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
+import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
+import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
-import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
   createLangyTrustedMessageReader,
   LangyMessageService,
 } from "./langy/langy-message.service";
 import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
 import { LangyTurnService } from "./langy/langy-turn.service";
-import {
-  LangyGithubAppTokenService,
-  type RedisLike,
-} from "./langy/langyGithubAppToken";
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { PrismaLangyConversationRepository } from "./langy/repositories/langy-conversation.prisma.repository";
 import { NullLangyConversationRepository } from "./langy/repositories/langy-conversation.repository";
 import { PrismaLangyConversationProjectionRepository } from "./langy/repositories/langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "./langy/repositories/langy-conversation-turn-projection.prisma.repository";
-import { PrismaLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.prisma.repository";
-import { NullLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.repository";
 import { PrismaLangyMessageRepository } from "./langy/repositories/langy-message.prisma.repository";
 import { NullLangyMessageRepository } from "./langy/repositories/langy-message.repository";
 import { PrismaLangyMessageProjectionRepository } from "./langy/repositories/langy-message-projection.prisma.repository";
@@ -217,22 +248,37 @@ import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { BlobStoreService } from "./ops/blob-store.service";
 import { EventExplorerService } from "./ops/event-explorer.service";
-import { ManagerExplorerService } from "./ops/manager-explorer.service";
+import {
+  ManagerExplorerService,
+  OVERDUE_PENDING_MS,
+  OVERDUE_WAKE_MS,
+} from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import {
+  NullProcessAuditSink,
+  ProcessAuditRepository,
+} from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
+import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { ProcessOpsPrismaRepository } from "./ops/repositories/process-ops.prisma.repository";
+import { NullProcessOpsRepository } from "./ops/repositories/process-ops.repository";
 import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { SchedulerAuditRepository } from "./ops/scheduler-audit.repository";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { SnapshotRedisRepository } from "./ops/snapshot/snapshot.repository";
+import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
@@ -248,6 +294,7 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
@@ -258,6 +305,7 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
+import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -276,6 +324,8 @@ import { LogRequestCollectionService } from "./traces/log-request-collection.ser
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
+import { SessionGroupsClickHouseRepository } from "./traces/repositories/session-groups.clickhouse.repository";
+import { NullSessionGroupsRepository } from "./traces/repositories/session-groups.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
@@ -286,6 +336,8 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
+import { NullGithubPullRequestLookup } from "./traces/session-groups.pull-request-link";
+import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
@@ -298,12 +350,16 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
+/** Keeps the connection's lifecycle lines under the name they had before ADR-093. */
+const redisLogger = createLogger("langwatch:redis");
+
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound holder for this pod's scenario execution pool, read by the
+ * simulationRunExecution process manager's execute intent.
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
-  return (globalForApp as any).__scenarioExecutionHandle ?? null;
+export function getScenarioExecutionPool(): ScenarioExecutionPoolHolder | null {
+  return (globalForApp as any).__scenarioExecutionPool ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -330,6 +386,8 @@ export function initializeDefaultApp(options?: {
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
+  installAuthzEngineGateReporting();
+
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
@@ -339,7 +397,7 @@ export function initializeDefaultApp(options?: {
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
   ): Promise<ClickHouseClient> => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client)
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
@@ -352,17 +410,26 @@ export function initializeDefaultApp(options?: {
     params,
   ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
-  const redis = config.skipRedis
-    ? null
-    : createRedisConnectionFromConfig({
-        url: config.redisUrl,
-        clusterEndpoints: config.redisClusterEndpoints,
-        db: config.redisDbIndex,
-      });
+  // ADR-093: the composition root owns the App's Redis connection, and nothing
+  // holds one at module scope. Two entry points outside a serving process build
+  // their own and close it themselves — `replayPreset` (which needs a
+  // standalone client, since its multi-key work CROSSSLOT-rejects on a cluster)
+  // and the `migrateObjectStorage` task, which boots no App at all. Both go
+  // through the client package; neither is a second live connection in a
+  // process this one is serving.
+  const redis = new RedisConnectionService({ logger: redisLogger }).connect({
+    url: config.redisUrl,
+    clusterEndpoints: config.redisClusterEndpoints,
+    dbIndex: config.redisDbIndex,
+    skip: config.skipRedis,
+  });
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(
@@ -389,6 +456,18 @@ export function initializeDefaultApp(options?: {
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table), the read floors that
+  // bound `evaluation_runs`, and the data-retention services wired further
+  // below. Constructed here rather than beside those services because the
+  // evaluation-run repository below needs it and is built first — without it
+  // that read floor silently falls back to the platform default, which is the
+  // whole point of making it tenant-aware.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
@@ -401,7 +480,10 @@ export function initializeDefaultApp(options?: {
   const evaluationRuns = traced(
     new EvaluationRunService(
       clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        ? new EvaluationRunClickHouseRepository({
+            resolveClient: resolveClickHouseClient,
+            retentionResolver: retentionPolicyCache,
+          })
         : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
@@ -484,14 +566,6 @@ export function initializeDefaultApp(options?: {
       workflowExecutor: { runEvaluationWorkflow },
     }),
     "EvaluationExecutionService",
-  );
-
-  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
-  // (which stamps dspy_steps as a traces-category table) and the data-retention
-  // services wired further below.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
   );
 
   const dspySteps = traced(
@@ -665,7 +739,14 @@ export function initializeDefaultApp(options?: {
   // service can ask "is this trace still shared?" without depending on
   // ShareService — that would close the cycle: ShareService already depends
   // on PinnedTraceService for auto(un)pin.
-  const shareRepo = new PrismaShareRepository(prisma);
+  // A cut-over organization's links are written through the grants ledger and
+  // read off the same compat row as ever (ADR-092 PR 3); everyone else gets
+  // the Prisma repository byte for byte.
+  const shareRepo = new LedgerShareRepository({
+    legacy: new PrismaShareRepository(prisma),
+    prisma,
+    writer: () => grantsLedgerWriter(),
+  });
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
@@ -730,6 +811,19 @@ export function initializeDefaultApp(options?: {
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
+    simulationRunMetricsStore: clickhouseEnabled
+      ? new SimulationRunMetricsAppendStore(
+          new SimulationRunMetricsRepositoryClickHouse(resolveClickHouseClient),
+        )
+      : // No ClickHouse → event sourcing is disabled; the append store is a noop.
+        {
+          append: async () => {
+            /* noop */
+          },
+          bulkAppend: async () => {
+            /* noop */
+          },
+        },
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
@@ -751,6 +845,11 @@ export function initializeDefaultApp(options?: {
     sessionMetricSeries: clickhouseEnabled
       ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
       : new NullSessionMetricSeriesRepository(),
+    codingAgentSessionEvents: clickhouseEnabled
+      ? new CodingAgentSessionEventsClickHouseRepository(
+          resolveClickHouseClient,
+        )
+      : new NullCodingAgentSessionEventsRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -786,6 +885,8 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
+    authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
+    authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -844,7 +945,7 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
-  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // Governance's KPI rollup. One instance for the whole App: the subscriber
   // sync writes through it, the spend-spike anomaly evaluator reads through
   // it — the same repository reference the process manager below takes and
   // `app.governance.kpis` hands out.
@@ -856,7 +957,7 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
-  // reactor sync writes through it, the puller worker and the workspace-view
+  // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
   // through it — the same repository reference the process manager below
   // takes and `app.governance.ocsfEvents` hands out.
@@ -940,6 +1041,16 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
+  // ADR-092 stage B: the in-place system migrations. Worker-only and
+  // fire-and-forget - one pass per boot, level-triggered, so held and parked
+  // organizations retry on the restart cadence with nobody running anything.
+  // Redis is handed in rather than read back off the App: this composes the
+  // App, so `tryGetApp()` is still null here, and a null handle would make
+  // the lease unacquirable and every pass a silent no-op.
+  const systemMigrations = roleRunsWorkers(config.processRole)
+    ? startSystemMigrations({ redis })
+    : undefined;
+
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1014,13 +1125,25 @@ export function initializeDefaultApp(options?: {
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {
+                  // Both reads are scoped to builder charts: a scheduled
+                  // report renders each one through `getTimeseries`, which
+                  // needs the series a builder payload carries and a saved
+                  // workbench chart's definition does not have.
                   loadCustomGraph: ({ projectId, customGraphId }) =>
                     prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
+                      where: {
+                        id: customGraphId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                     }),
                   loadDashboardGraphs: ({ projectId, dashboardId }) =>
                     prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
+                      where: {
+                        dashboardId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
@@ -1061,11 +1184,38 @@ export function initializeDefaultApp(options?: {
       });
   }
 
+  // The coding-agent pipeline's pull-request mapping subscriber fires against a
+  // service composed further down (it needs the GitHub connection, which needs
+  // Redis and Prisma), so the registry is handed the callable proxy now and the
+  // real implementation is wired once it exists.
+  const requestBranchMapping = new Deferred<
+    GithubPullRequestMappingService["requestBranchMapping"]
+  >("requestBranchMapping");
+
+  // The fleet-wide linkage maintenance the scheduled process manager drives.
+  // Late-bound for the same reason: both need the mapping service and its
+  // repository, which are composed further down.
+  const recheckDueBranches = new Deferred<() => Promise<number>>(
+    "recheckDueBranches",
+  );
+  const pruneStaleBranchLinkage = new Deferred<
+    () => Promise<{ branchChecks: number }>
+  >("pruneStaleBranchLinkage");
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
     redis: redis!,
     broadcast,
+    codingAgent: {
+      pullRequestMapping: {
+        requestBranchMapping: (params) => requestBranchMapping.fn(params),
+      },
+    },
+    github: {
+      recheckDueBranches: () => recheckDueBranches.fn(),
+      pruneStaleBranchLinkage: () => pruneStaleBranchLinkage.fn(),
+    },
     langy: {
       buffer: langyTokenBuffer,
       handoffStore: langyHandoffStore,
@@ -1088,6 +1238,16 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
+      // lands in the same ledger table, so without ClickHouse there is nowhere
+      // for it to go. The pipeline still records every observation on the log.
+      pulledUsageLedger: clickhouseEnabled
+        ? {
+            budgetCHRepository: new GatewayBudgetClickHouseRepository(
+              resolveClickHouseClient,
+            ),
+          }
+        : undefined,
     },
     projects,
     monitors,
@@ -1110,8 +1270,8 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle =
-    commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionPool =
+    commands.scenarioExecutionPool;
 
   if (roleRunsWorkers(config.processRole)) {
     // One-time background seeds on worker boot (ADR-051): topic-model
@@ -1144,22 +1304,33 @@ export function initializeDefaultApp(options?: {
     langyConversationRepository,
   );
 
-  // Langy GitHub App installations (issue #4747): the install/webhook lifecycle
-  // and the per-turn installation-token mint for bot-authored PRs. The App is
-  // optional per instance; when the private key is unset the service reports
-  // `configured=false` and every read short-circuits to "GitHub unavailable"
-  // without touching GitHub. The App private key is the only credential and it
-  // lives here in the control plane, never near a worker.
-  const langyGithubAppTokens = new LangyGithubAppTokenService(
-    env.GITHUB_LANGY_APP_ID ?? "",
-    env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+  // The organization's GitHub connection: the install/webhook lifecycle, and
+  // the token mints Langy (write) and pull-request linkage (read) ask for. The
+  // App is optional per instance; when the private key is unset the service
+  // reports `configured=false` and every read short-circuits to "GitHub
+  // unavailable" without touching GitHub. The App private key is the only
+  // credential and it lives here in the control plane, never near a worker.
+  const githubAppConfig = getGithubAppConfig();
+  const githubAppTokens = new GithubAppTokenService(
+    githubAppConfig.appId,
+    githubAppConfig.privateKey,
     // ioredis Redis/Cluster satisfy the narrow RedisLike surface at runtime; the
     // client's overloaded `set` signature just isn't structurally assignable.
     (redis ?? null) as unknown as RedisLike | null,
   );
-  const langyGithubInstallations = new LangyGithubInstallationsService(
-    new PrismaLangyGithubInstallationsRepository(prisma),
-    langyGithubAppTokens,
+  // Set once the mapping service exists, below. The installation hook and the
+  // service form a cycle (the hook backfills through the service, the service
+  // resolves installations through the connection), and this is where it is
+  // broken: the hook only ever runs long after composition.
+  let githubPullRequestMapping: GithubPullRequestMappingService | null = null;
+  const githubInstallations = new GithubInstallationsService(
+    new PrismaGithubInstallationsRepository(prisma),
+    githubAppTokens,
+    // Connecting GitHub is the moment a whole history of folded sessions
+    // becomes mappable. Without this the organization would see nothing until
+    // someone ran a new session on each branch.
+    ({ organizationId }) =>
+      githubPullRequestMapping?.runBackfillForOrganization({ organizationId }),
   );
 
   // Langy turn-start orchestration (ADR-046): the pipeline the
@@ -1187,6 +1358,12 @@ export function initializeDefaultApp(options?: {
     tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,
+    // Check-only cap view for the panel-open warm: signature parity with the
+    // turn's token strip, without spending a PR permit on a panel open.
+    checkPermit: getLangyGithubPrUsage,
+    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
+    // and riding `credentials.harness` into probe, stash and dispatch.
+    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
@@ -1213,15 +1390,19 @@ export function initializeDefaultApp(options?: {
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
-      // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
-      // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
-      // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and
-      // the 5s-cached flag store keeps that per-span read cheap.
+      // ADR-022: Edge size-check + transient S3 spool, on by default and
+      // switchable off per project. projectId === tenantId (routes/otel.ts
+      // passes project.id). processCommandData runs PER SPAN (not once per OTLP
+      // request/batch); the flag is resolved per span against the operator
+      // store, falling back to the registry default rather than PostHog, and
+      // the 5s-cached store keeps that per-span read cheap.
       //
       // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
       // from maybeSpool (S3 outage, BlobStore.putSpool throws) is caught here.
       // We log at warn level and return the original commandData unchanged so
-      // that ingestion is never blocked by the spool path. ADR-022.
+      // that ingestion is never blocked by the spool path. The span then takes
+      // the inline route, where capOversizedAttributes bounds each attribute
+      // value at 256 KB. ADR-022.
       processCommandData: async (data) => {
         // Media extraction runs FIRST: externalizing inline media parts to
         // the content-addressed stored-objects store usually brings the
@@ -1238,11 +1419,11 @@ export function initializeDefaultApp(options?: {
         // reason label (flag_store vs spool/S3) for alerting (GtVrL).
         let stage: "flag_store" | "spool" = "flag_store";
         try {
-          const enabled = await getFeatureFlagStore().get(
+          const enabled = await getFeatureFlagStore().getOrRegistryDefault(
             "release_trace_blob_offload",
             { projectId: data.tenantId },
           );
-          if (enabled !== true) return data;
+          if (!enabled) return data;
           stage = "spool";
           return await maybeSpool({
             data,
@@ -1259,7 +1440,7 @@ export function initializeDefaultApp(options?: {
               reason: stage,
               error: err instanceof Error ? err.message : String(err),
             },
-            "Edge spool failed — falling back to unmodified command data (fail-open)",
+            "Edge spool unavailable, ingesting this oversized span inline (fail-open). Attribute values above 256 KB will be truncated on this span; configure S3-compatible object storage to keep them intact.",
           );
           return data;
         }
@@ -1285,14 +1466,115 @@ export function initializeDefaultApp(options?: {
     "MetricRequestCollectionService",
   );
 
+  // Hoisted out of the `codingAgents` bag below: the Sessions lens rollup
+  // enriches session rows with these pre-folded counters, so both reads
+  // share the one service instance.
+  const codingAgentSessions = traced(
+    new CodingAgentSessionService({
+      sessions: repositories.codingAgentSession,
+      traceSessions: repositories.codingAgentTraceSession,
+      metricSeries: repositories.sessionMetricSeries,
+      sessionEvents: repositories.codingAgentSessionEvents,
+    }),
+    "CodingAgentSessionService",
+  );
+
+  // Pull-request linkage. The mapping service is the write side (branch to
+  // pull requests, negative-cached), the status service the live read, and the
+  // usage service the organization-first rollup the Pull Requests page and the
+  // REST endpoint share.
+  const githubPullRequestsRepository = new PrismaGithubPullRequestsRepository(
+    prisma,
+  );
+  githubPullRequestMapping = new GithubPullRequestMappingService({
+    repository: githubPullRequestsRepository,
+    installations: githubInstallations,
+    appTokens: githubAppTokens,
+    resolveOrganizationId,
+    findProjectIds: async (organizationId) =>
+      (
+        await prisma.project.findMany({
+          where: { team: { organizationId }, archivedAt: null },
+          select: { id: true },
+        })
+      ).map((project) => project.id),
+    sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
+  });
+  requestBranchMapping.resolve((params) =>
+    githubPullRequestMapping!.requestBranchMapping(params),
+  );
+  recheckDueBranches.resolve(() =>
+    runBranchRecheckPass({
+      repository: githubPullRequestsRepository,
+      mapping: githubPullRequestMapping!,
+    }),
+  );
+  pruneStaleBranchLinkage.resolve(() =>
+    runBranchRetentionPrune({ repository: githubPullRequestsRepository }),
+  );
+
+  const githubPullRequestStatus = new GithubPullRequestStatusService({
+    repository: githubPullRequestsRepository,
+    installations: githubInstallations,
+    appTokens: githubAppTokens,
+    redis: (redis ?? null) as unknown as RedisLike | null,
+  });
+
+  const pullRequestUsage = new PullRequestUsageService({
+    pullRequests: githubPullRequestsRepository,
+    sessions: repositories.codingAgentSession,
+    personalSessions: codingAgentSessions,
+    sessionEvents: repositories.codingAgentSessionEvents,
+    installations: githubInstallations,
+    resolveOrganizationId,
+    // The one place the bundled-plan policy is reached: the service takes the
+    // answer as a dep so the read stays free of the enterprise module, and the
+    // receiver and this rollup resolve bundled-ness the same way.
+    isSourceNonBillable: resolveSourceNonBillable,
+  });
+
+  // The Sessions screen's read: the same session service, plus the mapping
+  // lookup the sessions lens joins with, so both surfaces answer "which pull
+  // request" from one place.
+  const codingAgentSessionsList = traced(
+    new CodingAgentSessionsListService({
+      sessions: codingAgentSessions,
+      pullRequests: {
+        findForBranches: (args) =>
+          githubPullRequestsRepository.findAllByBranchKeys(args),
+      },
+      resolveOrganizationId,
+    }),
+    "CodingAgentSessionsListService",
+  );
+
+  const sessionGroups = traced(
+    new SessionGroupsService({
+      repository: clickhouseEnabled
+        ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
+        : new NullSessionGroupsRepository(),
+      codingAgentSessions,
+      pullRequests: {
+        findForBranches: (args) =>
+          githubPullRequestsRepository.findAllByBranchKeys(args),
+      },
+      resolveOrganizationId,
+    }),
+    "SessionGroupsService",
+  );
+
   const traces = {
     summary: traceSummary,
     list: traceList,
+    sessionGroups,
     spans: spanStorage,
     logRecords: logRecordStorage,
     collection: traceCollection,
     logCollection,
     metricCollection,
+    editOverlay: TraceEditOverlayService.create(prisma),
   };
 
   // Collect closeables for graceful shutdown
@@ -1309,6 +1591,18 @@ export function initializeDefaultApp(options?: {
       },
     });
   }
+  // BEFORE the Redis closeable, deliberately: stopping the writer hands the
+  // snapshot lease back, and a released lease is the difference between the
+  // fleet electing a new writer immediately and going without one for the
+  // remainder of the lease window — the rolling-deploy case. Once Redis is
+  // disconnected the release can no longer be issued at all.
+  gracefulCloseables.push({
+    name: "ops-snapshot",
+    close: async () => {
+      await ops.metricsCollector?.stop();
+      ops.snapshotReader?.stop();
+    },
+  });
   if (redis) {
     gracefulCloseables.push({
       name: "redis",
@@ -1327,6 +1621,14 @@ export function initializeDefaultApp(options?: {
     gracefulCloseables.push({
       name: "scheduler",
       close: () => scheduler.stop(),
+    });
+  }
+  if (systemMigrations) {
+    // Aborts the pass between tenants; a truncated pass is harmless because
+    // every migration is idempotent and the next boot resumes the sweep.
+    gracefulCloseables.push({
+      name: "system-migrations",
+      close: () => systemMigrations.stop(),
     });
   }
   gracefulCloseables.push({
@@ -1360,18 +1662,51 @@ export function initializeDefaultApp(options?: {
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
-  const sharedCh = getSharedClickHouseClient();
+  // One snapshot store shared by this pod's writer and its reader: the writer
+  // publishes only while it holds the lease, the reader always reads.
+  const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
+  const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo),
-    scheduler: new SchedulerOpsService(
-      new PrismaScheduledJobRepository(prisma),
-    ),
+    queues: new QueueService({
+      repo: queueRepo,
+      audit: new QueueAuditRepository(prisma),
+    }),
+    scheduler: new SchedulerOpsService({
+      repo: new PrismaScheduledJobRepository(prisma),
+      audit: new SchedulerAuditRepository(prisma),
+      // Best-effort poke so a manual run fires now rather than within one poll
+      // backstop. Latency only: the loop picks the row up either way.
+      wake: redis ? () => void SchedulerService.publishWake(redis) : null,
+      resolveProjectNames: async (projectIds) => {
+        const projects = await prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true },
+        });
+        return new Map(projects.map((p) => [p.id, p.name]));
+      },
+    }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
-    managerExplorer: new ManagerExplorerService(repositories.processStore),
+    managerExplorer: (() => {
+      const fleet = new ProcessOpsPrismaRepository(prisma);
+      // The pm_* gauges read the same counts the fleet table shows, on
+      // scrape, so alerting watches what the operator would see.
+      bindProcessFleetMetricsSource(() =>
+        fleet.countByProcessName({
+          now: Date.now(),
+          overdueWakeMs: OVERDUE_WAKE_MS,
+          overduePendingMs: OVERDUE_PENDING_MS,
+        }),
+      );
+      return new ManagerExplorerService({
+        store: repositories.processStore,
+        fleet,
+        audit: new ProcessAuditRepository(prisma),
+      });
+    })(),
     replay: new ReplayService(replayRepo),
     blobStore: new BlobStoreService(
       redis
@@ -1379,8 +1714,10 @@ export function initializeDefaultApp(options?: {
         : new NullBlobStoreRepository(),
     ),
     metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, queueRepo })
+      ? getOpsMetricsCollector({ redis, queueRepo, snapshotRepo })
       : null,
+    snapshotReader:
+      redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
   return initializeApp({
@@ -1420,7 +1757,10 @@ export function initializeDefaultApp(options?: {
     clickhouse: {
       enabled: clickhouseEnabled,
       resolveClient: resolveClickHouseClient,
+      resolveOrganizationClient: getClickHouseClientForOrganization,
+      allInstances: getAllClickHouseInstances,
     },
+    redis,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(
         getClickHouseClientForOrganization,
@@ -1431,17 +1771,6 @@ export function initializeDefaultApp(options?: {
         getClickHouseClientForOrganization,
       ),
     },
-    scenarios: {
-      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
-      // shared (cross-tenant) client directly rather than a per-tenant
-      // repository — see clickhouse-queries.md's "boot-time system sweeps"
-      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
-      // was built from.
-      orphanReconciliation: {
-        client: sharedCh,
-        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
-      },
-    },
     governance: {
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
@@ -1450,14 +1779,23 @@ export function initializeDefaultApp(options?: {
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
-      sessions: traced(
-        new CodingAgentSessionService(
-          repositories.codingAgentSession,
-          repositories.codingAgentTraceSession,
-          repositories.sessionMetricSeries,
+      sessions: codingAgentSessions,
+      sessionsList: codingAgentSessionsList,
+      pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
+    },
+    github: {
+      installations: traced(githubInstallations, "GithubInstallationsService"),
+      pullRequests: {
+        mapping: traced(
+          githubPullRequestMapping,
+          "GithubPullRequestMappingService",
         ),
-        "CodingAgentSessionService",
-      ),
+        status: traced(
+          githubPullRequestStatus,
+          "GithubPullRequestStatusService",
+        ),
+        repository: githubPullRequestsRepository,
+      },
     },
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
@@ -1465,7 +1803,11 @@ export function initializeDefaultApp(options?: {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({
+          fallbackClient: _getSharedClickHouseClient,
+        }),
+      ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1474,10 +1816,6 @@ export function initializeDefaultApp(options?: {
       conversations: traced(langyConversations, "LangyConversationService"),
       turns: traced(langyTurns, "LangyTurnService"),
       messages: traced(langyMessages, "LangyMessageService"),
-      githubInstallations: traced(
-        langyGithubInstallations,
-        "LangyGithubInstallationsService",
-      ),
       credentials: traced(
         LangyCredentialService.create(prisma),
         "LangyCredentialService",
@@ -1489,6 +1827,7 @@ export function initializeDefaultApp(options?: {
     },
     organizations,
     projects,
+    permissions: permissionsServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -1553,11 +1892,53 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "OrganizationService",
   );
   const nullProjects = traced(
-    new ProjectService(new NullProjectRepository()),
+    new ProjectService(
+      new NullProjectRepository(),
+      new NullLwqlKeyMapRepository(),
+    ),
     "ProjectService",
   );
 
   const testBroadcast = new BroadcastService(null);
+  const testCodingAgentSessions = new CodingAgentSessionService({
+    sessions: new NullCodingAgentSessionRepository(),
+    traceSessions: new NullCodingAgentTraceSessionRepository(),
+    metricSeries: new NullSessionMetricSeriesRepository(),
+    sessionEvents: new NullCodingAgentSessionEventsRepository(),
+  });
+  // Pull-request linkage against an unconfigured App and null stores: every
+  // read answers empty, every write is a no-op, and no test can accidentally
+  // reach github.com.
+  const testGithubAppTokens = new GithubAppTokenService("", "", null);
+  const testGithubInstallations = new GithubInstallationsService(
+    new NullGithubInstallationsRepository(),
+    testGithubAppTokens,
+  );
+  const testPullRequestsRepository = new NullGithubPullRequestsRepository();
+  const testGithubPullRequestMapping = new GithubPullRequestMappingService({
+    repository: testPullRequestsRepository,
+    installations: testGithubInstallations,
+    appTokens: testGithubAppTokens,
+    resolveOrganizationId: async () => undefined,
+    findProjectIds: async () => [],
+    sessions: testCodingAgentSessions,
+  });
+  const testPullRequestUsage = new PullRequestUsageService({
+    pullRequests: testPullRequestsRepository,
+    sessions: new NullCodingAgentSessionRepository(),
+    personalSessions: testCodingAgentSessions,
+    sessionEvents: new NullCodingAgentSessionEventsRepository(),
+    installations: testGithubInstallations,
+    resolveOrganizationId: async () => undefined,
+    // No enterprise policy in the test app: everything reads as billed, the
+    // conservative answer for a cost.
+    isSourceNonBillable: async () => false,
+  });
+  const testCodingAgentSessionsList = new CodingAgentSessionsListService({
+    sessions: testCodingAgentSessions,
+    pullRequests: new NullGithubPullRequestLookup(),
+    resolveOrganizationId: async () => undefined,
+  });
   return new App({
     config,
     broadcast: testBroadcast,
@@ -1582,6 +1963,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
             new TopicService(new NullTopicRepository()),
           ),
           "TraceListService",
+        ),
+        sessionGroups: traced(
+          new SessionGroupsService({
+            repository: new NullSessionGroupsRepository(),
+            codingAgentSessions: testCodingAgentSessions,
+          }),
+          "SessionGroupsService",
         ),
         spans: traced(
           new SpanStorageService(new NullSpanStorageRepository()),
@@ -1615,6 +2003,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           }),
           "MetricRequestCollectionService",
         ),
+        editOverlay: TraceEditOverlayService.create(testPrisma),
       };
     })(),
     evaluations: {
@@ -1699,7 +2088,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       resolveClient: async () => {
         throw new Error("ClickHouse is not available in the test app");
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+      allInstances: async () => [],
     },
+    // No Redis in the test preset; a test that needs one passes it as an
+    // override, or injects a double into the unit directly.
+    redis: null,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
     },
@@ -1707,9 +2103,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       instance: new InstanceUsageStatsClickHouseRepository(async () => {
         throw new Error("ClickHouse is not available in the test app");
       }),
-    },
-    scenarios: {
-      orphanReconciliation: { client: null, finder: null },
     },
     governance: {
       ocsfEvents: undefined,
@@ -1719,11 +2112,22 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     billableEvents: undefined,
     codingAgents: {
-      sessions: new CodingAgentSessionService(
-        new NullCodingAgentSessionRepository(),
-        new NullCodingAgentTraceSessionRepository(),
-        new NullSessionMetricSeriesRepository(),
-      ),
+      sessions: testCodingAgentSessions,
+      sessionsList: testCodingAgentSessionsList,
+      pullRequestUsage: testPullRequestUsage,
+    },
+    github: {
+      installations: testGithubInstallations,
+      pullRequests: {
+        mapping: testGithubPullRequestMapping,
+        status: new GithubPullRequestStatusService({
+          repository: testPullRequestsRepository,
+          installations: testGithubInstallations,
+          appTokens: testGithubAppTokens,
+          redis: null,
+        }),
+        repository: testPullRequestsRepository,
+      },
     },
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
@@ -1731,7 +2135,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(
@@ -1783,15 +2189,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new NullLangyMessageRepository(),
         new NullLangyConversationRepository(),
       ),
-      githubInstallations: new LangyGithubInstallationsService(
-        new NullLangyGithubInstallationsRepository(),
-        new LangyGithubAppTokenService("", "", null),
-      ),
       credentials: LangyCredentialService.create(testPrisma),
       feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),
     },
     organizations: nullOrganizations,
     projects: nullProjects,
+    permissions: permissionsServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,
@@ -1808,15 +2211,22 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: {
-      queues: new QueueService(new NullQueueRepository()),
-      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
+      queues: new QueueService({ repo: new NullQueueRepository() }),
+      scheduler: new SchedulerOpsService({
+        repo: new NullScheduledJobRepository(),
+      }),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
-      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
+      managerExplorer: new ManagerExplorerService({
+        store: new InMemoryProcessStore(),
+        fleet: new NullProcessOpsRepository(),
+        audit: new NullProcessAuditSink(),
+      }),
       replay: new ReplayService(new NullReplayRepository()),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
+      snapshotReader: null,
     },
     commands: {
       traces: {
@@ -1902,15 +2312,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       automations: {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
-      scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
-        setPool: () => {
+      scenarioExecutionPool: {
+        get: () => null,
+        set: () => {
           /* noop */
         },
       },
@@ -1926,7 +2330,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
-      new PrismaShareRepository(testPrisma),
+      // The same repository the real preset wires, so a test organization
+      // that has been cut over exercises the ledger path rather than a shape
+      // only tests see. The writer is built over `testPrisma` explicitly
+      // (rather than `grantsLedgerWriter()`, which always reaches for the
+      // app's Prisma singleton) - today the two are the same client
+      // (`testPrisma = globalPrisma`, presets.ts above), but a test preset
+      // should say what it depends on rather than rely on that coincidence.
+      new LedgerShareRepository({
+        legacy: new PrismaShareRepository(testPrisma),
+        prisma: testPrisma,
+        writer: () => new GrantsLedgerWriter(testPrisma),
+      }),
       testPinnedTraceService,
       {
         isTraceSharingEnabled: async (projectId) => {

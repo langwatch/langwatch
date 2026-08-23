@@ -9,8 +9,9 @@
  * not-found, matching the tenancy-mismatch branch rather than confirming the
  * id exists.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { ApiKeyService } from "../api-key.service";
 import { ApiKeyNotFoundError, ApiKeyReservedNameError } from "../errors";
@@ -22,7 +23,20 @@ const KEY_ID = "key_1";
 
 const REACHED_ADMIN_CHECK = "REACHED_ADMIN_CHECK";
 
+// The key's grants are ledger commands now; only its own row is a table
+// write, and reaching that write is what says the guard let the caller past.
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ({
+    attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
+    revokeBindings: vi.fn(),
+    revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+    defineRole: vi.fn(),
+    deleteRole: vi.fn(),
+  }),
+}));
+
 function mockPrisma(name: string): PrismaClient {
+  const reached = vi.fn().mockRejectedValue(new Error(REACHED_ADMIN_CHECK));
   return {
     apiKey: {
       findUnique: vi.fn().mockResolvedValue({
@@ -33,9 +47,12 @@ function mockPrisma(name: string): PrismaClient {
         revokedAt: null,
         roleBindings: [],
       }),
+      create: reached,
+      update: reached,
     },
-    // Reaching a transaction means the guard let the mutation through.
-    $transaction: vi.fn().mockRejectedValue(new Error(REACHED_ADMIN_CHECK)),
+    // The personal-workspace guard reads the scopes a binding names.
+    team: { findFirst: vi.fn().mockResolvedValue(null) },
+    project: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaClient;
 }
 
@@ -104,7 +121,7 @@ describe("ApiKeyService system-managed guard", () => {
     it("lets the product's own mint claim the name via isSystemManaged", async () => {
       // The discriminating positive case: Langy's session-key mint passes
       // `isSystemManaged: true` and must get past the guard (here: far enough
-      // to hit the transaction sentinel instead of the reserved-name error).
+      // to hit the key-row write instead of the reserved-name error).
       const sut = ApiKeyService.create(mockPrisma("irrelevant"));
 
       await expect(

@@ -1,33 +1,46 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
+import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import type { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();
 const validateRolesAssignable = vi.fn();
-const organizationUserCount = vi.fn();
+const organizationUserFindFirst = vi.fn();
 const groupFindFirst = vi.fn();
-const bindingCreate = vi.fn();
+const attachBindings = vi.fn();
 const bindingFindMany = vi.fn();
 const groupMembershipFindMany = vi.fn();
 
 const prisma = {
-  organizationUser: { count: organizationUserCount },
+  organizationUser: { findFirst: organizationUserFindFirst },
   group: { findFirst: groupFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
   roleBinding: {
-    create: bindingCreate,
     findMany: bindingFindMany,
   },
   groupMembership: { findMany: groupMembershipFindMany },
+  // The listing reads go through the per-organization fork, which asks the
+  // gate first. Answering it keeps these tests on the legacy head by choice;
+  // without it the gate's read throws and they pass on the fail-safe.
+  systemMigrationTenantState: {
+    findUnique: vi.fn().mockResolvedValue(null),
+  },
   $transaction: vi.fn(),
 } as unknown as PrismaClient;
+
+/** Every binding write is a ledger command now, so the writer is the seam. */
+const writer = {
+  attachBindings,
+  revokeBindings: vi.fn(),
+} as unknown as GrantsLedgerWriter;
 
 const repository = {
   validateScopeInOrg,
@@ -41,18 +54,27 @@ let service: RoleBindingService;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetAuthzEngineGateForTesting();
   validateScopeInOrg.mockResolvedValue(undefined);
   validateRolesAssignable.mockResolvedValue(undefined);
-  organizationUserCount.mockResolvedValue(1);
+  organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });
   groupFindFirst.mockResolvedValue({ id: "group_1" });
-  bindingCreate.mockResolvedValue({ id: "binding_1" });
+  attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
   bindingFindMany.mockResolvedValue([]);
   groupMembershipFindMany.mockResolvedValue([]);
-  service = new RoleBindingService(prisma, repository, roleService);
+  service = new RoleBindingService({
+    prisma,
+    repo: repository,
+    roleService,
+    writer,
+  });
 });
+
+const actor = { type: "user" as const, id: "user_admin" };
 
 const bindingInput = {
   organizationId: "org_1",
+  actor,
   role: TeamUserRole.MEMBER,
   scopeType: RoleBindingScopeType.TEAM,
   scopeId: "team_1",
@@ -60,13 +82,13 @@ const bindingInput = {
 
 describe("RoleBindingService tenant references", () => {
   it("rejects a user principal from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizationUserFindFirst.mockResolvedValue(null);
 
     await expect(
       service.create({ ...bindingInput, userId: "foreign_user" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
 
-    expect(bindingCreate).not.toHaveBeenCalled();
+    expect(attachBindings).not.toHaveBeenCalled();
   });
 
   it("rejects a group principal from another organization", async () => {
@@ -74,13 +96,13 @@ describe("RoleBindingService tenant references", () => {
 
     await expect(
       service.create({ ...bindingInput, groupId: "foreign_group" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "group_not_in_organization" });
 
-    expect(bindingCreate).not.toHaveBeenCalled();
+    expect(attachBindings).not.toHaveBeenCalled();
   });
 
   it("rejects batch bindings for a user from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizationUserFindFirst.mockResolvedValue(null);
 
     await expect(
       service.applyMemberBindings({
@@ -88,8 +110,9 @@ describe("RoleBindingService tenant references", () => {
         userId: "foreign_user",
         bindingIdsToDelete: [],
         bindingsToCreate: [],
+        actor,
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
   });
 
   it("filters stale foreign principals from organization reads", async () => {

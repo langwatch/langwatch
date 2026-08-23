@@ -1,6 +1,6 @@
 import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { generate } from "@langwatch/ksuid";
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
@@ -38,10 +38,13 @@ export class PrismaIngestionPullRunProjectionRepository
 
   async load(
     projectionKey: string,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<StoredProjection<IngestionPullRunStatusData> | null> {
     const row = await this.prisma.ingestionPullRunProjection.findUnique({
-      where: { sourceId: projectionKey },
+      where: {
+        sourceId: projectionKey,
+        projectId: String(context.tenantId),
+      },
     });
     return row ? fromRow(row) : null;
   }
@@ -69,7 +72,7 @@ export class PrismaIngestionPullRunProjectionRepository
 
     await this.prisma.$transaction(async (tx) => {
       await tx.ingestionPullRunProjection.upsert({
-        where: { sourceId },
+        where: { sourceId, projectId },
         create: {
           id: generate(INGESTION_PULL_RUN_KSUID_RESOURCE).toString(),
           sourceId,
