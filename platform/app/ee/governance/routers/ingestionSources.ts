@@ -63,6 +63,7 @@ function toDto(row: {
   description: string | null;
   parserConfig: unknown;
   status: string;
+  traceProjectId: string | null;
   lastEventAt: Date | null;
   archivedAt: Date | null;
   createdAt: Date;
@@ -84,6 +85,7 @@ function toDto(row: {
     description: row.description,
     parserConfig: safeParser,
     status: row.status,
+    traceProjectId: row.traceProjectId,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
@@ -135,6 +137,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: z.record(z.string(), z.unknown()).optional(),
         pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
+        traceProjectId: z.string().nullable().optional(),
       }),
     )
     .permission("ingestionSources:manage")
@@ -149,6 +152,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: input.parserConfig,
         pullConfig: input.pullConfig,
         pullSchedule: input.pullSchedule,
+        traceProjectId: input.traceProjectId,
         actorUserId: ctx.session.user.id,
       });
       return {
@@ -168,6 +172,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         status: statusSchema.optional(),
         teamId: z.string().nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
+        traceProjectId: z.string().nullable().optional(),
       }),
     )
     .permission("ingestionSources:manage")
@@ -182,6 +187,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         status: input.status,
         teamId: input.teamId,
         pullSchedule: input.pullSchedule,
+        traceProjectId: input.traceProjectId,
       });
       return toDto(updated);
     }),

@@ -25,6 +25,7 @@ import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/
 import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   captureException,
@@ -38,6 +39,7 @@ import {
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { mapGenieEventsToTraceRequest } from "./genieTraceMapper";
 import {
   type NormalizedPullEvent,
   type PullResult,
@@ -242,12 +244,14 @@ export async function runIngestionPull(params: {
   return { nextCursor: result.cursor, eventCount: result.events.length };
 }
 
-/** The IngestionSource fields the two write paths below actually read. */
+/** The IngestionSource fields the write paths below actually read. */
 type PullingSource = {
   id: string;
   sourceType: string;
   organizationId: string;
   teamId: string | null;
+  /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
+  traceProjectId: string | null;
 };
 
 /**
@@ -318,6 +322,77 @@ async function writePulledEvents({
       pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
     });
   }
+  await routeConversationsToTraceDestination({ events, source });
+}
+
+/**
+ * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
+ * flow through the standard trace door into the source's chosen destination
+ * project. Aggregate pulls never route — only `genie_query` events are
+ * conversations.
+ *
+ * Tenancy + redaction (Decision 13): the destination project id is the tenant,
+ * and the redaction level passed is the same `DEFAULT_PII_REDACTION_LEVEL`
+ * every receiver passes — the pipeline's own per-tenant policy lookup is the
+ * sole authority. This worker must never compute a level: at the default tier
+ * a caller-passed level has unchecked authority.
+ *
+ * A destination that has been archived or deleted since it was configured
+ * stops routing (skip + log) rather than failing the run — a stale column
+ * must not stall the audit pull forever. Any other routing failure throws:
+ * the audit rows are already durable on their replacing key and trace ids
+ * are deterministic, so the whole-window retry is a safe no-op re-send.
+ */
+export async function routeConversationsToTraceDestination({
+  events,
+  source,
+}: {
+  events: NormalizedPullEvent[];
+  source: PullingSource;
+}): Promise<void> {
+  if (!source.traceProjectId) return;
+
+  const request = mapGenieEventsToTraceRequest(events, {
+    ingestionSourceId: source.id,
+    organizationId: source.organizationId,
+    sourceType: source.sourceType,
+  });
+  if (!request) return;
+
+  // Pull-time re-check of the write-time guard: the column is freely
+  // editable and the project can be archived or deleted underneath it.
+  const destination = await prisma.project.findFirst({
+    where: {
+      id: source.traceProjectId,
+      archivedAt: null,
+      team: { organizationId: source.organizationId },
+    },
+    select: { id: true },
+  });
+  if (!destination) {
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        traceProjectId: source.traceProjectId,
+      },
+      "trace destination is archived, deleted, or not this org's — skipping conversation routing",
+    );
+    return;
+  }
+
+  const result = await getApp().traces.collection.handleOtlpTraceRequest(
+    destination.id,
+    request,
+    DEFAULT_PII_REDACTION_LEVEL,
+  );
+  logger.info(
+    {
+      ingestionSourceId: source.id,
+      traceProjectId: destination.id,
+      rejectedSpans: result?.rejectedSpans ?? 0,
+    },
+    "routed pulled conversations to trace destination",
+  );
 }
 
 /**

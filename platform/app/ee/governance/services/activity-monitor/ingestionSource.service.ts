@@ -91,6 +91,11 @@ export interface CreateIngestionSourceInput {
   pullConfig?: Record<string, unknown> | null;
   /** Five-field UTC cron schedule for the durable pull process. */
   pullSchedule?: string | null;
+  /**
+   * ADR-088 v7: optional trace destination for conversation-bearing pulls.
+   * Null/absent = don't route. Validated to be a live project of this org.
+   */
+  traceProjectId?: string | null;
   actorUserId: string;
 }
 
@@ -103,6 +108,8 @@ export interface UpdateIngestionSourceInput {
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
   pullSchedule?: string | null;
+  /** Undefined = leave alone; null = stop routing; string = new destination. */
+  traceProjectId?: string | null;
 }
 
 export interface CreatedIngestionSource {
@@ -198,6 +205,36 @@ async function syncPullProcessBestEffort({
     logger.error(
       { sourceId: source.id, error },
       "Failed to sync ingestion pull process; boot reconciliation will retry",
+    );
+  }
+}
+
+/**
+ * The trace destination must be a live project of the source's own
+ * organization: it decides where routed conversations (customer-visible
+ * data) land, and a stray id would write one tenant's conversations into
+ * another tenant's project. Mirrors `assertTraceProjectBelongsToOrg` on the
+ * virtual-key path (virtualKey.authz.ts) — the puller writes with a
+ * service-level Prisma client, so this write-time check is the only gate.
+ * ADR-088 v7, Decision 9.
+ */
+async function assertTraceDestinationIsOwnLiveProject(
+  prisma: PrismaClient,
+  organizationId: string,
+  traceProjectId: string | null | undefined,
+): Promise<void> {
+  if (!traceProjectId) return;
+  const project = await prisma.project.findFirst({
+    where: {
+      id: traceProjectId,
+      archivedAt: null,
+      team: { organizationId },
+    },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new ValidationError(
+      "Trace destination must be an active project of this organization.",
     );
   }
 }
@@ -365,6 +402,11 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     assertPullDestinationAllowed(requestedParserConfig);
+    await assertTraceDestinationIsOwnLiveProject(
+      this.prisma,
+      input.organizationId,
+      input.traceProjectId,
+    );
     const mergedParserConfig = encryptParserConfigCredentials(
       requestedParserConfig,
     )!;
@@ -378,6 +420,7 @@ export class IngestionSourceService {
         ingestSecretHash,
         parserConfig: mergedParserConfig as Prisma.InputJsonValue,
         pullSchedule: input.pullSchedule ?? null,
+        traceProjectId: input.traceProjectId ?? null,
         status: "awaiting_first_event",
         createdById: input.actorUserId,
       },
@@ -436,6 +479,17 @@ export class IngestionSourceService {
     if (input.status !== undefined) data.status = input.status;
     if (input.pullSchedule !== undefined)
       data.pullSchedule = input.pullSchedule;
+    if (input.traceProjectId !== undefined) {
+      // Undefined stays put; null stops routing; a named destination is
+      // re-validated exactly the way create validates it (the virtual-key
+      // editing contract — ADR-088 v7, Decision 9).
+      await assertTraceDestinationIsOwnLiveProject(
+        this.prisma,
+        input.organizationId,
+        input.traceProjectId,
+      );
+      data.traceProjectId = input.traceProjectId;
+    }
     if (input.teamId !== undefined) {
       data.team = input.teamId
         ? { connect: { id: input.teamId } }

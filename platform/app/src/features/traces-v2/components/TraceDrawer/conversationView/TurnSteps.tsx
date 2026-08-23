@@ -20,6 +20,12 @@ import {
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";
+/**
+ * Routed Databricks Genie turns (ADR-088 v7): the generated-SQL span renders
+ * as a tool step — label is the query description, arg is the SQL itself.
+ */
+const GENIE_QUERY_SPAN = "databricks_genie.query";
+const TOOL_SPAN_NAMES = new Set([TOOL_SPAN, GENIE_QUERY_SPAN]);
 
 const CELL = { fontFamily: "mono", fontSize: "11px" } as const;
 
@@ -128,12 +134,15 @@ interface Step {
 /** The turn's model calls and tool runs, in the order they happened. */
 function selectSteps(spans: SpanDetail[]): Step[] {
   return spans
-    .filter((span) => span.name === LLM_REQUEST_SPAN || span.name === TOOL_SPAN)
+    .filter(
+      (span) =>
+        span.name === LLM_REQUEST_SPAN || TOOL_SPAN_NAMES.has(span.name),
+    )
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs)
     .map((span) => {
       const params = (span.params ?? {}) as Record<string, unknown>;
-      const isTool = span.name === TOOL_SPAN;
+      const isTool = TOOL_SPAN_NAMES.has(span.name);
       return {
         spanId: span.spanId,
         kind: isTool ? ("tool" as const) : ("model" as const),
