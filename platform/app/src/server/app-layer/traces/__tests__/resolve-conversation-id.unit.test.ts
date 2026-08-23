@@ -201,7 +201,7 @@ describe("given a trace whose conversation id rides langgraph.thread_id only", (
 
   describe("when the query asks whether a conversation exists", () => {
     /** @scenario "has:conversation counts a legacy-key trace as having a conversation" */
-    it("has:conversation and none:conversation agree with their SQL predicate", () => {
+    it("has:conversation and none:conversation agree with their SQL predicate on every key layout", () => {
       const compiled = translateFilterToClickHouse(
         "has:conversation",
         "tenant-1",
@@ -214,7 +214,11 @@ describe("given a trace whose conversation id rides langgraph.thread_id only", (
       const bare = traceWith({});
 
       expect(evaluateQueryInMemory("has:conversation", legacyOnly)).toBe(true);
+      expect(evaluateQueryInMemory("none:conversation", legacyOnly)).toBe(
+        false,
+      );
       expect(evaluateQueryInMemory("has:conversation", canonical)).toBe(true);
+      expect(evaluateQueryInMemory("none:conversation", canonical)).toBe(false);
       expect(evaluateQueryInMemory("has:conversation", bare)).toBe(false);
       expect(evaluateQueryInMemory("none:conversation", bare)).toBe(true);
     });
