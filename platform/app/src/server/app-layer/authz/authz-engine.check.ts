@@ -31,7 +31,12 @@ import {
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
  *  has not caught up with what this pass stated or revoked. */
 export type AuthzEngineDiff = {
-  kind: "grant_revoked" | "grant_changed" | "role_changed" | "resource_changed";
+  kind:
+    | "grant_revoked"
+    | "grant_changed"
+    | "role_changed"
+    | "role_deleted"
+    | "resource_changed";
   id: string;
   field?: string;
   expected?: string | null;
@@ -104,10 +109,24 @@ export function checkRoleHeads({
       outstanding.push(role.roleId);
       continue;
     }
+    // A buried head is not agreement, and it is not lag either: the fold has
+    // no un-delete — `role.upsert` never touches `deletedAt`, and the delete
+    // moved the row's business time past anything a restatement could carry —
+    // so the disagreement is named for an operator rather than waited on. The
+    // `grant_revoked` treatment, one tier over.
+    if (head.deleted) {
+      diffs.push({ kind: "role_deleted", id: role.roleId });
+      continue;
+    }
     diffs.push(...roleDiffs({ role, head }));
   }
   for (const head of heads.roleHeads) {
-    if (!expectedRoleIds.has(head.id)) {
+    // An extra is a head whose legacy row is gone, waiting on the deletion
+    // this pass sent. A head ALREADY deleted is that deletion applied, and it
+    // never leaves this read — the name a role took stays taken, so the
+    // tombstone is permanent — which makes counting it outstanding a hold no
+    // later pass can clear.
+    if (!head.deleted && !expectedRoleIds.has(head.id)) {
       outstanding.push(head.id);
     }
   }

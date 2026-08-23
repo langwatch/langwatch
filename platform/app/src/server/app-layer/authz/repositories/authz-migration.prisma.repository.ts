@@ -194,6 +194,12 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<RoleHeadRow[]> {
+    // Deleted heads included, and flagged: this read serves the proof, which
+    // has to tell a role the fold has never seen from one it has already
+    // buried. `liveRoles` is the fence for every read that DECIDES access;
+    // dropping the tombstones here would make each one read as a role still
+    // waiting to fold, and hold the organization on a condition no later pass
+    // can clear.
     const rows = await this.prisma.role.findMany({
       where: { organizationId },
       select: {
@@ -202,9 +208,13 @@ export class PrismaAuthzMigrationRepository
         description: true,
         permissions: true,
         kind: true,
+        deletedAt: true,
       },
     });
-    return rows;
+    return rows.map(({ deletedAt, ...row }) => ({
+      ...row,
+      deleted: deletedAt !== null,
+    }));
   }
 
   async findLegacyTeamRows({

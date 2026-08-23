@@ -124,6 +124,16 @@ Feature: Moving an organization onto the grants projection
     When the migration runs again
     Then that grant is revoked
 
+  @unit
+  Scenario: A role head the fold has buried is a deletion applied, not work outstanding
+    Given a role head the migration has already deleted
+    And no legacy custom role row behind it
+    When the migration runs again
+    Then the organization finalizes
+    And that role's deletion is not sent a second time
+    But a buried head whose legacy row is back is named as a disagreement
+    And nothing is stated for it, because the projection has no un-delete
+
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is
     Given the queue is unavailable

@@ -54,7 +54,8 @@ type Data = {
   credentials?: ProjectCredentialFact[];
   groupMemberships?: Array<{ userId: string; groupId: string }>;
   grantHeads?: GrantHeadRow[];
-  roleHeads?: RoleHeadRow[];
+  /** `deleted` defaults to false: a head is live unless a test buries it. */
+  roleHeads?: Array<Omit<RoleHeadRow, "deleted"> & { deleted?: boolean }>;
   resourceRows?: ResourceGrantRow[];
   /** Wraps the recording ledger, for tests that need to observe or fail a
    *  send rather than only read what was sent. */
@@ -86,7 +87,10 @@ function harness(data: Data = {}) {
     },
     findRoleHeads: async () => {
       reads.roleHeads += 1;
-      return data.roleHeads ?? [];
+      return (data.roleHeads ?? []).map((head) => ({
+        ...head,
+        deleted: head.deleted ?? false,
+      }));
     },
     findResourceGrantRows: async () => {
       reads.resourceRows += 1;
@@ -927,6 +931,74 @@ describe("given an organization with legacy access rows", () => {
         "role_gone",
         "role_system",
       ]);
+    });
+
+    /** @scenario "A role head the fold has buried is a deletion applied, not work outstanding" */
+    it("finalizes over a buried role head whose legacy row is gone", async () => {
+      // The organization an API key deletion held forever: the delete a
+      // previous pass sent has landed, the tombstone is permanent — a role's
+      // name stays taken — and nothing about it is still outstanding.
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roleHeads: [
+          {
+            id: "role_buried",
+            name: "apikey:gone",
+            description: null,
+            permissions: [],
+            kind: "system_api_key",
+            deleted: true,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("finalized");
+      expect(sent.filter((entry) => entry.kind === "deleteRole")).toEqual([]);
+    });
+
+    /** @scenario "A role head the fold has buried is a deletion applied, not work outstanding" */
+    it("names a buried head whose legacy row is back, and states nothing for it", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        roles: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+            createdAtMs: CREATED,
+          },
+        ],
+        roleHeads: [
+          {
+            id: "role_1",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            kind: "custom",
+            deleted: true,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      const report = outcome.report as {
+        outstanding: number;
+        diffs: Array<{ kind: string; id: string }>;
+      };
+      // Named, not repaired: `role.upsert` leaves `deletedAt` alone, so no
+      // restatement could raise the row.
+      expect(report.diffs).toContainEqual({
+        kind: "role_deleted",
+        id: "role_1",
+      });
+      expect(report.outstanding).toBe(0);
+      expect(sent.filter((entry) => entry.kind === "defineRole")).toEqual([]);
     });
   });
 

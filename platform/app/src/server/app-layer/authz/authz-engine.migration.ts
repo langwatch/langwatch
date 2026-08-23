@@ -35,8 +35,8 @@
  * itself and a derived fact — whose legacy representation is the membership
  * or credential row it came from — creates no binding row at all.
  *
- * Two disagreements are named rather than repaired, deliberately — each
- * holds the organization with a diff an operator reads, and both fail
+ * Three disagreements are named rather than repaired, deliberately — each
+ * holds the organization with a diff an operator reads, and all of them fail
  * toward LESS access, never more:
  *
  * - A DERIVED fact whose head was revoked and whose legacy source came back
@@ -49,6 +49,19 @@
  *   `changeGrantRole`, because that event clears `legacyRole` (the
  *   escalation rule in the projection) while the expected fact still
  *   carries it; the check names the `legacyRole` disagreement instead.
+ * - A role head the fold has BURIED, whose legacy CustomRole row came back
+ *   under the same id, reports `role_deleted` each pass: the projection has
+ *   no un-delete, so nothing a restatement could carry would raise it.
+ *
+ * Deletion is also why the role head read returns tombstones and says so
+ * (`RoleHeadRow.deleted`) rather than fencing them out. A role's name stays
+ * taken after a delete, so its row stays for good; a read that dropped it
+ * would make a buried head indistinguishable from one the fold has not
+ * written yet, and the check would count a permanent tombstone as
+ * `outstanding` on every pass — holding the organization on a condition no
+ * later pass can clear, while the sweep re-sent that role's delete for as
+ * long as the migration ran. One API key deleted between two passes was
+ * enough to do it.
  *
  * @see specs/migration/authz-grants-rollout.feature
  * @see dev/docs/adr/110-grant-aggregates-are-grants.md
@@ -382,7 +395,15 @@ export class AuthzEngineMigration implements SystemMigration {
     await this.each({
       items: expected.roles.filter((role) => {
         const head = roleHeadById.get(role.roleId);
-        return head === undefined || roleDrifted({ role, head });
+        if (head === undefined) return true;
+        // A buried head is the one place this filter is not the check's
+        // predicate: the check names `role_deleted` and this states nothing,
+        // because nothing it could state would land. `role.upsert` leaves
+        // `deletedAt` alone by design, so the row would stay buried however
+        // many times the fact were restated — and the delete already moved
+        // the row's business time past the fact's own.
+        if (head.deleted) return false;
+        return roleDrifted({ role, head });
       }),
       signal,
       send: (role) =>
@@ -510,7 +531,13 @@ export class AuthzEngineMigration implements SystemMigration {
       // finalizes, and until then every role head — `system_api_key`
       // included — mirrors a legacy CustomRole row, so a head with no such
       // row is stale whatever its kind.
-      .filter((head) => !expectedRoleIds.has(head.id))
+      //
+      // A head already deleted is not a candidate, for the reason a revoked
+      // grant is not one: the deny has landed. Its tombstone stays in the
+      // head read forever, so re-sending the delete would append one event
+      // per pass, for every pass there will ever be, to bury a row that is
+      // already buried.
+      .filter((head) => !head.deleted && !expectedRoleIds.has(head.id))
       .map((head) => head.id)
       .sort();
     await this.each({
@@ -599,7 +626,7 @@ export class AuthzEngineMigration implements SystemMigration {
     );
     const redefines = expected.roles.flatMap((role) => {
       const head = roleHeadById.get(role.roleId);
-      if (!head || !roleDrifted({ role, head })) return [];
+      if (!head || head.deleted || !roleDrifted({ role, head })) return [];
       return [{ ...role, occurredAtMs }];
     });
     await this.each({
