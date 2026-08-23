@@ -86,7 +86,7 @@ export function DeadLetterSummary({
     <Card.Root>
       <Card.Body padding={4}>
         <HStack gap={2} marginBottom={3}>
-          <Box color="red.500">
+          <Box color="red.solid">
             <Skull size={16} />
           </Box>
           <Text textStyle="sm" fontWeight="medium" data-testid="dead-total">
@@ -375,7 +375,7 @@ function AttemptHistory({
             >
               {row.attempt}
             </Badge>
-            <Text textStyle="xs" fontFamily="mono" color="red.500">
+            <Text textStyle="xs" fontFamily="mono" color="red.solid">
               {row.errorType}
             </Text>
             <Text textStyle="xs" color="fg.muted">

@@ -663,7 +663,7 @@ function SessionPolicyForm({
         expiry.
       </Text>
       {isInvalid && (
-        <Text fontSize="xs" color="red.600">
+        <Text fontSize="xs" color="red.fgMuted">
           Enter an integer between 0 and 365.
         </Text>
       )}

@@ -188,12 +188,7 @@ export function DatasetMappingPreview({
               <Field.Label margin={0}>Mapping</Field.Label>
             </HStack>
           </Field.Root>
-          <HStack
-            bg="bg.muted"
-            borderRadius="md"
-            padding="3px"
-            gap={0}
-          >
+          <HStack bg="bg.muted" borderRadius="md" padding="3px" gap={0}>
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {

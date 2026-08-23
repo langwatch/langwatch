@@ -28,7 +28,7 @@ export function HealthLine({
   return (
     <Card.Root overflow="hidden">
       <HStack paddingX={4} paddingY={2} gap={2} data-testid="ops-health-line">
-        <Icon color="green.500" boxSize={3.5}>
+        <Icon color="green.solid" boxSize={3.5}>
           <CheckCircle2 />
         </Icon>
         <Text textStyle="xs" color="fg.muted">

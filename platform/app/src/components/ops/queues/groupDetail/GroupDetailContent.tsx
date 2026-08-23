@@ -61,7 +61,7 @@ function GroupStatusRow({
       </DetailField>
       {c.attempt > 0 && (
         <DetailField label="Attempts">
-          <Text textStyle="sm" fontFamily="mono" color="orange.500">
+          <Text textStyle="sm" fontFamily="mono" color="orange.solid">
             {c.attempt}
           </Text>
         </DetailField>
@@ -69,14 +69,14 @@ function GroupStatusRow({
       <DetailField label="Next run">
         <Text
           textStyle="sm"
-          color={c.state === "retrying" ? "orange.500" : undefined}
+          color={c.state === "retrying" ? "orange.solid" : undefined}
         >
           {describeNextRun(c, now)}
         </Text>
       </DetailField>
       {detail.activeJobId && (
         <DetailField label="Active Job">
-          <Text textStyle="xs" fontFamily="mono" color="green.500">
+          <Text textStyle="xs" fontFamily="mono" color="green.solid">
             {detail.activeJobId}
           </Text>
         </DetailField>
@@ -132,7 +132,7 @@ function GroupErrorSection({
         <Card.Body padding={3}>
           <Text
             textStyle="xs"
-            color="red.500"
+            color="red.solid"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >

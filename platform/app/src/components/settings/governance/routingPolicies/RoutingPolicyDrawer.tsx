@@ -287,13 +287,13 @@ function Problems({ problems }: { problems: string[] }) {
       align="start"
       gap={1}
       borderWidth="1px"
-      borderColor="orange.300"
+      borderColor="orange.emphasized"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={3}
     >
       {problems.map((problem) => (
-        <Text key={problem} fontSize="xs" color="orange.700">
+        <Text key={problem} fontSize="xs" color="orange.fg">
           {problem}
         </Text>
       ))}
@@ -318,19 +318,19 @@ function SaveError({
   return (
     <Box
       borderWidth="1px"
-      borderColor="red.300"
+      borderColor="red.emphasized"
       borderRadius="md"
-      backgroundColor="red.50"
+      backgroundColor="red.subtle"
       padding={3}
     >
       <HStack alignItems="start" gap={2}>
         <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <Text fontSize="xs" fontWeight="semibold" color="red.700">
+          <Text fontSize="xs" fontWeight="semibold" color="red.fg">
             {isEditing
               ? "Couldn't save the policy"
               : "Couldn't create the policy"}
           </Text>
-          <Text fontSize="xs" color="red.700">
+          <Text fontSize="xs" color="red.fg">
             {message}
           </Text>
         </VStack>

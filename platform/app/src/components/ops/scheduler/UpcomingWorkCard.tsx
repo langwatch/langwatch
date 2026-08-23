@@ -53,7 +53,7 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
       <Table.Cell textAlign="end">
         <Text
           textStyle="xs"
-          color={overdue ? "orange.500" : "fg.muted"}
+          color={overdue ? "orange.solid" : "fg.muted"}
           fontWeight={overdue ? "medium" : undefined}
           whiteSpace="nowrap"
         >

@@ -520,7 +520,7 @@ function VirtualKeyDetailPage() {
                       routingPolicyName ? (
                         <Link
                           href={`/gateway/routing-policies?drawer.open=routingPolicy&drawer.policyId=${vk.routingPolicyId}`}
-                          color="blue.600"
+                          color="blue.fgMuted"
                           fontSize="sm"
                           data-testid="vk-routing-policy-link"
                         >

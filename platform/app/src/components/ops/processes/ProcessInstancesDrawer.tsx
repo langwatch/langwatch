@@ -70,7 +70,7 @@ function InstanceRow({
       <Table.Cell>
         <Text
           textStyle="xs"
-          color={wakeOverdue ? "orange.500" : "fg.muted"}
+          color={wakeOverdue ? "orange.solid" : "fg.muted"}
           fontWeight={wakeOverdue ? "medium" : undefined}
         >
           {describeNextWake(row.nextWakeAt, now)}
@@ -90,7 +90,7 @@ function InstanceRow({
         <Text
           textStyle="xs"
           fontFamily="mono"
-          color={row.deadMessages > 0 ? "red.500" : "fg.muted"}
+          color={row.deadMessages > 0 ? "red.solid" : "fg.muted"}
         >
           {row.deadMessages}
         </Text>

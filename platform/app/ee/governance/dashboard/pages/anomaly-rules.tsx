@@ -1041,7 +1041,12 @@ function ThresholdPreview({
   const summary = summariseThresholdConfig(ruleType, raw);
   const palette =
     summary.kind === "ok"
-      ? { bg: "blue.subtle", border: "blue.emphasized", fg: "blue.fg", label: "Preview" }
+      ? {
+          bg: "blue.subtle",
+          border: "blue.emphasized",
+          fg: "blue.fg",
+          label: "Preview",
+        }
       : summary.kind === "unsupported"
         ? {
             bg: "orange.subtle",
@@ -1049,7 +1054,12 @@ function ThresholdPreview({
             fg: "orange.fg",
             label: "Won't fire",
           }
-        : { bg: "red.subtle", border: "red.emphasized", fg: "red.fg", label: "Invalid" };
+        : {
+            bg: "red.subtle",
+            border: "red.emphasized",
+            fg: "red.fg",
+            label: "Invalid",
+          };
   return (
     <Box
       borderWidth="1px"

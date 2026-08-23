@@ -718,7 +718,7 @@ function SourceRow({
           <Link
             href={`/governance/ingestion-sources/${source.id}`}
             color="fg"
-            _hover={{ color: "orange.600" }}
+            _hover={{ color: "orange.fgMuted" }}
           >
             <Text fontSize="sm" fontWeight="medium">
               {source.name}

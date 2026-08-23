@@ -592,7 +592,7 @@ export const AnnotationsTable = ({
               {row.original.queueItemId && (
                 <Menu.Item
                   value="remove-from-queue"
-                  color="red.500"
+                  color="red.solid"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeFromQueue([row.original.queueItemId!]);

@@ -175,9 +175,9 @@ function NoProvidersToPick({
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
+      borderColor="orange.emphasized"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={3}
     >
       <VStack align="start" gap={1}>
@@ -190,7 +190,7 @@ function NoProvidersToPick({
         {modelProvidersAdminPath && (
           <Link
             href={modelProvidersAdminPath}
-            color="orange.700"
+            color="orange.fg"
             fontSize="xs"
             fontWeight="medium"
           >
@@ -222,12 +222,12 @@ function SelectedProviders({
           <HStack
             key={`${id}-${index}`}
             borderWidth="1px"
-            borderColor={option ? "border.muted" : "red.300"}
+            borderColor={option ? "border.muted" : "red.emphasized"}
             borderRadius="sm"
             paddingX={2}
             paddingY={1}
             gap={2}
-            backgroundColor={option ? "bg.subtle" : "red.50"}
+            backgroundColor={option ? "bg.subtle" : "red.subtle"}
           >
             <Text fontSize="xs" color="fg.muted" minWidth="20px">
               {index + 1}.
@@ -239,7 +239,7 @@ function SelectedProviders({
                   : "This provider is no longer configured"}
               </Text>
               {option?.disabledAt && (
-                <Text fontSize="xs" color="orange.600">
+                <Text fontSize="xs" color="orange.fgMuted">
                   Disabled, so requests skip it
                 </Text>
               )}
