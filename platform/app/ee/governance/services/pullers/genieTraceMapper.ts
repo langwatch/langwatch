@@ -269,7 +269,7 @@ interface GenieMessageFrame {
   startMs: number;
   endMs: number;
   status: string;
-  completed: boolean;
+  isCompleted: boolean;
 }
 
 function frameOf(
@@ -311,7 +311,7 @@ function frameOf(
     startMs,
     endMs: Math.max(toMs(payload.last_updated_timestamp) ?? startMs, startMs),
     status,
-    completed: status === "COMPLETED",
+    isCompleted: status === "COMPLETED",
   };
 }
 
@@ -337,7 +337,7 @@ function assistantContentOf(
   // Defensive failure marker (Decision 13): never a false success. A
   // non-COMPLETED status or a completed message with no answer text both
   // degrade to a marked failure that still shows the question.
-  return frame.completed && answerText
+  return frame.isCompleted && answerText
     ? answerText
     : `[Genie message ${frame.status || "UNKNOWN_STATUS"} — no answer recorded]`;
 }
@@ -470,7 +470,7 @@ function queryStepSpan(
       stringAttr("langwatch.params", JSON.stringify(params)),
       ...originAttrs(frame.origin),
     ],
-    status: { code: frame.completed ? 1 : 2 },
+    status: { code: frame.isCompleted ? 1 : 2 },
   } satisfies OtlpJsonSpan;
 }
 
@@ -488,7 +488,7 @@ function mapMessage(
     startTimeUnixNano: msToNano(frame.startMs),
     endTimeUnixNano: msToNano(frame.endMs),
     attributes: rootAttributesOf(event, frame),
-    status: frame.completed
+    status: frame.isCompleted
       ? { code: 1 }
       : { code: 2, message: frame.status || "unknown" },
   };
