@@ -233,18 +233,26 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/tool-catalog")),
       },
       {
-        path: "/governance/departments",
-        ...page(() => import("./pages/governance/departments")),
+        path: "/governance/people",
+        ...page(() => import("./pages/governance/people")),
       },
       {
-        // The departments page was once named cost centers; old bookmarks
-        // land on the new name (the legacy /settings/governance/cost-centers
-        // address chains through here).
+        // The people page was named departments, and before that cost
+        // centers; both old addresses chain onto the current one.
+        path: "/governance/departments",
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/departments"
+            to="/governance/people"
+          />
+        ),
+      },
+      {
         path: "/governance/cost-centers",
         element: (
           <LegacyPrefixRedirect
             from="/governance/cost-centers"
-            to="/governance/departments"
+            to="/governance/people"
           />
         ),
       },

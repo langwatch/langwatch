@@ -59,11 +59,11 @@ function renderRouterAt(initialEntries: string[]) {
       element: (
         <LegacyPrefixRedirect
           from="/governance/cost-centers"
-          to="/governance/departments"
+          to="/governance/people"
         />
       ),
     },
-    { path: "/governance/departments", element: <div>departments</div> },
+    { path: "/governance/people", element: <div>people</div> },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -192,12 +192,12 @@ describe("legacy governance redirects", () => {
   });
 
   describe("when the retired cost centers address is cold-loaded", () => {
-    /** @scenario The retired cost centers address lands on departments */
-    it("chains through to the departments page", async () => {
+    /** @scenario The retired cost centers address lands on people */
+    it("chains through to the people page", async () => {
       const router = renderRouterAt(["/settings/governance/cost-centers"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe("/governance/departments");
+        expect(router.state.location.pathname).toBe("/governance/people");
       });
     });
   });

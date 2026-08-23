@@ -455,7 +455,7 @@ function GovernanceOverviewPage() {
               subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
               actions={
                 <Link
-                  href="/governance/departments"
+                  href="/governance/people"
                   color="blue.600"
                   fontSize="sm"
                 >

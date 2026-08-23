@@ -32,7 +32,7 @@ type Department = RouterOutputs["departments"]["list"][number];
  *
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
-function DepartmentsPage() {
+function PeoplePage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -53,16 +53,16 @@ function DepartmentsPage() {
   const hasDepartments = departments.length > 0;
 
   return (
-    <GovernanceLayout pageTitle="Departments · AI Governance · LangWatch">
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
             <Link href="/governance" color="blue.600">
               ← AI Governance
             </Link>{" "}
-            · Departments
+            · People
           </Text>
-          <Heading size="md">Departments</Heading>
+          <Heading size="md">People</Heading>
           <Text color="fg.muted" fontSize="sm" maxW="2xl">
             A department is an accounting label for spend. Assign people, teams,
             and projects to one, and spend rolls up by department across the
@@ -394,5 +394,5 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
 })(
   withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
-  })(DepartmentsPage),
+  })(PeoplePage),
 );

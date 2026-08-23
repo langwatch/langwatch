@@ -47,7 +47,7 @@ export const noOrgBouncerRoutes = [
   "/governance/ingestion-sources/[id]",
   "/governance/anomaly-rules",
   "/governance/tool-catalog",
-  "/governance/departments",
+  "/governance/people",
   "/governance/cost-centers",
   "/governance/teams",
   "/governance/teams/[id]",

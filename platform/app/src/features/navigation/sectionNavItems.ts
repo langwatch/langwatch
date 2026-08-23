@@ -111,9 +111,9 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: PackageOpen,
   },
   {
-    label: "Departments",
-    href: "/governance/departments",
-    includePath: "/governance/departments",
+    label: "People",
+    href: "/governance/people",
+    includePath: "/governance/people",
     icon: Wallet,
   },
 ];

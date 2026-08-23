@@ -78,7 +78,7 @@ describe("given the governance section navigation data", () => {
         { label: "Catalog", href: "/governance/ingestion-sources" },
         { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
         { label: "Tool Tiles", href: "/governance/tool-catalog" },
-        { label: "Departments", href: "/governance/departments" },
+        { label: "People", href: "/governance/people" },
       ]);
     });
   });
