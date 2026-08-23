@@ -230,6 +230,11 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "graph", plural: "graphs" },
   },
+  chart: {
+    surface: "dashboards",
+    digestStrategy: "id-ref",
+    noun: { singular: "chart", plural: "charts" },
+  },
   trigger: {
     surface: "automations",
     digestStrategy: "id-ref",

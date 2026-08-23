@@ -54,6 +54,8 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+import { getProtectionsForProject } from "~/server/api/utils";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -1057,6 +1059,185 @@ describe("given the saved workbench chart REST endpoints", () => {
     it("refuses before any chart is considered", async () => {
       const response = await app.request(chartsPath(openProject));
       expect(response.status).toBe(401);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Langy's CLI, at the wire. The `langwatch chart` family is a thin typed
+  // client over exactly these endpoints — its flag-to-request mapping is
+  // pinned by the SDK's own unit suite (chart-commands.unit.test.ts), so what
+  // these cases prove is the half the CLI cannot: that the requests the CLI
+  // emits, sent through the shipped HTTP app, land in the same rows, refusals
+  // and governors as every other path.
+  // ---------------------------------------------------------------------------
+
+  describe("given Langy drives the chart CLI against the API", () => {
+    /** The exact body `langwatch chart create --name … --sql-file … --param … --spec-file …` sends. */
+    const cliCreateBody = (name: string) => ({
+      name,
+      definition: {
+        version: 1,
+        sql: SQL,
+        parameters: { since: "2026-02-01 00:00:00" },
+        vegaLiteSpec: SPEC,
+      },
+    });
+
+    describe("when it creates a chart and reads it back by id", () => {
+      /** @scenario "Langy creates a chart with the CLI and reads it back with the same query, parameters and specification" */
+      it("returns the submitted SQL, parameter values and specification unchanged", async () => {
+        const created = await succeeds({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          status: 201,
+          body: cliCreateBody("Langy's chart"),
+        });
+
+        const read = await succeeds({
+          path: chartPath(openProject, created.id),
+          auth: asProject(openProject),
+        });
+        expect(read.definition.sql).toBe(SQL);
+        expect(read.definition.parameters).toEqual({
+          since: "2026-02-01 00:00:00",
+        });
+        expect(read.definition.vegaLiteSpec).toEqual(SPEC);
+      });
+    });
+
+    describe("when its chart is compared against one saved through the application", () => {
+      /** @scenario "A chart Langy creates is indistinguishable from one a member saves by hand" */
+      it("stores a row equal on kind, definition shape and project scoping", async () => {
+        const viaCli = await succeeds({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          status: 201,
+          body: cliCreateBody("Langy's twin"),
+        });
+
+        // The application's own save path: the service the tRPC router calls,
+        // with the member's protections resolved the same way.
+        const viaApplication = await SavedWorkbenchChartService.create(
+          prisma,
+        ).createChart({
+          projectId: openProject.id,
+          protections: await getProtectionsForProject(prisma, {
+            projectId: openProject.id,
+          }),
+          input: {
+            name: "Member's twin",
+            definition: cliCreateBody("unused").definition,
+          },
+        });
+
+        const rows = await prisma.customGraph.findMany({
+          where: {
+            projectId: openProject.id,
+            id: { in: [viaCli.id, viaApplication.id] },
+          },
+        });
+        expect(rows).toHaveLength(2);
+        const [first, second] = rows as unknown as [Body, Body];
+        expect(first.kind).toBe(WORKBENCH_SQL_CHART_KIND);
+        expect(second.kind).toBe(WORKBENCH_SQL_CHART_KIND);
+        expect(first.graph).toEqual(second.graph);
+        expect(first.projectId).toBe(second.projectId);
+      });
+    });
+
+    describe("when its credentials cannot read a column the SQL names", () => {
+      /** @scenario "SQL naming a column Langy's credentials cannot read is refused identically everywhere" */
+      it("is refused with the same validator code via the CLI's wire, REST directly, and the application's save path", async () => {
+        // The CLI's wire: the chart-create request `langwatch chart create` emits.
+        const viaCli = await refused({
+          path: chartsPath(gatedProject),
+          method: "POST",
+          auth: asProject(gatedProject),
+          body: {
+            name: "Withheld, via CLI",
+            definition: { ...DEFINITION, sql: GATED_SQL },
+          },
+        });
+
+        // REST directly: the governed query door with the same statement.
+        const viaRest = await refused({
+          path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+          method: "POST",
+          auth: asProject(gatedProject),
+          body: { sql: GATED_SQL },
+        });
+
+        // The application's own save path.
+        let viaApplication: string | undefined;
+        try {
+          await SavedWorkbenchChartService.create(prisma).createChart({
+            projectId: gatedProject.id,
+            protections: await getProtectionsForProject(prisma, {
+              projectId: gatedProject.id,
+            }),
+            input: {
+              name: "Withheld, via application",
+              definition: { ...DEFINITION, sql: GATED_SQL },
+            },
+          });
+        } catch (error) {
+          viaApplication = (error as { code?: string }).code;
+        }
+
+        expect(viaCli.error.code).toBe("lwql_not_permitted");
+        expect(viaRest.error.code).toBe(viaCli.error.code);
+        expect(viaApplication).toBe(viaCli.error.code);
+      });
+    });
+
+    describe("when it submits a specification the chart policy refuses", () => {
+      /** @scenario "A specification the chart policy refuses cannot be written through the CLI" */
+      it("answers the specification-refused code, and no chart is created", async () => {
+        const before = await listedIds(openProject);
+
+        const refusal = await refused({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          body: {
+            name: "Network-loading spec via CLI",
+            definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC },
+          },
+        });
+        expect(refusal.error.code).toBe(
+          "saved_workbench_chart_specification_refused",
+        );
+
+        expect(await listedIds(openProject)).toEqual(before);
+      });
+    });
+
+    describe("when it places a saved chart on a dashboard", () => {
+      /** @scenario "Langy places a saved chart on a dashboard with the CLI" */
+      it("sets the dashboard id and grid position, and the chart lists among the dashboard's charts", async () => {
+        const chart = await createChart(openProject, {
+          name: "Langy placed this",
+        });
+        const dashboard = await createDashboard(openProject);
+
+        // The exact request `langwatch chart place <id> --dashboard-id <d>` emits.
+        const placed = await succeeds({
+          path: placementPath(openProject, chart.id),
+          method: "PUT",
+          auth: asProject(openProject),
+          body: { dashboardId: dashboard.id },
+        });
+        expect(placed.dashboardId).toBe(dashboard.id);
+        expect(typeof placed.gridRow).toBe("number");
+
+        const dashboardCharts = await prisma.customGraph.findMany({
+          where: { projectId: openProject.id, dashboardId: dashboard.id },
+          select: { id: true },
+        });
+        expect(dashboardCharts.map((row) => row.id)).toContain(chart.id);
+      });
     });
   });
 });
