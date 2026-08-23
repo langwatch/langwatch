@@ -62,13 +62,15 @@ const enrollmentRepository = new PrismaSystemMigrationEnrollmentRepository(
 export const systemMigrationsService = new SystemMigrationsService({
   state: systemMigrationState,
   migrations: () =>
-    [...registeredMigrations(), ...registeredUserMigrations()].map((migration) => ({
-      name: migration.name,
-      title: migration.title,
-      description: migration.description,
-      requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
-      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-    })),
+    [...registeredMigrations(), ...registeredUserMigrations()].map(
+      (migration) => ({
+        name: migration.name,
+        title: migration.title,
+        description: migration.description,
+        requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+      }),
+    ),
   isSaaS: () => env.IS_SAAS === true,
   enrollments: enrollmentRepository,
   // The environment's private ClickHouse routing table doubles as the list

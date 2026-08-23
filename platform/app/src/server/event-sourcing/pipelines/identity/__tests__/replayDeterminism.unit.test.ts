@@ -50,7 +50,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: USER,
     type: "lw.identity.test",
     data,
-  } as Command<T>;
+  } as unknown as Command<T>;
 }
 
 function fold(events: IdentityEvent[]): IdentityFoldState {
@@ -109,7 +109,8 @@ async function emitHistory(): Promise<IdentityEvent[]> {
       }),
     ),
   );
-  const emailIdentifierId = events[1]!.data.identifierId as string;
+  const emailIdentifierId = (events[1]!.data as { identifierId: string })
+    .identifierId;
   push(
     await new VerifyIdentifierCommand(reads).handle(
       command({
@@ -136,7 +137,8 @@ async function emitHistory(): Promise<IdentityEvent[]> {
       }),
     ),
   );
-  const googleIdentifierId = events[0]!.data.identifierId as string;
+  const googleIdentifierId = (events[0]!.data as { identifierId: string })
+    .identifierId;
   push(
     await new DetachIdentifierCommand(reads).handle(
       command({

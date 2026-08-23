@@ -4,24 +4,22 @@ The final spec: how the thirteen deliverables (`D01`–`D13`, see `../identity-p
 
 # Precondition — authz program landed
 
-This program starts only when the grants ledger (ADR-092 §13; plan `dev/docs/plans/adr-092-authz-delivery-plan.md`, branch `feat/adr-092-grants-ledger`) is far enough on `main`. The gate is its **PR 2 — the ledger is the only membership writer**. rbac.ts deletion is its PR 4 (the contract) and does **not** gate this program. Ready-to-start checklist (the minimal API contract we consume):
+**Landed (2026-08-23 check against `main`).** The unified authorization engine is ADR-092 (engine, registry, fork) as reshaped by **ADR-110** (`dev/docs/adr/110-grant-aggregates-are-grants.md`; #7358, #7404): a grant is its own aggregate, there is one migration per organization, and finishing it IS the switch — no cutover step, no cutover table, no cached cutover gate, no cohorts. The engine gate (`server/app-layer/authz/engine-gate.ts`) reads the migration's `finalized` status and nothing else. Ready-to-start checklist, as it stands on `main`:
 
-- [ ] `server/authz/registry.ts` accepts new org-scope permission entries; registry-derived `Permission` type exported.
-- [ ] `grants.attach` / `grants.offboard` emit ledger commands with actor context; offboard carries the empty-proof postcondition.
-- [ ] `authz.require` / `.permission()` for tRPC; `useCan` / `RequireCan` for UI.
-- [ ] Edge middleware: any credential → `Principal {actor, subject}`, extensible with session claims.
-- [ ] The ledger's `Role` projection supports org-scope permission keys (for the IT-admin role).
-- [ ] Every membership write in identity code goes through `grants.*`, every check through `authz.*` — identity code never calls `rbac.ts`/`TeamUser` (available from ledger PR 2 onward).
+- [x] `packages/authz/src/registry.ts` is the permission registry (org-scope entries exist; registry-derived `Permission` type exported).
+- [x] `GrantsService.attach` / `.offboard` (`packages/authz-server/src/grants.service.ts`) emit ledger commands with actor context; offboard takes a principal filter and carries the empty-proof postcondition (`offboard.ts`).
+- [x] `.permission()` on tRPC procedures (`server/app-layer/authz/trpc-middleware.ts`, resolved through `getApp().permissions`); `useCan` / `RequireCan` for UI.
+- [ ] Edge middleware: any credential → `Principal {actor, subject}` with session claims — the vocabulary exists (`packages/authz/src/vocabulary.ts`), the impersonation-aware principal is D06's to finish.
+- [x] The `Role` projection supports org-scope permission keys (for the IT-admin role).
+- [x] Every membership write in identity code goes through `grants.*`, every check through `.permission()` / `getApp().permissions` — identity code never calls `rbac.ts`/`TeamUser`.
 
-If the authz program slips, D01–D04, D11 and D13 can start (they need nothing from authz); D05 and D08 hard-block on the checklist.
+D05 and D08 consume the checked items. **Any authz API change is a breaking change to this program** (risk register).
 
-## What the grants ledger hands this program
+## What the authz program hands this program
 
-Its delivery plan carries the mirror-image list ("The identity platform — doors left open"):
-
-- **The Redis-loss breaker is doctrine, not a primitive.** Ledger PR 1 shipped ADR-007's shared amendment (naming `authz_grants` and expecting `identity` to join) and deliberately **no breaker code** — no state machine, no probes, and *no in-memory processor, ever* (simplified 2026-08-17). What D02 adds is identity joining the amendment with its own volume analysis, plus the two seam hardenings the doctrine implies (best-effort staging, fail-open secondary storage) — nothing resembling a breaker gets built.
-- **The staged in-place rollout shape** — new native head born clean, adoption by deterministic ids, write gate on migration state, read fork gated per subject, parity-proved flips, rollback as a data flip — is the ledger's merged PR 1→3 arc, and Wave 1 transplants it wholesale (re-tenanted to users).
-- **`@langwatch/system-migrations` (on `main`, #7079)** drives every in-place backfill: leased runner in the worker process, per-tenant state machine `pending → migrated → finalized → rolled_back`, self-proving finalization, parked failures, ops migrations dashboard + operator rollback included. D01's identifier backfill and D04's grandfathering are riders; D09's per-customer progress record is a candidate (open question there).
+- **The Redis-loss breaker is doctrine, not a primitive.** ADR-007's shared amendment names `authz_grants` and expects `identity` to join; there is **no breaker code** — no state machine, no probes, and *no in-memory processor, ever*. What D02 adds is identity joining the amendment with its own volume analysis, plus the two seam hardenings the doctrine implies (best-effort staging, fail-open secondary storage) — nothing resembling a breaker gets built. Note the asymmetry ADR-110 then stated for authz — *every write through the group queue; Redis down ⇒ authz writes down* — which identity deliberately does **not** adopt (ADR-101 §Revision 2026-08-23): sign-in is the one write path that must survive Redis loss, so the fold apply stays on the calling path.
+- **The ADR-110 rollout shape** — new native head born clean, adoption by ids that are stable across retries, one migration that states facts and checks once, `finalized` as the only switch, held tenants with their outstanding facts named, rollback as a status change — is what Wave 1 transplants, re-tenanted to users. The earlier three-stage arc (witnessed migrations → write gate → parity-proved cutover) is gone from `main` and from this plan.
+- **`@langwatch/system-migrations` (on `main`, #7079, #7337)** drives every in-place backfill: leased runner in the worker process with per-tenant claims, state machine `pending → migrated (held) → finalized → rolled_back`, parked failures, ops migrations dashboard + operator rollback included. Cloud pacing is per-(organization, migration) enrollment and nothing else. D01's identifier backfill and D04's grandfathering are riders; D09's per-customer progress record is a candidate (open question there).
 - **SCIM converges on `grants.*`** (D08): when connections exist, the reconciler's actor is the connection — `actor: { type: "system", id: <connectionId> }` — which the ledger event shape accommodates with no schema change.
 - **Offboarding is a service seam**: identity deprovision paths call `GrantsService` (revoke/offboard, empty-proof postcondition); no identity imports inside authz packages, no cross-pipeline event subscriptions.
 - **Doctrine mirrored, never shared tables**: identity copies the ledger's dispatch discipline (waited CH append, idempotent applies, deterministic ids, caller-minted commandIds) and its projection-cursor pattern — but no table has two pipeline owners, and identity events may carry emails where the ledger's stay pseudonymized (epic R11).
@@ -125,7 +123,7 @@ The program starts here. Same shape as the authz program's plan (`dev/docs/plans
  additive migration: NEW Identifier        backfill rider (adoption events,
  table (PG) + User.userHashKey             deterministic ids, backdated occurredAt)
  identity adapter + routing table          org-driven enrollment pacing +
- fold apply on the calling path       ──►  everyone-else cohort
+ fold apply on the calling path       ──►  (no everyone-else cohort: ADR-110)
  per-user write gate (ships CLOSED —       backfill parity self-proving per user
  no migration rows exist yet)              (the D01 exit gate) — latch opens the
  verification ceremony guards              adapter's write gate user by user
@@ -139,18 +137,20 @@ The program starts here. Same shape as the authz program's plan (`dev/docs/plans
 ```
 
 - **PR 1 gate:** no-op command round-trip green; adapter routing-table coverage green (every better-auth model+operation explicitly routed, an unrouted write fails at startup); replay-parity green (rebuild `Identifier` from CH, diff vs live — trivially empty until users latch, structurally proven by test); write gate demonstrably closed by default. Rollback: revert — the table is additive, nothing reads it, no user is latched.
-- **PR 2 gate:** the D01 exit gate — backfill parity: the fold-built `Identifier` rows match what live `Account`/`User` rows imply, per user (self-proving finalization; disagreement holds the user at `migrated` with a diff on the ops migrations page). Rollback: un-enroll / roll back migration state — the write gate closes again for those users, protocol writes never depended on it.
+- **PR 2 gate:** the D01 exit gate — backfill parity: the fold-built `Identifier` rows match what live `Account`/`User` rows imply, per user (the migration states its facts and checks once; disagreement holds the user at `migrated` with the outstanding identifiers named on the ops migrations page, and the gate stays closed for a held user — `finalized` is the only switch, ADR-110). Rollback: withdraw the organization's enrollment / move the user's status to `rolled_back` — the write gate closes again within its TTL, protocol writes never depended on it.
 - **PR 3 gate:** the D02 exit gate — dev-compose Redis-kill: sign-in + attach + detach + session refresh pass; staging-drop and fail-open metrics emitted. Rollback: `AUTH_REDIS_FAIL_OPEN` off = today's behavior. The ledger PR 1 (#7143) dependency is satisfied — it merged 2026-08-18, as doctrine (the ADR-007 amendment), not as a primitive.
 
 D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only when the Wave 1 gates are green.
 
 > **Landed 2026-08-20:** PR 1, PR 2 and PR 3 shipped together in a single PR alongside the program docs (Alex's call). The per-PR gates above still hold slice by slice and remain the review map; the one outstanding exit-gate step is the dev-compose Redis-kill run, which needs a running stack.
+>
+> **Re-based 2026-08-23 on ADR-110:** the authz cutover gate the write gate was transplanted from no longer exists on `main`; the gate now opens on `finalized` only through the shared per-subject cache the engine gate uses; the everyone-else cohort and the org-paced enrollment expansion's synthetic ids are deleted (enrollment is a switch); the backfill restates every pass and detaches identifiers whose account row is gone. ADR-101 carries the revision note.
 
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:
 
-1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the grants-shaped rollout re-tenanted to users (org-paced enrollment, per-user latch). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
+1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20; re-based on ADR-110 2026-08-23). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the ADR-110-shaped rollout re-tenanted to users (org enrollment expanding to members, per-user `finalized` latch, calling-path apply as the one recorded divergence). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
 2. **Auth-path resilience** (D02) — adds the `identity` pipeline to **ADR-007's shared Redis-loss amendment** (which names `authz_grants` and expects identity to join), with the identity-specific volume and failure-semantics analysis.
 3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — identifier-first routing, auto-link rules, the first-party screen set; **explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided)** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
 4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.

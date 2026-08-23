@@ -30,13 +30,13 @@ import { randomBytes } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { prisma as appPrisma } from "~/server/db";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { isUserOnIdentityWrites } from "~/server/app-layer/identity/identifier-write-gate";
 import {
   IdentityCeremonies,
   newIdentityCommandId,
 } from "~/server/app-layer/identity/identity-ceremonies";
-import { isUserOnIdentityWrites } from "~/server/app-layer/identity/identifier-write-gate";
+import { prisma as appPrisma } from "~/server/db";
 import type { IdentifierProvider } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 
 const logger = createLogger("langwatch:better-auth:identity-adapter");
@@ -388,11 +388,14 @@ async function identifierIdForAccountRow({
  * would be an event gap — logged so the flow that introduces one is seen.
  */
 function guardTransaction(trx: TransactionAdapter): TransactionAdapter {
-  const guardedWrite = <Args extends { model: string }, R>(
+  // `Fn` is constrained on `never` rather than `{ model: string }` because the
+  // adapter's write methods are generic over their payload, and a generic
+  // function's parameter is not assignable FROM the bare `{ model }` shape.
+  const guardedWrite = <Fn extends (args: never) => unknown>(
     operation: WriteOperation,
-    run: (args: Args) => R,
-  ) =>
-    ((args: Args) => {
+    run: Fn,
+  ): Fn =>
+    ((args: { model: string }) => {
       const route = routeWrite(args.model, operation);
       if (route === "domain") {
         logger.warn(
@@ -400,8 +403,8 @@ function guardTransaction(trx: TransactionAdapter): TransactionAdapter {
           "domain-significant better-auth write inside a transaction: no ceremony runs here; the backfill adopts the row",
         );
       }
-      return run(args);
-    }) as never;
+      return run(args as never);
+    }) as unknown as Fn;
 
   return {
     ...trx,

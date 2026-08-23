@@ -183,7 +183,9 @@ export class VerificationCeremonyService {
   }): Promise<void> {
     const { userId, identifierId, verificationId, token, codeVerifier } =
       params;
-    const refuse = (reason: string): never => {
+    // Annotated explicitly: control-flow narrowing after a `never` call only
+    // applies when the callee's declared type says so.
+    const refuse: (reason: string) => never = (reason) => {
       logger.warn(
         { userId, identifierId, verificationId, reason },
         "verification completion refused",

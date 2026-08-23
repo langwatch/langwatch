@@ -18,10 +18,6 @@ import {
   AUTHZ_GRANTS_EVENT_TYPES,
 } from "../pipelines/authz-grants/schemas/constants";
 import {
-  IDENTITY_COMMAND_TYPES,
-  IDENTITY_EVENT_TYPES,
-} from "../pipelines/identity/schemas/constants";
-import {
   AUTOMATIONS_COMMAND_TYPES,
   AUTOMATIONS_EVENT_TYPES,
 } from "../pipelines/automations/schemas/constants";
@@ -46,6 +42,10 @@ import {
   GOVERNANCE_EVENTS_COMMAND_TYPES,
   GOVERNANCE_EVENTS_EVENT_TYPES,
 } from "../pipelines/governance-events/schemas/constants";
+import {
+  IDENTITY_COMMAND_TYPES,
+  IDENTITY_EVENT_TYPES,
+} from "../pipelines/identity/schemas/constants";
 import {
   LOG_PROCESSING_COMMAND_TYPES,
   LOG_PROCESSING_EVENT_TYPES,

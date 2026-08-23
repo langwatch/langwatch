@@ -20,7 +20,22 @@
  * Emission rides the calling-path dispatcher (`IdentityCeremonies`): guards
  * veto, the append lands waited, the fold applies before this migration
  * reads the rows back for its own proof — read-your-writes is what makes
- * the proof meaningful in a single pass.
+ * the proof meaningful in a single pass. That is the one place identity
+ * departs from ADR-110's queue-only rule, on purpose (ADR-101 §2).
+ *
+ * Idempotent by construction, not by bookkeeping (the ADR-110 migration
+ * shape): each pass re-reads the legacy rows, restates every fact (a
+ * restated fact dedupes at the event store), detaches the identifiers whose
+ * `Account` row is gone, and proves the heads against the rows it just read.
+ * Nothing here consults `previous`; there is no partial state a failed pass
+ * could leave behind that the next full pass does not simply redo. A held
+ * user's report names the identifiers outstanding, not a count.
+ *
+ * One disagreement is named rather than repaired, deliberately: an account
+ * removed and re-linked between passes re-derives the id of the detached
+ * identifier, and its restated attach dedupes against the original, so the
+ * head stays DETACHED and the check reports `state_mismatch` each pass
+ * (toward LESS sign-in history, never more). Remediation is the operator's.
  *
  * Spec: specs/identity/identifier-model.feature ("The backfill adopts
  * existing accounts and proves itself per user").
@@ -103,7 +118,11 @@ interface ExpectedIdentifier {
 
 export interface IdentifierBackfillMigrationDeps {
   reads: IdentityBackfillReads;
-  ceremonies: Pick<IdentityCeremonies, "attachIdentifier" | "verifyIdentifier">;
+  ceremonies: Pick<
+    IdentityCeremonies,
+    "attachIdentifier" | "verifyIdentifier" | "detachIdentifier"
+  >;
+  now?: () => number;
 }
 
 export class IdentityIdentifierBackfillMigration implements SystemMigration {
@@ -150,7 +169,10 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
     }
 
     const accounts = await this.deps.reads.findAccountRows({ userId });
-    const expected = expectedIdentifiers({ user, accounts });
+    const expected = expectedIdentifiers({
+      user: { ...user, email: user.email },
+      accounts,
+    });
 
     for (const adoption of expected) {
       await this.deps.ceremonies.attachIdentifier({
@@ -192,6 +214,8 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
       }
     }
 
+    await this.detachOrphanedIdentifiers({ userId, accounts });
+
     const diffs = await this.proveParity({ userId, expected });
     if (diffs.length > 0) {
       return {
@@ -203,6 +227,41 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
       status: "finalized",
       report: { kind: "adopted", identifiers: expected.length },
     };
+  }
+
+  /**
+   * The compensating fact: an identifier this migration adopted from an
+   * `Account` row that no longer exists is detached, so the projection never
+   * outlives the legacy truth it was proven against. Identifiers without an
+   * account (the email) are never this migration's to detach; a refusal
+   * (the identifier is PRIMARY, or already gone) is a parity fact the check
+   * below reports, never a park.
+   */
+  private async detachOrphanedIdentifiers({
+    userId,
+    accounts,
+  }: {
+    userId: string;
+    accounts: BackfillAccountRow[];
+  }): Promise<void> {
+    const liveAccountIds = new Set(accounts.map((account) => account.id));
+    const rows = await this.deps.reads.findIdentifierRows({ userId });
+    for (const row of rows) {
+      if (row.accountId === null || liveAccountIds.has(row.accountId)) continue;
+      if (!isLiveState(row.state)) continue;
+      try {
+        await this.deps.ceremonies.detachIdentifier({
+          tenantId: userId,
+          userId,
+          commandId: `backfill:detach:${row.id}:${row.accountId}`,
+          identifierId: row.id,
+          occurredAtMs: (this.deps.now ?? Date.now)(),
+          actor: BACKFILL_ACTOR,
+        });
+      } catch (error) {
+        if (!(error instanceof IdentityCommandRefusedError)) throw error;
+      }
+    }
   }
 
   /** The D01 exit gate: the fold-built rows against what the live rows imply. */
@@ -248,6 +307,10 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   }
 }
 
+function isLiveState(state: string): boolean {
+  return state === "ATTACHED" || state === "VERIFIED" || state === "PRIMARY";
+}
+
 /** ATTACHED is satisfied by any live state; VERIFIED by VERIFIED-or-PRIMARY. */
 function stateSatisfies(
   actual: string,
@@ -256,7 +319,7 @@ function stateSatisfies(
   if (expected === "VERIFIED") {
     return actual === "VERIFIED" || actual === "PRIMARY";
   }
-  return actual === "ATTACHED" || actual === "VERIFIED" || actual === "PRIMARY";
+  return isLiveState(actual);
 }
 
 function expectedIdentifiers({

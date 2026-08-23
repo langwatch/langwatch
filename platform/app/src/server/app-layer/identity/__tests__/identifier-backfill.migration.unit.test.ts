@@ -7,6 +7,7 @@ import {
 } from "~/server/event-sourcing/pipelines/identity/projections/identifierIdentity";
 import type {
   AttachIdentifierCommandData,
+  DetachIdentifierCommandData,
   VerifyIdentifierCommandData,
 } from "~/server/event-sourcing/pipelines/identity/schemas/commands";
 import {
@@ -102,6 +103,24 @@ function harness(options?: {
     return [];
   });
 
+  const detachIdentifier = vi.fn(async (data: DetachIdentifierCommandData) => {
+    const row = rows.get(data.identifierId);
+    if (!row) {
+      throw new IdentityCommandRefusedError(
+        "identity_identifier_not_found",
+        "no such identifier",
+      );
+    }
+    if (row.state === "PRIMARY") {
+      throw new IdentityCommandRefusedError(
+        "identity_primary_must_demote_first",
+        "primary identifiers never detach directly",
+      );
+    }
+    row.state = "DETACHED";
+    return [];
+  });
+
   const migration = new IdentityIdentifierBackfillMigration({
     reads: {
       findUser: async () => user,
@@ -111,10 +130,22 @@ function harness(options?: {
       findAccountRows: async () => accounts,
       findIdentifierRows: async () => [...rows.values()],
     },
-    ceremonies: { attachIdentifier, verifyIdentifier } as never,
+    ceremonies: {
+      attachIdentifier,
+      verifyIdentifier,
+      detachIdentifier,
+    } as never,
+    now: () => 1_800_000_000_000,
   });
 
-  return { migration, rows, minted, attachIdentifier, verifyIdentifier };
+  return {
+    migration,
+    rows,
+    minted,
+    attachIdentifier,
+    verifyIdentifier,
+    detachIdentifier,
+  };
 }
 
 describe("the identifier backfill migration", () => {
@@ -160,6 +191,57 @@ describe("the identifier backfill migration", () => {
         .slice(firstIds.length)
         .map(([data]) => data.commandId);
       expect(secondIds).toEqual(firstIds);
+    });
+  });
+
+  describe("when an adopted Account row is gone on a later pass", () => {
+    /** @scenario "The backfill detaches identifiers whose account row is gone" */
+    it("detaches the orphaned identifier with a stable command id and finalizes", async () => {
+      const first = harness();
+      await first.migration.migrateTenant({ tenantId: USER });
+      const googleRow = [...first.rows.values()].find(
+        (row) => row.provider === "google",
+      );
+      expect(googleRow?.state).toBe("VERIFIED");
+
+      const second = harness({
+        accounts: [],
+        presetRows: [...first.rows.values()],
+      });
+      const outcome = await second.migration.migrateTenant({ tenantId: USER });
+
+      expect(outcome.status).toBe("finalized");
+      expect(second.detachIdentifier).toHaveBeenCalledTimes(1);
+      expect(second.detachIdentifier.mock.calls[0]?.[0]).toMatchObject({
+        identifierId: googleRow?.id,
+        commandId: `backfill:detach:${googleRow?.id}:${googleRow?.accountId}`,
+        actor: { type: "system", id: "system:identity-backfill" },
+      });
+      expect(second.rows.get(googleRow?.id ?? "")?.state).toBe("DETACHED");
+      // The email identifier has no account row and is never the backfill's
+      // to detach.
+      const emailRow = [...second.rows.values()].find(
+        (row) => row.provider === "email",
+      );
+      expect(emailRow?.state).not.toBe("DETACHED");
+    });
+
+    it("never detaches twice: an already-detached identifier is left alone", async () => {
+      const first = harness();
+      await first.migration.migrateTenant({ tenantId: USER });
+      const second = harness({
+        accounts: [],
+        presetRows: [...first.rows.values()],
+      });
+      await second.migration.migrateTenant({ tenantId: USER });
+      const third = harness({
+        accounts: [],
+        presetRows: [...second.rows.values()],
+      });
+
+      await third.migration.migrateTenant({ tenantId: USER });
+
+      expect(third.detachIdentifier).not.toHaveBeenCalled();
     });
   });
 

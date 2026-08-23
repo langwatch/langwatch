@@ -118,6 +118,15 @@ const registerEndpoints = (v: IdentityVersion): void => {
         operationId: "completeIdentityVerification",
         tags: ["Identity"],
       },
+      // ADR-092 contract: every endpoint states its permission or why it
+      // has none. This one acts on the caller's OWN verification record -
+      // there is no organization scope to check; the family auth
+      // middleware proves the session and the ceremony service proves the
+      // record is pinned to exactly that user.
+      noPermission: {
+        reason:
+          "completes the session user's own verification; the ceremony service proves the record is pinned to that user, and no organization scope applies",
+      },
       meta: { policy: familyPolicy },
     },
     async (c, { input, app }) => {

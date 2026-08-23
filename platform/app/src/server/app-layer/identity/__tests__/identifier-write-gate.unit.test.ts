@@ -42,20 +42,23 @@ describe("identifier write gate", () => {
   });
 
   describe("when the user's backfill has landed", () => {
-    it("answers open for migrated and finalized alike", async () => {
-      await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
-          prisma: prismaWithStatus("migrated"),
-        }),
-      ).resolves.toBe(true);
-      resetIdentityWriteGateForTests();
+    /** @scenario "Finalizing a user's backfill opens their write gate" */
+    it("answers open for finalized only; a held (migrated) user stays closed", async () => {
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
           prisma: prismaWithStatus("finalized"),
         }),
       ).resolves.toBe(true);
+      resetIdentityWriteGateForTests();
+      // ADR-110: `migrated` is HELD — the proof found the projection behind
+      // or disagreeing, so the user stays on the protocol-only path.
+      await expect(
+        isUserOnIdentityWrites({
+          userId: USER,
+          prisma: prismaWithStatus("migrated"),
+        }),
+      ).resolves.toBe(false);
     });
 
     it("answers closed for parked and rolled_back", async () => {
@@ -123,7 +126,7 @@ describe("identifier write gate", () => {
       await expect(
         isUserOnIdentityWrites({
           userId: USER,
-          prisma: prismaWithStatus("migrated"),
+          prisma: prismaWithStatus("finalized"),
         }),
       ).resolves.toBe(true);
     });

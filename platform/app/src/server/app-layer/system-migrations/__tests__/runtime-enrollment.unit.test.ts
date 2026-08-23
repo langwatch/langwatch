@@ -11,9 +11,11 @@ const stubs = vi.hoisted(() => {
   const enrollmentFindMany = vi.fn();
   const enrollmentFindUnique = vi.fn();
   const warnings: Array<[string, unknown, unknown]> = [];
+  const organizationUserFindMany = vi.fn().mockResolvedValue([]);
   return {
     enrollmentFindMany,
     enrollmentFindUnique,
+    organizationUserFindMany,
     warnings,
     prisma: {
       systemMigrationEnrollment: {
@@ -24,6 +26,13 @@ const stubs = vi.hoisted(() => {
       // claims); an empty page ends it without touching Redis.
       organization: {
         findMany: vi.fn().mockResolvedValue([]),
+      },
+      // The user-rooted leg pages users the same way.
+      user: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      organizationUser: {
+        findMany: organizationUserFindMany,
       },
     },
   };
@@ -61,7 +70,12 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-import { migrationPassCohort, runSystemMigrationPass } from "../runtime";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/identifier-write-gate";
+import {
+  migrationPassCohort,
+  runSystemMigrationPass,
+  userMigrationPassCohort,
+} from "../runtime";
 
 describe("migrationPassCohort on cloud", () => {
   beforeEach(() => {
@@ -152,6 +166,67 @@ describe("migrationPassCohort on cloud", () => {
       // "all" did not widen anything and "none" did not narrow anything:
       // the cohort still came from the enrollment table.
       expect(stubs.enrollmentFindMany).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("userMigrationPassCohort on cloud", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when one organization is enrolled in the identifier backfill and another is not", () => {
+    /** @scenario "Organization enrollment is what puts a user in the backfill's cohort" */
+    it("admits exactly the enrolled organizations' members; org-less users stay out", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      stubs.enrollmentFindMany.mockResolvedValueOnce([
+        { organizationId: "org_acme", migrationName: backfill },
+      ]);
+      stubs.organizationUserFindMany.mockImplementationOnce(
+        async ({ where }: { where: { organizationId: { in: string[] } } }) =>
+          where.organizationId.in.includes("org_acme")
+            ? [{ userId: "user_sam" }, { userId: "user_ann" }]
+            : [],
+      );
+
+      const cohort = await userMigrationPassCohort();
+
+      expect(cohort({ tenantId: "user_sam", migrationName: backfill })).toBe(
+        true,
+      );
+      expect(cohort({ tenantId: "user_ann", migrationName: backfill })).toBe(
+        true,
+      );
+      // Only a member of globex, which nobody enrolled.
+      expect(cohort({ tenantId: "user_gil", migrationName: backfill })).toBe(
+        false,
+      );
+      // Outside every organization: nothing enrolls them on cloud.
+      expect(cohort({ tenantId: "user_solo", migrationName: backfill })).toBe(
+        false,
+      );
+      // Membership was read for the enrolled organizations only.
+      expect(stubs.organizationUserFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: { in: ["org_acme"] } },
+        }),
+      );
+    });
+  });
+
+  describe("when nothing is enrolled", () => {
+    it("reads no membership and admits nobody", async () => {
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await userMigrationPassCohort();
+
+      expect(
+        cohort({
+          tenantId: "user_sam",
+          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+        }),
+      ).toBe(false);
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
     });
   });
 });

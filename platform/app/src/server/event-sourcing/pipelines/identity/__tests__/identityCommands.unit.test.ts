@@ -57,7 +57,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: USER,
     type: "lw.identity.test",
     data,
-  } as Command<T>;
+  } as unknown as Command<T>;
 }
 
 function attachData(overrides?: Record<string, unknown>) {

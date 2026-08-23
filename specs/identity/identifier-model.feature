@@ -5,7 +5,8 @@ Feature: The identifier model - identity as an event-sourced pipeline
   So that routing, linking, SSO connections and Auth0 migrations have real
   identity data to build on, while sign-in itself never changes behavior
 
-  # D01 of the identity platform program (ADR-101, revised 2026-08-20;
+  # D01 of the identity platform program (ADR-101, revised 2026-08-20,
+  # re-based on ADR-110 2026-08-23;
   # dev/docs/identity-platform/D01-identity-pipeline-and-identifiers.md).
   #
   # The truth split - no table mixes truths, ADR-022/015 stand unamended:
@@ -19,10 +20,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
   #   Account / Session / VerificationToken (PG) - pure row-truth protocol
   #   tables written by repositories; never projections, never in replay.
   #
-  # Rollout is the grants arc re-tenanted to users: the adapter's
-  # command-emitting paths sit behind a per-user write gate that ships
-  # CLOSED and opens as each user's backfill lands (PR 2); deploying PR 1
-  # changes nothing on its own.
+  # Rollout is ADR-110's shape re-tenanted to users - one migration, and
+  # finishing it IS the switch: the adapter's command-emitting paths sit
+  # behind a per-user write gate that ships CLOSED and opens only when the
+  # user's backfill is finalized (migrated is HELD: the proof found the
+  # projection behind or disagreeing, and the next pass heals it).
+  # Enrollment is a switch, not a programme: the ops page enrolls
+  # organizations and their members migrate; there is no everyone-else
+  # cohort. Deploying the adapter changes nothing on its own.
 
   Background:
     Given the identity pipeline is registered with the event-sourcing framework
@@ -139,11 +144,30 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When the identity backfill migrates "sam"
     Then adoption events carry each source row's own business time
     And "sam" is finalized only when the fold-built rows match what the live rows imply
-    And a disagreement holds "sam" at migrated with a diff report
+    And a disagreement holds "sam" at migrated with the outstanding identifiers named
+
+  @unit
+  Scenario: The backfill detaches identifiers whose account row is gone
+    Given "sam"'s Google account was adopted on an earlier pass
+    And the Google Account row has since been deleted
+    When the identity backfill migrates "sam" again
+    Then the Google identifier is detached with a command id stable across retries
+    And the email identifier, which has no account row, is left alone
+    And a further pass detaches nothing
 
   @unit
   Scenario: Finalizing a user's backfill opens their write gate
     Given "sam"'s backfill pass concludes with matching rows
     When the migration state records "sam" as finalized
     Then the adapter's write gate answers open for "sam"
+    But a user held at migrated stays closed
     And an operator rollback closes it again
+
+  @unit
+  Scenario: Organization enrollment is what puts a user in the backfill's cohort
+    Given the installation is cloud
+    And "acme" is enrolled in the identifier backfill and "globex" is not
+    When a migration pass computes its user cohort
+    Then every member of "acme" is in the cohort
+    And a user who belongs only to "globex" is not
+    And a user outside every organization is not, and stays on the legacy path
