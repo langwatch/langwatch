@@ -103,10 +103,8 @@ them.
  │  facts        IdentifierFact, IdentityHeads, the fact payload schemas,     │
  │               event/command type strings, IDENTITY_EVENT_VERSION_LATEST   │
  │  reduce       reduceIdentity(heads, fact) — the one reducer               │
- │  decide       decideAttach / decideVerify / decideMarkPrimary /           │
- │               decideDetach / decideErase — the GUARDS, as pure functions  │
- │               over (heads, reads-already-taken, input) → facts | refusal  │
- │  backfill     expectedIdentifiers, parityDiffs — the proof's policy       │
+ │  backfill     backfillParityDiffs, orphanedIdentifierRows — what the      │
+ │               proof means, over row shapes                                │
  │  errors       the refusal family + the verification errors                │
  └───────────────────────────────────────────────────────────────────────────┘
                                       ▲
@@ -119,6 +117,9 @@ them.
  │               IdentityVerificationRepository (replace / find / consume)   │
  │               IdentityBackfillRepository     (find user / accounts / rows)│
  │               IdentityUsersRepository        (storeUserHashKeyIfMissing)  │
+ │  guards       IdentityGuards                 (veto-before-write; ONE      │
+ │                                               implementation for the      │
+ │                                               calling path and the queue) │
  │  services     IdentityService                (the five verbs)             │
  │               VerificationCeremonyService    (PKCE mint / complete)       │
  │               IdentityBackfillService        (adopt, establish, detach,   │
@@ -179,8 +180,7 @@ What moves in, and from where:
 | `identifier.ts` | `projections/identifierIdentity.ts` | `normalizeIdentifierValue`, `identifierDomain`; the crypto halves go to `identity-server/crypto` |
 | `facts.ts` | `schemas/events.ts`, `schemas/commands.ts`, `schemas/constants.ts`, `reduceIdentity.ts` (`IdentifierFact`, `IdentityLedgerState` → `IdentityHeads`) | Zod schemas for the fact **payloads** and the command inputs, with `infer`; the framework envelope (`EventSchema`, `aggregateType`, `idempotencyKey`) is NOT here — the app's pipeline composes it, as `authz-grants/schemas/events.ts` composes `GRANT_EVENT_SOURCES`. `IdentityFact = { type, data, occurredAt }` is the framework-free shape the reducer folds |
 | `reduce.ts` | `projections/reduceIdentity.ts` | Unchanged logic, framework-free input |
-| `decide.ts` | the `handle()` bodies of the five `commands/*.command.ts` | The guards become pure decisions: `decideAttachIdentifier({ heads, userHashKey, input }) → { facts }` or throws the refusal. Every async read a guard needs (`findUserHashKey`, `findActiveIdentifierByValue`, `findHeads`) is taken by the caller and passed in. One implementation serves both the calling path and the staged re-run, which is what makes "the heads-carry rule" (#7429, applied in #7333's last round) live in exactly one place |
-| `backfill.ts` | `migration/identifier-backfill.migration.ts` (`expectedIdentifiers`, `surplusRowDiffs`, `stateSatisfies`, `isLiveState`, `BackfillDiff`, the row DTOs) | The proof's policy is pure; the service that drives it is in `identity-server` |
+| `backfill.ts` | `migration/identifier-backfill.migration.ts` (`surplusRowDiffs`, `stateSatisfies`, `isLiveState`, `BackfillDiff`, the identifier row DTO) | The proof's policy is pure; `expectedIdentifiers` derives ids (node:crypto) and so lives beside the service in `identity-server` |
 | `errors.ts` | `commands/identityCommandErrors.ts`, the two classes inside `verification-ceremony.ts` | All identity `HandledError`s in one module. Codes stay registered in `features/errors/logic/{codes,presentation}.ts` — the same arrangement as `permission_denied`, defined in `@langwatch/authz`, presented in the app |
 
 `index.ts` opens with the same boundary statement `@langwatch/authz` carries.
@@ -239,17 +239,26 @@ export interface IdentityBackfillRepository { findUser; findAccountRows; findIde
 export interface IdentityUsersRepository { storeUserHashKeyIfMissing(args: { userId; userHashKey }) }
 ```
 
+**The guards** (`guards.ts`): `IdentityGuards` over `IdentityHeadsRepository`
+— the `handle()` bodies of the five pipeline commands, as one class. The
+first cut of this ADR put them in the pure package as `decide*` functions;
+they need `deriveIdentifierId` (node:crypto), and passing every read in
+from both callers would have duplicated the read sequencing the guard
+exists to own. They sit where `grant-validation.ts` sits for authz: in the
+server package, over the port. One implementation serves the calling path
+(`IdentityService`) and the queue's staged re-run (the app's thin command
+handlers), which is what keeps the heads-carry rule (#7429) in one place.
+
 **Services** (classes; `(port, deps)` constructors; every environment read
 and side effect an injected closure):
 
 ```ts
 export class IdentityService {
   constructor(
-    private readonly heads: IdentityHeadsRepository,
+    private readonly guards: IdentityGuards,
     private readonly ledger: IdentityLedger,
-    private readonly deps: { newCommandId: () => string; now: () => number },
   ) {}
-  attachIdentifier(input) { /* parse → reads → decideAttachIdentifier → ledger.commit */ }
+  attachIdentifier(input) { /* parse → guards.attachIdentifier → ledger.commit */ }
   verifyIdentifier(input) { … }   markPrimary(input) { … }
   detachIdentifier(input) { … }   eraseUser(input) { … }
 }
@@ -322,7 +331,7 @@ platform/app/src/server/event-sourcing/pipelines/identity/
   envelope.ts                              identityEvent(command, fact, index): the ONE place aggregateType,
                                            tenantId, idempotencyKey (commandId:index) are stamped;
                                            used by the commands AND by app-layer/identity/ledger.ts
-  commands/*.command.ts                    ~20 lines each: heads reads → decide* → envelope
+  commands/*.command.ts                    ~20 lines each: the package's guard → envelope
   projections/identity.foldProjection.ts   validate wire event → reduceIdentity
   pipeline.ts                              unchanged shape
 ```
@@ -388,7 +397,7 @@ constructs an `IdentityService`.
 | `pipelines/identity/projections/identifierIdentity.ts` | split: `identity/identifier.ts` + `identity/vocabulary.ts` (pure) and `identity-server/crypto/identifier-identity.ts` (`deriveIdentifierId`, `computeIdentifierHash`) |
 | `pipelines/identity/projections/reduceIdentity.ts` | `identity/reduce.ts` + `identity/facts.ts` |
 | `pipelines/identity/schemas/*.ts` | payloads + type strings → `identity/facts.ts`; framework envelope schemas stay, re-composed from the package |
-| `pipelines/identity/commands/*.command.ts` (5) | guard bodies → `identity/decide.ts`; the files stay as thin handlers |
+| `pipelines/identity/commands/*.command.ts` (5) | guard bodies → `identity-server/guards.ts`; the files stay as thin handlers |
 | `pipelines/identity/commands/identityGuardReads.ts` | port → `identity-server/identity-heads.repository.ts`; `eventIdempotencyKey` → framework |
 | `pipelines/identity/commands/identityCommandErrors.ts` | `identity/errors.ts` |
 | `app-layer/identity/identity-ceremonies.ts` | `identity-server/identity.service.ts` (verbs) + `app-layer/identity/ledger.ts` (commit) — the class is deleted |
@@ -417,12 +426,15 @@ the suite green. Six commits, in this order, each reviewable alone:
    its schemas from the package. `decide.ts` lands here with the five
    guards and the commands become thin.
 3. **`@langwatch/identity-server`:** skeleton (from `packages/authz-server`),
-   ports, `IdentityService`, `VerificationCeremonyService`,
-   `IdentityBackfillService`, crypto; `identity-ceremonies.ts` and
-   `verification-ceremony.ts` are deleted; `app-layer/identity/ledger.ts`
-   and `runtime.ts` appear; the migration and the route re-point.
-4. **The adapter:** `identity-server/src/better-auth/`; `better-auth/index.ts`
-   takes `identityDatabase()` from the runtime; the cycle is gone.
+   ports, `IdentityGuards`, `IdentityService`, `VerificationCeremonyService`,
+   `IdentityBackfillService`, crypto, and the better-auth facade under
+   `./better-auth` — self-contained and tested before the app touches it.
+4. **The app re-point, once:** `identity-ceremonies.ts`,
+   `verification-ceremony.ts` and the six better-auth identity modules are
+   deleted; `app-layer/identity/{runtime,ledger,write-gate}.ts` appear; the
+   pipeline's commands become thin; the migration, the route and
+   `better-auth/index.ts` re-point; the cycle is gone. (As landed, steps 2–4
+   of the first cut were re-cut so no consumer was edited twice.)
 5. **Repository integration tests** for the five Prisma repositories.
 6. **Docs:** ADR-101 §1/§2/§6 path references and the §6 sentence "a
    restated fact dedupes at the event store" → "a pass states only what the
@@ -437,14 +449,14 @@ rounds' history out of the review.
 
 ## Rationale / Trade-offs
 
-**Why decisions as pure functions rather than services in the package?**
-Because the guard must run on both the calling path and the staged re-run
-(ADR-101 §2: veto-before-write is structural), and the staged path is a
-pipeline command handler that the package cannot call. A pure
-`decide*(heads, reads, input)` is callable from both, tested once, and is
-the exact analogue of `AuthzEngine.decide()` in `@langwatch/authz`. The
-reads a guard needs are taken by whoever calls it — the service on the
-calling path, the handler on the staged path — through the same port.
+**Why one `IdentityGuards` class in the server package rather than pure
+`decide*` functions in the core?** Because the guard must run on both the
+calling path and the staged re-run (ADR-101 §2: veto-before-write is
+structural), and it derives identifier ids, which needs node:crypto. A
+class over the heads port is callable from both the service and the app's
+command handlers, tested once, and sits where `grant-validation.ts` sits for
+authz. Pure `decide*` functions would have pushed the read sequencing into
+both callers — the duplication the guard exists to prevent.
 
 **Why an `IdentityLedger.commit(command, facts)` port and not a
 `Sender<T>` per verb?** The authz package's seam is its write repository
