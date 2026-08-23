@@ -973,3 +973,72 @@ Scenario: A window too wide for even the coarsest offered step is refused everyw
   When even the one-hour step would exceed 10,000 buckets for that period
   Then the run is refused as too fine for the period on coarsening surfaces too
   And the refusal names the requested step and the bucket ceiling
+
+@unit
+Scenario: A chart declaring the granularity parameter runs at the step the surface supplies
+  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  And the surface supplies an offered step
+  When the chart is run by id
+  Then the stored statement is executed at the supplied step
+  And the result is labelled as following the granularity
+
+@unit
+Scenario: A declared granularity with no step supplied refuses to run naming the parameter
+  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  And the surface supplies no step
+  When the chart is run by id
+  Then the run is refused for the missing parameter
+  And the refusal names period_granularity_seconds
+
+@unit
+Scenario: Running a saved chart executes its stored statement with its saved values and the surface's window and step
+  Given a saved chart with stored SQL and saved parameter values
+  When the surface runs it with its own time window and step
+  Then the stored statement is executed with the saved values
+  And the surface's window and step are the ones bound
+
+@unit
+Scenario: Another project's saved chart is not runnable
+  Given a chart saved in one project
+  When a run names it from another project
+  Then the run is refused as chart not found
+
+@unit
+Scenario: Running a saved chart refuses a step finer than the period's bucket budget
+  Given a saved chart declaring granularity
+  And a step and period whose quotient exceeds the bucket ceiling
+  When the chart is run by id
+  Then the run is refused as too fine for the period
+
+# The run-by-chart-id procedure's own wiring, as distinct from what the service
+# decides. Bound by
+# `src/server/api/routers/__tests__/savedWorkbenchCharts.router.integration.test.ts`,
+# which runs against a real Postgres and the real RBAC tables so the permission
+# claims cannot be answered by a fake that was told what to return.
+
+@integration
+Scenario: Running a saved chart carries the same permission and switch as every other chart procedure
+  Given a project with the LangWatchQL workbench switched off
+  When a member runs a saved chart by id
+  Then the run is refused with the not-enabled code
+  And with the switch on, the run requires the analytics view permission
+
+@integration
+Scenario: A run is refused for a member without the analytics view permission, and nothing is executed
+  Given a member whose role carries no analytics view permission
+  When they run a saved chart by id
+  Then the run is refused as permission denied
+  And the query engine is never consulted
+
+@integration
+Scenario: A run names the tenant the database holds for the project in the request
+  Given a project whose LangWatchQL key is stored in the database
+  When a member runs a saved chart by id
+  Then the execution request carries that stored key
+  And not any key supplied by the caller
+
+@integration
+Scenario: Being allowed to read a chart is being allowed to run one
+  Given a member whose role grants analytics view but not chart management
+  When they run a saved chart by id
+  Then the run succeeds

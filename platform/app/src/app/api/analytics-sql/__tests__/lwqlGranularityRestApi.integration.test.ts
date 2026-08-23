@@ -153,11 +153,14 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
         granularitySeconds: 3600,
       });
 
-      // This deployment provisions no LangWatchQL identity, so the honest
-      // answer past the budget gate is unavailability — proving the refusal
-      // above was about the bucket arithmetic and not about the door.
-      expect(status).toBe(503);
-      expect(body.error.code).toBe("lwql_unavailable");
+      // What this proves is that the refusal above was about the bucket
+      // arithmetic and not about the door: at an hour the budget gate lets
+      // the request through to whatever gate comes next. Which gate that is
+      // depends on the deployment (no LWQL identity -> lwql_unavailable;
+      // a provisioned ClickHouse -> the query path itself), so assert only
+      // that the budget refusal is gone, not which honest answer follows.
+      expect(status).not.toBe(400);
+      expect(body.error?.code).not.toBe("lwql_granularity_too_fine");
     });
   });
 });
