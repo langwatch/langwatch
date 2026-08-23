@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 // Read the configuration from llms.txt.json
 const config = JSON.parse(fs.readFileSync('llms.txt.json', 'utf8'));
@@ -219,51 +218,89 @@ function processImports(content, filePath) {
   return modifiedContent;
 }
 
-// Process each include path
-includePaths.forEach(includePath => {
-  try {
-    // Create a find command to locate the files (sort for stable cross-platform ordering)
-    let findCmd = `find . -type f -path "./${includePath}" 2>/dev/null | sort`;
+// Compile a glob where `*` stays inside one path segment and `**` crosses
+// directories (shell find -path cannot make that distinction: its `*` matches
+// slashes too). Stars are swapped for placeholders first so the regex
+// escaping cannot touch them.
+function globToRegExp(glob) {
+  const STARS = {
+    doubleSlash: '\u0001', // **/  any directories, or none at all
+    slashDouble: '\u0002', // /**  this directory plus any children
+    double: '\u0003', // **   anything
+    single: '\u0004', // *    within one path segment
+  };
+  const tokenized = glob
+    .replace(/\*\*\//g, STARS.doubleSlash)
+    .replace(/\/\*\*/g, STARS.slashDouble)
+    .replace(/\*\*/g, STARS.double)
+    .replace(/\*/g, STARS.single);
+  const escaped = tokenized.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    '^' +
+      escaped
+        .replaceAll(STARS.doubleSlash, '(?:.*/)?')
+        .replaceAll(STARS.slashDouble, '(?:/.*)?')
+        .replaceAll(STARS.double, '.*')
+        .replaceAll(STARS.single, '[^/]*') +
+      '$',
+  );
+}
 
-    // Add exclude patterns if any
-    if (excludePaths.length > 0) {
-      excludePaths.forEach(excludePath => {
-        findCmd += ` | grep -Fv "${excludePath}"`;
-      });
+// Walk the tree once and keep every file path, relative without the leading
+// "./". Doing the traversal here instead of piping through shell find means a
+// read failure surfaces as an error rather than being masked by an exit-status
+// override, and glob semantics are exactly ours.
+function walkFiles(dir, base = '') {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...walkFiles(`${dir}/${entry.name}`, rel));
+    } else if (entry.isFile()) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+const allFiles = walkFiles('.').sort();
+const includeRegexes = includePaths.map(path_ => ({
+  pattern: path_,
+  regex: globToRegExp(path_),
+}));
+const excludeRegexes = excludePaths.map(glob => globToRegExp(glob));
+
+// Collect matches across every include pattern into one set, so overlapping
+// paths produce a single FILE block per page; sorted above for a stable order.
+const found = new Set();
+for (const file of allFiles) {
+  if (!includeRegexes.some(({ regex }) => regex.test(file))) continue;
+  if (excludeRegexes.some(regex => regex.test(file))) continue;
+  found.add(`./${file}`);
+}
+
+const files = [...found].sort();
+
+// Process each matching file
+files.forEach(file => {
+  console.log(`Processing: ${file}`);
+  try {
+    let content = fs.readFileSync(file, 'utf8');
+
+    // Process imports for MDX files
+    if (file.endsWith('.mdx')) {
+      content = processImports(content, file);
     }
 
-    // Execute the find command
-    const files = execSync(findCmd)
-      .toString()
-      .trim()
-      .split('\n')
-      .filter(file => file); // Remove empty lines
+    // Remove trailing whitespaces
+    content = content.replace(/[ \t]+$/gm, '');
 
-    // Process each matching file
-    files.forEach(file => {
-      console.log(`Processing: ${file}`);
-      try {
-        let content = fs.readFileSync(file, 'utf8');
-
-        // Process imports for MDX files
-        if (file.endsWith('.mdx')) {
-          content = processImports(content, file);
-        }
-
-        // Remove trailing whitespaces
-        content = content.replace(/[ \t]+$/gm, '');
-
-        // Append to output file
-        fs.appendFileSync(outputFile, `# FILE: ${file}\n\n`);
-        fs.appendFileSync(outputFile, content);
-        fs.appendFileSync(outputFile, '\n---\n\n');
-      } catch (err) {
-        console.error(`Error reading ${file}: ${err.message}`);
-      }
-    });
-  } catch (error) {
-    // If there's an error with the command, log and continue
-    console.log(`Error with pattern: ${includePath}: ${error.message}`);
+    // Append to output file
+    fs.appendFileSync(outputFile, `# FILE: ${file}\n\n`);
+    fs.appendFileSync(outputFile, content);
+    fs.appendFileSync(outputFile, '\n---\n\n');
+  } catch (err) {
+    console.error(`Error reading ${file}: ${err.message}`);
   }
 });
 
