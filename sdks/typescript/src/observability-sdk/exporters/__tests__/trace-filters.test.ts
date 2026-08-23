@@ -254,56 +254,88 @@ describe("trace-filters", () => {
   });
 
   describe("isHttpRequestSpan", () => {
-    function createSpanWith(
-      name: string,
-      scopeName: string,
-      attributes: Record<string, unknown> = {},
-    ): ReadableSpan {
-      return { ...createMockSpan(name, scopeName), attributes } as ReadableSpan;
+    function createSpanWith({
+      name,
+      scopeName,
+      attributes = {},
+    }: {
+      name: string;
+      scopeName: string;
+      attributes?: Record<string, unknown>;
+    }): ReadableSpan {
+      return {
+        ...createMockSpan(name, scopeName),
+        attributes,
+      } as ReadableSpan;
     }
 
     describe("given a span from an HTTP instrumentation scope", () => {
       /** @scenario "An HTTP instrumentation span is still excluded" */
-      it("is excluded by scope alone whatever its name says", () => {
+      it("excludes by fully qualified package scope alone whatever its name says", () => {
         expect(
           isHttpRequestSpan(
-            createSpanWith(
-              "totally-not-http",
-              "@opentelemetry/instrumentation-http",
-            ),
+            createSpanWith({
+              name: "totally-not-http",
+              scopeName: "@opentelemetry/instrumentation-http",
+            }),
           ),
         ).toBe(true);
         expect(
           isHttpRequestSpan(
-            createSpanWith("fetch", "@opentelemetry/instrumentation-undici"),
+            createSpanWith({
+              name: "fetch",
+              scopeName: "@opentelemetry/instrumentation-undici",
+            }),
           ),
         ).toBe(true);
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({
+              name: "call",
+              scopeName: "@opentelemetry/instrumentation-fetch",
+            }),
+          ),
+        ).toBe(true);
+      });
+
+      it("keeps an application span whose own scope is merely named fetch", () => {
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({ name: "fetch-user-profile", scopeName: "fetch" }),
+          ),
+        ).toBe(false);
       });
     });
 
     describe("given a span carrying the HTTP method attribute", () => {
       /** @scenario "An HTTP instrumentation span is still excluded" */
-      it("is excluded by the current and legacy method attributes", () => {
+      it("excludes by the current and legacy method attributes", () => {
         expect(
-          isHttpRequestSpan(
-            createSpanWith("custom-name", "my-scope", {
-              "http.request.method": "POST",
+          isHttpRequestSpan({
+            ...createSpanWith({
+              name: "custom-name",
+              scopeName: "my-scope",
             }),
-          ),
+            attributes: { "http.request.method": "POST" },
+          } as ReadableSpan),
         ).toBe(true);
         expect(
-          isHttpRequestSpan(
-            createSpanWith("custom-name", "my-scope", {
-              "http.method": "GET",
+          isHttpRequestSpan({
+            ...createSpanWith({
+              name: "custom-name",
+              scopeName: "my-scope",
             }),
-          ),
+            attributes: { "http.method": "GET" },
+          } as ReadableSpan),
         ).toBe(true);
       });
     });
 
     describe("given a span from an unknown scope with no method attribute", () => {
-      it("matches the uppercase verb shape OpenTelemetry emits", () => {
-        expect(isHttpRequestSpan(createMockSpan("POST", "my-scope"))).toBe(true);
+      it("matches every registered uppercase verb shape OpenTelemetry emits", () => {
+        expect(
+          isHttpRequestSpan(createMockSpan("POST", "my-scope")),
+        ).toBe(true);
         expect(
           isHttpRequestSpan(createMockSpan("POST /v1/traces", "my-scope")),
         ).toBe(true);
@@ -314,6 +346,14 @@ describe("trace-filters", () => {
           isHttpRequestSpan(createMockSpan("DELETE /item", "http")),
         ).toBe(true);
         expect(isHttpRequestSpan(createMockSpan("HEAD", ""))).toBe(true);
+        expect(
+          isHttpRequestSpan(createMockSpan("TRACE /health", "my-scope")),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(
+            createMockSpan("CONNECT proxy.example:443", "my-scope"),
+          ),
+        ).toBe(true);
       });
 
       /** @scenario "A user span named after a hyphenated verb word reaches the exporter" */

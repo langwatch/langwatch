@@ -233,13 +233,14 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
 }
 
 /**
- * Instrumentation scopes that emit HTTP client/server request spans.
+ * Instrumentation scopes that emit HTTP client/server request spans. Only
+ * fully qualified package scopes count: an application is free to name its
+ * own instrumentation "fetch" or "undici", and such spans are user data.
  */
 const HTTP_INSTRUMENTATION_SCOPES = new Set([
   "@opentelemetry/instrumentation-http",
   "@opentelemetry/instrumentation-undici",
-  "undici",
-  "fetch",
+  "@opentelemetry/instrumentation-fetch",
 ]);
 
 /**
@@ -282,5 +283,7 @@ export function isHttpRequestSpan(span: ReadableSpan): boolean {
     return true;
   }
 
-  return /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)( |$)/.test(span.name ?? "");
+  return /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE)( |$)/.test(
+    span.name ?? "",
+  );
 }
