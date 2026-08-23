@@ -97,8 +97,8 @@ Feature: Moving an organization onto the grants projection
 
   # A restated fact dedupes at the event store, but the queue has already paid
   # to carry it. A grant is its own aggregate, so a held organization restaged
-  # one group per grant on every worker boot: one organization carries 428,720
-  # share links and converged on nothing while it repeated them.
+  # one group per grant on every worker boot. An organization holding a large
+  # share-link population converged on nothing while it repeated them.
   @unit
   Scenario: A pass states only the facts the heads do not carry
     Given an organization whose projection already holds some of its facts

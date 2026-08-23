@@ -3,7 +3,7 @@
 **Date:** 2026-08-23
 
 **Status:** Accepted. **Decision 1 was amended the same day, before it ever ran
-in production** — see [Amendment](#amendment-2026-08-23--decision-1-traded-away-an-ordering-guarantee).
+in production** — see [Amendment](#amendment--decision-1-traded-away-an-ordering-guarantee).
 
 **Builds on:** ADR-110 (a grant is its own aggregate), ADR-100 (the
 aggregate-scoped lane), ADR-066 pillar 2 (append coalescing).
@@ -23,62 +23,38 @@ command's group key is `${aggregateType}:${getAggregateId(payload)}`
 `authz_grant:g` — a lane of one. Nothing else ever joins it.
 
 That is fine for interactive access changes, which arrive one at a time. It
-is the wrong shape for a bulk producer. On 2026-08-23 the ADR-110 migration
-restaged 428,720 share-link facts for organization `HXECRq2mRfSQpxTiSCcsS`
-and each fact appended its own single-row insert into `event_log`.
+is the wrong shape for a bulk producer, and a migration restating one
+organization's whole fact set is exactly that: each fact appended its own
+single-row insert into `event_log`.
 
-Measured in production, 14:29 → 16:03 UTC+2:
+What that did, in shape rather than in figures:
 
-| | during | after staging stopped |
-|---|---|---|
-| ClickHouse statements in flight | **200** (the limiter's whole budget) | 39 → 11 |
-| ClickHouse statements queued | ~1,090 | 0 |
-| mean wait for a statement slot | **5.7 s** | 0.000018 s |
-| mean job duration | 6,300 ms | 571 ms |
-| jobs completed | ~200/s | ~2,092/s |
-| worker CPU (10 pods) | 1.5–2.2 cores total | unchanged |
-| active groups | 1,259–1,280 | 1,265 |
+- The ClickHouse statement limiter (`server/clickhouse/statementLimit.ts`)
+  went to its ceiling and stayed there, with a long wait queue behind it.
+- Job duration became dominated by time spent waiting for a statement slot
+  rather than by doing any work.
+- Throughput therefore collapsed to the rate the limiter could drain,
+  fleet-wide.
 
-Every number follows from the first row:
+Two things are worth stating plainly about that.
 
-```text
-200-statement budget, ~1 s per statement
-   -> ~195 statements/s drained
-      -> 1,090 queued / 195 = 5.6 s wait
-         -> job = 5.7 s waiting + 0.6 s working = 6.3 s
-            -> 1,270 fleet slots / 6.3 s = 200 jobs/s
-```
-
-Two things are worth stating plainly about that table.
-
-**Concurrency was never the constraint.** Active groups sat at ~1,270 the
-entire time and worker CPU never moved off ~0.2 of a core per pod, on a
-single-threaded runtime. The fleet was full of jobs that were all asleep
+**Concurrency was never the constraint.** Active group count and worker CPU
+did not move throughout. The fleet was full of jobs that were all asleep
 waiting for the same semaphore. Raising the dispatch budget — the intuitive
 fix, and one we considered — would have admitted more jobs into a fleet with
 no free slots and a saturated limiter. It would have made this worse.
 
-**The blast radius was the whole platform, not the migration.** Mean job
-duration during the window, by job type:
+**The blast radius was the whole platform, not the migration.** Every job type
+that touches ClickHouse slowed by roughly the same factor, customer span
+ingestion (`recordSpan`) included, because the limiter is first-come,
+first-served: it bounds total concurrency and bounds the wait queue, but it
+has no notion of what the statement is *for*. A bulk backfill and a customer's
+trace write are peers.
 
-```text
-executeEvaluation    ████████████████████ 20.7 s
-metricTimeRollup     ███████████████ 15.5 s
-canonicalLogStorage  ██████████████ 14.9 s
-recordSpan           █████████████ 13.5 s   <- customer trace ingestion
-authzGrantsWrite     ███████████ 11.6 s
-```
-
-Customer span ingestion took 13.5 seconds a job because a background
-migration was allowed to hold all 200 statement slots. The statement limiter
-(`server/clickhouse/statementLimit.ts`) is first-come, first-served: it bounds
-total concurrency and bounds the wait queue, but it has no notion of what the
-statement is *for*. A bulk backfill and a customer's trace write are peers.
-
-## Amendment (2026-08-23) — decision 1 traded away an ordering guarantee
+## Amendment — decision 1 traded away an ordering guarantee
 
 The decision below originally sharded an organization's grant commands across
-32 lanes so their appends could coalesce. That shipped as #7435 and was
+a fixed number of lanes so their appends could coalesce. That shipped and was
 withdrawn the same day, before the shape ever ran under load. This section
 records why, because the reasoning that justified it was wrong in a way worth
 keeping.
@@ -93,17 +69,16 @@ for a command `jobPath` is `command/${commandName}`. So one grant's attach and
 its revoke have **always** lived in two different lanes:
 
 ```text
-<org>/command/attachGrant/authz_grant:grant_7Hk2mQ
-<org>/command/revokeGrant/authz_grant:grant_7Hk2mQ    <- a different lane
+<org>/command/attachGrant/authz_grant:<grantId>
+<org>/command/revokeGrant/authz_grant:<grantId>    <- a different lane
 ```
 
-Under the pre-existing shape both lanes held ~one command and drained
-immediately, so the skew between them was microseconds and the reordering was
+Under the pre-existing shape both lanes held about one command and drained
+immediately, so the skew between them was negligible and the reordering was
 theoretical. Sharding was designed to make lanes **deep** — that was the whole
-point. A lane holding 1/32 of an organization's grant commands, next to a
-revoke lane holding almost none, makes the skew proportional to the backlog.
-The guarantee was formally unchanged and the *behaviour* was not, and the ADR
-described only the former.
+point. A deep attach lane next to a nearly empty revoke lane makes the skew
+proportional to the backlog. The guarantee was formally unchanged and the
+*behaviour* was not, and the ADR described only the former.
 
 **The projection cannot recover the order downstream.** The `occurredAt` guard
 in `authz-grants-write.prisma.repository.ts` adjudicates between two writes to
@@ -135,13 +110,15 @@ FIFO lane — closing a gap that predates this ADR entirely:
 
 ```text
 BEFORE (ADR-110 default)     attach -> <org>/command/attachGrant/authz_grant:g
-                             revoke -> <org>/command/revokeGrant/authz_grant:g   two lanes
+                             revoke -> <org>/command/revokeGrant/authz_grant:g
+                                                                       two lanes
 
-#7435 (sharded, withdrawn)   attach -> <org>/command/attachGrant/authz_grant:14
-                             revoke -> <org>/command/revokeGrant/authz_grant:14  two DEEP lanes
+SHARDED (withdrawn)          attach -> <org>/command/attachGrant/authz_grant:<shard>
+                             revoke -> <org>/command/revokeGrant/authz_grant:<shard>
+                                                                       two DEEP lanes
 
 NOW (serializeByAggregate)   attach -> <org>/command/authz_grant:g
-                             revoke -> <org>/command/authz_grant:g               ONE lane, FIFO
+                             revoke -> <org>/command/authz_grant:g     ONE lane, FIFO
 ```
 
 It also changes how a lane is ordered. `serializeByAggregate` scores jobs by
@@ -150,12 +127,12 @@ a grant's lane is strict enqueue-order FIFO. For a single aggregate that is the
 right meaning of "in order": a retry cannot sort itself ahead of a newer
 command by carrying an older timestamp.
 
-**What we gave up.** The 428,720 → ~8,500 statement reduction. That is a real
-loss and it is affordable for one reason: **#7429 removed the volume at
-source.** A pass now states only the facts the projection heads do not already
-carry, so the bulk producer that motivated the sharding no longer exists, and
-the migration itself has since finished. Buying throughput we no longer need
-with an ordering guarantee we do need is the wrong trade.
+**What we gave up.** The statement economy a batch factor would have bought.
+That is a real loss and it is affordable for one reason: **#7429 removed the
+volume at source.** A pass now states only the facts the projection heads do
+not already carry, so the bulk producer that motivated the sharding no longer
+exists. Buying throughput we no longer need with an ordering guarantee we do
+need is the wrong trade.
 
 Correspondingly, `commandShardKey.ts` moves back to
 `pipelines/trace-processing/commands/`, its only home again now that the
@@ -198,10 +175,10 @@ carries this ADR.
 The first shape considered was a two-class split: statements are
 `interactive` by default, a caller may declare itself `background`, and
 background work may hold at most a fraction of the budget. Writing it down
-killed it. `recordSpan` — the job whose 13.5-second latency is the reason
-this matters — is queue work too. Any rule that classes "queue work" as
-background starves customer ingestion alongside the migration and contains
-nothing that actually happened here.
+killed it. `recordSpan` — the job whose latency is the reason this matters —
+is queue work too. Any rule that classes "queue work" as background starves
+customer ingestion alongside the migration and contains nothing that actually
+happened here.
 
 The axis that separates them is the **producer**, not the caller's
 interactivity. The correct shape is the one the dispatch path already has:
@@ -235,11 +212,10 @@ that hazard predates all of this — but that only covers the migration, and the
 skew sharding introduces applies to ordinary interactive traffic too.
 
 **Why is losing the batch factor acceptable?** Because #7429 deleted the
-demand rather than absorbing it. The 428,720 appends were a pass restating
-facts the heads already carried; a pass now states only what is missing, and
-the migration has finished. Should another bulk grant producer appear, the
-answer is decision 2 — bound what one producer may hold — not a wider lane
-that reorders a grant's own history.
+demand rather than absorbing it. The appends were a pass restating facts the
+heads already carried; a pass now states only what is missing. Should another
+bulk grant producer appear, the answer is decision 2 — bound what one producer
+may hold — not a wider lane that reorders a grant's own history.
 
 **Why not both — shard, and serialize a grant across command types?** The
 queue offers exactly two shapes and they are mutually exclusive.
@@ -277,5 +253,4 @@ path. There is no third option, and inventing one means changing
 - `platform/app/src/server/clickhouse/statementLimit.ts`
 - `specs/event-sourcing/authz-grant-command-lanes.feature`
 - PR #7429 — the heads filter that stopped the restaging at source
-- PR #7435 — the sharded lane, superseded by the amendment above
 - ADR-110 — a grant is its own aggregate

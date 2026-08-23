@@ -1242,9 +1242,9 @@ describe("given an organization with legacy access rows", () => {
     });
 
     /**
-     * The family that made this necessary: one organization carries 428,720
-     * share links, one fact each, and a held organization restaged all of
-     * them on every worker boot.
+     * The family that made this necessary: share links, one fact each, in a
+     * population large enough that a held organization restaging all of them
+     * on every worker boot never converged.
      *
      * @scenario "A pass states only the facts the heads do not carry"
      */
