@@ -110,10 +110,47 @@ Feature: Running system migrations across organizations
     Then none of the already-enrolled organizations are drawn again
 
   @unit
-  Scenario: A cohort never includes an enterprise organization
+  Scenario: A cohort leaves out an enterprise organization by default
     Given an enterprise organization exists
     When a cohort is sampled
-    Then the enterprise organization is never drawn
+    Then the enterprise organization is not drawn
+
+  @unit
+  Scenario: A cohort leaves out a private-dataplane organization by default
+    Given an organization with a dedicated data plane exists
+    When a cohort is sampled
+    Then that organization is not drawn
+
+  # Finishing a proven rollout means taking the held-back organizations over
+  # too, and the single-organization enroll never applied either exclusion —
+  # so the only thing the default was buying was an operator enrolling them
+  # one id at a time.
+  @unit
+  Scenario: An operator can draw enterprise organizations into a cohort
+    Given an enterprise organization exists
+    When a cohort is sampled with enterprise organizations included
+    Then the enterprise organization can be drawn
+
+  @unit
+  Scenario: An operator can draw private-dataplane organizations into a cohort
+    Given an organization with a dedicated data plane exists
+    When a cohort is sampled with dedicated-data-plane organizations included
+    Then that organization can be drawn
+
+  # Two switches, not one: an enterprise organization is a commercial risk and
+  # a private-dataplane organization keeps its events in a ClickHouse instance
+  # of its own. Lifting one must never lift the other.
+  @unit
+  Scenario: Including one held-back class does not include the other
+    Given an enterprise organization and a dedicated-data-plane organization exist
+    When a cohort is sampled with only enterprise organizations included
+    Then the enterprise organization can be drawn
+    And the dedicated-data-plane organization is not drawn
+
+  @unit
+  Scenario: A widened cohort says so in the audit trail
+    When a cohort is sampled with a held-back class included
+    Then each enrolled organization's audit row records which classes were included
 
   @unit
   Scenario: A later step's cohort samples only organizations enrolled for the step before it
