@@ -67,12 +67,28 @@ function guidanceRegionRe(): RegExp {
   );
 }
 
-/** Whether the file carries a LangWatch guidance block. */
+/**
+ * The region plus the one newline install put in front of it to separate it
+ * from the user's content. Removing this and nothing else restores a
+ * non-empty file byte for byte.
+ */
+function guidanceRemovalRe(): RegExp {
+  return new RegExp(
+    `\\n?${escapeRe(GUIDANCE_BEGIN)}[\\s\\S]*?${escapeRe(GUIDANCE_END)}\\n?`,
+    "m",
+  );
+}
+
+/**
+ * Whether the file carries a complete LangWatch guidance block. A lone begin
+ * marker is not one: removal accepts only a complete region, so anything
+ * looser would report a target that cannot be removed.
+ */
 export function hasCodexAgentGuidance(
   filePath = defaultCodexAgentsMdPath(),
 ): boolean {
   try {
-    return fs.readFileSync(filePath, "utf8").includes(GUIDANCE_BEGIN);
+    return guidanceRegionRe().test(fs.readFileSync(filePath, "utf8"));
   } catch {
     return false;
   }
@@ -90,8 +106,11 @@ export function installCodexAgentGuidance(
   let content = "";
   try {
     content = fs.readFileSync(filePath, "utf8");
-  } catch {
-    /* no file yet: the block becomes the file */
+  } catch (error) {
+    // Only an absent file means "the block becomes the file". Any other read
+    // failure, a permission error above all, must not fall through to a write
+    // that would replace the user's content with our block alone.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
   let next: string;
@@ -104,7 +123,10 @@ export function installCodexAgentGuidance(
   } else if (content === "") {
     next = block;
   } else {
-    next = `${content.replace(/\n*$/, "\n\n")}${block}`;
+    // Exactly one newline separates the user's content from our region, and
+    // removal takes that newline back with the region. The user's own bytes,
+    // trailing newlines included, are left as they are.
+    next = `${content}\n${block}`;
   }
 
   if (next === content) return { changed: false };
@@ -128,7 +150,7 @@ export function removeCodexAgentGuidance(
   } catch {
     return false;
   }
-  const region = guidanceRegionRe().exec(content);
+  const region = guidanceRemovalRe().exec(content);
   if (!region) return false;
 
   const remainder =

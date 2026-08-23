@@ -28,11 +28,11 @@ const CLAUDE_MARKERS = [
   "CLAUDE_PROJECT_DIR",
 ] as const;
 
-const insideClaude = CLAUDE_MARKERS.some(
+const isInsideClaude = CLAUDE_MARKERS.some(
   (marker) => (process.env[marker]?.trim() ?? "") !== "",
 );
 
-if (insideClaude) {
+if (isInsideClaude) {
   process.stdout.write(
     `${JSON.stringify({
       hookSpecificOutput: {

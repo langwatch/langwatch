@@ -32726,9 +32726,9 @@ When one machine runs several codex sessions at the same time, the command attri
 For the full per-turn traces of a review to land on the pull request too, a fresh `codex` session inside a worktree of the pull request's branch is still the most complete setup:
 
 ```bash
-git -C <repo> fetch origin <branch>
-git -C <repo> worktree add -B <branch> <repo>/.claude/worktrees/<name> origin/<branch>
-cd <repo>/.claude/worktrees/<name> && codex
+git -C "<repo>" fetch origin "<branch>"
+git -C "<repo>" worktree add -B "<branch>" "<repo>/.claude/worktrees/<name>" "origin/<branch>"
+cd "<repo>/.claude/worktrees/<name>" && codex
 ```
 
 Claude Code sessions can also switch natively, with the EnterWorktree tool. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.

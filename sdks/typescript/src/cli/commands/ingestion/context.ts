@@ -289,7 +289,8 @@ async function resolveSession({
 }): Promise<ResolvedSession | null> {
   if (sessionId || agent) {
     const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
-    if (!sessionId || !AGENTS.has(normalized)) {
+    const trimmedSessionId = sessionId?.trim() ?? "";
+    if (!trimmedSessionId || !AGENTS.has(normalized)) {
       writeLine(
         "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
       );
@@ -297,11 +298,11 @@ async function resolveSession({
     }
     return {
       agent: normalized,
-      sessionId: sessionId.trim(),
+      sessionId: trimmedSessionId,
       codexMeta:
         normalized === "codex"
           ? await readCodexMeta({
-              sessionId: sessionId.trim(),
+              sessionId: trimmedSessionId,
               codexSessionsRoot,
             })
           : null,

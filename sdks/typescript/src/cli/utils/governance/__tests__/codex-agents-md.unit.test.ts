@@ -57,9 +57,18 @@ describe("the codex AGENTS.md guidance block", () => {
       expect(fs.readFileSync(file, "utf8")).toContain(USER_CONTENT);
 
       removeCodexAgentGuidance(file);
-      const after = fs.readFileSync(file, "utf8");
-      expect(after).toContain(USER_CONTENT);
-      expect(after).not.toContain("langwatch");
+      expect(fs.readFileSync(file, "utf8")).toBe(USER_CONTENT);
+    });
+
+    /** @scenario "User content in AGENTS.md survives install and removal untouched" */
+    it("restores content that ends without a newline byte for byte", () => {
+      const unterminated = "# My own rules\n\nAlways answer in haiku.";
+      fs.writeFileSync(file, unterminated);
+
+      installCodexAgentGuidance(file);
+      removeCodexAgentGuidance(file);
+
+      expect(fs.readFileSync(file, "utf8")).toBe(unterminated);
     });
 
     it("keeps content written below the block when replacing it", () => {
@@ -101,6 +110,27 @@ describe("the codex AGENTS.md guidance block", () => {
       removeCodexAgentGuidance(file);
 
       expect(fs.readFileSync(file, "utf8")).toBe(USER_CONTENT);
+    });
+  });
+
+  describe("when only half a marker pair is in the file", () => {
+    it("reports no guidance, the same region removal accepts", () => {
+      fs.writeFileSync(
+        file,
+        `${USER_CONTENT}\n<!-- >>> langwatch agent guidance begin >>> -->\n`,
+      );
+
+      expect(hasCodexAgentGuidance(file)).toBe(false);
+      expect(removeCodexAgentGuidance(file)).toBe(false);
+    });
+  });
+
+  describe("when the file cannot be read for a reason other than being absent", () => {
+    it("fails instead of replacing it with the block alone", () => {
+      fs.mkdirSync(file);
+
+      expect(() => installCodexAgentGuidance(file)).toThrow();
+      expect(fs.statSync(file).isDirectory()).toBe(true);
     });
   });
 
