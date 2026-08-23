@@ -3,9 +3,15 @@
  *
  * Framework-free on purpose: the browser imports the endpoint path and event
  * type, the server route imports the request schema, and neither drags the
- * other's world along. The version is spelled in the path the client calls —
- * there is no unversioned way to reach the endpoint worth teaching the client
- * ([ADR-112 direction]: omitting a version must never silently mean "latest").
+ * other's world along.
+ *
+ * The version is spelled in the path the client calls, so the client is pinned
+ * to a dated contract rather than following whatever "latest" becomes. That is
+ * a choice about THIS client, not a claim about the surface: `@langwatch/api`
+ * also mounts a bare unversioned alias for every endpoint, which resolves to
+ * latest and is the only mount its OpenAPI document describes. Pinning here
+ * means a new dated version cannot change the reply under a browser that has
+ * not reloaded.
  */
 import { z } from "zod";
 

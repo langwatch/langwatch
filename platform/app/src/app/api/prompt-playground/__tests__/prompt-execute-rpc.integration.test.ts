@@ -212,14 +212,29 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
       expect(response.status).toBe(404);
     });
 
-    it("refuses the unversioned path rather than treating it as the latest", async () => {
+    it("serves the unversioned path as the bare alias for the latest version", async () => {
+      // `@langwatch/api` mounts a bare alias for every endpoint that resolves
+      // to the newest dated version, and that alias is the only mount its
+      // OpenAPI document describes. So the unversioned path reaches the same
+      // handler — it does not 404 — and this asserts that rather than the
+      // opposite, which is what the client's own pinning had been read as
+      // promising.
       const response = await app.request(
         "/api/prompt-playground/prompt.execute",
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "project_1",
+            formValues,
+            variables: [],
+            messages: [{ role: "user", content: "hello" }],
+          }),
+        },
       );
 
-      expect(response.status).toBe(404);
-      expect(studioBackendPostEvent).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(studioBackendPostEvent).toHaveBeenCalled();
     });
   });
 });
