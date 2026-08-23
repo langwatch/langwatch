@@ -124,7 +124,7 @@ const registry = {
   lwql_granularity_too_fine: {
     tips: [
       "The requested bucket size would produce more datapoints than one query may return for this period",
-      "Use a coarser granularity -- 1 second, 1 minute or 1 hour -- or narrow the date range",
+      "Use a bucket size that fits the range from the offered steps -- 1 second, 1 minute or 1 hour -- or narrow the date range",
     ],
   },
   lwql_granularity_requires_window: {

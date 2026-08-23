@@ -894,35 +894,62 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
 # next PR of the stack; #6713 tracks them.
 
 @unit
-@scenario "A statement declaring the granularity parameter runs at the step the workbench supplies"
 Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+  Given SQL declaring period_granularity_seconds as UInt32 alongside both period bounds
+  And the workbench supplies a step of 60 seconds
+  When the member runs the query
+  Then the statement is bound with a granularity of 60 seconds
+  And the result is labelled as following the granularity
 
 @unit
-@scenario "A granularity declared with no step supplied runs on its own authored bucketing"
 Scenario: A granularity declared with no step supplied runs on its own authored bucketing
+  Given SQL declaring period_granularity_seconds as UInt32
+  And the surface supplies no step
+  When the member runs the query
+  Then no granularity value is bound
+  And the result is labelled as not following the granularity
 
 @unit
-@scenario "A caller that supplies period_granularity_seconds itself is refused"
 Scenario: A caller that supplies period_granularity_seconds itself is refused
+  Given SQL declaring period_granularity_seconds as UInt32
+  When a caller supplies a value for period_granularity_seconds directly
+  Then the run is refused as a reserved parameter supplied
+  And the refusal names exactly the parameters the caller supplied
 
 @unit
-@scenario "The granularity parameter declared as anything but UInt32 is refused"
 Scenario: The granularity parameter declared as anything but UInt32 is refused
+  Given SQL declaring period_granularity_seconds as a String
+  When the statement is validated
+  Then it is refused as a wrong granularity declaration
+  And the refusal names UInt32 as the required declared type
 
 @unit
-@scenario "A zero or fractional step is refused as a wrong declaration"
 Scenario: A zero or fractional step is refused as a wrong declaration
+  Given SQL declaring period_granularity_seconds as UInt32
+  When the surface supplies a step that is zero, negative, fractional, or not an offered step
+  Then the run is refused as a wrong granularity declaration
+  And the refusal says the step must be one of the offered steps
 
 @integration @unimplemented
-@scenario "A saved chart declaring granularity without both period parameters is refused at save"
 Scenario: A saved chart declaring granularity without both period parameters is refused at save
-  Tracking: #6713 (run-path wiring PR)
+  # Tracking: #6713 (run-path wiring PR)
+  Given SQL declaring period_granularity_seconds without period_start or period_end
+  When the member saves the chart
+  Then the save is refused because granularity requires the period parameters
+  And the refusal names which period bounds are absent
 
 @unit
-@scenario "A granularity declared alongside a mistyped period bound is refused at save"
 Scenario: A granularity declared alongside a mistyped period bound is refused at save
+  Given SQL declaring period_granularity_seconds and period_start declared as a String
+  When the statement is validated
+  Then it is refused because granularity requires well-typed period parameters
+  And the refusal distinguishes the mistyped bound from an absent one
 
 @integration @unimplemented
-@scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST"
 Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
-  Tracking: #6713 (run-path wiring PR)
+  # Tracking: #6713 (run-path wiring PR)
+  Given a chart declaring granularity and a requested step of 1 second
+  And a period wide enough that the window divided by the step exceeds 10,000 buckets
+  When the member runs it on a caller-owned surface
+  Then the run is refused as too fine for the period
+  And a dashboard running the same chart is coarsened to the finest step that fits

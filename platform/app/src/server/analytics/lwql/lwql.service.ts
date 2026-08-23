@@ -265,8 +265,12 @@ export class LangWatchQLService {
    *
    * @throws the validator's handled error when the policy refuses the query,
    *   {@link LangWatchQLParameterMissingError} when a declared parameter has no
-   *   value, and the two time-window refusals in `./timeWindow.ts` when a
-   *   reserved name is supplied by the caller or declared as a non-date-time.
+   *   value, the two time-window refusals in `./timeWindow.ts` when a
+   *   reserved name is supplied by the caller or declared as a non-date-time,
+   *   {@link LangWatchQLReservedGranularityTypeError} when the granularity
+   *   declaration or a surface-supplied step is malformed, and
+   *   {@link LangWatchQLGranularityRequiresTimeWindowError} when granularity
+   *   is declared without both period bounds.
    */
   validate({
     projectId,
@@ -313,9 +317,9 @@ export class LangWatchQLService {
       throw lwqlValidationError(validation);
     }
 
-    // The save-time granularity rules ride on every validate: type and
-    // requires-window are refused wherever the statement is persisted, which
-    // is what makes REST and tRPC saves refuse identically.
+    // The granularity rules ride on every validate -- persisted saves AND
+    // ad-hoc execution, since execute() calls validate() -- which is what
+    // makes REST saves, tRPC saves and workbench runs refuse identically.
     assertLangWatchQLGranularityDeclaration(validation.parameters);
 
     // Before the missing-parameter check, never after: an injected window IS a

@@ -373,7 +373,7 @@ const presentations = {
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
     describe: () =>
-      "The bucket size you picked produces more datapoints than one query may return for this date range. Pick a coarser granularity -- 1 second, 1 minute or 1 hour -- or narrow the range.",
+      "The bucket size you picked produces more datapoints than one query may return for this date range. Pick a bucket size that fits the range from the offered steps -- 1 second, 1 minute or 1 hour -- or narrow the range.",
   },
   lwql_granularity_requires_window: {
     title: "Granularity needs the period parameters",
