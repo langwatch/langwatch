@@ -2,98 +2,70 @@
 #
 # ADR-110 made a grant its own AGGREGATE, which fixed the whole-organization
 # fold. Because a command's group key defaults to the aggregate id, it also
-# gave every grant its own LANE — a lane of one, which nothing can batch with.
-# That is right for interactive access changes and wrong for a bulk producer:
-# on 2026-08-23 one migration's 428,720 single-row appends held all 200
-# ClickHouse statement slots for ninety minutes, and every pipeline on the
-# fleet — customer span ingestion included — queued behind it.
+# gave every grant its own LANE — and because the queue puts the command NAME
+# in the job path, `attachGrant` and `revokeGrant` for ONE grant sat in two
+# lanes that could drain in either order.
+#
+# ADR-114 first tried to shard those lanes so a bulk producer's appends would
+# coalesce. That made the skew between the two lanes far larger, and the skew
+# is not recoverable downstream: `revoked` is a conditional UPDATE, so a revoke
+# that arrives before its row exists matches nothing and writes nothing, and
+# the late `attached` then inserts a live row no revocation contradicts. The
+# amended decision serializes every command about one grant into ONE lane.
 #
 # The fold is not in scope here and does not change: state is still one grant.
 # This file is only about which queue lane a command WAITS in.
 
 @event-sourcing @authz
-Feature: Grant commands share a sharded organization lane
+Feature: Every command about one grant rides one ordered lane
   As the LangWatch platform
-  I want a bulk grant producer's appends to coalesce instead of spending one
-  ClickHouse statement each
-  So that a background import cannot exhaust the statement budget that
-  customer-facing work depends on
+  I want the commands that change a single grant to apply to it in the order
+  they were issued
+  So that a revoke can never be overtaken by the attach it follows and leave
+  access live that an operator took away
 
   # ═══ The lane ═════════════════════════════════════════════════════════
 
   @unit
-  Scenario: Commands about the same grant share a lane
-    Given two commands naming the same grant
+  Scenario: Every command about one grant rides one lane
+    When the grants pipeline is built
+    Then attaching, revoking and role-changing each serialize on the grant
+    And none of them declares a lane override the queue would ignore
+
+  @unit
+  Scenario: A grant's attach and its revoke share one lane
+    Given an attach and a revoke naming the same grant
     When their lanes are derived
-    Then both land in the same lane
-    And their order relative to each other is preserved
+    Then both resolve to the same grant
+    And the command name does not separate them into two lanes
+    And the revoke is handled after the attach it follows
 
   @unit
-  Scenario: Commands about different grants spread across lanes
-    Given grant commands for many different grants in one organization
+  Scenario: Commands about different grants stay independent
+    Given commands naming different grants in one organization
     When their lanes are derived
-    Then they are spread across the organization's lanes
-    And no lane holds all of them
-
-  @unit
-  Scenario: A lane is stable across processes and restarts
-    Given a grant id
-    When its lane is derived twice
-    Then both derivations give the same lane
-
-  @unit
-  Scenario: The organization is not repeated in the lane
-    Given a grant command for an organization
-    When its lane is derived
-    Then the lane does not restate the organization
-    And the queue key still separates one organization from another
-
-  @unit
-  Scenario: Sharding can be turned off
-    Given a shard count of one
-    When lanes are derived for many grants
-    Then every command lands in a single lane per organization
-
-  @unit
-  Scenario Outline: A nonsensical shard count falls back to one lane
-    Given a shard count of <count>
-    When a lane is derived
-    Then it does not throw
-    And the command lands in the single lane
-
-    Examples:
-      | count |
-      | 0     |
-      | -1    |
-      | 1.5   |
-
-  @unit
-  Scenario: The shard count is bounded
-    Given a shard count above the maximum
-    When a lane is derived
-    Then the maximum is used instead
+    Then they land in different lanes
+    And neither waits on the other
 
   # ═══ The batching ═════════════════════════════════════════════════════
-
+  #
+  # Narrower than it was: a batch now folds ONE grant's own queued
+  # same-command jobs, which is safe precisely because they share an
+  # aggregate and drain in order. It buys no cross-grant economy and is not
+  # meant to — a bulk producer's pressure is answered where it is created
+  # (PR #7429, which stopped a pass restating facts the heads already carry),
+  # not by weakening the order a grant is applied in.
   @unit
-  Scenario: The grant commands a bulk producer emits are registered to coalesce
+  Scenario: A grant's queued commands fold into one insert
     When the grants pipeline is built
     Then attaching, revoking and role-changing each declare a batch bound
-    And each declares the sharded lane
+    And the batch bound is a flat number, not a resolver
 
   @unit
   Scenario: Role commands keep the default lane
     When the grants pipeline is built
-    Then defining, changing and deleting a role declare no lane override
+    Then defining, changing and deleting a role declare no serialization
     And they declare no batch bound
-
-  # A grant command's payload is a handful of ids and never expands after it is
-  # dequeued, so the drain's byte budget weighs it honestly and a flat bound is
-  # safe — unlike the span case, whose spooled payloads needed a resolver.
-  @unit
-  Scenario: The batch bound is a flat number, not a resolver
-    When the grants pipeline is built
-    Then the batch bound is a number
 
   # ═══ What must not change ═════════════════════════════════════════════
   #
