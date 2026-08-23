@@ -38,6 +38,27 @@ Feature: Auth-path Redis-loss resilience
     And the drop is counted and logged, because rate limiting fails open with it
 
   @unit
+  Scenario: A dropped delete is retried out of band until Redis recovers
+    Given Redis is configured but erroring when a session is revoked
+    When the revocation's secondary-storage delete drops
+    Then the delete is re-attempted on an interval
+    And it lands once Redis recovers, and the retrying stops
+
+  @unit
+  Scenario: A delete that never lands is abandoned after the retry window, counted
+    Given Redis stays down past the retry window
+    When a dropped delete keeps failing its re-attempts
+    Then the key is abandoned when its window closes
+    And the abandonment is counted and logged without the key
+
+  @unit
+  Scenario: The retry set overflowing abandons the oldest dropped delete
+    Given the retry set is at its capacity
+    When another delete drops
+    Then the oldest pending key is abandoned with the abandonment counted
+    And the newer keys keep retrying
+
+  @unit
   Scenario: The flag off keeps previous behavior exactly
     Given AUTH_REDIS_FAIL_OPEN is not enabled
     When better-auth uses secondary storage

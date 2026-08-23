@@ -51,7 +51,7 @@ import type {
   SystemMigration,
   TenantMigrationOutcome,
 } from "@langwatch/system-migrations";
-import { identifierProviderFor } from "~/server/better-auth/identityDatabase";
+import { identifierProviderFor } from "~/server/better-auth/identityRouting";
 import { IdentityCommandRefusedError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
 import {
   arrivalStateForProvider,

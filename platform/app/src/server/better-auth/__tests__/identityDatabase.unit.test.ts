@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { IdentityPrimaryMustDemoteFirstError } from "~/server/event-sourcing/pipelines/identity/commands/identityCommandErrors";
+import { createIdentityDatabase } from "../identityDatabase";
 import {
-  createIdentityDatabase,
   IdentityAdapterUnroutedWriteError,
   identifierProviderFor,
   ROUTED_MODELS,
   routeWrite,
   WRITE_OPERATIONS,
-} from "../identityDatabase";
+} from "../identityRouting";
 
 const USER = "user_sam";
 

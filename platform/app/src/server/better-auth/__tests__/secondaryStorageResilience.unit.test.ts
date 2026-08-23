@@ -118,7 +118,7 @@ describe("better-auth secondary storage fail-open (D02 seam b)", () => {
       expect(storage.delete.mock.calls.length).toBe(attemptsSoFar);
     });
 
-    /** @scenario "A delete that never lands is abandoned after the retry window, counted" */
+    /** @scenario "The retry set overflowing abandons the oldest dropped delete" */
     it("abandons the oldest key when the retry set overflows its cap, counted", async () => {
       vi.useFakeTimers();
       const storage = erroringStorage();
