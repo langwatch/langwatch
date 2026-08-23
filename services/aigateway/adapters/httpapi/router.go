@@ -1501,8 +1501,12 @@ var (
 	sseDataPrefix  = []byte("data: ")
 	sseDoubleNL    = []byte("\n\n")
 	sseErrorPrefix = []byte("event: error\ndata: ")
-	sseWarnPrefix  = []byte("event: warning\ndata: ")
 	sseDone        = []byte("data: [DONE]\n\n")
+	// SSE comment line (RFC 9110 text/event-stream): spec clients ignore
+	// lines starting with a colon, while curl -N and log scrapers still see
+	// the diagnostic. Strict OpenAI-compatible clients schema-validate every
+	// data: payload against chunk | error, so the note must never ride one.
+	sseUsageWarnComment = []byte(": provider_did_not_report_usage_on_stream\n\n")
 )
 
 // streamErrorFrame builds the data payload for a terminal `event: error`.
@@ -1598,10 +1602,7 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if !raw && iter.Usage().TotalTokens == 0 {
-		warnJSON, _ := sonic.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
-		_, _ = w.Write(sseWarnPrefix)
-		_, _ = w.Write(warnJSON)
-		_, _ = w.Write(sseDoubleNL)
+		_, _ = w.Write(sseUsageWarnComment)
 	}
 
 	if !raw {
