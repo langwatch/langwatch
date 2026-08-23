@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2020"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/identity-server.tsbuildinfo",
+    // Consumers import the TypeScript sources directly (see the package's
+    // `exports`), so this project only ever type-checks - nothing is built.
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  // Tests are checked by tsconfig.test.json, which adds the vitest globals
+  // this project does not need.
+  "exclude": ["src/__tests__/**"]
+}
