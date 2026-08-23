@@ -100,6 +100,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And each figure rolls up from zero as a rolling number
     And the figures stay still for people who prefer reduced motion
 
+  # The card used to word-match its badge anywhere in the payload, so reading
+  # the failing rows of a run painted a red "failed" badge on a call that
+  # succeeded, and the body under it was the first two lines of the JSON.
+  @integration
+  Scenario: A run card reads its state from the run, not from its rows
+    When Langy reads the failing rows of a run that succeeded
+    Then the card shows no failure
+    And it counts the rows it read instead of printing their JSON
+
   @integration
   Scenario: An unmapped tool falls through to the raw view
     When Langy runs a tool that is not a LangWatch action and has no capability card
