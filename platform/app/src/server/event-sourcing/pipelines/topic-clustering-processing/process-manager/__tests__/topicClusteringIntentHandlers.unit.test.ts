@@ -219,6 +219,37 @@ describe("createTopicClusteringRunHandler", () => {
     });
   });
 
+  describe("when clustering fails for a reason only the customer can fix", () => {
+    it("records run_failed on the first attempt instead of retrying", async () => {
+      const commands = makeCommands();
+      const run = createTopicClusteringRunHandler({
+        runPort: {
+          runClusteringPage: vi
+            .fn()
+            .mockRejectedValue(
+              new ModelNotConfiguredError(
+                "analytics.topic_clustering_llm",
+                "FAST",
+                "Topic clustering",
+                "project-1",
+              ),
+            ),
+        },
+        commands: () => commands,
+        clock: () => 999,
+      });
+
+      await run(makePayload(), makeContext({ attempt: 1 }));
+
+      expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorCode: "model_not_configured",
+          isUserActionable: true,
+        }),
+      );
+    });
+  });
+
   describe("when clustering fails on the final attempt", () => {
     it("records a durable run_failed instead of dying silently", async () => {
       const commands = makeCommands();
@@ -383,6 +414,45 @@ describe("run outcome metrics (ADR-054)", () => {
         outcome: "failed_final",
       });
       expect(after).toBe(before + 1);
+    });
+  });
+
+  describe("when the failure is the customer's to fix", () => {
+    it("counts a failed_customer page, keeping failed_final an internal-fault signal", async () => {
+      const beforeCustomer = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_customer",
+      });
+      const beforeFinal = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_final",
+      });
+      const commands = makeCommands();
+      const run = createTopicClusteringRunHandler({
+        runPort: {
+          runClusteringPage: vi
+            .fn()
+            .mockRejectedValue(
+              new ModelNotConfiguredError(
+                "analytics.topic_clustering_llm",
+                "FAST",
+                "Topic clustering",
+                "project-1",
+              ),
+            ),
+        },
+        commands: () => commands,
+        clock: () => 999,
+      });
+
+      await run(makePayload(), makeContext({ attempt: 1 }));
+
+      const afterCustomer = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_customer",
+      });
+      const afterFinal = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_final",
+      });
+      expect(afterCustomer).toBe(beforeCustomer + 1);
+      expect(afterFinal).toBe(beforeFinal);
     });
   });
 

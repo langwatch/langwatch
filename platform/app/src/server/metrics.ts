@@ -1079,7 +1079,12 @@ const topicClusteringPageTotal = new Counter({
 export const incrementTopicClusteringPageTotal = ({
   outcome,
 }: {
-  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+  outcome:
+    | "completed"
+    | "skipped"
+    | "failed_retryable"
+    | "failed_final"
+    | "failed_customer";
 }) => topicClusteringPageTotal.labels(outcome).inc();
 
 register.removeSingleMetric("topic_clustering_page_duration_milliseconds");
