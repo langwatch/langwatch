@@ -128,6 +128,12 @@ const query = protectedProcedure
       sql: z.string().min(1).max(MAX_LWQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
       timeWindow: lwqlTimeWindowSchema.optional(),
+      /**
+       * The datapoint step for a statement that declares
+       * `{period_granularity_seconds:UInt32}`, in seconds. Shape only — the
+       * bucket-budget arithmetic and its refusal are the service's.
+       */
+      granularitySeconds: z.number().int().positive().optional(),
     }),
   )
   .permission("analytics:view")
@@ -152,6 +158,9 @@ const query = protectedProcedure
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+      ...(input.granularitySeconds === undefined
+        ? {}
+        : { granularitySeconds: input.granularitySeconds }),
     });
   });
 

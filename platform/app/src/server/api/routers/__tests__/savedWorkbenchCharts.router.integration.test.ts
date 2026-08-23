@@ -439,6 +439,61 @@ describe("the saved workbench chart router", () => {
     });
   });
 
+  describe("given a chart declaring the granularity parameter", () => {
+    // The granularity declaration is only meaningful when both period bounds
+    // are declared alongside — without them, the bucket budget no surface can
+    // compute is exactly the one the dashboard needs.
+    const GRANULARITY_WITHOUT_BOUNDS_SQL =
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "count() AS value FROM analytics.traces " +
+      "WHERE OccurredAt >= {period_start:DateTime} " +
+      "GROUP BY bucket ORDER BY bucket";
+
+    const GRANULARITY_WITH_BOUNDS_SQL =
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "count() AS value FROM analytics.traces " +
+      "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+      "GROUP BY bucket ORDER BY bucket";
+
+    describe("when the member saves it without both period parameters", () => {
+      /** @scenario "A saved chart declaring granularity without both period parameters is refused at save" */
+      it("is refused at save with the requires-window code and nothing is written", async () => {
+        expect(
+          await refusalOf(() =>
+            author.create({
+              projectId: PROJECT,
+              name: "Bucketed, half a window",
+              definition: {
+                ...DEFINITION,
+                sql: GRANULARITY_WITHOUT_BOUNDS_SQL,
+                parameters: {},
+              },
+            }),
+          ),
+        ).toBe("lwql_granularity_requires_window");
+
+        expect((await author.getAll({ projectId: PROJECT })).length).toBe(0);
+      });
+
+      it("saves the same declaration once both period bounds stand beside it", async () => {
+        // The control behind the refusal: the declaration itself is fine — it
+        // is the missing bounds that refuse. This also proves a granularity
+        // chart is savable at all now that its surface-owned step is deferred
+        // to run instead of demanded of a save request that may never carry one.
+        const saved = await author.create({
+          projectId: PROJECT,
+          name: "Bucketed, whole window",
+          definition: {
+            ...DEFINITION,
+            sql: GRANULARITY_WITH_BOUNDS_SQL,
+            parameters: {},
+          },
+        });
+        expect(saved.definition.sql).toBe(GRANULARITY_WITH_BOUNDS_SQL);
+      });
+    });
+  });
+
   describe("given a member saving and then editing a chart", () => {
     describe("when they save, read, rename and delete it", () => {
       /** @scenario "A saved chart can be renamed or deleted from the list" */

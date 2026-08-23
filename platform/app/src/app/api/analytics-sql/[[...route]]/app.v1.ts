@@ -78,6 +78,13 @@ const lwqlQuerySchema = z.object({
    * which is also why sending either of those under `parameters` is refused.
    */
   timeWindow: lwqlTimeWindowSchema.optional(),
+  /**
+   * The datapoint step for a statement that declares
+   * `{period_granularity_seconds:UInt32}`, in seconds — the REST twin of the
+   * workbench's step control, so a statement's bucketing means the same thing
+   * at both doors. Shape only: the bucket-budget refusal is the service's.
+   */
+  granularitySeconds: z.number().int().positive().optional(),
 });
 
 // Response schemas exist for the published OpenAPI document. The service owns
@@ -100,6 +107,13 @@ const lwqlResultSchema = z.object({
   // What a consumer can say from it is that this result was offered the period
   // beside it, not that the period bounded it.
   followsTimeWindow: z.boolean(),
+  // The granularity facts, mirroring the service's result: whether the
+  // statement declares the reserved parameter at all, the step this run was
+  // bucketed at when one was supplied for it, and — never set on this
+  // caller-owned door today — what a coarsening surface asked for.
+  followsGranularity: z.boolean(),
+  granularitySeconds: z.number().optional(),
+  coarsenedFromSeconds: z.number().optional(),
   diagnostics: z.array(
     z.object({
       // Enumerated rather than a bare string: a consumer branches on the code,
@@ -141,9 +155,7 @@ const lwqlSchemaSchema = z.object({
   ),
 });
 
-export function registerLangWatchQLRoutes(
-  secured: ReturnType<typeof createProjectApp>,
-): void {
+function registerQuery(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:view")).post(
     "/:projectId/analytics/query/clickhouse",
     describeRoute({
@@ -172,7 +184,8 @@ export function registerLangWatchQLRoutes(
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      const { sql, parameters, timeWindow } = c.req.valid("json");
+      const { sql, parameters, timeWindow, granularitySeconds } =
+        c.req.valid("json");
 
       logger.info(
         { projectId: project.id, sqlLength: sql.length },
@@ -187,11 +200,14 @@ export function registerLangWatchQLRoutes(
         sql,
         ...(parameters ? { parameters } : {}),
         ...(timeWindow ? { timeWindow } : {}),
+        ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
       });
       return c.json(result);
     },
   );
+}
 
+function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:view")).get(
     "/:projectId/analytics/schema",
     describeRoute({
@@ -225,4 +241,17 @@ export function registerLangWatchQLRoutes(
       );
     },
   );
+}
+
+/**
+ * Registers the LangWatchQL analytics SQL routes on the analytics SQL app.
+ *
+ * One function per verb because the house line ceiling is per function; the
+ * split is mechanical and the registration order is the document's.
+ */
+export function registerLangWatchQLRoutes(
+  secured: ReturnType<typeof createProjectApp>,
+): void {
+  registerQuery(secured);
+  registerSchema(secured);
 }

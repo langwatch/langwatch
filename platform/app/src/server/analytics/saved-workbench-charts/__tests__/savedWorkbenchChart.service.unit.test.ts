@@ -17,6 +17,10 @@ import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
+import type {
+  LangWatchQLExecutionRequest,
+  LangWatchQLExecutor,
+} from "../../lwql/executor";
 import { LangWatchQLService } from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
@@ -173,13 +177,43 @@ class FakeStore implements SavedWorkbenchChartStore {
   }
 }
 
-function build() {
+/**
+ * An executor that records what it was asked to run and answers a fixed small
+ * result — the same fake the LangWatchQL service suite drives, because the
+ * claims worth making about a run are "what reached the database", which is an
+ * artifact to inspect rather than a call sequence to verify.
+ */
+function recordingExecutor(): LangWatchQLExecutor & {
+  readonly calls: LangWatchQLExecutionRequest[];
+} {
+  const calls: LangWatchQLExecutionRequest[] = [];
+  return {
+    calls,
+    async execute(request) {
+      calls.push(request);
+      return {
+        columns: [{ name: "value", type: "UInt64" }],
+        rows: [{ value: 7 }],
+        truncated: false,
+        statistics: {
+          elapsedMs: 2,
+          rowsRead: 4,
+          bytesRead: 40,
+          rowsReturned: 1,
+        },
+      };
+    },
+  };
+}
+
+function build(executor: LangWatchQLExecutor | null = null) {
   const store = new FakeStore();
   const service = new SavedWorkbenchChartService({
     repository: store,
-    // No executor: the gate is a policy decision, not a database round trip.
+    // No executor by default: the save gate is a policy decision, not a
+    // database round trip. The run suites pass a recording one.
     lwql: new LangWatchQLService({
-      executor: null,
+      executor,
       database: "analytics",
     }),
   });
@@ -529,6 +563,199 @@ describe("editing a saved workbench chart", () => {
 
         expect(renamed.name).toBe("Traces per week");
         expect(renamed.definition).toEqual(saved.definition);
+      });
+    });
+  });
+});
+
+/**
+ * The run path: what a saved chart becomes when someone opens it and presses
+ * run. Same harness as saving — the real LangWatchQL gate over an in-memory
+ * store — with a recording executor behind the gate, because the claims worth
+ * making are about *what reached the database*: the stored statement, the
+ * stored values, the surface's window and step, or nothing at all.
+ */
+describe("running a saved workbench chart", () => {
+  /** The tenant the run executes for. Only these two fields are ever needed. */
+  const RUNNER = { id: PROJECT_ID, lwqlKey: "sk-lw-run-chart-unit-test-key" };
+
+  /** Seven days — wide enough that only the hour step fits the bucket ceiling. */
+  const WEEK = {
+    start: new Date("2026-02-20T00:00:00.000Z"),
+    end: new Date("2026-02-27T00:00:00.000Z"),
+  };
+
+  /** Declares both reserved window bounds and the granularity parameter. */
+  const BUCKETED_SQL =
+    "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+    "count() AS value FROM analytics.traces " +
+    "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+    "AND TraceName = {name:String} GROUP BY bucket ORDER BY bucket";
+
+  async function saveBucketedChart(
+    service: ReturnType<typeof build>["service"],
+  ) {
+    return await service.createChart({
+      projectId: PROJECT_ID,
+      protections: FULLY_PERMITTED,
+      input: {
+        name: "Traces per step",
+        definition: definition({
+          sql: BUCKETED_SQL,
+          parameters: { name: "checkout" },
+        }),
+      },
+    });
+  }
+
+  describe("given a chart saved with both reserved declarations and its own parameter values", () => {
+    describe("when it is run with the surface's period and step", () => {
+      /** @scenario "Running a saved chart executes its stored statement with its saved values and the surface's window and step" */
+      it("executes the stored statement with all three bound, and reports the facts", async () => {
+        const executor = recordingExecutor();
+        const { service } = build(executor);
+        const saved = await saveBucketedChart(service);
+
+        const result = await service.runChart({
+          id: saved.id,
+          projectId: PROJECT_ID,
+          project: RUNNER,
+          protections: FULLY_PERMITTED,
+          input: {
+            timeWindow: WEEK,
+            // An hour over a week: 168 buckets, inside the ceiling.
+            granularitySeconds: 3600,
+          },
+        });
+
+        expect(executor.calls).toHaveLength(1);
+        expect(executor.calls[0]!.sql).toBe(BUCKETED_SQL);
+        expect(executor.calls[0]!.parameters).toEqual({
+          // Saved alongside the query at save time.
+          name: "checkout",
+          // Injected from the surface at run time.
+          period_start: "2026-02-20 00:00:00",
+          period_end: "2026-02-27 00:00:00",
+          period_granularity_seconds: 3600,
+        });
+        expect(result.rows).toEqual([{ value: 7 }]);
+        expect(result.followsTimeWindow).toBe(true);
+        expect(result.followsGranularity).toBe(true);
+        expect(result.granularitySeconds).toBe(3600);
+      });
+    });
+  });
+
+  describe("given a chart in another project, or an id nothing saved", () => {
+    describe("when the runner names either on their own project", () => {
+      /** @scenario "Another project's saved chart is not runnable" */
+      it("answers not found, identically, and runs nothing", async () => {
+        const executor = recordingExecutor();
+        const { service } = build(executor);
+        const saved = await saveBucketedChart(service);
+
+        expect(
+          (
+            await refusalOf(() =>
+              service.runChart({
+                id: saved.id,
+                projectId: "project-elsewhere",
+                project: { ...RUNNER, id: "project-elsewhere" },
+                protections: FULLY_PERMITTED,
+                input: { timeWindow: WEEK },
+              }),
+            )
+          ).code,
+        ).toBe("saved_workbench_chart_not_found");
+        expect(
+          (
+            await refusalOf(() =>
+              service.runChart({
+                id: "never-saved",
+                projectId: PROJECT_ID,
+                project: RUNNER,
+                protections: FULLY_PERMITTED,
+                input: {},
+              }),
+            )
+          ).code,
+        ).toBe("saved_workbench_chart_not_found");
+        expect(executor.calls).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a step finer than the period's bucket budget allows", () => {
+    describe("when the chart declaring the granularity parameter is run with it", () => {
+      /** @scenario "Running a saved chart refuses a step finer than the period's bucket budget" */
+      it("refuses the run with the ceiling arithmetic and executes nothing", async () => {
+        const executor = recordingExecutor();
+        const { service } = build(executor);
+        const saved = await saveBucketedChart(service);
+
+        const refusal = await refusalOf(() =>
+          service.runChart({
+            id: saved.id,
+            projectId: PROJECT_ID,
+            project: RUNNER,
+            protections: FULLY_PERMITTED,
+            input: {
+              timeWindow: WEEK,
+              // A week of one-second buckets: 604,800, far past 10,000.
+              granularitySeconds: 1,
+            },
+          }),
+        );
+
+        expect(refusal.code).toBe("lwql_granularity_too_fine");
+        expect(refusal.meta).toMatchObject({
+          requestedGranularitySeconds: 1,
+          windowSeconds: 7 * 24 * 3600,
+          maxBuckets: 10_000,
+        });
+        expect(executor.calls).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a chart whose SQL reads a column the runner may no longer see", () => {
+    describe("when someone with narrowed permissions runs it", () => {
+      it("refuses the run on their own current protections, not the author's", async () => {
+        const executor = recordingExecutor();
+        const { service } = build(executor);
+        const saved = await service.createChart({
+          projectId: PROJECT_ID,
+          protections: FULLY_PERMITTED,
+          input: {
+            name: "Captured input",
+            definition: definition({ sql: CONTENT_SQL }),
+          },
+        });
+
+        expect(
+          (
+            await refusalOf(() =>
+              service.runChart({
+                id: saved.id,
+                projectId: PROJECT_ID,
+                project: RUNNER,
+                protections: WITHOUT_CONTENT,
+                input: {},
+              }),
+            )
+          ).code,
+        ).toBe("lwql_not_permitted");
+        expect(executor.calls).toHaveLength(0);
+
+        // A caller who does hold the permission runs the very same chart.
+        await service.runChart({
+          id: saved.id,
+          projectId: PROJECT_ID,
+          project: RUNNER,
+          protections: FULLY_PERMITTED,
+          input: {},
+        });
+        expect(executor.calls).toHaveLength(1);
       });
     });
   });

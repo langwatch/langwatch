@@ -897,9 +897,15 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
 
 # The S1-bindable scenarios below are bound by
 # `src/server/analytics/lwql/__tests__/lwqlGranularity.unit.test.ts` and
-# `.../lwqlGranularityDeclaration.unit.test.ts`. The two marked @unimplemented
-# need the run-path wiring (procedure input + run-by-chart-id) landing in the
-# next PR of the stack; #6713 tracks them.
+# `.../lwqlGranularityDeclaration.unit.test.ts`. The run-path ones are bound by
+# the wiring suites: save-time refusal by
+# `src/server/api/routers/__tests__/savedWorkbenchCharts.router.integration.test.ts`,
+# the budget refusal on caller-owned doors by
+# `src/server/api/routers/__tests__/lwqlGranularityBudget.router.integration.test.ts`
+# (workbench) and
+# `src/app/api/analytics-sql/__tests__/lwqlGranularityRestApi.integration.test.ts`
+# (REST), and run-by-chart-id by
+# `src/server/analytics/saved-workbench-charts/__tests__/savedWorkbenchChart.service.unit.test.ts`.
 
 @unit
 Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
@@ -938,9 +944,8 @@ Scenario: A zero or fractional step is refused as a wrong declaration
   Then the run is refused as a wrong granularity declaration
   And the refusal says the step must be one of the offered steps
 
-@integration @unimplemented
+@integration
 Scenario: A saved chart declaring granularity without both period parameters is refused at save
-  # Tracking: #6713 (run-path wiring PR)
   Given SQL declaring period_granularity_seconds without period_start or period_end
   When the member saves the chart
   Then the save is refused because granularity requires the period parameters
@@ -953,14 +958,14 @@ Scenario: A granularity declared alongside a mistyped period bound is refused at
   Then it is refused because granularity requires well-typed period parameters
   And the refusal distinguishes the mistyped bound from an absent one
 
-@integration @unimplemented
+@integration
 Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
-  # Tracking: #6713 (run-path wiring PR)
   Given a chart declaring granularity and a requested step of 1 second
   And a period wide enough that the window divided by the step exceeds 10,000 buckets
   When the member runs it on a caller-owned surface
   Then the run is refused as too fine for the period
   And a dashboard running the same chart is coarsened to the finest step that fits
+  And the refusal carries the bucket arithmetic in its structured detail
 
 @unit
 Scenario: A window too wide for even the coarsest offered step is refused everywhere

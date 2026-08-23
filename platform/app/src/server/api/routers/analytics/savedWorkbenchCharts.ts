@@ -23,8 +23,10 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
+import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
+import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -133,10 +135,59 @@ const deleteChart = protectedProcedure
     return { success: true };
   });
 
+/**
+ * Runs one saved chart and returns its result.
+ *
+ * A sibling of `getById` rather than a new surface — running is reading with
+ * execution attached — chained through the same permission and switch gates as
+ * every other procedure here. The period and the datapoint step are supplied by
+ * this request, never read out of the stored definition: they are the surface's
+ * to set, which is the whole reserved-parameter contract. Handled errors
+ * propagate untouched, like on `create`: the boundary serialises their code plus
+ * `meta`, and the workbench renders registry copy keyed by that code — including
+ * `lwql_granularity_too_fine`'s bucket arithmetic.
+ */
+const run = protectedProcedure
+  .input(
+    chartScopeSchema.extend({
+      timeWindow: lwqlTimeWindowSchema.optional(),
+      granularitySeconds: z.number().int().positive().optional(),
+    }),
+  )
+  .permission("analytics:view")
+  .use(enforceWorkbenchEnabled)
+  .mutation(async ({ ctx, input }) => {
+    // The project's LangWatchQL secret is hashed into the tenant capability the
+    // query runs under; it is read server-side and never leaves this function.
+    const project = await ctx.prisma.project.findUnique({
+      where: { id: input.projectId },
+      select: { id: true, lwqlKey: true },
+    });
+    if (!project) {
+      throw new NotFoundError("project_not_found", "Project", input.projectId);
+    }
+
+    return SavedWorkbenchChartService.create(ctx.prisma).runChart({
+      id: input.id,
+      projectId: input.projectId,
+      project,
+      protections: await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      }),
+      input: {
+        ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+        ...(input.granularitySeconds === undefined
+          ? {}
+          : { granularitySeconds: input.granularitySeconds }),
+      },
+    });
+  });
+
 export const savedWorkbenchChartsRouter = createTRPCRouter({
   getAll,
   getById,
   create,
   update,
+  run,
   delete: deleteChart,
 });

@@ -44,8 +44,11 @@ import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
   getLangWatchQLService,
+  type LangWatchQLCaller,
+  type LangWatchQLQueryResult,
   type LangWatchQLService,
 } from "../lwql/lwql.service";
+import type { LangWatchQLTimeWindow } from "../lwql/timeWindow";
 import {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDefinitionInvalidError,
@@ -259,6 +262,67 @@ export class SavedWorkbenchChartService {
     if (!row) throw new SavedWorkbenchChartNotFoundError();
 
     return this.present(row);
+  }
+
+  /**
+   * Runs a saved chart: loads it through the one read path charts have and
+   * executes its stored statement through the LangWatchQL gate, with the
+   * surface's period and datapoint step supplied fresh by whoever is asking.
+   *
+   * It lives here rather than beside the ad-hoc query endpoint because the
+   * chart — its stored values, its versioned definition — is this service's
+   * fact, and the execution gate is a dependency it already holds; a second
+   * runner would be a second place that knows what a chart becomes a run.
+   *
+   * The stored definition is re-parsed on the way in (via {@link getById}), so
+   * a row this build can no longer read is refused by name rather than
+   * executed. Validation is not repeated as a separate step because execution
+   * validates first itself, against the caller's own current protections — a
+   * member whose permissions narrowed after saving cannot run the chart into
+   * columns they may no longer read.
+   *
+   * @throws {SavedWorkbenchChartNotFoundError} when no chart of this kind has
+   *   that id in this project — another project's id included.
+   * @throws the LangWatchQL gate's own handled errors: the validator's refusal,
+   *   {@link LangWatchQLParameterMissingError} when the statement declares a
+   *   reserved name the request supplies no value for (a declared granularity
+   *   with no step among them), and
+   *   {@link LangWatchQLGranularityTooFineError} when the period at the
+   *   supplied step overflows the bucket ceiling — a direct chart run is
+   *   caller-owned, so it refuses where the dashboard will coarsen.
+   */
+  async runChart({
+    id,
+    projectId,
+    project,
+    protections,
+    input,
+  }: {
+    id: string;
+    projectId: string;
+    /** The tenant the query runs for; its key never appears in the result. */
+    project: LangWatchQLCaller;
+    /** The runner's content permissions, resolved server-side for this request. */
+    protections: Protections;
+    input: {
+      /** The period the surface is showing, when it has one. */
+      timeWindow?: LangWatchQLTimeWindow;
+      /** The step the surface chose, for a statement that declares the parameter. */
+      granularitySeconds?: number;
+    };
+  }): Promise<LangWatchQLQueryResult> {
+    const chart = await this.getById({ id, projectId });
+
+    return this.deps.lwql.execute({
+      project,
+      protections,
+      sql: chart.definition.sql,
+      parameters: chart.definition.parameters,
+      ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+      ...(input.granularitySeconds !== undefined
+        ? { granularitySeconds: input.granularitySeconds }
+        : {}),
+    });
   }
 
   /**

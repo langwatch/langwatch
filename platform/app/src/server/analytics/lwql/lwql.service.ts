@@ -14,6 +14,9 @@
  *  3. Validate, then resolve the surface's time window into the reserved
  *     parameters the statement declares (`./resolveTimeWindow.ts`) — in that order,
  *     because an injected window is what satisfies the missing-parameter check.
+ *     The granularity declaration is resolved the same way at run, refusing on
+ *     bucket-budget overflow: every door through here is caller-owned, so a
+ *     step finer than the period allows is refused rather than coarsened.
  *     A refusal is thrown as the validator's own handled error and the query
  *     never reaches the database.
  *  4. Execute as the restricted identity, carrying the caller's tenant
@@ -69,10 +72,13 @@ import {
 } from "./executor";
 import {
   assertLangWatchQLGranularityDeclaration,
+  type LangWatchQLGranularityResolution,
+  resolveLangWatchQLGranularity,
   resolveLangWatchQLTimeWindow,
 } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
+import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
 import {
   type AcceptedLangWatchQL,
@@ -80,6 +86,73 @@ import {
 } from "./validation/validate";
 
 const logger = createLogger("langwatch:analytics:lwql");
+
+/**
+ * The run-path half of the reserved-parameter contract, as one step: resolve
+ * what the caller's window and step mean for this request on a caller-owned
+ * door, then refuse when any declared reserved name would still reach the
+ * database without a value — one refusal naming everything the surface forgot
+ * rather than only its first omission.
+ *
+ * An unvalued declared name cannot simply ride along: ClickHouse answers a
+ * missing substitution with `UNKNOWN_QUERY_PARAMETER`, which reaches the caller
+ * as an unknown 500 for something a surface can fix by sending its window or
+ * step. Refusing here, before execution, is what turns that into a named code.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} for a mistyped declaration
+ *   or malformed step, {@link LangWatchQLReservedParameterSuppliedError} when
+ *   the request carries a surface-owned value,
+ *   {@link LangWatchQLGranularityTooFineError} on bucket-budget overflow, and
+ *   {@link LangWatchQLParameterMissingError} when a declared reserved name has
+ *   no value.
+ */
+function resolveRunGranularityOrRefuseUnfilled({
+  declared,
+  parameters,
+  timeWindow,
+  granularitySeconds,
+  awaitingTimeWindow,
+}: {
+  /** Bound parameters the validated statement declares. */
+  readonly declared: Parameters<
+    typeof resolveLangWatchQLGranularity
+  >[0]["declared"];
+  /** Values the caller sent. */
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  /** The period the surface is showing, when it has one. */
+  readonly timeWindow?: LangWatchQLTimeWindow;
+  /** The step the caller-owned surface chose, when it offers one. */
+  readonly granularitySeconds?: number;
+  /**
+   * Reserved window names no window filled — already computed by validate,
+   * joined here so one refusal can name every omission together.
+   */
+  readonly awaitingTimeWindow: readonly string[];
+}): LangWatchQLGranularityResolution {
+  // Caller-owned doors resolve the granularity contract with refuse on
+  // overflow: whoever is asking picked the step, so coarsening it for them
+  // would change the answer they asked for.
+  const granularity = resolveLangWatchQLGranularity({
+    declared,
+    ...(parameters ? { parameters } : {}),
+    ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
+    ...(timeWindow ? { timeWindow } : {}),
+    onBudgetOverflow: "refuse",
+  });
+
+  const unfilledReserved = [
+    ...awaitingTimeWindow,
+    ...(granularity.followsGranularity &&
+    granularity.granularitySeconds === undefined
+      ? [LWQL_PERIOD_GRANULARITY_PARAMETER]
+      : []),
+  ].sort();
+  if (unfilledReserved.length > 0) {
+    throw new LangWatchQLParameterMissingError(unfilledReserved);
+  }
+
+  return granularity;
+}
 
 /** What a caller gets back from the query endpoint. */
 export interface LangWatchQLQueryResult {
@@ -111,6 +184,28 @@ export interface LangWatchQLQueryResult {
    * @see ./timeWindow.ts
    */
   readonly followsTimeWindow: boolean;
+  /**
+   * Whether the statement declares the reserved granularity parameter at all.
+   *
+   * Like `followsTimeWindow`, declaring is all this reports: the author writes
+   * the bucketing expression, so a declaration the SQL never multiplies an
+   * interval with still answers `true`.
+   */
+  readonly followsGranularity: boolean;
+  /**
+   * The step this run was bucketed at, present when the statement declares the
+   * granularity parameter and the caller supplied a step for it. Absent
+   * otherwise — an undeclared statement keeps whatever bucketing its SQL
+   * hard-codes.
+   */
+  readonly granularitySeconds?: number;
+  /**
+   * The step the caller asked for, present only when this run coarsened.
+   * Every current caller refuses on overflow rather than coarsening, so this
+   * is never set through {@link execute} today; it is carried so the result
+   * shape is already the one the dashboard's coarsening door reports into.
+   */
+  readonly coarsenedFromSeconds?: number;
 }
 
 /** The tenant a query runs for. Only these two fields are ever needed. */
@@ -140,6 +235,16 @@ export interface LangWatchQLExecuteInput {
    * @see ./timeWindow.ts
    */
   readonly timeWindow?: LangWatchQLTimeWindow;
+  /**
+   * The datapoint step the caller-owned surface chose, in seconds, for a
+   * statement that declares `{period_granularity_seconds:UInt32}`. Injected
+   * like the window and refused when the period at this step would overflow
+   * the bucket ceiling — every door through {@link execute} belongs to a
+   * caller who picked the step, so there is no coarsening to hide behind.
+   *
+   * Ignored by a statement that does not declare the parameter.
+   */
+  readonly granularitySeconds?: number;
 }
 
 /**
@@ -337,6 +442,12 @@ export class LangWatchQLService {
       // A reserved name with no window yet is not missing — it is deferred to
       // the surface, and `execute` is where that becomes a refusal.
       .filter((name) => !window.awaitingTimeWindow.includes(name))
+      // The granularity is surface-owned exactly like the window bounds, so a
+      // declaration with no step yet is deferred rather than missing: a save
+      // request can never legitimately carry one (the reserved-supplied sweep
+      // above refuses it), and demanding it here would leave every chart that
+      // declares the parameter unsavable.
+      .filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER)
       .sort();
     if (missing.length > 0) throw new LangWatchQLParameterMissingError(missing);
 
@@ -354,7 +465,10 @@ export class LangWatchQLService {
    *
    * @throws the validator's handled error when the policy refuses the query,
    *   {@link LangWatchQLParameterMissingError} when a declared parameter has no
-   *   value, and {@link LangWatchQLUnavailableError} when no LangWatchQL identity
+   *   value — including a declared granularity with no step supplied —
+   *   {@link LangWatchQLGranularityTooFineError} when the period at the
+   *   supplied step overflows the bucket ceiling, and
+   *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
    *   is provisioned.
    */
   async execute({
@@ -363,6 +477,7 @@ export class LangWatchQLService {
     sql,
     parameters,
     timeWindow,
+    granularitySeconds,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     const validation = this.validate({
       projectId: project.id,
@@ -371,13 +486,13 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
-
-    // A statement that asks for the period but was handed none cannot run: the
-    // database would answer `UNKNOWN_QUERY_PARAMETER`, which reaches the caller
-    // as an unknown 500 for something a surface can fix by sending its window.
-    if (validation.awaitingTimeWindow.length > 0) {
-      throw new LangWatchQLParameterMissingError(validation.awaitingTimeWindow);
-    }
+    const granularity = resolveRunGranularityOrRefuseUnfilled({
+      declared: validation.parameters,
+      ...(parameters ? { parameters } : {}),
+      ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+      awaitingTimeWindow: validation.awaitingTimeWindow,
+    });
 
     // Fail closed. The check is here rather than in the constructor so that a
     // deployment with no LangWatchQL identity still answers the schema endpoint,
@@ -392,12 +507,52 @@ export class LangWatchQLService {
       throw new LangWatchQLUnavailableError();
     }
 
+    return await this.executeValidated({
+      executor,
+      project,
+      sql,
+      validation,
+      granularity,
+    });
+  }
+
+  /**
+   * Runs a statement that passed every gate as the restricted identity, and
+   * shapes what came back with the facts those gates recorded.
+   *
+   * Split from {@link execute} because it is the half of the order that has no
+   * more decisions to make — only the database call, the advisory diagnostics
+   * over its answer, and the result both of them describe.
+   */
+  private async executeValidated({
+    executor,
+    project,
+    sql,
+    validation,
+    granularity,
+  }: {
+    readonly executor: LangWatchQLExecutor;
+    readonly project: LangWatchQLCaller;
+    readonly sql: string;
+    readonly validation: ValidatedLangWatchQL;
+    readonly granularity: LangWatchQLGranularityResolution;
+  }): Promise<LangWatchQLQueryResult> {
+    // The resolved record plus the step this run was bucketed at, when the
+    // statement declares the parameter. Built unconditionally and omitted when
+    // empty, so an unparameterised query keeps the request shape it had.
+    const executionParameters = {
+      ...validation.boundParameters,
+      ...(granularity.granularitySeconds === undefined
+        ? {}
+        : {
+            [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
+          }),
+    };
+
     const execution = await executor.execute({
       sql,
-      // The resolved record, not the caller's: it is the one carrying the
-      // window this surface injected.
-      ...(validation.boundParameters
-        ? { parameters: validation.boundParameters }
+      ...(Object.keys(executionParameters).length > 0
+        ? { parameters: executionParameters }
         : {}),
       tenantCapability: lwqlTenantCapability({
         secret: project.lwqlKey,
@@ -430,6 +585,7 @@ export class LangWatchQLService {
         truncated: execution.truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
+        followsGranularity: granularity.followsGranularity,
       },
       "LangWatchQL executed",
     );
@@ -441,6 +597,13 @@ export class LangWatchQLService {
       truncated: execution.truncated,
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
+      followsGranularity: granularity.followsGranularity,
+      ...(granularity.granularitySeconds === undefined
+        ? {}
+        : { granularitySeconds: granularity.granularitySeconds }),
+      ...(granularity.coarsenedFromSeconds === undefined
+        ? {}
+        : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
     };
   }
 }
