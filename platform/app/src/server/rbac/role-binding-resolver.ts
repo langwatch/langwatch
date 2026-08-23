@@ -133,7 +133,9 @@ async function collectBindingsForUser({
       where: {
         organizationId,
         userId,
-        user: { orgMemberships: { some: { organizationId } } },
+        user: {
+          orgMemberships: { some: { organizationId, disabledAt: null } },
+        },
       },
       select: {
         role: true,
@@ -153,7 +155,9 @@ async function collectBindingsForUser({
           members: {
             some: {
               userId,
-              user: { orgMemberships: { some: { organizationId } } },
+              user: {
+                orgMemberships: { some: { organizationId, disabledAt: null } },
+              },
             },
           },
         },
@@ -485,10 +489,13 @@ export async function resolveLegacyCeiling({
   // and the group ids, in one round trip. The org role is needed because
   // EXTERNAL members are capped before any team role is consulted.
   const user = await prisma.user.findFirst({
-    where: { id: userId, orgMemberships: { some: { organizationId } } },
+    where: {
+      id: userId,
+      orgMemberships: { some: { organizationId, disabledAt: null } },
+    },
     select: {
       orgMemberships: {
-        where: { organizationId },
+        where: { organizationId, disabledAt: null },
         select: { role: true },
       },
       groupMemberships: {

@@ -59,6 +59,32 @@ Feature: Reconciling an organization down to its licensed seats
     And the work they did is still attributed to them
 
   @integration
+  Scenario: A disabled member cannot act through any permission path
+    Given a member of the organization has been disabled
+    When they try to act in that organization
+    Then the request is refused
+    And they are told their access was disabled, not that they are not a member
+
+  @unit
+  Scenario: A disabled member's API keys stop working
+    Given a member of the organization has been disabled
+    When a request arrives on an API key they own
+    Then the request is refused
+    But a service key that belongs to nobody keeps working
+
+  @unit
+  Scenario: A link that was public to anyone still opens for a disabled member
+    Given a member of the organization has been disabled
+    When they open a link that was shared with anyone
+    Then the link still opens
+    But a link shared only with the organization does not
+
+  @unit
+  Scenario: Disabling takes effect at once, not when a cache expires
+    When an admin disables or re-enables a membership
+    Then every authorization answer held for that organization is retired immediately
+
+  @integration
   Scenario: A disabled member can be re-enabled when a seat is free
     Given the organization is within its seat count
     And a member of the organization has been disabled

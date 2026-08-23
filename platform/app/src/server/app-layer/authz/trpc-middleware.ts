@@ -28,6 +28,7 @@
  * and refuses any procedure whose chain carries none.
  */
 import {
+  type AuthzDenialReason,
   type AuthzPermission,
   type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
@@ -42,7 +43,10 @@ import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
 import { type App, getApp } from "../app";
-import { LiteMemberRestrictedError } from "../permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  MembershipDisabledError,
+} from "../permissions/errors";
 
 const logger = createLogger("langwatch:authz");
 
@@ -96,7 +100,7 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const { permitted, organizationRole } = await appOf(
+      const { permitted, organizationRole, denialReason } = await appOf(
         ctx,
       ).permissions.getDecision({
         userId: ctx.session.user.id,
@@ -104,7 +108,12 @@ export const checkDeclaredPermission = ({
         scope,
       });
       if (!permitted) {
-        throw deniedError({ permission, scope, organizationRole });
+        throw deniedError({
+          permission,
+          scope,
+          organizationRole,
+          denialReason,
+        });
       }
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
@@ -137,7 +146,7 @@ export const checkDeclaredPermissionAny = (
       if (typeof projectId !== "string" || projectId.length === 0) {
         throw wiringBug({ permission: permissions[0] });
       }
-      const { permitted, organizationRole } = await appOf(
+      const { permitted, organizationRole, denialReason } = await appOf(
         ctx,
       ).permissions.getProjectAnyDecision({
         userId: ctx.session.user.id,
@@ -149,6 +158,7 @@ export const checkDeclaredPermissionAny = (
           permission: permissions[0],
           scope: { tier: "project", id: projectId },
           organizationRole,
+          denialReason,
         });
       }
       ctx.organizationRole = organizationRole;
@@ -261,11 +271,25 @@ function deniedError({
   permission,
   scope,
   organizationRole,
+  denialReason,
 }: {
   permission: AuthzPermission;
   scope: DeclaredScopeId;
   organizationRole: OrganizationUserRole | null;
+  denialReason?: AuthzDenialReason;
 }): TRPCError {
+  // Checked before the role, because a disabled member HAS a role and the
+  // role-shaped answers would all be wrong for them: the lite-member modal
+  // offers an upgrade they cannot buy, and the generic denial names a
+  // permission nobody can grant them while the seat is off.
+  if (denialReason === "membership-disabled") {
+    const disabled = new MembershipDisabledError(scope.id);
+    return new TRPCError({
+      code: "UNAUTHORIZED",
+      message: disabled.message,
+      cause: disabled,
+    });
+  }
   // String comparison on purpose: a VALUE import of the Prisma enum would put
   // the generated client on this module's graph for one constant.
   if (organizationRole === "EXTERNAL") {
@@ -280,7 +304,7 @@ function deniedError({
   const denied = new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
-    denialReason: "no-binding",
+    denialReason: denialReason ?? "no-binding",
   });
   // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
   // here: `handledErrorMiddleware` re-derives it from the handled cause's

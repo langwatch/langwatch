@@ -28,6 +28,7 @@ import {
   ALL_PERMISSIONS,
   AuthzEngine,
   type AuthzDecision,
+  type AuthzDenialReason,
   type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzScopeRef,
@@ -183,7 +184,11 @@ export class AuthzService {
     principal: AuthzPrincipalRef;
     permission: AuthzPermission;
     ceiling?: boolean;
-  }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
+  }): Promise<{
+    allowed: boolean;
+    organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDenialReason;
+  }> {
     const scope = await this.resolveScope({ projectId, teamId, organizationId });
     if (!scope) return { allowed: false, organizationRole: null };
 
@@ -207,7 +212,11 @@ export class AuthzService {
       demoProjectId: this.demoProjectId(),
     });
     recordDenial(decision);
-    return { allowed: decision.allowed, organizationRole: grants.organizationRole };
+    return {
+      allowed: decision.allowed,
+      organizationRole: grants.organizationRole,
+      denialReason: decision.denialReason,
+    };
   }
 
   /**
@@ -227,6 +236,7 @@ export class AuthzService {
     allowed: boolean;
     matchedPermission?: AuthzPermission;
     organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDenialReason;
   }> {
     const scope = await this.collector.resolveScopeRef({ projectId });
     if (!scope) return { allowed: false, organizationRole: null };
@@ -262,6 +272,12 @@ export class AuthzService {
       allowed: matched !== undefined,
       ...(matched ? { matchedPermission: matched } : {}),
       organizationRole: grants.organizationRole,
+      // No single decision to read a reason off - every candidate permission
+      // was refused. The one reason worth naming is the one that refused them
+      // all for the same cause, and the snapshot already carries it.
+      ...(matched === undefined && grants.membershipDisabled
+        ? { denialReason: "membership-disabled" as const }
+        : {}),
     };
   }
 

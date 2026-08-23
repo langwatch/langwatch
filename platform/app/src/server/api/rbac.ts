@@ -1,4 +1,8 @@
-import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz";
+import type {
+  AuthzDenialReason,
+  AuthzPermission,
+  EnforcedScopeFields,
+} from "@langwatch/authz";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
@@ -534,6 +538,17 @@ export function canDelete(role: TeamUserRole, resource: Resource): boolean {
 export type PermissionResult = {
   permitted: boolean;
   organizationRole: OrganizationUserRole | null;
+  /**
+   * Why the check failed, when the answer came from the engine — the boundary
+   * needs it to raise the error a caller can act on rather than a generic
+   * refusal.
+   *
+   * Absent on the legacy walk, which never produced one and is being deleted
+   * (ADR-110). A legacy-head organization therefore still DENIES a disabled
+   * member — the security answer is the same on both heads — it just falls
+   * back to the generic copy instead of naming the seat.
+   */
+  denialReason?: AuthzDenialReason;
 };
 
 // ============================================================================
@@ -721,7 +736,12 @@ async function checkPermissionFromBindings({
       organizationId,
       scopeId: { in: scopeIds },
       OR: [
-        { userId, user: { orgMemberships: { some: { organizationId } } } },
+        {
+          userId,
+          user: {
+            orgMemberships: { some: { organizationId, disabledAt: null } },
+          },
+        },
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
@@ -879,7 +899,11 @@ async function getCurrentOrganizationRole({
   organizationId: string;
 }): Promise<OrganizationUserRole | null> {
   const member = await prisma.organizationUser?.findFirst({
-    where: { userId, organizationId },
+    // A membership an admin disabled to reclaim its seat is not a current
+    // one: it keeps its role and its history and confers no access until it
+    // is re-enabled (seat-reconciliation.feature). Matches the predicate the
+    // AuthZ collector applies to the same row.
+    where: { userId, organizationId, disabledAt: null },
     select: { role: true },
   });
   return member?.role ?? null;
@@ -1007,6 +1031,7 @@ export async function resolveProjectPermission(
       // above did, so these agree; the context's is the fallback for the
       // unresolved-scope answer, which carries no snapshot at all.
       organizationRole: decision.organizationRole ?? context.organizationRole,
+      denialReason: decision.denialReason,
     };
   }
 
@@ -1221,6 +1246,19 @@ export async function hasOrganizationPermission(
   return hasOrganizationPermissionLegacy(ctx, organizationId, permission);
 }
 
+export async function organizationDenialReason(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+): Promise<AuthzDenialReason | undefined> {
+  const userId = ctx.session?.user?.id;
+  if (!userId) return undefined;
+  const membership = await ctx.prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { disabledAt: true },
+  });
+  return membership?.disabledAt ? "membership-disabled" : undefined;
+}
+
 async function hasOrganizationPermissionLegacy(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
@@ -1233,7 +1271,9 @@ async function hasOrganizationPermissionLegacy(
   const userId = ctx.session.user.id;
 
   const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId },
+    // A seat-disabled membership confers nothing, exactly as an absent one
+    // does — see getCurrentOrganizationRole above.
+    where: { userId, organizationId, disabledAt: null },
     select: { role: true },
   });
 
@@ -1435,7 +1475,10 @@ async function loadScopeResolution(
                 userId,
                 user: {
                   orgMemberships: {
-                    some: { organizationId: args.organizationId },
+                    some: {
+                      organizationId: args.organizationId,
+                      disabledAt: null,
+                    },
                   },
                 },
               },

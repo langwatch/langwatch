@@ -1072,6 +1072,14 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  membership_disabled: {
+    // The person IS a member, so nothing here may suggest they are not, and
+    // nothing may suggest a role they could ask for instead — the seat is the
+    // whole problem. Names the one action that works: ask an admin.
+    title: "Your access to this organization is turned off",
+    describe: () =>
+      "Your membership is still here with everything you did. An organization admin can turn your access back on when a seat is free.",
+  },
   migration_enrollment_already_exists: {
     title: "This organization is already enrolled",
     describe: (error) => {

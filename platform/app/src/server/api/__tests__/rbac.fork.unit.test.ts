@@ -71,7 +71,9 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
         .mockResolvedValue({ id: TEAM_ID, organizationId: ORGANIZATION_ID }),
     },
     organizationUser: {
-      findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+      findFirst: vi
+        .fn()
+        .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: roleBindingFindMany },

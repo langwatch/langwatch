@@ -10,13 +10,14 @@
  * alone — no shadow or reverse-shadow comparison at request time. The contract
  * PR rewires ONLY this class onto the engine — nothing above it learns.
  */
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AuthzDenialReason, AuthzPermission } from "@langwatch/authz";
 import type {
   OrganizationUserRole,
   PrismaClient,
 } from "~/generated/prisma/client";
 import {
   hasOrganizationPermission,
+  organizationDenialReason,
   resolveProjectPermission,
   resolveProjectPermissionAny,
   resolveTeamPermission,
@@ -26,6 +27,12 @@ import type { Session } from "~/server/auth";
 export type PermissionDecision = {
   permitted: boolean;
   organizationRole: OrganizationUserRole | null;
+  /**
+   * Why the check failed, when it did — the boundary needs it to pick the
+   * error a caller can act on. Absent on a permitted decision, and on the
+   * legacy walk, which never produced one.
+   */
+  denialReason?: AuthzDenialReason;
 };
 
 export interface PermissionDecisionRepository {
@@ -113,15 +120,23 @@ export class ForkAwarePermissionDecisionRepository
     organizationId: string;
     permission: AuthzPermission;
   }): Promise<PermissionDecision> {
+    const ctx = this.resolverContextFor(userId);
+    const permitted = await hasOrganizationPermission(
+      ctx,
+      organizationId,
+      permission,
+    );
     return {
-      permitted: await hasOrganizationPermission(
-        this.resolverContextFor(userId),
-        organizationId,
-        permission,
-      ),
+      permitted,
       // The organization walk carries no membership role in its answer, and
       // legacy never put one on the context either.
       organizationRole: null,
+      // Asked for only on a refusal, so the permitted path pays nothing.
+      ...(permitted
+        ? {}
+        : {
+            denialReason: await organizationDenialReason(ctx, organizationId),
+          }),
     };
   }
 
