@@ -28,6 +28,39 @@ import { useState } from "react";
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 import { type ChoicesRefRow, useChoicesRefRows } from "./useChoicesRefRows";
 
+/**
+ * What one option row reads.
+ *
+ * The LABEL is the answer the reader is picking, so it is always the title: a
+ * ref grounds an option, it never renames it. "Publish the winning draft" with
+ * a ref to the prompt it would publish must not read as the prompt's own name,
+ * or the reader is picking between two resources instead of two answers. A
+ * live ref supplies the detail line instead, with the entity's current name
+ * and vital line as the viewer is allowed to see them today.
+ */
+function optionRowText({
+  option,
+  refRow,
+}: {
+  option: LangyDerivedChoicesCard["options"][number];
+  refRow: ChoicesRefRow;
+}): { primary: string; secondary?: string } {
+  if (refRow.state === "dead") {
+    return { primary: option.label, secondary: "No longer exists" };
+  }
+  const detail =
+    refRow.state === "live"
+      ? [refRow.primary, refRow.secondary]
+          .filter((part): part is string => !!part && part !== option.label)
+          .join(" · ")
+      : "";
+  const secondary = detail !== "" ? detail : option.description;
+  return {
+    primary: option.label,
+    ...(secondary !== undefined ? { secondary } : {}),
+  };
+}
+
 export function LangyChoicesCard({
   card,
   lockState,
@@ -111,14 +144,7 @@ export function LangyChoicesCard({
           const isPicked = picked.has(option.id);
           const selectable = open && !dead;
 
-          const primary =
-            refRow.state === "live" && refRow.primary
-              ? refRow.primary
-              : option.label;
-          const secondary = dead
-            ? "No longer exists"
-            : ((refRow.state === "live" ? refRow.secondary : undefined) ??
-              option.description);
+          const { primary, secondary } = optionRowText({ option, refRow });
 
           return (
             <chakra.button

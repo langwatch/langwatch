@@ -426,6 +426,47 @@ describe("given a derived timeseries with hints", () => {
   });
 });
 
+describe("given an option labeled with an action and grounded in a resource", () => {
+  /** @scenario "A grounded option still reads as the answer it is" */
+  it("reads as its own label, with the resource's current name as detail", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyChoicesCard
+          card={{
+            kind: "choices",
+            blockId: "q-publish",
+            question: "Publish the winner?",
+            options: [
+              {
+                id: "publish",
+                label: "Publish the winning draft",
+                ref: { type: "prompt", id: "prompt_1" },
+              },
+            ],
+          }}
+          lockState={{ status: "open" }}
+          onSelect={vi.fn()}
+          refRowsOverride={
+            new Map([
+              [
+                "publish",
+                {
+                  state: "live",
+                  primary: "support-reply-v1",
+                  secondary: "version 3",
+                },
+              ],
+            ])
+          }
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByText("Publish the winning draft")).toBeDefined();
+    expect(screen.getByText("support-reply-v1 · version 3")).toBeDefined();
+  });
+});
+
 describe("given an option whose entity no longer exists", () => {
   it("renders it disabled and says the thing is gone — unselectable", () => {
     const onSelect = vi.fn();
