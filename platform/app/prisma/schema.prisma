@@ -4293,3 +4293,37 @@ model SystemMigrationEnrollment {
   @@id([organizationId, migrationName])
   @@index([migrationName])
 }
+
+// One Stored Objects operational row. Legacy ClickHouse metadata remains
+// authoritative until the organization system migration is finalized; this
+// table is not an event projection.
+model StoredObject {
+  tenantId                  String
+  id                        String
+  status                    String
+  purpose                   String
+  ownerKind                 String
+  ownerId                   String
+  filename                  String
+  sha256                    String
+  sizeBytes                 BigInt
+  mediaType                 String
+  mediaTypeVerified         Boolean  @default(false)
+  storageProvider           String?
+  storageDestinationId      String?
+  storageProviderRelativeId String?  @db.Text
+  generation                Int      @default(0)
+  audiences                 Json
+  expiresAt                 DateTime?
+  availableAt               DateTime?
+  deletedAt                 DateTime?
+  source                    String
+  legacyFingerprint         String?
+  createdAt                 DateTime
+  updatedAt                 DateTime @default(now()) @updatedAt
+
+  @@id([tenantId, id])
+  @@index([tenantId, status, id])
+  @@index([ownerKind, ownerId, status])
+  @@index([status, expiresAt])
+}
