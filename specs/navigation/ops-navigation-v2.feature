@@ -51,6 +51,17 @@ Feature: Internal ops navigation in the new navigation modes
     When each registered ops address is matched against the settings menu
     Then every one of them is claimed by a menu entry
 
+  # The ops menu lists workspaces, not every tool inside one. Projection
+  # replay, the payload store and Deja View all read the event-sourcing
+  # substrate, so they are reached from that workspace's own rail — replay
+  # was already only a drawer opened from its projections section, so its
+  # menu entry pointed at a redirect.
+  @unit
+  Scenario: The event-sourcing tools are offered inside their workspace
+    When the ops menu is built
+    Then projection replay, the payload store and Deja View are not top-level ops entries
+    And the Event Sourcing entry claims their addresses
+
   @integration
   Scenario: An ops page renders inside the new settings shell
     Given my device is on a new navigation mode
