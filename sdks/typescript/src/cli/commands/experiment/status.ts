@@ -158,7 +158,7 @@ export const experimentStatusCommand = async (
       const deadline = Date.now() + limitMs;
       const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
-      let lastReadError: unknown = null;
+      let lastReadError: Error | null = null;
       while (!TERMINAL_STATUSES.has(status.status) && Date.now() < deadline) {
         spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
         await sleep(pollMs);
@@ -170,7 +170,8 @@ export const experimentStatusCommand = async (
           // status it already has and looks again, so a dropped socket at
           // second 12 of a 60 second wait no longer reports a healthy run as
           // failed.
-          lastReadError = error;
+          lastReadError =
+            error instanceof Error ? error : new Error(String(error));
         }
       }
       // Still unreadable when the wait ended: the caller has no current answer,

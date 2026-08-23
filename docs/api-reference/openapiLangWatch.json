@@ -12823,7 +12823,7 @@
                           "description": "The experiment setup: datasets, targets and evaluators. Read it, change it, send it back whole."
                         },
                         "version": {
-                          "type": "number",
+                          "type": "integer",
                           "description": "Send this back as expectedVersion to save safely"
                         },
                         "updatedAt": {
@@ -12850,7 +12850,7 @@
                           "type": "string"
                         },
                         "version": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "updatedAt": {
                           "type": "string",
@@ -13000,7 +13000,7 @@
                   "type": "object",
                   "properties": {
                     "version": {
-                      "type": "number",
+                      "type": "integer",
                       "description": "The version the save produced"
                     }
                   },
@@ -13222,6 +13222,7 @@
             "schema": {
               "type": "integer",
               "default": 50,
+              "minimum": 1,
               "maximum": 100
             },
             "description": "Versions per page, capped at 100"
@@ -13231,7 +13232,8 @@
             "name": "cursor",
             "required": false,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "description": "The `nextCursor` of the previous page"
           },
@@ -13258,7 +13260,7 @@
                         "type": "object",
                         "properties": {
                           "version": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "autoSaved": {
                             "type": "boolean",
@@ -13300,7 +13302,7 @@
                     },
                     "nextCursor": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ],
                       "description": "Pass as `cursor` to read the next page, null on the last one"
