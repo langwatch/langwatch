@@ -17,7 +17,7 @@ import (
 type chunkStreamIter struct {
 	chunks [][]byte
 	usage  domain.Usage
-	raw    bool
+	isRaw  bool
 }
 
 func (s *chunkStreamIter) Next(_ context.Context) bool {
@@ -33,7 +33,7 @@ func (s *chunkStreamIter) Chunk() []byte {
 func (s *chunkStreamIter) Usage() domain.Usage { return s.usage }
 func (s *chunkStreamIter) Err() error          { return nil }
 func (s *chunkStreamIter) Close() error        { return nil }
-func (s *chunkStreamIter) RawFraming() bool    { return s.raw }
+func (s *chunkStreamIter) RawFraming() bool    { return s.isRaw }
 
 // dataLines extracts every SSE data-line payload from the response body.
 func dataLines(body []byte) []string {
@@ -85,7 +85,7 @@ func TestWriteSSE_RawFramingNeverAppended(t *testing.T) {
 	upstream := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ola\"}]}}]}\n\n"
 	iter := &chunkStreamIter{
 		chunks: [][]byte{[]byte(upstream)},
-		raw:    true,
+		isRaw:  true,
 	}
 	rec := httptest.NewRecorder()
 	writeSSE(context.Background(), rec, iter)
