@@ -4,6 +4,9 @@
 
 **Status:** Proposed
 
+**Behavioural contract:**
+[Application workspace boundaries](../../../specs/dependencies/application-workspace-boundaries.feature)
+
 **Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-076: single pnpm workspace](./076-single-pnpm-workspace.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
