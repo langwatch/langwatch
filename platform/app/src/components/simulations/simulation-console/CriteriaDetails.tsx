@@ -25,9 +25,14 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
           >
             ✓ Met Criteria ({results.metCriteria.length}):
           </Text>
-          <VStack align="start" gap={1} pl={2}>
+          <VStack align="start" gap={1} pl={2} w="full">
             {results.metCriteria.map((criterion, idx) => (
-              <Text key={idx} color={CONSOLE_COLORS.successColor} fontSize="sm">
+              <Text
+                key={idx}
+                color={CONSOLE_COLORS.successColor}
+                fontSize="sm"
+                wordBreak="break-word"
+              >
                 • {criterion}
               </Text>
             ))}
@@ -45,9 +50,14 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
           >
             ✗ Unmet Criteria ({results.unmetCriteria.length}):
           </Text>
-          <VStack align="start" gap={1} pl={2}>
+          <VStack align="start" gap={1} pl={2} w="full">
             {results.unmetCriteria.map((criterion, idx) => (
-              <Text key={idx} color={CONSOLE_COLORS.failureColor} fontSize="sm">
+              <Text
+                key={idx}
+                color={CONSOLE_COLORS.failureColor}
+                fontSize="sm"
+                wordBreak="break-word"
+              >
                 • {criterion}
               </Text>
             ))}
@@ -66,6 +76,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
             fontSize="sm"
             pl={2}
             whiteSpace="pre-wrap"
+            wordBreak="break-word"
             fontWeight="bold"
           >
             {results.reasoning}

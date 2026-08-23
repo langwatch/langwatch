@@ -42,7 +42,7 @@ function CriteriaList({
             marginTop="2px"
             flexShrink={0}
           />
-          <Text textStyle="xs" color="fg">
+          <Text textStyle="xs" color="fg" wordBreak="break-word">
             {criterion}
           </Text>
         </HStack>

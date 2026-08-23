@@ -284,7 +284,7 @@ export function ScenarioInputMappingSection({
         {valueMappings.length > 0 && (
           <VStack align="stretch" gap={1} marginTop={2}>
             {valueMappings.map(([identifier, mapping]) => (
-              <Box key={identifier}>
+              <Box key={identifier} wordBreak="break-word">
                 <Text
                   as="span"
                   fontSize="xs"

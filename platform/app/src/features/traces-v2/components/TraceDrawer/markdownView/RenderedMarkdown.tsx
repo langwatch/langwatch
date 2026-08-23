@@ -27,7 +27,16 @@ export function RenderedMarkdown({
   );
 
   return (
-    <Box paddingX={paddingX} paddingY={paddingY} color="fg">
+    // overflowWrap inherits into every prose element below, so unbreakable
+    // tokens (URLs, JSON blobs) wrap instead of painting past the box. It is
+    // inert inside `white-space: pre` code blocks, which keep their own
+    // horizontal scroll.
+    <Box
+      paddingX={paddingX}
+      paddingY={paddingY}
+      color="fg"
+      overflowWrap="anywhere"
+    >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {markdown}
       </ReactMarkdown>

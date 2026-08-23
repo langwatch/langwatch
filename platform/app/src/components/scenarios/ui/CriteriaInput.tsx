@@ -165,7 +165,13 @@ export function CriteriaInput({
             <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="1px">
               {index + 1}.
             </Text>
-            <Text flex={1} fontSize="sm" whiteSpace="pre-wrap">
+            <Text
+              flex={1}
+              fontSize="sm"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+              minWidth={0}
+            >
               {criterion}
             </Text>
             <Pencil

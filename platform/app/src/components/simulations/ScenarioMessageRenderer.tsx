@@ -184,6 +184,7 @@ export function ScenarioMessageRenderer({
                   fontStyle="italic"
                   paddingX={2}
                   textAlign={textAlignForRole(item.role)}
+                  wordBreak="break-word"
                 >
                   {item.transcript}
                 </Text>
@@ -196,13 +197,16 @@ export function ScenarioMessageRenderer({
       case "tool_call":
         return (
           <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
-            <HStack gap={1.5} color="orange.fg">
+            <HStack gap={1.5} color="orange.fg" w="full">
               <Settings size={12} />
               <Text
                 textStyle="2xs"
                 fontWeight="600"
                 textTransform="uppercase"
                 letterSpacing="0.06em"
+                wordBreak="break-word"
+                flex={1}
+                minWidth={0}
               >
                 {item.name}
               </Text>
@@ -264,6 +268,9 @@ export function ScenarioMessageRenderer({
       width="100%"
       height="100%"
       overflowY="auto"
+      // Explicit, so an overflowing unbreakable token clips here instead of
+      // computing overflow-x to auto and growing a horizontal scrollbar.
+      overflowX="hidden"
     >
       {smallerView
         ? items.map(renderItem)

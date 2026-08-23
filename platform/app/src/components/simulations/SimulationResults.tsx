@@ -29,7 +29,7 @@ function ReasoningSection({ reasoning }: { reasoning?: string }) {
       <Text fontWeight="semibold" color="fg" fontSize="md" mb={2}>
         Reasoning:
       </Text>
-      <Text color="fg" fontSize="sm" lineHeight="tall">
+      <Text color="fg" fontSize="sm" lineHeight="tall" wordBreak="break-word">
         {reasoning}
       </Text>
     </Box>
@@ -57,7 +57,7 @@ function CriteriaSection({
       {criteria.length > 0 ? (
         <VStack alignItems="flex-start" gap={2} pl={2}>
           {criteria.map((criterion: string, idx: number) => (
-            <HStack key={idx} align="flex-start" gap={3}>
+            <HStack key={idx} align="flex-start" gap={3} w="full">
               <Box
                 w={2}
                 h={2}
@@ -66,7 +66,14 @@ function CriteriaSection({
                 mt={2}
                 flexShrink={0}
               />
-              <Text color={textColor} fontSize="sm" lineHeight="tall">
+              <Text
+                color={textColor}
+                fontSize="sm"
+                lineHeight="tall"
+                wordBreak="break-word"
+                flex={1}
+                minWidth={0}
+              >
                 {criterion}
               </Text>
             </HStack>

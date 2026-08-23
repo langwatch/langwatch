@@ -229,7 +229,7 @@ export function ExternalSetDetailPanel({
           >
             EXTERNAL SET
           </Text>
-          <Text fontSize="lg" fontWeight="semibold">
+          <Text fontSize="lg" fontWeight="semibold" wordBreak="break-word">
             {scenarioSetId}
           </Text>
         </VStack>

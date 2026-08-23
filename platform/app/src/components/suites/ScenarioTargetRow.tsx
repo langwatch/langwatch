@@ -233,7 +233,9 @@ export function ScenarioTargetRow({
               })}
             </Text>
           </HStack>
-          <Text fontSize="sm" textAlign="left" truncate>
+          {/* minWidth 0 lets the flex child shrink below its text width, so
+              `truncate` ellipses instead of pushing the row wide. */}
+          <Text fontSize="sm" textAlign="left" truncate minWidth={0}>
             {displayName}
           </Text>
           {hasCancelButton && (

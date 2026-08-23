@@ -142,7 +142,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
           </HStack>
         )}
         {raw || forceRaw ? (
-          <Text fontFamily="mono" fontSize="13px">
+          <Text fontFamily="mono" fontSize="13px" wordBreak="break-word">
             {JSON.stringify(json, null, 2)}
           </Text>
         ) : (
@@ -186,7 +186,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
               {renderCopyButton()}
             </HStack>
           )}
-          <Text fontFamily="mono" fontSize="14px">
+          <Text fontFamily="mono" fontSize="14px" wordBreak="break-word">
             {value
               ? typeof value === "string"
                 ? value
