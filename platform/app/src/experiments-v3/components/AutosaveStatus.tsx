@@ -1,7 +1,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { AlertCircle, Check, Cloud, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import type { AutosaveState } from "~/components/datasets/editor/DatasetTableContext";
 import { Tooltip } from "~/components/ui/tooltip";
+import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants";
 
 type AutosaveStatusProps = {
   evaluationState: AutosaveState;
@@ -20,8 +21,18 @@ export function AutosaveStatus({
   evaluationError,
   datasetError,
 }: AutosaveStatusProps) {
-  // Derive combined state - error takes priority, then saving, then saved
-  const hasError = evaluationState === "error" || datasetState === "error";
+  // A refused save and a failed save are different events and must not share a
+  // label: the refusal wrote nothing and lost nothing, so "Failed to save"
+  // tells the reader the opposite of what happened. A real failure alongside a
+  // refusal still wins, because that one does need attention.
+  const failures = [
+    { state: evaluationState, reason: evaluationError },
+    { state: datasetState, reason: datasetError },
+  ].filter(({ state }) => state === "error");
+  const hasError = failures.some(
+    ({ reason }) => reason !== AUTOSAVE_OUT_OF_DATE_REASON,
+  );
+  const isOutOfDate = failures.length > 0 && !hasError;
   const isSaving = evaluationState === "saving" || datasetState === "saving";
   const isSaved =
     (evaluationState === "saved" || evaluationState === "idle") &&
@@ -33,6 +44,13 @@ export function AutosaveStatus({
         icon: <AlertCircle size={14} />,
         text: "Failed to save",
         color: "red.fg",
+      };
+    }
+    if (isOutOfDate) {
+      return {
+        icon: <CloudOff size={14} />,
+        text: AUTOSAVE_OUT_OF_DATE_REASON,
+        color: "orange.fg",
       };
     }
     if (isSaving) {
@@ -67,7 +85,11 @@ export function AutosaveStatus({
     } else if (evaluationState === "saved") {
       lines.push("Evaluation state saved");
     } else if (evaluationState === "error") {
-      lines.push(`Evaluation: ${evaluationError ?? "Failed to save"}`);
+      lines.push(
+        evaluationError === AUTOSAVE_OUT_OF_DATE_REASON
+          ? "A newer version was saved. Reload to get it. Your edits are still here until you do."
+          : `Evaluation: ${evaluationError ?? "Failed to save"}`,
+      );
     }
 
     if (datasetState === "saving") {

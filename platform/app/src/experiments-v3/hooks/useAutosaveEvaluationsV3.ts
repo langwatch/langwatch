@@ -8,6 +8,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
+import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants";
 import { createInitialState, type EvaluationsV3State } from "../types";
 import {
   extractPersistedState,
@@ -320,7 +321,7 @@ export const useAutosaveEvaluationsV3 = () => {
           ? handled.meta.currentVersion
           : (workbenchVersion ?? 0) + 1;
       setStaleWorkbench({ serverVersion });
-      setAutosaveStatus("evaluation", "error", "Out of date");
+      setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
       return;
     }
     console.error("Failed to autosave evaluations v3:", error);

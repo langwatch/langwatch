@@ -339,3 +339,23 @@ Feature: Versioned workbench saves
       Given a reader who cannot update experiments
       When the version history opens
       Then no row offers a restore
+
+  Rule: A save refused for a newer version is reported as out of date, not as a failure
+
+    Nothing is lost when the seam refuses a save: the write never happened and
+    the newer version is one reload away. Reporting it as a failed save tells
+    the reader their work is gone, which is the opposite of what took place, and
+    it reads worst exactly when it is most common, after the assistant saves a
+    version of its own.
+
+    @integration
+    Scenario: The toolbar names the reason a save was refused
+      Given an open workbench whose save was refused for a newer version
+      When the reader looks at the save status
+      Then it reads that the workbench is out of date
+
+    @integration
+    Scenario: A save that truly failed is still reported as a failure
+      Given an open workbench whose save failed for any other reason
+      When the reader looks at the save status
+      Then it reads that the save failed
