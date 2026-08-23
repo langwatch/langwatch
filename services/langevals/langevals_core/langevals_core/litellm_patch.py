@@ -133,9 +133,45 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     return kwargs
 
 
-def apply_gpt5_temperature_compatibility(kwargs: dict) -> dict:
+# The gpt-5 models that DO accept a temperature, so the family test does not
+# claim them: the image models take one, the text models do not
+# (`platform/app/src/server/modelProviders/llmModels.json` is the catalog this
+# was read from — 46 of the family refuse, these two accept).
+#
+# The exceptions are listed rather than inverting this into an allowlist of the
+# 46, because the two errors are not symmetric. Pinning a model that would have
+# accepted 0 costs one evaluator its determinism; missing a model that refuses
+# fails the call outright and the evaluation reaches no verdict at all. New
+# refusing models also appear far more often than new accepting ones, so the
+# list that needs no maintenance is this one.
+TEMPERATURE_UNRESTRICTED_MODEL_NAMES = frozenset(
+    {
+        "gpt-5-image",
+        "gpt-5-image-mini",
+    }
+)
+
+
+def is_temperature_pinned_model(model: Optional[str]) -> bool:
     """
-    Pin temperature to the default for gpt-5-family models, which accept only
+    Whether this model accepts only its default temperature.
+
+    Matched on the name after the provider prefix, so `openai/gpt-5-mini` and
+    `azure/gpt-5-mini` answer alike.
+    """
+    if not model:
+        return False
+    name = model.split("/")[-1]
+    if name in TEMPERATURE_UNRESTRICTED_MODEL_NAMES:
+        return False
+    return "gpt-5" in name
+
+
+def apply_gpt5_temperature_compatibility(
+    kwargs: dict, requested_model: Optional[str] = None
+) -> dict:
+    """
+    Pin temperature to the default for the gpt-5-family models that accept only
     that value and reject every other with a BadRequestError ("'temperature'
     does not support 0.0 with this model. Only the default (1) value is
     supported.").
@@ -147,9 +183,23 @@ def apply_gpt5_temperature_compatibility(kwargs: dict) -> dict:
     Applied centrally so every evaluator and every user-configured judge
     model gets it, not only the two that carry their own guard
     (llm_answer_match, select_best_compare).
+
+    This one IS an override, unlike apply_tool_reasoning_compatibility above:
+    there, a caller's stated reasoning effort is a choice the provider can
+    honor, so it is left to answer for itself. Here the stated value is one
+    the provider will refuse outright, so keeping it only converts a verdict
+    into a 400. The cost is real and belongs in the open — a judge on such a
+    model does not run at temperature 0, so its verdicts are not reproducible
+    the way the evaluator's default intends.
+
+    `requested_model` is the model the request named before any Azure
+    deployment rewrite, since a deployment's arbitrary name ("prod-judge")
+    carries nothing to recognise the family by.
     """
-    model = kwargs.get("model") or ""
-    if "gpt-5" not in model:
+    if not (
+        is_temperature_pinned_model(kwargs.get("model"))
+        or is_temperature_pinned_model(requested_model)
+    ):
         return kwargs
     if kwargs.get("temperature") in (None, 1, 1.0):
         return kwargs
@@ -283,7 +333,10 @@ def patch_litellm_params(kwargs):
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
 
-    # Azure patches
+    # Azure patches. Kept before the rewrite: a deployment name is arbitrary
+    # ("prod-judge"), so after this block there is nothing left in the model
+    # string to recognise a family by.
+    requested_model = kwargs.get("model")
     deployment_name = request_env.get("AZURE_DEPLOYMENT_NAME") or os.environ.get(
         "AZURE_DEPLOYMENT_NAME"
     )
@@ -321,7 +374,9 @@ def patch_litellm_params(kwargs):
     # Same position for the same reason: the model name is now final, and an
     # explicit X_LITELLM_temperature has landed — a value the model refuses
     # is normalized rather than sent to fail.
-    kwargs = apply_gpt5_temperature_compatibility(kwargs)
+    kwargs = apply_gpt5_temperature_compatibility(
+        kwargs, requested_model=requested_model
+    )
 
     return kwargs
 
