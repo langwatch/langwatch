@@ -47,7 +47,7 @@ export function uiActionDedupKey({
 /**
  * Tell the server how one action ended.
  *
- * `accepted: false` is the server's soft refusal: the pending action, the
+ * `isAccepted: false` is the server's soft refusal: the pending action, the
  * claimant or the turn no longer match, so it dropped the report instead of
  * throwing. The agent gets no terminal result either way, so it counts the
  * same as a thrown call.
@@ -57,7 +57,7 @@ type CompleteUiAction = (args: {
   ok: boolean;
   result?: unknown;
   errorCode?: string;
-}) => Promise<{ accepted: boolean }>;
+}) => Promise<{ isAccepted: boolean }>;
 
 /**
  * What a thrown handler owes the two audiences: an error code for the agent
@@ -94,8 +94,8 @@ async function reportOutcome({
   outcome: Parameters<CompleteUiAction>[0];
 }): Promise<boolean> {
   try {
-    const { accepted } = await complete(outcome);
-    return accepted;
+    const { isAccepted } = await complete(outcome);
+    return isAccepted;
   } catch {
     return false;
   }
@@ -114,7 +114,7 @@ export async function executeUiAction({
   turnId: string | null;
   seen: Set<string>;
   handlers: LangyUiActionHandlers;
-  claim: (args: { actionId: string }) => Promise<{ claimed: boolean }>;
+  claim: (args: { actionId: string }) => Promise<{ isClaimed: boolean }>;
   complete: CompleteUiAction;
   onHandlerError?: (info: { kind: string; message: string }) => void;
 }): Promise<UiActionExecution> {
@@ -124,8 +124,8 @@ export async function executeUiAction({
   const handler = handlers[entry.kind];
   if (!handler) return "no-handler";
 
-  const { claimed } = await claim({ actionId: entry.actionId });
-  if (!claimed) return "not-claimed";
+  const { isClaimed } = await claim({ actionId: entry.actionId });
+  if (!isClaimed) return "not-claimed";
 
   const parsed = handler.payloadSchema.safeParse(entry.payload);
   if (!parsed.success) {

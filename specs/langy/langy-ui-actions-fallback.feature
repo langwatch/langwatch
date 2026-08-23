@@ -26,16 +26,18 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     And the result names executedVia backend
 
   @unit
-  Scenario: An unclaimed action falls back to the backend after the claim window
-    Given a live tab exists but never claims the published action
-    When the claim window lapses
-    Then the pending record is deleted before the backend executes
+  Scenario: An action no page picks up is still carried out, once
+    Given a live tab exists but never takes the published action
+    When the agent's action goes unanswered
+    Then the change is applied without the page
+    And a tab waking up late cannot apply it a second time
 
   @unit
-  Scenario: A claimed but silent action times out and never double-executes
-    Given a page claimed the action and reported nothing
-    When the execute budget lapses
-    Then the dispatch answers langy_ui_timeout and the backend never runs
+  Scenario: A page that takes an action and goes quiet leaves nothing half done
+    Given a page took the action and reported nothing
+    When it stays silent past the time it was given
+    Then the agent is told the action timed out
+    And the change is never applied a second time behind the page
 
   @unit
   Scenario: A backend fallback without the experiment named is refused
@@ -56,10 +58,10 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     Then the projection is marked source saved and carries the version
 
   @unit
-  Scenario: A run started with no browser executes from the saved state
+  Scenario: A run started with no browser covers what the workbench holds
     Given no page answered a workbench.run dispatch
     When the backend starts the run
-    Then it loads the saved state through the same path a CI run uses
+    Then the run covers the same rows and columns the saved workbench shows
 
   @unit
   Scenario: A run started with no browser fills the cells the workbench shows

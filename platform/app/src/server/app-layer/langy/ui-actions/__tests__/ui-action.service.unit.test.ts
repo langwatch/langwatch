@@ -249,7 +249,7 @@ describe("LangyUiActionService", () => {
         conversationId: "conv-1",
         actionId,
       });
-      expect(late).toEqual({ claimed: false });
+      expect(late).toEqual({ isClaimed: false });
     });
   });
 
@@ -380,10 +380,10 @@ describe("LangyUiActionService", () => {
           actionId: "a1",
         };
         expect(await service.claim({ ...args, userId: "user-1" })).toEqual({
-          claimed: true,
+          isClaimed: true,
         });
         expect(await service.claim({ ...args, userId: "user-2" })).toEqual({
-          claimed: false,
+          isClaimed: false,
         });
       });
     });
@@ -405,7 +405,7 @@ describe("LangyUiActionService", () => {
               userId: "user-1",
               actionId: "a1",
             }),
-          ).toEqual({ claimed: false });
+          ).toEqual({ isClaimed: false });
         }
       });
     });
@@ -424,7 +424,7 @@ describe("LangyUiActionService", () => {
             userId: "user-1",
             actionId: "a1",
           }),
-        ).toEqual({ claimed: true });
+        ).toEqual({ isClaimed: true });
       });
     });
   });
@@ -457,7 +457,7 @@ describe("LangyUiActionService", () => {
           actionId: "a1",
           completion: { ok: true },
         });
-        expect(fromOther).toEqual({ accepted: false });
+        expect(fromOther).toEqual({ isAccepted: false });
         expect(store.lists.get(uiActionKeys.result("a1"))).toBeUndefined();
 
         const fromClaimant = await service.complete({
@@ -467,7 +467,7 @@ describe("LangyUiActionService", () => {
           actionId: "a1",
           completion: { ok: true, result: { targetId: "t2" } },
         });
-        expect(fromClaimant).toEqual({ accepted: true });
+        expect(fromClaimant).toEqual({ isAccepted: true });
         expect(store.lists.get(uiActionKeys.result("a1"))).toHaveLength(1);
         expect(store.kv.has(uiActionKeys.pending("a1"))).toBe(false);
       });
@@ -557,7 +557,7 @@ describe("LangyUiActionService", () => {
   });
 
   describe("when the published action goes unclaimed", () => {
-    /** @scenario An unclaimed action falls back to the backend after the claim window */
+    /** @scenario An action no page picks up is still carried out, once */
     it("deletes the pending record first, then executes on the backend", async () => {
       const { redis, store } = makeRedis(["wait-empty"]);
       const appended: Array<{
@@ -592,7 +592,7 @@ describe("LangyUiActionService", () => {
   });
 
   describe("when a page claimed the action and went silent", () => {
-    /** @scenario A claimed but silent action times out and never double-executes */
+    /** @scenario A page that takes an action and goes quiet leaves nothing half done */
     it("times out without running the backend", async () => {
       // The first scripted wait plants the claim before it lapses: the page
       // took the action and never completed. The second wait times out too.
@@ -649,7 +649,7 @@ describe("LangyUiActionService", () => {
       // its SET NX now. Hooking the pending delete puts that claim at the exact
       // interleaving: the dispatch has decided to run on the backend, and the
       // record the tab validated is still there.
-      let lateClaim: { claimed: boolean } | undefined;
+      let lateClaim: { isClaimed: boolean } | undefined;
       const del = redis.del.bind(redis);
       redis.del = async (...keys) => {
         lateClaim ??= await service.claim({
@@ -669,7 +669,7 @@ describe("LangyUiActionService", () => {
       });
 
       expect(outcome.executedVia).toBe("backend");
-      expect(lateClaim).toEqual({ claimed: false });
+      expect(lateClaim).toEqual({ isClaimed: false });
       expect(runnerCalls).toBe(1);
     });
   });

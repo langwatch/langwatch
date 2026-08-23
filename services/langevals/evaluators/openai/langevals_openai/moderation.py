@@ -10,6 +10,7 @@ from langevals_core.base_evaluator import (
     SingleEvaluationResult,
     BatchEvaluationResult,
     EvaluatorEntry,
+    EvaluationResultError,
     EvaluationResultSkipped,
     evaluation_timed_out_result,
 )
@@ -111,6 +112,12 @@ class OpenAIModerationEvaluator(
         # stall for as long as the socket stays open, and the caller holds a
         # gate slot the whole time, so an unbounded call here is the wedge the
         # deadline exists to stop.
+        # An empty batch has nothing to moderate. Calling the provider with an
+        # empty input list spends a request the API rejects, and the base class
+        # answers [] for the same case.
+        if not data:
+            return []
+
         deadline = None if max_seconds is None else time.monotonic() + max_seconds
         # No SDK retries: each attempt gets the full timeout, so the default of
         # two would let one call run for three times the budget.
@@ -187,6 +194,22 @@ class OpenAIModerationEvaluator(
 
             results.append(
                 OpenAIModerationResult(score=score, passed=passed, details=details)
+            )
+
+        # `zip` stops at the shorter list, so a provider answer with fewer
+        # results than entries would return a short list and every caller
+        # reading answers by position would read them against the wrong entries.
+        # Every entry gets an answer, and one the provider did not cover says so.
+        while len(results) < len(data):
+            results.append(
+                EvaluationResultError(
+                    error_type="ModerationResultMissing",
+                    details=(
+                        "The moderation API answered fewer entries than were "
+                        "sent, so this entry has no result."
+                    ),
+                    traceback=[],
+                )
             )
 
         return results

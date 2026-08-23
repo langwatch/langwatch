@@ -110,8 +110,12 @@ describe("payload schemas", () => {
     },
   ];
 
-  it.each(fixtures)("parses the $kind fixture", ({ schema, payload }) => {
-    expect(schema.safeParse(payload).success).toBe(true);
+  describe("given a payload an action would really be called with", () => {
+    describe("when its own schema parses it", () => {
+      it.each(fixtures)("accepts the $kind fixture", ({ schema, payload }) => {
+        expect(schema.safeParse(payload).success).toBe(true);
+      });
+    });
   });
 
   describe("when a generated id is given as a blank string", () => {

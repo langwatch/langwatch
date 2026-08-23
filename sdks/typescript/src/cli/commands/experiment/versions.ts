@@ -32,10 +32,16 @@ export const experimentVersionsCommand = async (
   await resolveCredentials();
 
   const limit = (() => {
-    const parsed = options.limit
-      ? parsePositiveIntOrNull(options.limit)
-      : DEFAULT_LIMIT;
-    if (parsed === null) return DEFAULT_LIMIT;
+    if (options.limit === undefined) return DEFAULT_LIMIT;
+    const parsed = parsePositiveIntOrNull(options.limit);
+    if (parsed === null) {
+      // Falling back to the default would serve a page size nobody asked for,
+      // and the caller would read the short page as the whole history.
+      console.error(
+        `--limit takes a whole number of versions, 1 to ${MAX_PAGE_SIZE}. Got "${options.limit}".`,
+      );
+      process.exit(1);
+    }
     return Math.min(parsed, MAX_PAGE_SIZE);
   })();
 

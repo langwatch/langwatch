@@ -299,7 +299,7 @@ async function readTurnHealth({
   ]);
   if (!conversation || !liveness) return null;
   return {
-    stale: liveness.stale,
+    isStale: liveness.stale,
     terminal: decideSyntheticTerminal({
       status: conversation.status,
       lastError: conversation.lastError,
@@ -808,7 +808,7 @@ export const langyRouter = createTRPCRouter({
   /**
    * The page asking to execute a dispatched UI action
    * (specs/langy/langy-ui-actions.feature). First successful claim wins across
-   * every tab and every stream replay; everyone else gets `claimed: false` and
+   * every tab and every stream replay; everyone else gets `isClaimed: false` and
    * drops. `langy:view` on purpose: executing happens under the human's own
    * session on their own page, and the dispatch already enforced the action's
    * real permission against the agent's session key. The pending record the
@@ -825,14 +825,14 @@ export const langyRouter = createTRPCRouter({
         actionId: z.string(),
       }),
     )
-    .mutation(async ({ input, ctx }): Promise<{ claimed: boolean }> => {
+    .mutation(async ({ input, ctx }): Promise<{ isClaimed: boolean }> => {
       const userId = ctx.session.user.id;
       const conversation = await getApp().langy.conversations.findByIdVisible({
         id: input.conversationId,
         projectId: input.projectId,
         userId,
       });
-      if (!conversation) return { claimed: false };
+      if (!conversation) return { isClaimed: false };
       return await createUiActionService().claim({
         projectId: input.projectId,
         userId,
@@ -843,7 +843,7 @@ export const langyRouter = createTRPCRouter({
 
   /**
    * The page reporting a claimed action's outcome. Only the claiming user may
-   * complete; anything else is dropped as `accepted: false` — the dispatch has
+   * complete; anything else is dropped as `isAccepted: false`. The dispatch has
    * its own timeout, so a dropped completion cannot wedge the agent.
    */
   completeUiAction: langyReadProcedure
@@ -856,7 +856,7 @@ export const langyRouter = createTRPCRouter({
         errorCode: z.string().max(200).optional(),
       }),
     )
-    .mutation(async ({ input, ctx }): Promise<{ accepted: boolean }> => {
+    .mutation(async ({ input, ctx }): Promise<{ isAccepted: boolean }> => {
       return await createUiActionService().complete({
         projectId: input.projectId,
         userId: ctx.session.user.id,

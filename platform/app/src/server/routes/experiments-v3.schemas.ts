@@ -373,6 +373,7 @@ export const workbenchStateResponseSchema = z.object({
   state: workbenchStateSchema.nullable(),
   version: z
     .number()
+    .int()
     .describe("Send this back as expectedVersion to save safely"),
   updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
 });
@@ -381,7 +382,7 @@ export const workbenchStateResponseSchema = z.object({
 export const workbenchVersionProbeResponseSchema = z.object({
   id: z.string(),
   slug: z.string(),
-  version: z.number(),
+  version: z.number().int(),
   updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
 });
 
@@ -401,11 +402,11 @@ export const saveWorkbenchStateBodySchema = z.object({
 });
 
 export const saveWorkbenchStateResponseSchema = z.object({
-  version: z.number().describe("The version the save produced"),
+  version: z.number().int().describe("The version the save produced"),
 });
 
 const workbenchVersionSchema = z.object({
-  version: z.number(),
+  version: z.number().int(),
   autoSaved: z
     .boolean()
     .describe("True for a version written by an ordinary save"),
@@ -422,6 +423,7 @@ export const listWorkbenchVersionsResponseSchema = z.object({
   versions: z.array(workbenchVersionSchema).describe("Newest first"),
   nextCursor: z
     .number()
+    .int()
     .nullable()
     .describe("Pass as `cursor` to read the next page, null on the last one"),
 });

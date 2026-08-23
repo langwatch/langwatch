@@ -578,10 +578,9 @@ describe("Persistence", () => {
           results: {},
         };
 
-        const result = persistedEvaluationsV3StateSchema.safeParse(state);
+        const parsed = persistedEvaluationsV3StateSchema.parse(state);
 
-        expect(result.success).toBe(true);
-        expect(result.data?.results).toEqual({
+        expect(parsed.results).toEqual({
           targetOutputs: {},
           targetMetadata: {},
           evaluatorResults: {},
@@ -599,11 +598,10 @@ describe("Persistence", () => {
           results: { targetOutputs: { t1: ["out"] } },
         };
 
-        const result = persistedEvaluationsV3StateSchema.safeParse(state);
+        const parsed = persistedEvaluationsV3StateSchema.parse(state);
 
-        expect(result.success).toBe(true);
-        expect(result.data?.results?.targetOutputs).toEqual({ t1: ["out"] });
-        expect(result.data?.results?.errors).toEqual({});
+        expect(parsed.results?.targetOutputs).toEqual({ t1: ["out"] });
+        expect(parsed.results?.errors).toEqual({});
       });
     });
 

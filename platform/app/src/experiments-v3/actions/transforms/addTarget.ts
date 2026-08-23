@@ -59,24 +59,29 @@ export const attachTarget = ({
  * A caller-supplied id has to be free. Two targets under one id make every
  * mapping filed against it ambiguous, and a scoped run could not say which
  * column it covers.
+ *
+ * Blank is not an id: an empty or whitespace-only string is read as "no id
+ * given" and gets a generated one, so it can never reach state and make every
+ * later lookup match the wrong column.
  */
 export const addTarget: Transform<AddTargetPayload, { targetId: string }> = ({
   state,
   payload,
 }) => {
   const parsed = addTargetPayloadSchema.parse(payload);
+  const requestedId = parsed.id?.trim();
 
-  if (parsed.id && state.targets.some((t) => t.id === parsed.id)) {
+  if (requestedId && state.targets.some((t) => t.id === requestedId)) {
     throw new TransformError({
       code: "target_already_exists",
-      message: `Target ${parsed.id} is already in the workbench`,
-      meta: { targetId: parsed.id },
+      message: `Target ${requestedId} is already in the workbench`,
+      meta: { targetId: requestedId },
     });
   }
 
   const target: TargetConfig = {
     ...parsed,
-    id: parsed.id ?? newTargetId(),
+    id: requestedId || newTargetId(),
     inputs: parsed.inputs as Field[],
     outputs: parsed.outputs as Field[],
   };

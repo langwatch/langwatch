@@ -362,6 +362,29 @@ def test_every_model_call_attempt_fits_inside_the_batch_deadline(deadline, overr
     )
 
 
+# @scenario "A configured model timeout keeps its value whatever the batch allows"
+@pytest.mark.parametrize("deadline", [601, 5000])
+def test_an_operator_override_keeps_its_value_whatever_the_deadline(deadline):
+    """The same LANGEVALS_MODEL_TIMEOUT means the same thing at every deadline.
+
+    The ceiling bounds the timeout this function derives, never the one an
+    operator asked for. The override used to survive a wide deadline and be
+    cut to the ceiling by a narrow one, so the same configuration produced two
+    different per-call timeouts and neither the docstring nor the environment
+    said which one was in force.
+    """
+    attempts, timeout = server.resolve_model_call_bounds(
+        batch_deadline=float(deadline), model_timeout=600.0
+    )
+
+    assert timeout == 600.0
+    assert timeout > server.MODEL_TIMEOUT_CEILING_SECONDS
+    assert (
+        server.model_call_budget_seconds(attempts=attempts, model_timeout=timeout)
+        <= deadline
+    )
+
+
 def test_the_resolved_model_timeout_is_the_one_litellm_applies():
     """A bound that is computed and not applied stops nothing."""
     import litellm

@@ -3,6 +3,7 @@ import {
   type RemoveTargetPayload,
   removeTargetPayloadSchema,
 } from "../schemas";
+import { requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
 /**
@@ -32,12 +33,17 @@ const dropVariant = <T extends { comparison?: { variants: string[] } }>({
  * Remove a target and every reference to it: its own column, its bucket in each
  * evaluator's mappings, any other target's mapping that read its output, and
  * its slot in any comparison.
+ *
+ * An id the workbench does not hold is refused rather than reported as a
+ * removal, so a caller that misnamed a column learns it instead of reading
+ * "the column is gone" and moving on.
  */
 export const removeTarget: Transform<
   RemoveTargetPayload,
   { targetId: string }
 > = ({ state, payload }) => {
   const { targetId } = removeTargetPayloadSchema.parse(payload);
+  requireTarget({ state, targetId });
 
   const evaluators = state.evaluators.map((evaluator) => {
     const mappings: typeof evaluator.mappings = {};

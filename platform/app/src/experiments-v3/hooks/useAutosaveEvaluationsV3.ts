@@ -388,6 +388,11 @@ export const useAutosaveEvaluationsV3 = () => {
    * same `expectedVersion`, so the second is refused for a version the first
    * had just created, and the workbench reads as out of date against its own
    * write.
+   *
+   * Every link is made to settle. `.then` on a rejected promise skips its
+   * callback, so a single throw anywhere in a save would leave the chain
+   * permanently rejected and the page would never send another one, silently,
+   * for the rest of its life.
    */
   const inFlightRef = useRef<Promise<AutosaveOutcome>>(
     Promise.resolve("unchanged"),
@@ -397,7 +402,7 @@ export const useAutosaveEvaluationsV3 = () => {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
-    inFlightRef.current = inFlightRef.current.then(async () => {
+    const attemptSave = async (): Promise<AutosaveOutcome> => {
       const state = useEvaluationsV3Store.getState();
       if (!project || !state.experimentId || !state.name) return "unchanged";
       // Out of date against the server: saving now would clobber the newer
@@ -438,8 +443,21 @@ export const useAutosaveEvaluationsV3 = () => {
       } catch (error) {
         return handleAutosaveFailure({ error, snapshot });
       }
+    };
+    const link = inFlightRef.current.then(attemptSave).catch((error) => {
+      // Reached only when the save threw outside its own guard: reporting the
+      // failure, reading the store, or building the snapshot. Nothing was
+      // written, and the next change gets a fresh attempt.
+      console.error("Failed to autosave evaluations v3:", error);
+      setAutosaveStatus(
+        "evaluation",
+        "error",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      return "failed" as const;
     });
-    return inFlightRef.current;
+    inFlightRef.current = link;
+    return link;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
 

@@ -41,24 +41,29 @@ export const attachEvaluator = ({
  * A caller-supplied id has to be free. Two evaluators under one id make the
  * mappings and the scores filed against it ambiguous, and the table could not
  * say which one a score column belongs to.
+ *
+ * Blank is not an id: an empty or whitespace-only string is read as "no id
+ * given" and gets a generated one, so it can never reach state and make every
+ * later lookup match the wrong evaluator.
  */
 export const addEvaluator: Transform<
   AddEvaluatorPayload,
   { evaluatorId: string }
 > = ({ state, payload }) => {
   const parsed = addEvaluatorPayloadSchema.parse(payload);
+  const requestedId = parsed.id?.trim();
 
-  if (parsed.id && state.evaluators.some((e) => e.id === parsed.id)) {
+  if (requestedId && state.evaluators.some((e) => e.id === requestedId)) {
     throw new TransformError({
       code: "evaluator_already_exists",
-      message: `Evaluator ${parsed.id} is already in the workbench`,
-      meta: { evaluatorId: parsed.id },
+      message: `Evaluator ${requestedId} is already in the workbench`,
+      meta: { evaluatorId: requestedId },
     });
   }
 
   const evaluator: EvaluatorConfig = {
     ...parsed,
-    id: parsed.id ?? newEvaluatorId(),
+    id: requestedId || newEvaluatorId(),
     evaluatorType: parsed.evaluatorType as EvaluatorConfig["evaluatorType"],
     inputs: parsed.inputs as Field[],
   };

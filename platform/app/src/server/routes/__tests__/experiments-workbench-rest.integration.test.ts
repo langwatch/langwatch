@@ -104,6 +104,10 @@ describe("the experiments workbench REST surface", () => {
   });
 
   afterAll(async () => {
+    // Vitest runs teardown even when the arrangement above threw, and reading
+    // `project.id` then reports a TypeError from here instead of the real
+    // failure. Nothing was created either, so there is nothing to clean up.
+    if (!project) return;
     await prisma.experimentVersion.deleteMany({
       where: { experimentId: { in: createdIds }, projectId: project.id },
     });

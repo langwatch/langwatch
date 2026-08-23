@@ -147,9 +147,10 @@ describe("setEvaluatorMapping", () => {
     /** @scenario "A mapping only names entities the workbench holds" */
     it("stores no mapping for the bucket it named", () => {
       const state = baseState();
+      let produced: unknown;
 
-      refusalCode(() =>
-        setEvaluatorMapping({
+      refusalCode(() => {
+        produced = setEvaluatorMapping({
           state,
           payload: {
             evaluatorId: "evaluator_1",
@@ -158,9 +159,14 @@ describe("setEvaluatorMapping", () => {
             inputField: "rubric",
             mapping: { type: "value", value: "x" },
           },
-        }),
-      );
+        });
+        return produced;
+      });
 
+      // The refusal is what the transform produced instead of a state. Reading
+      // the input alone would pass whether or not the bucket was built, since
+      // a transform never writes into what it was given.
+      expect(produced).toBeUndefined();
       expect(state.evaluators[0]!.mappings.nope).toBeUndefined();
     });
   });

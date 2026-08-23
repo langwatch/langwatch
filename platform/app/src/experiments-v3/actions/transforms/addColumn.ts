@@ -21,9 +21,12 @@ export const addColumn: Transform<
   const { datasetId, column } = addColumnPayloadSchema.parse(payload);
   const dataset = requireInlineDataset({ state, datasetId });
 
+  // Blank is not an id: an empty or whitespace-only one falls back to the name,
+  // the same as sending none. A blank id reaching state would key the records
+  // block on "" and the column would never find its own values again.
   const newColumn = {
     ...column,
-    id: column.id ?? column.name,
+    id: column.id?.trim() || column.name,
   } as DatasetColumn;
 
   const taken = dataset.inline.columns.some(

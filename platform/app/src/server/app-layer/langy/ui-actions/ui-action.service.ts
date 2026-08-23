@@ -373,7 +373,7 @@ export class LangyUiActionService {
   /**
    * The page asking to execute `actionId`. First caller wins (SET NX); every
    * other tab, every stream replay, and a tab racing the dispatch's own
-   * handover to the backend gets `claimed: false` and drops. The pending
+   * handover to the backend gets `isClaimed: false` and drops. The pending
    * record is the authority on WHERE the action belongs: a claim naming a
    * different conversation or project than the dispatch pinned is refused
    * exactly like an unknown action, so this cannot be used to probe or hijack
@@ -398,14 +398,14 @@ export class LangyUiActionService {
     userId: string;
     conversationId: string;
     actionId: string;
-  }): Promise<{ claimed: boolean }> {
+  }): Promise<{ isClaimed: boolean }> {
     const pending = await this.readPending(actionId);
     if (
       !pending ||
       pending.projectId !== projectId ||
       pending.conversationId !== conversationId
     ) {
-      return { claimed: false };
+      return { isClaimed: false };
     }
     const set = await this.redis.set(
       uiActionKeys.claim(actionId),
@@ -414,14 +414,14 @@ export class LangyUiActionService {
       CLAIM_TTL_SECONDS,
       "NX",
     );
-    return { claimed: set === "OK" };
+    return { isClaimed: set === "OK" };
   }
 
   /**
    * The page reporting the claimed action's outcome. Only the claiming user's
    * session may complete, and only while the pending record still names the
    * same project and conversation; anything else is dropped as
-   * `accepted: false` (the dispatch side has its own timeout, so a dropped
+   * `isAccepted: false` (the dispatch side has its own timeout, so a dropped
    * completion cannot wedge it).
    */
   async complete({
@@ -436,17 +436,17 @@ export class LangyUiActionService {
     conversationId: string;
     actionId: string;
     completion: UiActionCompletion;
-  }): Promise<{ accepted: boolean }> {
+  }): Promise<{ isAccepted: boolean }> {
     const pending = await this.readPending(actionId);
     if (
       !pending ||
       pending.projectId !== projectId ||
       pending.conversationId !== conversationId
     ) {
-      return { accepted: false };
+      return { isAccepted: false };
     }
     const claimant = await this.redis.get(uiActionKeys.claim(actionId));
-    if (claimant !== userId) return { accepted: false };
+    if (claimant !== userId) return { isAccepted: false };
 
     const raw = JSON.stringify(completion);
     // Measure what Redis stores: a string's length counts UTF-16 code units,
@@ -465,7 +465,7 @@ export class LangyUiActionService {
     }
     await this.redis.expire(uiActionKeys.result(actionId), RESULT_TTL_SECONDS);
     await this.redis.del(uiActionKeys.pending(actionId));
-    return { accepted: true };
+    return { isAccepted: true };
   }
 
   private async readPending(actionId: string): Promise<PendingUiAction | null> {

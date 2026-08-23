@@ -149,7 +149,7 @@ describe("advanceSettlement", () => {
 
   describe("when a settled reading arrives for the first time", () => {
     it("counts it and waits for the confirmation", () => {
-      const next = advance({ stale: true, terminal: { type: "end" } });
+      const next = advance({ isStale: true, terminal: { type: "end" } });
 
       expect(next.outcome).toBeNull();
       expect(next.streaks.settled).toBe(1);
@@ -158,9 +158,9 @@ describe("advanceSettlement", () => {
 
   describe("when the settled reading is confirmed", () => {
     it("returns the terminal to synthesize", () => {
-      const first = advance({ stale: true, terminal: { type: "end" } });
+      const first = advance({ isStale: true, terminal: { type: "end" } });
       const second = advance(
-        { stale: true, terminal: { type: "end" } },
+        { isStale: true, terminal: { type: "end" } },
         first.streaks,
       );
 
@@ -173,7 +173,7 @@ describe("advanceSettlement", () => {
 
   describe("when a poll could not be made", () => {
     it("counts towards neither verdict and resets both streaks", () => {
-      const first = advance({ stale: true, terminal: { type: "end" } });
+      const first = advance({ isStale: true, terminal: { type: "end" } });
       const second = advance(null, first.streaks);
 
       expect(second.outcome).toBeNull();
@@ -185,7 +185,7 @@ describe("advanceSettlement", () => {
     it("never decides anything, however many polls go by", () => {
       let streaks = NO_SETTLEMENT_STREAKS;
       for (let poll = 0; poll < 500; poll += 1) {
-        const next = advance({ stale: false, terminal: null }, streaks);
+        const next = advance({ isStale: false, terminal: null }, streaks);
         expect(next.outcome).toBeNull();
         streaks = next.streaks;
       }
@@ -197,7 +197,7 @@ describe("advanceSettlement", () => {
       let streaks = NO_SETTLEMENT_STREAKS;
       let outcome = null as ReturnType<typeof advance>["outcome"];
       for (let poll = 0; poll < 100 && !outcome; poll += 1) {
-        const next = advance({ stale: true, terminal: null }, streaks);
+        const next = advance({ isStale: true, terminal: null }, streaks);
         streaks = next.streaks;
         outcome = next.outcome;
       }

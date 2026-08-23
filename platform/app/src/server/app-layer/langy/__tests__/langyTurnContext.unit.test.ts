@@ -33,7 +33,7 @@ function renderContext(context: LangyTurnContext) {
   return renderLangyTurnContext({ context, isUiActionSurfaceOpen: true });
 }
 
-/** Render only page context — the common case in these tests. */
+/** The common case in these tests: a chip list, and nothing else set. */
 function renderResources(pageContext: LangyResourceContext[] | undefined) {
   return renderContext({ pageContext });
 }

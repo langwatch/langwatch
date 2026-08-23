@@ -258,7 +258,7 @@ export class ExperimentService {
     });
 
     if (existing) {
-      await this.repository.updateById({
+      const updated = await this.repository.updateById({
         id: existing.id,
         projectId,
         data: {
@@ -270,6 +270,16 @@ export class ExperimentService {
           // here a person would want to restore.
           workbenchVersion: { increment: 1 },
         },
+      });
+      // Same signal every other write sends. Without it an open workbench sits
+      // on the old state until its next focus or visibility probe, which is
+      // minutes of showing a dataset and a target the evaluation no longer uses.
+      await this.publishExperimentUpdated({
+        projectId,
+        experimentId: existing.id,
+        slug: existing.slug,
+        version: updated.workbenchVersion,
+        actorLabel: "api",
       });
       return existing;
     }

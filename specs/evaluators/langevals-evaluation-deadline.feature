@@ -62,6 +62,20 @@ Feature: A stuck evaluation cannot take the evaluation service down with it
       When the entry retries it as many times as it is allowed
       Then every attempt and every wait between them fits inside the evaluation timeout
 
+  Rule: A configured model timeout means the same thing every time
+
+    The operator sets one model timeout for the deployment, and the deadline of
+    a batch is not theirs to see. A timeout that keeps its value on a long batch
+    and is shortened on a short one gives the same setting two meanings, and
+    neither the setting nor the answer says which one applied.
+
+    @unit
+    Scenario: A configured model timeout keeps its value whatever the batch allows
+      Given an operator who set a model timeout longer than the built-in limit
+      When batches run with different deadlines
+      Then every batch uses the timeout the operator set
+      And no batch is still allowed to run past its own deadline
+
   Rule: One endpoint calls every evaluator
 
     An evaluator that batches differently may replace the batch method. A

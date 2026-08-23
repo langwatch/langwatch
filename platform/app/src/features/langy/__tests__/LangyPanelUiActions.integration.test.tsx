@@ -94,8 +94,10 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 const mutation = vi.fn();
-const claimUiAction = vi.fn(async (_input: unknown) => ({ claimed: true }));
-const completeUiAction = vi.fn(async (_input: unknown) => ({ accepted: true }));
+const claimUiAction = vi.fn(async (_input: unknown) => ({ isClaimed: true }));
+const completeUiAction = vi.fn(async (_input: unknown) => ({
+  isAccepted: true,
+}));
 const subscription = vi.fn(
   (_path: string, _input: unknown, _options: unknown) => ({
     unsubscribe: vi.fn(),
@@ -339,50 +341,54 @@ async function startTurn() {
 describe("Feature: Langy drives the open page through typed UI actions", () => {
   describe("Rule: the page executes the action the agent dispatched", () => {
     describe("given the page handles the dispatched kind", () => {
-      it("claims the action and runs the page's handler", async () => {
-        await startTurn();
+      describe("when the action arrives on the turn's stream", () => {
+        it("claims the action and runs the page's handler", async () => {
+          await startTurn();
 
-        act(() => {
-          latestOnData()(UI_ENTRY);
-        });
+          act(() => {
+            latestOnData()(UI_ENTRY);
+          });
 
-        await waitFor(() => expect(claimUiAction).toHaveBeenCalledTimes(1));
-        // The turn is not part of the claim: the page and the dispatch read the
-        // conversation's current turn from records that settle at different
-        // moments, and a claim refused on that difference sent live work to the
-        // backend with the page open.
-        expect(claimUiAction).toHaveBeenCalledWith({
-          projectId: "project-demo",
-          conversationId: "conv-1",
-          actionId: "action-1",
+          await waitFor(() => expect(claimUiAction).toHaveBeenCalledTimes(1));
+          // The turn is not part of the claim: the page and the dispatch read
+          // the conversation's current turn from records that settle at
+          // different moments, and a claim refused on that difference sent
+          // live work to the backend with the page open.
+          expect(claimUiAction).toHaveBeenCalledWith({
+            projectId: "project-demo",
+            conversationId: "conv-1",
+            actionId: "action-1",
+          });
+          await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
         });
-        await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
       });
     });
   });
 
   describe("Rule: page control is switched off by its rollout flag", () => {
     describe("given page control was switched off before the action arrived", () => {
-      /** @scenario "With page control rolled back, the open page ignores dispatched actions" */
-      it("never claims the action, and the page's handler never runs", async () => {
-        const { rerender } = await startTurn();
+      describe("when the action arrives on the turn's stream", () => {
+        /** @scenario "With page control rolled back, the open page ignores dispatched actions" */
+        it("never claims the action, and the page's handler never runs", async () => {
+          const { rerender } = await startTurn();
 
-        // The flag flips mid-turn: the panel is already mounted and the
-        // transport is memoised, so this is the case the ref exists for.
-        flagsRef.current = { release_langy_ui_actions: false };
-        rerender(<LangySidecar actionHandlersRef={handlersRef} />);
+          // The flag flips mid-turn: the panel is already mounted and the
+          // transport is memoised, so this is the case the ref exists for.
+          flagsRef.current = { release_langy_ui_actions: false };
+          rerender(<LangySidecar actionHandlersRef={handlersRef} />);
 
-        act(() => {
-          latestOnData()(UI_ENTRY);
+          act(() => {
+            latestOnData()(UI_ENTRY);
+          });
+          // Let anything the dispatch would have started settle first.
+          await act(async () => {
+            await Promise.resolve();
+          });
+
+          expect(claimUiAction).not.toHaveBeenCalled();
+          expect(completeUiAction).not.toHaveBeenCalled();
+          expect(run).not.toHaveBeenCalled();
         });
-        // Let anything the dispatch would have started settle before asserting.
-        await act(async () => {
-          await Promise.resolve();
-        });
-
-        expect(claimUiAction).not.toHaveBeenCalled();
-        expect(completeUiAction).not.toHaveBeenCalled();
-        expect(run).not.toHaveBeenCalled();
       });
     });
   });

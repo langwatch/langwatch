@@ -1,4 +1,5 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { LANGY_LIVENESS } from "./langy.streaming.constants";
 import type { LangyStreamEntry } from "./langyTokenBuffer";
 
 /**
@@ -69,7 +70,7 @@ export function decideSyntheticTerminal({
  * the durable fold has not settled it, which is the wedged turn nothing else
  * will clean up.
  */
-export const WEDGED_TURN_PATIENCE_MS = 90_000;
+export const WEDGED_TURN_PATIENCE_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;
 
 /**
  * Whether to give up the live stream of a turn that neither settles nor beats.
@@ -102,7 +103,7 @@ export function shouldAbandonWedgedTurn({
 /** What one look at the durable fold and the heartbeat says about a turn. */
 export interface TurnHealth {
   /** The heartbeat has not been refreshed inside its grace window. */
-  stale: boolean;
+  isStale: boolean;
   /** The terminal to synthesize, when the turn has provably settled. */
   terminal: LangyStreamEntry | null;
 }
@@ -146,7 +147,7 @@ export function advanceSettlement({
 }): { streaks: SettlementStreaks; outcome: SettlementOutcome | null } {
   const next: SettlementStreaks = {
     settled: health?.terminal ? streaks.settled + 1 : 0,
-    stale: health?.stale ? streaks.stale + 1 : 0,
+    stale: health?.isStale ? streaks.stale + 1 : 0,
   };
 
   if (health?.terminal && next.settled >= confirmPolls) {

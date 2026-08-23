@@ -20,6 +20,17 @@
 const MAX_FRAMES = 10;
 
 /**
+ * The column's own attribute selector.
+ *
+ * A target id is any non-empty string, so a quote or a backslash in one would
+ * end the attribute value early and make `querySelector` throw. That throw
+ * would travel out of an action that already applied its change, so the caller
+ * would read a save as a failure and do it again.
+ */
+const targetColumnSelector = (targetId: string): string =>
+  `[data-target-column="${CSS.escape(targetId)}"]`;
+
+/**
  * The name this column shows in its own header, or null when it is not on
  * screen. Read rather than derived: every candidate carries the same prompt
  * handle, so only the disambiguated form tells them apart, and computing it a
@@ -29,7 +40,7 @@ const MAX_FRAMES = 10;
 export function targetColumnLabel(targetId: string): string | null {
   if (typeof document === "undefined") return null;
   const header = document.querySelector(
-    `[data-target-column="${targetId}"] [data-target-name]`,
+    `${targetColumnSelector(targetId)} [data-target-name]`,
   );
   return header?.getAttribute("data-target-name") || null;
 }
@@ -37,7 +48,7 @@ export function targetColumnLabel(targetId: string): string | null {
 export function revealTargetColumn(targetId: string, frame = 0): void {
   if (typeof document === "undefined") return;
 
-  const header = document.querySelector(`[data-target-column="${targetId}"]`);
+  const header = document.querySelector(targetColumnSelector(targetId));
   if (!header) {
     // Giving up in silence is right: scrolling is a courtesy, never the point
     // of the action, and an action that succeeded must not report a failure

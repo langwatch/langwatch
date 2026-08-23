@@ -28,8 +28,8 @@ function makeHandlers(
 
 function makeLegs() {
   return {
-    claim: vi.fn(async () => ({ claimed: true })),
-    complete: vi.fn(async () => ({ accepted: true })),
+    claim: vi.fn(async () => ({ isClaimed: true })),
+    complete: vi.fn(async () => ({ isAccepted: true })),
   };
 }
 
@@ -76,7 +76,7 @@ describe("executeUiAction", () => {
     it("drops without running the handler", async () => {
       const run = vi.fn();
       const legs = makeLegs();
-      legs.claim.mockResolvedValue({ claimed: false });
+      legs.claim.mockResolvedValue({ isClaimed: false });
 
       const outcome = await executeUiAction({
         entry: ENTRY,
@@ -193,7 +193,7 @@ describe("executeUiAction", () => {
       const onHandlerError = vi.fn();
       // The pending action, the claimant or the turn no longer match, so the
       // server drops the report. The agent gets no terminal result from it.
-      legs.complete.mockResolvedValue({ accepted: false });
+      legs.complete.mockResolvedValue({ isAccepted: false });
 
       const outcome = await executeUiAction({
         entry: ENTRY,

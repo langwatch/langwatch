@@ -13,5 +13,7 @@ export {
   projectWorkbenchState,
 } from "./projection";
 export { scopeFromRunPayload } from "./runScope";
+// ast-grep-ignore: no-export-star-shim-ts
 export * from "./schemas";
+// ast-grep-ignore: no-export-star-shim-ts
 export * from "./transforms";

@@ -31,6 +31,20 @@ Feature: The moderation evaluator answers every entry it was sent
       Then the middle result is skipped
       And the entries either side keep their own scores
 
+    @unit
+    Scenario: A short answer from the provider still leaves one result per entry
+      Given a batch of several entries
+      When the provider answers fewer entries than were sent
+      Then every entry still has a result
+      And the entries the provider did not cover are reported as errors
+
+    @unit
+    Scenario: An empty batch is answered without calling the provider
+      Given a batch with no entries
+      When it is evaluated
+      Then the answer is empty
+      And no provider call is made
+
   Rule: The batch still costs two provider calls
 
     @unit

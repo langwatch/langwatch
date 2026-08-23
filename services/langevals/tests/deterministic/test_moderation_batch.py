@@ -122,6 +122,62 @@ class TestGivenABatchOfSeveralEntries:
         assert calls == [["first", "second"], ["first out", "second out"]]
 
 
+class TestGivenAProviderThatAnswersFewerEntriesThanWereSent:
+    # @scenario "A short answer from the provider still leaves one result per entry"
+    def test_still_answers_every_entry(self, monkeypatch):
+        """The walk pairs results with entries by position.
+
+        `zip` stops at the shorter list, so a truncated answer silently drops
+        the tail. A caller reading results by index would then read every
+        answer against the wrong entry, and the last entries against nothing.
+        """
+
+        class _ShortModerations:
+            def create(self, input: list[str]):
+                # One result short, whatever was sent.
+                return type(
+                    "_FakeResponse",
+                    (),
+                    {"results": [_FakeResult(t) for t in input[:-1]]},
+                )()
+
+        class _ShortClient:
+            def __init__(self):
+                self.moderations = _ShortModerations()
+
+            def with_options(self, **_kwargs):
+                return self
+
+        monkeypatch.setattr(
+            moderation_module, "OpenAI", lambda **_kwargs: _ShortClient()
+        )
+        evaluator = OpenAIModerationEvaluator()
+
+        results = evaluator.evaluate_batch(
+            data=[
+                OpenAIModerationEntry(input=VIOLENT),
+                OpenAIModerationEntry(input="the weather is nice"),
+                OpenAIModerationEntry(input="how do I return these shoes"),
+            ]
+        )
+
+        assert len(results) == 3
+        assert results[0].score == pytest.approx(0.9)
+        assert results[2].status == "error"
+        assert results[2].error_type == "ModerationResultMissing"
+
+
+class TestGivenAnEmptyBatch:
+    # @scenario "An empty batch is answered without calling the provider"
+    def test_answers_nothing_and_spends_nothing(self, calls):
+        evaluator = OpenAIModerationEvaluator()
+
+        results = evaluator.evaluate_batch(data=[])
+
+        assert results == []
+        assert calls == []
+
+
 class TestGivenAnEmptyEntryAmongFullOnes:
     # @scenario "An empty entry is skipped without moving the others"
     def test_skips_it_and_keeps_the_others_in_place(self, calls):

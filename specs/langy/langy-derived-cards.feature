@@ -123,7 +123,7 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   Scenario: A settled turn's cards reach the reader who watched it stream
     Given a turn this browser streamed whose reply carried card fences
     When the turn settles and the panel keeps the copy it streamed
-    Then the fences draw as cards by the same scanner the relay stamps with
+    Then the reader sees the same cards a reader who opened it later sees
     And the reader never has to reload the page to see them
 
   @integration

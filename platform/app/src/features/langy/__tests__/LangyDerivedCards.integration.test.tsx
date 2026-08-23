@@ -99,10 +99,13 @@ const choicesPart = (blockId: string) => ({
   },
 });
 
-function assistantMessage(
-  parts: unknown[],
-  metadata: Record<string, unknown> = {},
-): UIMessage {
+function assistantMessage({
+  parts,
+  metadata = {},
+}: {
+  parts: unknown[];
+  metadata?: Record<string, unknown>;
+}): UIMessage {
   return {
     id: "m-assistant",
     role: "assistant",
@@ -138,11 +141,13 @@ function renderMessage(
 describe("given a reply whose parts carry a stamped block between prose", () => {
   it("renders prose as prose and the card where the block sat, in derived chrome", () => {
     renderMessage(
-      assistantMessage([
-        { type: "text", text: "Here is the picture:" },
-        statsCardPart,
-        { type: "text", text: "That is the shape of it." },
-      ]),
+      assistantMessage({
+        parts: [
+          { type: "text", text: "Here is the picture:" },
+          statsCardPart,
+          { type: "text", text: "That is the shape of it." },
+        ],
+      }),
     );
 
     expect(screen.getByText("Here is the picture:")).toBeDefined();
@@ -161,7 +166,9 @@ const FENCED_TEXT = {
 
 describe("given recorded text that happens to contain a fence", () => {
   it("renders it as text — for a recorded reply the stamped part is the only card source", () => {
-    renderMessage(assistantMessage([FENCED_TEXT], recorded));
+    renderMessage(
+      assistantMessage({ parts: [FENCED_TEXT], metadata: recorded }),
+    );
     // The relay saw this text and stamped nothing, so nothing is a card.
     expect(derivedFrames()).toHaveLength(0);
   });
@@ -170,7 +177,7 @@ describe("given recorded text that happens to contain a fence", () => {
 describe("given the copy this browser streamed for itself", () => {
   /** @scenario "A settled turn's cards reach the reader who watched it stream" */
   it("draws the fence as a card, because nothing ever stamped this copy", () => {
-    renderMessage(assistantMessage([FENCED_TEXT]));
+    renderMessage(assistantMessage({ parts: [FENCED_TEXT] }));
 
     expect(derivedFrames()).toHaveLength(1);
     expect(screen.getByText("fake")).toBeDefined();
@@ -182,15 +189,17 @@ describe("given the copy this browser streamed for itself", () => {
 describe("given a failed block part", () => {
   it("renders the collapsed disclosure and expands to the raw text", () => {
     renderMessage(
-      assistantMessage([
-        { type: "text", text: "before" },
-        {
-          type: "langy-card-failed",
-          blockId: "failed-block-1",
-          raw: '{"kind": "traces", "traces": [{"trace_id": "tr_fake"}]}',
-        },
-        { type: "text", text: "after" },
-      ]),
+      assistantMessage({
+        parts: [
+          { type: "text", text: "before" },
+          {
+            type: "langy-card-failed",
+            blockId: "failed-block-1",
+            raw: '{"kind": "traces", "traces": [{"trace_id": "tr_fake"}]}',
+          },
+          { type: "text", text: "after" },
+        ],
+      }),
     );
 
     const line = screen.getByText("Langy tried to draw a card here");
@@ -205,10 +214,12 @@ describe("given a failed block part", () => {
 });
 
 describe("given an open question card", () => {
-  const message = assistantMessage([
-    { type: "text", text: "One thing I need from you:" },
-    choicesPart("q1"),
-  ]);
+  const message = assistantMessage({
+    parts: [
+      { type: "text", text: "One thing I need from you:" },
+      choicesPart("q1"),
+    ],
+  });
   const timeline = langyChoicesTimeline([message]);
 
   it("answers with the option bound to its exact question", () => {
@@ -237,7 +248,7 @@ describe("given a question the browser streamed and nothing stamped", () => {
 
   /** @scenario "A settled turn's cards reach the reader who watched it stream" */
   it("is answerable, because the timeline reads the same fences the panel draws", () => {
-    const message = assistantMessage([FENCED_QUESTION]);
+    const message = assistantMessage({ parts: [FENCED_QUESTION] });
     const onChoiceSelect = vi.fn();
     renderMessage(message, {
       choicesTimeline: langyChoicesTimeline([message]),
@@ -251,7 +262,10 @@ describe("given a question the browser streamed and nothing stamped", () => {
   });
 
   it("stays closed once the message is the durable record's", () => {
-    const message = assistantMessage([FENCED_QUESTION], recorded);
+    const message = assistantMessage({
+      parts: [FENCED_QUESTION],
+      metadata: recorded,
+    });
     renderMessage(message, {
       choicesTimeline: langyChoicesTimeline([message]),
       onChoiceSelect: vi.fn(),
@@ -263,7 +277,7 @@ describe("given a question the browser streamed and nothing stamped", () => {
 
 describe("given an answered question", () => {
   it("renders locked with the choice marked, options unclickable", () => {
-    const message = assistantMessage([choicesPart("q1")]);
+    const message = assistantMessage({ parts: [choicesPart("q1")] });
     const timeline = langyChoicesTimeline([
       message,
       {
@@ -291,7 +305,7 @@ describe("given an answered question", () => {
 
 describe("given a question the conversation moved past", () => {
   it("renders superseded — readable, visibly closed, unanswerable", () => {
-    const message = assistantMessage([choicesPart("q1")]);
+    const message = assistantMessage({ parts: [choicesPart("q1")] });
     const timeline = langyChoicesTimeline([
       message,
       {
@@ -317,7 +331,9 @@ describe("given a question the conversation moved past", () => {
 describe("given no timeline at all", () => {
   it("fails closed: the question renders unanswerable", () => {
     const onChoiceSelect = vi.fn();
-    renderMessage(assistantMessage([choicesPart("q1")]), { onChoiceSelect });
+    renderMessage(assistantMessage({ parts: [choicesPart("q1")] }), {
+      onChoiceSelect,
+    });
     fireEvent.click(screen.getByText("Staging agent"));
     expect(onChoiceSelect).not.toHaveBeenCalled();
   });
@@ -326,29 +342,31 @@ describe("given no timeline at all", () => {
 describe("given a derived timeseries with hints", () => {
   it("binds a validating explore hint to a Traces link", () => {
     renderMessage(
-      assistantMessage([
-        {
-          type: "langy-card",
-          blockId: "ts1",
-          kind: "timeseries",
-          provenance: "derived",
-          card: {
-            kind: "timeseries",
+      assistantMessage({
+        parts: [
+          {
+            type: "langy-card",
             blockId: "ts1",
-            title: "Cost per day",
-            series: [
-              {
-                name: "cost",
-                points: [
-                  { t: "d1", v: 1 },
-                  { t: "d2", v: 2 },
-                ],
-              },
-            ],
+            kind: "timeseries",
+            provenance: "derived",
+            card: {
+              kind: "timeseries",
+              blockId: "ts1",
+              title: "Cost per day",
+              series: [
+                {
+                  name: "cost",
+                  points: [
+                    { t: "d1", v: 1 },
+                    { t: "d2", v: 2 },
+                  ],
+                },
+              ],
+            },
+            hints: [{ type: "explore", query: { query: "checkout" } }],
           },
-          hints: [{ type: "explore", query: { query: "checkout" } }],
-        },
-      ]),
+        ],
+      }),
     );
     expect(derivedFrames()).toHaveLength(1);
     const link = screen.getByText("Open in Traces").closest("a");
@@ -365,29 +383,31 @@ describe("given a derived timeseries with hints", () => {
     // so a hint naming only one is a genuine narrowing, not an empty query —
     // it must earn a link the same way a free-text hint does.
     renderMessage(
-      assistantMessage([
-        {
-          type: "langy-card",
-          blockId: "ts3",
-          kind: "timeseries",
-          provenance: "derived",
-          card: {
-            kind: "timeseries",
+      assistantMessage({
+        parts: [
+          {
+            type: "langy-card",
             blockId: "ts3",
-            title: "Cost per day",
-            series: [
-              {
-                name: "cost",
-                points: [
-                  { t: "d1", v: 1 },
-                  { t: "d2", v: 2 },
-                ],
-              },
-            ],
+            kind: "timeseries",
+            provenance: "derived",
+            card: {
+              kind: "timeseries",
+              blockId: "ts3",
+              title: "Cost per day",
+              series: [
+                {
+                  name: "cost",
+                  points: [
+                    { t: "d1", v: 1 },
+                    { t: "d2", v: 2 },
+                  ],
+                },
+              ],
+            },
+            hints: [{ type: "explore", query: { origin: "evaluation" } }],
           },
-          hints: [{ type: "explore", query: { origin: "evaluation" } }],
-        },
-      ]),
+        ],
+      }),
     );
     const link = screen.getByText("Open in Traces").closest("a");
     expect(link?.getAttribute("href")).toBe(
@@ -397,29 +417,31 @@ describe("given a derived timeseries with hints", () => {
 
   it("drops an explore hint the platform cannot validate, card intact", () => {
     renderMessage(
-      assistantMessage([
-        {
-          type: "langy-card",
-          blockId: "ts2",
-          kind: "timeseries",
-          provenance: "derived",
-          card: {
-            kind: "timeseries",
+      assistantMessage({
+        parts: [
+          {
+            type: "langy-card",
             blockId: "ts2",
-            title: "Cost per day",
-            series: [
-              {
-                name: "cost",
-                points: [
-                  { t: "d1", v: 1 },
-                  { t: "d2", v: 2 },
-                ],
-              },
-            ],
+            kind: "timeseries",
+            provenance: "derived",
+            card: {
+              kind: "timeseries",
+              blockId: "ts2",
+              title: "Cost per day",
+              series: [
+                {
+                  name: "cost",
+                  points: [
+                    { t: "d1", v: 1 },
+                    { t: "d2", v: 2 },
+                  ],
+                },
+              ],
+            },
+            hints: [{ type: "explore", query: { nonsense: true } }],
           },
-          hints: [{ type: "explore", query: { nonsense: true } }],
-        },
-      ]),
+        ],
+      }),
     );
     expect(screen.queryByText("Open in Traces")).toBeNull();
     expect(screen.getByText("Cost per day")).toBeDefined();
@@ -551,21 +573,26 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
     'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Live counts", "items": [';
 
   it("shows no card preview until a validating prefix exists", () => {
-    renderMessage(assistantMessage([{ type: "text", text: statsFenceOpen }]), {
-      isStreaming: true,
-    });
+    renderMessage(
+      assistantMessage({ parts: [{ type: "text", text: statsFenceOpen }] }),
+      {
+        isStreaming: true,
+      },
+    );
     expect(screen.getByText(/Plotting/)).toBeDefined();
     expect(derivedFrames()).toHaveLength(0);
   });
 
   it("renders the forming card once the prefix validates, marked forming", () => {
     renderMessage(
-      assistantMessage([
-        {
-          type: "text",
-          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
-        },
-      ]),
+      assistantMessage({
+        parts: [
+          {
+            type: "text",
+            text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+          },
+        ],
+      }),
       { isStreaming: true },
     );
     expect(formingFrames()).toHaveLength(1);
@@ -575,12 +602,14 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
 
   it("replaces the preview with the settled card — exactly one card renders", () => {
     const { rerender } = renderMessage(
-      assistantMessage([
-        {
-          type: "text",
-          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
-        },
-      ]),
+      assistantMessage({
+        parts: [
+          {
+            type: "text",
+            text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+          },
+        ],
+      }),
       { isStreaming: true },
     );
     expect(formingFrames()).toHaveLength(1);
@@ -590,21 +619,23 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
     rerender(
       <ChakraProvider value={defaultSystem}>
         <MessageContent
-          message={assistantMessage([
-            { type: "text", text: "Plotting this now:" },
-            {
-              type: "langy-card",
-              blockId: "live1",
-              kind: "stats",
-              provenance: "derived",
-              card: {
-                kind: "stats",
+          message={assistantMessage({
+            parts: [
+              { type: "text", text: "Plotting this now:" },
+              {
+                type: "langy-card",
                 blockId: "live1",
-                title: "Live counts",
-                items: [{ label: "traces", value: 12 }],
+                kind: "stats",
+                provenance: "derived",
+                card: {
+                  kind: "stats",
+                  blockId: "live1",
+                  title: "Live counts",
+                  items: [{ label: "traces", value: 12 }],
+                },
               },
-            },
-          ])}
+            ],
+          })}
           appliedOutcomes={{}}
           discardedProposals={new Set()}
           applyingProposals={new Set()}
@@ -630,16 +661,18 @@ describe("given a card renderer that throws", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     renderMessage(
-      assistantMessage([
-        { type: "text", text: "healthy prose" },
-        {
-          type: "langy-card",
-          blockId: "boom",
-          kind: "stats",
-          provenance: "derived",
-          card: { kind: "stats", blockId: "boom", items: [{ label: 3 }] },
-        },
-      ]),
+      assistantMessage({
+        parts: [
+          { type: "text", text: "healthy prose" },
+          {
+            type: "langy-card",
+            blockId: "boom",
+            kind: "stats",
+            provenance: "derived",
+            card: { kind: "stats", blockId: "boom", items: [{ label: 3 }] },
+          },
+        ],
+      }),
     );
     expect(screen.getByText("healthy prose")).toBeDefined();
     expect(screen.getByText("Langy tried to draw a card here")).toBeDefined();
@@ -669,7 +702,7 @@ describe("given a stats card comparing readings on one scale", () => {
 
   /** @scenario "The bar comparison marks the leading reading" */
   it("draws a bar per reading and marks the leading one", () => {
-    renderMessage(assistantMessage([comparison]));
+    renderMessage(assistantMessage({ parts: [comparison] }));
 
     const bars = screen.getAllByTestId("derived-stat-bar");
     expect(bars).toHaveLength(2);
@@ -679,7 +712,7 @@ describe("given a stats card comparing readings on one scale", () => {
 
   /** @scenario "A unit word is drawn as the symbol a reader expects" */
   it("draws each unit as its symbol", () => {
-    renderMessage(assistantMessage([comparison]));
+    renderMessage(assistantMessage({ parts: [comparison] }));
 
     expect(screen.getByText("35%")).toBeDefined();
     expect(screen.getByText("45%")).toBeDefined();
@@ -688,19 +721,21 @@ describe("given a stats card comparing readings on one scale", () => {
   /** @scenario "The figure row wraps rather than leaving the panel" */
   it("keeps every reading in the card rather than dropping any", () => {
     renderMessage(
-      assistantMessage([
-        {
-          ...comparison,
-          card: {
-            ...comparison.card,
-            items: [
-              ...comparison.card.items,
-              { label: "Policy-sheet rows", value: 83, unit: "percent" },
-              { label: "Shipping-window rows", value: 60, unit: "percent" },
-            ],
+      assistantMessage({
+        parts: [
+          {
+            ...comparison,
+            card: {
+              ...comparison.card,
+              items: [
+                ...comparison.card.items,
+                { label: "Policy-sheet rows", value: 83, unit: "percent" },
+                { label: "Shipping-window rows", value: 60, unit: "percent" },
+              ],
+            },
           },
-        },
-      ]),
+        ],
+      }),
     );
 
     expect(screen.getAllByTestId("derived-stat-bar")).toHaveLength(4);

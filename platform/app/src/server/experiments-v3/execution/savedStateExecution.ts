@@ -62,21 +62,28 @@ export const buildStateFromWorkbench = (
   };
 };
 
+/** What the stored experiment says the run covers, once it is readable. */
+type SavedWorkbench = {
+  experimentId: string;
+  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>;
+  dataset: z.infer<
+    typeof persistedEvaluationsV3StateSchema
+  >["datasets"][number];
+};
+
 /**
- * Resolve the experiment, parse its saved state, and load everything the
- * orchestrator needs. Throws `ExperimentNotFoundError` and
- * `InvalidExperimentConfigurationError` like the run route always has; the
- * loader's own refusals come back as `{error, status}` for the caller to map.
+ * Read the experiment's saved state and the dataset the run is pinned to.
+ *
+ * Kept apart from the loader below so each half answers one question: this one
+ * is only about what was stored and whether it can be run at all.
  */
-export async function prepareSavedStateExecution({
+async function readSavedWorkbench({
   projectId,
   slug,
-  runInputs,
 }: {
   projectId: string;
   slug: string;
-  runInputs?: ExecutionDataInputs;
-}): Promise<SavedStateExecution | SavedStateExecutionRefusal> {
+}): Promise<SavedWorkbench | SavedStateExecutionRefusal> {
   const experiment = await ExperimentService.create({
     prisma,
   }).findBySlugAndType({
@@ -106,6 +113,30 @@ export async function prepareSavedStateExecution({
     return { error: "No dataset configured", status: 400 };
   }
 
+  return { experimentId: experiment.id, workbenchState, dataset };
+}
+
+/**
+ * Resolve the experiment, parse its saved state, and load everything the
+ * orchestrator needs. Throws `ExperimentNotFoundError` and
+ * `InvalidExperimentConfigurationError` like the run route always has; the
+ * loader's own refusals come back as `{error, status}` for the caller to map.
+ */
+export async function prepareSavedStateExecution({
+  projectId,
+  slug,
+  runInputs,
+}: {
+  projectId: string;
+  slug: string;
+  runInputs?: ExecutionDataInputs;
+}): Promise<SavedStateExecution | SavedStateExecutionRefusal> {
+  const saved = await readSavedWorkbench({ projectId, slug });
+  if ("error" in saved) {
+    return saved;
+  }
+  const { experimentId, workbenchState, dataset } = saved;
+
   const dataResult = await loadExecutionData({
     projectId,
     dataset,
@@ -118,7 +149,7 @@ export async function prepareSavedStateExecution({
   }
 
   return {
-    experiment: { id: experiment.id, slug },
+    experiment: { id: experimentId, slug },
     workbenchState,
     state: buildStateFromWorkbench(workbenchState),
     datasetRows: dataResult.datasetRows,

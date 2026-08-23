@@ -129,7 +129,7 @@ describe("the real command tree", () => {
    * again. Commander rejects an undeclared option before the output
    * preprocessor ever runs, so the flag has to be declared per command.
    */
-  describe("the commands an agent drives the open page with", () => {
+  describe("when inspecting the commands an agent drives the open page with", () => {
     const agentDriven = [
       ["ui", "call"],
       ["ui", "actions"],

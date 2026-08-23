@@ -78,7 +78,10 @@ describe("revealTargetColumn", () => {
       revealTargetColumn("target-never");
       await runFrames(40);
 
-      expect(frame.mock.calls.length).toBeLessThanOrEqual(10);
+      // Exactly the ceiling, from both sides. An upper bound alone would also
+      // pass for a version that gave up after the first look, which is the
+      // other way this can break and the one that loses the scroll.
+      expect(frame).toHaveBeenCalledTimes(10);
     });
   });
 });

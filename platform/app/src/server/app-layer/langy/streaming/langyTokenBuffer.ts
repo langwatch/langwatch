@@ -439,7 +439,9 @@ export class LangyTokenBuffer {
    * platform-computed link before ever calling this, so nothing agent-authored
    * reaches the stream. No durable event is ever written for this: a navigate
    * fires at most once, on the live edge, and reopening a past conversation
-   * (the durable fold) can never replay it.
+   * (the durable fold) can never replay it. Buffered tokens are flushed first,
+   * so the line that says where the agent is going arrives before the page
+   * moves there.
    */
   async appendNavigate({
     conversationId,
@@ -450,6 +452,7 @@ export class LangyTokenBuffer {
     turnId: string;
     href: string;
   }): Promise<void> {
+    await this.flush({ conversationId, turnId });
     await this.append(conversationId, turnId, { type: "navigate", href });
   }
 
@@ -460,6 +463,11 @@ export class LangyTokenBuffer {
    * action to this conversation + turn in Redis; nothing agent-authored
    * reaches the stream unvalidated. No durable event is ever written: like
    * `navigate`, an action fires at most once, on the live edge.
+   *
+   * Buffered tokens are flushed first, as `appendPlan` and `appendTool` do.
+   * The agent says what it is about to do and then does it, so the page has to
+   * receive those words before the change they announce. Without the flush a
+   * column can appear while the line explaining it is still in the buffer.
    */
   async appendUiAction({
     conversationId,
@@ -474,6 +482,7 @@ export class LangyTokenBuffer {
     kind: string;
     payload: unknown;
   }): Promise<void> {
+    await this.flush({ conversationId, turnId });
     await this.append(conversationId, turnId, {
       type: "ui",
       actionId,

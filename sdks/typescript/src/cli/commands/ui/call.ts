@@ -37,12 +37,18 @@ const readStdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString("utf8");
 };
 
+/**
+ * The cause is kept: a missing file, a directory and a permission denial all
+ * need a different fix, and an agent told only "could not read" cannot tell
+ * which one it hit.
+ */
 const readPayloadFile = async (file: string): Promise<string> => {
   if (file === "-") return await readStdin();
   try {
     return await readFile(file, "utf8");
-  } catch {
-    throw new Error(`Could not read the payload file ${file}`);
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not read the payload file ${file}: ${cause}`);
   }
 };
 

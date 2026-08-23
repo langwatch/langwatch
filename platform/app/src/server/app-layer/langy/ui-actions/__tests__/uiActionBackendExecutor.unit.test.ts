@@ -240,7 +240,7 @@ describe("executeBackendAction", () => {
   });
 
   describe("when the run action falls back to the saved state", () => {
-    /** @scenario A run started with no browser executes from the saved state */
+    /** @scenario A run started with no browser covers what the workbench holds */
     it("starts a polling run and returns its id", async () => {
       const experiments = makeExperiments();
       mockSavedStateRun({ datasetRows: [{ input: "hi" }], runId: "run-1" });

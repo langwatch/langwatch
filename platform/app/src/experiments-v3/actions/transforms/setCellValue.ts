@@ -2,7 +2,11 @@ import {
   type SetCellValuePayload,
   setCellValuePayloadSchema,
 } from "../schemas";
-import { replaceDataset, requireInlineDataset } from "./helpers";
+import {
+  inlineRowCount,
+  replaceDataset,
+  requireInlineDataset,
+} from "./helpers";
 import { type Transform, TransformError } from "./types";
 
 /**
@@ -12,8 +16,10 @@ import { type Transform, TransformError } from "./types";
  * add a record the table never shows, so the value would be invisible and the
  * write would still report success.
  *
- * Short columns are padded with empty strings up to the row being written, so a
- * value can land past the end of a ragged column.
+ * Every column is padded with empty strings up to the row being written, not
+ * only the one that takes the value. The table reads a row across all columns,
+ * so padding one column alone would put the new value on a row the other
+ * columns do not have, and the run would read the cells beside it as missing.
  */
 export const setCellValue: Transform<
   SetCellValuePayload,
@@ -31,21 +37,23 @@ export const setCellValue: Transform<
     });
   }
 
-  const columnValues = [...(dataset.inline.records[columnId] ?? [])];
-  while (columnValues.length <= rowIndex) {
-    columnValues.push("");
+  const rowCount = Math.max(inlineRowCount(dataset.inline), rowIndex + 1);
+  const records: Record<string, string[]> = { ...dataset.inline.records };
+  for (const column of dataset.inline.columns) {
+    const columnValues = [...(records[column.id] ?? [])];
+    while (columnValues.length < rowCount) {
+      columnValues.push("");
+    }
+    records[column.id] = columnValues;
   }
-  columnValues[rowIndex] = value;
+  records[columnId]![rowIndex] = value;
 
   return {
     state: replaceDataset({
       state,
       dataset: {
         ...dataset,
-        inline: {
-          ...dataset.inline,
-          records: { ...dataset.inline.records, [columnId]: columnValues },
-        },
+        inline: { ...dataset.inline, records },
       },
     }),
     result: { datasetId, rowIndex },

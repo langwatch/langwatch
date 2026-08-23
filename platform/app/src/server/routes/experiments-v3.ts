@@ -259,11 +259,20 @@ const authenticateRequest = async (
   return { project: resolved.project, resolved, markUsed };
 };
 
-/** Query parameters that are optional positive integers, or nothing. */
+/**
+ * Query parameters and path segments that are optional positive integers, or
+ * nothing.
+ *
+ * The whole value has to be digits. `parseInt` reads the leading number and
+ * discards the rest, so it turns `3abc` into 3 and `1.5` into 1: a mistyped
+ * `/versions/3abc/restore` would then restore version 3 instead of answering
+ * 404, which is a write the caller never asked for.
+ */
 const parseOptionalPositiveInt = (value: string | undefined) => {
   if (value === undefined) return undefined;
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  if (!/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
 // ── POST /execute ────────────────────────────────────────────────────
@@ -1229,14 +1238,14 @@ secured.access(apiKeyAuthExperimentsView).get(
         in: "query",
         name: "limit",
         required: false,
-        schema: { type: "integer", default: 50, maximum: 100 },
+        schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
         description: "Versions per page, capped at 100",
       },
       {
         in: "query",
         name: "cursor",
         required: false,
-        schema: { type: "integer" },
+        schema: { type: "integer", minimum: 1 },
         description: "The `nextCursor` of the previous page",
       },
     ],

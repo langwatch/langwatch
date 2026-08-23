@@ -134,6 +134,10 @@ export const resolveScopedRowIndices = ({
 }): number[] => {
   const allRows = () => Array.from({ length: rowCount }, (_, i) => i);
   const inRange = (i: number) => i >= 0 && i < rowCount;
+  // A row named twice is still one row. Kept as-sent otherwise, so the run
+  // covers the rows in the order the caller asked for.
+  const picked = (indices: number[]) =>
+    Array.from(new Set(indices.filter(inRange)));
 
   switch (scope.type) {
     case "full":
@@ -141,9 +145,9 @@ export const resolveScopedRowIndices = ({
     case "evaluator-all-rows":
       return allRows();
     case "rows":
-      return scope.rowIndices.filter(inRange);
+      return picked(scope.rowIndices);
     case "target-rows":
-      return scope.rowIndices ? scope.rowIndices.filter(inRange) : allRows();
+      return scope.rowIndices ? picked(scope.rowIndices) : allRows();
     case "cell":
     case "evaluator":
       return [scope.rowIndex].filter(inRange);

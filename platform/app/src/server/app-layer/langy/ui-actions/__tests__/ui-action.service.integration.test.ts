@@ -85,13 +85,13 @@ describe("LangyUiActionService against real Redis", () => {
       }
       const actionId = appended[0]!.actionId;
       const claim = await service.claim({ ...IDS, actionId });
-      expect(claim).toEqual({ claimed: true });
+      expect(claim).toEqual({ isClaimed: true });
       const complete = await service.complete({
         ...IDS,
         actionId,
         completion: { ok: true, result: { targetId: "t2" } },
       });
-      expect(complete).toEqual({ accepted: true });
+      expect(complete).toEqual({ isAccepted: true });
     })();
 
     const [outcome] = await Promise.all([dispatch, page]);
@@ -128,9 +128,9 @@ describe("LangyUiActionService against real Redis", () => {
       service.claim({ ...IDS, actionId }),
       service.claim({ ...IDS, userId: "user-tab-2", actionId }),
     ]);
-    expect([first.claimed, second.claimed].sort()).toEqual([false, true]);
+    expect([first.isClaimed, second.isClaimed].sort()).toEqual([false, true]);
 
-    const claimant = first.claimed ? IDS.userId : "user-tab-2";
+    const claimant = first.isClaimed ? IDS.userId : "user-tab-2";
     await service.complete({
       ...IDS,
       userId: claimant,

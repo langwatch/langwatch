@@ -158,11 +158,24 @@ export const experimentStatusCommand = async (
       const deadline = Date.now() + limitMs;
       const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
+      let lastReadError: unknown = null;
       while (!TERMINAL_STATUSES.has(status.status) && Date.now() < deadline) {
         spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
         await sleep(pollMs);
-        status = await readStatus();
+        try {
+          status = await readStatus();
+          lastReadError = null;
+        } catch (error) {
+          // One unreadable poll says nothing about the run. The wait keeps the
+          // status it already has and looks again, so a dropped socket at
+          // second 12 of a 60 second wait no longer reports a healthy run as
+          // failed.
+          lastReadError = error;
+        }
       }
+      // Still unreadable when the wait ended: the caller has no current answer,
+      // so they get the failure rather than a stale status dressed up as fresh.
+      if (lastReadError) throw lastReadError;
       // A run still going when the limit is up is not a failure: the caller
       // asked how far it had got, and that is what it gets. Failing here would
       // make a slow run indistinguishable from a broken one.

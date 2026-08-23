@@ -143,12 +143,15 @@ def resolve_model_call_bounds(
     # nothing left to floor to, and rounding up to a second would put the model
     # timeout past the deadline it has to fit inside, which is the one thing
     # this function promises never happens.
-    return 1, float(
-        min(
-            MODEL_TIMEOUT_CEILING_SECONDS,
-            math.floor(only_attempt) if only_attempt >= 1 else only_attempt,
-        )
-    )
+    whole_seconds = math.floor(only_attempt) if only_attempt >= 1 else only_attempt
+    if model_timeout is not None:
+        # The ceiling bounds what this function DERIVES, never what an operator
+        # asked for. Both branches honor the override up to the deadline, as
+        # the docstring says: capping it here alone would make one
+        # LANGEVALS_MODEL_TIMEOUT value mean two different things, decided by
+        # how much of the batch budget happened to be left.
+        return 1, float(whole_seconds)
+    return 1, float(min(MODEL_TIMEOUT_CEILING_SECONDS, whole_seconds))
 
 
 # How long ONE model call may take, which is the usual reason an evaluation

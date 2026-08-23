@@ -90,7 +90,7 @@ Feature: Langy runs the prompt improvement loop on the workbench
   Scenario: Langy stops after three attempts that fail to beat the best candidate
     When three consecutive attempts fail to beat the best candidate
     Then Langy stops and reports what it tried
-    And asks for direction instead of churning
+    And it offers the reader the choice of publishing the best draft or carrying on
 
   @e2e
   Scenario: Langy stops once it spends the attempt budget
