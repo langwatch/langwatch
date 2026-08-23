@@ -205,6 +205,42 @@ Rule: Strongly typed filter field registry
     Then the parser produces a Tag with a wildcard expression
     And the ClickHouse translation uses arrayExists with LIKE
 
+Rule: A pill's filter queries the same value the pill displays
+  The drawer header renders a Conversation (or User) identity pill from one
+  resolved source, and its filter affordance compiles that same value against
+  the facet expression. Trace summaries exist where the conversation id was
+  stamped under a legacy key (`langgraph.thread_id`, `langwatch.thread_id`)
+  instead of `gen_ai.conversation.id`, so the facet resolves the whole key
+  chain, not just the canonical attribute.
+
+  Implementation:
+    platform/app/src/server/app-layer/traces/resolve-conversation-id.ts
+
+  @unit
+  Scenario: Conversation pill on a legacy-key trace filters to that conversation
+    Given a trace summary whose conversation id is set under "langgraph.thread_id" only
+    When the drawer header renders the Conversation pill and the reader clicks its filter
+    Then the compiled ClickHouse predicate matches that trace's conversation id
+    And the in-memory evaluation agrees with the SQL result
+
+  @unit
+  Scenario: Facet read and display resolution never disagree on precedence
+    Given summaries carrying the conversation id under any of the supported keys, or several at once
+    Then the facet's in-memory read and the drawer header resolution follow the same precedence chain
+    And an empty string under an earlier key falls through to the next key
+
+  @unit
+  Scenario: has:conversation counts a legacy-key trace as having a conversation
+    Given a trace summary whose conversation id is set under "langgraph.thread_id" only
+    When the query "has:conversation" is evaluated
+    Then both the SQL predicate and the in-memory evaluation report the conversation as present
+
+  @integration
+  Scenario: Filtering by a legacy-key conversation id returns the trace from ClickHouse
+    Given an ingested trace whose conversation id is stored under "langgraph.thread_id" only
+    When the trace list is filtered by `conversation:"<that id>"`
+    Then the trace appears in the results
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FILTER STATE MACHINE

@@ -609,4 +609,87 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       expect(counts.values).toEqual({});
     });
   });
+
+  describe("given a trace whose conversation id rides a legacy attribute key", () => {
+    const legacyTenant = `test-legacy-conversation-${nanoid()}`;
+    const legacyTraceId = "legacy-conversation-trace";
+    const legacyTimeRange = { from: base - 60_000, to: base + 60_000 };
+
+    const conversationFacetExpression = (() => {
+      const def = FACET_REGISTRY.find((facet) => facet.key === "conversation");
+      if (!def || !("expression" in def)) {
+        throw new Error(
+          "the conversation facet no longer carries an expression",
+        );
+      }
+      return def.expression;
+    })();
+
+    /** The filter the sidebar compiles, so the test reads the production SQL. */
+    const filterForLegacy = (queryText: string) => {
+      const compiled = translateFilterToClickHouse(
+        queryText,
+        legacyTenant,
+        legacyTimeRange,
+      );
+      if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
+      return compiled;
+    };
+
+    const listWith = (queryText: string) =>
+      repo.findAll({
+        tenantId: legacyTenant,
+        timeRange: legacyTimeRange,
+        sort: { column: "OccurredAt", direction: "desc" },
+        limit: 50,
+        offset: 0,
+        filterWhere: filterForLegacy(queryText),
+      });
+
+    beforeAll(async () => {
+      // Rows written before the canonicaliser folded thread ids onto
+      // gen_ai.conversation.id keep the raw langgraph key only.
+      await insertRows([
+        makeTraceSummaryRow(0, {
+          TenantId: legacyTenant,
+          TraceId: legacyTraceId,
+          OccurredAt: new Date(base),
+          CreatedAt: new Date(base),
+          UpdatedAt: new Date(base),
+          LastEventOccurredAt: new Date(base),
+          Attributes: { "langgraph.thread_id": "thread-legacy-1" },
+        }),
+      ]);
+    }, 120_000);
+
+    afterAll(async () => {
+      if (!ch) return;
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: legacyTenant },
+      });
+    });
+
+    /** @scenario "Filtering by a legacy-key conversation id returns the trace from ClickHouse" */
+    it("finds the trace when filtering by its conversation id", async () => {
+      const page = await listWith('conversation:"thread-legacy-1"');
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([legacyTraceId]);
+      expect(page.totalHits).toBe(1);
+    });
+
+    /** @scenario "has:conversation counts a legacy-key trace as having a conversation" */
+    it("counts the trace under has:conversation and lists its id in the facet values", async () => {
+      const withConversation = await listWith("has:conversation");
+      expect(withConversation.totalHits).toBe(1);
+
+      const counts = await repo.findFacetCounts({
+        tenantId: legacyTenant,
+        timeRange: legacyTimeRange,
+        facetExpression: conversationFacetExpression,
+      });
+      expect(counts.values).toEqual({ "thread-legacy-1": 1 });
+    });
+  });
 });

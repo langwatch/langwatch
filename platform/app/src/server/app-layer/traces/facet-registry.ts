@@ -22,6 +22,10 @@ import type {
   RangeRead,
 } from "./filter-to-clickhouse/field-def";
 import { UNSUPPORTED } from "./filter-to-clickhouse/field-def";
+import {
+  CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
+  resolveConversationId,
+} from "./resolve-conversation-id";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 export type FacetGroup =
@@ -163,8 +167,8 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Conversation",
     group: "trace",
     table: "trace_summaries",
-    expression: "Attributes['gen_ai.conversation.id']",
-    read: (t) => t.summary.attributes["gen_ai.conversation.id"] ?? "",
+    expression: CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
+    read: (t) => resolveConversationId(t.summary.attributes),
   },
   {
     // The same key the analytics layer aliases as `metadata.customer_id`.
