@@ -152,6 +152,32 @@ Feature: Langy drives the open page through typed UI actions
     and the customer read "Failed to save" over work they had just watched
     Langy do.
 
+    A page can also reach a state where it cannot save at all: once the server
+    holds a newer version, autosave stands down, because writing then would
+    clobber it. Answering "done" from there is the same false success by
+    another door, so the page refuses and names the state. The agent's remedy
+    is the backend path, which writes the saved document directly.
+
+    @integration
+    Scenario: A page that cannot save refuses the action instead of reporting success
+      Given a page whose save was refused for a newer version
+      When the agent dispatches a workbench action the browser handles
+      Then the action is refused as out of date
+      And the page is not changed
+
+    @integration
+    Scenario: A page that cannot save does not run the document it holds
+      Given a page whose save was refused for a newer version
+      When the agent dispatches a run
+      Then the action is refused as out of date
+      And no run is started
+
+    @unit
+    Scenario: A refused action tells the agent how to write anyway
+      Given a page refused an action for a newer version
+      When the agent reads the refusal
+      Then it is told to apply the change to the saved evaluation instead
+
     @integration
     Scenario: An agent edit is on the server before the action reports success
       Given the agent dispatches a workbench action the browser handles

@@ -410,6 +410,11 @@ const registry = {
       "Pass --experiment <slug> so the backend knows which experiment to apply the action to; the slug is on the experiment context chip and in `langwatch experiment list`",
     ],
   },
+  langy_ui_page_out_of_date: {
+    tips: [
+      "The open page holds an older version and cannot save. Pass --experiment <slug> so the change is applied to the saved evaluation instead, and tell the user their page needs a reload",
+    ],
+  },
   langy_ui_timeout: {
     tips: [
       "The page may have applied part of the action — read the current state (for example `langwatch workbench get-state`) before retrying",
@@ -569,4 +574,21 @@ export function remediation(code: RemediationCode): {
     ...(entry.tips ? { tips: entry.tips } : {}),
     ...(entry.docsPath ? { docsUrl: docsUrl(entry.docsPath) } : {}),
   };
+}
+
+/**
+ * The tips for a code that is only known at runtime.
+ *
+ * One error can carry another's code: the UI-action channel wraps whatever the
+ * page reported, and its own advice is "read meta.errorCode for the page's own
+ * reason". Following that advice should then reach the inner code's tips rather
+ * than end at its name, so the wrapper looks the inner code up here. Unknown
+ * codes answer with nothing, because a code from a page is data.
+ */
+export function remediationFor(code: string | undefined): {
+  tips?: readonly string[];
+  docsUrl?: string;
+} {
+  if (!code || !(code in registry)) return {};
+  return remediation(code as RemediationCode);
 }

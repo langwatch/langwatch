@@ -1932,6 +1932,11 @@ const presentations = {
     describe: () =>
       "No page was open, and Langy didn't name the evaluation to apply the change to. Ask again with the evaluation named, or open it first.",
   },
+  langy_ui_page_out_of_date: {
+    title: "This page is behind the saved evaluation",
+    describe: () =>
+      "The evaluation changed elsewhere, so this page could not save Langy's change. Reload the page and ask again.",
+  },
   langy_ui_no_browser: {
     title: "No page was open to make the change",
     describe: () =>

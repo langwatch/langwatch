@@ -161,6 +161,7 @@ export const APP_ERROR_CODES = [
   "langy_ui_experiment_required",
   "langy_ui_handler_failed",
   "langy_ui_no_browser",
+  "langy_ui_page_out_of_date",
   "langy_ui_payload_invalid",
   "langy_ui_timeout",
   "langy_ui_turn_inactive",

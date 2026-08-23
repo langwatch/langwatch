@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
-import { remediation } from "../../error-remediation";
+import { remediation, remediationFor } from "../../error-remediation";
 
 /**
  * UI-action channel errors (specs/langy/langy-ui-actions.feature).
@@ -152,7 +152,13 @@ export class LangyUiHandlerFailedError extends HandledError {
             ? "customer"
             : "platform",
         meta: { kind, ...(errorCode ? { errorCode } : {}) },
-        ...remediation("langy_ui_handler_failed"),
+        // The page's own code first when it has advice of its own: the generic
+        // tip only says to read `meta.errorCode`, which is a name, not a next
+        // step.
+        ...{
+          ...remediation("langy_ui_handler_failed"),
+          ...remediationFor(errorCode),
+        },
       },
     );
     this.name = "LangyUiHandlerFailedError";

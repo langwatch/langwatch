@@ -90,6 +90,12 @@ const RELAYED_META_CODES = new Set(["missing_provider"]);
  */
 const CLIENT_MINTED_CODES = new Set([
   "langy_codex_plan_limit",
+  // Thrown by the open workbench page, not by a handled error anywhere in
+  // these trees: the page refuses an agent's action when the server already
+  // holds a newer version, and the UI-action channel relays that code to the
+  // agent inside `langy_ui_handler_failed`. A customer sees it too, in the
+  // toast the page raises for a failed action.
+  "langy_ui_page_out_of_date",
   // Same shape, from `promoteModelUnavailableError`: the gateway's
   // `model_provider_not_bound` tells whoever configures a virtual key to bind
   // a provider to it or drop the prefix from the model name. In the panel the

@@ -31,6 +31,7 @@ import {
   useRegisterLangyActions,
   useRegisterLangyHandlers,
 } from "~/features/langy/LangyContext";
+import { LangyUiPageOutOfDateError } from "~/features/langy/uiActions/errors";
 import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -353,6 +354,16 @@ export default function ExperimentsWorkbenchPage() {
   // Reads project the LIVE store — unsaved prompt drafts, pending cells and
   // in-memory results included, which the saved copy cannot show.
   const uiActionHandlers = useMemo<LangyUiActionHandlers>(() => {
+    // A page the server has already moved past cannot write: autosave stands
+    // down there by design. Answering "done" from that state told the agent a
+    // document existed that only this tab could see, so every later step was
+    // built on it. Checked before the change, so nothing is half applied, and
+    // again after the save, which is where the refusal actually lands.
+    const assertPageIsCurrent = () => {
+      if (useEvaluationsV3Store.getState().staleWorkbench) {
+        throw new LangyUiPageOutOfDateError();
+      }
+    };
     const handlers: LangyUiActionHandlers = {};
     for (const kind of WORKBENCH_ACTION_KINDS) {
       const definition = WORKBENCH_ACTIONS[kind];
@@ -368,10 +379,12 @@ export default function ExperimentsWorkbenchPage() {
         // then refused as out of date. The column could never be saved after
         // that, so the loop worked on a page nothing else could see.
         run: async (payload: unknown) => {
+          assertPageIsCurrent();
           const result = useEvaluationsV3Store
             .getState()
             .applyWorkbenchAction({ kind, payload });
           await saveNow();
+          assertPageIsCurrent();
           return result;
         },
       };
@@ -386,8 +399,12 @@ export default function ExperimentsWorkbenchPage() {
       run: async (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
         // Persist first: a run writes its results back as a new version, so
         // any edit still sitting in this tab would be a version behind before
-        // the first cell lands.
+        // the first cell lands. A tab that cannot save is a tab whose columns
+        // the run would not compute, so it refuses rather than running the
+        // wrong document.
+        assertPageIsCurrent();
         await saveNow();
+        assertPageIsCurrent();
         // Fire-and-forget like the run proposal: the run streams into the
         // table the user is watching, and the agent polls the runs API for
         // completion. The payload-to-scope mapping is shared with the backend
