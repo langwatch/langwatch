@@ -858,3 +858,71 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
 #   → Scenario: A statement declaring only one reserved period parameter is given that one
 #   → Scenario: A period-aware statement run with no window names what is unset
 #   → Scenario: The schema browser names the reserved period parameters where SQL is written
+
+# --- Granularity contract (#6713 slice 3, S1): the surface-owned bucket size ---
+#
+# A statement may declare `{period_granularity_seconds:UInt32}` and use it as
+# the multiplier of a fixed-unit interval -- `INTERVAL
+# {period_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles an
+# interval unit to a function name, so only the multiplier can be a bound value.
+#
+# AC1 "a chart declaring the parameter runs at the step the surface supplies"
+#   → Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+#   → Scenario: A granularity declared with no step supplied runs on its own authored bucketing
+# AC2 "a caller-supplied value for a reserved name is refused" (granularity half)
+#   → Scenario: A caller that supplies period_granularity_seconds itself is refused
+# AC3 "the declaration must be UInt32"
+#   → Scenario: The granularity parameter declared as anything but UInt32 is refused
+#   → Scenario: A zero or fractional step is refused as a wrong declaration
+# AC4 "declaring granularity requires declaring both period bounds, checked at save"
+#   → Scenario: A saved chart declaring granularity without both period parameters is refused at save
+#   → Scenario: A granularity declared alongside a mistyped period bound is refused at save
+# AC5 "a window finer than the bucket ceiling is refused on caller-owned surfaces"
+#   → Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
+# AC6 "offered steps are sub-day: 1 second, 1 minute, 1 hour" — O1 resolved to
+#     sub-day by probe: over the Amsterdam fallback night the timezone-argument
+#     seconds form drifts off local midnight while toStartOfDay stays at 00:00.
+#     Day-scale waits on a reserved period_timezone parameter.
+#   → covered by the offered-step constant and its unit test; no runtime behaviour of its own.
+# AC7 "each new code has a presentation entry and a remediation entry" → guarded
+#    by `codes.unit.test.ts` and the exhaustive `satisfies` in `presentation.ts`.
+
+# The S1-bindable scenarios below are bound by
+# `src/server/analytics/lwql/__tests__/lwqlGranularity.unit.test.ts` and
+# `.../lwqlGranularityDeclaration.unit.test.ts`. The two marked @unimplemented
+# need the run-path wiring (procedure input + run-by-chart-id) landing in the
+# next PR of the stack; #6713 tracks them.
+
+@unit
+@scenario "A statement declaring the granularity parameter runs at the step the workbench supplies"
+Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+
+@unit
+@scenario "A granularity declared with no step supplied runs on its own authored bucketing"
+Scenario: A granularity declared with no step supplied runs on its own authored bucketing
+
+@unit
+@scenario "A caller that supplies period_granularity_seconds itself is refused"
+Scenario: A caller that supplies period_granularity_seconds itself is refused
+
+@unit
+@scenario "The granularity parameter declared as anything but UInt32 is refused"
+Scenario: The granularity parameter declared as anything but UInt32 is refused
+
+@unit
+@scenario "A zero or fractional step is refused as a wrong declaration"
+Scenario: A zero or fractional step is refused as a wrong declaration
+
+@integration @unimplemented
+@scenario "A saved chart declaring granularity without both period parameters is refused at save"
+Scenario: A saved chart declaring granularity without both period parameters is refused at save
+  Tracking: #6713 (run-path wiring PR)
+
+@unit
+@scenario "A granularity declared alongside a mistyped period bound is refused at save"
+Scenario: A granularity declared alongside a mistyped period bound is refused at save
+
+@integration @unimplemented
+@scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST"
+Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
+  Tracking: #6713 (run-path wiring PR)

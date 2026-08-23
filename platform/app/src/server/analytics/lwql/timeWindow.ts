@@ -54,6 +54,74 @@ export const LWQL_TIME_WINDOW_PARAMETERS = [
 export type LangWatchQLTimeWindowParameter =
   (typeof LWQL_TIME_WINDOW_PARAMETERS)[number];
 
+/**
+ * The datapoint-bucket size the surface sets for charts that opt into it,
+ * in seconds.
+ *
+ * Declared in a statement as `{period_granularity_seconds:UInt32}` and used
+ * as the multiplier of a fixed-unit interval -- `INTERVAL
+ * {period_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles
+ * `INTERVAL 1 HOUR` to a *function name* (`toIntervalHour`), so the unit of
+ * an offered step cannot itself be a bound value. Fixing the unit at seconds
+ * and making the multiplier the bound parameter is what leaves the surface
+ * one value to inject.
+ */
+export const LWQL_PERIOD_GRANULARITY_PARAMETER = "period_granularity_seconds";
+
+/**
+ * Every reserved name the surface owns: the two window bounds and the
+ * granularity. A request carrying a value for any of them is refused --
+ * each is set by whatever is showing the chart, and a caller that sets one
+ * is pinning something that will then ignore its surface.
+ */
+export const LWQL_SURFACE_PARAMETERS = [
+  LWQL_PERIOD_START_PARAMETER,
+  LWQL_PERIOD_END_PARAMETER,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
+] as const;
+
+export type LangWatchQLSurfaceParameter =
+  (typeof LWQL_SURFACE_PARAMETERS)[number];
+
+/** Whether a parameter name belongs to the surface rather than the caller. */
+export function isLangWatchQLSurfaceParameter(
+  name: string,
+): name is LangWatchQLSurfaceParameter {
+  return (LWQL_SURFACE_PARAMETERS as readonly string[]).includes(name);
+}
+
+/**
+ * Exactly `UInt32`.
+ *
+ * The same strictness decision as the date-time types above, applied to an
+ * unsigned count: one spelling, no widened aliases. `UInt32` is the smallest
+ * unsigned ClickHouse integer every offered step fits inside (`UInt16` tops
+ * out below a day's seconds), and a count of seconds has no reason to be
+ * nullable, signed, or floating.
+ */
+const LWQL_GRANULARITY_PARAMETER_TYPE = /^UInt32$/;
+
+/** Whether a declared ClickHouse type can carry the granularity multiplier. */
+export function isLangWatchQLGranularityParameterType(type: string): boolean {
+  return LWQL_GRANULARITY_PARAMETER_TYPE.test(type.trim());
+}
+
+/**
+ * The datapoint granularities the surface offers, in seconds: one second,
+ * one minute, one hour.
+ *
+ * Deliberately sub-day. A fixed 86,400-second interval carries no notion of
+ * a local day: on a DST-transition day (25 or 23 hours) the bucket boundary
+ * drifts off local midnight -- verified against ClickHouse 25.10, where over
+ * the Europe/Amsterdam fallback night the timezone-argument form buckets
+ * 22:00-00:00 local to `02:00` and 01:00-04:00 local to `01:00`, while
+ * `toStartOfDay(t, 'Europe/Amsterdam')` stays at `00:00` throughout. A
+ * member asking for daily buckets would get silently misaligned ones.
+ * Day-scale waits on a reserved `period_timezone` parameter (the namespace
+ * already anticipates it) and is tracked as a follow-up.
+ */
+export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
+
 /** Whether a parameter name is one the surface owns. */
 export function isLangWatchQLTimeWindowParameter(
   name: string,

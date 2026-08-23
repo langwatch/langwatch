@@ -365,6 +365,16 @@ const presentations = {
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
   },
+  lwql_granularity_too_fine: {
+    title: "That granularity would return too many datapoints",
+    describe: () =>
+      "The bucket size you picked produces more datapoints than one query may return for this date range. Pick a coarser granularity -- 1 second, 1 minute or 1 hour -- or narrow the range.",
+  },
+  lwql_granularity_requires_window: {
+    title: "Granularity needs the period parameters",
+    describe: () =>
+      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
+  },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
     describe: () =>

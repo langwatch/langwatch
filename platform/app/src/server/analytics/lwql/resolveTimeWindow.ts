@@ -29,15 +29,23 @@
  */
 
 import {
+  LangWatchQLGranularityRequiresTimeWindowError,
+  LangWatchQLGranularityTooFineError,
+  LangWatchQLReservedGranularityTypeError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
 } from "./errors";
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
+  isLangWatchQLGranularityParameterType,
+  isLangWatchQLSurfaceParameter,
   isLangWatchQLTimeWindowParameter,
   type LangWatchQLTimeWindow,
   type LangWatchQLTimeWindowParameter,
+  LWQL_GRANULARITY_STEPS,
+  LWQL_PERIOD_END_PARAMETER,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "./timeWindow";
 import type { LangWatchQLParameter } from "./validation/validate";
@@ -124,7 +132,7 @@ export function resolveLangWatchQLTimeWindow({
   }
 
   const supplied = Object.keys(parameters ?? {})
-    .filter(isLangWatchQLTimeWindowParameter)
+    .filter(isLangWatchQLSurfaceParameter)
     .sort();
   if (supplied.length > 0) {
     throw new LangWatchQLReservedParameterSuppliedError(supplied);
@@ -151,4 +159,220 @@ export function resolveLangWatchQLTimeWindow({
     followsTimeWindow,
     awaitingTimeWindow: [],
   };
+}
+
+/**
+ * How many buckets a window at a step produces, rounded up -- a partial
+ * bucket at the window's end still renders as a datapoint.
+ */
+function bucketCount(windowSeconds: number, stepSeconds: number): number {
+  return Math.ceil(windowSeconds / stepSeconds);
+}
+
+/**
+ * The ceiling on datapoint buckets one governed run may produce through the
+ * granularity contract. Named so the dashboard clamp notice can cite it and
+ * the budget arithmetic has one home.
+ */
+export const LWQL_GRANULARITY_MAX_BUCKETS = 10_000;
+
+/** What a statement's granularity declaration means for one request. */
+export interface LangWatchQLGranularityResolution {
+  /**
+   * The step this run was bucketed at, present when the statement declares
+   * the granularity parameter and the surface supplied a value. Absent
+   * otherwise -- an undeclared statement keeps whatever bucketing its SQL
+   * text hard-codes.
+   */
+  readonly granularitySeconds?: number;
+  /** Whether the statement declares the granularity parameter at all. */
+  readonly followsGranularity: boolean;
+  /**
+   * The step the caller asked for, present only when this run coarsened:
+   * the dashboard names requested and effective side by side rather than
+   * changing a shared control's meaning silently.
+   */
+  readonly coarsenedFromSeconds?: number;
+}
+
+/**
+ * The finest offered step whose bucket count fits the ceiling, for the
+ * surfaces that coarsen instead of refusing. Falls back to the coarsest
+ * step when even it does not fit: a multi-year window on the one-hour floor
+ * still renders, with the notice saying so, rather than refusing a shared
+ * dashboard URL that happens to span years.
+ */
+function finestFittingStep(windowSeconds: number): number {
+  // The coarsest offered step, the answer when nothing fits. Seeded from the
+  // first element rather than an end-of-array index, whose result the
+  // compiler cannot know is populated.
+  let coarsest: number = LWQL_GRANULARITY_STEPS[0];
+  for (const step of LWQL_GRANULARITY_STEPS) {
+    if (bucketCount(windowSeconds, step) <= LWQL_GRANULARITY_MAX_BUCKETS) {
+      return step;
+    }
+    coarsest = step;
+  }
+  return coarsest;
+}
+
+/**
+ * Decides what the granularity declaration means for one request, and
+ * refuses the ways it can be misused -- the granularity counterpart of
+ * {@link resolveLangWatchQLTimeWindow}, kept separate because its failure
+ * modes differ: where the window is injected only when declared and merely
+ * reported otherwise, a granularity declaration binds the run to a *budget*,
+ * and the budget's overflow has two designed outcomes. Surfaces the caller
+ * owns -- the workbench, the REST route -- refuse with
+ * {@link LangWatchQLGranularityTooFineError}; the dashboard owns the range
+ * and auto-coarsens instead, naming what happened.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
+ *   declared as anything but `UInt32`. Raised before any value check so an
+ *   author gets the same answer about their statement whether or not the
+ *   request also carried a value for it.
+ * @throws {LangWatchQLReservedParameterSuppliedError} when the request
+ *   carries a value for it. Asserted here as well as in the window sweep so
+ *   this function stays safe when called on its own.
+ * @throws {LangWatchQLGranularityTooFineError} when the declared window at
+ *   the supplied step exceeds {@link LWQL_GRANULARITY_MAX_BUCKETS} buckets
+ *   and the surface asked to refuse rather than coarsen.
+ */
+/**
+ * The save-time half of the granularity contract, shared by every door that
+ * persists a statement: a granularity declaration is only meaningful when
+ * both period bounds are declared too -- without them the bucket budget the
+ * dashboard computes is uncomputable -- and only when declared as `UInt32`.
+ *
+ * Called from the service's `validate`, so tRPC and REST saves refuse here,
+ * before anything is written. The value-level rules (positive integer, bucket
+ * budget) are {@link resolveLangWatchQLGranularity}'s, at run.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} when the parameter is
+ *   declared as anything but `UInt32`.
+ * @throws {LangWatchQLGranularityRequiresTimeWindowError} when it is declared
+ *   but either period bound is missing.
+ */
+export function assertLangWatchQLGranularityDeclaration(
+  declared: readonly LangWatchQLParameter[],
+): void {
+  const declaredGranularity = declared.find(
+    (parameter) => parameter.name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+  );
+  if (!declaredGranularity) return;
+
+  if (!isLangWatchQLGranularityParameterType(declaredGranularity.type)) {
+    throw new LangWatchQLReservedGranularityTypeError([
+      declaredGranularity.name,
+    ]);
+  }
+
+  const periodNames = [LWQL_PERIOD_START_PARAMETER, LWQL_PERIOD_END_PARAMETER];
+  const missing = periodNames.filter(
+    (name) =>
+      !declared.some((parameter) => {
+        if (parameter.name !== name) return false;
+        return isLangWatchQLDateTimeParameterType(parameter.type);
+      }),
+  );
+  if (missing.length > 0) {
+    throw new LangWatchQLGranularityRequiresTimeWindowError();
+  }
+}
+
+export function resolveLangWatchQLGranularity({
+  declared,
+  parameters,
+  granularitySeconds,
+  timeWindow,
+  onBudgetOverflow = "refuse",
+}: {
+  /** Bound parameters the validated statement declares. */
+  readonly declared: readonly LangWatchQLParameter[];
+  /** Values the caller sent -- checked so a reserved one cannot slip through. */
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  /**
+   * The step the surface chose, when the statement declares the parameter
+   * and the surface offers a choice. A positive integer when present.
+   */
+  readonly granularitySeconds?: number;
+  /** The period this run is windowed to; the budget is computed against it. */
+  readonly timeWindow?: LangWatchQLTimeWindow;
+  /** Refuse (caller-owned surfaces) or coarsen (the dashboard) on overflow. */
+  readonly onBudgetOverflow?: "refuse" | "coarsen";
+}): LangWatchQLGranularityResolution {
+  const declaredGranularity = declared.find(
+    (parameter) => parameter.name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+  );
+
+  if (!declaredGranularity) {
+    return { followsGranularity: false };
+  }
+
+  if (!isLangWatchQLGranularityParameterType(declaredGranularity.type)) {
+    throw new LangWatchQLReservedGranularityTypeError([
+      declaredGranularity.name,
+    ]);
+  }
+
+  const supplied = Object.keys(parameters ?? {}).filter(
+    (name) => name === LWQL_PERIOD_GRANULARITY_PARAMETER,
+  );
+  if (supplied.length > 0) {
+    throw new LangWatchQLReservedParameterSuppliedError(supplied);
+  }
+
+  if (
+    granularitySeconds !== undefined &&
+    (!Number.isInteger(granularitySeconds) || granularitySeconds <= 0)
+  ) {
+    // A zero or fractional step is a malformed surface value, not a caller
+    // choice -- the input schemas refuse it first; this is the backstop.
+    throw new LangWatchQLReservedGranularityTypeError([
+      declaredGranularity.name,
+    ]);
+  }
+
+  if (granularitySeconds === undefined) {
+    // Declared but the surface offered no choice: the statement runs with
+    // the bucketing its SQL text hard-codes. The same documented limitation
+    // as the window contract's awaiting list -- the declaration records
+    // intent, and proving the parameter actually drives the bucketing
+    // expression is out of reach statically.
+    return { followsGranularity: true };
+  }
+
+  if (!timeWindow) {
+    // No window, no budget to check. The save-time rule requiring both
+    // period parameters alongside granularity makes this unreachable for
+    // saved charts; a workbench run supplies the page period
+    // unconditionally.
+    return { followsGranularity: true, granularitySeconds };
+  }
+
+  const windowSeconds = Math.max(
+    0,
+    Math.ceil((timeWindow.end.getTime() - timeWindow.start.getTime()) / 1000),
+  );
+  const requestedBuckets = bucketCount(windowSeconds, granularitySeconds);
+
+  if (requestedBuckets > LWQL_GRANULARITY_MAX_BUCKETS) {
+    if (onBudgetOverflow === "refuse") {
+      throw new LangWatchQLGranularityTooFineError({
+        requestedGranularitySeconds: granularitySeconds,
+        windowSeconds,
+        maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
+      });
+    }
+    const effective = finestFittingStep(windowSeconds);
+    return {
+      followsGranularity: true,
+      granularitySeconds: effective,
+      ...(effective !== granularitySeconds
+        ? { coarsenedFromSeconds: granularitySeconds }
+        : {}),
+    };
+  }
+
+  return { followsGranularity: true, granularitySeconds };
 }

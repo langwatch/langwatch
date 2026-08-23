@@ -67,7 +67,10 @@ import {
   type LangWatchQLStatistics,
   lwqlConnectionFromEnv,
 } from "./executor";
-import { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
+import {
+  assertLangWatchQLGranularityDeclaration,
+  resolveLangWatchQLTimeWindow,
+} from "./resolveTimeWindow";
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
@@ -309,6 +312,11 @@ export class LangWatchQLService {
       );
       throw lwqlValidationError(validation);
     }
+
+    // The save-time granularity rules ride on every validate: type and
+    // requires-window are refused wherever the statement is persisted, which
+    // is what makes REST and tRPC saves refuse identically.
+    assertLangWatchQLGranularityDeclaration(validation.parameters);
 
     // Before the missing-parameter check, never after: an injected window IS a
     // value, and checking first would refuse every period-aware statement for

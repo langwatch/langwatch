@@ -161,6 +161,8 @@ export const APP_ERROR_CODES = [
   "license_signing_key_not_pem",
   "lite_member_restricted",
   "lite_member_viewer_only",
+  "lwql_granularity_requires_window",
+  "lwql_granularity_too_fine",
   "lwql_not_enabled",
   "lwql_not_permitted",
   "lwql_parameter_missing",

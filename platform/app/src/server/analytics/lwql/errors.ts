@@ -186,3 +186,106 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
     this.name = "LangWatchQLReservedParameterTypeError";
   }
 }
+
+/**
+ * The granularity parameter was declared with a type other than `UInt32`, or
+ * the surface supplied a step that is not a positive whole number of
+ * seconds.
+ *
+ * A sibling of {@link LangWatchQLReservedParameterTypeError} sharing its code
+ * -- from the caller's side both read as "you declared a surface-owned
+ * parameter with the wrong type" -- because one presentation entry covers
+ * them. The messages differ where it matters: this one names the exact
+ * spelling to declare.
+ *
+ * Raised while validating rather than while running, so a chart is refused
+ * at *save* for the same reason it would be refused at render.
+ */
+export class LangWatchQLReservedGranularityTypeError extends HandledError {
+  declare readonly code: "lwql_reserved_parameter_type";
+
+  constructor(
+    /** The reserved names declared (or valued) wrongly. Sorted. */
+    mistyped: readonly string[],
+  ) {
+    super(
+      "lwql_reserved_parameter_type",
+      "The query declares period_granularity_seconds with a type that is not UInt32.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { parameters: mistyped },
+        ...remediation("lwql_reserved_parameter_type"),
+      },
+    );
+    this.name = "LangWatchQLReservedGranularityTypeError";
+  }
+}
+
+/**
+ * The declared window at the requested datapoint granularity would produce
+ * more buckets than one governed run may return.
+ *
+ * The workbench and the REST route refuse here because their callers chose
+ * the step; the dashboard does not arrive here -- it owns the range, so it
+ * auto-coarsens instead and says so.
+ *
+ * Remediation is arithmetic, not retrying: widen the step until the bucket
+ * count fits the ceiling, or narrow the window.
+ */
+export class LangWatchQLGranularityTooFineError extends HandledError {
+  declare readonly code: "lwql_granularity_too_fine";
+
+  constructor({
+    requestedGranularitySeconds,
+    windowSeconds,
+    maxBuckets,
+  }: {
+    requestedGranularitySeconds: number;
+    windowSeconds: number;
+    maxBuckets: number;
+  }) {
+    super(
+      "lwql_granularity_too_fine",
+      "The requested datapoint granularity produces more buckets than the selected period allows.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: {
+          requestedGranularitySeconds,
+          windowSeconds,
+          maxBuckets,
+        },
+        ...remediation("lwql_granularity_too_fine"),
+      },
+    );
+    this.name = "LangWatchQLGranularityTooFineError";
+  }
+}
+
+/**
+ * A statement declared `period_granularity_seconds` without declaring the
+ * period window the bucket budget is computed against.
+ *
+ * Refused at *save*: without both bounds the surface cannot compute how many
+ * buckets a run would produce, so the budget contract would be uncomputable
+ * exactly when it matters most -- on the dashboard, where the range is the
+ * dashboard's own control. Declaring the two period parameters alongside is
+ * the fix, and the schema browser spells them.
+ */
+export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
+  declare readonly code: "lwql_granularity_requires_window";
+
+  constructor() {
+    super(
+      "lwql_granularity_requires_window",
+      "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("lwql_granularity_requires_window"),
+      },
+    );
+    this.name = "LangWatchQLGranularityRequiresTimeWindowError";
+  }
+}

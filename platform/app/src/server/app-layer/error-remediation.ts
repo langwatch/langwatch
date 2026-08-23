@@ -114,6 +114,18 @@ const registry = {
       "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
     ],
   },
+  lwql_granularity_too_fine: {
+    tips: [
+      "The requested bucket size would produce more datapoints than one query may return for this period",
+      "Use a coarser granularity -- 1 second, 1 minute or 1 hour -- or narrow the date range",
+    ],
+  },
+  lwql_granularity_requires_window: {
+    tips: [
+      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "The bucket budget is computed against the period those two bounds describe",
+    ],
+  },
   lwql_not_enabled: {
     tips: [
       "The LangWatchQL feature is not enabled for this project — retrying will not help",
