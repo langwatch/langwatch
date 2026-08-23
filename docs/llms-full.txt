@@ -7604,11 +7604,11 @@ The full walkthrough, environment variables, and sequence diagrams live in the [
 # FILE: ./ai-gateway/governance/activity-monitor-event-sourcing.mdx
 
 ---
-title: Activity Monitor — event-sourcing architecture
-description: Why the receiver → event_log → projection reactor → anomaly reactor pipeline replaces the original direct-CH-write design, and how to extend it.
+title: Activity Monitor event-sourcing architecture
+description: Why the receiver → event_log → projection subscriber → anomaly subscriber pipeline replaces the original direct-CH-write design, and how to extend it.
 ---
 
-# Activity Monitor — event-sourcing architecture
+# Activity Monitor event-sourcing architecture
 
 ## Why this exists
 
@@ -7619,21 +7619,20 @@ plan for anomaly detection (Option C v0) was a poller worker that
 periodically swept active `AnomalyRule` rows and SELECT-ed against
 the CH table.
 
-Per @rchaves's 2026-04-27 directive — *"event sourcing is the one
-true way"* — and @master_orchestrator's follow-up (rebase/learn from
-[PR #3351](https://github.com/langwatch/langwatch/pull/3351)) we
-redesigned the trigger architecture before the eval engine landed.
-The receiver now appends an `ActivityEventReceived` event to
-`event_log`, and a dedicated `activity-monitor-processing` pipeline
-takes over from there. Anomaly detection becomes a reactor that
-fires *as new events arrive*, not a worker that polls.
+We redesigned the trigger architecture before the eval engine landed,
+following the event-sourcing pattern from
+[PR #3351](https://github.com/langwatch/langwatch/pull/3351). The
+receiver appends an `ActivityEventReceived` event to `event_log`, and
+a dedicated `activity-monitor-processing` pipeline takes over from
+there. Anomaly detection is a subscriber that fires as new events
+arrive, not a worker that polls.
 
 ## The pipeline
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────┐
 │  /api/ingest/otel/:sourceId  /api/ingest/webhook/:sourceId      │
-│  (Hono routes — auth, validate sourceId, parse body)            │
+│  (Hono routes: auth, validate sourceId, parse body)             │
 └────────────────────────┬───────────────────────────────────────┘
                          │
                          ▼  RecordActivityEventCommand
@@ -7658,7 +7657,7 @@ fires *as new events arrive*, not a worker that polls.
          │ wakes:                            │ wakes:
          ▼                                   ▼
 ┌──────────────────────────┐      ┌──────────────────────────────┐
-│ Reactor                  │      │ Reactor                      │
+│ Subscriber                  │      │ Subscriber                      │
 │  activityEventBroadcast  │      │  anomalyDetection            │
 │  (real-time UI push for  │      │  - load active AnomalyRules  │
 │   /governance dashboard) │      │  - evaluate per-rule type    │
@@ -7670,25 +7669,24 @@ fires *as new events arrive*, not a worker that polls.
 ```
 
 The shape mirrors `pipelines/trace-processing/` (PR #3351's
-alertTrigger reactor) — same `definePipeline().withFoldProjection().
-withMapProjection().withReactor()` builder, same
-`ReactorDefinition<EventShape, FoldState>` contract, same
+alertTrigger subscriber): the same `definePipeline().withFoldProjection().
+withMapProjection().withSubscriber()` builder, the same
+`SubscriberDispatchDefinition<EventShape, FoldState>` contract, the same
 `triggerActionDispatch.ts` shared helper.
 
 ## Why a dedicated pipeline (not bolted onto trace-processing)
 
-Per @master_orchestrator's call: gateway/activity events have
-different aggregate semantics from traces. A trace is a
-multi-span aggregate that folds into a `TraceSummaryData` over
-its lifetime. An activity event is a *single completed
-observation* of upstream platform behaviour — there's no
+Gateway and activity events have different aggregate semantics from
+traces. A trace is a multi-span aggregate that folds into a
+`TraceSummaryData` over its lifetime. An activity event is a *single
+completed observation* of upstream platform behaviour, with no
 multi-event aggregate to fold across; each event already has
-final cost/tokens/actor when it arrives.
+final cost, tokens, and actor when it arrives.
 
 Bolting them onto `trace-processing` would force one of:
 
 1. Activity events get represented as fake single-span traces
-   (lossy + confusing — trace_summaries would mix gateway-proxied
+   (lossy and confusing: trace_summaries would mix gateway-proxied
    traces and per-event activity rows under the same TenantId).
 2. trace_summaries grows a discriminator column and the fold
    projection becomes branchy.
@@ -7700,35 +7698,36 @@ aggregate semantics clean.
 
 ## Aggregate identity
 
-```
+```text
 aggregateType:  "activity_event"
 aggregateId:    EventId  (one event = one aggregate, no fold across events)
 tenantId:       IngestionSource.id  (matches gateway_activity_events.TenantId)
 ```
 
-The fold projection (`anomalyWindow`) does not aggregate events
-*into* an aggregate — it aggregates *across* aggregates within a
-tenant, keyed by tenant + rolling window. That's a different shape
-from trace-processing's "fold spans into a trace summary" —
-in our case the fold is "tally per-tenant rolling spend / request
-count / per-actor breakdown for the past N minutes/hours". Same
-machinery, different aggregate semantics.
+The fold projection (`anomalyWindow`) aggregates *across* aggregates
+within a tenant, keyed by tenant and rolling window, rather than
+folding events *into* one aggregate. Trace-processing folds spans
+into a trace summary; this fold tallies per-tenant rolling spend,
+request count, and per-actor breakdown for the past N minutes or
+hours. Same machinery, different aggregate semantics.
 
 ## Slicing the redesign
 
-Per @master_orchestrator's C0/C1/C2/C3 sequence:
+The redesign ships as four slices, C0 through C3:
 
-### C0 — this doc + spec updates
+### C0: this doc and spec updates
+
 - This architecture doc.
 - `specs/ai-gateway/governance/anomaly-detection.feature` updated to
-  drop poller language; reactor framing throughout.
+  drop poller language; subscriber framing throughout.
 - `AnomalyAlert` Prisma model + migration `20260427020000_add_anomaly_alert/`
-  doc-comment updated to reference the reactor as producer.
-- Existing receivers continue to write CH directly until C1 lands —
-  this slice is doc-only so the team can review the architecture
+  doc-comment updated to reference the subscriber as producer.
+- Existing receivers continue to write CH directly until C1 lands.
+  This slice is doc-only so the team can review the architecture
   before more code moves.
 
-### C1 — receiver → event_log → projection reactor
+### C1: receiver → event_log → projection subscriber
+
 - New event schema: `ActivityEventReceived` with the OCSF-normalised
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
@@ -7738,36 +7737,38 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
   writing CH directly.
 - Map projection `activityEventStorage` writes to
   `gateway_activity_events` (replaces today's direct insert).
-- Dogfood: curl → 202 → row visible in CH (same as today, just via
+- Manual check: curl → 202 → row visible in CH (same as today, just via
   event-sourced path).
 
-### C2 — AnomalyAlert + anomaly reactor for one rule type
+### C2: AnomalyAlert and anomaly subscriber for one rule type
+
 - Apply the AnomalyAlert migration that's already drafted but
   doesn't ship behaviour yet.
 - Add `anomalyWindow` fold projection (per-tenant rolling totals).
-- Add `anomalyDetection` reactor for `spend_spike` only first
+- Add `anomalyDetection` subscriber for `spend_spike` only first
   (cleanest mapping to the existing CostUSD field).
 - Wire into `api.activityMonitor.recentAnomalies` (replaces current
   `[]` stub).
-- Dogfood: create rule in Alexis's UI → curl violating event →
-  alert appears on `/governance` within ~30s.
+- Manual check: create a rule in the anomaly rules UI → curl a violating
+  event → alert appears on `/governance` within ~30s.
 
-### C3 — Dispatch destinations
+### C3: Dispatch destinations
+
 - Generic webhook + log-only first (matches PR #3351's
   triggerActionDispatch shape).
 - Slack / PagerDuty / SIEM / email follow as per-destination
-  adapter slices once the reactor pattern is proven.
+  adapter slices once the subscriber pattern is proven.
 
 ## What we keep from the v0 receiver code
 
-- `IngestionSourceService` (CRUD + auth) — unchanged.
-- `gateway_activity_events` CH schema (migration `00019_*`) —
+- `IngestionSourceService` (CRUD and auth): unchanged.
+- `gateway_activity_events` CH schema (migration `00019_*`):
   unchanged. The map projection writes the same columns.
-- OTel + webhook normalisers (`normalizers/otel.ts` etc.) —
-  unchanged. They get called from the map projection now instead of
-  the receiver handler.
-- All receiver auth + sourceId-mismatch + 24h secret rotation grace —
-  unchanged.
+- OTel and webhook normalisers (`normalizers/otel.ts` etc.):
+  unchanged. The map projection calls them now instead of the
+  receiver handler.
+- All receiver auth, sourceId-mismatch, and 24h secret rotation
+  grace: unchanged.
 
 ## What we drop from the v0 receiver code
 
@@ -7775,34 +7776,34 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
   receiver handler. The receiver instead enqueues an event into
   the pipeline; the map projection does the actual CH insert.
 - The poller-based AnomalyEvaluatorService design that was sketched
-  but never shipped. Replaced by the anomaly reactor.
+  but never shipped. Replaced by the anomaly subscriber.
 
 ## Test strategy per slice
 
-| Slice | BDD spec | Integration test | Dogfood |
-|-------|----------|------------------|---------|
+| Slice | BDD spec | Integration test | Manual check |
+|-------|----------|------------------|--------------|
 | C0 (this) | anomaly-detection.feature updated | n/a (doc + schema) | architecture review in-channel |
 | C1 | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row | curl → 202 → CH SELECT |
-| C2 | spend_spike scenario in anomaly-detection.feature | reactor test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
-| C3 | dispatch scenarios in anomaly-detection.feature | reactor test: dispatch helper called with right shape | webhook receives canonical body |
+| C2 | spend_spike scenario in anomaly-detection.feature | subscriber test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
+| C3 | dispatch scenarios in anomaly-detection.feature | subscriber test: dispatch helper called with right shape | webhook receives canonical body |
 
-Each slice ships its own BDD + integration coverage before code
-lands; production architecture is reactor-only — `evaluateNow`
-appends a synthetic event and lets the reactor handle it (test
-harness, not parallel code path).
+Each slice ships its own BDD and integration coverage before code
+lands. The production architecture is subscriber-only: `evaluateNow`
+appends a synthetic event and lets the subscriber handle it (a test
+harness, not a parallel code path).
 
 ## Cross-references
 
-- [PR #3351 — feat: event-driven trace triggers via reactor](https://github.com/langwatch/langwatch/pull/3351)
+- [PR #3351: event-driven trace triggers via subscriber](https://github.com/langwatch/langwatch/pull/3351)
   (the pattern this redesign learns from).
-- [`anomaly-detection.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-detection.feature)
-  — user-facing contract, updated for event-sourcing.
-- [`anomaly-rules.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-rules.feature)
-  — configuration entity (already shipped, unchanged).
-- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
-  — admin UI contract (already shipped; pipeline section adds in C1).
-- [Governance architecture](/ai-gateway/governance/architecture) — top-level governance
-  architecture; this doc is the activity-monitor deep-dive linked
+- [`anomaly-detection.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-detection.feature):
+  user-facing contract, updated for event-sourcing.
+- [`anomaly-rules.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-rules.feature):
+  configuration entity (already shipped, unchanged).
+- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature):
+  admin UI contract (already shipped; pipeline section adds in C1).
+- [Governance architecture](/ai-gateway/governance/architecture): top-level governance
+  architecture. This doc is the activity-monitor deep-dive linked
   from the "Activity Monitor (Tier C/D)" block.
 
 ---
@@ -8125,11 +8126,11 @@ admins read.
 # FILE: ./ai-gateway/governance/architecture.mdx
 
 ---
-title: LangWatch governance — architecture
+title: LangWatch governance architecture
 description: How the personal-keys flow, AI Gateway, Activity Monitor, RoutingPolicy admin, and IngestionSource pipeline fit into one control plane.
 ---
 
-# LangWatch governance — architecture
+# LangWatch governance architecture
 
 ## What problem this is solving
 
@@ -8138,13 +8139,13 @@ CLIs (Claude Code, Codex, Cursor, Gemini CLI), packaged SaaS that
 embed AI (Cowork, Copilot Studio, Workato Genies, ChatGPT Enterprise),
 and bespoke agents written in-house. Each comes with its own auth
 plane, its own admin console, its own audit trail. There's no single
-view of "what is every AI in our org doing right now," no consistent
-budget enforcement across them, no one-throat-to-choke for the
-security team when an agent misbehaves at 3 AM.
+view of what every AI in the org is doing right now, no consistent
+budget enforcement across them, and no single point of control for
+the security team when an agent misbehaves.
 
 LangWatch is the **control plane** that sits above all of this. It
 provides governance, monitoring, evals, and (for the surfaces we
-proxy) policy enforcement — across every AI tool and platform the
+proxy) policy enforcement across every AI tool and platform the
 enterprise uses, regardless of who built each one.
 
 ## The five integration tiers
@@ -8153,34 +8154,34 @@ Different platforms allow different levels of governance. We model
 this as a ladder, deepest control on top:
 
 ```
-┌─ Tier A — Gateway proxy ─────────────────────────────────────────────┐
+┌─ Tier A: Gateway proxy ──────────────────────────────────────────────┐
 │ Customer's API key flows through LangWatch's AI Gateway.            │
 │ Mid-flight inspection, rewrite, block. Examples: Claude Code,       │
 │ Codex, Cursor (with custom endpoint), any custom agent, Workato     │
 │ BYOK, Vertex AI, Bedrock-via-proxy.                                 │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier B — BYOK endpoint routing ─────────────────────────────────────┐
+┌─ Tier B: BYOK endpoint routing ──────────────────────────────────────┐
 │ Closed SaaS that supports a custom-LLM endpoint setting. Customer   │
 │ points the platform at LangWatch's gateway. Same depth as Tier A    │
 │ for traffic that flows through. Examples: parts of Workato Genies,  │
 │ open agent frameworks that accept ANTHROPIC_BASE_URL.               │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier C — Audit log ingestion ───────────────────────────────────────┐
+┌─ Tier C: Audit log ingestion ────────────────────────────────────────┐
 │ Closed SaaS we cannot proxy. Pull audit / OTel / S3-delivered logs  │
 │ from the platform's admin API. Observational governance: detect,    │
-│ alert, recommend, trigger admin-API revokes — but no mid-flight     │
+│ alert, recommend, trigger admin-API revokes, but no mid-flight      │
 │ block. Examples: Cowork (OTel push), Copilot Studio (Office 365     │
 │ Management Activity API pull), ChatGPT Enterprise (Compliance       │
 │ Platform pull), Claude Enterprise (Compliance API pull), Workato    │
 │ (audit log streaming push), Gemini for Workspace (Cloud Logging).   │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier D — OTel / SDK instrumentation ────────────────────────────────┐
+┌─ Tier D: OTel / SDK instrumentation ─────────────────────────────────┐
 │ Customer's own agents emitting traces via OpenInference / Traceloop │
 │ / our SDK. Per-turn detail. Better than audit logs but not          │
 │ proxyable. Examples: Cowork's native OTel feed, customer agents     │
 │ with our SDK installed.                                             │
 └──────────────────────────────────────────────────────────────────────┘
-┌─ Tier E — Sandboxed runtime ─────────────────────────────────────────┐
+┌─ Tier E: Sandboxed runtime ──────────────────────────────────────────┐
 │ LangWatch hosts the agent runtime. Maximum control: egress policy,  │
 │ MCP allowlist, per-tool approval gates. Premium / post-land         │
 │ expansion. Examples: Open Managed Agents within LangWatch, Hermes   │
@@ -8241,7 +8242,7 @@ agents they want sandboxed inside their LangWatch deployment.
 
 ## Data flow per tier
 
-### Tier A — Gateway proxy
+### Tier A: Gateway proxy
 
 ```
 dev's CLI / agent  ──┐
@@ -8261,11 +8262,11 @@ dev's CLI / agent  ──┐
                 │  - canonicalise attributes          │
                 │  - cost calc per token usage        │
                 │  - emit to ClickHouse               │
-                │  - emit to GatewayBudget reactor    │
+                │  - emit to GatewayBudget subscriber    │
                 └────────────────────────────────────┘
 ```
 
-### Tier C — Audit log ingestion
+### Tier C: Audit log ingestion
 
 ```
 Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
@@ -8299,7 +8300,7 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `RoutingPolicy` | Provider chain template | Org-scoped; hierarchical via `scope`+`scopeId` |
 | `VirtualKey` | The actual credential issued to a caller | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
 | `VirtualKeyScope` | One scope row per VK (1:N) | Cascade upward to derive eligible ModelProviders |
-| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential — no separate gateway binding |
+| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding |
 | `GatewayBudget` | Spend limit | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL |
 | `IngestionSource` | Per-platform fleet config | Org-scoped; carries ingestSecret + parserConfig |
 
@@ -8312,9 +8313,9 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `event_log` | Event-sourced audit trail | inherited |
 | `gateway_budget_ledger_events` | Per-trace spend per applicable budget | `principal_user_id` already first-class |
 
-`TenantId = projectId` invariant is preserved across all tables —
-`OrganizationId` is added as a **query dimension** for cross-project
-rollup, not a tenancy boundary swap.
+Every table keeps the `TenantId = projectId` invariant.
+`OrganizationId` is a **query dimension** for cross-project rollup,
+not a tenancy boundary swap.
 
 ## OCSF + AOS event schema
 
@@ -8325,8 +8326,8 @@ internal event shape, extended with
 fields for AI-specific context. Why:
 
 - Datadog Cloud SIEM, Splunk, Microsoft Sentinel, Elastic Security,
-  Google Chronicle, Sumo Logic all natively understand OCSF — alert
-  routing inherits these integrations for free.
+  Google Chronicle, Sumo Logic all natively understand OCSF, so alert
+  routing inherits these integrations.
 - AOS extends OCSF's API Activity class (6003) with prompt / tool /
   cost / agent-session fields specifically for AI activity.
 - Adopting an open standard keeps us interoperable with whatever
@@ -8344,36 +8345,35 @@ OCSF.
 |---|---|---|---|---|
 | Claude Code / Codex CLI / Cursor / custom agent | A | ✅ via Gateway | n/a | n/a |
 | Workato (BYOK route) | A/B | ✅ | n/a | n/a |
-| Workato (audit log push) | C | ❌ | ✅ pause recipe via Platform API | — |
-| Cowork desktop | C/D | ❌ | ✅ revoke workspace key via Anthropic Admin | — |
-| Copilot Studio | C | ❌ | ✅ disable agent via Power Platform admin | — |
-| ChatGPT Enterprise / Codex (cloud) | C | ❌ | ✅ revoke key via OpenAI Compliance | — |
-| Claude Enterprise / Cowork (cloud) | C/D | ❌ | ✅ revoke workspace key | — |
-| Gemini for Workspace | C | ❌ | ✅ via Google Workspace admin | — |
-| Salesforce Einstein / Slack AI / Notion AI | — | ❌ | ❌ | ✅ alert only |
+| Workato (audit log push) | C | ❌ | ✅ pause recipe via Platform API | n/a |
+| Cowork desktop | C/D | ❌ | ✅ revoke workspace key via Anthropic Admin | n/a |
+| Copilot Studio | C | ❌ | ✅ disable agent via Power Platform admin | n/a |
+| ChatGPT Enterprise / Codex (cloud) | C | ❌ | ✅ revoke key via OpenAI Compliance | n/a |
+| Claude Enterprise / Cowork (cloud) | C/D | ❌ | ✅ revoke workspace key | n/a |
+| Gemini for Workspace | C | ❌ | ✅ via Google Workspace admin | n/a |
+| Salesforce Einstein / Slack AI / Notion AI | n/a | ❌ | ❌ | ✅ alert only |
 
-This is what gets reflected in the Activity Monitor's "actions
-available" UI per anomaly, and what determines which adapter shipping
-order we prioritise.
+The Activity Monitor lists these actions per anomaly in its "actions
+available" UI, and this matrix sets the order in which we ship the
+adapters.
 
 ## Feature-flag gating
 
-Every governance UI surface is gated behind one app feature flag —
-`release_ui_ai_governance_enabled` — so this long-lived branch can
-merge into main without exposing in-progress features to current
-customers. The CLI surface is always available once installed; per-
-account governance entitlement is enforced server-side.
+One app feature flag, `release_ui_ai_governance_enabled`, gates every
+governance UI surface, so in-progress features stay hidden from
+current customers. The CLI surface is always available once
+installed; per-account governance entitlement is enforced
+server-side.
 
 The AI Gateway product itself ships as-is to customers on the
 existing `release_ui_ai_gateway_menu_enabled` flag. The governance
-flag is intentionally separate — they're different product lines
-with different rollout cadences.
+flag stays separate because the two are different product lines with
+different rollout cadences.
 
-Backend endpoints stay reachable regardless of flag state. Per
-@rchaves's directive, hiding the user-visible surface is enough; the
-data model + tRPC routes + REST endpoints + ingestion receivers all
-exist on every deployment, just not linked to from any visible UI
-when the flag is off.
+Backend endpoints stay reachable regardless of flag state. Hiding the
+user-visible surface is enough: the data model, tRPC routes, REST
+endpoints, and ingestion receivers all exist on every deployment, and
+no visible UI links to them when the flag is off.
 
 See `specs/ai-gateway/governance/feature-flag-gating.feature` for the
 gating contract.
@@ -8385,7 +8385,7 @@ What's on this branch today:
 - ✅ RoutingPolicy admin UI + provider-cred org validation
 - ✅ Personal VirtualKeys + admin catalog
 - ✅ Unified `langwatch` CLI (10 governance subcommands, device-flow auth)
-- ✅ `/me` + `/me/settings` + `/settings/routing-policies`
+- ✅ `/me` + `/me/settings` + `/gateway/routing-policies`
 - ✅ AI Gateway with personal-key support
 - ✅ `user.personalBudget` tRPC + `BudgetExceededBanner`
 - ✅ Helm NOTES + post-install docs
@@ -8445,19 +8445,19 @@ docs/ai-gateway/self-hosting/                        # Operator docs
 
 ## Where to read more
 
-- [`gateway.md`](https://github.com/langwatch/langwatch) — full
-  product strategy doc that drives this architecture.
-- [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature)
-  — the single-flag / single-env-var contract.
-- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
-  — admin-side oversight UI contract.
-- [`ingestion-sources.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/ingestion-sources.feature)
-  — admin-side IngestionSource setup forms + lifecycle.
-- [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature)
-  — self-host deployment contract for the personal-keys flow.
-- [Admin setup](/ai-gateway/governance/admin-setup) — admin's day-1 walkthrough.
-- [Personal keys](/ai-gateway/governance/personal-keys) — end-user dev story.
-- [Routing policies](/ai-gateway/governance/routing-policies) — RoutingPolicy concepts.
+- [langwatch/langwatch](https://github.com/langwatch/langwatch): the repository
+  that holds the gateway product strategy doc driving this architecture.
+- [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature):
+  the single-flag / single-env-var contract.
+- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature):
+  admin-side oversight UI contract.
+- [`ingestion-sources.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/ingestion-sources.feature):
+  admin-side IngestionSource setup forms and lifecycle.
+- [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature):
+  self-host deployment contract for the personal-keys flow.
+- [Admin setup](/ai-gateway/governance/admin-setup): admin's day-1 walkthrough.
+- [Personal keys](/ai-gateway/governance/personal-keys): end-user dev story.
+- [Routing policies](/ai-gateway/governance/routing-policies): RoutingPolicy concepts.
 
 ---
 
@@ -14524,7 +14524,7 @@ sidebarTitle: Anomaly rules
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
@@ -15314,7 +15314,7 @@ sidebarTitle: Compliance architecture
 
 <Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
-<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
@@ -16890,7 +16890,7 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -19029,7 +19029,7 @@ parsing + cursor-based resume.
 
 <Info>**Pairs with:** [Ingestion sources](/ai-governance/ingestion-sources/index) (the broader substrate that pull-mode lands events into) and [CLI debugging](/ai-governance/cli-debug) (`langwatch ingest tail` shows pulled events alongside pushed ones).</Info>
 
-<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/overview#open-core-licensing).</Warning>
+<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/open-core-licensing).</Warning>
 
 Inspired by Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect (pull
 side). The goal is the same: **one declarative config → one universal
@@ -25928,13 +25928,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Integration
@@ -26396,13 +26396,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Installation
@@ -26537,13 +26537,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Installation
@@ -39284,7 +39284,7 @@ If you want to add an annotation to a queue, you can do so by clicking on the ad
 
 To create an annotation, follow these steps:
 
-1) Click the message you want to annotate on and a [Trace](/concepts#traces) details drawer will open.
+1) Click the message you want to annotate on and a [Trace](/concepts#traces-one-task-end-to-end) details drawer will open.
 2) On the top right, click the annotation button.
 3) Here you will be able to add a comment, a link or any other information that you want to add to the message.
 
@@ -57974,7 +57974,7 @@ deployment plan.
 | Tamper-evidence (Merkle-root publication) | ❌ | Enterprise (post-GA follow-up) |
 
 The split is enforced at three layers, see
-[Open-core licensing](/ai-governance/overview#open-core-licensing) for
+[Open-core licensing](/ai-governance/open-core-licensing) for
 the layered enforcement (UI gating + tRPC middleware + service-layer
 defense-in-depth + CLI 402 envelope), and
 [Per-file license headers](/ai-governance/overview#per-file-license-headers)
@@ -58114,7 +58114,7 @@ queryable; gated surfaces re-gate.
 ## Where to next
 
 - [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
-- [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
+- [AI Governance → Open-core licensing](/ai-governance/open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
 - [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
 - [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD, AWS Cognito and OneLogin wiring
 
@@ -59754,7 +59754,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.12.0
+    targetRevision: 3.16.0
     helm:
       releaseName: langwatch
       values: |
@@ -59803,7 +59803,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.12.0
+      targetRevision: 3.16.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -60164,7 +60164,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.12.0
+VERSION=3.16.0
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -60180,13 +60180,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.12.0"
+    tag: "3.16.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.12.0"
+    tag: "3.16.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.12.0"
+    tag: "3.16.0"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -63853,7 +63853,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.12.0 \
+  --version 3.16.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -64185,7 +64185,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.12.0 \
+  --version 3.16.0 \
   -f values-production.yaml
 ```
 
