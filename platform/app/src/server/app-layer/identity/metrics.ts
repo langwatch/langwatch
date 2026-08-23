@@ -13,7 +13,7 @@ for (const name of metricNames) {
 }
 
 /**
- * The write gate's migration-state read failed (`identifier-write-gate.ts`):
+ * The write gate's migration-state read failed (`write-gate.ts`):
  * for up to the negative-cache TTL this user's ceremonies emit no identity
  * events regardless of their true backfill status. Protocol behavior is
  * unaffected — the gap is event history, which the backfill's next pass

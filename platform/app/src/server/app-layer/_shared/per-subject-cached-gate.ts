@@ -1,6 +1,6 @@
 /**
  * The cache behind the authz engine gate (../authz/engine-gate.ts) and the
- * identity write gate (../identity/identifier-write-gate.ts): a boolean
+ * identity write gate (../identity/write-gate.ts): a boolean
  * answer, asked once per check, cached per SUBJECT - an organization for
  * authz, a user for identity - with a TTL so a finishing migration takes
  * effect fleet-wide without a deploy. Each gate owns its question; this

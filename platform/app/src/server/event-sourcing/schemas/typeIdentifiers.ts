@@ -10,6 +10,10 @@ import {
   ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
 } from "@ee/event-sourcing/typeIdentifiers";
 import {
+  IDENTITY_COMMAND_TYPES,
+  IDENTITY_EVENT_TYPES,
+} from "@langwatch/identity";
+import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy";
@@ -42,10 +46,6 @@ import {
   GOVERNANCE_EVENTS_COMMAND_TYPES,
   GOVERNANCE_EVENTS_EVENT_TYPES,
 } from "../pipelines/governance-events/schemas/constants";
-import {
-  IDENTITY_COMMAND_TYPES,
-  IDENTITY_EVENT_TYPES,
-} from "../pipelines/identity/schemas/constants";
 import {
   LOG_PROCESSING_COMMAND_TYPES,
   LOG_PROCESSING_EVENT_TYPES,

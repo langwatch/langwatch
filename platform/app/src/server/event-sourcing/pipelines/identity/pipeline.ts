@@ -1,9 +1,9 @@
+import type { IdentityGuards } from "@langwatch/identity-server";
 import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";
-import type { IdentityGuardReads } from "./commands/identityGuardReads";
 import { MarkPrimaryCommand } from "./commands/markPrimary.command";
 import { VerifyIdentifierCommand } from "./commands/verifyIdentifier.command";
 import {
@@ -18,19 +18,20 @@ import type { IdentityEvent } from "./schemas/events";
 
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
-  /** How command guards see current state — Postgres reads over the
-   *  Identifier projection and User.userHashKey; in-memory in tests. */
-  identityGuardReads: IdentityGuardReads;
+  /** The guards every command handler runs — `@langwatch/identity-server`'s
+   *  IdentityGuards over the app's heads repository, the same instance shape
+   *  the calling path uses. */
+  identityGuards: IdentityGuards;
 }
 
 /**
  * The identity pipeline (ADR-101, D01). One aggregate per user; commands
  * append (waited) and the operational projection folds into the Postgres
  * `Identifier` head in per-user FIFO. Its production writers are the
- * identity adapter (better-auth/identityDatabase.ts) and the identifier
- * backfill, and both sit behind the per-user write gate
- * (app-layer/identity/identifier-write-gate.ts), which ships CLOSED and
- * opens only when a user's backfill is finalized - so deploying this
+ * identity adapter and the identifier backfill, both through
+ * `IdentityService` and the app's ledger writer, and both sit behind the
+ * per-user write gate (app-layer/identity/write-gate.ts), which ships CLOSED
+ * and opens only when a user's backfill is finalized - so deploying this
  * pipeline emits nothing on its own.
  *
  * Lanes: the commands keep the default per-aggregate group key. The queue
@@ -53,27 +54,27 @@ export function createIdentityPipeline(deps: IdentityPipelineDeps) {
     .withCommandInstance(
       "attachIdentifier",
       AttachIdentifierCommand,
-      new AttachIdentifierCommand(deps.identityGuardReads),
+      new AttachIdentifierCommand(deps.identityGuards),
     )
     .withCommandInstance(
       "verifyIdentifier",
       VerifyIdentifierCommand,
-      new VerifyIdentifierCommand(deps.identityGuardReads),
+      new VerifyIdentifierCommand(deps.identityGuards),
     )
     .withCommandInstance(
       "markPrimary",
       MarkPrimaryCommand,
-      new MarkPrimaryCommand(deps.identityGuardReads),
+      new MarkPrimaryCommand(deps.identityGuards),
     )
     .withCommandInstance(
       "detachIdentifier",
       DetachIdentifierCommand,
-      new DetachIdentifierCommand(deps.identityGuardReads),
+      new DetachIdentifierCommand(deps.identityGuards),
     )
     .withCommandInstance(
       "eraseUser",
       EraseUserCommand,
-      new EraseUserCommand(deps.identityGuardReads),
+      new EraseUserCommand(deps.identityGuards),
     )
     .build();
 }

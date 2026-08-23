@@ -9,21 +9,25 @@
  * The magic-link LANDING page (GET renders, never verifies) is deliberately
  * not here — it is a browser page, not an API operation: the app route
  * `/auth/verify-email` (`src/pages/auth/verify-email.tsx`, public, no
- * session). Completion is this family's
- * `verification.complete`, which carries the real proofs: the emailed token
- * and the initiating context's PKCE verifier, checked by the ceremony
- * service against the id-pinned record.
+ * session). Completion is this family's `verification.complete`, which
+ * carries the real proofs: the emailed token and the initiating context's
+ * PKCE verifier, checked by the ceremony service against the id-pinned
+ * record.
  *
  * Auth is the signed-in user's session — the ceremony verifies *their* own
  * identifier, and the service re-checks the record pins exactly their
  * userId. No RBAC permission applies (identity is user-scoped, not
  * organization-scoped).
  *
+ * Routes only: the ceremony service is composed in the identity runtime
+ * (app-layer/identity/runtime.ts), never here.
+ *
  * Spec: specs/identity/identifier-model.feature.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import { createService } from "@langwatch/api";
 import { HandledError } from "@langwatch/handled-error";
+import type { VerificationCeremonyService } from "@langwatch/identity-server";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
@@ -33,14 +37,8 @@ import {
   publicEndpoint,
   registerRoutePolicy,
 } from "~/server/api/security";
-import { IdentityCeremonies } from "~/server/app-layer/identity/identity-ceremonies";
-import {
-  PrismaIdentityVerificationRepository,
-  PrismaVerifiableIdentifierReads,
-} from "~/server/app-layer/identity/repositories/identity-verification.prisma.repository";
-import { VerificationCeremonyService } from "~/server/app-layer/identity/verification-ceremony";
+import { verificationCeremony } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import type { NextRequest } from "~/types/next-stubs";
 
 export const IDENTITY_API_VERSION = "2026-08-20";
@@ -48,6 +46,9 @@ export const IDENTITY_API_VERSION = "2026-08-20";
 const BASE_PATH = "/api/identity";
 const FAMILY = "identity";
 
+/** The family's one auth refusal: no session. A transport concern of this
+ *  route, not an identity error — the same code every other family's
+ *  missing-credential refusal answers with. */
 class IdentitySessionRequiredError extends HandledError {
   constructor() {
     super("missing_credentials", "missing_credentials", {
@@ -84,22 +85,6 @@ type IdentityFamilyApp = BaseApp & {
   verification: VerificationCeremonyService;
 };
 type IdentityVersion = VersionBuilder<IdentityFamilyApp>;
-
-/** Test seam: swap the composed ceremony service. */
-let serviceOverride: VerificationCeremonyService | null = null;
-export function setVerificationCeremoniesForTests(
-  replacement: VerificationCeremonyService | null,
-): void {
-  serviceOverride = replacement;
-}
-
-function composeVerificationCeremonies(): VerificationCeremonyService {
-  return new VerificationCeremonyService({
-    store: new PrismaIdentityVerificationRepository(prisma),
-    identifiers: new PrismaVerifiableIdentifierReads(prisma),
-    ceremonies: new IdentityCeremonies({ prisma }),
-  });
-}
 
 const completeVerificationSchema = z.object({
   identifierId: z.string().min(1),
@@ -175,9 +160,7 @@ export const app = createService({
     });
   },
 })
-  .provide({
-    verification: () => serviceOverride ?? composeVerificationCeremonies(),
-  })
+  .provide({ verification: () => verificationCeremony() })
   .version(IDENTITY_API_VERSION, (v) => {
     registerEndpoints(v);
   })

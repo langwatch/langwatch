@@ -1,4 +1,9 @@
 import {
+  emptyIdentityHeads,
+  type IdentityHeads,
+  reduceIdentity,
+} from "@langwatch/identity";
+import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
@@ -19,13 +24,8 @@ import {
   type UserErasedEvent,
   userErasedEventSchema,
 } from "../schemas/events";
-import {
-  emptyIdentityState,
-  type IdentityLedgerState,
-  reduceIdentity,
-} from "./reduceIdentity";
 
-export const IDENTITY_PROJECTION_VERSION = "2026-08-20";
+const IDENTITY_PROJECTION_VERSION = "2026-08-20";
 
 const identityEvents = [
   identifierAttachedEventSchema,
@@ -36,9 +36,9 @@ const identityEvents = [
   userErasedEventSchema,
 ] as const;
 
-/** The reducer's state plus the base class's bookkeeping stamps — server
+/** The reducer's heads plus the base class's bookkeeping stamps — server
  *  rig, deliberately outside the replay-proof reducer surface. */
-export type IdentityFoldState = IdentityLedgerState & {
+export type IdentityFoldState = IdentityHeads & {
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -52,8 +52,8 @@ export type IdentityFoldState = IdentityLedgerState & {
  * replay semantics, ADR-022/015 unamended.
  *
  * Every handler is the same move: validate the wire event and hand it to
- * the pure reducer — live dispatch and the replay test run the identical
- * function.
+ * `@langwatch/identity`'s reducer — live dispatch, the queue's fold and the
+ * replay proof run the identical function.
  */
 export class IdentityStateFoldProjection
   extends AbstractFoldProjection<
@@ -78,7 +78,7 @@ export class IdentityStateFoldProjection
   }
 
   protected initState() {
-    return emptyIdentityState({ userId: "" });
+    return emptyIdentityHeads({ userId: "" });
   }
 
   private fold(
@@ -86,7 +86,7 @@ export class IdentityStateFoldProjection
     state: IdentityFoldState,
   ): IdentityFoldState {
     const parsed = identityEventSchema.parse(event);
-    const next = reduceIdentity({ state, event: parsed });
+    const next = reduceIdentity({ heads: state, fact: parsed });
     return {
       ...state,
       ...next,

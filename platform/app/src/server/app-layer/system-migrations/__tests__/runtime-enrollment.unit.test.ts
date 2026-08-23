@@ -94,7 +94,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/identifier-write-gate";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
 import {
   migrationPassCohort,
   runSystemMigrationPass,

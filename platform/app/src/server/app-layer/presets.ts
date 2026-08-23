@@ -222,7 +222,7 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
-import { PrismaIdentityGuardReads } from "./identity/repositories/identity-guard-reads.prisma.repository";
+import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
@@ -890,7 +890,7 @@ export function initializeDefaultApp(options?: {
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(prisma),
-    identityGuardReads: new PrismaIdentityGuardReads(prisma),
+    identityHeads: new PrismaIdentityHeadsRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

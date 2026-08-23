@@ -1,3 +1,8 @@
+import { emptyIdentityHeads } from "@langwatch/identity";
+import {
+  IdentityGuards,
+  type IdentityHeadsRepository,
+} from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../..";
 import type { AggregateType } from "../../../domain/aggregateType";
@@ -7,10 +12,8 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "../../../projections/stateProjection.types";
-import type { IdentityGuardReads } from "../commands/identityGuardReads";
 import { createIdentityPipeline } from "../pipeline";
 import type { IdentityFoldState } from "../projections/identityState.foldProjection";
-import type { IdentityLedgerState } from "../projections/reduceIdentity";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -34,24 +37,39 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   }
 }
 
-class InMemoryGuardReads implements IdentityGuardReads {
+/** Heads read straight off the in-memory projection store — the app's
+ *  Prisma heads repository over the same rows, in one class. */
+class ProjectionHeads implements IdentityHeadsRepository {
   constructor(private readonly store: InMemoryStateStore) {}
 
-  async getUserHashKey(_params: { userId: string }) {
+  async findUserHashKey() {
     return "key_material";
   }
 
-  async findActiveIdentifierByValue(_params: { normalizedValue: string }) {
+  async findActiveIdentifierByValue() {
     return null;
   }
 
-  async loadIdentityState({
+  async findHeads({ userId }: { userId: string }) {
+    const stored = this.store.stored.get(userId);
+    if (!stored) return emptyIdentityHeads({ userId });
+    return { userId, identifiers: stored.state.identifiers };
+  }
+
+  async findIdentifier({
     userId,
+    identifierId,
   }: {
     userId: string;
-  }): Promise<IdentityLedgerState> {
-    const stored = this.store.stored.get(userId);
-    return stored?.state ?? { userId, identifiers: {} };
+    identifierId: string;
+  }) {
+    return (
+      this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null
+    );
+  }
+
+  async findIdentifierIdForAccount() {
+    return null;
   }
 }
 
@@ -79,7 +97,7 @@ describe("identity pipeline", () => {
       const pipeline = eventSourcing.register(
         createIdentityPipeline({
           identityProjectionStore: store,
-          identityGuardReads: new InMemoryGuardReads(store),
+          identityGuards: new IdentityGuards(new ProjectionHeads(store)),
         }),
       );
       try {

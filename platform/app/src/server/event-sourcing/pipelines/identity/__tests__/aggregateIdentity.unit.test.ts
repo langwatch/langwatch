@@ -1,3 +1,12 @@
+import {
+  emptyIdentityHeads,
+  type IdentifierFact,
+  type IdentityHeads,
+} from "@langwatch/identity";
+import {
+  IdentityGuards,
+  type IdentityHeadsRepository,
+} from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../..";
 import type { Command } from "../../../commands/command";
@@ -5,14 +14,9 @@ import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
 import { AttachIdentifierCommand } from "../commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "../commands/detachIdentifier.command";
 import { EraseUserCommand } from "../commands/eraseUser.command";
-import type { IdentityGuardReads } from "../commands/identityGuardReads";
 import { MarkPrimaryCommand } from "../commands/markPrimary.command";
 import { VerifyIdentifierCommand } from "../commands/verifyIdentifier.command";
 import { createIdentityPipeline } from "../pipeline";
-import type {
-  IdentifierFact,
-  IdentityLedgerState,
-} from "../projections/reduceIdentity";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -36,19 +40,27 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
   };
 }
 
-class StateReads implements IdentityGuardReads {
-  constructor(private readonly state: IdentityLedgerState) {}
+class HeadsOf implements IdentityHeadsRepository {
+  constructor(private readonly heads: IdentityHeads) {}
 
-  async getUserHashKey() {
+  async findUserHashKey() {
     return "key_material";
+  }
+
+  async findHeads() {
+    return this.heads;
   }
 
   async findActiveIdentifierByValue() {
     return null;
   }
 
-  async loadIdentityState() {
-    return this.state;
+  async findIdentifier({ identifierId }: { identifierId: string }) {
+    return this.heads.identifiers[identifierId] ?? null;
+  }
+
+  async findIdentifierIdForAccount() {
+    return null;
   }
 }
 
@@ -61,7 +73,7 @@ function command<T>(data: T): Command<T> {
   } as unknown as Command<T>;
 }
 
-const held: IdentityLedgerState = {
+const held: IdentityHeads = {
   userId: USER,
   identifiers: {
     idf_1: fact({ identifierId: "idf_1", state: "VERIFIED" }),
@@ -75,8 +87,8 @@ const base = { tenantId: USER, userId: USER, occurredAtMs: T0, actor: ACTOR };
  * The aggregate type is the storage partition key, not a label: the event
  * store refuses at append any event whose type differs from the one its
  * pipeline declares (#7406). Every verb's event is run through the store's
- * own validator against the pipeline's declared type, so a command and its
- * pipeline cannot drift apart without this going red.
+ * own validator against the pipeline's declared type, so the envelope and
+ * the pipeline cannot drift apart without this going red.
  */
 describe("identity event aggregate type", () => {
   describe("when every verb emits", () => {
@@ -84,7 +96,9 @@ describe("identity event aggregate type", () => {
     it.each([
       {
         label: "attach",
-        handler: new AttachIdentifierCommand(new StateReads(held)),
+        handler: new AttachIdentifierCommand(
+          new IdentityGuards(new HeadsOf(emptyIdentityHeads({ userId: USER }))),
+        ),
         data: {
           ...base,
           commandId: "idcmd_1",
@@ -98,12 +112,14 @@ describe("identity event aggregate type", () => {
       {
         label: "verify",
         handler: new VerifyIdentifierCommand(
-          new StateReads({
-            userId: USER,
-            identifiers: {
-              idf_1: fact({ state: "ATTACHED", verifiedAtMs: null }),
-            },
-          }),
+          new IdentityGuards(
+            new HeadsOf({
+              userId: USER,
+              identifiers: {
+                idf_1: fact({ state: "ATTACHED", verifiedAtMs: null }),
+              },
+            }),
+          ),
         ),
         data: {
           ...base,
@@ -115,17 +131,19 @@ describe("identity event aggregate type", () => {
       },
       {
         label: "mark primary",
-        handler: new MarkPrimaryCommand(new StateReads(held)),
+        handler: new MarkPrimaryCommand(new IdentityGuards(new HeadsOf(held))),
         data: { ...base, commandId: "idcmd_3", identifierId: "idf_1" },
       },
       {
         label: "detach",
-        handler: new DetachIdentifierCommand(new StateReads(held)),
+        handler: new DetachIdentifierCommand(
+          new IdentityGuards(new HeadsOf(held)),
+        ),
         data: { ...base, commandId: "idcmd_4", identifierId: "idf_2" },
       },
       {
         label: "erase",
-        handler: new EraseUserCommand(new StateReads(held)),
+        handler: new EraseUserCommand(new IdentityGuards(new HeadsOf(held))),
         data: { ...base, commandId: "idcmd_5" },
       },
     ])("the store accepts every event $label emits", async ({
@@ -134,7 +152,7 @@ describe("identity event aggregate type", () => {
     }) => {
       const declared = createIdentityPipeline({
         identityProjectionStore: {} as never,
-        identityGuardReads: {} as never,
+        identityGuards: {} as never,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 
@@ -144,6 +162,29 @@ describe("identity event aggregate type", () => {
           validateEventAggregateType(event as never, declared, index),
         ).not.toThrow();
       }
+    });
+  });
+
+  describe("when the same command is retried", () => {
+    /** @scenario "A retried command dedupes at the event store" */
+    it("keys idempotency as commandId:index so a retry dedupes", async () => {
+      const handler = new AttachIdentifierCommand(
+        new IdentityGuards(new HeadsOf(emptyIdentityHeads({ userId: USER }))),
+      );
+      const data = {
+        ...base,
+        commandId: "idcmd_1",
+        accountId: null,
+        provider: "google" as const,
+        providerAccountId: "gid_9",
+        value: "Sam.J@Acme.com",
+        ceremony: { flow: "better-auth" },
+      };
+      const first = await handler.handle(command(data));
+      const retry = await handler.handle(command(data));
+      expect(first[0]!.idempotencyKey).toBe("idcmd_1:0");
+      expect(retry[0]!.idempotencyKey).toBe("idcmd_1:0");
+      expect(first[0]!.data).toEqual(retry[0]!.data);
     });
   });
 });

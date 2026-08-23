@@ -1,5 +1,5 @@
 /**
- * The shape ../authz/engine-gate.ts and ../identity/identifier-write-gate.ts delegate to.
+ * The shape ../authz/engine-gate.ts and ../identity/write-gate.ts delegate to.
  * Their own tests
  * already cover the per-gate TTL/fail-safe contract through the two public
  * gates; this suite covers the behaviours that live in the shared helper

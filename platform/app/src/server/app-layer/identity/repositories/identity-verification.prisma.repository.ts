@@ -1,10 +1,9 @@
-import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 import type {
   IdentityVerificationRecord,
-  IdentityVerificationStore,
-  VerifiableIdentifierReads,
-} from "../verification-ceremony";
+  IdentityVerificationRepository,
+} from "@langwatch/identity-server";
+import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * The verification ceremony's row-truth storage (D01): ceremony records live
@@ -59,7 +58,7 @@ function parsePayload(raw: string): StoredPayload | null {
 }
 
 export class PrismaIdentityVerificationRepository
-  implements IdentityVerificationStore
+  implements IdentityVerificationRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -81,11 +80,13 @@ export class PrismaIdentityVerificationRepository
     ]);
   }
 
-  async findByIdentifierId(params: {
+  async findByIdentifierId({
+    identifierId,
+  }: {
     identifierId: string;
   }): Promise<IdentityVerificationRecord | null> {
     const row = await this.prisma.verificationToken.findFirst({
-      where: { identifier: keyFor(params.identifierId) },
+      where: { identifier: keyFor(identifierId) },
       orderBy: { createdAt: "desc" },
     });
     if (!row) return null;
@@ -101,11 +102,14 @@ export class PrismaIdentityVerificationRepository
     };
   }
 
-  async consume(params: {
+  async consume({
+    identifierId,
+    verificationId,
+  }: {
     identifierId: string;
     verificationId: string;
   }): Promise<boolean> {
-    const identifier = keyFor(params.identifierId);
+    const identifier = keyFor(identifierId);
     // The same newest-row rule `findByIdentifierId` reads by, so completion
     // consumes the record it was checked against.
     const row = await this.prisma.verificationToken.findFirst({
@@ -114,31 +118,12 @@ export class PrismaIdentityVerificationRepository
     });
     if (!row) return false;
     const payload = parsePayload(row.token);
-    if (!payload || payload.verificationId !== params.verificationId) {
-      return false;
-    }
+    if (!payload || payload.verificationId !== verificationId) return false;
     // Single-use is this delete: two concurrent completions race on the exact
     // (identifier, token) pair and exactly one deleteMany reports a row gone.
     const deleted = await this.prisma.verificationToken.deleteMany({
       where: { identifier, token: row.token },
     });
     return deleted.count > 0;
-  }
-}
-
-/** The mint guard's read of the Identifier projection (fold-written rows). */
-export class PrismaVerifiableIdentifierReads
-  implements VerifiableIdentifierReads
-{
-  constructor(private readonly prisma: PrismaClient) {}
-
-  async findIdentifier(params: {
-    userId: string;
-    identifierId: string;
-  }): Promise<{ provider: string; state: string } | null> {
-    return this.prisma.identifier.findFirst({
-      where: { id: params.identifierId, userId: params.userId },
-      select: { provider: true, state: true },
-    });
   }
 }

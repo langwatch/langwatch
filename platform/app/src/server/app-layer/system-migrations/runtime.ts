@@ -24,9 +24,7 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
-import { IdentityCeremonies } from "../identity/identity-ceremonies";
-import { IdentityIdentifierBackfillMigration } from "../identity/migration/identifier-backfill.migration";
-import { PrismaIdentityBackfillRepository } from "../identity/repositories/identity-backfill.prisma.repository";
+import { identifierBackfillMigration } from "../identity/runtime";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
@@ -140,12 +138,7 @@ export function registeredMigrations(): SystemMigration[] {
  * the tenant axis differs.
  */
 export function registeredUserMigrations(): SystemMigration[] {
-  return [
-    new IdentityIdentifierBackfillMigration({
-      reads: new PrismaIdentityBackfillRepository(prisma),
-      ceremonies: new IdentityCeremonies({ prisma }),
-    }),
-  ];
+  return [identifierBackfillMigration()];
 }
 
 const senders = async () => (await authzGrantsCommands()).commands;

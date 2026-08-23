@@ -7,28 +7,59 @@
  * on the app page /auth/verify-email, which renders and makes no request
  * (src/pages/auth/__tests__/verify-email.integration.test.tsx).
  *
+ * The route composes nothing: the ceremony service comes from the identity
+ * runtime, which this suite replaces with one over in-memory ports.
+ *
  * See specs/identity/identifier-model.feature.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { InMemoryVerificationStore } from "~/server/app-layer/identity/__tests__/inMemoryVerificationStore";
+import type { VerifyIdentifierCommandData } from "@langwatch/identity";
 import {
+  type IdentityVerificationRecord,
+  type IdentityVerificationRepository,
   s256Challenge,
   VerificationCeremonyService,
-} from "~/server/app-layer/identity/verification-ceremony";
+} from "@langwatch/identity-server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { verificationCeremony } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
-import type { VerifyIdentifierCommandData } from "~/server/event-sourcing/pipelines/identity/schemas/commands";
-import {
-  app as identityFamilyApp,
-  setVerificationCeremoniesForTests,
-} from "../[[...route]]/app";
+import { app as identityFamilyApp } from "../[[...route]]/app";
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn(async () => null),
 }));
 
+vi.mock("~/server/app-layer/identity/runtime", () => ({
+  verificationCeremony: vi.fn(),
+}));
+
 const USER = "user_sam";
 const IDENTIFIER = "idf_work";
 const COMPLETE_PATH = "/api/identity/verification.complete";
+
+class InMemoryVerificationStore implements IdentityVerificationRepository {
+  records = new Map<string, IdentityVerificationRecord>();
+
+  async replaceForIdentifier(record: IdentityVerificationRecord) {
+    this.records.set(record.identifierId, record);
+  }
+
+  async findByIdentifierId({ identifierId }: { identifierId: string }) {
+    return this.records.get(identifierId) ?? null;
+  }
+
+  async consume({
+    identifierId,
+    verificationId,
+  }: {
+    identifierId: string;
+    verificationId: string;
+  }) {
+    const record = this.records.get(identifierId);
+    if (!record || record.verificationId !== verificationId) return false;
+    this.records.delete(identifierId);
+    return true;
+  }
+}
 
 let store: InMemoryVerificationStore;
 let service: VerificationCeremonyService;
@@ -37,19 +68,31 @@ let verifyIdentifier: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   store = new InMemoryVerificationStore();
   verifyIdentifier = vi.fn(async (_data: VerifyIdentifierCommandData) => []);
-  service = new VerificationCeremonyService({
+  service = new VerificationCeremonyService(
     store,
-    identifiers: {
-      findIdentifier: async () => ({ provider: "email", state: "ATTACHED" }),
+    {
+      findIdentifier: async () => ({
+        identifierId: IDENTIFIER,
+        userId: USER,
+        provider: "email",
+        value: "sam@acme.com",
+        domain: "acme.com",
+        identifierHash: null,
+        accountId: null,
+        connectionId: null,
+        state: "ATTACHED",
+        verifiedAtMs: null,
+        attachedAtMs: 0,
+        detachedAtMs: null,
+      }),
     },
-    ceremonies: { verifyIdentifier: verifyIdentifier as never },
-    isLatched: async () => true,
-  });
-  setVerificationCeremoniesForTests(service);
+    { verifyIdentifier: verifyIdentifier as never },
+    { isLatched: async () => true },
+  );
+  vi.mocked(verificationCeremony).mockReturnValue(service);
 });
 
 afterEach(() => {
-  setVerificationCeremoniesForTests(null);
   vi.mocked(getServerAuthSession).mockReset();
   vi.mocked(getServerAuthSession).mockResolvedValue(null as never);
 });

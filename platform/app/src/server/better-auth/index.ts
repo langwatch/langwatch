@@ -20,6 +20,7 @@ import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
+import { identityDatabase } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -33,7 +34,6 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
-import { createIdentityDatabase } from "./identityDatabase";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { withRedisFailOpen } from "./secondaryStorageResilience";
 
@@ -235,9 +235,9 @@ export const auth = betterAuth({
    * adapter; domain-significant writes additionally run identity ceremonies
    * for users whose backfill has latched (the write gate ships closed, so
    * deploying this changed nothing on its own). An unrouted better-auth
-   * write throws — see identityDatabase.ts.
+   * write throws — composed in app-layer/identity/runtime.ts.
    */
-  database: createIdentityDatabase(),
+  database: identityDatabase(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which

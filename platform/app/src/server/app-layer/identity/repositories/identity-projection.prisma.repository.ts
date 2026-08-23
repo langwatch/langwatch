@@ -1,75 +1,11 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import {
-  IDENTIFIER_LIFECYCLE_STATES,
-  type IdentifierFact,
-  type IdentifierLifecycleState,
-} from "~/server/event-sourcing/pipelines/identity/projections/reduceIdentity";
-import { identifierProviderSchema } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-
-function parseLifecycleState(raw: string): IdentifierLifecycleState {
-  const state = IDENTIFIER_LIFECYCLE_STATES.find(
-    (candidate) => candidate === raw,
-  );
-  if (!state) {
-    throw new Error(`Identifier row carries unknown state "${raw}"`);
-  }
-  return state;
-}
-
-interface IdentifierRowShape {
-  id: string;
-  userId: string;
-  provider: string;
-  value: string | null;
-  domain: string | null;
-  identifierHash: string | null;
-  accountId: string | null;
-  state: string;
-  connectionId: string | null;
-  verifiedAt: Date | null;
-  attachedAt: Date;
-  detachedAt: Date | null;
-}
-
-function rowToFact(row: IdentifierRowShape): IdentifierFact {
-  return {
-    identifierId: row.id,
-    userId: row.userId,
-    provider: identifierProviderSchema.parse(row.provider),
-    value: row.value,
-    domain: row.domain,
-    identifierHash: row.identifierHash,
-    accountId: row.accountId,
-    connectionId: row.connectionId,
-    state: parseLifecycleState(row.state),
-    verifiedAtMs: row.verifiedAt?.getTime() ?? null,
-    attachedAtMs: row.attachedAt.getTime(),
-    detachedAtMs: row.detachedAt?.getTime() ?? null,
-  };
-}
-
-function factToRow(fact: IdentifierFact): IdentifierRowShape {
-  return {
-    id: fact.identifierId,
-    userId: fact.userId,
-    provider: fact.provider,
-    value: fact.value,
-    domain: fact.domain,
-    identifierHash: fact.identifierHash,
-    accountId: fact.accountId,
-    state: fact.state,
-    connectionId: fact.connectionId,
-    verifiedAt: fact.verifiedAtMs === null ? null : new Date(fact.verifiedAtMs),
-    attachedAt: new Date(fact.attachedAtMs),
-    detachedAt: fact.detachedAtMs === null ? null : new Date(fact.detachedAtMs),
-  };
-}
+import { factToRow, rowToFact } from "./identifier-row";
 
 /**
  * The identity pipeline's projection store (ADR-101 §3): the Postgres
@@ -127,8 +63,7 @@ export class PrismaIdentityProjectionRepository
     const { state } = projection;
 
     for (const fact of Object.values(state.identifiers)) {
-      const row = factToRow(fact);
-      const { id, ...columns } = row;
+      const { id, ...columns } = factToRow(fact);
       await this.prisma.identifier.upsert({
         where: { id },
         create: { id, ...columns },

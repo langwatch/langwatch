@@ -17,6 +17,8 @@ import {
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { IdentityHeadsRepository } from "@langwatch/identity-server";
+import { IdentityGuards } from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
@@ -148,7 +150,6 @@ import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-pro
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
-import type { IdentityGuardReads } from "./pipelines/identity/commands/identityGuardReads";
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
@@ -357,8 +358,8 @@ export interface PipelineRepositories {
   authzAuditTrail: AuthzAuditTrailStore;
   /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
   identityProjection: StateProjectionStore<IdentityFoldState>;
-  /** Postgres reads the identity command guards run against (ADR-101 §2). */
-  identityGuardReads: IdentityGuardReads;
+  /** Postgres reads the identity guards run against (ADR-101 §2). */
+  identityHeads: IdentityHeadsRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -661,7 +662,9 @@ export class PipelineRegistry {
     this.deps.eventSourcing.register(
       createIdentityPipeline({
         identityProjectionStore: this.deps.repositories.identityProjection,
-        identityGuardReads: this.deps.repositories.identityGuardReads,
+        identityGuards: new IdentityGuards(
+          this.deps.repositories.identityHeads,
+        ),
       }),
     );
 

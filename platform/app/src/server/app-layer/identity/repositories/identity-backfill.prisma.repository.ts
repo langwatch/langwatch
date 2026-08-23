@@ -1,25 +1,28 @@
-import { randomBytes } from "node:crypto";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { BackfillIdentifierRow } from "@langwatch/identity";
 import type {
   BackfillAccountRow,
-  BackfillIdentifierRow,
   BackfillUserRow,
-  IdentityBackfillReads,
-} from "../migration/identifier-backfill.migration";
+  IdentityBackfillRepository,
+} from "@langwatch/identity-server";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * The backfill's reads over the legacy truth (`User`/`Account`) and the
- * `Identifier` projection it proves itself against, plus the one write the
- * migration owns besides its events: minting a missing `User.userHashKey`
- * (the adapter mints it for new sign-ups; the backfill sweeps the users who
- * predate it, ADR-101 §4).
+ * `Identifier` projection it proves itself against. Reads only: the one
+ * write the pass owns besides its facts is the users repository's.
  */
-export class PrismaIdentityBackfillRepository implements IdentityBackfillReads {
+export class PrismaIdentityBackfillRepository
+  implements IdentityBackfillRepository
+{
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findUser(params: { userId: string }): Promise<BackfillUserRow | null> {
+  async findUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<BackfillUserRow | null> {
     const user = await this.prisma.user.findUnique({
-      where: { id: params.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -38,21 +41,13 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReads {
     };
   }
 
-  async mintUserHashKeyIfMissing(params: { userId: string }): Promise<void> {
-    // Guarded update: a key minted concurrently (the adapter, another pass)
-    // is never overwritten — rewriting it would orphan every hash already
-    // computed with the old key.
-    await this.prisma.user.updateMany({
-      where: { id: params.userId, userHashKey: null },
-      data: { userHashKey: randomBytes(32).toString("hex") },
-    });
-  }
-
-  async findAccountRows(params: {
+  async findAccountRows({
+    userId,
+  }: {
     userId: string;
   }): Promise<BackfillAccountRow[]> {
     const rows = await this.prisma.account.findMany({
-      where: { userId: params.userId },
+      where: { userId },
       select: {
         id: true,
         provider: true,
@@ -69,11 +64,13 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReads {
     }));
   }
 
-  async findIdentifierRows(params: {
+  async findIdentifierRows({
+    userId,
+  }: {
     userId: string;
   }): Promise<BackfillIdentifierRow[]> {
-    const rows = await this.prisma.identifier.findMany({
-      where: { userId: params.userId },
+    return this.prisma.identifier.findMany({
+      where: { userId },
       select: {
         id: true,
         provider: true,
@@ -82,6 +79,5 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReads {
         state: true,
       },
     });
-    return rows;
   }
 }

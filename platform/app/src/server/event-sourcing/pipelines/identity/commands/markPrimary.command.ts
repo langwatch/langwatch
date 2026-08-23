@@ -1,26 +1,17 @@
-import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
-import type { Command, CommandHandler } from "../../../commands/command";
-import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
+  MARK_PRIMARY_COMMAND_TYPE,
   type MarkPrimaryCommandData,
   markPrimaryCommandDataSchema,
-} from "../schemas/commands";
-import {
-  IDENTITY_EVENT_VERSION_LATEST,
-  MARK_PRIMARY_COMMAND_TYPE,
-  PRIMARY_CHANGED_EVENT_TYPE,
-  USER_IDENTITY_AGGREGATE_TYPE,
-} from "../schemas/constants";
-import type { PrimaryChangedEvent } from "../schemas/events";
-import {
-  IdentityIdentifierNotFoundError,
-  IdentityPrimaryRequiresVerifiedError,
-} from "./identityCommandErrors";
-import type { IdentityGuardReads } from "./identityGuardReads";
+} from "@langwatch/identity";
+import type { IdentityGuards } from "@langwatch/identity-server";
+import { defineCommandSchema } from "../../..";
+import type { Command, CommandHandler } from "../../../commands/command";
+import { identityEventsFor } from "../envelope";
+import type { IdentityEvent } from "../schemas/events";
 
+/** The staged re-run: the calling path's guard, the calling path's envelope. */
 export class MarkPrimaryCommand
-  implements
-    CommandHandler<Command<MarkPrimaryCommandData>, PrimaryChangedEvent>
+  implements CommandHandler<Command<MarkPrimaryCommandData>, IdentityEvent>
 {
   static readonly schema = defineCommandSchema(
     MARK_PRIMARY_COMMAND_TYPE,
@@ -32,45 +23,15 @@ export class MarkPrimaryCommand
     return payload.userId;
   }
 
-  constructor(private readonly reads: IdentityGuardReads) {}
+  constructor(private readonly guards: IdentityGuards) {}
 
   async handle(
     command: Command<MarkPrimaryCommandData>,
-  ): Promise<PrimaryChangedEvent[]> {
-    const { userId, commandId, identifierId, occurredAtMs, actor } =
-      command.data;
-    const state = await this.reads.loadIdentityState({ userId });
-    const fact = state.identifiers[identifierId];
-    if (!fact) {
-      throw new IdentityIdentifierNotFoundError(
-        `mark_primary: identifier ${identifierId} does not exist for this user`,
-      );
-    }
-    if (fact.state === "PRIMARY") return [];
-    if (fact.state !== "VERIFIED") {
-      throw new IdentityPrimaryRequiresVerifiedError(
-        `mark_primary: identifier is ${fact.state}, only VERIFIED takes PRIMARY`,
-      );
-    }
-    const previous = Object.values(state.identifiers).find(
-      (candidate) => candidate.state === "PRIMARY",
-    );
-    return [
-      EventUtils.createEvent<PrimaryChangedEvent>({
-        aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
-        aggregateId: userId,
-        tenantId: createTenantId(command.tenantId),
-        type: PRIMARY_CHANGED_EVENT_TYPE,
-        version: IDENTITY_EVENT_VERSION_LATEST,
-        data: {
-          identifierId,
-          previousIdentifierId: previous?.identifierId ?? null,
-          actor,
-        },
-        metadata: {},
-        occurredAt: occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
-      }),
-    ];
+  ): Promise<IdentityEvent[]> {
+    const facts = await this.guards.markPrimary(command.data);
+    return identityEventsFor({
+      command: { type: MARK_PRIMARY_COMMAND_TYPE, data: command.data },
+      facts,
+    });
   }
 }

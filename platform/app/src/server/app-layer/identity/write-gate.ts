@@ -20,21 +20,18 @@
  * `IDENTITY_WRITE_GATE_TTL_MS`, which is the bound an operator should expect.
  * Fail-safe direction is CLOSED — an unreadable state table can only delay
  * event history, never break sign-in.
+ *
+ * The state repository is the caller's (the runtime composes it): this
+ * module reads no Prisma of its own, the way the engine gate takes its
+ * client from the caller.
  */
 import { createLogger } from "@langwatch/observability";
 import type { SystemMigrationStateRepository } from "@langwatch/system-migrations";
-import { prisma as appPrisma } from "../../db";
 import { perSubjectCachedFlag } from "../_shared/per-subject-cached-gate";
-import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { identityWriteGateReadFailuresTotal } from "./metrics";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "./migration-name";
 
-const logger = createLogger("langwatch:identity:identifier-write-gate");
-
-/** The D01 backfill's name. The gate keys on its state rows, so the flip is
- *  data, not a deploy. Renaming orphans every stored record — the standard
- *  migration-name rule. */
-export const IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME =
-  "identity-d01-identifier-backfill" as const;
+const logger = createLogger("langwatch:identity:write-gate");
 
 export const IDENTITY_WRITE_GATE_TTL_MS = 60_000;
 
@@ -45,16 +42,6 @@ const gate = perSubjectCachedFlag({
   // active users, so the cap is sized well above the default.
   maxEntries: 50_000,
 });
-
-/** Composed lazily so importing the module never touches Prisma. */
-let defaultStateRepository: SystemMigrationStateRepository | null = null;
-
-function defaultState(): SystemMigrationStateRepository {
-  defaultStateRepository ??= new PrismaSystemMigrationStateRepository(
-    appPrisma,
-  );
-  return defaultStateRepository;
-}
 
 async function readUserOnIdentityWrites({
   userId,
@@ -88,10 +75,10 @@ async function readUserOnIdentityWrites({
 /** Whether THIS user's domain-significant ceremonies emit identity events. */
 export async function isUserOnIdentityWrites({
   userId,
-  state = defaultState(),
+  state,
 }: {
   userId: string;
-  state?: SystemMigrationStateRepository;
+  state: SystemMigrationStateRepository;
 }): Promise<boolean> {
   return gate.get({
     subject: userId,
