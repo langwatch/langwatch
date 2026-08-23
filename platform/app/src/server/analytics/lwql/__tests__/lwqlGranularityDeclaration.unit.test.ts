@@ -33,6 +33,16 @@ const BOTH_PERIODS: LangWatchQLParameter[] = [
   { name: "period_end", type: "DateTime" },
 ];
 
+/** The `message` of a thrown error, or the reason there is none. */
+function messageOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    return (error as Error).message;
+  }
+  return "<no error was thrown>";
+}
+
 describe("the validator accepts a bound parameter inside INTERVAL (A5)", () => {
   it("parses and permits the granularity multiplier in the bucketing expression", () => {
     const result = validateLangWatchQL({
@@ -108,5 +118,27 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
         { name: "period_end", type: "DateTime" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
+  });
+
+  it("tells a mistyped bound apart from an absent one in the copy", () => {
+    // Both bounds are declared here. Telling the author to declare
+    // period_start sends them looking for a line already on screen; what
+    // they have to change is its type.
+    const mistyped = messageOf(() =>
+      assertLangWatchQLGranularityDeclaration([
+        { name: "period_granularity_seconds", type: "UInt32" },
+        { name: "period_start", type: "String" },
+        { name: "period_end", type: "DateTime" },
+      ]),
+    );
+    const absent = messageOf(() =>
+      assertLangWatchQLGranularityDeclaration([
+        { name: "period_granularity_seconds", type: "UInt32" },
+      ]),
+    );
+
+    expect(mistyped).toContain("DateTime");
+    expect(mistyped).not.toBe(absent);
+    expect(absent).toContain("must also declare");
   });
 });

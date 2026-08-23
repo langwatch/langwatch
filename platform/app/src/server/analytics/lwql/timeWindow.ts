@@ -1,5 +1,5 @@
 /**
- * LangWatchQL analytics SQL — the time-window vocabulary.
+ * LangWatchQL analytics SQL — the time-window and granularity vocabulary.
  *
  * A statement says whether it follows the surface's period by *declaring* two
  * reserved bound parameters, `{period_start:DateTime}` and
@@ -13,6 +13,13 @@
  * period_end)`. A convention this module documents rather than something it can
  * enforce — the author writes the comparison — and it is what the schema
  * browser tells a member writing SQL.
+ *
+ * A third reserved name, `{period_granularity_seconds:UInt32}`, opts a
+ * statement into the surface's datapoint bucket size on the same terms. The
+ * three together are the surface's — {@link LWQL_SURFACE_PARAMETERS} — and a
+ * request carrying a value for any of them is refused. The steps the surface
+ * offers are {@link LWQL_GRANULARITY_STEPS}, and they are the only values the
+ * policy accepts, because coarsening picks its answer from that same list.
  *
  * ## This module has no imports, and must not gain any
  *

@@ -41,6 +41,39 @@ const WINDOW = {
 /** Seven days, in seconds. */
 const WEEK_SECONDS = 7 * 24 * 3600;
 
+/** The `code` of a thrown handled error, or the reason there is none. */
+function codeOf(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return (error as { code?: unknown }).code;
+  }
+  return "<no error was thrown>";
+}
+
+/** The `message` of a thrown error, or the reason there is none. */
+function messageOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    return (error as Error).message;
+  }
+  return "<no error was thrown>";
+}
+
+/** The `meta` of a thrown handled error, empty when nothing was thrown. */
+function metaOf(run: () => unknown): Record<string, unknown> {
+  try {
+    run();
+  } catch (error) {
+    return ((error as { meta?: Record<string, unknown> }).meta ?? {}) as Record<
+      string,
+      unknown
+    >;
+  }
+  return {};
+}
+
 describe("resolveLangWatchQLGranularity", () => {
   describe("given a statement that does not declare the parameter", () => {
     it("reports no granularity and injects nothing", () => {
@@ -113,9 +146,10 @@ describe("resolveLangWatchQLGranularity", () => {
       ).toThrow(LangWatchQLReservedGranularityTypeError);
     });
 
-    it("refuses before looking at any supplied value", () => {
-      // Wrong type AND zero: the type error is the answer, either way.
-      expect(() =>
+    it("reports the wrong declared type, not the bad step, when both are wrong", () => {
+      // Wrong type AND zero: the declaration is what the author must fix
+      // first, so its copy is the answer either way.
+      const run = () =>
         resolveLangWatchQLGranularity({
           declared: [
             ...PERIOD,
@@ -124,31 +158,43 @@ describe("resolveLangWatchQLGranularity", () => {
           parameters: {},
           timeWindow: WINDOW,
           granularitySeconds: 0,
-        }),
-      ).toThrow(LangWatchQLReservedGranularityTypeError);
+        });
+
+      expect(() => run()).toThrow(LangWatchQLReservedGranularityTypeError);
+      expect(messageOf(run)).toContain("not UInt32");
     });
   });
 
   describe("given a caller-supplied value for the reserved name", () => {
+    const suppliesGranularity = () =>
+      resolveLangWatchQLGranularity({
+        declared: [...PERIOD, ...GRANULARITY],
+        parameters: { period_granularity_seconds: 60 },
+        timeWindow: WINDOW,
+      });
+
     /** @scenario "A caller that supplies period_granularity_seconds itself is refused" */
     it("is refused by this resolver even when called on its own", () => {
-      expect(() =>
-        resolveLangWatchQLGranularity({
-          declared: [...PERIOD, ...GRANULARITY],
-          parameters: { period_granularity_seconds: 60 },
-          timeWindow: WINDOW,
-        }),
-      ).toThrow(/surface sets itself/);
+      expect(codeOf(suppliesGranularity)).toBe(
+        "lwql_reserved_parameter_supplied",
+      );
+    });
+
+    it("names the granularity parameter rather than the window pair", () => {
+      // The refusal used to say "time-window parameters" whatever was sent,
+      // so a caller that supplied only the step was told to remove two
+      // parameters it had never sent, and not the one it had.
+      const message = messageOf(suppliesGranularity);
+
+      expect(message).toContain("period_granularity_seconds");
+      expect(message).not.toContain("period_start");
+      expect(message).not.toContain("period_end");
     });
   });
 
   describe("given a malformed surface step", () => {
     /** @scenario "A zero or fractional step is refused as a wrong declaration" */
-    it.each([
-      [0],
-      [-60],
-      [1.5],
-    ])("refuses %p as a wrong declaration", (step) => {
+    it.each([[0], [-60], [1.5]])("refuses %p as a malformed step", (step) => {
       expect(() =>
         resolveLangWatchQLGranularity({
           declared: [...PERIOD, ...GRANULARITY],
@@ -156,6 +202,48 @@ describe("resolveLangWatchQLGranularity", () => {
           granularitySeconds: step,
         }),
       ).toThrow(LangWatchQLReservedGranularityTypeError);
+    });
+
+    it("describes the step rather than claiming the declaration is mistyped", () => {
+      // The declaration here is a correct UInt32. Copy blaming its type sends
+      // the author to a line that is already right.
+      const run = () =>
+        resolveLangWatchQLGranularity({
+          declared: [...PERIOD, ...GRANULARITY],
+          timeWindow: WINDOW,
+          granularitySeconds: 1.5,
+        });
+
+      expect(codeOf(run)).toBe("lwql_granularity_parameter_type");
+      expect(messageOf(run)).not.toContain("UInt32");
+      expect(messageOf(run)).toContain("whole number of seconds");
+    });
+
+    it("refuses a positive whole step the surface does not offer", () => {
+      // 7,200 is a positive integer, so the old positive-integer check let it
+      // through -- and coarsening would then have "coarsened" it to the
+      // 3,600-second hour, a step twice as fine as the one requested.
+      expect(() =>
+        resolveLangWatchQLGranularity({
+          declared: [...PERIOD, ...GRANULARITY],
+          timeWindow: WINDOW,
+          granularitySeconds: 7200,
+          onBudgetOverflow: "coarsen",
+        }),
+      ).toThrow(LangWatchQLReservedGranularityTypeError);
+    });
+
+    it("admits every step the surface offers", () => {
+      for (const step of LWQL_GRANULARITY_STEPS) {
+        expect(() =>
+          resolveLangWatchQLGranularity({
+            declared: [...PERIOD, ...GRANULARITY],
+            timeWindow: WINDOW,
+            granularitySeconds: step,
+            onBudgetOverflow: "coarsen",
+          }),
+        ).not.toThrow();
+      }
     });
   });
 
@@ -173,23 +261,21 @@ describe("resolveLangWatchQLGranularity", () => {
     });
 
     it("carries the arithmetic in the refusal's meta", () => {
-      try {
+      const run = () =>
         resolveLangWatchQLGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: 1,
           onBudgetOverflow: "refuse",
         });
-        throw new Error("expected the refusal");
-      } catch (error) {
-        expect(error).toBeInstanceOf(LangWatchQLGranularityTooFineError);
-        const handled = error as LangWatchQLGranularityTooFineError;
-        expect(handled.meta).toMatchObject({
-          requestedGranularitySeconds: 1,
-          windowSeconds: WEEK_SECONDS,
-          maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
-        });
-      }
+
+      expect(() => run()).toThrow(LangWatchQLGranularityTooFineError);
+      expect(codeOf(run)).toBe("lwql_granularity_too_fine");
+      expect(metaOf(run)).toMatchObject({
+        requestedGranularitySeconds: 1,
+        windowSeconds: WEEK_SECONDS,
+        maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
+      });
     });
 
     it("coarsens to the finest fitting offered step on the dashboard", () => {
@@ -221,6 +307,42 @@ describe("resolveLangWatchQLGranularity", () => {
         followsGranularity: true,
         granularitySeconds: 3600,
       });
+    });
+
+    it("never reports coarsening to a step finer than the one requested", () => {
+      // The invariant the label promises: wherever coarsenedFromSeconds is
+      // set, the effective step is strictly wider than the requested one.
+      //
+      // The refusal above is what makes the finer-than-requested case
+      // unreachable through this entry point, so this sweep holds on the old
+      // `effective !== requested` code too -- it pins the property rather
+      // than falsifying the bug. The test that fails on the pre-fix code is
+      // "refuses a positive whole step the surface does not offer": 7,200
+      // used to reach coarsening and come back labelled as widened to 3,600.
+      const windows = [
+        WINDOW,
+        {
+          start: new Date("2026-02-20T00:00:00.000Z"),
+          end: new Date("2036-02-20T00:00:00.000Z"),
+        },
+      ];
+
+      for (const timeWindow of windows) {
+        for (const step of LWQL_GRANULARITY_STEPS) {
+          const resolution = resolveLangWatchQLGranularity({
+            declared: [...PERIOD, ...GRANULARITY],
+            timeWindow,
+            granularitySeconds: step,
+            onBudgetOverflow: "coarsen",
+          });
+
+          if (resolution.coarsenedFromSeconds !== undefined) {
+            expect(resolution.granularitySeconds).toBeGreaterThan(
+              resolution.coarsenedFromSeconds,
+            );
+          }
+        }
+      }
     });
 
     it("coarsens to the coarsest floor when nothing fits, still naming the change", () => {
@@ -295,6 +417,15 @@ describe("resolveLangWatchQLGranularity", () => {
         granularitySeconds: 60,
       });
     });
+  });
+});
+
+describe("the bucket ceiling", () => {
+  // Pinned because the coarsening cases above are written against this exact
+  // number -- a week at one-minute steps is 10,080 buckets, and only just
+  // overflows. Move the ceiling and those cases stop testing what they say.
+  it("admits ten thousand buckets per governed run", () => {
+    expect(LWQL_GRANULARITY_MAX_BUCKETS).toBe(10_000);
   });
 });
 

@@ -123,13 +123,38 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
+ * The refusal sentence for exactly the names the request carried, agreeing in
+ * number so a single supplied name does not read as "values for period_start".
+ *
+ * Built from the supplied names rather than a fixed phrase because the same
+ * code covers the two window bounds and the granularity step, and naming the
+ * wrong one tells a caller to remove a parameter it never sent.
+ */
+function suppliedParameterSentence(supplied: readonly string[]): string {
+  if (supplied.length === 0) {
+    return "The request supplied values for parameters the surface sets itself.";
+  }
+  if (supplied.length === 1) {
+    return `The request supplied a value for ${supplied[0]}, which the surface sets itself.`;
+  }
+  const last = supplied[supplied.length - 1] as string;
+  const names = `${supplied.slice(0, -1).join(", ")} and ${last}`;
+  return `The request supplied values for ${names}, which the surface sets itself.`;
+}
+
+/**
  * The request carried a value for a parameter the surface owns.
  *
- * `period_start` and `period_end` are supplied by whatever is showing the chart
- * — the dashboard's period, the workbench's page period — and a caller that
- * sets one is pinning a window that will then ignore the surface it sits on.
- * Refused rather than overwritten, because silently discarding a value a caller
- * sent is how the two-charts-different-periods bug comes back wearing our name.
+ * `period_start`, `period_end` and `period_granularity_seconds` are supplied by
+ * whatever is showing the chart — the dashboard's period and step, the
+ * workbench's page period — and a caller that sets one is pinning something
+ * that will then ignore the surface it sits on. Refused rather than
+ * overwritten, because silently discarding a value a caller sent is how the
+ * two-charts-different-periods bug comes back wearing our name.
+ *
+ * The message names the parameters actually supplied rather than the
+ * time-window pair: a caller that sent only the granularity was previously
+ * told to remove parameters it had not sent.
  *
  * @see ./timeWindow.ts — the contract this enforces
  */
@@ -142,7 +167,7 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
   ) {
     super(
       "lwql_reserved_parameter_supplied",
-      "The request supplied values for time-window parameters the surface sets itself.",
+      suppliedParameterSentence(supplied),
       {
         httpStatus: 400,
         fault: "customer",
@@ -188,6 +213,19 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
 }
 
 /**
+ * Which of the two granularity failures this is. They share a code because a
+ * caller acts on both the same way — fix the granularity declaration or the
+ * step behind it — but they are not the same fact, and a message claiming a
+ * type mismatch for a well-typed declaration carrying a fractional step sends
+ * the reader to the wrong line.
+ */
+export type LangWatchQLGranularityFault =
+  /** Declared as something other than `UInt32`. */
+  | "declared-type"
+  /** Declared correctly, but the step supplied is not a positive integer. */
+  | "step-value";
+
+/**
  * The granularity parameter was declared with a type other than `UInt32`, or
  * the surface supplied a step that is not a positive whole number of
  * seconds.
@@ -206,14 +244,18 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
   constructor(
     /** The reserved names declared (or valued) wrongly. Sorted. */
     mistyped: readonly string[],
+    /** Which failure this is; the declaration one when unstated. */
+    fault: LangWatchQLGranularityFault = "declared-type",
   ) {
     super(
       "lwql_granularity_parameter_type",
-      "The query declares period_granularity_seconds with a type that is not UInt32.",
+      fault === "step-value"
+        ? "The datapoint granularity must be a whole number of seconds greater than zero."
+        : "The query declares period_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
         fault: "customer",
-        meta: { parameters: mistyped },
+        meta: { parameters: mistyped, granularityFault: fault },
         ...remediation("lwql_granularity_parameter_type"),
       },
     );
@@ -263,25 +305,43 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
 }
 
 /**
- * A statement declared `period_granularity_seconds` without declaring the
- * period window the bucket budget is computed against.
+ * A statement declared `period_granularity_seconds` without a usable period
+ * window for the bucket budget to be computed against -- either bound absent,
+ * or present but declared as something other than a date-time.
  *
  * Refused at *save*: without both bounds the surface cannot compute how many
  * buckets a run would produce, so the budget contract would be uncomputable
  * exactly when it matters most -- on the dashboard, where the range is the
  * dashboard's own control. Declaring the two period parameters alongside is
  * the fix, and the schema browser spells them.
+ *
+ * The two causes get different copy. Telling an author to declare
+ * `period_start` when it is on screen, declared `String`, sends them looking
+ * for a line that is already there.
  */
 export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
   declare readonly code: "lwql_granularity_requires_window";
 
-  constructor() {
+  constructor({
+    absent = [],
+    mistyped = [],
+  }: {
+    /** Period bounds the statement does not declare at all. */
+    readonly absent?: readonly string[];
+    /** Period bounds declared, but not as a date-time. */
+    readonly mistyped?: readonly string[];
+  } = {}) {
     super(
       "lwql_granularity_requires_window",
-      "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+      mistyped.length > 0 && absent.length === 0
+        ? "A chart declaring period_granularity_seconds must declare period_start and period_end as DateTime."
+        : "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
       {
         httpStatus: 400,
         fault: "customer",
+        // Named consumer: the editor, which highlights the declarations to add
+        // or rewrite rather than making the author diff the two lists.
+        meta: { absent, mistyped },
         ...remediation("lwql_granularity_requires_window"),
       },
     );
