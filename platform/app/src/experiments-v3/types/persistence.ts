@@ -25,9 +25,9 @@ export const persistedResultsSchema = z.object({
   runId: z.string().optional(),
   versionId: z.string().optional(),
   targetOutputs: z.record(z.array(z.unknown())).default({}),
-  targetMetadata: z.record(z.array(targetRowMetadataSchema.nullish())).default(
-    {},
-  ),
+  targetMetadata: z
+    .record(z.array(targetRowMetadataSchema.nullish()))
+    .default({}),
   evaluatorResults: z.record(z.record(z.array(z.unknown()))).default({}),
   errors: z.record(z.array(z.string().nullish())).default({}),
 });
