@@ -535,7 +535,9 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                             <Text
                               textStyle="xs"
                               fontFamily="mono"
-                              color={c.attempt > 0 ? "orange.solid" : "fg.muted"}
+                              color={
+                                c.attempt > 0 ? "orange.solid" : "fg.muted"
+                              }
                             >
                               {c.attempt > 0 ? c.attempt : "—"}
                             </Text>

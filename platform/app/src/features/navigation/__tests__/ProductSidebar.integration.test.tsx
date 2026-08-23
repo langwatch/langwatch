@@ -627,8 +627,10 @@ describe("the product sidebar", () => {
         .querySelector("kbd");
       // The hairline border is pinned on the shared chip style itself,
       // which jsdom can read where a CSS variable it cannot resolve is
-      // out of reach: quietChipStyle.unit.test.ts.
-      expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+      // out of reach: quietChipStyle.unit.test.ts. The grey is the custom
+      // `fg.faint` now rather than the built-in `gray.400`; Chakra slugifies
+      // either into the same variable shape.
+      expect(cap).toHaveStyle({ color: "var(--chakra-colors-fg-faint)" });
     });
   });
 });

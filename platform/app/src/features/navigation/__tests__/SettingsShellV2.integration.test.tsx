@@ -327,9 +327,11 @@ describe("the settings shell in a new navigation mode", () => {
       const pills = screen.getAllByText("ENT");
       expect(pills.length).toBeGreaterThanOrEqual(1);
       // The hairline border is pinned on the shared chip style itself:
-      // shell/__tests__/quietChipStyle.unit.test.ts.
+      // shell/__tests__/quietChipStyle.unit.test.ts. The grey is the custom
+      // `fg.faint` now rather than the built-in `gray.400`; Chakra slugifies
+      // either into the same variable shape.
       expect(pills[0]).toHaveStyle({
-        color: "var(--chakra-colors-gray-400)",
+        color: "var(--chakra-colors-fg-faint)",
       });
     });
 

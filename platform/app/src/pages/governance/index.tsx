@@ -405,7 +405,11 @@ function GovernanceOverviewPage() {
               subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
               actions={
                 teams.length > 0 ? (
-                  <Link href="/governance/teams" color="blue.fgMuted" fontSize="sm">
+                  <Link
+                    href="/governance/teams"
+                    color="blue.fgMuted"
+                    fontSize="sm"
+                  >
                     View all teams →
                   </Link>
                 ) : null
@@ -430,7 +434,11 @@ function GovernanceOverviewPage() {
               subline="Top 5 LangWatch members ranked by spend (last 30 days)."
               actions={
                 users.length > 0 ? (
-                  <Link href="/governance/users" color="blue.fgMuted" fontSize="sm">
+                  <Link
+                    href="/governance/users"
+                    color="blue.fgMuted"
+                    fontSize="sm"
+                  >
                     View all users →
                   </Link>
                 ) : null
@@ -512,7 +520,10 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/ingestion-sources" color="blue.fgMuted">
+                    <Link
+                      href="/governance/ingestion-sources"
+                      color="blue.fgMuted"
+                    >
                       + Add a source
                     </Link>
                   )}
@@ -1117,7 +1128,8 @@ function TrendCell({
     );
   }
   const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "·";
-  const color = pct > 25 ? "orange.solid" : pct < -25 ? "blue.solid" : "fg.muted";
+  const color =
+    pct > 25 ? "orange.solid" : pct < -25 ? "blue.solid" : "fg.muted";
   return (
     <Box flex={2} color={color}>
       {arrow} {fmtTrendPct(pct)}

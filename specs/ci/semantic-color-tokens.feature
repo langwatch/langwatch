@@ -71,6 +71,15 @@ Feature: Color props come from semantic tokens
       categorical identity color does not theme a surface
 
   @unit
+  Scenario: A raw shade is reported whichever quote holds it
+    Given a color prop whose shade is written in single quotes or in an
+      uninterpolated template literal
+    When CI runs the plugin over it
+    Then the shade is reported, the same as a double-quoted one
+    So that the quote a shade is written in cannot decide whether the rule sees
+      it
+
+  @unit
   Scenario: The rule must still match its own fixtures
     Given a fixtures file of deliberate violations
     When CI runs the plugin over it
