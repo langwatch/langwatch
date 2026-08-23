@@ -35,8 +35,13 @@ interface PromptPlaygroundChatProps extends BoxProps {
    * substitutes except `input`, whose field is the message box itself.
    */
   composerVariables?: ChatVariableField[];
-  /** Sets one variable's value for the next run, from the message box. */
-  onVariableValueChange?: (identifier: string, value: string) => void;
+  /**
+   * Sets one variable's value for the next run, from the message box.
+   *
+   * Required: its only caller passes it, and a variable row the customer can
+   * type into that reports nothing is worse than no row at all.
+   */
+  onVariableValueChange: (identifier: string, value: string) => void;
 }
 
 /**

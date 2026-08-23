@@ -25,7 +25,6 @@ import { describe, expect, it } from "vitest";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import { scenarioMessageSnapshotSchema } from "~/server/scenarios/schemas";
 
-/** A MESSAGE_SNAPSHOT wire event carrying the given messages. */
 function makeSnapshot(messages: unknown[]) {
   return {
     type: ScenarioEventType.MESSAGE_SNAPSHOT,

@@ -34,7 +34,11 @@ export interface ChatInputProps {
   isVisible?: boolean;
   /** The variables this run will substitute, `input` excluded. */
   variables?: ChatVariableField[];
-  onVariableValueChange?: (identifier: string, value: string) => void;
+  /**
+   * Required, because both callers pass it and a variable row you can type
+   * into that reports nothing is worse than no row at all.
+   */
+  onVariableValueChange: (identifier: string, value: string) => void;
 }
 
 export function SyncedChatInput({
@@ -195,12 +199,15 @@ export function SyncedChatInput({
         {/* What this run will substitute, above the field that starts it. The
             prompt's variables are declared in the editor beside the messages
             that reference them; what they are worth for one run is set here. */}
-        {onVariableValueChange && (
-          <ChatVariableFields
-            variables={variables}
-            onValueChange={onVariableValueChange}
-          />
-        )}
+        {/* Gated on the variables, not on the handler: what decides whether
+            the row belongs on screen is whether the prompt declares any.
+            `ChatVariableFields` already renders nothing for an empty list, so
+            requiring the callback too only meant a caller that passed
+            variables and forgot the handler lost the row without a word. */}
+        <ChatVariableFields
+          variables={variables}
+          onValueChange={onVariableValueChange}
+        />
 
         {/* The field and the button are siblings on one row, bottom-aligned, so
             the action stays beside the last line as the field grows. They were

@@ -33,9 +33,17 @@ export function useDeltaBuffer(
 
   useEffect(() => cancel, [cancel]);
 
-  const begin = useCallback((id: string) => {
-    pendingRef.current = { id, content: "" };
-  }, []);
+  const begin = useCallback(
+    (id: string) => {
+      // The previous run's frame is dropped, not left scheduled. Leaving it
+      // meant the new run's first `set` returned early — the frame was still
+      // outstanding — so the opening tokens waited for a frame belonging to a
+      // reply that had already ended.
+      cancel();
+      pendingRef.current = { id, content: "" };
+    },
+    [cancel],
+  );
 
   const set = useCallback((content: string) => {
     const pending = pendingRef.current;

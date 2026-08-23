@@ -1,6 +1,7 @@
 /**
  * Height of the bar that tops each pane of a prompt window — the editor's
- * toolbar on the left, the conversation's sub-tabs on the right.
+ * toolbar on the left, the conversation's bar and its reset action on the
+ * right.
  *
  * One number, shared, because the two bars sit side by side and each closes
  * with a hairline: at different heights those hairlines read as one rule broken

@@ -223,7 +223,19 @@ function SidebarItem({
       borderRadius="md"
       cursor="pointer"
       _hover={{ bg: active ? "bg.muted" : "bg.subtle" }}
+      // Opening a prompt is what this list is for, so the row has to answer a
+      // keyboard as well as a pointer. As a bare `Box` it took no focus, and a
+      // screen reader announced a `div`. Same treatment `TurnSeparator` gives
+      // its own clickable row.
+      role="button"
+      tabIndex={0}
+      aria-current={active ? "true" : undefined}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onClick?.();
+      }}
       display="flex"
       alignItems="center"
       gap={2}

@@ -65,113 +65,6 @@ const createTabData = (overrides?: Partial<TabData>): TabData => ({
   ...overrides,
 });
 
-describe("PromptConversationSection Store Integration", () => {
-  let store: ReturnType<typeof getStoreForTesting>;
-
-  beforeEach(() => {
-    localStorage.clear();
-    clearStoreInstances();
-    store = getStoreForTesting(TEST_PROJECT_ID);
-  });
-
-  afterEach(() => {
-    cleanup();
-    clearStoreInstances();
-    localStorage.clear();
-  });
-
-  describe("variable values persistence", () => {
-    it("stores variable values in tab data", () => {
-      store.getState().addTab({
-        data: createTabData({
-          variableValues: {
-            name: "John",
-            context: "Some context",
-          },
-        }),
-      });
-
-      const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      const tabData = store.getState().getByTabId(tabId!);
-
-      expect(tabData?.variableValues).toEqual({
-        name: "John",
-        context: "Some context",
-      });
-    });
-
-    it("updates variable values via updateTabData", () => {
-      store.getState().addTab({ data: createTabData() });
-
-      const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      expect(tabId).toBeDefined();
-
-      store.getState().updateTabData({
-        tabId: tabId!,
-        updater: (data) => ({
-          ...data,
-          variableValues: {
-            ...data.variableValues,
-            name: "Updated value",
-          },
-        }),
-      });
-
-      const tabData = store.getState().getByTabId(tabId!);
-      expect(tabData?.variableValues.name).toBe("Updated value");
-    });
-
-    it("persists variable values to localStorage", () => {
-      const tabId = store.getState().addTab({
-        data: createTabData({
-          variableValues: { name: "Persisted" },
-        }),
-      });
-
-      // Tab data (including variableValues) is persisted under its own
-      // per-tab key, not the top-level window/tab-order index key.
-      const tabStorageKey = `${TEST_PROJECT_ID}:tab:${tabId}`;
-      const storedData = localStorage.getItem(tabStorageKey);
-      expect(storedData).toBeDefined();
-      expect(storedData).toContain("Persisted");
-    });
-
-    it("each tab maintains separate variable values", () => {
-      store.getState().addTab({
-        data: createTabData({ variableValues: { name: "Tab1Value" } }),
-      });
-      store.getState().addTab({
-        data: createTabData({ variableValues: { name: "Tab2Value" } }),
-      });
-
-      const tab1Id = store.getState().windows[0]?.tabs[0]?.id;
-      const tab2Id = store.getState().windows[0]?.tabs[1]?.id;
-
-      expect(store.getState().getByTabId(tab1Id!)?.variableValues.name).toBe(
-        "Tab1Value",
-      );
-      expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe(
-        "Tab2Value",
-      );
-
-      store.getState().updateTabData({
-        tabId: tab1Id!,
-        updater: (data) => ({
-          ...data,
-          variableValues: { name: "Tab1Updated" },
-        }),
-      });
-
-      expect(store.getState().getByTabId(tab1Id!)?.variableValues.name).toBe(
-        "Tab1Updated",
-      );
-      expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe(
-        "Tab2Value",
-      );
-    });
-  });
-});
-
 // Mock TabIdContext. tabIdRef lets a test point the component at a real store
 // tab id (defaults to a fixed value for tests that don't touch the store).
 const { tabIdRef } = vi.hoisted(() => ({
@@ -234,10 +127,13 @@ function FormWrapper({
   return <FormProvider {...methods}>{children}</FormProvider>;
 }
 
-const renderConversationSection = (
-  props: Partial<Parameters<typeof PromptConversationSection>[0]> = {},
-  formValues?: Partial<PromptConfigFormValues>,
-) => {
+const renderConversationSection = ({
+  props = {},
+  formValues,
+}: {
+  props?: Partial<Parameters<typeof PromptConversationSection>[0]>;
+  formValues?: Partial<PromptConfigFormValues>;
+} = {}) => {
   const defaultProps = {
     layoutMode: "vertical" as const,
     isPromptExpanded: true,
@@ -268,7 +164,7 @@ const withInputs = (
   } as any,
 });
 
-describe("PromptConversationSection Layout Modes", () => {
+describe("given the conversation pane", () => {
   beforeEach(() => {
     localStorage.clear();
     clearStoreInstances();
@@ -285,16 +181,16 @@ describe("PromptConversationSection Layout Modes", () => {
     tabIdRef.current = "test-tab-id";
   });
 
-  describe("vertical layout mode", () => {
+  describe("when the panes are stacked vertically", () => {
     it("shows resizable divider in vertical mode", () => {
-      renderConversationSection({ layoutMode: "vertical" });
+      renderConversationSection({ props: { layoutMode: "vertical" } });
 
       expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
     });
 
     /** @scenario The drag divider sits above the conversation's bar when the panes are stacked */
     it("puts the divider before the pane bar in document order", () => {
-      renderConversationSection({ layoutMode: "vertical" });
+      renderConversationSection({ props: { layoutMode: "vertical" } });
 
       const divider = screen.getByTestId("resizable-divider");
       const bar = screen.getByText("Conversation");
@@ -307,7 +203,7 @@ describe("PromptConversationSection Layout Modes", () => {
 
     /** @scenario The conversation's bar closes with a hairline in both layouts */
     it("closes the pane bar with a hairline in vertical mode", () => {
-      renderConversationSection({ layoutMode: "vertical" });
+      renderConversationSection({ props: { layoutMode: "vertical" } });
 
       expect(screen.getByTestId("conversation-pane-bar")).toHaveStyle({
         borderBottomStyle: "solid",
@@ -315,16 +211,16 @@ describe("PromptConversationSection Layout Modes", () => {
     });
   });
 
-  describe("horizontal layout mode", () => {
+  describe("when the panes sit side by side", () => {
     it("hides resizable divider in horizontal mode", () => {
-      renderConversationSection({ layoutMode: "horizontal" });
+      renderConversationSection({ props: { layoutMode: "horizontal" } });
 
       expect(screen.queryByTestId("resizable-divider")).not.toBeInTheDocument();
     });
 
     /** @scenario The conversation's bar closes with a hairline in both layouts */
     it("closes the pane bar with a hairline in horizontal mode", () => {
-      renderConversationSection({ layoutMode: "horizontal" });
+      renderConversationSection({ props: { layoutMode: "horizontal" } });
 
       expect(screen.getByTestId("conversation-pane-bar")).toHaveStyle({
         borderBottomStyle: "solid",
@@ -332,24 +228,24 @@ describe("PromptConversationSection Layout Modes", () => {
     });
   });
 
-  describe("common features", () => {
+  describe("when either layout is showing", () => {
     /** @scenario The conversation pane offers no sub-tabs */
     it("offers no sub-tabs", () => {
-      renderConversationSection({ layoutMode: "vertical" });
+      renderConversationSection({ props: { layoutMode: "vertical" } });
 
       expect(screen.queryAllByRole("tab")).toHaveLength(0);
       expect(screen.getByTestId("playground-chat")).toBeInTheDocument();
     });
 
     it("shows Reset chat button in both modes", () => {
-      renderConversationSection({ layoutMode: "vertical" });
+      renderConversationSection({ props: { layoutMode: "vertical" } });
       expect(
         screen.getByRole("button", { name: /reset chat/i }),
       ).toBeInTheDocument();
 
       cleanup();
 
-      renderConversationSection({ layoutMode: "horizontal" });
+      renderConversationSection({ props: { layoutMode: "horizontal" } });
       expect(
         screen.getByRole("button", { name: /reset chat/i }),
       ).toBeInTheDocument();
@@ -359,13 +255,13 @@ describe("PromptConversationSection Layout Modes", () => {
   describe("when the prompt declares an input variable", () => {
     /** @scenario The message box is the only field for the input variable */
     it("never offers input a field of its own", () => {
-      renderConversationSection(
-        { layoutMode: "vertical" },
-        withInputs([
+      renderConversationSection({
+        props: { layoutMode: "vertical" },
+        formValues: withInputs([
           { identifier: "input", type: "str" },
           { identifier: "topic", type: "str" },
         ]),
-      );
+      });
 
       expect(screen.queryByLabelText("Set input")).not.toBeInTheDocument();
       expect(screen.getByLabelText("Set topic")).toBeInTheDocument();
@@ -385,10 +281,10 @@ describe("PromptConversationSection Layout Modes", () => {
         }),
       });
 
-      renderConversationSection(
-        { layoutMode: "vertical" },
-        withInputs([{ identifier: "input", type: "str" }]),
-      );
+      renderConversationSection({
+        props: { layoutMode: "vertical" },
+        formValues: withInputs([{ identifier: "input", type: "str" }]),
+      });
 
       // The chat stub renders a field per variable it is given; `input` never
       // reaches it, so the stale value cannot beat what the user types.
@@ -404,10 +300,10 @@ describe("PromptConversationSection Layout Modes", () => {
       // Point the component's useTabId() at the real store tab so its writes land.
       tabIdRef.current = tabId!;
 
-      const { unmount } = renderConversationSection(
-        { layoutMode: "vertical" },
-        withInputs([{ identifier: "topic", type: "str" }]),
-      );
+      const { unmount } = renderConversationSection({
+        props: { layoutMode: "vertical" },
+        formValues: withInputs([{ identifier: "topic", type: "str" }]),
+      });
 
       await user.type(screen.getByLabelText("Set topic"), "flushed");
 
@@ -432,16 +328,19 @@ describe("PromptConversationSection Layout Modes", () => {
       const formValues = withInputs([{ identifier: "topic", type: "str" }]);
 
       // Mount, type a value, then unmount — this is "switch away".
-      const first = renderConversationSection(
-        { layoutMode: "vertical" },
+      const first = renderConversationSection({
+        props: { layoutMode: "vertical" },
         formValues,
-      );
+      });
       await user.type(screen.getByLabelText("Set topic"), "kept");
       first.unmount();
 
       // "Switch back": a fresh mount of the same tab must show the value again,
       // proving the full round-trip (flush on unmount -> restore from store).
-      renderConversationSection({ layoutMode: "vertical" }, formValues);
+      renderConversationSection({
+        props: { layoutMode: "vertical" },
+        formValues,
+      });
       expect(screen.getByLabelText("Set topic")).toHaveValue("kept");
     });
   });

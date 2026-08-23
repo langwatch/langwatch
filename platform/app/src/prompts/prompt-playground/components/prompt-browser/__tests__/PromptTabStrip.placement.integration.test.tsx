@@ -72,7 +72,7 @@ function renderStrip(ids: string[]) {
   return { ...result, onSelectTab };
 }
 
-describe("the prompt tab strip", () => {
+describe("given the prompt tab strip", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     titles.current = { "tab-1": "search-agent", "tab-2": "summariser" };

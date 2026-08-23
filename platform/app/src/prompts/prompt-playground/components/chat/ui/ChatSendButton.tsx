@@ -29,18 +29,22 @@ export interface ChatSendButtonProps {
  * dozen props.
  */
 function sendButtonAppearance({
-  stopping,
-  inactive,
+  isStopping,
+  isInactive,
 }: {
-  stopping: boolean;
-  inactive: boolean;
+  isStopping: boolean;
+  isInactive: boolean;
 }) {
   return {
-    "aria-label": stopping ? "Stop generating" : "Send message",
-    background: stopping ? "red.solid" : inactive ? "bg.muted" : "orange.solid",
-    color: stopping || !inactive ? "white" : "fg.muted",
-    cursor: inactive ? "default" : "pointer",
-    _hover: inactive ? undefined : { filter: "brightness(1.08)" },
+    "aria-label": isStopping ? "Stop generating" : "Send message",
+    background: isStopping
+      ? "red.solid"
+      : isInactive
+        ? "bg.muted"
+        : "orange.solid",
+    color: isStopping || !isInactive ? "white" : "fg.muted",
+    cursor: isInactive ? "default" : "pointer",
+    _hover: isInactive ? undefined : { filter: "brightness(1.08)" },
   };
 }
 
@@ -50,14 +54,14 @@ export function ChatSendButton({
   onSend,
   onStop,
 }: ChatSendButtonProps) {
-  const stopping = inProgress && !!onStop;
-  const inactive = stopping ? false : disabled || inProgress;
+  const isStopping = inProgress && !!onStop;
+  const isInactive = isStopping ? false : disabled || inProgress;
 
   return (
     <chakra.button
       type="button"
-      onClick={() => (stopping ? onStop?.() : onSend())}
-      disabled={inactive}
+      onClick={() => (isStopping ? onStop?.() : onSend())}
+      disabled={isInactive}
       width="34px"
       height="34px"
       borderRadius="full"
@@ -66,12 +70,12 @@ export function ChatSendButton({
       display="grid"
       placeItems="center"
       transition="background 150ms ease"
-      {...sendButtonAppearance({ stopping, inactive })}
+      {...sendButtonAppearance({ isStopping, isInactive })}
     >
       {/* The paper-plane's ink sits low-left of its own box, so centring the
           glyph geometrically leaves it looking low and left. The nudge is
           optical, and the square needs none of it. */}
-      {stopping ? (
+      {isStopping ? (
         <LuSquare size={12} />
       ) : (
         <LuSend size={14} style={{ transform: "translate(-1px, 1px)" }} />

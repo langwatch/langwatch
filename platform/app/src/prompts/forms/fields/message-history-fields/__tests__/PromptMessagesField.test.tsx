@@ -168,12 +168,12 @@ const renderComponent = (props: WrapperProps = {}) => {
   return render(<TestWrapper {...props} />);
 };
 
-describe("PromptMessagesField", () => {
+describe("given the prompt messages field", () => {
   afterEach(() => {
     cleanup();
   });
 
-  describe("editing mode menu", () => {
+  describe("when choosing an editing mode", () => {
     it("defaults to Prompt mode for system + user with {{input}}", () => {
       renderComponent();
 
@@ -268,7 +268,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("Instructions mode", () => {
+  describe("when the editor is in Instructions mode", () => {
     it("shows only the system message textarea", () => {
       renderComponent();
 
@@ -322,7 +322,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("Messages mode", () => {
+  describe("when the editor is in Messages mode", () => {
     // Helper: messages that trigger Messages mode
     const messagesForMessagesMode = [
       { role: "system" as const, content: "System prompt" },
@@ -368,7 +368,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("content preservation", () => {
+  describe("when switching modes with content already written", () => {
     it("preserves message content when switching from Prompt to Messages mode", async () => {
       const user = userEvent.setup();
       renderComponent();
@@ -429,7 +429,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("system message creation", () => {
+  describe("when a mode needs a system message that does not exist", () => {
     it("creates system message when switching to Prompt mode if none exists", async () => {
       const user = userEvent.setup();
       // No system message - this defaults to Messages mode
@@ -445,7 +445,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("delayed form reset (drawer scenario)", () => {
+  describe("when the form resets after the drawer has opened", () => {
     it("updates editing mode when form is reset with different messages", async () => {
       // This simulates the drawer behavior:
       // 1. Form starts with default messages (system + user with {{input}}) -> Prompt mode

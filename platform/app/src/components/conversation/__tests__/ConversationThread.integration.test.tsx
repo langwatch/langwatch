@@ -340,9 +340,13 @@ describe("<ConversationThread />", () => {
 
   describe("given the thread is rendered beside other scrolling content", () => {
     it("scrolls its own box rather than every ancestor", () => {
-      const scrollTo = vi.fn();
       // jsdom implements neither, so both are observed rather than measured.
-      Element.prototype.scrollTo = scrollTo as unknown as Element["scrollTo"];
+      // Spied rather than assigned: assigning left the stub on the shared
+      // prototype for every describe after this one, and `clearAllMocks`
+      // clears calls without removing the patch.
+      const scrollTo = vi
+        .spyOn(Element.prototype, "scrollTo")
+        .mockImplementation(() => undefined);
 
       renderConversation([{ id: "m1", role: "user", content: "hello" }]);
 
@@ -352,6 +356,8 @@ describe("<ConversationThread />", () => {
       // and back down again. Scrolling its own box cannot reach a sibling.
       expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
       expect(scrollTo).toHaveBeenCalled();
+
+      scrollTo.mockRestore();
     });
   });
 

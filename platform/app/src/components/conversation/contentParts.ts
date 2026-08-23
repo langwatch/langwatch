@@ -62,14 +62,6 @@ export function readToolBlock(
 }
 
 /**
- * OpenAI Realtime audio, in either state: inline base64 before server-side
- * extraction, or a `/api/files/<id>` reference after it.
- *
- * Each branch builds its whole part because `MediaPartData` splits its union
- * on `source.type` — a shared object literal over a union of sources matches
- * neither arm.
- */
-/**
  * The media type each audio format the providers send actually is.
  *
  * `pcm16` is OpenAI Realtime's raw-sample format, which browsers play as wav.
@@ -86,17 +78,22 @@ const AUDIO_MIME_BY_FORMAT: Record<string, string> = {
   webm: "audio/webm",
 };
 
+/**
+ * OpenAI Realtime audio, in either state: inline base64 before server-side
+ * extraction, or a `/api/files/<id>` reference after it.
+ *
+ * Each branch builds its whole part because `MediaPartData` splits its union
+ * on `source.type` — a shared object literal over a union of sources matches
+ * neither arm.
+ */
 function audioPart(
   audio: { data?: string; url?: string; format?: string; mimeType?: string },
   { id, role, traceId, index }: PartContext,
 ): DisplayPart | undefined {
-  // Only mp3 was named, so ogg, flac, opus and the rest were all labelled
-  // audio/wav and the player was handed a type the bytes are not. A format we
-  // do not have a mapping for still says what it is rather than claiming wav.
-  // Lowercased before the lookup: `visitContentPart` passes `input_audio.format`
-  // through exactly as the provider spelled it, so a provider sending "MP3"
-  // missed the table and landed on `audio/MP3` — the very thing the table is
-  // here to prevent.
+  // Lowercased first: `visitContentPart` passes `input_audio.format` through
+  // exactly as the provider spelled it, so "MP3" missed the table. A format
+  // with no entry still says what it is rather than claiming wav, which is
+  // what every non-mp3 format used to be labelled.
   const format = audio.format?.toLowerCase();
   const mimeType =
     audio.mimeType ??

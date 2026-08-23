@@ -211,5 +211,15 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
       );
       expect(response.status).toBe(404);
     });
+
+    it("refuses the unversioned path rather than treating it as the latest", async () => {
+      const response = await app.request(
+        "/api/prompt-playground/prompt.execute",
+        { method: "POST" },
+      );
+
+      expect(response.status).toBe(404);
+      expect(studioBackendPostEvent).not.toHaveBeenCalled();
+    });
   });
 });
