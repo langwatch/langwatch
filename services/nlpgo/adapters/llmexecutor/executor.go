@@ -147,10 +147,11 @@ func (e *GatewayHTTPError) Error() string {
 // Aggregator envelopes (OpenRouter and compatible relays) wrap the real
 // upstream failure: `error.message` is a generic "Provider returned
 // error" while `error.metadata.raw` carries the upstream's own error
-// text and `error.metadata.provider_name` says which upstream failed.
-// Without the metadata the surfaced message gives the user zero signal,
-// so it is appended when present — flattened and bounded first, see
-// flattenErrorDetail.
+// response and `error.metadata.provider_name` says which upstream
+// failed. Without the metadata the surfaced message gives the user zero
+// signal, so both are appended when present: the name as it stands, and
+// the upstream's own message field out of `raw`, never the response
+// itself. See upstreamMessageFrom and flattenErrorDetail.
 func extractProviderErrorMessage(body []byte) string {
 	if len(body) == 0 {
 		return ""
@@ -177,23 +178,70 @@ func extractProviderErrorMessage(body []byte) string {
 	if message == "" {
 		return ""
 	}
-	if raw := flattenErrorDetail(envelope.Error.Metadata.Raw, maxAggregatorRawRunes); raw != "" {
-		detail := raw
-		if name := flattenErrorDetail(
-			envelope.Error.Metadata.ProviderName,
-			maxAggregatorProviderNameRunes,
-		); name != "" {
-			detail = name + ": " + raw
-		}
-		message = message + " (" + detail + ")"
+	name := flattenErrorDetail(
+		envelope.Error.Metadata.ProviderName,
+		maxAggregatorProviderNameRunes,
+	)
+	upstream := flattenErrorDetail(
+		upstreamMessageFrom(envelope.Error.Metadata.Raw),
+		maxAggregatorRawRunes,
+	)
+	switch {
+	case name != "" && upstream != "":
+		message = message + " (" + name + ": " + upstream + ")"
+	case name != "":
+		message = message + " (" + name + ")"
+	case upstream != "":
+		message = message + " (" + upstream + ")"
 	}
 	return message
 }
 
-// Bounds for the aggregator metadata appended to a surfaced message.
-// `raw` is the upstream's whole error RESPONSE rather than a curated
-// message field, so it can be kilobytes of JSON or an HTML page; the
-// name is a vendor label and only ever a few words.
+// upstreamMessageFrom reads the upstream's own message out of an aggregator's
+// `raw` field, or "" when the field carries no message.
+//
+// `raw` is the upstream's whole error RESPONSE, not a curated message field.
+// It can be another vendor's JSON envelope, an HTML error page, or a body that
+// echoes part of the request back, and the surfaced message travels in an SSE
+// error frame and an `error.message` trace attribute. Truncating an
+// unstructured body bounds its size and redacts nothing, so only a message
+// FIELD is taken: that is the same class of vendor-written text as the
+// top-level `error.message` this function already surfaces. A `raw` that is
+// not a JSON document, or that names no message, is dropped, and the provider
+// name alone says which upstream failed.
+//
+// The complete response is still on GatewayHTTPError.Body for server-side
+// reading, so nothing is lost for diagnostics.
+func upstreamMessageFrom(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "{") {
+		return ""
+	}
+	var upstream struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+		Message string `json:"message"`
+		Detail  string `json:"detail"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &upstream); err != nil {
+		return ""
+	}
+	for _, candidate := range []string{
+		upstream.Error.Message,
+		upstream.Message,
+		upstream.Detail,
+	} {
+		if candidate != "" {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// Bounds for the aggregator metadata appended to a surfaced message. Both are
+// vendor-written text rather than whole bodies, but a message field still has
+// no length contract, and the name is only ever a few words.
 const (
 	maxAggregatorRawRunes          = 512
 	maxAggregatorProviderNameRunes = 64
