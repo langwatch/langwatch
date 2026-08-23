@@ -33,6 +33,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
 const { mutateMock, chartQueryMock } = vi.hoisted(() => ({
   mutateMock: vi.fn(),
@@ -106,7 +107,9 @@ function answer({
 const mount = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
 
-function mountWidget(props: { granularitySeconds?: number } = {}) {
+function mountWidget(
+  props: { granularitySeconds?: LangWatchQLGranularityStep } = {},
+) {
   return mount(
     <LangWatchQLDashboardWidget
       chartId="chart_1"

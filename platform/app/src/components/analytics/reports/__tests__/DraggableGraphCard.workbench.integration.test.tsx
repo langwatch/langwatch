@@ -27,6 +27,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
@@ -91,7 +92,7 @@ function renderCard({
   granularitySeconds,
 }: {
   kind?: string | null;
-  granularitySeconds?: number | null;
+  granularitySeconds?: LangWatchQLGranularityStep | null;
 } = {}) {
   return render(
     <DraggableGraphCard

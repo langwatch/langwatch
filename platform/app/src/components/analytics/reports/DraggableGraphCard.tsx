@@ -7,6 +7,7 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
 import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
 import type { SizeOption } from "./GraphCardMenu";
@@ -30,7 +31,7 @@ interface GraphData {
    * The datapoint step a placed workbench chart was given, in seconds. Only
    * meaningful for `workbench_sql` rows.
    */
-  granularitySeconds?: number | null;
+  granularitySeconds?: LangWatchQLGranularityStep | null;
   trigger?: {
     id: string;
     active: boolean;

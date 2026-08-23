@@ -38,6 +38,7 @@ import { useMemo } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import { api } from "~/utils/api";
 
 import { useLangWatchQLWidgetRun } from "../hooks/useLangWatchQLWidgetRun";
@@ -51,7 +52,7 @@ import { LazyLangWatchQLWidgetChart } from "./LazyLangWatchQLWidgetChart";
  * parameter but has no step stored yet — one minute, the middle of the offered
  * steps. Coarsened up from here when the dashboard's period is wide.
  */
-export const LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS = 60;
+export const LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS: LangWatchQLGranularityStep = 60;
 
 export interface LangWatchQLDashboardWidgetProps {
   readonly chartId: string;
@@ -61,7 +62,7 @@ export interface LangWatchQLDashboardWidgetProps {
    * {@link LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS}; ignored entirely by a
    * statement that does not declare the granularity parameter.
    */
-  readonly granularitySeconds?: number;
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
   /** The card's title, used to describe the chart to a screen reader. */
   readonly name: string;
 }

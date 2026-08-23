@@ -24,6 +24,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import { api } from "~/utils/api";
 
 export interface UseLangWatchQLWidgetRunInput {
@@ -35,8 +36,8 @@ export interface UseLangWatchQLWidgetRunInput {
   readonly start: number;
   /** Period end, epoch milliseconds. */
   readonly end: number;
-  /** The datapoint step to request, in seconds. */
-  readonly granularitySeconds: number;
+  /** The datapoint step to request — one of the offered steps. */
+  readonly granularitySeconds: LangWatchQLGranularityStep;
 }
 
 export function useLangWatchQLWidgetRun({

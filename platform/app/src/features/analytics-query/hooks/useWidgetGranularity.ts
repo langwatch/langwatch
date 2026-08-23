@@ -25,6 +25,7 @@
  */
 
 import { useCallback, useMemo } from "react";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
 import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
 import { useRouter } from "~/utils/compat/next-router";
@@ -32,7 +33,9 @@ import { useRouter } from "~/utils/compat/next-router";
 /** The query parameter the whole picker state is encoded into. */
 export const WIDGET_GRANULARITY_QUERY_PARAMETER = "widgetGranularity";
 
-const isOfferedStep = (seconds: number): boolean =>
+const isOfferedStep = (
+  seconds: number,
+): seconds is LangWatchQLGranularityStep =>
   (LWQL_GRANULARITY_STEPS as readonly number[]).includes(seconds);
 
 /**
@@ -43,10 +46,10 @@ const isOfferedStep = (seconds: number): boolean =>
  */
 export function parseWidgetGranularity(
   encoded: string | undefined,
-): Readonly<Record<string, number>> {
+): Readonly<Record<string, LangWatchQLGranularityStep>> {
   if (!encoded) return {};
 
-  const parsed: Record<string, number> = {};
+  const parsed: Record<string, LangWatchQLGranularityStep> = {};
   for (const entry of encoded.split(",")) {
     const separator = entry.lastIndexOf(":");
     if (separator <= 0) continue;
@@ -62,7 +65,7 @@ export function parseWidgetGranularity(
 
 /** Encodes a lookup back into the parameter, sorted so the URL is stable. */
 export function encodeWidgetGranularity(
-  picks: Readonly<Record<string, number>>,
+  picks: Readonly<Record<string, LangWatchQLGranularityStep>>,
 ): string {
   return Object.keys(picks)
     .sort()
@@ -72,7 +75,9 @@ export function encodeWidgetGranularity(
 
 export interface WidgetGranularityState {
   /** The step each card was picked to run at, by graph id. */
-  readonly granularityByGraphId: Readonly<Record<string, number>>;
+  readonly granularityByGraphId: Readonly<
+    Record<string, LangWatchQLGranularityStep>
+  >;
   /** Records a member's pick for one card, into the URL. */
   readonly setGranularity: (
     graphId: string,
