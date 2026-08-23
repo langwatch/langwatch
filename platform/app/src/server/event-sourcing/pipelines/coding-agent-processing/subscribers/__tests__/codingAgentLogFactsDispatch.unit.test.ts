@@ -5,8 +5,9 @@
  * @see specs/coding-agent/session-aggregate.feature
  * @see specs/coding-agent/session-git-context.feature
  */
+
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "~/server/event-sourcing";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../../log-processing/schemas/events";
 import type { ContributeLogFactsCommandData } from "../../schemas/commands";

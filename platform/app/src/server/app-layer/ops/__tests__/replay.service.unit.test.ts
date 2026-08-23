@@ -1,6 +1,6 @@
+import type { ReplayProgress } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
 import { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "../replay.service";
 import {
   IDLE_STATUS,

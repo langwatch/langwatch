@@ -1,5 +1,9 @@
-import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
-import type { Command, CommandHandler } from "../../../commands/command";
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "@langwatch/eventing";
 import {
   type ContributeLogFactsCommandData,
   contributeLogFactsCommandDataSchema,

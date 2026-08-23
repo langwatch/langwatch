@@ -1,15 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import type { AgentService } from "@langwatch/agents-contract";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
-import type { PrismaClient } from "~/generated/prisma/client";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import {
-  AgentRepository,
-  type AgentRepository as AgentRepositoryType,
-} from "../../agents/agent.repository";
 import {
   buildTemplateContext,
   mergePropagationHeaders,
@@ -38,7 +34,7 @@ function safeOrigin(url: string): string {
 interface HttpAgentAdapterParams {
   agentId: string;
   projectId: string;
-  agentRepository: AgentRepositoryType;
+  agentRepository: Pick<AgentService, "getById">;
 }
 
 /**
@@ -50,7 +46,7 @@ export class HttpAgentAdapter extends AgentAdapter {
 
   private readonly agentId: string;
   private readonly projectId: string;
-  private readonly agentRepository: AgentRepositoryType;
+  private readonly agentRepository: Pick<AgentService, "getById">;
 
   constructor({ agentId, projectId, agentRepository }: HttpAgentAdapterParams) {
     super();
@@ -58,22 +54,6 @@ export class HttpAgentAdapter extends AgentAdapter {
     this.agentId = agentId;
     this.projectId = projectId;
     this.agentRepository = agentRepository;
-  }
-
-  static create({
-    agentId,
-    projectId,
-    prisma,
-  }: {
-    agentId: string;
-    projectId: string;
-    prisma: PrismaClient;
-  }): HttpAgentAdapter {
-    return new HttpAgentAdapter({
-      agentId,
-      projectId,
-      agentRepository: new AgentRepository(prisma),
-    });
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -140,7 +120,7 @@ export class HttpAgentAdapter extends AgentAdapter {
   }
 
   private async fetchAgentConfig(): Promise<HttpComponentConfig> {
-    const agent = await this.agentRepository.findById({
+    const agent = await this.agentRepository.getById({
       id: this.agentId,
       projectId: this.projectId,
     });

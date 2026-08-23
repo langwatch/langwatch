@@ -47,17 +47,18 @@ vi.hoisted(() => {
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
+import {
+  EventSourcing,
+  InMemoryProcessStore,
+  mapCommands,
+} from "@langwatch/eventing";
 import http from "http";
 import { nanoid } from "nanoid";
 import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
-
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import { mapCommands } from "~/server/event-sourcing/mapCommands";
-import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -97,12 +98,11 @@ async function pullThroughTheRealPipeline(params: {
 }): Promise<{ nextCursor: string | null; eventCount: number }> {
   const eventSourcing = new EventSourcing({
     processStore: new InMemoryProcessStore(),
-    redis: null,
     // Consumers only run for a worker role, and the outbox dispatcher IS the
     // step under test — without this the intent would sit pending forever and
     // the ledger assertions would fail for a reason that has nothing to do
     // with the adapter.
-    processRole: "all",
+    executionTarget: "all",
   });
   try {
     const pipeline = eventSourcing.register(

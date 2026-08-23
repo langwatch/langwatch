@@ -1,6 +1,10 @@
-import { definePipeline } from "../../";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import {
   CancelRunCommand,
   DeleteRunCommand,
@@ -25,11 +29,8 @@ import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
 } from "./projections/simulationRunState.foldProjection";
+import { SIMULATION_PROCESSING_EVENT_TYPES } from "./schemas/constants";
 import type { SimulationProcessingEvent } from "./schemas/events";
-import {
-  type CustomerIoSimulationSyncSubscriberDeps,
-  createCustomerIoSimulationSyncSubscriber,
-} from "./subscribers/customerIoSimulationSync.subscriber";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
@@ -55,7 +56,6 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
-  customerIoSimulationSync?: CustomerIoSimulationSyncSubscriberDeps;
 }
 
 /**
@@ -74,7 +74,7 @@ export interface SimulationProcessingPipelineDeps {
  *   metrics_computed event (metrics are computed upstream by
  *   ComputeRunMetricsCommand and carried on the event).
  * - Subscribers own side effects (SSE broadcast, suite-run sync, trace
- *   metrics pull, Customer.io sync) from event payloads only.
+ *   metrics pull) from event payloads only.
  * - The simulationRunExecution process manager owns the execution
  *   lifecycle: dispatch to the worker pool, cancellation broadcast with a
  *   force-terminal backstop, and the stall watchdog.
@@ -90,46 +90,39 @@ export interface SimulationProcessingPipelineDeps {
 export function createSimulationProcessingPipeline(
   deps: SimulationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<SimulationProcessingEvent>()
-    .withName("simulation_processing")
-    .withAggregateType("simulation_run")
-    .withFoldProjection(
-      "simulationRunState",
+  return definePipeline<SimulationProcessingEvent>({
+    name: "simulation_processing",
+    aggregate: defineAggregate({
+      type: "simulation_run",
+      events: defineEvents(SIMULATION_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new SimulationRunStateFoldProjection({
         store: deps.simulationRunStore,
       }),
     )
-    .withMapProjection(
-      "simulationRunMetrics",
+    .withClickHouseMapProjection(
       new SimulationRunMetricsMapProjection({
         store: deps.simulationRunMetricsStore,
       }),
     )
-    .withSubscriber(
+    .withEventSubscriber(
       "snapshotUpdateBroadcast",
       createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
     )
-    .withSubscriber(
+    .withEventSubscriber(
       "suiteRunSync",
       createSuiteRunSyncSubscriber(deps.suiteRunSync),
     )
-    .withSubscriber(
+    .withEventSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
     .withProcessManager(
       SIMULATION_RUN_EXECUTION_PROCESS_NAME,
       simulationRunExecutionPM(deps.simulationRunExecution),
-    );
-
-  if (deps.customerIoSimulationSync) {
-    builder = builder.withSubscriber(
-      "customerIoSimulationSync",
-      createCustomerIoSimulationSyncSubscriber(deps.customerIoSimulationSync),
-    );
-  }
-
-  return builder
+    )
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)

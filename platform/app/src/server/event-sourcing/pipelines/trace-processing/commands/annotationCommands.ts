@@ -1,4 +1,4 @@
-import { defineCommand } from "../../../commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   ADD_ANNOTATION_COMMAND_TYPE,
   ANNOTATION_ADDED_EVENT_TYPE,

@@ -24,20 +24,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import type { EvaluationReportedEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { LocalFilesystemDriver } from "~/server/stored-objects/local-filesystem-driver";
 import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";

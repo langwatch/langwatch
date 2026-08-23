@@ -15,11 +15,11 @@ async function metricValue(
   );
 }
 
+import type { IntentContext } from "@langwatch/eventing";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
 } from "~/server/app-layer/topic-clustering/clustering-error";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { createTopicClusteringRunHandler } from "../topicClusteringIntentHandlers";
 import type { TopicClusteringRunIntent } from "../topicClusteringProcess.types";

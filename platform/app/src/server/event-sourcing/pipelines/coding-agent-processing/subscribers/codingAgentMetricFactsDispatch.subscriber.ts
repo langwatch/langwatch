@@ -1,5 +1,5 @@
+import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../metric-processing/schemas/constants";
 import type { MetricProcessingEvent } from "../../metric-processing/schemas/events";

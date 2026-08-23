@@ -1,9 +1,5 @@
+import type { IntentContext, IntentExecutor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-
-import type {
-  IntentContext,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   incrementIngestionPullTotal,
   observeIngestionPullDuration,

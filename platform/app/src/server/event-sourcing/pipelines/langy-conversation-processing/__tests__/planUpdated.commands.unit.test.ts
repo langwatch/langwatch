@@ -10,8 +10,9 @@
  *
  * @see specs/langy/langy-plan-progress.feature
  */
+
+import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TenantId } from "../../../domain/tenantId";
 import { UpdatePlanCommand } from "../commands";
 
 const TENANT = "project-1";

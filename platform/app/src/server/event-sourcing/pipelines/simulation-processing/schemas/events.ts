@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
-import { EventSchema } from "../../../domain/types";
+import { EventSchema } from "@langwatch/eventing";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,

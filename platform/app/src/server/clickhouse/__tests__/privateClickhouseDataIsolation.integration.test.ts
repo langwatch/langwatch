@@ -14,7 +14,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
-import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
+import type { EventRecord } from "@langwatch/eventing";
 import {
   privateRouteOrgId,
   startTestClickHouseEndpoints,
@@ -297,9 +297,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
   afterAll(async () => {
     // Clean up clickhouseClient caches
-    const { clearCustomClientCache, clearTenantOrgCache } = await import(
-      "../clickhouseClient"
-    );
+    const { clearCustomClientCache, clearTenantOrgCache } =
+      await import("../clickhouseClient");
     await clearCustomClientCache();
     clearTenantOrgCache();
 
@@ -330,9 +329,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
    * and throws if the client is null (mirrors production wiring).
    */
   async function buildResolver(): Promise<ClickHouseClientResolver> {
-    const { getClickHouseClientForTenant } = await import(
-      "../clickhouseClient"
-    );
+    const { getClickHouseClientForTenant } =
+      await import("../clickhouseClient");
     return async (tenantId: string) => {
       const client = await getClickHouseClientForTenant(tenantId);
       if (!client) {
@@ -348,9 +346,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     describe("when inserting events for a private-CH org", () => {
       /** @scenario Events for a private-CH org are stored in the private instance */
       it("stores events in the private instance only", async () => {
-        const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
-        );
+        const { EventRepositoryClickHouse } =
+          await import("~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse");
         const resolver = await buildResolver();
         const repo = new EventRepositoryClickHouse(resolver);
 
@@ -371,9 +368,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
     describe("when inserting events for a shared-CH org", () => {
       it("stores events in the shared instance only", async () => {
-        const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
-        );
+        const { EventRepositoryClickHouse } =
+          await import("~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse");
         const resolver = await buildResolver();
         const repo = new EventRepositoryClickHouse(resolver);
 
@@ -394,9 +390,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     describe("when inserting a span for a private-CH org", () => {
       /** @scenario Spans for a private-CH org go to the private instance only */
       it("stores the span in the private instance only", async () => {
-        const { SpanStorageClickHouseRepository } = await import(
-          "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository"
-        );
+        const { SpanStorageClickHouseRepository } =
+          await import("~/server/app-layer/traces/repositories/span-storage.clickhouse.repository");
         const resolver = await buildResolver();
         const repo = new SpanStorageClickHouseRepository(resolver);
 
@@ -422,9 +417,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
       /** @scenario Spans for a shared-CH org go to the shared instance only */
       /** @scenario Concurrent writes for different orgs route correctly */
       it("routes each write to the correct container", async () => {
-        const { SpanStorageClickHouseRepository } = await import(
-          "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository"
-        );
+        const { SpanStorageClickHouseRepository } =
+          await import("~/server/app-layer/traces/repositories/span-storage.clickhouse.repository");
         const resolver = await buildResolver();
         const repo = new SpanStorageClickHouseRepository(resolver);
 

@@ -1,4 +1,4 @@
-import { defineCommand } from "../../../commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   CHANGE_TRACE_NAME_COMMAND_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,

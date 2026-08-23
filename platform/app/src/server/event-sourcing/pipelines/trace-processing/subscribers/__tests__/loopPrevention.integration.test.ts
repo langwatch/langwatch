@@ -37,6 +37,12 @@
  *      check (emergency rollback path).
  */
 
+import type { EventSourcing } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import type {
@@ -48,22 +54,20 @@ import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repos
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import { makeQueueName } from "~/server/queues/makeQueueName";
-import type { AggregateType } from "../../../..";
-import { definePipeline } from "../../../..";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
 } from "../../../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
+  createTestEventSourcing,
   createTestTenantId,
   getTenantIdString,
 } from "../../../../__tests__/integration/testHelpers";
-import { EventSourcing } from "../../../../eventSourcing";
-import { EventStoreClickHouse } from "../../../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../../stores/repositories/eventRepositoryClickHouse";
 import type { ExecuteEvaluationCommandData } from "../../../evaluation-processing/schemas/commands";
 import { AssignTopicCommand } from "../../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../../commands/recordSpanCommand";
@@ -71,6 +75,7 @@ import { SpanStorageMapProjection } from "../../projections/spanStorage.mapProje
 import { SpanAppendStore } from "../../projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
+import { TRACE_PROCESSING_EVENT_TYPES } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import { createEvaluationTriggerSubscriber } from "../evaluationTrigger.subscriber";
@@ -252,11 +257,9 @@ describe.skipIf(!hasTestcontainers)(
       const eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(async () => clickHouseClient),
       );
-      eventSourcing = EventSourcing.createWithStores({
+      eventSourcing = createTestEventSourcing({
         eventStore,
-        clickhouse: async () => clickHouseClient,
         redis: redisConnection,
-        processRole: "worker",
       });
 
       const spanAppendStore = new SpanAppendStore(
@@ -284,23 +287,40 @@ describe.skipIf(!hasTestcontainers)(
       const fastSpec = { ...realSubscriber.spec, delay: 0 };
 
       const pipelineName = `trace_loop_prevention_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const pipelineDef = definePipeline<TraceProcessingEvent>()
-        .withName(pipelineName)
-        .withAggregateType("trace" as AggregateType)
-        .withFoldProjection(
-          "traceSummary",
+      const pipelineDef = definePipeline<TraceProcessingEvent>({
+        name: pipelineName,
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
+        }),
+      })
+        .withClickHouseFoldProjection(
           new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
         )
-        .withMapProjection(
-          "spanStorage",
+        .withClickHouseMapProjection(
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withSubscriber("evaluationTrigger", fastSpec as any)
-        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
-        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
-        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
-        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
-        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
+        .withProjectionSubscriber("evaluationTrigger", fastSpec as any)
+        .withProjectionSubscriber(
+          "customEvaluationSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "traceUpdateBroadcast",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "simulationMetricsSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "projectMetadata",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "spanStorageBroadcast",
+          noopMapSubscriber() as any,
+        )
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();

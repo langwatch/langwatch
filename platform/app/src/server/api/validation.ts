@@ -3,9 +3,9 @@
  *
  * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
  *
- * `@hono/zod-validator` does not THROW when a request fails its schema — it
- * *returns* `c.json(result, 400)`, where `result` is zod's `safeParse` output
- * serialised whole. Two things follow, and both are bad:
+ * The Standard Schema validator does not throw when a request fails its
+ * schema; without a hook it returns the validation result directly. Two things
+ * follow, and both are bad:
  *
  *   1. The route's `onError` never runs, so `handleError` never sees it. Every
  *      other failure at this boundary is a `HandledError` with a code, a status
@@ -20,9 +20,8 @@
  *      a paragraph listing every permitted value inline, which then gets
  *      truncated on its way to the model — losing the only part worth having.
  *
- * So this wrapper installs the hook zod-validator always accepted and nobody
- * passed: on failure it THROWS a typed error, and the ordinary boundary
- * machinery takes it from there.
+ * This wrapper installs the validation hook and throws a typed error on
+ * failure, so the ordinary boundary machinery takes it from there.
  *
  * ── THE SHAPE ──────────────────────────────────────────────────────────────
  *
@@ -323,7 +322,7 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
 /**
  * A request validator that fails the way the rest of the boundary fails.
  *
- * A drop-in for `hono-openapi/zod`'s `validator`: it takes the same arguments,
+ * A drop-in for `hono-openapi`'s `validator`: it takes the same arguments,
  * carries the OpenAPI metadata the spec generator reads, and — because it is
  * declared AS that function's own type — preserves its inference exactly, so
  * `c.req.valid("json")` stays typed at every call site. Restating that

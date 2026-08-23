@@ -10,7 +10,7 @@
  * invariant in lean-for-projection.unit.test.ts + replay-projection-parity.integration.test.ts.
  */
 
-import type { Event } from "~/server/event-sourcing";
+import type { Event } from "@langwatch/eventing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,

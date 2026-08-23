@@ -97,13 +97,16 @@ export const systemMigrationsService = new SystemMigrationsService({
  * without the event-sourcing stack refuses loudly, and the migration then
  * parks its organization with an honest report.
  */
-export function registeredMigrations(): SystemMigration[] {
+export function registeredMigrations(
+  additionalMigrations: readonly SystemMigration[] = [],
+): SystemMigration[] {
   return [
     new AuthzEngineMigration({
       store: new PrismaAuthzMigrationRepository(prisma),
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
+    ...additionalMigrations,
   ];
 }
 
@@ -280,6 +283,7 @@ export async function runSystemMigrationTargetedPass({
 
 export async function runSystemMigrationPass(args?: {
   signal?: AbortSignal;
+  additionalMigrations?: readonly SystemMigration[];
   /**
    * The process's Redis handle. Pass it when the App is still being composed
    * - `tryGetApp()` answers null until then, and a null handle makes the
@@ -295,7 +299,7 @@ export async function runSystemMigrationPass(args?: {
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaOrganizationTenantSource(prisma),
     cohort: await migrationPassCohort(),
-    migrations: registeredMigrations().filter((migration) =>
+    migrations: registeredMigrations(args?.additionalMigrations).filter((migration) =>
       migrationRunsOnThisInstallation({
         isSaaS: env.IS_SAAS === true,
         runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,

@@ -1554,9 +1554,8 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     it("correctly handles real payload format with chat_messages and input fields", async () => {
       // This test uses the EXACT format from a real frontend request
       // Including the transposeColumnsFirstToRowsFirstWithId and JSON parsing steps
-      const { transposeColumnsFirstToRowsFirstWithId } = await import(
-        "~/optimization_studio/utils/datasetUtils"
-      );
+      const { transposeColumnsFirstToRowsFirstWithId } =
+        await import("~/optimization_studio/utils/datasetUtils");
 
       const datasetColumns: DatasetColumn[] = [
         { id: "input_0", name: "input", type: "string" },
@@ -1680,10 +1679,10 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       };
 
       // Import the HTTP agent service to create a mock agent
-      const { AgentService } = await import("~/server/agents/agent.service");
+      const { AgentsFeature } = await import("~/runtime/app/features/agents");
       const { prisma } = await import("~/server/db");
       const { nanoid } = await import("nanoid");
-      const agentService = AgentService.create(prisma);
+      const agentService = AgentsFeature.create({ prisma, session: null });
 
       // Create a temporary HTTP agent for this test
       const agent = await agentService.create({
@@ -1748,7 +1747,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(doneEvent?.type).toBe("done");
       } finally {
         // Clean up agent
-        await agentService.softDelete({ id: agent.id, projectId: project.id });
+        await agentService.archive({ id: agent.id, projectId: project.id });
       }
     }, 60000);
 

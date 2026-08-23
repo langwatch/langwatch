@@ -1,12 +1,18 @@
-import type { AggregateType } from "../../";
-import { createTenantId, definePipeline } from "../../";
-import { EventSourcing } from "../../eventSourcing";
-import type {
-  PipelineWithCommandHandlers,
-  RegisteredPipeline,
-} from "../../pipeline/types";
-import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
+import {
+  createEventingGroupQueueFactory,
+  createTenantId,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  EventSourcing,
+  type EventStore,
+  type ExecutionTarget,
+  type PipelineWithCommandHandlers,
+  type RegisteredPipeline,
+} from "@langwatch/eventing";
+import type IORedis from "ioredis";
+import { EventRepositoryClickHouse } from "../../adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "../../adapters/clickhouse/eventStoreClickHouse";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -14,6 +20,7 @@ import {
 } from "./testContainers";
 import type { TestProjection } from "./testPipelines";
 import {
+  TEST_EVENT_TYPE,
   TestCommandHandler,
   testFoldProjection,
   testMapProjection,
@@ -41,6 +48,27 @@ export async function closePipelineGracefully(pipeline: {
  */
 export function generateTestAggregateId(prefix = "test-aggregate"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function createTestEventSourcing({
+  eventStore,
+  redis,
+  consumersEnabled = true,
+  executionTarget = consumersEnabled ? "worker" : "web",
+}: {
+  eventStore: EventStore;
+  redis: IORedis;
+  consumersEnabled?: boolean;
+  executionTarget?: ExecutionTarget;
+}): EventSourcing {
+  return new EventSourcing({
+    eventStore,
+    queueFactory: createEventingGroupQueueFactory({
+      dependencies: { redis },
+      consumersEnabled,
+    }),
+    executionTarget,
+  });
 }
 
 /**
@@ -81,21 +109,23 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
-  const eventSourcing = EventSourcing.createWithStores({
+  const eventSourcing = createTestEventSourcing({
     eventStore,
-    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
-    processRole: "worker",
   });
 
   // Build pipeline using static definition
   // Using test aggregate type (now included in production schemas)
-  const pipelineDefinition = definePipeline<any>()
-    .withName(pipelineName)
-    .withAggregateType("test_aggregate" as AggregateType)
+  const pipelineDefinition = definePipeline<any>({
+    name: pipelineName,
+    aggregate: defineAggregate({
+      type: "test_aggregate",
+      events: defineEvents([TEST_EVENT_TYPE] as const),
+    }),
+  })
     .withCommand("testCommand", TestCommandHandler as any)
-    .withMapProjection("testHandler", testMapProjection as any)
-    .withFoldProjection("testProjection", testFoldProjection as any)
+    .withClickHouseMapProjection(testMapProjection as any)
+    .withClickHouseFoldProjection(testFoldProjection as any)
     .build();
 
   const pipeline = eventSourcing.register(pipelineDefinition);

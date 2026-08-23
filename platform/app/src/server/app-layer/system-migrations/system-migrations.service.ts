@@ -5,6 +5,7 @@ import type {
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import {
+  MigrationDrainProofRequiresMigratedError,
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
@@ -627,6 +628,57 @@ export class SystemMigrationsService {
       // retries either way.
       logger.error({ error }, "operator-kicked migration pass failed");
     });
+  }
+
+  /**
+   * Records the deployment fact that no legacy-only Stored Objects writer can
+   * create bytes after reconciliation. The proof lives in the existing
+   * migration report, not in another domain table.
+   */
+  async assertLegacyWritersDrained({
+    migrationName,
+    tenantId,
+    minimumWriterGeneration,
+    actorUserId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+    minimumWriterGeneration: string;
+    actorUserId: string;
+  }): Promise<void> {
+    const record = await this.deps.state.findRecord({ migrationName, tenantId });
+    if (!record) throw new MigrationStateNotFoundError();
+    if (record.status !== "migrated") {
+      throw new MigrationDrainProofRequiresMigratedError({
+        status: record.status,
+      });
+    }
+    const priorReport =
+      record.report != null && typeof record.report === "object"
+        ? (record.report as Record<string, unknown>)
+        : {};
+    const assertedAt = new Date().toISOString();
+    await this.deps.state.upsertRecord({
+      ...record,
+      report: {
+        ...priorReport,
+        legacyWriterDrainProof: {
+          minimumWriterGeneration,
+          assertedAt,
+          actorUserId,
+        },
+      },
+    });
+    logger.warn(
+      {
+        migrationName,
+        tenantId,
+        minimumWriterGeneration,
+        actorUserId,
+        assertedAt,
+      },
+      "operator asserted that legacy-only writers are drained",
+    );
   }
 
   /**

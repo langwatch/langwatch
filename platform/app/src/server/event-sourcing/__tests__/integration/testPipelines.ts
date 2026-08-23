@@ -1,24 +1,21 @@
-import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
 import {
   type AggregateType,
+  type AppendStore,
+  type Command,
+  type CommandHandler,
   createTenantId,
   defineCommandSchema,
   type EventType,
   EventUtils,
-} from "../../";
-import type { Command, CommandHandler } from "../../commands/command";
-import type { TenantId } from "../../domain/tenantId";
-import type { Projection } from "../../domain/types";
-import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "../../projections/foldProjection.types";
-import type {
-  AppendStore,
-  MapProjectionDefinition,
-} from "../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
+  type FoldProjectionDefinition,
+  type FoldProjectionStore,
+  type MapProjectionDefinition,
+  type Projection,
+  type ProjectionStoreContext,
+  type TenantId,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 import { getTestClickHouseClient } from "./testContainers";
 
 const logger = createLogger(

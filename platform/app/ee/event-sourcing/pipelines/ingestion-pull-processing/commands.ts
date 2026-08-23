@@ -1,4 +1,4 @@
-import { defineCommand } from "~/server/event-sourcing/commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   INGESTION_PULL_COMMAND_TYPES,
   INGESTION_PULL_EVENT_TYPES,

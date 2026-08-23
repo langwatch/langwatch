@@ -1,4 +1,4 @@
-import { compareOrdinal } from "../../../utils/compareOrdinal";
+import { compareOrdinal } from "@langwatch/eventing";
 import type {
   OtlpAnyValue,
   OtlpKeyValue,

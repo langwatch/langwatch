@@ -137,7 +137,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 ## Consequences
 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
-- **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output.
+- **Shared templating module** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any subscriber or intent executor that needs customer-customizable output.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
 - **Operator-facing surfaces** (ADR-037):
   - Split-pane editor with live preview (Monaco + Liquid mode).
@@ -150,7 +150,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
+- [ADR-052](./052-automations-on-process-manager-substrate.md) — outbox dispatch is the renderer's caller
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
 - [ADR-037](./037-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)

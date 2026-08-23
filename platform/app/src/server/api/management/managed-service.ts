@@ -7,16 +7,17 @@
  * against) and the enforcement chain that actually refuses requests. The
  * `guard(permission)` helper returns both halves from the same permission, and
  * `onRouteMounted` registers the policy for every mount the framework creates:
- * each dated version, `latest`, the bare alias, withdrawn 410 tombstones (their
- * inherited config carries the meta), and the two version-namespace guards.
+ * each dated version, `latest`, withdrawn 410 tombstones (their inherited
+ * config carries the meta), and the two version-namespace guards.
  *
  * The non-wildcard namespace guard is a real, enumerable route in the Hono
  * route table, so it MUST be policy-registered or the authorization test fails;
  * it is registered as a public endpoint with the reason written out, because it
  * serves nothing but a 404 for unknown version segments.
  */
-import { createService, type MountedRoute } from "@langwatch/api";
+import { createService, type MountedRoute, type RouteChain } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz";
+
 import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
@@ -43,8 +44,8 @@ export interface ManagementEndpointMeta {
 
 /**
  * A versioned management service with org-key auth in throw mode and a
- * policy-registering mount callback. Use the returned `guard(permission)` on
- * EVERY endpoint:
+ * policy-registering mount callback. Apply the returned `guard(permission)`
+ * on EVERY endpoint, at the head of its definition chain:
  *
  * ```ts
  * const { service, guard } = createManagementService({
@@ -53,9 +54,11 @@ export interface ManagementEndpointMeta {
  *   feature: "RBAC",
  * });
  *
- * service.version(MANAGEMENT_API_VERSION, (v) => {
- *   v.get("/", { ...guard("organization:manage"), output, description, docs }, handler);
- * });
+ * service.registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+ *   guard("organization:manage")(b)
+ *     .withOutput(roleListSchema)
+ *     .withDocs({ operationId: "listRoles", tags: ["Roles"] }),
+ * );
  * ```
  *
  * The enforcement order is fixed: org auth (service-level, throws
@@ -83,21 +86,19 @@ export function createManagementService({
     basePath,
     middleware: [appContextMiddleware],
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
-    // The framework mounts this for every endpoint that declares a
-    // `permission`, between auth and the endpoint's own middleware. The
-    // enforcement runs through the App-composed permissions service
-    // (`requireOrgPermissionOrThrow` → `getApp().permissions`), and because
-    // the framework owns the mounting, an endpoint's `middleware` array can
-    // no longer displace the check its declared policy promises.
     permissionEnforcer: (permission) => requireOrgPermissionOrThrow(permission),
     onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
-  const guard = (permission: AuthzPermission) => ({
-    meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
-    permission,
-    middleware: [requireEnterprisePlanRest(feature)],
-  });
+  const guard =
+    (permission: AuthzPermission) =>
+    (b: RouteChain): RouteChain =>
+      b
+        .withPermission(permission)
+        .withMeta({
+          policy: requires(permission),
+        } satisfies ManagementEndpointMeta)
+        .withMiddleware(requireEnterprisePlanRest(feature));
 
   return { service, guard };
 }
@@ -105,9 +106,8 @@ export function createManagementService({
 /**
  * Puts one mount in the route-policy registry, refusing to classify a route
  * that never declared a policy. Every mount the framework creates arrives
- * here: each dated version, `latest`, the bare alias, withdrawn 410 tombstones
- * (their inherited config carries the meta), and the two version-namespace
- * guards.
+ * here: each dated version, `latest`, withdrawn 410 tombstones (their
+ * inherited config carries the meta), and the two version-namespace guards.
  */
 function registerMountedRoute({
   route,
@@ -116,11 +116,15 @@ function registerMountedRoute({
   route: MountedRoute;
   family: string;
 }): void {
-  if (route.isNamespaceGuard) {
+  if (route.isNamespaceGuard || route.isDiscoverEndpoint) {
     const policy = publicEndpoint(
-      "version-namespace guard: answers 404 for unknown version segments " +
-        "so they cannot fall through to a dynamic unversioned route; " +
-        "reads no data and takes no credential",
+      route.isDiscoverEndpoint
+        ? "rpc.discover catalogue: serves the service's own operation index " +
+            "and the same information the published document carries, no tenant " +
+            "data, no credential"
+        : "version-namespace guard: answers 404 for unknown version segments " +
+            "so they cannot fall through to a dynamic route; " +
+            "reads no data and takes no credential",
     );
     registerRoutePolicy({
       method: route.method,
@@ -136,13 +140,10 @@ function registerMountedRoute({
   if (!meta?.policy) {
     throw new Error(
       `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
-        `declares no access policy; spread guard(permission) into its ` +
-        `endpoint config`,
+        `declares no access policy; apply guard(permission) at the head of ` +
+        `its definition chain`,
     );
   }
-  // The registry must never promise a check the pipeline does not mount: a
-  // permission policy in `meta` is only honest when the SAME permission is on
-  // `config.permission`, which is what the framework enforces from.
   if (
     meta.policy.kind === "permission" &&
     route.config?.permission !== meta.policy.permission

@@ -1,5 +1,5 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "./constants";
 import { canonicalMetricDataPointSchema } from "./metricDataPoint";
 

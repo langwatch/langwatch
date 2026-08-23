@@ -7,6 +7,8 @@
  *
  * @see specs/coding-agent/session-aggregate.feature
  */
+
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
@@ -15,7 +17,6 @@ import {
   serializeAttributes,
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { createTenantId } from "~/server/event-sourcing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
 import {
   makeSpanReferencedPayload,

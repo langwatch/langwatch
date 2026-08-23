@@ -1,7 +1,6 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
-import { EventSchema } from "~/server/event-sourcing/domain/types";
 import {
   INGESTION_PULL_EVENT_TYPES,
   INGESTION_PULL_EVENT_VERSIONS,

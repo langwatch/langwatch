@@ -19,8 +19,8 @@ vi.mock("~/server/posthog", () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
 
+import type { TriggerContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createProjectMetadataHandler,

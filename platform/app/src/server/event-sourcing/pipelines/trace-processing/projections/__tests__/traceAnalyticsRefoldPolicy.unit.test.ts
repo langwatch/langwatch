@@ -1,7 +1,6 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
@@ -22,7 +21,7 @@ import { MAX_PROCESSED_SPANS } from "../traceSummary.foldProjection";
  * Spans are distributed and arrive in any order, so an earlier span is simply
  * folded when it arrives and the event log is never re-read.
  *
- * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+ * See specs/trace-processing/hot-trace-fold-amplification.feature.
  */
 
 const TENANT_ID = createTenantId("project-1");

@@ -1,10 +1,9 @@
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { Projection } from "../../../";
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+} from "@langwatch/eventing";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   EvaluationCompletedEvent,

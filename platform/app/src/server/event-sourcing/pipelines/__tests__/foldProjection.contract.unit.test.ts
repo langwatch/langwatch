@@ -1,8 +1,10 @@
+import type {
+  AggregateType,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "@langwatch/eventing";
+import { createMockFoldProjectionStore } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
-import { createMockFoldProjectionStore } from "../../services/__tests__/testHelpers";
-import { TIME_LOCAL_AGGREGATE_TYPES } from "../../stores/rehydrationWindow";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -25,7 +27,7 @@ import { TraceSummaryFoldProjection } from "../trace-processing/projections/trac
 
 /**
  * Aggregate type each fold is registered under — mirrors the
- * `.withAggregateType(...)` binding in the pipeline definitions
+ * aggregate binding in the pipeline definitions
  * (trace-processing/pipeline.ts, evaluation-processing/pipeline.ts). If a
  * registration moves, move it here too; the point of the duplication is that
  * this file fails when someone re-binds a trusted fold to a type whose

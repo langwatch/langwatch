@@ -1,6 +1,6 @@
+import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
-import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";
 
@@ -32,7 +32,10 @@ export interface SnapshotUpdateBroadcastSubscriberDeps {
  */
 export function createSnapshotUpdateBroadcastSubscriber(
   deps: SnapshotUpdateBroadcastSubscriberDeps,
-): SubscriberSpec<SimulationProcessingEvent> {
+): SubscriberSpec<SimulationProcessingEvent> & {
+  fold?: never;
+  map?: never;
+} {
   return {
     events: [
       SIMULATION_RUN_EVENT_TYPES.QUEUED,

@@ -41,8 +41,8 @@ The design space had four hard constraints:
    instance-local state. Reconciler-style logic on the cluster must be
    idempotent.
 
-The orphan-cleanup half of this — PG rows referencing CH traces that TTL
-deletes — has a distinct enough shape that it gets its own ADR (ADR-023).
+Postgres rows that reference ClickHouse traces may outlive those traces. ADR-025
+defines the deliberate policy: no ingestion-coupled orphan sweeper.
 
 ## Decision
 
@@ -310,7 +310,7 @@ lingers as a stale reference. Acceptable given expected pin volume.
 
 ## References
 
-- Related ADRs: ADR-023 (orphan-sweep reactor + chain — superseded),
+- Related ADRs: ADR-025 (orphan sweep removed),
   ADR-025 (orphan sweep removed), ADR-019 (repository-service layering)
 - Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `platform/app/src/server/data-retention/`,

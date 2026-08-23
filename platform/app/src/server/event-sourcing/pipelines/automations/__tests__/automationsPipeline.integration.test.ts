@@ -1,3 +1,10 @@
+import {
+  createEventingGroupQueueFactory,
+  createTenantId,
+  EventSourcing,
+  InMemoryProcessStore,
+  mapCommands,
+} from "@langwatch/eventing";
 import type { Redis } from "ioredis";
 import {
   afterAll,
@@ -9,7 +16,6 @@ import {
   vi,
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
-
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -19,10 +25,6 @@ import {
   cleanupTestDataForTenant,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import { createTenantId } from "../../../domain/tenantId";
-import { EventSourcing } from "../../../eventSourcing";
-import { mapCommands } from "../../../mapCommands";
-import { InMemoryProcessStore } from "../../../process-manager/stores/inMemoryProcessStore";
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
@@ -76,7 +78,7 @@ describe("automations pipeline", () => {
     describe("when both physical events reach the process inbox", () => {
       it("records one logical event and consumes the match once", async () => {
         const processStore = new InMemoryProcessStore();
-        eventSourcing = new EventSourcing({ processStore, redis: null });
+        eventSourcing = new EventSourcing({ processStore });
         const pipeline = eventSourcing.register(
           createAutomationsPipeline(pipelineDeps()),
         );
@@ -110,7 +112,7 @@ describe("automations pipeline", () => {
     describe("when the later activity lands in a new settle window", () => {
       it("records and consumes a second evaluation round", async () => {
         const processStore = new InMemoryProcessStore();
-        eventSourcing = new EventSourcing({ processStore, redis: null });
+        eventSourcing = new EventSourcing({ processStore });
         const pipeline = eventSourcing.register(
           createAutomationsPipeline(pipelineDeps()),
         );
@@ -143,7 +145,7 @@ describe("automations pipeline", () => {
   });
 
   // ADR-066 pillar 2: recordTriggerMatch opts into append coalescing. This suite
-  // runs on the in-memory queue (redis: null), which processes one job at a time
+  // runs on the in-memory queue, which processes one job at a time
   // and does NOT coalesce — so the "N matches → fewer inserts" observable is
   // proven end-to-end at the GroupQueue layer (groupQueue.integration.test.ts,
   // scripts.integration.test.ts). Here we pin the adopter's opt-in and confirm
@@ -164,7 +166,7 @@ describe("automations pipeline", () => {
 
       it("records every match durably in FIFO order", async () => {
         const processStore = new InMemoryProcessStore();
-        eventSourcing = new EventSourcing({ processStore, redis: null });
+        eventSourcing = new EventSourcing({ processStore });
         const pipeline = eventSourcing.register(
           createAutomationsPipeline(pipelineDeps()),
         );
@@ -189,7 +191,7 @@ describe("automations pipeline", () => {
     describe("when commands and committed events are delivered", () => {
       it("keeps FIFO ordering through the trigger process", async () => {
         const processStore = new InMemoryProcessStore();
-        eventSourcing = new EventSourcing({ processStore, redis: null });
+        eventSourcing = new EventSourcing({ processStore });
         const pipeline = eventSourcing.register(
           createAutomationsPipeline(pipelineDeps()),
         );
@@ -219,7 +221,7 @@ describe("automations pipeline", () => {
   describe("given two triggers in one project match the same trace", () => {
     it("keeps their process-outbox identities isolated", async () => {
       const processStore = new InMemoryProcessStore();
-      eventSourcing = new EventSourcing({ processStore, redis: null });
+      eventSourcing = new EventSourcing({ processStore });
       const pipeline = eventSourcing.register(
         createAutomationsPipeline(pipelineDeps()),
       );
@@ -285,13 +287,15 @@ describe.skipIf(!hasRedis)(
       describe("when the coalescing consumer drains them", () => {
         it("stores every match in one multi-row call with distinct idempotency keys", async () => {
           const processStore = new InMemoryProcessStore();
-          // processRole "all" runs the worker so the GroupQueue consumer actually
-          // drains and coalesces; no clickhouse → the in-memory event store backs
-          // reads, and we spy on its multi-row write.
+          // The GroupQueue consumer drains and coalesces; the in-memory event
+          // store backs reads, and we spy on its multi-row write.
           const eventSourcing = new EventSourcing({
             processStore,
-            redis,
-            processRole: "all",
+            queueFactory: createEventingGroupQueueFactory({
+              dependencies: { redis },
+              consumersEnabled: true,
+            }),
+            executionTarget: "all",
           });
 
           try {

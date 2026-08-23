@@ -20,7 +20,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 

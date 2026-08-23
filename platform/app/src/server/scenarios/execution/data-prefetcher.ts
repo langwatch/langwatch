@@ -11,10 +11,12 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { Agent } from "@langwatch/agents-contract";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
@@ -37,10 +39,6 @@ import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
 import { decrypt } from "~/utils/encryption";
-import {
-  AgentRepository,
-  type TypedAgent,
-} from "../../agents/agent.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -131,7 +129,7 @@ export interface AgentFetcher {
   findById(params: {
     projectId: string;
     id: string;
-  }): Promise<TypedAgent | null>;
+  }): Promise<Agent | null>;
 }
 
 /**
@@ -961,10 +959,7 @@ async function fetchWorkflowAgentData({
 
   // workflowId can live on the Agent row or inside the DSL config. Prefer the
   // agent row (set when the agent was created by WorkflowSelectorDrawer).
-  const workflowId =
-    (agent as TypedAgent & { workflowId?: string | null }).workflowId ??
-    config.workflow_id ??
-    null;
+  const workflowId = agent.workflowId ?? config.workflow_id ?? null;
   if (!workflowId) return null;
 
   const latest = await workflowVersionFetcher.getLatestDsl({
@@ -1233,7 +1228,7 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
 export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
   const scenarioService = ScenarioService.create(prisma);
   const promptService = new PromptService(prisma);
-  const agentRepository = new AgentRepository(prisma);
+  const agentService = AgentsFeature.create({ prisma, session: null });
 
   return {
     scenarioFetcher: {
@@ -1260,7 +1255,7 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         promptService.getPromptByIdOrHandle(params),
     },
     agentFetcher: {
-      findById: (params) => agentRepository.findById(params),
+      findById: (params) => agentService.getById(params),
     },
     workflowVersionFetcher: {
       getLatestDsl: async ({ projectId, workflowId }) => {

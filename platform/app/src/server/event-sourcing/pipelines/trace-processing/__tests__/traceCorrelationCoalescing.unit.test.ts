@@ -11,14 +11,12 @@
  * trace-side pair is the same producer shape reached by the default key rather
  * than an explicit one.
  *
- * See specs/event-sourcing/producer-append-coalescing.feature.
+ * See packages/eventing/specs/producer-append-coalescing.feature.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../../domain/types";
-import { processCommandBatch } from "../../../services/commands/commandDispatcher";
-import type { JobRegistryEntry } from "../../../services/queues/queueManager";
-import { QueueManager } from "../../../services/queues/queueManager";
+import type { Event, JobRegistryEntry } from "@langwatch/eventing";
+import { processCommandBatch, QueueManager } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
 import { RecordLogContributionCommand } from "../commands/recordLogContributionCommand";
 import { RecordMetricCorrelationCommand } from "../commands/recordMetricCorrelationCommand";
 import { createTraceProcessingPipeline } from "../pipeline";
@@ -36,14 +34,6 @@ import {
   logContributionPayload,
   metricCorrelationPayload,
 } from "./support/traceProcessingFixtures";
-
-vi.mock("../../../utils/killSwitch", () => ({
-  isComponentDisabled: vi.fn().mockResolvedValue(false),
-}));
-
-import { isComponentDisabled } from "../../../utils/killSwitch";
-
-const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
 
 function registrationOf(commandName: string) {
   return createTraceProcessingPipeline(buildTraceDeps()).commands.find(
@@ -92,14 +82,6 @@ function metricBatchParamsFor({
 }
 
 describe("trace correlation append coalescing", () => {
-  beforeEach(() => {
-    mockedIsComponentDisabled.mockResolvedValue(false);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("given the trace-processing pipeline is defined", () => {
     describe("when the correlation commands are registered", () => {
       it("bounds a log contribution batch at the trace correlation bound", () => {
@@ -344,22 +326,6 @@ describe("trace correlation append coalescing", () => {
         expect(
           new Set((events as Event[]).map((event) => event.aggregateId)),
         ).toEqual(new Set([FIXTURE_TRACE_ID]));
-      });
-    });
-
-    describe("when the command is killed for the tenant", () => {
-      it("appends nothing for the whole batch", async () => {
-        mockedIsComponentDisabled.mockResolvedValue(true);
-        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          logContributionPayload({ index }),
-        );
-
-        await processCommandBatch(
-          logBatchParamsFor({ payloads, storeEventsFn }),
-        );
-
-        expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
   });

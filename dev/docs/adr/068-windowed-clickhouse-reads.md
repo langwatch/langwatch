@@ -6,7 +6,7 @@
 
 **Shipping with this ADR:** `queryWindowed` on the resilient ClickHouse client, one shared default window, and the `clickhouse_windowed_read_total{table, outcome}` counter — with all five hand-rolled window-and-fallback sites adopting it at byte-identical semantics. The token-bucket limiter on the widen path is the sequenced follow-up (below), gated on the metric data this change produces.
 
-**Builds on:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the same amplifier class (unbounded, cold-partition-walking ClickHouse reads on the per-item hot path) that took production down on 2026-07-23. ADR-066 closed it for *fold refolds*; this ADR closes the *ad-hoc windowed-read* face of it, and puts the surface that owns cold-scan detection in charge of the fallback.
+**Builds on:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the same amplifier class (unbounded, cold-partition-walking ClickHouse reads on the per-item hot path) that took production down on 2026-07-23. ADR-066 closed it for *fold refolds*; this ADR closes the *ad-hoc windowed-read* face of it, and puts the surface that owns cold-scan detection in charge of the fallback.
 
 **Relates to:** [ADR-034](./034-event-sourced-analytics-materialization.md) (analytics rollup reads are windowed adopters), [ADR-024](./024-cold-path-tiered-storage.md) (why an unbounded scan on a retention-managed table walks cold S3 partitions).
 
@@ -235,7 +235,7 @@ limit second (next change), with the measurement as the limiter's precondition.
 ## References
 
 - **Behavioural contract:** [specs/clickhouse/windowed-read-fallback.feature](../../../specs/clickhouse/windowed-read-fallback.feature)
-- [ADR-066](./066-projection-clickhouse-cached-store.md) — read-through fold store + append coalescing (the 2026-07-23 outage; this ADR closes the ad-hoc-windowed-read face of the same amplifier)
+- [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — read-through fold store + append coalescing (the 2026-07-23 outage; this ADR closes the ad-hoc-windowed-read face of the same amplifier)
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — analytics materialisation (its rollup reads are windowed adopters)
 - [ADR-024](./024-cold-path-tiered-storage.md) — cold-path tiered storage (why an unbounded scan walks cold S3 partitions)
 - `dev/docs/best_practices/clickhouse-queries.md` — partition-pruning and heavy-column read discipline

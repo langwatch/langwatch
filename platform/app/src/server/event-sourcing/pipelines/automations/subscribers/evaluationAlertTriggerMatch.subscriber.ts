@@ -1,3 +1,5 @@
+import type { FoldProjectionStore, TriggerContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   NOTIFY_TRIGGER_ACTIONS,
@@ -6,11 +8,8 @@ import {
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 const logger = createLogger(
   "langwatch:triggers:evaluation-alert-trigger-match-subscriber",

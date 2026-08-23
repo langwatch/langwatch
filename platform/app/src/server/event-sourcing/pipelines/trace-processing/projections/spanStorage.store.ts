@@ -1,11 +1,11 @@
-import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
-import type { SpanInsertData } from "~/server/app-layer/traces/types";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,
   BulkAppendContext,
-} from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedSpan } from "../schemas/spans";
 
 /**

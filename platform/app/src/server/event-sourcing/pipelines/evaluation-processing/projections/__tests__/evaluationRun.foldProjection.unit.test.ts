@@ -1,8 +1,7 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
-import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,

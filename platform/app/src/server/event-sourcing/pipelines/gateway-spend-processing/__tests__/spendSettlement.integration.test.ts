@@ -30,9 +30,7 @@ describe("settlement on the spend record (real ClickHouse)", () => {
       "../projections/gatewaySpend.store"
     );
     const { spendRowToEnvelope } = await import("@ee/webhooks/envelope");
-    const { EventUtils, createTenantId } = await import(
-      "~/server/event-sourcing"
-    );
+    const { EventUtils, createTenantId } = await import("@langwatch/eventing");
     const constants = await import("../schemas/constants");
 
     const containers = await startTestContainers();

@@ -1,8 +1,8 @@
 import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
+import type { StoredProjection } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { GuardParams } from "~/utils/dbGuardMiddleware";
 import { guardProjectId } from "~/utils/dbMultiTenancyProtection";
 import { PrismaIngestionPullRunProjectionRepository } from "../ingestion-pull-run-projection.prisma.repository";

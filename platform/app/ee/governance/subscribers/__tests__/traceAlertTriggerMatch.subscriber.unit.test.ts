@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { TriggerContext } from "@langwatch/eventing";
 import { register } from "prom-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";

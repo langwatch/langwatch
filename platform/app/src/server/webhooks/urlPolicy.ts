@@ -3,7 +3,7 @@ import {
   inspectWebhookUrlShape,
   type WebhookUrlProblem,
 } from "@langwatch/automations/providers/webhook";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/eventing";
 import {
   createSSRFValidator,
   isPrivateOrLocalhostIP,

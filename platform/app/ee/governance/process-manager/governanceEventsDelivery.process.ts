@@ -9,10 +9,14 @@ import {
   type WebhookDeliveryProcessDeps,
   webhookRetryDelayMs,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type {
+  IntentContext,
+  JsonValue,
+  NewOutboxMessage,
+  ProcessManagerApplier,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type {
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
@@ -22,8 +26,6 @@ import {
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
 import type { GovernanceEventsProcessingEvent } from "~/server/event-sourcing/pipelines/governance-events/schemas/events";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
-import type { NewOutboxMessage } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import {
   budgetCrossingToEnvelope,
   vkLifecycleToEnvelope,

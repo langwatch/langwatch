@@ -19,8 +19,8 @@
  *   1. the operation is described. `generateSpecs` skips a handler carrying no
  *      `describeRoute({...})`, so the annotation is the precondition, not a
  *      nicety. A `@langwatch/api` service writes no `describeRoute` of its own:
- *      the framework emits one from the endpoint config, and only when the
- *      config declares an `output` or a `description`
+ *      the framework emits one from the definition chain, and only when the
+ *      chain carries a `withOutput(...)` or a `withDocs(...)`
  *   2. the route's Hono app is imported by `src/tasks/generateOpenAPISpec.ts`
  *   3. its prefix is in that file's `APP_DERIVED_PREFIXES`, or the merge keeps
  *      whatever the JSON already said
@@ -51,6 +51,7 @@ import {
   honoPathToTemplate,
   importsApiFramework,
   joinRoutePath,
+  type RouteRegistration,
   serviceBasePathsOf,
 } from "./lib/hono-route-table";
 import { type Exclusion, UNPUBLISHED } from "./openapi-route-exclusions";
@@ -111,6 +112,20 @@ function declaredApiBasePaths(source: string): string[] {
   return declared;
 }
 
+/** Every `export const NAME = "YYYY-MM-DD"` in the scanned sources. */
+function dateConstantsOf(files: string[]): Map<string, string> {
+  const constants = new Map<string, string>();
+  const pattern = /export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*"(20\d{2}-\d{2}-\d{2})"/g;
+
+  for (const file of files) {
+    for (const match of readFileSync(file, "utf8").matchAll(pattern)) {
+      constants.set(match[1]!, match[2]!);
+    }
+  }
+
+  return constants;
+}
+
 /**
  * The `/api` basePaths a file's routes are served under.
  *
@@ -155,8 +170,22 @@ function basePathsFor({
 export function collectRegisteredRoutes(
   roots: readonly string[],
 ): RegisteredRoute[] {
-  return discoverTypeScriptFiles(roots).flatMap((file) =>
-    routesRegisteredIn({ file, source: readFileSync(file, "utf8") }),
+  const files = discoverTypeScriptFiles(roots);
+  // Version constants live outside the handler roots by design —
+  // `MANAGEMENT_API_VERSION` sits in `src/server/api/management/version.ts` —
+  // so the scan for them casts a wider net than the route walk itself.
+  const constants = dateConstantsOf(
+    discoverTypeScriptFiles([
+      ...roots,
+      join(LANGWATCH_ROOT, "src/server/api"),
+    ]),
+  );
+  return files.flatMap((file) =>
+    routesRegisteredIn({
+      file,
+      source: readFileSync(file, "utf8"),
+      constants,
+    }),
   );
 }
 
@@ -164,9 +193,11 @@ export function collectRegisteredRoutes(
 function routesRegisteredIn({
   file,
   source,
+  constants,
 }: {
   file: string;
   source: string;
+  constants: Map<string, string>;
 }): RegisteredRoute[] {
   const basePaths = basePathsFor({ file, source });
   if (basePaths.length === 0) return [];
@@ -174,30 +205,195 @@ function routesRegisteredIn({
   const relative = file.startsWith(`${LANGWATCH_ROOT}/`)
     ? file.slice(LANGWATCH_ROOT.length + 1)
     : file;
-  const framework = importsApiFramework(source)
-    ? { usesApiFramework: true as const }
-    : {};
+  const framework = importsApiFramework(source);
 
-  return collectRouteRegistrations(source).flatMap((registration) =>
-    basePaths.map((basePath) => ({
-      key: `${registration.method.toUpperCase()} ${honoPathToTemplate(
-        joinRoutePath({ basePath, routePath: registration.path }),
-      )}`,
-      file: relative,
-      described: registration.described,
-      ...(registration.withdrawn ? { withdrawn: true as const } : {}),
-      ...framework,
-    })),
+  return basePaths.flatMap((basePath) =>
+    framework
+      ? expandServiceRegistrations({
+          registrations: collectRouteRegistrations(source),
+          basePath,
+          file: relative,
+          constants,
+        })
+      : collectRouteRegistrations(source).map((registration) => ({
+          key: `${registration.method.toUpperCase()} ${honoPathToTemplate(
+            joinRoutePath({ basePath, routePath: registration.path }),
+          )}`,
+          file: relative,
+          described: registration.described,
+          ...(registration.withdrawn ? { withdrawn: true as const } : {}),
+        })),
   );
+}
+
+// ---------------------------------------------------------------------------
+// @langwatch/api services: one registration fans out into dated + latest mounts
+// ---------------------------------------------------------------------------
+
+/**
+ * The version namespace a registration names, resolved.
+ *
+ * The argument is a literal, `"preview"`, or an identifier for a shared
+ * constant (`MANAGEMENT_API_VERSION`) that the constants map resolves. An
+ * unresolvable reference fails loudly: guessing a namespace would count the
+ * route under a path it is not served at, which is the silence the gate
+ * exists to break.
+ */
+function resolveVersionNamespace({
+  registration,
+  file,
+  constants,
+}: {
+  registration: RouteRegistration;
+  file: string;
+  constants: Map<string, string>;
+}): string {
+  if (registration.version !== undefined) return registration.version;
+
+  const resolved =
+    registration.versionRef !== undefined
+      ? constants.get(registration.versionRef)
+      : undefined;
+  if (resolved !== undefined) return resolved;
+
+  throw new Error(
+    `${file} registers ${registration.method.toUpperCase()} ${registration.path} ` +
+      `with version ${registration.versionRef ?? "<none>"}, which no scanned ` +
+      `source exports as a YYYY-MM-DD constant, so no namespace can be derived ` +
+      `for it. Spell the date literally, or export the constant.`,
+  );
+}
+
+/**
+ * The mounts one service file's registrations produce, per ADR 102: every
+ * dated version of every endpoint, plus `latest`. There is no bare alias, and
+ * inheritance is folded in — an endpoint registered at an earlier version is
+ * counted at every later dated namespace too, because that is what the
+ * document publishes.
+ *
+ * State at a namespace is the last event dated on or before it: a
+ * re-registration overrides, a `withdraw(...)` tombstones from its version
+ * onward. Withdrawals name no method, so they apply to every method the file
+ * registered at that path — the same rule the framework applies.
+ */
+function expandServiceRegistrations({
+  registrations,
+  basePath,
+  file,
+  constants,
+}: {
+  registrations: RouteRegistration[];
+  basePath: string;
+  file: string;
+  constants: Map<string, string>;
+}): RegisteredRoute[] {
+  interface ServiceEvent {
+    namespace: string;
+    index: number;
+    registration: RouteRegistration;
+  }
+
+  const events: ServiceEvent[] = registrations.map((registration, index) => ({
+    namespace: resolveVersionNamespace({ registration, file, constants }),
+    index,
+    registration,
+  }));
+
+  const dated = [
+    ...new Set(
+      events.map((event) => event.namespace).filter((v) => v !== "preview"),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const methodsByPath = new Map<string, Set<string>>();
+  for (const event of events) {
+    if (event.registration.withdrawn) continue;
+    const methods = methodsByPath.get(event.registration.path) ?? new Set();
+    methods.add(event.registration.method);
+    methodsByPath.set(event.registration.path, methods);
+  }
+
+  /** The state one endpoint is in at one namespace, or null when it does not exist there. */
+  const stateAt = (
+    method: string,
+    path: string,
+    namespace: string,
+  ): RouteRegistration | null => {
+    let state: RouteRegistration | null = null;
+    for (const event of events) {
+      if (event.namespace === "preview" || event.namespace > namespace) {
+        continue;
+      }
+      const applies = event.registration.withdrawn
+        ? event.registration.path === path
+        : event.registration.path === path &&
+          event.registration.method === method;
+      if (applies) state = event.registration;
+    }
+    return state;
+  };
+
+  const out: RegisteredRoute[] = [];
+  const emit = (
+    method: string,
+    path: string,
+    namespace: string,
+    state: RouteRegistration,
+  ): void => {
+    out.push({
+      key: `${method.toUpperCase()} ${honoPathToTemplate(
+        joinRoutePath({
+          basePath: `${basePath}/${namespace}`,
+          routePath: path,
+        }),
+      )}`,
+      file,
+      described: state.described,
+      usesApiFramework: true,
+      ...(state.withdrawn ? { withdrawn: true as const } : {}),
+    });
+  };
+
+  for (const [path, methods] of methodsByPath) {
+    for (const method of methods) {
+      for (const namespace of dated) {
+        const state = stateAt(method, path, namespace);
+        if (state) emit(method, path, namespace, state);
+      }
+      if (dated.length > 0) {
+        const latest = stateAt(method, path, dated[dated.length - 1]!);
+        if (latest) emit(method, path, "latest", latest);
+      }
+      // Preview is its own namespace: only preview events apply, and a
+      // preview mount is never documented.
+      let preview: RouteRegistration | null = null;
+      for (const event of events) {
+        if (event.namespace !== "preview") continue;
+        const applies = event.registration.withdrawn
+          ? event.registration.path === path
+          : event.registration.path === path &&
+            event.registration.method === method;
+        if (applies) preview = event.registration;
+      }
+      if (preview) emit(method, path, "preview", preview);
+    }
+  }
+
+  return out;
 }
 
 /** Every `METHOD /path` the document describes. */
 export function documentedOperations(document: OpenApiDocument): Set<string> {
   const documented = new Set<string>();
   for (const [path, item] of Object.entries(document.paths ?? {})) {
+    // A trailing slash is the same resource to both sides of this comparison:
+    // the framework mounts a family root as `/{version}/`, the document keeps
+    // that spelling, and the route table's join strips it. Normalize here
+    // rather than reporting twelve collection roots as missing over a `/`.
+    const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
     for (const method of HTTP_METHODS) {
       if (item[method] !== undefined) {
-        documented.add(`${method.toUpperCase()} ${path}`);
+        documented.add(`${method.toUpperCase()} ${normalized}`);
       }
     }
   }
@@ -251,11 +447,11 @@ export function auditCoverage({
   const byKey = new Map<string, RegisteredRoute>();
   for (const route of routes) {
     // A key registered more than once resolves to its last registration, as a
-    // whole record. Versions are declared in order and the bare alias serves
-    // the last resolution of a path, so that registration is the one the
-    // document describes: an early version registers the route, a later one
-    // withdraws it or stops describing it, and both the withdrawal and the
-    // diagnostic have to read the later shape.
+    // whole record. The latest namespace serves the last resolution of a
+    // path, so that registration is the one the document describes there: an
+    // early version registers the route, a later one withdraws it or stops
+    // describing it, and both the withdrawal and the diagnostic have to read
+    // the later shape.
     byKey.set(route.key, route);
   }
 
@@ -306,7 +502,7 @@ function publishingStepMissing(route: RegisteredRoute): string {
     return "described, so its app is probably not imported by generateOpenAPISpec";
   }
   return route.usesApiFramework
-    ? "no output or description in its endpoint config, so the framework describes nothing for the generator to publish"
+    ? "no withOutput or withDocs in its definition chain, so the framework describes nothing for the generator to publish"
     : "no describeRoute, so the generator skips it";
 }
 
@@ -327,9 +523,9 @@ function formatUnexplained(routes: RegisteredRoute[]): string[] {
   lines.push(
     "",
     "Publish it: describe the operation (describeRoute({...}) on the handler,",
-    "or output/description in the endpoint config of an @langwatch/api",
-    "service), import its app in src/tasks/generateOpenAPISpec.ts, add its",
-    "prefix to APP_DERIVED_PREFIXES, then run `pnpm run task",
+    "or withOutput(...)/withDocs(...) in the definition chain of an",
+    "@langwatch/api service), import its app in src/tasks/generateOpenAPISpec.ts,",
+    "add its prefix to APP_DERIVED_PREFIXES, then run `pnpm run task",
     "generateOpenAPISpec`.",
     "",
     "Or record why it stays unpublished, in UNPUBLISHED in",

@@ -1,15 +1,17 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  nullLog,
+  type ProjectionStoreContext,
+  type RegisteredStateProjection,
+  type ReplayContext,
+  replayStateProjection,
+  runFoldMapReplay,
+  type StateProjectionDefinition,
+  type StateProjectionStore,
+  type StoredProjection,
+} from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
-import type {
-  StateProjectionDefinition,
-  StateProjectionStore,
-  StoredProjection,
-} from "../../projections/stateProjection.types";
-import { runFoldMapReplay } from "../replayEngine";
-import { nullLog } from "../replayLog";
-import { replayStateProjection } from "../replayStatePath";
-import type { RegisteredStateProjection, ReplayContext } from "../types";
+import { ClickHouseReplayEventSource } from "../replayEventLoader";
 
 interface CounterState {
   count: number;
@@ -337,10 +339,12 @@ describe("replayStateProjection", () => {
 
     const ctx: ReplayContext = {
       redis,
-      resolveClient: async (tenantId?: string) => {
-        if (tenantId) resolvedTenants.push(tenantId);
-        return client;
-      },
+      eventSource: new ClickHouseReplayEventSource(
+        async (tenantId?: string) => {
+          if (tenantId) resolvedTenants.push(tenantId);
+          return client;
+        },
+      ),
       accumulatorOpts: {},
     };
 
@@ -421,7 +425,7 @@ describe("replayStateProjection", () => {
     const result = await replayStateProjection({
       ctx: {
         redis,
-        resolveClient: async () => client,
+        eventSource: new ClickHouseReplayEventSource(async () => client),
         accumulatorOpts: {},
       },
       projection: registered(store),
@@ -460,7 +464,7 @@ describe("replayStateProjection", () => {
     const { store } = spyStore();
     const ctx: ReplayContext = {
       redis: forbiddenRedis,
-      resolveClient: async () => client,
+      eventSource: new ClickHouseReplayEventSource(async () => client),
       accumulatorOpts: {},
     };
 
@@ -488,9 +492,9 @@ describe("the fold/map engine with state projections", () => {
     const { store } = spyStore();
     const ctx = {
       redis: forbiddenRedis,
-      resolveClient: async () => {
+      eventSource: new ClickHouseReplayEventSource(async () => {
         throw new Error("should not resolve — guard must fire first");
-      },
+      }),
       accumulatorOpts: {},
     } as unknown as ReplayContext;
 

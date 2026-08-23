@@ -1,3 +1,5 @@
+import type { EventSubscriberContext } from "@langwatch/eventing";
+import { createTenantId, DispatchError } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -7,10 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 import {
   createAgentTurnLivenessSubscriber,

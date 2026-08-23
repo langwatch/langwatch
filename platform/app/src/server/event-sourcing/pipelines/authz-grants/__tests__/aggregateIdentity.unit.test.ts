@@ -11,7 +11,7 @@
  * emitted event's shape would have passed throughout.
  */
 import { describe, expect, it } from "vitest";
-import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
+import { validateEventAggregateType } from "@langwatch/eventing/testing";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,

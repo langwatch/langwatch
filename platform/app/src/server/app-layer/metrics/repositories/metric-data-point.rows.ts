@@ -1,3 +1,4 @@
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { MetricSequencePoint } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import type {
   AggregationTemporality,
@@ -5,8 +6,6 @@ import type {
   MetricKind,
   MetricRollupRow,
 } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 
 /**
  * ReplacingMergeTree keeps the largest version, so inverting the acceptance

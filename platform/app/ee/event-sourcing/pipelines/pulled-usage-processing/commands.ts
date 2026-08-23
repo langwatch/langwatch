@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { defineCommand } from "~/server/event-sourcing/commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   PULLED_USAGE_AGGREGATE_TYPE,
   PULLED_USAGE_COMMAND_TYPES,

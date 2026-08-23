@@ -11,13 +11,13 @@
  * So this adds no second description of the API. `GET /api/openapi.json` serves
  * the same `apiDocument`, so the two cannot disagree.
  *
- * `POST /api/rpc.discover` is the narrow view for a caller that wants the RPC
- * operations and their argument schemas without reading 632 KB of OpenAPI to
- * find them. It is a projection of the same document — see
- * `~/server/openapi/rpc-catalogue` — so it holds no state, registers nothing,
- * and cannot disagree with the document about an operation it reports. It is
- * itself an RPC, POST and dotted, because an endpoint that describes a
- * convention should obey it.
+ * `POST /api/rpc.discover` is the fleet index: every API service and the URL
+ * of that service's own catalogue, so a caller discovers the services in one
+ * call and any one service's RPC operations in two. It is a projection of the
+ * mounted route tables — see `~/server/openapi/rpc-catalogue` — so it holds
+ * no state, registers nothing, and cannot point at a catalogue that does not
+ * answer. It is itself an RPC, POST and dotted, because an endpoint that
+ * describes a convention should obey it.
  *
  * The name is borrowed from OpenRPC, which is JSON-RPC 2.0's discovery method,
  * and this API does not speak JSON-RPC. What is borrowed is the name a caller
@@ -31,16 +31,19 @@
  * route sharing this file is reported at a path that does not exist
  * (`/api/llms.txt`). One basePath per file keeps the gate's output truthful.
  *
- * See specs/api-reference/api-discovery.feature.
+ * See packages/api/specs/api-discovery.feature.
  */
 
+import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
+import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
+import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
+import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import {
   WELL_KNOWN_OPENAPI_PATH,
   WHY_DISCOVERY_IS_PUBLIC,
 } from "~/server/openapi/discovery-locations";
-import { apiDocument } from "~/server/openapi/document";
-import { buildRpcCatalogue } from "~/server/openapi/rpc-catalogue";
+import { buildRpcServiceIndex } from "~/server/openapi/rpc-catalogue";
 import {
   jsonBytesResponse,
   respondWithApiDocument,
@@ -53,23 +56,29 @@ secured
   .get("/openapi.json", respondWithApiDocument);
 
 /**
+ * The framework-built service apps. The composition root is the one place
+ * that knows the fleet, and the index projects the catalogues out of their
+ * route tables — a service appears because its catalogue mount exists, never
+ * because someone listed it here.
+ */
+const SERVICE_APPS = [
+  organizationApp,
+  roleBindingsApp,
+  rolesApp,
+  scimTokensApp,
+];
+
+/**
  * Projected once, at module load.
  *
- * An earlier comment here claimed the catalogue was not worth caching because
- * caching would introduce staleness. That was wrong on both halves: the
- * document is a build artifact and cannot change while the process runs, so
- * there is no staleness to introduce — and rebuilding it per request re-walked
- * 166 paths and re-serialised the result every time, for an answer that is
- * identical until the next deploy.
- *
- * This is still a projection rather than a registry. Nothing writes to it; it
- * is derived from the document exactly as before, just once instead of per
- * call.
+ * The route tables are built artifacts and cannot change while the process
+ * runs, so the index is identical until the next deploy — and re-deriving it
+ * per request would re-walk them every time for the same answer.
  */
 const catalogueBytes: Uint8Array<ArrayBuffer> = Buffer.from(
   JSON.stringify(
-    buildRpcCatalogue({
-      document: apiDocument,
+    buildRpcServiceIndex({
+      apps: SERVICE_APPS,
       openapiUrl: WELL_KNOWN_OPENAPI_PATH,
     }),
   ),

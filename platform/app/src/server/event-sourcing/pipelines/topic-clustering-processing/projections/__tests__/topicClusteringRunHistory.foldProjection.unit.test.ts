@@ -1,6 +1,5 @@
+import type { StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import {
   TOPIC_CLUSTERING_RUN_HISTORY_LIMIT,
   TOPIC_CLUSTERING_RUN_OUTCOME,

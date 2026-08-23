@@ -19,10 +19,10 @@
  * the log needs a module mock, and this file is the one that stays mock-free.
  */
 
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CODE_EVALUATOR_CONFIG } from "~/server/evaluators/codeEvaluator";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,

@@ -10,6 +10,7 @@
  * bundle, so the composition happens here and only here.
  */
 
+import { EventSchema } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -31,7 +32,6 @@ import {
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 
 export const LangyConversationStartedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED),

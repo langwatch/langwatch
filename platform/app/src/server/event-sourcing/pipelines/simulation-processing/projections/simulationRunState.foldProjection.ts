@@ -1,12 +1,11 @@
-import { createLogger } from "@langwatch/observability";
-import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
-import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
-import type { Projection } from "../../../";
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+  ValidationError,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SimulationMessageSnapshotEvent,

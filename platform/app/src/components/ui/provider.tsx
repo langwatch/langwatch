@@ -1,12 +1,11 @@
 "use client";
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ColorModeProvider, type ColorModeProviderProps } from "./color-mode";
+import {
+  DesignSystemProvider,
+  type DesignSystemProviderProps,
+} from "@langwatch/design-system/provider";
+import { system } from "~/theme";
 
-export function Provider(props: ColorModeProviderProps) {
-  return (
-    <ChakraProvider value={defaultSystem}>
-      <ColorModeProvider {...props} />
-    </ChakraProvider>
-  );
+export function Provider(props: Omit<DesignSystemProviderProps, "system">) {
+  return <DesignSystemProvider system={system} {...props} />;
 }

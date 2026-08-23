@@ -1,3 +1,4 @@
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -17,8 +18,6 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "../types";

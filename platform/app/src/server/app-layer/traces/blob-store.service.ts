@@ -188,7 +188,7 @@ const SPOOL_KEY_PREFIX = "trace-blobs/spool";
  * influence the queue message could steer a read at another tenant's object.
  * v2 carries no location at all: `getSpool`/`deleteSpool` re-derive it from the
  * command's own trusted `tenantId` + span ids, exactly as `putSpool` derived it
- * (the same discipline `TieredBlobStore`'s `BlobRef` follows — ADR-030 §5).
+ * (the same discipline `TieredBlobStore`'s `BlobRef` follows).
  */
 export const SPOOL_REF_V2 = "spool:v2";
 

@@ -1,3 +1,9 @@
+import type { Event, ProjectionStoreContext } from "@langwatch/eventing";
+import {
+  createTenantId,
+  MapProjectionExecutor,
+  StateProjectionExecutor,
+} from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -8,8 +14,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
 import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
 import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { Event } from "~/server/event-sourcing/domain/types";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
@@ -22,9 +26,6 @@ import {
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";

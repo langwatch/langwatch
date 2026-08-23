@@ -1,5 +1,5 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import {
   admitSpendCommandDataSchema,
   confirmSpendCommandDataSchema,

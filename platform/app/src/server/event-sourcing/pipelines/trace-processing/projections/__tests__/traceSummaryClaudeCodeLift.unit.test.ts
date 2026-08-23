@@ -18,9 +18,9 @@
  * (computeSpanCost + accumulateTokens), covered in the converter + service
  * tests.
  */
-import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "~/server/event-sourcing";
+import { createTenantId } from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
 
 import {
   LOG_CONTRIBUTED_EVENT_TYPE,

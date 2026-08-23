@@ -1,7 +1,7 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { CancellationPublisher } from "../../../../scenarios/cancellation-channel";
 import { publishCancellation } from "../../../../scenarios/cancellation-channel";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
 

@@ -1,4 +1,4 @@
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { EventUtils } from "@langwatch/eventing";
 
 /**
  * Resolves and validates a single tenantId for a batch of entries that

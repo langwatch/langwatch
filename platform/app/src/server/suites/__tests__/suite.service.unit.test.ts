@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentService } from "@langwatch/agents-contract";
 import type { SimulationSuite } from "~/generated/prisma/client";
-import type { AgentRepository } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
@@ -61,8 +61,8 @@ type MockScenarioRepository = {
 };
 
 type MockAgentRepository = {
-  findManyIncludingArchived: ReturnType<typeof vi.fn>;
-  findNamesByIds: ReturnType<typeof vi.fn>;
+  getReferenceStates: ReturnType<typeof vi.fn>;
+  getNamesByIds: ReturnType<typeof vi.fn>;
 };
 
 type MockLlmConfigRepository = {
@@ -95,10 +95,10 @@ function makeMockAgentRepository(
   overrides: Partial<MockAgentRepository> = {},
 ): MockAgentRepository {
   return {
-    findManyIncludingArchived: vi.fn(({ ids }: { ids: string[] }) =>
+    getReferenceStates: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
-    findNamesByIds: vi.fn(async () => []),
+    getNamesByIds: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -151,7 +151,10 @@ function createService(overrides?: {
   const service = new SuiteService(
     suiteRepo as unknown as SuiteRepository,
     scenarioRepo as unknown as ScenarioRepository,
-    agentRepo as unknown as AgentRepository,
+    agentRepo as unknown as Pick<
+      AgentService,
+      "getNamesByIds" | "getReferenceStates"
+    >,
     llmConfigRepo as unknown as LlmConfigRepository,
     suiteRunService,
   );
@@ -445,7 +448,7 @@ describe("SuiteService", () => {
         it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             agentRepository: {
-              findManyIncludingArchived: vi.fn(
+              getReferenceStates: vi.fn(
                 async ({ ids }: { ids: string[] }) =>
                   ids
                     .filter((id) => id !== "removed-target")
@@ -546,7 +549,7 @@ describe("SuiteService", () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
             agentRepository: {
-              findManyIncludingArchived: vi.fn(
+              getReferenceStates: vi.fn(
                 async ({ ids }: { ids: string[] }) =>
                   ids.map((id) => ({
                     id,
@@ -611,7 +614,7 @@ describe("SuiteService", () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
             agentRepository: {
-              findManyIncludingArchived: vi.fn(
+              getReferenceStates: vi.fn(
                 async ({ ids }: { ids: string[] }) =>
                   ids.map((id) => ({ id, archivedAt })),
               ),
@@ -649,7 +652,7 @@ describe("SuiteService", () => {
               ),
             },
             agentRepository: {
-              findManyIncludingArchived: vi.fn(
+              getReferenceStates: vi.fn(
                 async ({ ids }: { ids: string[] }) =>
                   ids.map((id) => ({
                     id,
@@ -734,7 +737,7 @@ describe("SuiteService", () => {
           });
 
           expect(result.jobCount).toBe(1);
-          expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledWith({
+          expect(agentRepo.getReferenceStates).toHaveBeenCalledWith({
             ids: ["agent_1"],
             projectId: "proj_1",
           });
@@ -815,8 +818,8 @@ describe("SuiteService", () => {
             ...RUN_DEFAULTS,
           });
 
-          expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledTimes(1);
-          expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledWith({
+          expect(agentRepo.getReferenceStates).toHaveBeenCalledTimes(1);
+          expect(agentRepo.getReferenceStates).toHaveBeenCalledWith({
             ids: ["agent_1", "agent_2"],
             projectId: "proj_1",
           });
@@ -849,7 +852,7 @@ describe("SuiteService", () => {
             ...RUN_DEFAULTS,
           });
 
-          expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledWith({
+          expect(agentRepo.getReferenceStates).toHaveBeenCalledWith({
             ids: ["agent_1", "agent_2"],
             projectId: "proj_1",
           });
@@ -1069,7 +1072,7 @@ describe("SuiteService", () => {
             ]),
           },
           agentRepository: {
-            findNamesByIds: vi.fn(async () => [
+            getNamesByIds: vi.fn(async () => [
               { id: "agent_1", name: "My Agent" },
             ]),
           },
@@ -1123,7 +1126,7 @@ describe("SuiteService", () => {
         expect(result.scenarios).toEqual({});
         expect(result.targets).toEqual({});
         expect(scenarioRepo.findNamesByIds).not.toHaveBeenCalled();
-        expect(agentRepo.findNamesByIds).not.toHaveBeenCalled();
+        expect(agentRepo.getNamesByIds).not.toHaveBeenCalled();
         expect(llmConfigRepo.findNamesByIds).not.toHaveBeenCalled();
       });
     });
@@ -1132,7 +1135,7 @@ describe("SuiteService", () => {
       it("queries agents and prompts separately", async () => {
         const { service, agentRepo, llmConfigRepo } = createService({
           agentRepository: {
-            findNamesByIds: vi.fn(async () => [
+            getNamesByIds: vi.fn(async () => [
               { id: "agent_1", name: "Agent One" },
             ]),
           },
@@ -1157,7 +1160,7 @@ describe("SuiteService", () => {
           agent_1: "Agent One",
           prompt_1: "Prompt One",
         });
-        expect(agentRepo.findNamesByIds).toHaveBeenCalledWith({
+        expect(agentRepo.getNamesByIds).toHaveBeenCalledWith({
           ids: ["agent_1"],
           projectId: "proj_1",
         });

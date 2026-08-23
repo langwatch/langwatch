@@ -1,10 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
-import type { BillableEventsRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
+import type { BillableEventsRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
+import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
@@ -25,8 +27,6 @@ import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.s
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";

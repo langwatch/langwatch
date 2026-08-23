@@ -4,6 +4,7 @@ import type {
 } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 import {
+  MigrationDrainProofRequiresMigratedError,
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationPassAlreadyRunningError,
@@ -902,5 +903,58 @@ describe("SystemMigrationsService.runForOrganization", () => {
       });
       expect(runTargetedPass).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("SystemMigrationsService.assertLegacyWritersDrained", () => {
+  it("stores an audited proof in the existing migrated report", async () => {
+    const { service, upserts } = serviceWith({
+      record: {
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        status: "migrated",
+        report: { differenceCount: 0 },
+      },
+    });
+
+    await service.assertLegacyWritersDrained({
+      migrationName: MIGRATION,
+      tenantId: TENANT,
+      minimumWriterGeneration: "2026.08.22",
+      actorUserId: "user_alex",
+    });
+
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0]).toMatchObject({
+      status: "migrated",
+      report: {
+        differenceCount: 0,
+        legacyWriterDrainProof: {
+          minimumWriterGeneration: "2026.08.22",
+          actorUserId: "user_alex",
+        },
+      },
+    });
+  });
+
+  it("refuses to rewrite a finalized latch", async () => {
+    const { service, upserts } = serviceWith({
+      record: {
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        status: "finalized",
+        report: {},
+      },
+    });
+
+    await expect(
+      service.assertLegacyWritersDrained({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        minimumWriterGeneration: "2026.08.22",
+        actorUserId: "user_alex",
+      }),
+    ).rejects.toThrow(MigrationDrainProofRequiresMigratedError);
+    expect(upserts).toHaveLength(0);
   });
 });

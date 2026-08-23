@@ -944,7 +944,8 @@ authz check reads. Checks **never** read ClickHouse.
           (id derived from eventId, ON CONFLICT DO NOTHING, never an
            update; when-guard skips genesis/backfill/mint sources so
            cutover cannot flood the audit page; subscribers are excluded
-           from replay per ADR-098 - the existing audit UI is untouched)
+           from replay by the Eventing subscriber contract - the existing
+           audit UI is untouched)
 
   ONE writer, TWO views, ONE subscriber. Application code never writes
   Grant, Role, RoleBinding, CustomRole, or grant AuditLog rows directly.
@@ -956,9 +957,8 @@ itself — `(acceptedAt, eventId)` is the ledger's order, the projection
 follows it, and we accept that order as **best-effort FIFO**: it is the
 order ClickHouse accepted the events, which is the only order the system
 has. **No fold ever runs inline — not in normal operation and not during an
-outage.** If Redis is down, ADR-007's "Redis-loss circuit breaker" amendment
-(which names this pipeline, and expects the identity pipeline to join it
-later — identity programme D02) guarantees exactly three things, and inline
+outage.** If Redis is down, this decision's named-pipeline circuit breaker
+guarantees exactly three things, and inline
 processing is deliberately not among them:
 
 - **Appends still land.** The event store is ClickHouse and the append is
@@ -1174,15 +1174,15 @@ deliberately out of scope.
   sharing, PR #5809) - its `ShareLink` table is the resource tier's storage
   until an org's cutover imports the rows into `Grant` (§8, §13); its
   possession-not-existence invariant is preserved by the collector either way.
-- The ledger's lineage (all §13): [ADR-007](./007-event-sourcing-architecture.md)
+- The ledger's lineage (all §13): [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
   (the pipeline architecture; its web-role rule holds unchanged — the
   instant-enforcement write is a service write, not inline processing), [ADR-022](./022-event-log-source-of-truth.md) (*event_log
   as single source of truth* - cite by title, two files share the number;
   the waited `async_insert` append is its pattern; `leanForProjection`
   conformance is a no-op here, no heavy fields),
-  [ADR-015](./015-projection-replay-coordination.md) (the replay protocol
+  [ADR-015](../../../packages/eventing/adrs/015-projection-replay-coordination.md) (the replay protocol
   the byte-identical replay test rides),
-  [ADR-098](./098-post-event-work-subscribers-and-process-managers.md)
+  [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
   (subscriber vocabulary; subscribers excluded from replay - what makes the
   insert-only audit subscriber safe), [ADR-093](./093-redis-is-an-owned-client.md)
   (Redis ownership; instant enforcement never touches it),

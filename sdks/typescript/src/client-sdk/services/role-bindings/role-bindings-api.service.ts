@@ -6,8 +6,9 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 import type {
   ManagementRole,
@@ -112,7 +113,7 @@ export class RoleBindingsApiService {
   ): Promise<ListRoleBindingsResponse> {
     return this.#request({
       operation: "list role bindings",
-      path: "/api/role-bindings",
+      path: managementPath("/api/role-bindings"),
       query: { ...options },
     });
   }
@@ -120,7 +121,7 @@ export class RoleBindingsApiService {
   async create(input: CreateRoleBindingInput): Promise<CreatedRoleBinding> {
     return this.#request({
       operation: "create role binding",
-      path: "/api/role-bindings",
+      path: managementPath("/api/role-bindings"),
       method: "POST",
       body: input,
     });
@@ -135,7 +136,7 @@ export class RoleBindingsApiService {
   }): Promise<RoleBinding> {
     return this.#request({
       operation: `update role binding "${id}"`,
-      path: `/api/role-bindings/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
       method: "PATCH",
       body: input,
     });
@@ -144,7 +145,7 @@ export class RoleBindingsApiService {
   async delete(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `delete role binding "${id}"`,
-      path: `/api/role-bindings/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

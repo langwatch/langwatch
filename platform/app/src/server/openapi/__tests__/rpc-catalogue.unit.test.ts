@@ -1,243 +1,109 @@
 /**
  * @vitest-environment node
  *
- * The RPC catalogue is a projection of the OpenAPI document. Every claim here
- * follows from that, which is why they are worth pinning: the day someone
- * "optimises" it into a registry that families write to, these stop holding.
+ * The root RPC catalogue is a projection of the mounted route tables, two
+ * levels deep: it lists every service with the URL of that service's own
+ * rpc.discover, and repeats no operation at the root. Every claim here follows
+ * from it being derived rather than declared, which is why they are worth
+ * pinning: the day someone "optimises" it into a registry, these stop holding.
  *
- * See specs/api-reference/api-discovery.feature.
+ * The per-operation rules — the name grammar, POST-only, nothing the document
+ * does not carry — are pinned where they now live: the framework's own
+ * rpc-discover.unit.test.ts in @langwatch/api.
+ *
+ * See packages/api/specs/api-discovery.feature.
  */
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { buildRpcCatalogue } from "../rpc-catalogue";
+import { buildRpcServiceIndex } from "../rpc-catalogue";
 
 const OPENAPI_URL = "/.well-known/openapi";
 
-const build = ({
-  paths,
-  components,
-}: {
-  paths: Record<string, unknown>;
-  components?: unknown;
-}) =>
-  buildRpcCatalogue({
-    document: { paths, ...(components ? { components } : {}) },
-    openapiUrl: OPENAPI_URL,
-  });
-
-const rollSecret = {
-  post: {
-    operationId: "rollWebhookEndpointSecret",
-    summary: "Roll an endpoint's signing secret",
-    requestBody: {
-      content: {
-        "application/json": {
-          schema: { type: "object", properties: { id: { type: "string" } } },
-        },
-      },
-    },
-    responses: {
-      "200": {
-        content: {
-          "application/json": {
-            schema: { $ref: "#/components/schemas/WebhookEndpoint" },
-          },
-        },
-      },
-    },
-  },
+/** A minimal app whose route table carries the given POST mounts. */
+const appWithMounts = (paths: string[]): Hono => {
+  const app = new Hono();
+  for (const path of paths) {
+    app.post(path, (c) => c.json({}));
+  }
+  return app;
 };
 
-describe("the RPC catalogue", () => {
-  describe("given a document carrying a dotted RPC operation", () => {
-    describe("when the catalogue is built", () => {
-      /** @scenario "The catalogue reports the RPC operations the document publishes" */
-      it("lists it by dotted name with the path to POST to", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.rollSecret": rollSecret,
-          },
-        });
+const THINGS_LATEST = "/api/things/latest/rpc.discover";
 
-        expect(catalogue.operations).toHaveLength(1);
-        expect(catalogue.operations[0]).toMatchObject({
-          name: "endpoints.rollSecret",
-          path: "/api/webhooks/endpoints.rollSecret",
-          operationId: "rollWebhookEndpointSecret",
-          status: 200,
-        });
-      });
-
-      /** @scenario "The catalogue reports the RPC operations the document publishes" */
-      it("carries the argument and result schemas from that same document", () => {
-        const catalogue = build({
-          paths: { "/api/webhooks/endpoints.rollSecret": rollSecret },
-          components: { schemas: { WebhookEndpoint: { type: "object" } } },
-        });
-
-        expect(catalogue.operations[0]?.input).toEqual({
-          type: "object",
-          properties: { id: { type: "string" } },
-        });
-        expect(catalogue.operations[0]?.output).toEqual({
-          $ref: "#/components/schemas/WebhookEndpoint",
-        });
-        expect(catalogue.components).toEqual({
-          WebhookEndpoint: { type: "object" },
-        });
-      });
+describe("the root RPC catalogue", () => {
+  /** @scenario "The root catalogue links to every service's catalogue" */
+  it("lists every service with the URL of its own catalogue", () => {
+    const index = buildRpcServiceIndex({
+      apps: [
+        appWithMounts(["/api/roles/2026-08-07/rpc.discover", "/api/roles/latest/rpc.discover"]),
+        appWithMounts([THINGS_LATEST]),
+      ],
+      openapiUrl: OPENAPI_URL,
     });
+
+    expect(index.services).toEqual([
+      { name: "roles", discover: "/api/roles/latest/rpc.discover" },
+      { name: "things", discover: THINGS_LATEST },
+    ]);
   });
 
-  describe("given an operation that takes no arguments", () => {
-    describe("when the catalogue is built", () => {
-      it("reports a null input rather than omitting the operation", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.list": {
-              post: {
-                responses: {
-                  "200": {
-                    content: {
-                      "application/json": { schema: { type: "array" } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        expect(catalogue.operations[0]?.input).toBeNull();
-        expect(catalogue.operations[0]?.output).toEqual({ type: "array" });
-      });
+  /** @scenario "The root catalogue links to every service's catalogue" */
+  it("points at the OpenAPI document for the full surface", () => {
+    const index = buildRpcServiceIndex({
+      apps: [appWithMounts([THINGS_LATEST])],
+      openapiUrl: OPENAPI_URL,
     });
+
+    expect(index.openapi).toBe(OPENAPI_URL);
   });
 
-  /**
-   * `assertStatusInvariant` in `@langwatch/api` refuses a registration whose
-   * success status could move, so reading the first 2xx is reading a decision
-   * the framework already made rather than guessing between several.
-   */
-  describe("given an operation answering a non-200 success status", () => {
-    describe("when the catalogue is built", () => {
-      it("reports the status the operation actually answers", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.create": {
-              post: {
-                responses: {
-                  "201": {
-                    content: {
-                      "application/json": { schema: { type: "object" } },
-                    },
-                  },
-                  "400": { description: "Bad Request" },
-                },
-              },
-            },
-          },
-        });
-
-        expect(catalogue.operations[0]?.status).toBe(201);
-      });
-
-      it("reports no body for an operation that sends none", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.delete": {
-              post: { responses: { "204": { description: "No Content" } } },
-            },
-          },
-        });
-
-        expect(catalogue.operations[0]?.status).toBe(204);
-        expect(catalogue.operations[0]?.output).toBeNull();
-      });
+  /** @scenario "The root catalogue links to every service's catalogue" */
+  it("repeats no operation at the root", () => {
+    const index = buildRpcServiceIndex({
+      apps: [appWithMounts([THINGS_LATEST])],
+      openapiUrl: OPENAPI_URL,
     });
+
+    expect(index).not.toHaveProperty("operations");
+    for (const entry of index.services) {
+      expect(Object.keys(entry).sort()).toEqual(["discover", "name"]);
+    }
   });
 
-  describe("given a document carrying no dotted operations", () => {
-    describe("when the catalogue is built", () => {
-      /** @scenario "The catalogue reports no operation the document does not carry" */
-      it("is empty and still points at the document", () => {
-        const catalogue = build({ paths: {} });
-
-        expect(catalogue.operations).toEqual([]);
-        expect(catalogue.openapi).toBe(OPENAPI_URL);
-      });
+  it("skips a service whose catalogue mount does not exist", () => {
+    // Derived, not declared: an app off the framework has no rpc.discover
+    // mount, so the index cannot point at one. This is the claim that stops
+    // the index drifting from the served surface.
+    const index = buildRpcServiceIndex({
+      apps: [appWithMounts(["/api/legacy/things.list"]), appWithMounts([THINGS_LATEST])],
+      openapiUrl: OPENAPI_URL,
     });
+
+    expect(index.services).toEqual([
+      { name: "things", discover: THINGS_LATEST },
+    ]);
   });
 
-  describe("given ordinary REST paths", () => {
-    describe("when the catalogue is built", () => {
-      /** @scenario "A non-RPC path is not reported as an RPC" */
-      it("lists none of them", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints": { post: { responses: {} } },
-            "/api/webhooks/endpoints/{id}": { get: { responses: {} } },
-            "/api/trace/{id}": { get: { responses: {} } },
-          },
-        });
+  it("answers an empty fleet when no service is on the framework", () => {
+    const index = buildRpcServiceIndex({ apps: [], openapiUrl: OPENAPI_URL });
 
-        expect(catalogue.operations).toEqual([]);
-      });
-
-      /**
-       * The grammar is `@langwatch/api`'s `isRpcPath`, the same one `v.rpc`
-       * refuses a registration with — so a name it would have refused is a name
-       * the catalogue does not recognise, without a second regex here.
-       */
-      /** @scenario "The catalogue recognises names by the same grammar that registers them" */
-      it("does not recognise a name v.rpc would have refused", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/Endpoints.create": { post: { responses: {} } },
-            "/api/webhooks/endpoints.roll_secret": { post: { responses: {} } },
-            "/api/webhooks/endpoints.": { post: { responses: {} } },
-          },
-        });
-
-        expect(catalogue.operations).toEqual([]);
-      });
-    });
+    expect(index.services).toEqual([]);
+    expect(index.openapi).toBe(OPENAPI_URL);
   });
 
-  describe("given a dotted path documented under another method", () => {
-    describe("when the catalogue is built", () => {
-      /** @scenario "A dotted path that is not a POST is not reported as an RPC" */
-      it("does not advertise a call that would not work", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.list": { get: { responses: {} } },
-          },
-        });
-
-        expect(catalogue.operations).toEqual([]);
-      });
+  it("orders services by discover URL so the response is stable", () => {
+    const index = buildRpcServiceIndex({
+      apps: [
+        appWithMounts(["/api/zeta/latest/rpc.discover"]),
+        appWithMounts(["/api/alpha/latest/rpc.discover"]),
+      ],
+      openapiUrl: OPENAPI_URL,
     });
-  });
 
-  describe("given several RPC operations", () => {
-    describe("when the catalogue is built", () => {
-      it("orders them by path so the response is stable between requests", () => {
-        const catalogue = build({
-          paths: {
-            "/api/webhooks/endpoints.rollSecret": rollSecret,
-            "/api/webhooks/endpoints.create": { post: { responses: {} } },
-            "/api/things/things.list": { post: { responses: {} } },
-          },
-        });
-
-        expect(catalogue.operations.map((operation) => operation.path)).toEqual(
-          [
-            "/api/things/things.list",
-            "/api/webhooks/endpoints.create",
-            "/api/webhooks/endpoints.rollSecret",
-          ],
-        );
-      });
-    });
+    expect(index.services.map((entry) => entry.name)).toEqual([
+      "alpha",
+      "zeta",
+    ]);
   });
 });

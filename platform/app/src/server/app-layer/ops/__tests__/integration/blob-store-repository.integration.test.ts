@@ -1,3 +1,10 @@
+import { createTenantId } from "@langwatch/eventing";
+import {
+  blobHolderSetKey,
+  blobLeaseSetKey,
+  LEGACY_HOLDER_LEASE_GUARD,
+  redisBlobKey,
+} from "@langwatch/group-queue/operational";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -5,13 +12,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { createTenantId } from "../../../../event-sourcing/domain/tenantId";
-import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing/queues/groupQueue/blobConstants";
-import {
-  blobHolderSetKey,
-  blobLeaseSetKey,
-  redisBlobKey,
-} from "../../../../event-sourcing/queues/groupQueue/blobKeys";
 import { BlobStoreRedisRepository } from "../../repositories/blob-store.redis.repository";
 
 const hasTestcontainers = !!(process.env.REDIS_URL || process.env.CI_REDIS_URL);

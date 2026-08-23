@@ -109,20 +109,25 @@ describe("Cascade Archive", () => {
 
   // Helper to create an agent linked to a workflow
   async function createTestAgent(name: string, workflowId?: string) {
-    const result = await caller.agents.create({
-      projectId,
-      name,
-      type: workflowId ? "workflow" : "code",
-      config: workflowId
-        ? { name, isCustom: true, workflow_id: workflowId }
-        : {
+    const result = workflowId
+      ? await caller.agents.create({
+          projectId,
+          name,
+          type: "workflow",
+          config: { name, isCustom: true, workflow_id: workflowId },
+          workflowId,
+        })
+      : await caller.agents.create({
+          projectId,
+          name,
+          type: "code",
+          config: {
             name,
             parameters: [{ identifier: "code", type: "code", value: "pass" }],
             inputs: [],
             outputs: [],
           },
-      workflowId,
-    });
+        });
     createdAgentIds.push(result.id);
     return result;
   }
@@ -430,7 +435,9 @@ describe("Cascade Archive", () => {
       });
 
       expect(result.archivedWorkflow).not.toBeNull();
-      expect(result.archivedWorkflow?.archivedAt).not.toBeNull();
+      await expect(
+        prisma.workflow.findUnique({ where: { id: workflow.id, projectId } }),
+      ).resolves.toMatchObject({ archivedAt: expect.any(Date) });
     });
   });
 
@@ -493,7 +500,9 @@ describe("Cascade Archive", () => {
       });
 
       expect(result.archivedWorkflow).not.toBeNull();
-      expect(result.archivedWorkflow?.archivedAt).not.toBeNull();
+      await expect(
+        prisma.workflow.findUnique({ where: { id: workflow.id, projectId } }),
+      ).resolves.toMatchObject({ archivedAt: expect.any(Date) });
     });
   });
 });

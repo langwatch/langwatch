@@ -1,6 +1,10 @@
-import { definePipeline } from "~/server/event-sourcing";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type ProcessManagerApplier,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 
 import {
   ConfigureIngestionPullCommand,
@@ -33,7 +37,10 @@ import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusFoldProjection,
 } from "./projections/ingestionPullRunStatus.foldProjection";
-import { INGESTION_PULL_EVENT_TYPES } from "./schemas/constants";
+import {
+  INGESTION_PULL_EVENT_TYPES,
+  INGESTION_PULL_PROCESSING_EVENT_TYPES,
+} from "./schemas/constants";
 import type { IngestionPullProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -90,11 +97,14 @@ export function ingestionPullPM(
 export function createIngestionPullProcessingPipeline(
   deps: IngestionPullProcessingPipelineDeps,
 ) {
-  return definePipeline<IngestionPullProcessingEvent>()
-    .withName("ingestion_pull_processing")
-    .withAggregateType("ingestion_pull")
-    .withProjection(
-      "ingestionPullRunStatus",
+  return definePipeline<IngestionPullProcessingEvent>({
+    name: "ingestion_pull_processing",
+    aggregate: defineAggregate({
+      type: "ingestion_pull",
+      events: defineEvents(INGESTION_PULL_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withPostgresProjection(
       new IngestionPullRunStatusFoldProjection({ store: deps.runStatusStore }),
     )
     .withCommand("configure", ConfigureIngestionPullCommand)

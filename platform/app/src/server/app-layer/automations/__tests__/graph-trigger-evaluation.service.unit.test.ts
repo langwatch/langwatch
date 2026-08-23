@@ -1,9 +1,9 @@
+import { DispatchError } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   evaluateGraphTrigger,
   GRAPH_TRIGGER_MAX_RESULT_ROWS,

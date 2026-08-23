@@ -12,8 +12,8 @@ import type { TraceProcessingEvent } from "../schemas/events";
 
 /**
  * Wiring-level unit test: builds the REAL trace-processing pipeline and
- * asserts the `.withSubscriber("triggerMatch", ...)` /
- * `.withSubscriber("graphTriggerActivity", ...)` registrations at
+ * asserts the `.withProjectionSubscriber("triggerMatch", ...)` /
+ * `.withEventSubscriber("graphTriggerActivity", ...)` registrations at
  * pipeline.ts:224-241 carry the intended events/delay/ttl/dedup. These
  * debounce/dedup values previously lived on deleted reactors' options and
  * were tested there (ADR-052) — this locks the replacement wiring in.

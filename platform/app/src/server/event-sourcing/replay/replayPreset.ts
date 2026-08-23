@@ -1,3 +1,10 @@
+import type {
+  FoldProjectionStore,
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  RegisteredStateProjection,
+} from "@langwatch/eventing";
+import { ReplayService, RepositoryFoldStore } from "@langwatch/eventing";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
@@ -10,21 +17,14 @@ import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processi
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
-import type { FoldProjectionStore } from "../projections/foldProjection.types";
-import { RepositoryFoldStore } from "../projections/repositoryFoldStore";
-import { ReplayService } from "./replayService";
-import type {
-  RegisteredFoldProjection,
-  RegisteredMapProjection,
-  RegisteredStateProjection,
-} from "./types";
+import { ClickHouseReplayEventSource } from "./replayEventLoader";
 
 export interface ReplayRuntime {
   service: ReplayService;
   projections: RegisteredFoldProjection[];
   mapProjections: RegisteredMapProjection[];
   /**
-   * Discovered `.withProjection()` operational state projections, carrying
+   * Discovered Postgres operational state projections, carrying
    * their definition and store for a paused, from-init canonical rebuild.
    */
   stateProjections: RegisteredStateProjection[];
@@ -182,7 +182,7 @@ export function createReplayRuntime(config: {
   }
 
   const service = new ReplayService({
-    clickhouseClientResolver: clientResolver,
+    eventSource: new ClickHouseReplayEventSource(clientResolver),
     redis,
     // Reuse the live pipeline's cached resolver so replay-rebuilt rows honour
     // the same per-tenant retention as live ingestion.

@@ -1,4 +1,4 @@
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { ProcessManagerApplier } from "@langwatch/eventing";
 
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";

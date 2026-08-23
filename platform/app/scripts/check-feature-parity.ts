@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 /**
  * Feature-parity check: every `@integration` / `@unit` scenario in every
- * `.feature` file under `specs/**` must be bound to at least one test via a
- * `@scenario "<title>"` JSDoc annotation.
+ * `.feature` file under a configured specification root must be bound to at
+ * least one test via a `@scenario "<title>"` JSDoc annotation.
  *
  * Enforces the "Feature File Parity" rule from
  * dev/docs/TESTING_PHILOSOPHY.md. Without this check, feature files can drift
@@ -44,15 +44,32 @@ const REPO_ROOT = resolve(__dirname, "../../..");
 /**
  * Every tree that holds `.feature` files.
  *
- * `sdks/typescript/specs` is here because leaving it out made the whole tree
- * INVISIBLE: its scenarios counted for nothing, and — worse — an `@scenario`
- * annotation in `sdks/typescript/src` (which IS scanned) could never resolve
- * against them, so binding one was reported as a typo. A spec tree the checker
- * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
- * falls into, one directory up.
+ * Package-owned specifications are listed explicitly for the same reason as
+ * the SDK tree: a package boundary must not make its behavioural contracts
+ * invisible to the repository-wide parity gate.
  */
+function discoverPackageSpecRoots(packagesRoot: string): string[] {
+  if (!existsSync(packagesRoot)) return [];
+  const roots: string[] = [];
+  const visit = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === "node_modules") continue;
+      const path = join(directory, entry.name);
+      if (entry.name === "specs") {
+        roots.push(path);
+      } else {
+        visit(path);
+      }
+    }
+  };
+  visit(packagesRoot);
+  return roots.sort();
+}
+
 const SPECS_ROOTS = [
   resolve(REPO_ROOT, "specs"),
+  resolve(REPO_ROOT, "platform/app/specs"),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "packages")),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
@@ -394,17 +411,21 @@ const LEGACY_INERT: string[] = [
   "specs/evaluators/satisfaction-score-migration.feature",
   "specs/evaluators/thread-eval-skips-without-thread-id.feature",
   "specs/evaluators/workflow-evaluator-editor.feature",
-  "specs/event-sourcing/deduplication-strategy.feature",
-  "specs/event-sourcing/dispatch-error-contract.feature",
-  "specs/event-sourcing/fold-projection.feature",
-  "specs/event-sourcing/global-projections.feature",
-  "specs/event-sourcing/map-projection.feature",
-  "specs/event-sourcing/oversized-attribute-value-preview.feature",
-  "specs/event-sourcing/payload-envelope.feature",
-  "specs/event-sourcing/pipeline-model.feature",
-  "specs/event-sourcing/process-roles.feature",
-  "specs/event-sourcing/redis-fold-cache.feature",
-  "specs/event-sourcing/work-conserving-fair-dispatch.feature",
+  "packages/eventing/specs/deduplication-strategy.feature",
+  "packages/eventing/specs/fold-projection.feature",
+  "packages/eventing/specs/map-projection.feature",
+  "packages/eventing/specs/pipeline-model.feature",
+  "packages/eventing/specs/process-roles.feature",
+  "packages/eventing/specs/redis-fold-cache.feature",
+  // The reduced Stored Objects package foundation ships before runtime binding.
+  // Remove this entry with the first app binding, drop the feature-level
+  // @unimplemented tag, and park only any remaining rollout scenarios.
+  "packages/features/stored-objects/specs/stored-objects.feature",
+  "packages/group-queue/specs/payload-envelope.feature",
+  "packages/group-queue/specs/work-conserving-fair-dispatch.feature",
+  "specs/automations/dispatch-error-contract.feature",
+  "specs/billing/global-projections.feature",
+  "specs/trace-processing/oversized-attribute-value-preview.feature",
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",

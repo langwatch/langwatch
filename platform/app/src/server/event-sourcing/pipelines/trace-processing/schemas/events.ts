@@ -1,8 +1,9 @@
+import {
+  AggregateTypeSchema,
+  EventSchema,
+  TenantIdSchema,
+} from "@langwatch/eventing";
 import { z } from "zod";
-
-import { AggregateTypeSchema } from "../../../domain/aggregateType";
-import { TenantIdSchema } from "../../../domain/tenantId";
-import { EventSchema } from "../../../domain/types";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { piiRedactionLevelSchema } from "./commands";

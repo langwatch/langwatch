@@ -1,9 +1,9 @@
 import {
+  GROUP_QUEUE_REGISTRY_KEY,
   isEnvelope,
   readEnvelopeTieredRefFromHeader,
   splitEnvelope,
-} from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
-import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
+} from "@langwatch/group-queue/operational";
 import type { QueueMigrationBlocker } from "./objectStorageMigration";
 
 /**

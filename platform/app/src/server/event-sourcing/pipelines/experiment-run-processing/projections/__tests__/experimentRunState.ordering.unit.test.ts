@@ -13,10 +13,13 @@
  * - started, target_result, evaluator_result, and completed can
  *   have nearly identical or even inverted occurredAt timestamps
  */
+
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,

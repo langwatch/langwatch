@@ -9,12 +9,12 @@
  * handler reconstitutes from object storage is over 256 KB and unbounded above.
  * The bound is therefore resolved per span so a spooled one caps itself at 1.
  *
- * See specs/event-sourcing/producer-append-coalescing.feature.
+ * See packages/eventing/specs/producer-append-coalescing.feature.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../../domain/types";
-import { processCommandBatch } from "../../../services/commands/commandDispatcher";
+import type { Event } from "@langwatch/eventing";
+import { processCommandBatch } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
 import {
   RECORD_SPAN_DEDUPLICATION,
   RecordSpanCommand,
@@ -36,14 +36,6 @@ import {
   spanId,
   spanPayload,
 } from "./support/traceProcessingFixtures";
-
-vi.mock("../../../utils/killSwitch", () => ({
-  isComponentDisabled: vi.fn().mockResolvedValue(false),
-}));
-
-import { isComponentDisabled } from "../../../utils/killSwitch";
-
-const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
 
 function recordSpanRegistration(
   deps: Partial<TraceProcessingPipelineDeps> = {},
@@ -100,14 +92,6 @@ function batchParamsFor({
 }
 
 describe("recordSpan append coalescing", () => {
-  beforeEach(() => {
-    mockedIsComponentDisabled.mockResolvedValue(false);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("given the trace-processing pipeline is defined", () => {
     describe("when recordSpan is registered without sharding", () => {
       /** @scenario 'many items for one aggregate become one insert' */
@@ -213,20 +197,6 @@ describe("recordSpan append coalescing", () => {
         expect(
           new Set((events as Event[]).map((event) => event.aggregateId)),
         ).toEqual(new Set([FIXTURE_TRACE_ID]));
-      });
-    });
-
-    describe("when the command is killed for the tenant", () => {
-      it("appends nothing for the whole batch", async () => {
-        mockedIsComponentDisabled.mockResolvedValue(true);
-        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          spanPayload({ spanId: spanId(index) }),
-        );
-
-        await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
-
-        expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
   });

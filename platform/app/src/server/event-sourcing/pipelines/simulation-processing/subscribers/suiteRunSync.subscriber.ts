@@ -1,6 +1,6 @@
+import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { isSuiteSetId } from "../../../../suites/suite-set-id";
-import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,
@@ -50,7 +50,10 @@ export interface SuiteRunSyncSubscriberDeps {
  */
 export function createSuiteRunSyncSubscriber(
   deps: SuiteRunSyncSubscriberDeps,
-): SubscriberSpec<SimulationProcessingEvent> {
+): SubscriberSpec<SimulationProcessingEvent> & {
+  fold?: never;
+  map?: never;
+} {
   const handleStarted = async (
     event: SimulationRunStartedEvent,
   ): Promise<void> => {

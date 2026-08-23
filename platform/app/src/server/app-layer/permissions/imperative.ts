@@ -28,7 +28,7 @@ import { type App, getApp } from "../app";
 type ImperativeContext = {
   session: Session | null;
   /** The composed App the context factory injected (tRPC ctx / Hono var). */
-  app?: App;
+  app?: Pick<App, "permissions">;
 };
 
 async function decide({

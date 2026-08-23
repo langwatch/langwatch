@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Store corrected by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
+**Store corrected by:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
 
 **Amended (2026-07-24):** the per-agent vocabulary moved from one grown-together normalization module into a **registration-style agent registry** (`coding-agent-processing/agents/` — one pure definition per agent: identity predicate, name prefixes, alias quirks; ordered, first match wins), mirroring the trace-canonicalisation extractor pattern. And the agent roster gained a sixth member: **`claude_cowork`** (Claude Cowork — the Claude desktop runtime in a VM; same event vocabulary as Claude Code, identified only by `service.name: cowork`, events-only export, model calls and tool runs folded from its `api_request`/`tool_result` events). Note the literal `claude_cowork` also names a governance IngestionSource type ([ADR-018](./018-governance-unified-observability-substrate.md)) — same product, different subsystem: governance ingests Cowork's span-shaped payloads org-wide; this pipeline folds its per-project session events.
 
@@ -49,8 +49,8 @@ root cause — *the model has no session aggregate, only a trace aggregate*:
    overlays the result.
 4. Context-less logs must first *become* a trace (synthesized trace ids) to
    participate — everything must be a trace before it can be seen.
-5. `trace-processing` already registers 13 reactors; coding-agent concerns
-   metastasizing there deepens a side-effect sprawl we already regret.
+5. `trace-processing` already serves many post-fold concerns; coding-agent
+   lifecycle and projections there would deepen an unrelated side-effect graph.
 
 ## Decision
 
@@ -74,11 +74,11 @@ aggregate is the **session**, not the trace.
    The trace pipeline's coding-agent fold and its log re-routing are retired;
    the trace becomes a *contribution and a drill-down*, not the spine.
 
-3. **Consumption primitives: subscribers, projections, one process manager.
-   No reactors.** Fan-in is `withEventSubscriber`; read models are
+3. **Consumption primitives: subscribers, projections, one process manager.**
+   Fan-in is `withEventSubscriber`; read models are
    projections; lifecycle (session finalization, late-contribution reopen) is
    a named process manager per ADR-052. Origin gating is a predicate inside
-   the subscriber, not a gate reactor.
+   the subscriber, not a separate gate stage.
 
 4. **Projections.**
    - `coding_agent_sessions` — the session row (fold), **keyed by
@@ -137,9 +137,8 @@ the trace pipeline. A session aggregate makes metrics a first-class
 contributor — which is the only way metric-only sessions can exist — and
 returns `trace-processing` to processing traces.
 
-**Why no reactors:** reactors are unnamed side effects triggered by storage
-events; thirteen of them on the trace pipeline is how the current tangle
-grew. Subscribers make consumption explicit and replay-visible; process
+**Why subscribers and process managers:** subscribers make best-effort
+consumption explicit and replay-excluded; process
 managers make multi-step lifecycle a named, testable saga (ADR-052).
 Everything this pipeline needs maps onto those two plus projections.
 
@@ -170,14 +169,8 @@ canonical metric tables.
 - Multi-trace sessions unify under one row; the trace drawer's session tab
   resolves through `coding_agent_trace_sessions`.
 - The session-view read drops its per-open rollup scan.
-- `trace-processing` loses the coding-agent fold, the legacy
-  `claudeCodeSpanSync` reactor and log-to-span converter (still live on
-  main today), and their spec; log-only installs stop getting synthesized
-  tool spans and need `langwatch claude` re-run for real spans — a release
-  note, as PR #5708 already documented.
-- PR #5708 is superseded and closed; its branch is deleted (this also
-  retires the credential blob still reachable in that branch's history —
-  the password is already rotated).
+- `trace-processing` contains no coding-agent fold or log-to-span converter;
+  coding-agent facts enter through the dedicated pipeline's subscribers.
 - Future agents (or any customer app that sets `session.id`) onboard by
   writing one vocabulary adapter; the aggregate, projections and surfaces
   are already generic.

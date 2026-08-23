@@ -149,24 +149,69 @@ describe("collectRouteRegistrations", () => {
   describe("when the file declares its service through @langwatch/api", () => {
     /** @scenario "An SSE endpoint is counted as a GET route" */
     it("reads an sse endpoint as the GET it is mounted as", () => {
-      // The framework mounts `sse` with `app.get`, so a stream is one more
-      // route on the surface: it is either documented or excluded like any
-      // other GET. Read as a method of its own it would be neither, and a
+      // The framework mounts `registerSse` with `app.get`, so a stream is one
+      // more route on the surface: it is either documented or excluded like
+      // any other GET. Read as a method of its own it would be neither, and a
       // whole endpoint would sit outside the gate.
       const registrations = collectRouteRegistrations(
         [
           FRAMEWORK_IMPORT,
-          'v.sse("/runs/:id/events", { events: { token: Token } }, stream);',
+          'service.registerSse("runs.watch", "2026-08-07", stream, (b) =>',
+          "  b.withEvents({ token: Token }),",
+          ");",
         ].join("\n"),
       );
 
       expect(registrations).toEqual([
         {
           method: "get",
-          path: "/runs/:id/events",
+          path: "/runs.watch",
           readsQuery: false,
           described: false,
           sse: true,
+          version: "2026-08-07",
+        },
+      ]);
+    });
+
+    it("reads an RPC registration as the POST it is mounted as", () => {
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'service.register("things.create", "2026-08-07", create, (b) =>',
+          "  b.withInput(NewThing).withOutput(Thing),",
+          ");",
+        ].join("\n"),
+      );
+
+      expect(registrations).toEqual([
+        {
+          method: "post",
+          path: "/things.create",
+          readsQuery: false,
+          described: true,
+          version: "2026-08-07",
+        },
+      ]);
+    });
+
+    it("reads a registerRoute registration with its method, path and version reference", () => {
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'service.registerRoute("get", "/roles/:id", MANAGEMENT_API_VERSION, read, (b) =>',
+          "  b.withParams(IdParams).withOutput(Role),",
+          ");",
+        ].join("\n"),
+      );
+
+      expect(registrations).toEqual([
+        {
+          method: "get",
+          path: "/roles/:id",
+          readsQuery: false,
+          described: true,
+          versionRef: "MANAGEMENT_API_VERSION",
         },
       ]);
     });
@@ -175,57 +220,64 @@ describe("collectRouteRegistrations", () => {
       const registrations = collectRouteRegistrations(
         [
           FRAMEWORK_IMPORT,
-          'v.withdraw("get", "/roles/:id/legacy");',
-          'v.get("/roles/:id", { output: Role }, read);',
+          'service.withdraw("/roles/:id/legacy", "2026-09-01");',
+          'service.registerRoute("get", "/roles/:id", "2026-08-07", read, (b) => b.withOutput(Role));',
         ].join("\n"),
       );
 
       expect(registrations).toEqual([
         {
-          method: "get",
+          // A withdrawal names the endpoint, not the method: the gate expands
+          // it against the methods registered at the path.
+          method: "all",
           path: "/roles/:id/legacy",
           readsQuery: false,
           described: false,
           withdrawn: true,
+          version: "2026-09-01",
         },
         {
           method: "get",
           path: "/roles/:id",
           readsQuery: false,
           described: true,
+          version: "2026-08-07",
         },
       ]);
     });
 
     it("keeps spans in source order when a withdrawal precedes a read", () => {
-      // The two shapes are matched by separate patterns. Merged by index they
-      // span correctly; appended one list after the other, the withdrawal would
-      // own the source from its own line to the end of the file and take the
-      // query read below it with it.
+      // The shapes are matched by separate patterns. Merged by index they
+      // span correctly; appended one list after the other, the withdrawal
+      // would own the source from its own line to the end of the file and
+      // take the query read below it with it.
       const registrations = collectRouteRegistrations(
         [
           FRAMEWORK_IMPORT,
-          'v.withdraw("delete", "/roles/:id");',
-          'v.get("/roles", { query: Filters }, async (c) => {',
-          '  const scope = c.req.query("scope");',
+          'service.withdraw("/roles/:id", "2026-09-01");',
+          'service.registerRoute("get", "/roles", "2026-08-07", async (c) => {',
+          '  const scope = c.get("query").scope;',
           "  return list(scope);",
-          "});",
+          "}, (b) => b.withQuery(Filters));",
         ].join("\n"),
       );
 
       expect(registrations).toEqual([
         {
-          method: "delete",
+          method: "all",
           path: "/roles/:id",
           readsQuery: false,
           described: false,
           withdrawn: true,
+          version: "2026-09-01",
         },
         {
           method: "get",
           path: "/roles",
           readsQuery: true,
+          // withQuery alone declares nothing documentable.
           described: false,
+          version: "2026-08-07",
         },
       ]);
     });
@@ -234,8 +286,8 @@ describe("collectRouteRegistrations", () => {
       const registrations = collectRouteRegistrations(
         [
           FRAMEWORK_IMPORT,
-          'v.get("/roles", { output: RoleList }, list);',
-          'v.post("/roles", { input: NewRole }, create);',
+          'service.registerRoute("get", "/roles", "2026-08-07", list, (b) => b.withOutput(RoleList));',
+          'service.registerRoute("post", "/roles", "2026-08-07", create, (b) => b.withInput(NewRole));',
         ].join("\n"),
       );
 
@@ -243,26 +295,39 @@ describe("collectRouteRegistrations", () => {
     });
 
     it("counts a docs block alone as describing the endpoint", () => {
-      // The framework publishes on `docs` with nothing else set, so an
+      // The framework publishes on `withDocs` with nothing else set, so an
       // endpoint carrying only an operation id and its tags does reach the
       // document. Read as undescribed, its hint would send a reader hunting
       // for an annotation that is already there.
       const registrations = collectRouteRegistrations(
         [
           FRAMEWORK_IMPORT,
-          'v.delete("/roles/:id", { docs: { operationId: "deleteRole" } }, remove);',
+          'service.registerRoute("delete", "/roles/:id", "2026-08-07", remove, (b) =>',
+          '  b.withDocs({ operationId: "deleteRole" }),',
+          ");",
         ].join("\n"),
       );
 
       expect(registrations.map((r) => r.described)).toEqual([true]);
     });
+
+    it("refuses a registration shape it cannot read rather than dropping it silently", () => {
+      expect(() =>
+        collectRouteRegistrations(
+          [
+            FRAMEWORK_IMPORT,
+            'service.registerRoute("get", "/" + suffix, "2026-08-07", read);',
+          ].join("\n"),
+        ),
+      ).toThrow(/cannot read/);
+    });
   });
 
   describe("when the file has nothing to do with @langwatch/api", () => {
     it("does not read an output key as a described endpoint", () => {
-      // `output:` is an ordinary word. Only the framework turns it into a
-      // describeRoute, so only a file importing the framework may be read
-      // that way.
+      // `output:` is an ordinary word. Only the framework turns a chain call
+      // into a describeRoute, so only a file importing the framework may be
+      // read that way.
       const registrations = collectRouteRegistrations(
         'secured.get("/things", async (c) => c.json({ output: result }));',
       );
@@ -270,6 +335,14 @@ describe("collectRouteRegistrations", () => {
       expect(registrations).toEqual([
         { method: "get", path: "/things", readsQuery: false, described: false },
       ]);
+    });
+
+    it("does not read framework-shaped calls without the import", () => {
+      const registrations = collectRouteRegistrations(
+        'registry.register("things.create", "2026-08-07", create);',
+      );
+
+      expect(registrations).toEqual([]);
     });
   });
 });

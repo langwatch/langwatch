@@ -1,5 +1,9 @@
-import type { Event } from "../../domain/types";
-import { definePipeline } from "../../pipeline/staticBuilder";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+} from "@langwatch/eventing";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
@@ -38,34 +42,36 @@ export interface GithubMaintenancePipelineDeps {
 export function createGithubMaintenancePipeline(
   deps: GithubMaintenancePipelineDeps,
 ) {
-  return (
-    definePipeline<Event>()
-      .withName("github_maintenance")
+  return definePipeline<Event>({
+    name: "github_maintenance",
+    aggregate: defineAggregate({
       // `global`, like the other maintenance pipelines: this appends no events,
       // and the sweep spans every tenant by design.
-      .withAggregateType("global")
-      .withProcessManager(GITHUB_BRANCH_RECHECK_PROCESS_NAME, (pm) =>
-        pm
-          .state<GithubBranchRecheckState>(GITHUB_BRANCH_RECHECK_INITIAL_STATE)
-          // Both intents are declared before `onWake` because the wake emits
-          // both: the builder only lets one be declared after it.
-          .intent(
-            "recheck",
-            githubBranchRecheckSchema,
-            runGithubBranchRecheck(deps.branchRecheck),
-          )
-          .intent(
-            "prune",
-            githubBranchRecheckSchema,
-            runGithubRetentionPrune(deps.branchRecheck),
-          )
-          .schedule({ everyMs: GITHUB_BRANCH_RECHECK_INTERVAL_MS })
-          .onWake(githubBranchRecheckWake)
-          // A pass is bounded at 50 branches and each one is a sequential GitHub
-          // call, so the lease has to cover fifty round trips plus their retries.
-          // The prune shares it: one DELETE, a single statement.
-          .outbox({ leaseDurationMs: 10 * 60 * 1000, maxAttempts: 3 }),
-      )
-      .build()
-  );
+      type: "global",
+      events: defineEvents([]),
+    }),
+  })
+    .withProcessManager(GITHUB_BRANCH_RECHECK_PROCESS_NAME, (pm) =>
+      pm
+        .state<GithubBranchRecheckState>(GITHUB_BRANCH_RECHECK_INITIAL_STATE)
+        // Both intents are declared before `onWake` because the wake emits
+        // both: the builder only lets one be declared after it.
+        .intent(
+          "recheck",
+          githubBranchRecheckSchema,
+          runGithubBranchRecheck(deps.branchRecheck),
+        )
+        .intent(
+          "prune",
+          githubBranchRecheckSchema,
+          runGithubRetentionPrune(deps.branchRecheck),
+        )
+        .schedule({ everyMs: GITHUB_BRANCH_RECHECK_INTERVAL_MS })
+        .onWake(githubBranchRecheckWake)
+        // A pass is bounded at 50 branches and each one is a sequential GitHub
+        // call, so the lease has to cover fifty round trips plus their retries.
+        // The prune shares it: one DELETE, a single statement.
+        .outbox({ leaseDurationMs: 10 * 60 * 1000, maxAttempts: 3 }),
+    )
+    .build();
 }

@@ -12,7 +12,7 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { AgentService } from "~/server/agents/agent.service";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -55,7 +55,7 @@ const defaultAgentConfigLookup: AgentConfigLookup = async ({
   projectId,
   agentId,
 }) => {
-  const agent = await AgentService.create(prisma).getById({
+  const agent = await AgentsFeature.create({ prisma, session: null }).getById({
     id: agentId,
     projectId,
   });

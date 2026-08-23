@@ -8,9 +8,9 @@
  * @see specs/licensing/billing-meter-dispatch.feature
  */
 
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../domain/tenantId";
 import type { ReportUsageForMonthCommandData } from "../../schemas/commands";
 
 // ---------------------------------------------------------------------------

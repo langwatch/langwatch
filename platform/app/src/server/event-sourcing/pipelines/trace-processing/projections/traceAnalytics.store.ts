@@ -1,7 +1,9 @@
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,

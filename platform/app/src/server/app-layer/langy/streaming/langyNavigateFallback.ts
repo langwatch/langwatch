@@ -23,7 +23,7 @@
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
-import { AgentService } from "~/server/agents/agent.service";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getApp } from "~/server/app-layer/app";
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { DatasetService } from "~/server/datasets/dataset.service";
@@ -175,7 +175,7 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
 
   agent_: async ({ projectId, resourceId }) => {
     // Throws AgentNotFoundError on a miss; the caller maps any throw to null.
-    const agent = await AgentService.create(prisma).getByIdOrThrow({
+    const agent = await AgentsFeature.create({ prisma, session: null }).getById({
       id: resourceId,
       projectId,
     });

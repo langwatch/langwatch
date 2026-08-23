@@ -6,11 +6,11 @@
  * Covers schema parsing, command handler emit, idempotency-key
  * collapsing, and the corresponding type guard.
  *
- * @see specs/event-sourcing/simulation-set-archive.feature
+ * @see specs/suites/simulation-set-archive.feature
  */
 
+import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TenantId } from "../../../domain/tenantId";
 import { ArchiveSetCommand } from "../commands";
 import {
   type SimulationProcessingEvent,

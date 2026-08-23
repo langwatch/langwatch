@@ -1,5 +1,5 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "./constants";
 import { canonicalLogRecordSchema } from "./logRecord";
 

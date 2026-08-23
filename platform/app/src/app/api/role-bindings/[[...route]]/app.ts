@@ -18,7 +18,7 @@
  * handlers never emit `management.roleBinding.*` rows of their own — that
  * would record the same mutation twice.
  */
-import type { BaseApp, VersionBuilder } from "@langwatch/api";
+import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
@@ -41,8 +41,10 @@ const { service, guard } = createManagementService({
   feature: "MANAGEMENT_API",
 });
 
-type RoleBindingsFamilyApp = BaseApp & { roleBindings: RoleBindingService };
-type RoleBindingsVersion = VersionBuilder<RoleBindingsFamilyApp>;
+/** The handler context: the framework's variables plus the family's provider. */
+type RoleBindingsContext = ServiceContext<
+  EndpointVariables & { roleBindings: RoleBindingService }
+>;
 
 // ── wire schemas ─────────────────────────────────────────────────────────────
 
@@ -144,6 +146,9 @@ const rowMatchesFilters = (
 const organizationOf = (c: Context): Organization =>
   c.get("organization") as Organization;
 
+/** Validated path params, typed at the read site (see the chain note in @langwatch/api). */
+const paramsOf = <T>(c: RoleBindingsContext): T => c.get("params") as T;
+
 /**
  * The just-written binding as the list reports it, so a write's response is
  * byte-compatible with a later read — or null while the grants projection is
@@ -170,17 +175,9 @@ const readBackBinding = async ({
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const listBindingsHandler = async (
-  c: Context,
-  {
-    query,
-    app,
-  }: {
-    query: z.infer<typeof listQuerySchema>;
-    app: RoleBindingsFamilyApp;
-  },
-) => {
-  const rows = await app.roleBindings.listForOrg({
+const listBindingsHandler = async (c: RoleBindingsContext) => {
+  const query = c.get("query") as z.infer<typeof listQuerySchema>;
+  const rows = await c.get("roleBindings").listForOrg({
     organizationId: organizationOf(c).id,
   });
   const filtered = rows.filter((row) => rowMatchesFilters(row, query));
@@ -193,24 +190,19 @@ const listBindingsHandler = async (
 };
 
 const createBindingHandler = async (
-  c: Context,
-  {
-    input,
-    app,
-  }: {
-    input: z.infer<typeof createBindingSchema>;
-    app: RoleBindingsFamilyApp;
-  },
+  c: RoleBindingsContext,
+  input: z.infer<typeof createBindingSchema>,
 ) => {
   const organization = organizationOf(c);
+  const roleBindings = c.get("roleBindings");
   const hasLegacyAccessNotice = input.userId
-    ? await app.roleBindings.wouldFirstBindingDisableLegacyAccess({
+    ? await roleBindings.wouldFirstBindingDisableLegacyAccess({
         organizationId: organization.id,
         userId: input.userId,
       })
     : false;
 
-  const created = await app.roleBindings.create({
+  const created = await roleBindings.create({
     organizationId: organization.id,
     ...input,
     actor: orgRequestLedgerActor(c),
@@ -223,7 +215,7 @@ const createBindingHandler = async (
   // role_binding_already_exists once the first row is projected).
   const binding =
     (await readBackBinding({
-      roleBindings: app.roleBindings,
+      roleBindings,
       organizationId: organization.id,
       bindingId: created.id,
     })) ??
@@ -246,19 +238,13 @@ const createBindingHandler = async (
 };
 
 const updateBindingHandler = async (
-  c: Context,
-  {
-    params,
-    input,
-    app,
-  }: {
-    params: z.infer<typeof idParamsSchema>;
-    input: z.infer<typeof updateBindingSchema>;
-    app: RoleBindingsFamilyApp;
-  },
+  c: RoleBindingsContext,
+  input: z.infer<typeof updateBindingSchema>,
 ) => {
+  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  const updated = await app.roleBindings.update({
+  const roleBindings = c.get("roleBindings");
+  const updated = await roleBindings.update({
     organizationId: organization.id,
     bindingId: params.id,
     role: input.role,
@@ -268,7 +254,7 @@ const updateBindingHandler = async (
     actor: orgRequestLedgerActor(c),
   });
   const binding = await readBackBinding({
-    roleBindings: app.roleBindings,
+    roleBindings,
     organizationId: organization.id,
     bindingId: updated.id,
   });
@@ -286,86 +272,15 @@ const updateBindingHandler = async (
   return binding;
 };
 
-const deleteBindingHandler = async (
-  c: Context,
-  {
-    params,
-    app,
-  }: {
-    params: z.infer<typeof idParamsSchema>;
-    app: RoleBindingsFamilyApp;
-  },
-) => {
+const deleteBindingHandler = async (c: RoleBindingsContext) => {
+  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  await app.roleBindings.delete({
+  await c.get("roleBindings").delete({
     organizationId: organization.id,
     bindingId: params.id,
     actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };
-};
-
-// ── endpoint registration ────────────────────────────────────────────────────
-
-const registerCollectionEndpoints = (v: RoleBindingsVersion): void => {
-  v.get(
-    "/",
-    {
-      ...guard("organization:manage"),
-      query: listQuerySchema,
-      output: z.object({
-        bindings: z.array(bindingSchema),
-        totalCount: z.number(),
-      }),
-      description:
-        "List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set.",
-      docs: { operationId: "listRoleBindings", tags: ["Role Bindings"] },
-    },
-    listBindingsHandler,
-  );
-
-  v.post(
-    "/",
-    {
-      ...guard("organization:manage"),
-      input: createBindingSchema,
-      output: createdBindingSchema,
-      status: 201,
-      description:
-        "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
-      docs: { operationId: "createRoleBinding", tags: ["Role Bindings"] },
-    },
-    createBindingHandler,
-  );
-};
-
-const registerItemEndpoints = (v: RoleBindingsVersion): void => {
-  v.patch(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      input: updateBindingSchema,
-      output: bindingSchema,
-      description:
-        "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.",
-      docs: { operationId: "updateRoleBinding", tags: ["Role Bindings"] },
-    },
-    updateBindingHandler,
-  );
-
-  v.delete(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      output: z.object({ success: z.literal(true) }),
-      description:
-        "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.",
-      docs: { operationId: "deleteRoleBinding", tags: ["Role Bindings"] },
-    },
-    deleteBindingHandler,
-  );
 };
 
 // ── service wiring ───────────────────────────────────────────────────────────
@@ -379,8 +294,70 @@ export const app = service
         roleService: new RoleService(prisma),
       }),
   })
-  .version(MANAGEMENT_API_VERSION, (v) => {
-    registerCollectionEndpoints(v);
-    registerItemEndpoints(v);
-  })
+  .registerRoute("get", "/", MANAGEMENT_API_VERSION, listBindingsHandler, (b) =>
+    guard("organization:manage")(b)
+      .withQuery(listQuerySchema)
+      .withOutput(
+        z.object({
+          bindings: z.array(bindingSchema),
+          totalCount: z.number(),
+        }),
+      )
+      .withDocs({
+        operationId: "listRoleBindings",
+        tags: ["Role Bindings"],
+        description:
+          "List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set.",
+      }),
+  )
+  .registerRoute(
+    "post",
+    "/",
+    MANAGEMENT_API_VERSION,
+    createBindingHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withInput(createBindingSchema)
+        .withOutput(createdBindingSchema)
+        .withStatus(201)
+        .withDocs({
+          operationId: "createRoleBinding",
+          tags: ["Role Bindings"],
+          description:
+            "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
+        }),
+  )
+  .registerRoute(
+    "patch",
+    "/:id",
+    MANAGEMENT_API_VERSION,
+    updateBindingHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withParams(idParamsSchema)
+        .withInput(updateBindingSchema)
+        .withOutput(bindingSchema)
+        .withDocs({
+          operationId: "updateRoleBinding",
+          tags: ["Role Bindings"],
+          description:
+            "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead.",
+        }),
+  )
+  .registerRoute(
+    "delete",
+    "/:id",
+    MANAGEMENT_API_VERSION,
+    deleteBindingHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withParams(idParamsSchema)
+        .withOutput(z.object({ success: z.literal(true) }))
+        .withDocs({
+          operationId: "deleteRoleBinding",
+          tags: ["Role Bindings"],
+          description:
+            "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found.",
+        }),
+  )
   .build();

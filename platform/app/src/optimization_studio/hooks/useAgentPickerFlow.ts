@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { NodeWithOptionalPosition } from "~/types";
 import type { Component } from "../types/dsl";
 import { buildAgentNodeData } from "../utils/agentNodeData";

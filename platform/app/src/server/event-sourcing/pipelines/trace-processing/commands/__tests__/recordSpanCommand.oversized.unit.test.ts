@@ -11,10 +11,10 @@
  * caps oversized attribute values before the span becomes an event.
  */
 
+import { type Command, createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
-import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../utils/capOversizedAttributes";

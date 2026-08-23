@@ -33,6 +33,7 @@ import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -69,7 +70,7 @@ describe("Feature: Role bindings REST API", () => {
   });
 
   const postBinding = (body: Record<string, unknown>) =>
-    app.request("/api/role-bindings", {
+    app.request(`/api/role-bindings/${MANAGEMENT_API_VERSION}/`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(body),
@@ -242,7 +243,7 @@ describe("Feature: Role bindings REST API", () => {
       expect(groupBinding.status).toBe(201);
 
       const byUser = await app.request(
-        `/api/role-bindings?userId=${memberUserId}`,
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/?userId=${memberUserId}`,
         { headers: authHeaders() },
       );
       expect(byUser.status).toBe(200);
@@ -257,7 +258,7 @@ describe("Feature: Role bindings REST API", () => {
       }
 
       const byTeamScope = await app.request(
-        `/api/role-bindings?scopeType=TEAM&scopeId=${teamAId}`,
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/?scopeType=TEAM&scopeId=${teamAId}`,
         { headers: authHeaders() },
       );
       const byTeamScopeBody = await byTeamScope.json();
@@ -269,7 +270,7 @@ describe("Feature: Role bindings REST API", () => {
 
       // The API-key principal from the seeding is listable too.
       const byApiKey = await app.request(
-        `/api/role-bindings?apiKeyId=${serviceApiKeyId}`,
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/?apiKeyId=${serviceApiKeyId}`,
         { headers: authHeaders() },
       );
       const byApiKeyBody = await byApiKey.json();
@@ -335,7 +336,7 @@ describe("Feature: Role bindings REST API", () => {
       expect(created.customRoleId).toBe(customRoleId);
 
       const list = await app.request(
-        `/api/role-bindings?groupId=${groupId}&scopeType=PROJECT&scopeId=${projectId}`,
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/?groupId=${groupId}&scopeType=PROJECT&scopeId=${projectId}`,
         { headers: authHeaders() },
       );
       const listBody = await list.json();
@@ -703,7 +704,7 @@ describe("Feature: Role bindings REST API", () => {
         ).permitted,
       ).toBe(true);
 
-      const response = await app.request(`/api/role-bindings/${created.id}`, {
+      const response = await app.request(`/api/role-bindings/${MANAGEMENT_API_VERSION}/${created.id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -724,7 +725,7 @@ describe("Feature: Role bindings REST API", () => {
     /** @scenario Deleting an unknown binding returns not found */
     it("answers role_binding_not_found for an unknown id", async () => {
       const response = await app.request(
-        `/api/role-bindings/rolebinding_${nanoid(10)}`,
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/rolebinding_${nanoid(10)}`,
         { method: "DELETE", headers: authHeaders() },
       );
 

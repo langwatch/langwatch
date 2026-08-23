@@ -38,7 +38,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
-import type { TypedAgent } from "../../server/agents/agent.repository";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
 import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";

@@ -8,7 +8,7 @@
  * publish a description at a fixed URL is that a caller can fetch it before it
  * has a token.
  *
- * See specs/api-reference/api-discovery.feature.
+ * See packages/api/specs/api-discovery.feature.
  */
 import { describe, expect, it } from "vitest";
 
@@ -265,9 +265,9 @@ describe("API discovery", () => {
     });
   });
 
-  describe("given a caller that wants only the RPC operations", () => {
+  describe("given a caller that wants the RPC fleet", () => {
     describe("when it POSTs to the catalogue", () => {
-      /** @scenario "Discovering the catalogue is itself an RPC" */
+      /** @scenario "Discovering a catalogue is itself an RPC" */
       it("answers a POST at the dotted name", async () => {
         const res = await app.request("/api/rpc.discover", { method: "POST" });
 
@@ -275,21 +275,46 @@ describe("API discovery", () => {
         expect(res.headers.get("content-type")).toContain("application/json");
       });
 
-      /**
-       * No family has adopted RPC naming yet, so the catalogue is empty and
-       * says so honestly. Deriving it from the document rather than a registry
-       * is what makes that require no backfill later.
-       */
-      /** @scenario "The catalogue reports no operation the document does not carry" */
-      it("reports an empty catalogue that still points at the document", async () => {
+      /** @scenario "The root catalogue links to every service's catalogue" */
+      it("lists every framework service with the URL of its own catalogue, repeating no operation", async () => {
         const res = await app.request("/api/rpc.discover", { method: "POST" });
         const catalogue = (await res.json()) as {
           openapi: string;
-          operations: unknown[];
+          services: { name: string; discover: string }[];
         };
 
-        expect(catalogue.operations).toEqual([]);
         expect(catalogue.openapi).toBe(WELL_KNOWN);
+        expect(catalogue).not.toHaveProperty("operations");
+        expect(catalogue.services).toEqual([
+          {
+            name: "organization",
+            discover: "/api/organization/latest/rpc.discover",
+          },
+          {
+            name: "role-bindings",
+            discover: "/api/role-bindings/latest/rpc.discover",
+          },
+          { name: "roles", discover: "/api/roles/latest/rpc.discover" },
+          {
+            name: "scim-tokens",
+            discover: "/api/scim-tokens/latest/rpc.discover",
+          },
+        ]);
+      });
+
+      it("and the service catalogue it points at answers", async () => {
+        const { app: rolesApp } =
+          await import("~/app/api/roles/[[...route]]/app");
+
+        const res = await rolesApp.request("/api/roles/latest/rpc.discover", {
+          method: "POST",
+        });
+
+        expect(res.status).toBe(200);
+        const catalogue = (await res.json()) as { operations: unknown[] };
+        // The management families are REST: no dotted operations yet, and an
+        // empty catalogue is an honest answer, not a missing one.
+        expect(catalogue.operations).toEqual([]);
       });
     });
 

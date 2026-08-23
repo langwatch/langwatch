@@ -1,6 +1,6 @@
+import { EventUtils } from "@langwatch/eventing";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";

@@ -250,7 +250,9 @@ Feature: Handled errors — the handled-error boundary
   # ==========================================================================
 
   # @unimplemented: no SSE subscription is exercised end-to-end anywhere that
-  # would observe the error frame's payload.
+  # would observe the error frame's payload. When registerSse (packages/api)
+  # becomes the transport for these streams, this payload is the contract it
+  # adopts — packages/api/specs/sse-streaming.feature pins the framework side.
   @integration @unimplemented @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
     Given an SSE subscription hits a known failure mid-stream

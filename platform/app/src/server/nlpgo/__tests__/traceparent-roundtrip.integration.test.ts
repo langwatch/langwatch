@@ -51,33 +51,38 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-
+import type { EventSourcing } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import { type AggregateType, definePipeline } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
+  createTestEventSourcing,
   createTestTenantId,
   getTenantIdString,
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import { AssignTopicCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/assignTopicCommand";
 import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/recordSpanCommand";
 import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
 import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
+import { TRACE_PROCESSING_EVENT_TYPES } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { makeQueueName } from "~/server/queues/makeQueueName";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -263,11 +268,9 @@ describe.skipIf(!shouldRun)(
       const eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(async () => clickHouseClient),
       );
-      eventSourcing = EventSourcing.createWithStores({
+      eventSourcing = createTestEventSourcing({
         eventStore,
-        clickhouse: async () => clickHouseClient,
         redis: redisConnection,
-        processRole: "worker",
       });
 
       const spanAppendStore = new SpanAppendStore(
@@ -284,23 +287,43 @@ describe.skipIf(!shouldRun)(
       const pipelineName = `trace_nlpgo_e2e_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 8)}`;
-      const pipelineDef = definePipeline<TraceProcessingEvent>()
-        .withName(pipelineName)
-        .withAggregateType("trace" as AggregateType)
-        .withFoldProjection(
-          "traceSummary",
+      const pipelineDef = definePipeline<TraceProcessingEvent>({
+        name: pipelineName,
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
+        }),
+      })
+        .withClickHouseFoldProjection(
           new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
         )
-        .withMapProjection(
-          "spanStorage",
+        .withClickHouseMapProjection(
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
-        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
-        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
-        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
-        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
-        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
+        .withProjectionSubscriber(
+          "evaluationTrigger",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "customEvaluationSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "traceUpdateBroadcast",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "simulationMetricsSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "projectMetadata",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "spanStorageBroadcast",
+          noopMapSubscriber() as any,
+        )
         // REAL RecordSpanCommand with no-op PII/cost/token deps —
         // same pattern as the other event-sourcing integration tests.
         .withCommand(

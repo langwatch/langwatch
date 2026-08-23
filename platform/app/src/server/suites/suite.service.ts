@@ -6,6 +6,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { AgentService } from "@langwatch/agents-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
@@ -14,7 +15,7 @@ import type {
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
 import { slugify } from "~/utils/slugify";
-import { AgentRepository } from "../agents/agent.repository";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
@@ -67,7 +68,10 @@ export class SuiteService {
   constructor(
     private readonly repository: SuiteRepository,
     private readonly scenarioRepository: ScenarioRepository,
-    private readonly agentRepository: AgentRepository,
+    private readonly agentRepository: Pick<
+      AgentService,
+      "getNamesByIds" | "getReferenceStates"
+    >,
     private readonly llmConfigRepository: LlmConfigRepository,
     private readonly suiteRunService: SuiteRunService,
   ) {}
@@ -82,7 +86,7 @@ export class SuiteService {
     return new SuiteService(
       new SuiteRepository(params.prisma),
       new ScenarioRepository(params.prisma),
-      new AgentRepository(params.prisma),
+      AgentsFeature.create({ prisma: params.prisma, session: null }),
       new LlmConfigRepository(params.prisma),
       params.suiteRunService,
     );
@@ -398,7 +402,7 @@ export class SuiteService {
 
     const agentRows =
       agentIds.length > 0
-        ? await this.agentRepository.findNamesByIds({
+        ? await this.agentRepository.getNamesByIds({
             ids: agentIds,
             projectId,
           })
@@ -571,7 +575,7 @@ export class SuiteService {
     // Batch agent targets (both HTTP and code agents live in the Agent table)
     const agentRows =
       agentTargets.length > 0
-        ? await this.agentRepository.findManyIncludingArchived({
+        ? await this.agentRepository.getReferenceStates({
             ids: agentTargets.map((t) => t.referenceId),
             projectId,
           })

@@ -1,10 +1,10 @@
-import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,
   BulkAppendContext,
-} from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 
 abstract class MetricStoreBase

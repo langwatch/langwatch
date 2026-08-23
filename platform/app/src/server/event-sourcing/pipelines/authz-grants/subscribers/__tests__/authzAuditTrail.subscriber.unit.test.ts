@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../..";
+import { createTenantId } from "@langwatch/eventing";
 import {
   AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,

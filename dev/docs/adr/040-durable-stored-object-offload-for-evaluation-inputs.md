@@ -4,7 +4,9 @@
 
 **Status:** Proposed
 
-**Relates to:** [ADR-022](./022-event-log-source-of-truth.md) (event_log as source of truth, transient S3 spool for trace payloads), [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-022 data-retention](./022-data-retention.md) (row TTL).
+**Partially superseded by:** [Stored Objects ADR-001](../../../packages/features/stored-objects/adrs/001-package-boundary.md) for Stored Objects persistence, write ordering, current-state projection and byte-ledger authority. This ADR continues to own evaluation thresholds, marker shapes, fail-open policy, read resolution and the evaluation-specific retention requirement.
+
+**Relates to:** [ADR-022](./022-event-log-source-of-truth.md) (event_log as source of truth, transient S3 spool for trace payloads), [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md) (event sourcing), [ADR-022 data-retention](./022-data-retention.md) (row TTL).
 
 ## Context
 
@@ -28,26 +30,34 @@ Concretely:
 - **Offload marker** is a valid JSON object so every existing `JSON.stringify(inputs)` / `JSON.parse(Inputs)` seam keeps working:
 
   ```json
-  { "__lw_stored_object": { "id": "...", "sizeBytes": 0, "sha256": "...", "preview": "...", "truncatedPreview": true } }
+  {
+    "__lw_stored_object": {
+      "id": "...",
+      "sizeBytes": 0,
+      "sha256": "...",
+      "preview": "...",
+      "truncatedPreview": true
+    }
+  }
   ```
 
   `preview` is the first 16 KiB of the serialized inputs; `truncatedPreview` says whether it is a prefix of a longer payload.
 
 - **Hard ceiling `EVAL_INPUTS_HARD_CEILING_BYTES = 50 MiB`** (env `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES`). Above it the full payload is not moved to storage (a multi-GB PUT is itself a memory and latency hazard). The marker carries the preview only, with `ceilingExceeded: true`, `id: ""`, `sha256: null`, and a structured warning attributes the bound to the tenant and evaluation. The full content is not recoverable in this pathological case; this is accepted because it protects the platform and is observable.
 
-- **Write-time wiring.** The offload runs inside `emitReported` in `executeEvaluation.command.ts`, before the event is built, so the stored-object PUT precedes the `event_log` append (matching the PUT-then-row ordering the stored-objects service uses internally). It is on by default (the SYSTEM feature flag `ops_evaluation_payload_offload_disabled` is the operator kill switch, flipped from /ops/feature-flags) and fail-open for the evaluation, bounded for the payload: a PUT error degrades the inputs to a preview-only marker (`offloadFailed: true`, `id: ""`, `sha256: null`) with a structured warning, so the evaluation still completes while `event_log.EventPayload` and the fold stay bounded even during an S3 outage. Full input recovery is unavailable for runs reported in that window, the same trade the hard ceiling makes. An unreadable kill switch keeps the default (offload runs). When disabled, inputs flow inline and only the unconditional repository cap below bounds the row.
+- **Write-time wiring.** The offload runs inside `emitReported` in `executeEvaluation.command.ts`, before the evaluation event is built, so a durable stored-object reference exists before that event is appended. Stored Objects itself registers the write operation before moving bytes, as defined by Stored Objects ADR-001. It is on by default (the SYSTEM feature flag `ops_evaluation_payload_offload_disabled` is the operator kill switch, flipped from /ops/feature-flags) and fail-open for the evaluation, bounded for the payload: a PUT error degrades the inputs to a preview-only marker (`offloadFailed: true`, `id: ""`, `sha256: null`) with a structured warning, so the evaluation still completes while `event_log.EventPayload` and the fold stay bounded even during an S3 outage. Full input recovery is unavailable for runs reported in that window, the same trade the hard ceiling makes. An unreadable kill switch keeps the default (offload runs). When disabled, inputs flow inline and only the unconditional repository cap below bounds the row.
 
 - **Belt-and-braces unconditional row cap.** `evaluation-run.clickhouse.repository.ts` caps the serialized `Inputs` at 8 MiB at write, replacing it with a valid-JSON `{ "__lw_truncated": { originalBytes, cap } }` marker, and caps `Details` / `Error` / `ErrorDetails` as plain text with an observable suffix. This runs on every write regardless of the flag or the writer, so a ClickHouse part is merge-safe even when the offload path is off, failed open, or bypassed by another writer. With offload on, `Inputs` arrives here already as a small marker, so the cap is a no-op.
 
-- **Read resolution.** Markers are resolved only at API read boundaries, behind an optional dependency, mirroring the trace read path. The natural seam is `EvaluationService.getEvaluationInputs`, the lazy per-evaluation read the trace drawer already fetches through: it streams the durable object and returns the full inputs, so the caller cannot tell whether the inputs were inline or offloaded. Folds and reactors receive the raw marker and never dereference it, so the fat payload never re-inlines on a fold re-write.
+- **Read resolution.** Markers are resolved only at API read boundaries, behind an optional dependency, mirroring the trace read path. The natural seam is `EvaluationService.getEvaluationInputs`, the lazy per-evaluation read the trace drawer already fetches through: it streams the durable object and returns the full inputs, so the caller cannot tell whether the inputs were inline or offloaded. Folds and projection subscribers receive the raw marker and never dereference it, so the fat payload never re-inlines on a fold re-write.
 
-- **Billing ledger.** The stored-objects table already records `size_bytes` per row, which is the offloaded byte ledger. `StoredObjectsService.getStorageUsageByProject` sums it per project (optionally per purpose) using the ReplacingMergeTree IN-tuple dedup pattern, and `stored_objects` is added to the ClickHouse storage-stats `MONITORED_TABLES`. Stripe metering is out of scope; the ledger and its aggregation are the deliverable.
+- **Billing ledger.** The Stored Objects Postgres projection records verified bytes once per active project-scoped content ID. `StoredObjectsService.getStorageUsageByProject` reads that ledger; purpose is provenance and its filtered totals are diagnostic rather than additive allocation. The legacy ClickHouse `stored_objects` table and storage-stats collector remain compatibility surfaces only during the authority migration defined by Stored Objects ADR-001. Stripe metering is out of scope; the ledger and its aggregation are the deliverable.
 
 ## Rationale / Trade-offs
 
-Offload beats truncation because it keeps the full evaluator input content, which is the whole value of storing inputs: a truncated input cannot be re-inspected or re-run. Reusing the stored-objects service means content-addressed dedup, per-tenant BYOC dataplane resolution, the project-delete cascade, and the `size_bytes` ledger all come for free, and there is one byte path to reason about rather than a new one.
+Offload beats truncation because it keeps the full evaluator input content, which is the whole value of storing inputs: a truncated input cannot be re-inspected or re-run. Reusing the stored-objects service means content-addressed dedup, per-tenant BYOC dataplane resolution, the project-delete cascade, and the Stored Objects project byte ledger all come for free, and there is one byte path to reason about rather than a new one.
 
-Resolving only at read boundaries, never inside the fold, is the load-bearing constraint. The fold reads current state and re-upserts it; resolving a marker there would re-inline the fat payload into the next row write and defeat the entire mechanism. Keeping folds and reactors on the raw marker is what makes the bound durable across re-folds.
+Resolving only at read boundaries, never inside the fold, is the load-bearing constraint. The fold reads current state and re-upserts it; resolving a marker there would re-inline the fat payload into the next row write and defeat the entire mechanism. Keeping folds and projection subscribers on the raw marker is what makes the bound durable across re-folds.
 
 The unconditional repository cap is deliberately coarser than the offload (it truncates rather than preserving content). It is not the primary mechanism; it is the backstop that guarantees merge-safety independent of the flag and independent of which writer produced the row.
 
@@ -55,8 +65,8 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 
 - `event_log.EventPayload` and `evaluation_runs.Inputs` stay bounded for oversized inputs; part merges no longer risk memory exhaustion from a single fat row.
 - Reads through the lazy inputs seam are transparent; no frontend change is required, since the marker is resolved server-side.
-- Offloaded bytes are attributable per tenant through `size_bytes`, surfaced by `getStorageUsageByProject` and the storage-stats collector.
-- **Retention gotcha (accepted, with follow-up):** `stored_objects` has no TTL (its migration defines no `TTL` clause, and the no-retention invariant is pinned by a test). Offloaded evaluation inputs therefore outlive the `evaluation_runs` row TTL: the row expires on the retention schedule, but the durable object persists until the project is deleted (the stored-objects project-delete cascade removes it). This is accepted for now. Follow-up: a retention-aware sweep that deletes `purpose = "evaluation_inputs"` objects whose owning evaluation has aged out, so offloaded inputs honor the same retention window as the row.
+- Offloaded bytes are attributable per tenant through the Stored Objects project ledger and surfaced by `getStorageUsageByProject`.
+- **Retention gotcha (accepted, with follow-up):** Stored Objects has no generic time-based garbage collection. Offloaded evaluation inputs therefore outlive the `evaluation_runs` row TTL: the row expires on the retention schedule, but the durable object persists until the project is deleted through the Stored Objects cascade. This is accepted for now. Follow-up: Evaluations owns a retention-aware sweep that asks Stored Objects to delete `purpose = "evaluation_inputs"` objects whose owning evaluation has aged out, so offloaded inputs honor the same retention window as the row.
 - The hard-ceiling case loses full content for pathological (>50 MiB) inputs. This is observable via the structured warning and is a conscious trade against unbounded PUTs.
 
 ## References
@@ -64,4 +74,4 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 - Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
 - Offload module: `platform/app/src/server/app-layer/evaluations/evaluation-inputs-offload.ts`
 - Unconditional caps: `platform/app/src/server/app-layer/evaluations/evaluation-column-caps.ts`
-- Related ADRs: ADR-022 (event_log source of truth / transient spool), ADR-007 (event sourcing).
+- Related ADRs: [ADR-022](./022-event-log-source-of-truth.md) (event-log source of truth and transient spool) and the [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md).

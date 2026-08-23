@@ -1,17 +1,17 @@
+import type {
+  FoldProjectionOptions,
+  FoldProjectionStore,
+} from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "~/server/event-sourcing/projections/abstractFoldProjection";
-import type {
-  FoldProjectionOptions,
-  FoldProjectionStore,
-} from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "../schemas/constants";
 import type {
@@ -1189,7 +1189,7 @@ export class TraceAnalyticsFoldProjection
    * out-of-order batch, pinning the checkpoint at the max occurredAt so every
    * later batch looked out of order too — an O(n²) death spiral that never
    * caught up (2026-07-09 incident; see
-   * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   * specs/trace-processing/hot-trace-fold-amplification.feature).
    *
    * Precision about "order-insensitive", because the executor keys on this flag
    * to choose the STREAMING refold (`streamRefoldUpToDelivered`, whose pages

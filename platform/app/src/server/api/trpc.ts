@@ -56,7 +56,8 @@ import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
-import { type App, getApp } from "~/server/app-layer/app";
+import { RequestApp, type RequestAppServices } from "~/runtime/app/requestApp";
+import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -90,12 +91,10 @@ interface CreateContextOptions {
   res?: NextApiResponse;
   session: Session | null;
   /**
-   * The composed App this request decides through. The request path passes
-   * `getApp()`; a test can inject a fake here instead of mocking the App
-   * module. Left unset, App-reading middleware falls back to the process
-   * singleton.
+   * The request application this context decides through. Tests can inject a
+   * fake here instead of constructing runtime infrastructure.
    */
-  app?: App;
+  app?: RequestAppServices;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
@@ -126,7 +125,13 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     req: opts.req,
     res: opts.res,
     prisma,
-    app: opts.app,
+    app:
+      opts.app ??
+      RequestApp.create({
+        prisma,
+        session: opts.session,
+        permissions: getApp().permissions,
+      }),
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
@@ -151,7 +156,6 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     session,
-    app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
   });

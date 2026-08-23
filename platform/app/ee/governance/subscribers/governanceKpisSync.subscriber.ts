@@ -8,8 +8,8 @@ import type {
   GovernanceKpiContribution,
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -38,7 +38,7 @@ export interface GovernanceKpisSyncSubscriberDeps {
 }
 
 /**
- * Pre-enqueue relevance guard (ADR-026 via ADR-098): the origin check is a
+ * Pre-enqueue relevance guard: the origin check is a
  * pure read of the committed fold state, so deciding at `when` is equivalent
  * to the early-return in the handler — except a non-governance trace never
  * pays a serialize + queue round-trip for a job that would immediately no-op.

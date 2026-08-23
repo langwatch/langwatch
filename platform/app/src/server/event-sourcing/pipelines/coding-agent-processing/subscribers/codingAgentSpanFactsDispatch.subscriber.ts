@@ -1,7 +1,7 @@
+import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
 import {
   isSpanReceivedEvent,

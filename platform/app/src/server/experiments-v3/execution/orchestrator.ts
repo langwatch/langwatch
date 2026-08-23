@@ -35,7 +35,7 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { Agent as TypedAgent } from "@langwatch/agents-contract";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type {

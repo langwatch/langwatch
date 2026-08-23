@@ -1,3 +1,4 @@
+import { SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -16,7 +17,6 @@ import type {
   MetricUsageEstimate,
   MetricUsageEstimateQuery,
 } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import type {
   MetricDataPointBulkWrite,
   MetricDataPointRepository,

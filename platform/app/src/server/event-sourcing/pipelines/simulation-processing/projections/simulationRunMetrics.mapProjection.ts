@@ -1,8 +1,8 @@
+import type { AppendStore } from "@langwatch/eventing";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
-} from "../../../projections/abstractMapProjection";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+} from "@langwatch/eventing";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import {
   type SimulationRunMetricsComputedEvent,

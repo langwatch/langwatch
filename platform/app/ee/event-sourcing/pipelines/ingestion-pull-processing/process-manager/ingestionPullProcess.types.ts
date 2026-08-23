@@ -1,6 +1,5 @@
+import type { IntentSpec } from "@langwatch/eventing";
 import { z } from "zod";
-
-import type { IntentSpec } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
 export const INGESTION_PULL_PROCESS_NAME = "ingestionPull";
 

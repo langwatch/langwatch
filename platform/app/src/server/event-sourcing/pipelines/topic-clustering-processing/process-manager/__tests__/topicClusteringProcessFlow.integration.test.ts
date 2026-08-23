@@ -1,16 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
-import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
-import {
-  InMemoryProcessStore,
-  OutboxDispatcherService,
-  ProcessManagerService,
-} from "~/server/event-sourcing/process-manager";
 import {
   buildIntentHandlers,
   buildProcessDefinition,
-} from "~/server/event-sourcing/process-manager/processRuntime";
+  buildProcessManager,
+  InMemoryProcessStore,
+  OutboxDispatcherService,
+  ProcessManagerService,
+} from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 
 import { buildProcessEventView } from "../topicClustering.process";
 import type { TopicClusteringOutcomeCommands } from "../topicClusteringIntentHandlers";

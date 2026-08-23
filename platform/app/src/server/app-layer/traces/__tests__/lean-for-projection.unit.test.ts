@@ -9,9 +9,9 @@
  * No "should" in it() names (project convention).
  */
 
+import type { Event } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { Event } from "~/server/event-sourcing";
-import { createTenantId } from "~/server/event-sourcing";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,

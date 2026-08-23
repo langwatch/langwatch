@@ -1,4 +1,5 @@
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
+import { toDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   Column,
@@ -14,7 +15,6 @@ import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import type { AlertType } from "~/generated/prisma/client";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
-import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {

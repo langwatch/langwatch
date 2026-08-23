@@ -1,5 +1,5 @@
+import type { ProcessRef } from "@langwatch/eventing";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,

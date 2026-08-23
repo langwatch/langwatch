@@ -1,3 +1,4 @@
+import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import crypto from "crypto";
@@ -14,7 +15,6 @@ import type {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { EventUtils } from "../../event-sourcing/utils/event.utils";
 import type { CanonicalizeSpanAttributesService } from "./canonicalisation";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 

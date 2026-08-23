@@ -19,8 +19,8 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 **Prior art / related decisions.**
 - **ADR-024 (cold-path tiered storage)** — precedent that object storage is "deployment shape, not a customer feature," with self-hosted-may-not-have-S3 gated by env. Our storage-gating mirrors it.
 - **ADR-022 (data retention)** — "retention *charging*, not auto-deletion" is the model for the deferred dataset-storage billing.
-- **ADR-007 / 023 / 026 (event sourcing, GroupQueue)** — the GroupQueue is the in-house Redis FIFO substrate that replaced BullMQ; `registerJob` schedules standalone one-shot work on it.
-- **#4547** removes the BullMQ legacy stack (`src/server/background/`); **#4498 (outbox)** and **#4743** build the GroupQueue-based replacement. New async work must not use BullMQ.
+- **[Group Queue framework](../../../packages/group-queue/adrs/20260820-group-queue-framework-boundary.md)** — `registerJob` schedules standalone, ordered one-shot work on the shared Redis transport.
+- Dataset normalization is a product job over Group Queue, not an Eventing pipeline or process manager.
 - **ADR-019** + `CLAUDE.md` — Hono route → service → repository; `projectId` on every query.
 
 ## Decision
@@ -35,7 +35,7 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 
 4. **Heavy uploads go browser→S3 directly via a presigned upload; the backend never receives file bytes, the client never parses the file.** The upload key is **server-generated and scoped to a single `staging/{projectId}/…` object** (tenant isolation — the browser performs the write, so the key is locked at presign time), with a short TTL and the **size cap enforced at *finalize*** (HEAD the staged object; reject + delete if over `UPLOAD_MAX_BYTES`). The presign is a **PUT** via the already-installed `s3-request-presigner` (no new dep); a POST-policy that rejects *before* bytes land (`createPresignedPost`) is deferred hardening (v6). The normalizer reads only from the staging prefix and writes chunk keys itself — a client can never presign a live chunk key. Self-hosted without browser-reachable S3 instead mints a **same-origin streaming staging route** (the app receives the PUT and streams it to local-FS staging), so heavy uploads work without S3 too — the bytes transit the app, accepted for single-pod self-host (v14). The presign/finalize/retry routes are reachable by the **browser session cookie** (not API-key-only), with an API-key fallback for the SDK, and enforce `datasets:manage` + project membership on the client-supplied `projectId` (v10). Rejects backend-proxied upload, size-threshold split, client-influenced keys, unbounded PUT.
 
-5. **Normalize (raw CSV/JSONL in S3 → chunked JSONL) runs off-request as a standalone GroupQueue job (`registerJob`), idempotent under re-drive — pure Postgres + S3, no ClickHouse.** *(No dedup key: the per-dataset group key serializes to concurrency 1 and the handler's `status='processing'` guard makes a re-enqueue a no-op; a `ttlMs` dedup was rejected as it would swallow a legitimate fast retry — v17.)* A mechanical one-shot transform, deliberately not modelled as a domain event. It is held to a **streaming/memory contract** so it doesn't fall over: true backpressured streaming (read-stream → record transform → chunk-writer stream, never an in-memory array), **concurrency = 1** for the normalize group (a heavy job can't OOM the shared worker and take down folds/projections), and a **fast reject above `UPLOAD_MAX_BYTES`**. If a job is interrupted (worker death), nothing is lost — the dataset stays at `status=processing` with PG rows and the staging file intact, and is recoverable via a **manual retry** (re-enqueue) **and** an automatic **poll-triggered re-drive** (`reapStaleProcessing`, fired on the next upload — still no cron; v17); a stuck dataset is never a dead end. Rejects BullMQ (deleted, #4547), synchronous-in-request (timeout on GB files), and `.withOutbox`/reactor/fold (pulls ClickHouse into a PG-only domain + depends on unmerged #4498). A standalone **cron** sweeper was considered and dropped — the recovery sweeps are poll-triggered, not scheduled (see Revisions v2, v17).
+5. **Normalize (raw CSV/JSONL in S3 → chunked JSONL) runs off-request as a standalone Group Queue job (`registerJob`), idempotent under re-drive — pure Postgres + S3, no ClickHouse.** The per-dataset group key serializes work at concurrency 1 and the handler's `status='processing'` guard makes re-enqueue safe; a TTL dedup is deliberately absent because it could swallow a legitimate fast retry. The transform is held to a streaming/memory contract: backpressured read → transform → chunk-writer streams, no in-memory dataset array, and a fast reject above `UPLOAD_MAX_BYTES`. If a worker stops, the dataset remains `processing` with its rows and staging file intact. Manual re-enqueue and poll-triggered stale-work re-drive recover it. This mechanical product job does not use an Eventing projection or process manager.
 
 6. **The dataset carries a PG `status` column** (`uploading` → `processing` → `ready` / `failed`), typed `String @default("ready")` so existing rows stay valid; the normalize job flips it. **Every read consumer gates on `status=ready`** — UI (polls), the Go engine via `loadDatasets.ts`, the REST `/upload` append path, and the SDK — so a half-normalized dataset is never served. Rejects a ClickHouse fold projection (PG-only domain) and a Prisma enum (house style uses `String` for lifecycles).
 
@@ -94,7 +94,7 @@ model Dataset {
 }
 
 // DatasetRecord: UNCHANGED here. Dropped in a SEPARATE later migration after full cutover (Decision 7).
-// No ReactorOutbox / ClickHouse changes — normalize is a standalone GroupQueue job (Decision 5).
+// Normalize is a standalone Group Queue job (Decision 5).
 ```
 
 Migration is additive (new nullable columns + defaults); existing rows become `status="ready"`, `contentLayout="postgres"`, served from PG until the migration job flips them to `s3_jsonl`.
@@ -119,7 +119,7 @@ Migration is additive (new nullable columns + defaults); existing rows become `s
 
 - **Batched/streaming dataset reads** — the immediate fast-follow epic.
 - **`UPLOAD_MAX_BYTES`** — pick a concrete value before implementation.
-- ~~**Automatic re-drive** (poll-triggered, no scheduler)~~ — **shipped (v17):** `reapStaleProcessing` re-drives wedged `processing` rows and `reapStalePendingUploads` reaps abandoned `uploading` rows, both poll-triggered on the next upload (no scheduler). The **`.withOutbox` migration** remains optional later hardening.
+- `reapStaleProcessing` re-drives wedged `processing` rows and `reapStalePendingUploads` reaps abandoned `uploading` rows. Both are poll-triggered by upload activity rather than a scheduler.
 - **Chunk row-count ceiling** — value deferred to the reads epic; v1's only hard bound is the ~16 MB byte cap (Decision 2). (Self-hosted migration trigger resolved in Decision 7 — Helm hook Job.)
 - **POST-policy hardening** — adopt `createPresignedPost` (`@aws-sdk/s3-presigned-post`) to reject oversize *at upload* rather than at finalize; deferred (v6 ships PUT + finalize guard, dep-free).
 - **BYOC route** — decommission the dead `useCustomS3` DB route or wire `DATAPLANE_S3__`; deferred, resolver seam keeps it additive.

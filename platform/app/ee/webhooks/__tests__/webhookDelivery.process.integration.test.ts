@@ -9,6 +9,16 @@
  * the pipeline's own applier.
  */
 
+import type { ProcessEventEnvelope } from "@langwatch/eventing";
+import {
+  buildIntentHandlers,
+  buildProcessDefinition,
+  buildProcessManager,
+  InMemoryProcessStore,
+  OutboxDispatcherService,
+  type ProcessDefinition,
+  ProcessManagerService,
+} from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -21,24 +31,12 @@ import {
 } from "vitest";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
-import {
-  InMemoryProcessStore,
-  type ProcessDefinition,
-  ProcessManagerService,
-} from "~/server/event-sourcing/process-manager";
-import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
-import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
-import {
-  buildIntentHandlers,
-  buildProcessDefinition,
-} from "~/server/event-sourcing/process-manager/processRuntime";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,

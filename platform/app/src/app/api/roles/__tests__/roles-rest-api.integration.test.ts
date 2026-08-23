@@ -17,6 +17,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -42,7 +43,7 @@ describe("Feature: Custom roles REST API", () => {
     description?: string;
     permissions: string[];
   }) => {
-    const response = await app.request("/api/roles", {
+    const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(body),
@@ -112,7 +113,7 @@ describe("Feature: Custom roles REST API", () => {
       });
       expect(auditor.status).toBe(201);
 
-      const response = await app.request("/api/roles", {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
@@ -204,7 +205,7 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${created.id}`, {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
         headers: authHeaders(),
       });
 
@@ -220,7 +221,7 @@ describe("Feature: Custom roles REST API", () => {
 
     /** @scenario Fetching a role from another organization is refused */
     it("answers custom_role_not_found for another organization's role id", async () => {
-      const response = await app.request(`/api/roles/${otherOrgRoleId}`, {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${otherOrgRoleId}`, {
         headers: authHeaders(),
       });
 
@@ -237,14 +238,14 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${created.id}`, {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ permissions: ["project:view"] }),
       });
       expect(response.status).toBe(200);
 
-      const readBack = await app.request(`/api/roles/${created.id}`, {
+      const readBack = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
         headers: authHeaders(),
       });
       expect((await readBack.json()).permissions).toEqual(["project:view"]);
@@ -259,14 +260,14 @@ describe("Feature: Custom roles REST API", () => {
         })
       ).json();
 
-      const response = await app.request(`/api/roles/${created.id}`, {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
       expect((await response.json()).success).toBe(true);
 
-      const readBack = await app.request(`/api/roles/${created.id}`, {
+      const readBack = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/${created.id}`, {
         headers: authHeaders(),
       });
       expect(readBack.status).toBe(404);
@@ -275,7 +276,7 @@ describe("Feature: Custom roles REST API", () => {
 
     /** @scenario The permission catalog lists organization-exclusive permissions */
     it("groups permissions by resource and marks the organization-exclusive ones", async () => {
-      const response = await app.request("/api/roles/permissions", {
+      const response = await app.request(`/api/roles/${MANAGEMENT_API_VERSION}/permissions`, {
         headers: authHeaders(),
       });
 

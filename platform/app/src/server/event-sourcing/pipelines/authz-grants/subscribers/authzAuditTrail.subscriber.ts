@@ -1,7 +1,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { GrantEventSource } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
-import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
+import type { SubscriberSpec } from "@langwatch/eventing";
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,
   type AuthzAuditVerb,
@@ -229,7 +229,7 @@ export function toAuthzAuditRow(event: AuthzGrantsEvent): AuthzAuditRow {
  */
 export function createAuthzAuditTrailSubscriber(
   deps: AuthzAuditTrailSubscriberDeps,
-): SubscriberSpec<AuthzGrantsEvent> {
+): SubscriberSpec<AuthzGrantsEvent> & { fold?: never; map?: never } {
   return {
     events: AUTHZ_AUDIT_EVENT_TYPES,
     when: (event) => isAuditableGrantEvent(event),

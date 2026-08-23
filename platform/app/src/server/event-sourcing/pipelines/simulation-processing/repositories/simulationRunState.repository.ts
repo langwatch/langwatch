@@ -3,7 +3,7 @@ import type {
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
-} from "../../../";
+} from "@langwatch/eventing";
 
 export interface SimulationRunStateRepository<
   ProjectionType extends Projection = Projection,

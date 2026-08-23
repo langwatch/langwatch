@@ -41,6 +41,13 @@ export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
 /** In-place, idempotent import driven by the shared system-migration runner. */
 export class ClickHouseImportStoredObjectMigration implements SystemMigration {
   readonly name = STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME;
+  readonly title = "Stored Objects ClickHouse import";
+  readonly description =
+    "Imports each organization's latest Stored Object metadata from " +
+    "ClickHouse into Postgres, then waits for proof that legacy writers have " +
+    "drained before allowing the tenant to cut over.";
+  readonly requiresOperatorConfirmation = true;
+  readonly runsAutomaticallyOnSelfHosted = false;
 
   static create(
     options: ClickHouseImportStoredObjectMigrationOptions,

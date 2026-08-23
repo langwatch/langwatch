@@ -1,8 +1,12 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Command, CommandHandler } from "../../../";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { AssignTopicCommandData } from "../schemas/commands";
 import { assignTopicCommandDataSchema } from "../schemas/commands";
 import {

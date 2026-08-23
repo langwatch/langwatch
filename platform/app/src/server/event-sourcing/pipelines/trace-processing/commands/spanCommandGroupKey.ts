@@ -20,7 +20,7 @@
  * `shardCount <= 1` returns the bare trace id — byte-identical to the historic
  * key — so the feature is off until an operator raises the count. The per-tenant
  * soft-cap still bounds how many of a tenant's groups run at once, so a fanned-out
- * hot trace cannot starve its neighbours (see specs/event-sourcing/tenant-soft-cap.feature).
+ * hot trace cannot starve its neighbours (see packages/group-queue/specs/tenant-soft-cap.feature).
  */
 
 import { clampShardCount, shardIndexFor } from "./commandShardKey";

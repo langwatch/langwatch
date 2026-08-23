@@ -14,10 +14,16 @@
  * `c.get("project")` or `cache.delete(key)`, which are far more common in these
  * files than route registrations are.
  *
- * Services built on `@langwatch/api` spell two more shapes. `v.sse("/x", ...)`
- * is a GET once mounted, so it is read as one. `v.withdraw("get", "/x")` is a
- * 410 tombstone for a path an earlier version served, so it is read as a route
- * that exists and can never be documented.
+ * Services built on `@langwatch/api` spell their registrations differently
+ * (ADR 101): `.registerRoute("get", "/x", version, ...)`,
+ * `.register("things.create", version, ...)` (an RPC, mounted as a POST at
+ * `/things.create`), `.registerSse("things.watch", version, ...)` (mounted as
+ * a GET) and `.withdraw("/x" | "things.get", version)` (a 410 tombstone). The
+ * version argument is a `YYYY-MM-DD` literal, `"preview"`, or an identifier —
+ * a shared constant the coverage gate resolves; this library only records
+ * which form it took. Those shapes are only read when the file imports the
+ * framework: `register` is an ordinary word, and the import is what separates
+ * the framework's spelling of a route from a coincidence.
  *
  * The parse is textual on purpose. A route registered through a helper, a loop,
  * or a computed path is invisible to it — the repo has none today, and a check
@@ -66,6 +72,8 @@ const QUERY_READ_MARKERS = [
   /[Vv]alidator\(\s*"query"/,
   /c\.req\.valid\(\s*"query"\s*\)/,
   /c\.req\.query\(/,
+  // The framework's spelling: validated query arrives as a context variable.
+  /c\.get\(\s*"query"\s*\)/,
 ];
 
 /** A route registration carries `describeRoute` when its span mentions one. */
@@ -73,12 +81,12 @@ const DESCRIBE_ROUTE_MARKER = /describeRoute\(/;
 
 /**
  * What documents a `@langwatch/api` endpoint. Those services never write
- * `describeRoute` themselves: the framework emits it from the endpoint config,
- * and only when the config gives it something to say. Any one of these three
- * keys is enough for it to publish, so any one of them is the framework's
- * spelling of the same precondition.
+ * `describeRoute` themselves: the framework emits it from the definition
+ * chain, and only when the chain gives it something to say — a `withOutput`
+ * or a `withDocs`. Either one is the framework's spelling of the same
+ * precondition.
  */
-const ENDPOINT_DOC_MARKERS = [/\boutput:/, /\bdescription:/, /\bdocs:/];
+const ENDPOINT_DOC_MARKERS = [/\bwithOutput\(/, /\bwithDocs\(/];
 
 /**
  * Whether a file declares its routes through the `@langwatch/api` framework.
@@ -99,10 +107,20 @@ export interface RouteRegistration {
   readsQuery: boolean;
   /** Whether the span carries `describeRoute(` — the generator's precondition. */
   described: boolean;
-  /** Present when the registration is `v.sse(...)`, which mounts as a GET. */
+  /** Present when the registration is `registerSse(...)`, which mounts as a GET. */
   sse?: boolean;
-  /** Present when the registration is a `v.withdraw(...)` 410 tombstone. */
+  /** Present when the registration is a `withdraw(...)` 410 tombstone. */
   withdrawn?: boolean;
+  /**
+   * The registration's version namespace as a literal (`"2026-08-07"` or
+   * `"preview"`), when the source spells it out.
+   */
+  version?: string;
+  /**
+   * The registration's version argument when it is an identifier (a shared
+   * constant such as `MANAGEMENT_API_VERSION`), for the caller to resolve.
+   */
+  versionRef?: string;
 }
 
 interface RouteMatch {
@@ -111,26 +129,31 @@ interface RouteMatch {
   index: number;
   sse: boolean;
   withdrawn: boolean;
+  version?: string;
+  versionRef?: string;
 }
+
+/** The version argument of a framework registration: a literal or an identifier. */
+const VERSION_ARGUMENT = String.raw`(?:"(20\d{2}-\d{2}-\d{2}|preview)"|([A-Za-z_][A-Za-z0-9_]*))`;
 
 /**
  * Every registration in a file, in source order.
  *
- * The two shapes are matched by separate patterns and merged by index before
+ * The shapes are matched by separate patterns and merged by index before
  * anything slices spans out of the source. Appended one list after the other,
  * a withdrawal written above a registration would still sort below it, and the
  * arithmetic that gives each route the source up to its neighbour would run
  * backwards: the registration's span collapses to nothing while the
- * withdrawal's runs to the end of the file, crediting a `c.req.query(` or an
- * `output:` to the wrong route.
+ * withdrawal's runs to the end of the file, crediting a `c.req.query(` or a
+ * `withOutput(` to the wrong route.
+ *
+ * The framework shapes are only matched when the file imports `@langwatch/api`
+ * — `register` is an ordinary word, and a framework pattern matched against a
+ * plain file would invent routes out of unrelated calls.
  */
-function routeMatches(source: string): RouteMatch[] {
+function routeMatches(source: string, framework: boolean): RouteMatch[] {
   const registrations = new RegExp(
-    `\\.(${[...HTTP_METHODS, "sse"].join("|")})\\(\\s*"(/[^"]*)"`,
-    "g",
-  );
-  const withdrawals = new RegExp(
-    `\\.withdraw\\(\\s*"(${HTTP_METHODS.join("|")})"\\s*,\\s*"(/[^"]*)"`,
+    `\\.(${HTTP_METHODS.join("|")})\\(\\s*"(/[^"]*)"`,
     "g",
   );
 
@@ -140,24 +163,126 @@ function routeMatches(source: string): RouteMatch[] {
     const [, method, path] = match;
     if (method === undefined || path === undefined) continue;
     matches.push({
-      method: method === "sse" ? "get" : method,
-      path,
-      index: match.index,
-      sse: method === "sse",
-      withdrawn: false,
-    });
-  }
-
-  for (const match of source.matchAll(withdrawals)) {
-    const [, method, path] = match;
-    if (method === undefined || path === undefined) continue;
-    matches.push({
       method,
       path,
       index: match.index,
       sse: false,
-      withdrawn: true,
+      withdrawn: false,
     });
+  }
+
+  if (framework) {
+    const restRoutes = new RegExp(
+      String.raw`\.registerRoute\(\s*"(${HTTP_METHODS.join("|")})"\s*,\s*"(\/[^"]*)"\s*,\s*${VERSION_ARGUMENT}`,
+      "g",
+    );
+    const rpcRoutes = new RegExp(
+      String.raw`\.register\(\s*"([^"]+)"\s*,\s*${VERSION_ARGUMENT}`,
+      "g",
+    );
+    const sseRoutes = new RegExp(
+      String.raw`\.registerSse\(\s*"([^"]+)"\s*,\s*${VERSION_ARGUMENT}`,
+      "g",
+    );
+    const withdrawals = new RegExp(
+      String.raw`\.withdraw\(\s*"([^"]+)"\s*,\s*${VERSION_ARGUMENT}`,
+      "g",
+    );
+
+    const versionOf = (
+      literal: string | undefined,
+      reference: string | undefined,
+    ): Pick<RouteMatch, "version" | "versionRef"> =>
+      literal !== undefined ? { version: literal } : { versionRef: reference };
+
+    const frameworkMatches: RouteMatch[] = [];
+
+    for (const match of source.matchAll(restRoutes)) {
+      const [, method, path, literal, reference] = match;
+      if (method === undefined || path === undefined) continue;
+      frameworkMatches.push({
+        method,
+        path,
+        index: match.index,
+        sse: false,
+        withdrawn: false,
+        ...versionOf(literal, reference),
+      });
+    }
+
+    for (const match of source.matchAll(rpcRoutes)) {
+      const [, name, literal, reference] = match;
+      if (name === undefined) continue;
+      frameworkMatches.push({
+        method: "post",
+        path: `/${name}`,
+        index: match.index,
+        sse: false,
+        withdrawn: false,
+        ...versionOf(literal, reference),
+      });
+    }
+
+    for (const match of source.matchAll(sseRoutes)) {
+      const [, name, literal, reference] = match;
+      if (name === undefined) continue;
+      frameworkMatches.push({
+        method: "get",
+        path: `/${name}`,
+        index: match.index,
+        sse: true,
+        withdrawn: false,
+        ...versionOf(literal, reference),
+      });
+    }
+
+    for (const match of source.matchAll(withdrawals)) {
+      const [, target, literal, reference] = match;
+      if (target === undefined) continue;
+      frameworkMatches.push({
+        // A withdrawal names the endpoint, not the method: every method
+        // registered at the path is tombstoned. The coverage gate expands the
+        // marker against the registrations it has seen for the path.
+        method: "all",
+        path: target.startsWith("/") ? target : `/${target}`,
+        index: match.index,
+        sse: false,
+        withdrawn: true,
+        ...versionOf(literal, reference),
+      });
+    }
+
+    // A framework call the patterns above cannot read — a computed path, a
+    // version expression — would take its routes out of both gates unseen.
+    // Count every call site and refuse to guess. `register` is tried after
+    // `registerRoute`/`registerSse` so each site counts exactly once.
+    const frameworkCalls = [
+      ...source.matchAll(
+        /\.(registerRoute|registerSse|register|withdraw)\(\s*"/g,
+      ),
+    ].length;
+    if (frameworkMatches.length !== frameworkCalls) {
+      throw new Error(
+        `${frameworkCalls - frameworkMatches.length} @langwatch/api registration call(s) ` +
+          `have a shape this parser cannot read (a computed path or version ` +
+          `expression?). Use a string literal path and a YYYY-MM-DD literal or ` +
+          `a module constant, or teach scripts/lib/hono-route-table.ts the new ` +
+          `form — unread registrations serve routes no gate can see.`,
+      );
+    }
+
+    // A group prefixes every dotted name registered through it, and the prefix
+    // lives in a variable this parse never sees — so a grouped registration
+    // would be counted under the wrong path, which is worse than none.
+    if (/\.group\(\s*"/.test(source)) {
+      throw new Error(
+        `This file registers endpoints through a @langwatch/api group, whose ` +
+          `name prefixing this textual parse cannot reproduce. Register without ` +
+          `a group, or teach scripts/lib/hono-route-table.ts to apply the prefix.`,
+      );
+    }
+
+    matches.push(...frameworkMatches);
   }
 
   return matches.sort((a, b) => a.index - b.index);
@@ -170,7 +295,7 @@ function routeMatches(source: string): RouteMatch[] {
  */
 export function collectRouteRegistrations(source: string): RouteRegistration[] {
   const framework = importsApiFramework(source);
-  const matches = routeMatches(source);
+  const matches = routeMatches(source, framework);
 
   return matches.map((match, i) => {
     const end = matches[i + 1]?.index ?? source.length;
@@ -184,6 +309,8 @@ export function collectRouteRegistrations(source: string): RouteRegistration[] {
         (framework && ENDPOINT_DOC_MARKERS.some((marker) => marker.test(body))),
       ...(match.sse ? { sse: true } : {}),
       ...(match.withdrawn ? { withdrawn: true } : {}),
+      ...(match.version !== undefined ? { version: match.version } : {}),
+      ...(match.versionRef !== undefined ? { versionRef: match.versionRef } : {}),
     };
   });
 }

@@ -1,3 +1,4 @@
+# Stored Objects persistence and accounting: ../../packages/features/stored-objects/adrs/001-package-boundary.md
 Feature: Evaluation payload offload
   As the LangWatch evaluations pipeline persisting evaluator inputs
   I want oversized evaluation inputs offloaded to object storage with a
@@ -32,9 +33,9 @@ Feature: Evaluation payload offload
   #     8 MiB; Details/Error/ErrorDetails -> observable text truncation).
   #   - Read resolution seam: EvaluationService.getEvaluationInputs
   #     (evaluation.service.ts) resolves the marker; folds/subscribers get it raw.
-  #   - Billing ledger: stored_objects.size_bytes, summed by
-  #     StoredObjectsService.getStorageUsageByProject; stored_objects added to
-  #     MONITORED_TABLES (clickhouse/metrics.ts).
+  #   - Byte ledger: the Stored Objects Postgres projection counts each active
+  #     project content ID once; getStorageUsageByProject reads that authority.
+  #     The ClickHouse stored_objects collector is migration compatibility only.
   # Integration coverage:
   #   src/server/app-layer/evaluations/__tests__/evaluation-payload-offload.integration.test.ts
   #   Unit coverage:

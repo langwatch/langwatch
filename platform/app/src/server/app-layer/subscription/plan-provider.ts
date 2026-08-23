@@ -1,21 +1,12 @@
 import { applyPlanTypeEntitlements } from "../../../../ee/licensing/planEntitlements";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type {
+  PlanInfo,
+  PlanProvider,
+  PlanProviderUser,
+} from "@langwatch/entitlements-contract";
 
+export type { PlanProvider, PlanProviderUser } from "@langwatch/entitlements-contract";
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
-
-export type PlanProviderUser = {
-  id?: string;
-  email?: string | null;
-  name?: string | null;
-  impersonator?: { email?: string | null };
-};
-
-export interface PlanProvider {
-  getActivePlan(params: {
-    organizationId: string;
-    user?: PlanProviderUser;
-  }): Promise<PlanInfo>;
-}
 
 /**
  * The single point every resolved plan passes through, whichever leg produced

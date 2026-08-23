@@ -1,6 +1,5 @@
+import type { AppendStore, Event } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { Event } from "../../../../domain/types";
-import type { AppendStore } from "../../../../projections/mapProjection.types";
 import { LOG_FACTS_CONTRIBUTED_EVENT_TYPE } from "../../schemas/constants";
 import type { LogFactsContributedEvent } from "../../schemas/events";
 import {

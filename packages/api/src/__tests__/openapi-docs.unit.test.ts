@@ -129,12 +129,37 @@ describe("OpenAPI documentation", () => {
     expect(list?.summary).toBe("List things");
     expect(list?.description).toBe("Lists every thing in the project.");
     expect(list?.tags).toEqual(["Things"]);
-    expect(list?.operationId).toBe("listThings");
+    expect(list?.operationId).toBe("listThings_2025_03_15");
     expect(list?.security).toEqual([{ bearerAuth: [] }]);
     expect(list?.responses).toHaveProperty("200");
     expect(list?.responses?.["404"]).toMatchObject({
       description: "Thing not found",
     });
+  });
+
+  it("gives every documented mount a unique operationId", async () => {
+    const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
+    const operationIds = Object.values(spec.paths).flatMap((path) =>
+      Object.values(path ?? {}).flatMap((operation) => {
+        if (
+          typeof operation !== "object" ||
+          operation === null ||
+          !("operationId" in operation) ||
+          typeof operation.operationId !== "string"
+        ) {
+          return [];
+        }
+        return [operation.operationId];
+      }),
+    );
+
+    expect(new Set(operationIds).size).toBe(operationIds.length);
+    expect(
+      spec.paths["/api/things/latest/things.create"]?.post?.operationId,
+    ).toBe("createThing");
+    expect(
+      spec.paths["/api/things/2025-06-01/things.create"]?.post?.operationId,
+    ).toBe("createThing_2025_06_01");
   });
 
   it("keeps the documented mounts' parameters and request body in the document", async () => {

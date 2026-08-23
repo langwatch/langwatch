@@ -152,6 +152,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
 
     return {
       provider: backendModelProviderKey,
+      routingHandle: null,
       enabled: false,
       customKeys: null,
       models: null,

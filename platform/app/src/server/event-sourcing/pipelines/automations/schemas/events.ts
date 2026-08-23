@@ -1,8 +1,7 @@
 import { NOTIFICATION_CADENCES } from "@langwatch/automations/cadences";
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 import { TriggerAction } from "~/generated/prisma/client";
-
-import { EventSchema } from "../../../domain/types";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./constants";
 
 export const triggerActionClassSchema = z.enum(["notify", "persist"]);

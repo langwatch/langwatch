@@ -1,6 +1,5 @@
+import type { IntentContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
 import {
   createCancelExecutionHandler,

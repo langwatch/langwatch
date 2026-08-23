@@ -310,9 +310,10 @@ describe("auditCoverage", () => {
 
   describe("when a version registers a route a later one withdraws", () => {
     it("treats the shared key as withdrawn", () => {
-      // The bare alias serves the last resolution of a path, so the withdrawal
-      // is what a caller meets there. Keeping the first registration's answer
-      // would report a 410 as an undocumented live endpoint.
+      // The latest namespace serves the last resolution of a path, so the
+      // withdrawal is what a caller meets there. Keeping the first
+      // registration's answer would report a 410 as an undocumented live
+      // endpoint.
       const result = audit({
         routes: [
           route({ key: "GET /api/roles/{id}", described: true }),
@@ -418,44 +419,62 @@ describe("collectRegisteredRoutes", () => {
         'import { createService } from "@langwatch/api";',
         "",
         'export const app = createService({ name: "roles" })',
-        '  .version("2026-08-07", (v) => {',
-        '    v.get("/", { output: RoleList }, list);',
-        '    v.get("/:id", { output: Role }, read);',
-        "  })",
+        '  .registerRoute("get", "/", "2026-08-07", list, (b) => b.withOutput(RoleList))',
+        '  .registerRoute("get", "/:id", "2026-08-07", read, (b) => b.withOutput(Role))',
         "  .build();",
       ]);
 
-      expect(collectRegisteredRoutes([root]).map((route) => route.key)).toEqual(
-        ["GET /api/roles", "GET /api/roles/{id}"],
-      );
+      expect(
+        collectRegisteredRoutes([root]).map((route) => route.key),
+      ).toEqual([
+        // Per endpoint: its dated mounts, then latest.
+        "GET /api/roles/2026-08-07",
+        "GET /api/roles/latest",
+        "GET /api/roles/2026-08-07/{id}",
+        "GET /api/roles/latest/{id}",
+      ]);
     });
 
-    /** @scenario "A versioned registration is counted once at its bare alias path" */
-    it("counts a route redeclared across versions once, at its bare path", () => {
-      // Every version mounts: `/api/roles/2026-01-01/`, `/api/roles/latest/`
-      // and the bare `/api/roles`. Only the bare alias is documented, and it
-      // is the only one the source spells, so the route table lands on it
-      // without knowing anything about versions.
+    /** @scenario "A versioned registration is counted at its dated and latest mounts" */
+    it("counts a route redeclared across versions at each dated mount and latest, never bare", () => {
+      // Every documented version is a real route: `/api/roles/2026-01-01`,
+      // `/api/roles/2026-08-07` and `/api/roles/latest`. There is no bare
+      // alias for the gate to collapse them onto.
       write("roles/app.ts", [
         'import { createService } from "@langwatch/api";',
         "",
         'export const app = createService({ name: "roles" })',
-        '  .version("2026-01-01", (v) => {',
-        '    v.get("/", { output: RoleList }, list);',
-        "  })",
-        '  .version("2026-08-07", (v) => {',
-        '    v.get("/", { output: RoleListV2 }, list);',
-        "  })",
+        '  .registerRoute("get", "/", "2026-01-01", list, (b) => b.withOutput(RoleList))',
+        '  .registerRoute("get", "/", "2026-08-07", list, (b) => b.withOutput(RoleListV2))',
         "  .build();",
       ]);
 
       const routes = collectRegisteredRoutes([root]);
 
       expect(routes.map((route) => route.key)).toEqual([
-        "GET /api/roles",
-        "GET /api/roles",
+        "GET /api/roles/2026-01-01",
+        "GET /api/roles/2026-08-07",
+        "GET /api/roles/latest",
       ]);
-      expect(audit({ routes }).registered).toBe(1);
+      expect(audit({ routes }).registered).toBe(3);
+    });
+
+    it("resolves a version named by a shared constant", () => {
+      write("version.ts", [
+        'export const MANAGEMENT_API_VERSION = "2026-08-07";',
+      ]);
+      write("roles/app.ts", [
+        'import { createService } from "@langwatch/api";',
+        'import { MANAGEMENT_API_VERSION } from "./version";',
+        "",
+        'export const app = createService({ name: "roles" })',
+        '  .registerRoute("get", "/", MANAGEMENT_API_VERSION, list, (b) => b.withOutput(RoleList))',
+        "  .build();",
+      ]);
+
+      expect(
+        collectRegisteredRoutes([root]).map((route) => route.key),
+      ).toEqual(["GET /api/roles/2026-08-07", "GET /api/roles/latest"]);
     });
 
     it("flags the family, so a report can name the fix that family needs", () => {
@@ -463,10 +482,8 @@ describe("collectRegisteredRoutes", () => {
         'import { createService } from "@langwatch/api";',
         "",
         'export const app = createService({ name: "roles" })',
-        '  .version("2026-08-07", (v) => {',
-        '    v.get("/", { output: RoleList }, list);',
-        '    v.post("/", { input: NewRole }, create);',
-        "  })",
+        '  .registerRoute("get", "/", "2026-08-07", list, (b) => b.withOutput(RoleList))',
+        '  .registerRoute("post", "/", "2026-08-07", create, (b) => b.withInput(NewRole))',
         "  .build();",
       ]);
 
@@ -479,30 +496,34 @@ describe("collectRegisteredRoutes", () => {
           route.usesApiFramework,
         ]),
       ).toEqual([
-        ["GET /api/roles", true, true],
-        ["POST /api/roles", false, true],
+        ["GET /api/roles/2026-08-07", true, true],
+        ["GET /api/roles/latest", true, true],
+        ["POST /api/roles/2026-08-07", false, true],
+        ["POST /api/roles/latest", false, true],
       ]);
     });
 
-    it("carries a withdrawal through to the route table", () => {
+    it("carries a withdrawal through to the route table, from its version onward", () => {
       write("roles/app.ts", [
         'import { createService } from "@langwatch/api";',
         "",
         'export const app = createService({ name: "roles" })',
-        '  .version("2026-08-07", (v) => {',
-        '    v.withdraw("get", "/:id/legacy");',
-        "  })",
+        '  .registerRoute("get", "/:id/legacy", "2026-01-01", read, (b) => b.withOutput(Legacy))',
+        '  .withdraw("/:id/legacy", "2026-08-07")',
         "  .build();",
       ]);
 
-      expect(collectRegisteredRoutes([root])).toEqual([
-        {
-          key: "GET /api/roles/{id}/legacy",
-          file: join(root, "roles/app.ts"),
-          described: false,
-          withdrawn: true,
-          usesApiFramework: true,
-        },
+      expect(
+        collectRegisteredRoutes([root]).map((route) => [
+          route.key,
+          route.withdrawn ?? false,
+        ]),
+      ).toEqual([
+        // Still live where it is still served...
+        ["GET /api/roles/2026-01-01/{id}/legacy", false],
+        // ...tombstoned from the withdrawal version onward, latest included.
+        ["GET /api/roles/2026-08-07/{id}/legacy", true],
+        ["GET /api/roles/latest/{id}/legacy", true],
       ]);
     });
 

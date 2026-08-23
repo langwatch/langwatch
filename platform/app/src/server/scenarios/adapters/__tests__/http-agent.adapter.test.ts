@@ -1,11 +1,11 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
+import type {
+  Agent as TypedAgent,
+  AgentService,
+} from "@langwatch/agents-contract";
 import { Response } from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
-import type {
-  AgentRepository,
-  TypedAgent,
-} from "../../../agents/agent.repository";
 import { TemplateRenderError } from "../../execution/http-template-engine";
 import { HttpAgentAdapter } from "../http-agent.adapter";
 
@@ -26,8 +26,8 @@ const createAgentInput = (
 
 const createMockAgentRepository = (agent: TypedAgent | null = null) =>
   ({
-    findById: vi.fn().mockResolvedValue(agent),
-  }) as unknown as AgentRepository;
+    getById: vi.fn().mockResolvedValue(agent),
+  }) as unknown as Pick<AgentService, "getById">;
 
 const createHttpAgent = (
   configOverrides: Partial<HttpComponentConfig> = {},

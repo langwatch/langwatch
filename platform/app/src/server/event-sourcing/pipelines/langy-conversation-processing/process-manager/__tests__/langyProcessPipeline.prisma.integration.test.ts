@@ -1,20 +1,17 @@
-import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import {
-  OutboxDispatcherService,
-  PrismaProcessStore,
-  type ProcessRef,
-} from "~/server/event-sourcing/process-manager";
+import type { EventSubscriberContext } from "@langwatch/eventing";
 import {
   buildIntentHandlers,
+  buildProcessManager,
+  createTenantId,
+  OutboxDispatcherService,
+  type ProcessRef,
   ProcessRuntime,
-} from "~/server/event-sourcing/process-manager/processRuntime";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+} from "@langwatch/eventing";
+import { nanoid } from "nanoid";
+import { afterEach, describe, expect, it } from "vitest";
+import { prisma } from "~/server/db";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import { langyConversationProcess } from "../langyConversationProcess";

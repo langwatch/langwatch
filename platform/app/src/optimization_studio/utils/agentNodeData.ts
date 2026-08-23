@@ -1,4 +1,4 @@
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
 import type {
   AgentComponent,
   Field,

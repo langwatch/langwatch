@@ -1,3 +1,5 @@
+import type { StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -8,8 +10,6 @@ import {
   parseConversationTurnKey,
 } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 

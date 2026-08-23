@@ -1,7 +1,7 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type {
   SpanReceivedEvent,
   TraceProcessingEvent,

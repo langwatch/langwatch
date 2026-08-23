@@ -1,10 +1,10 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
+import type { ReplayProgress } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
 import type {
   ReplayHistoryEntry,
   ReplayRepository,

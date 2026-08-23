@@ -1,9 +1,5 @@
+import type { SubscriberSpec, TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-
-import type {
-  SubscriberSpec,
-  TriggerContext,
-} from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -75,12 +71,13 @@ export function passesTraceOriginGuards(
 
 /**
  * A named subscriber spec on the traceSummary fold, ready for
- * `.withSubscriber(x.name, x.spec)` on the trace-processing pipeline
+ * `.withProjectionSubscriber(x.name, x.spec)` on the trace-processing pipeline
  * (ADR-052). `ctx.state` is the committed traceSummary fold state.
  */
 export type TraceSummarySubscriber = {
   name: string;
   spec: SubscriberSpec<TraceProcessingEvent> & {
+    fold: "traceSummary";
     handler: (
       event: TraceProcessingEvent,
       context: TriggerContext<TraceSummaryData>,
@@ -110,7 +107,7 @@ type ExtraGuard = (event: TraceProcessingEvent) => boolean;
  * just no-op until the gate has fired.
  *
  * The full guard chain — fold-state guards included — rejects pre-enqueue via
- * `when`, which receives the committed fold state (ADR-098): a filtered event
+ * `when`, which receives the committed fold state: a filtered event
  * never pays a serialize + gzip + blob write that the queue's dedup would then
  * discard. A 10k-span trace fans a subscriber out once per span; the guards
  * reject nearly all of it. The handler re-checks, staying safe for any caller

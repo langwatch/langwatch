@@ -1,11 +1,11 @@
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type {
   FoldProjectionOptions,
   FoldProjectionStore,
-} from "~/server/event-sourcing/projections/foldProjection.types";
+} from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   codingAgentCostComputedUsd,
   codingAgentCostReportedUsd,

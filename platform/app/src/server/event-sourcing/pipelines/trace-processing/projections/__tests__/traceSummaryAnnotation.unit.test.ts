@@ -1,6 +1,6 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createTenantId } from "~/server/event-sourcing";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,

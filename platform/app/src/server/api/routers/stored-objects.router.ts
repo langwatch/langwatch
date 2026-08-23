@@ -2,7 +2,7 @@
  * StoredObjects tRPC router.
  *
  * Provides server-side existence probes for stored objects so the UI
- * does not need to issue raw `fetch` calls to /api/files/:id.  Auth is
+ * does not need to issue raw `fetch` calls to /api/files/:id. Auth is
  * inherited from the tRPC session, which avoids the CORS / credential
  * fragility of a native HEAD probe.
  */

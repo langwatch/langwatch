@@ -8,11 +8,11 @@
  *
  * Feature: specs/traces/trace-summary-storage-anchor.feature
  */
-import { describe, expect, it, vi } from "vitest";
 
+import type { ProjectionStoreContext } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
 import { TraceSummaryStore } from "../traceSummary.store";
 
 const context = {

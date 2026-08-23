@@ -1,45 +1,82 @@
+import {
+  FIELD_TYPES as AGENT_FIELD_TYPES,
+  HTTP_METHODS as AGENT_HTTP_METHODS,
+  type Field as AgentField,
+  type HttpAuth as AgentHttpAuth,
+  type HttpAuthType as AgentHttpAuthType,
+  type HttpHeader as AgentHttpHeader,
+  type HttpMethod as AgentHttpMethod,
+  agentChatMessageSchema,
+  codeParameterSchema as agentCodeParameterSchema,
+  fieldSchema as agentFieldSchema,
+  httpAuthSchema as agentHttpAuthSchema,
+  httpHeaderSchema as agentHttpHeaderSchema,
+  llmConfigSchema as agentLlmConfigSchema,
+  baseAgentConfigSchema,
+  type CodeAgentConfig,
+  codeAgentConfigSchema,
+  type HttpAgentConfig,
+  httpAgentConfigSchema,
+  type SignatureAgentConfig,
+  signatureAgentConfigSchema,
+  type WorkflowAgentConfig,
+  workflowAgentConfigSchema,
+} from "@langwatch/agents-contract";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import { FieldMappingSchema } from "~/server/scenarios/field-mapping";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
 import type { ChatMessage } from "../../server/tracer/types";
 
-export const FIELD_TYPES = [
-  "str",
-  "image",
-  "float",
-  "int",
-  "bool",
-  "list",
-  "list[str]",
-  "list[float]",
-  "list[int]",
-  "list[bool]",
-  "dict",
-  "json_schema",
-  "chat_messages",
-  "signature",
-  "llm",
-  "prompting_technique",
-  "dataset",
-  "code",
-] as const;
+/**
+ * Adapts the feature contracts' Zod 4 / Standard Schema validators to the
+ * app's remaining Zod 3 schema graph. Parsed values (including defaults and
+ * transforms) come from the feature-owned schema; this adapter is only the
+ * temporary compatibility boundary for legacy app composition.
+ */
+const asLegacyZodSchema = <Input, Output>(
+  schema: StandardSchemaV1<Input, Output>,
+): z.ZodType<Output> =>
+  z.any().transform((value, context) => {
+    const result = schema["~standard"].validate(value);
+    if (result instanceof Promise) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Asynchronous feature schemas cannot be composed in Zod 3",
+      });
+      return z.NEVER;
+    }
 
-export type Field = {
-  identifier: string;
-  type: (typeof FIELD_TYPES)[number];
-  optional?: boolean;
-  value?: unknown;
-  desc?: string;
-  prefix?: string;
-  hidden?: boolean;
-  json_schema?: object;
-};
+    if (result.issues) {
+      for (const issue of result.issues) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: issue.message,
+          path: issue.path
+            ?.map((segment) =>
+              typeof segment === "object" && segment !== null
+                ? segment.key
+                : segment,
+            )
+            .filter(
+              (segment): segment is string | number =>
+                typeof segment === "string" || typeof segment === "number",
+            ),
+        });
+      }
+      return z.NEVER;
+    }
+
+    return result.value;
+  }) as z.ZodType<Output>;
+
+export const FIELD_TYPES = AGENT_FIELD_TYPES;
+export type Field = AgentField;
 export const WORKFLOW_TYPES = ["component", "evaluator", "workflow"] as const;
 export type WorkflowTypes = (typeof WORKFLOW_TYPES)[number];
 
@@ -145,29 +182,7 @@ export type BaseComponent = {
   execution_state?: ExecutionState;
 };
 
-export const llmConfigSchema = z.object({
-  model: z.string(),
-  temperature: z.number().optional(),
-  max_tokens: z.number().optional(),
-  // Traditional sampling parameters
-  top_p: z.number().optional(),
-  frequency_penalty: z.number().optional(),
-  presence_penalty: z.number().optional(),
-  // Other sampling parameters
-  seed: z.number().optional(),
-  top_k: z.number().optional(),
-  min_p: z.number().optional(),
-  repetition_penalty: z.number().optional(),
-  // Reasoning parameter (canonical/unified field)
-  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
-  reasoning: z.string().optional(),
-  // Provider-specific fields - kept for backward compatibility
-  reasoning_effort: z.string().optional(), // OpenAI (legacy)
-  thinkingLevel: z.string().optional(), // Gemini (legacy)
-  effort: z.string().optional(), // Anthropic (legacy)
-  verbosity: z.string().optional(),
-  litellm_params: z.record(z.string()).optional(),
-});
+export const llmConfigSchema = asLegacyZodSchema(agentLlmConfigSchema);
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
@@ -440,204 +455,30 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   secrets?: Record<string, string>;
 };
 
-// ============================================================================
-// Component Schemas for Agent Config Validation
-// These schemas validate that agent configs match existing DSL node data types
-// so they can be used directly when generating workflows for execution.
-// ============================================================================
+// Agent authoring contracts are owned by packages/features/agents/contract.
+// These names remain as compatibility aliases for the Studio graph while its
+// broader workflow vocabulary stays app-owned.
+export const fieldSchema = asLegacyZodSchema(agentFieldSchema);
+export const baseComponentSchema = asLegacyZodSchema(baseAgentConfigSchema);
+export const chatMessageSchema = asLegacyZodSchema(agentChatMessageSchema);
+export const signatureComponentSchema = asLegacyZodSchema(
+  signatureAgentConfigSchema,
+);
+export const codeParameterSchema = asLegacyZodSchema(agentCodeParameterSchema);
+export const codeComponentSchema = asLegacyZodSchema(codeAgentConfigSchema);
+export const customComponentSchema = asLegacyZodSchema(
+  workflowAgentConfigSchema,
+);
+export const httpHeaderSchema = asLegacyZodSchema(agentHttpHeaderSchema);
+export const httpAuthSchema = asLegacyZodSchema(agentHttpAuthSchema);
+export const HTTP_METHODS = AGENT_HTTP_METHODS;
+export const httpComponentSchema = asLegacyZodSchema(httpAgentConfigSchema);
 
-/**
- * Schema for Field type used in parameters, inputs, outputs
- */
-export const fieldSchema = z.object({
-  identifier: z.string(),
-  type: z.enum(FIELD_TYPES),
-  optional: z.boolean().optional(),
-  value: z.unknown().optional(),
-  desc: z.string().optional(),
-  prefix: z.string().optional(),
-  hidden: z.boolean().optional(),
-  json_schema: z.object({}).passthrough().optional(),
-});
-
-/**
- * Schema for BaseComponent - the foundation of all node data types
- */
-export const baseComponentSchema = z.object({
-  _library_ref: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  cls: z.string().optional(),
-  parameters: z.array(fieldSchema).optional(),
-  inputs: z.array(fieldSchema).optional(),
-  outputs: z.array(fieldSchema).optional(),
-  isCustom: z.boolean().optional(),
-  behave_as: z.literal("evaluator").optional(),
-});
-
-/**
- * Schema for chat messages used in signature configs
- */
-export const chatMessageSchema = z.object({
-  role: z.enum(["system", "user", "assistant"]).optional(),
-  content: z.string().optional(),
-});
-
-/**
- * Schema for Signature/LlmPromptConfigComponent node data
- * Used for "signature" type agents
- *
- * Supports two storage formats:
- * 1. Top-level llm/prompt/messages (used by agent drawers)
- * 2. Parameters array with llm/instructions/messages entries (used by workflow nodes)
- */
-export const signatureComponentSchema = baseComponentSchema.extend({
-  configId: z.string().optional(),
-  handle: z.string().nullable().optional(),
-  versionMetadata: z
-    .object({
-      versionId: z.string(),
-      versionNumber: z.number(),
-      versionCreatedAt: z.string(),
-    })
-    .optional(),
-  // Top-level LLM config (alternative to parameters array)
-  llm: llmConfigSchema.optional(),
-  prompt: z.string().optional(),
-  messages: z.array(chatMessageSchema).optional(),
-  // True when the dispatched config diverges from the saved version
-  // (set by mergeLocalConfigsIntoDsl when a localPromptConfig is
-  // present). nlpgo stamps it onto Prompt.compile as
-  // langwatch.prompt.draft for the trace-UI's "(unsaved edits)" label.
-  promptDraft: z.boolean().optional(),
-});
-
-/**
- * Schema for the code parameter specifically
- */
-export const codeParameterSchema = z.object({
-  identifier: z.literal("code"),
-  type: z.literal("code"),
-  value: z.string(),
-  optional: z.boolean().optional(),
-  desc: z.string().optional(),
-  prefix: z.string().optional(),
-  hidden: z.boolean().optional(),
-});
-
-/**
- * Schema for Code node data
- * Used for "code" type agents
- * Requires a parameters array with at least a "code" parameter
- */
-export const codeComponentSchema = baseComponentSchema.extend({
-  parameters: z
-    .array(z.union([codeParameterSchema, fieldSchema]))
-    .refine(
-      (params) =>
-        params?.some((p) => p.identifier === "code" && p.type === "code"),
-      {
-        message: "Code component must have a 'code' parameter with type 'code'",
-      },
-    ),
-  /** Maps agent input field identifiers to scenario data sources or static values. */
-  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
-  /** Which output field to use as the scenario result. When unset, uses the first output. */
-  scenarioOutputField: z.string().optional(),
-});
-
-/**
- * Schema for Custom/Workflow node data
- * Used for "workflow" type agents
- */
-export const customComponentSchema = baseComponentSchema.extend({
-  isCustom: z.boolean().optional(),
-  workflow_id: z.string().optional(),
-  publishedId: z.string().optional(),
-  version_id: z.string().optional(),
-  versions: z.record(z.any()).optional(),
-  /** Maps agent input field identifiers to scenario data sources or static values. */
-  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
-  /** Which output field to use as the scenario result. When unset, uses the first output. */
-  scenarioOutputField: z.string().optional(),
-});
-
-// TODO: Move schemas and exports to their own files
-/**
- * Schema for HTTP header key-value pairs
- */
-export const httpHeaderSchema = z.object({
-  key: z.string(),
-  value: z.string(),
-});
-
-/**
- * Schema for HTTP authentication configuration
- */
-export const httpAuthSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("none") }),
-  z.object({ type: z.literal("bearer"), token: z.string() }),
-  z.object({
-    type: z.literal("api_key"),
-    header: z.string(),
-    value: z.string(),
-  }),
-  z.object({
-    type: z.literal("basic"),
-    username: z.string(),
-    password: z.string(),
-  }),
-]);
-
-/**
- * HTTP methods supported by HTTP agents
- */
-export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
-export type HttpMethod = (typeof HTTP_METHODS)[number];
-
-/**
- * HTTP authentication types
- */
-export type HttpAuthType = "none" | "bearer" | "api_key" | "basic";
-export type HttpAuth = z.infer<typeof httpAuthSchema>;
-export type HttpHeader = z.infer<typeof httpHeaderSchema>;
-
-/**
- * Schema for HTTP component node data
- * Used for "http" type agents that call external APIs
- *
- * Note: URL validation is relaxed to allow progressive typing in UI.
- * Full URL validation should happen on save in the drawer.
- */
-export const httpComponentSchema = baseComponentSchema.extend({
-  url: z.string().min(1, "URL is required"),
-  method: z.enum(HTTP_METHODS).default("POST"),
-  headers: z.array(httpHeaderSchema).optional(),
-  auth: httpAuthSchema.optional(),
-  bodyTemplate: z.string().optional(),
-  outputPath: z.string().optional(),
-  timeoutMs: z.number().positive().optional(),
-  /** Maps agent input field identifiers to scenario data sources or static values. */
-  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
-  /**
-   * Present while `langwatch agent dev` points this agent at a local tunnel:
-   * `previousUrl` is what the CLI restores on exit, `connectedAt` when the
-   * session started. Set and removed by the CLI; the platform reads it to
-   * show the local-tunnel badge and to name tunnel failures.
-   */
-  devTunnel: z
-    .object({
-      previousUrl: z.string().optional(),
-      connectedAt: z.string().optional(),
-    })
-    .optional(),
-});
-
-/**
- * Union type for all valid agent config types
- * These match the existing Component types so they're directly usable in DSL
- */
-export type SignatureComponentConfig = z.infer<typeof signatureComponentSchema>;
-export type CodeComponentConfig = z.infer<typeof codeComponentSchema>;
-export type CustomComponentConfig = z.infer<typeof customComponentSchema>;
-export type HttpComponentConfig = z.infer<typeof httpComponentSchema>;
+export type HttpMethod = AgentHttpMethod;
+export type HttpAuthType = AgentHttpAuthType;
+export type HttpAuth = AgentHttpAuth;
+export type HttpHeader = AgentHttpHeader;
+export type SignatureComponentConfig = SignatureAgentConfig;
+export type CodeComponentConfig = CodeAgentConfig;
+export type CustomComponentConfig = WorkflowAgentConfig;
+export type HttpComponentConfig = HttpAgentConfig;

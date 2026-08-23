@@ -9,7 +9,7 @@ import type {
   LlmPromptConfigComponent,
   SignatureComponentConfig,
 } from "~/optimization_studio/types/dsl";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { Agent as TypedAgent } from "@langwatch/agents-contract";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell } from "../types";
 import {

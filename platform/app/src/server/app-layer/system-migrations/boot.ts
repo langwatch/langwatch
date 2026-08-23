@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
 import { runSystemMigrationPass } from "./runtime";
 
@@ -16,11 +17,13 @@ const logger = createLogger("langwatch:system-migrations:boot");
  */
 export function startSystemMigrations(args?: {
   redis?: Redis | Cluster | null;
+  additionalMigrations?: readonly SystemMigration[];
 }): { stop: () => Promise<void> } {
   const controller = new AbortController();
   const pass = runSystemMigrationPass({
     signal: controller.signal,
     redis: args?.redis,
+    additionalMigrations: args?.additionalMigrations,
   })
     .then((summary) => {
       logger.info({ summary }, "system migration pass finished");

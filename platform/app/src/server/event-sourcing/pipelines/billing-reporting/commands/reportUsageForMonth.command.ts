@@ -1,3 +1,5 @@
+import type { Command, CommandHandler, Event } from "@langwatch/eventing";
+import { defineCommandSchema } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
@@ -9,9 +11,6 @@ import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
-import type { Command, CommandHandler } from "../../../";
-import { defineCommandSchema } from "../../../";
-import type { Event } from "../../../domain/types";
 import type { ReportUsageForMonthCommandData } from "../schemas/commands";
 import { reportUsageForMonthCommandDataSchema } from "../schemas/commands";
 import { BILLING_REPORT_COMMAND_TYPES } from "../schemas/constants";

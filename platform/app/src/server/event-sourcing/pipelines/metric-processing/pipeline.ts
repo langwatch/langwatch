@@ -1,12 +1,19 @@
-import { definePipeline } from "../..";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type EventSubscriberDefinition,
+} from "@langwatch/eventing";
 import { metricCommandGroupKey } from "./canonical/shards";
 import { RecordMetricDataPointCommand } from "./commands/recordMetricDataPointCommand";
 import { MetricDataPointStorageMapProjection } from "./projections/metricDataPointStorage.mapProjection";
 import { MetricSeriesCatalogMapProjection } from "./projections/metricSeriesCatalog.mapProjection";
 import { MetricTimeRollupMapProjection } from "./projections/metricTimeRollup.mapProjection";
-import { METRIC_COMMAND_COALESCE_MAX_BATCH } from "./schemas/constants";
+import {
+  METRIC_COMMAND_COALESCE_MAX_BATCH,
+  METRIC_PROCESSING_EVENT_TYPES,
+} from "./schemas/constants";
 import type { MetricProcessingEvent } from "./schemas/events";
 import type { CanonicalMetricDataPoint } from "./schemas/metricDataPoint";
 
@@ -22,25 +29,26 @@ export interface MetricProcessingPipelineDeps {
 export function createMetricProcessingPipeline(
   deps: MetricProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<MetricProcessingEvent>()
-    .withName("metric_processing")
-    .withAggregateType("metric")
-    .withMapProjection(
-      "metricDataPointStorage",
+  let builder = definePipeline<MetricProcessingEvent>({
+    name: "metric_processing",
+    aggregate: defineAggregate({
+      type: "metric",
+      events: defineEvents(METRIC_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseMapProjection(
       new MetricDataPointStorageMapProjection({
         store: deps.metricDataPointAppendStore,
         shardCount: deps.metricCommandShardCount,
       }),
     )
-    .withMapProjection(
-      "metricSeriesCatalog",
+    .withClickHouseMapProjection(
       new MetricSeriesCatalogMapProjection({
         store: deps.metricSeriesCatalogAppendStore,
         shardCount: deps.metricCommandShardCount,
       }),
     )
-    .withMapProjection(
-      "metricTimeRollup",
+    .withClickHouseMapProjection(
       new MetricTimeRollupMapProjection({
         store: deps.metricTimeRollupAppendStore,
         shardCount: deps.metricCommandShardCount,

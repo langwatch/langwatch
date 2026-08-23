@@ -4,8 +4,9 @@
  *
  * @see specs/coding-agent/session-aggregate.feature
  */
+
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "~/server/event-sourcing";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,

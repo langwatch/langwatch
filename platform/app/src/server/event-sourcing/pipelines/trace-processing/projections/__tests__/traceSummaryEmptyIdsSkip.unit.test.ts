@@ -1,5 +1,5 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "~/server/event-sourcing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,

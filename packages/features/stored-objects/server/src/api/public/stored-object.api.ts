@@ -1,5 +1,4 @@
 import type { ServiceBuilder } from "@langwatch/api";
-import type { AuthzPermission } from "@langwatch/authz";
 import {
   createStoredObjectsPublicRpc,
   type StoredObjectDeliveryAudience,
@@ -13,17 +12,12 @@ import type { MiddlewareHandler } from "hono";
 
 export const STORED_OBJECTS_PUBLIC_API_VERSION = "2026-08-22" as const;
 
-export type StoredObjectsPublicApiEndpointMeta = Readonly<{
-  permission: AuthzPermission;
-}>;
-
 export type StoredObjectsPublicApiOptions = Readonly<{
   service(
     context: unknown,
   ): StoredObjectsService | Promise<StoredObjectsService>;
   maximumUploadBytes: number;
   projectId(context: unknown): string;
-  requirePermission(permission: AuthzPermission): MiddlewareHandler;
   authorizeAudience(input: {
     context: unknown;
     projectId: string;
@@ -72,12 +66,7 @@ export class StoredObjectsPublicApi {
         builder
           .withInput(contract.createUpload.input)
           .withOutput(contract.createUpload.output)
-          .withMiddleware(
-            this.options.requirePermission(contract.createUpload.permission),
-          )
-          .withMeta({
-            permission: contract.createUpload.permission,
-          } satisfies StoredObjectsPublicApiEndpointMeta)
+          .withPermission(contract.createUpload.permission)
           .withDocs({
             operationId: "createStoredObjectUpload",
             summary: "Create a stored-object upload",
@@ -95,12 +84,7 @@ export class StoredObjectsPublicApi {
         builder
           .withInput(contract.confirmUpload.input)
           .withOutput(contract.confirmUpload.output)
-          .withMiddleware(
-            this.options.requirePermission(contract.confirmUpload.permission),
-          )
-          .withMeta({
-            permission: contract.confirmUpload.permission,
-          } satisfies StoredObjectsPublicApiEndpointMeta)
+          .withPermission(contract.confirmUpload.permission)
           .withDocs({
             operationId: "confirmStoredObjectUpload",
             summary: "Confirm a stored-object upload",
@@ -125,12 +109,7 @@ export class StoredObjectsPublicApi {
         builder
           .withInput(contract.get.input)
           .withOutput(contract.get.output)
-          .withMiddleware(
-            this.options.requirePermission(contract.get.permission),
-          )
-          .withMeta({
-            permission: contract.get.permission,
-          } satisfies StoredObjectsPublicApiEndpointMeta)
+          .withPermission(contract.get.permission)
           .withDocs({
             operationId: "getStoredObject",
             summary: "Resolve a fresh stored-object capability",
@@ -148,12 +127,7 @@ export class StoredObjectsPublicApi {
         builder
           .withInput(contract.delete.input)
           .withOutput(contract.delete.output)
-          .withMiddleware(
-            this.options.requirePermission(contract.delete.permission),
-          )
-          .withMeta({
-            permission: contract.delete.permission,
-          } satisfies StoredObjectsPublicApiEndpointMeta)
+          .withPermission(contract.delete.permission)
           .withDocs({
             operationId: "deleteStoredObject",
             summary: "Delete a stored object",

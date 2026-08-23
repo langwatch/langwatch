@@ -1,5 +1,5 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
 import { ManagerExplorerService } from "../manager-explorer.service";
 import { NullProcessAuditSink } from "../process-audit.repository";
 import {

@@ -1,15 +1,14 @@
+import type { Projection, StateProjectionStore } from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   foldLangyConversationState,
   initLangyConversationState,
   LANGY_CONVERSATION_PROJECTION_VERSIONS,
   type LangyConversationStateData,
 } from "@langwatch/langy";
-import type { Projection } from "../../../";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import type {
   LangyAgentRespondedEvent,
   LangyAgentResponseFailedEvent,

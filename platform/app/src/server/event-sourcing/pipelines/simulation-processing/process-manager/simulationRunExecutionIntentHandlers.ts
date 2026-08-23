@@ -1,6 +1,5 @@
+import type { IntentExecutor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-
-import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { ExecutionJobData } from "~/server/scenarios/execution/execution-pool";
 
 import type {

@@ -31,9 +31,10 @@ authoritative final answer is the `turn_finalized` event, not the tokens. But it
 is deliberately *slow at the edge* for good reasons that we do not want to
 change:
 
-- `runTurn` runs **out of band** — it is dispatched by the `spawnAgent` reactor
-  off `agent_turn_started`, not on the browser's request socket. Time-to-first
-  token includes event dispatch → GroupQueue drain → reactor → pool → manager
+- `runTurn` runs **out of band** — it is dispatched by the conversation
+  process manager's worker intent after `agent_turn_started`, not on the
+  browser's request socket. Time-to-first token includes event dispatch →
+  Group Queue drain → intent executor → pool → manager
   spawn.
 - The token buffer **batches** `CHUNK_TOKENS = 64` words before flushing a
   `delta` to Redis (bounds XADD volume on a fast stream), and the reader picks it

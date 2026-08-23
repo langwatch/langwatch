@@ -1,8 +1,12 @@
-import { definePipeline } from "../..";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import { throttledWindow } from "../../subscribers/throttleWindow";
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+  type TriggerContext,
+  throttledWindow,
+} from "@langwatch/eventing";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -22,7 +26,10 @@ import {
   SessionMetricSeriesMapProjection,
   type SessionMetricSeriesRecord,
 } from "./projections/sessionMetricSeries.mapProjection";
-import { CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH } from "./schemas/constants";
+import {
+  CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+  CODING_AGENT_PROCESSING_EVENT_TYPES,
+} from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
 import {
   PULL_REQUEST_MAPPING_WINDOW_MS,
@@ -84,29 +91,29 @@ export interface CodingAgentProcessingPipelineDeps {
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
 ) {
-  const builder = definePipeline<CodingAgentProcessingEvent>()
-    .withName("coding_agent_processing")
-    .withAggregateType("coding_agent_session")
-    .withFoldProjection(
-      "codingAgentSession",
+  const builder = definePipeline<CodingAgentProcessingEvent>({
+    name: "coding_agent_processing",
+    aggregate: defineAggregate({
+      type: "coding_agent_session",
+      events: defineEvents(CODING_AGENT_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new CodingAgentSessionFoldProjection({
         store: deps.codingAgentSessionStore,
       }),
     )
-    .withMapProjection(
-      "codingAgentTraceSessions",
+    .withClickHouseMapProjection(
       new CodingAgentTraceSessionsMapProjection({
         store: deps.codingAgentTraceSessionAppendStore,
       }),
     )
-    .withMapProjection(
-      "sessionMetricSeries",
+    .withClickHouseMapProjection(
       new SessionMetricSeriesMapProjection({
         store: deps.sessionMetricSeriesAppendStore,
       }),
     )
-    .withMapProjection(
-      "codingAgentSessionEvents",
+    .withClickHouseMapProjection(
       new CodingAgentSessionEventsMapProjection({
         store: deps.codingAgentSessionEventsAppendStore,
       }),
@@ -135,7 +142,7 @@ export function createCodingAgentProcessingPipeline(
 
   return (
     deps.pullRequestMappingHandler
-      ? builder.withSubscriber("pullRequestMapping", {
+      ? builder.withProjectionSubscriber("pullRequestMapping", {
           fold: "codingAgentSession",
           runIn: ["worker"],
           when: (_event, context) => shouldMapPullRequests(context.state),

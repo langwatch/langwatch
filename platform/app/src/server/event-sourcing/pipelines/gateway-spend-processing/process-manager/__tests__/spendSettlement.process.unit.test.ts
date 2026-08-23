@@ -7,22 +7,20 @@
  * pipeline's own applier.
  */
 
-import { nanoid } from "nanoid";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import {
-  InMemoryProcessStore,
-  type ProcessDefinition,
-  ProcessManagerService,
-} from "~/server/event-sourcing/process-manager";
-import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
-import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
+import type { ProcessEventEnvelope } from "@langwatch/eventing";
 import {
   buildIntentHandlers,
   buildProcessDefinition,
+  buildProcessManager,
+  InMemoryProcessStore,
+  OutboxDispatcherService,
+  type ProcessDefinition,
+  ProcessManagerService,
   SCHEDULE_ARM_EVENT_TYPE,
   SCHEDULED_SINGLETON_PROJECT_ID,
-} from "~/server/event-sourcing/process-manager/processRuntime";
+} from "@langwatch/eventing";
+import { nanoid } from "nanoid";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenAdmission } from "../../repositories/openAdmissions.clickhouse.repository";
 import {
   SETTLEMENT_SWEEP_INTERVAL_MS,

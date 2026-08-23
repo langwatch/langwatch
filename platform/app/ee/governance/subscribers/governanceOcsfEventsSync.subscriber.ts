@@ -6,8 +6,8 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -130,7 +130,7 @@ function buildOcsfEventRow({
 }
 
 /**
- * Pre-enqueue relevance guard (ADR-026 via ADR-098). See
+ * Pre-enqueue relevance guard. See
  * governanceKpisSync for the reasoning: the origin check is pure, reads the
  * committed fold state, and rejects the bulk of trace traffic before a job
  * is packed. Kept in the handler too — inline mode, fail-open dispatch, and

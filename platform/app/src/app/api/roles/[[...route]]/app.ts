@@ -17,15 +17,17 @@
  * handlers never emit `management.role.*` rows of their own — that would
  * record the same mutation twice.
  */
-
-import type { BaseApp, VersionBuilder } from "@langwatch/api";
+import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import {
+  isOrgExclusivePermission,
+  type Permission,
+} from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { RoleService } from "~/server/role/role.service";
@@ -37,8 +39,8 @@ const { service, guard } = createManagementService({
   feature: "RBAC",
 });
 
-type RolesFamilyApp = BaseApp & { roles: RoleService };
-type RolesVersion = VersionBuilder<RolesFamilyApp>;
+/** The handler context: the framework's variables plus the family's provider. */
+type RolesContext = ServiceContext<EndpointVariables & { roles: RoleService }>;
 
 // ── wire schemas ─────────────────────────────────────────────────────────────
 
@@ -99,25 +101,22 @@ const roleWire = (
 const organizationOf = (c: Context): Organization =>
   c.get("organization") as Organization;
 
+/** Validated path params, typed at the read site (see the chain note in @langwatch/api). */
+const paramsOf = <T>(c: RolesContext): T => c.get("params") as T;
+
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const listRolesHandler = async (
-  c: Context,
-  { app }: { app: RolesFamilyApp },
-) => {
-  const roles = await app.roles.getAllRoles(organizationOf(c).id);
+const listRolesHandler = async (c: RolesContext) => {
+  const roles = await c.get("roles").getAllRoles(organizationOf(c).id);
   return { roles: roles.map(roleWire) };
 };
 
 const createRoleHandler = async (
-  c: Context,
-  {
-    input,
-    app,
-  }: { input: z.infer<typeof createRoleSchema>; app: RolesFamilyApp },
+  c: RolesContext,
+  input: z.infer<typeof createRoleSchema>,
 ) => {
   const organization = organizationOf(c);
-  const role = await app.roles.createRole({
+  const role = await c.get("roles").createRole({
     params: {
       organizationId: organization.id,
       name: input.name,
@@ -144,14 +143,9 @@ const permissionCatalogHandler = async () => {
   };
 };
 
-const getRoleHandler = async (
-  c: Context,
-  {
-    params,
-    app,
-  }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
-) => {
-  const role = await app.roles.getRoleForOrg({
+const getRoleHandler = async (c: RolesContext) => {
+  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
+  const role = await c.get("roles").getRoleForOrg({
     roleId: params.id,
     organizationId: organizationOf(c).id,
   });
@@ -159,19 +153,12 @@ const getRoleHandler = async (
 };
 
 const updateRoleHandler = async (
-  c: Context,
-  {
-    params,
-    input,
-    app,
-  }: {
-    params: z.infer<typeof idParamsSchema>;
-    input: z.infer<typeof updateRoleSchema>;
-    app: RolesFamilyApp;
-  },
+  c: RolesContext,
+  input: z.infer<typeof updateRoleSchema>,
 ) => {
+  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  const role = await app.roles.updateRoleForOrg({
+  const role = await c.get("roles").updateRoleForOrg({
     roleId: params.id,
     organizationId: organization.id,
     params: {
@@ -188,105 +175,15 @@ const updateRoleHandler = async (
   return roleWire(role);
 };
 
-const deleteRoleHandler = async (
-  c: Context,
-  {
-    params,
-    app,
-  }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
-) => {
+const deleteRoleHandler = async (c: RolesContext) => {
+  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  await app.roles.deleteRoleForOrg({
+  await c.get("roles").deleteRoleForOrg({
     roleId: params.id,
     organizationId: organization.id,
     actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };
-};
-
-// ── endpoint registration ────────────────────────────────────────────────────
-
-const registerCollectionEndpoints = (v: RolesVersion): void => {
-  v.get(
-    "/",
-    {
-      ...guard("organization:manage"),
-      output: z.object({ roles: z.array(roleSchema) }),
-      description:
-        "List the organization's custom roles with their permission sets.",
-      docs: { operationId: "listRoles", tags: ["Roles"] },
-    },
-    listRolesHandler,
-  );
-
-  v.post(
-    "/",
-    {
-      ...guard("organization:manage"),
-      input: createRoleSchema,
-      output: roleSchema,
-      status: 201,
-      description:
-        "Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken.",
-      docs: { operationId: "createRole", tags: ["Roles"] },
-    },
-    createRoleHandler,
-  );
-
-  // Declared before /:id so the static segment can never be read as an id.
-  v.get(
-    "/permissions",
-    {
-      ...guard("organization:manage"),
-      output: permissionCatalogSchema,
-      description:
-        "The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding).",
-      docs: { operationId: "listRolePermissions", tags: ["Roles"] },
-    },
-    permissionCatalogHandler,
-  );
-};
-
-const registerItemEndpoints = (v: RolesVersion): void => {
-  v.get(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      output: roleSchema,
-      description:
-        "Read one custom role. An id from another organization answers 404 custom_role_not_found.",
-      docs: { operationId: "getRole", tags: ["Roles"] },
-    },
-    getRoleHandler,
-  );
-
-  v.patch(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      input: updateRoleSchema,
-      output: roleSchema,
-      description:
-        "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright.",
-      docs: { operationId: "updateRole", tags: ["Roles"] },
-    },
-    updateRoleHandler,
-  );
-
-  v.delete(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      output: z.object({ success: z.literal(true) }),
-      description:
-        "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
-      docs: { operationId: "deleteRole", tags: ["Roles"] },
-    },
-    deleteRoleHandler,
-  );
 };
 
 // ── service wiring ───────────────────────────────────────────────────────────
@@ -295,8 +192,86 @@ export const app = service
   .provide({
     roles: () => new RoleService(prisma),
   })
-  .version(MANAGEMENT_API_VERSION, (v) => {
-    registerCollectionEndpoints(v);
-    registerItemEndpoints(v);
-  })
+  .registerRoute("get", "/", MANAGEMENT_API_VERSION, listRolesHandler, (b) =>
+    guard("organization:manage")(b)
+      .withOutput(z.object({ roles: z.array(roleSchema) }))
+      .withDocs({
+        operationId: "listRoles",
+        tags: ["Roles"],
+        description:
+          "List the organization's custom roles with their permission sets.",
+      }),
+  )
+  .registerRoute("post", "/", MANAGEMENT_API_VERSION, createRoleHandler, (b) =>
+    guard("organization:manage")(b)
+      .withInput(createRoleSchema)
+      .withOutput(roleSchema)
+      .withStatus(201)
+      .withDocs({
+        operationId: "createRole",
+        tags: ["Roles"],
+        description:
+          "Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken.",
+      }),
+  )
+  // Declared before /:id so the static segment can never be read as an id.
+  .registerRoute(
+    "get",
+    "/permissions",
+    MANAGEMENT_API_VERSION,
+    permissionCatalogHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withOutput(permissionCatalogSchema)
+        .withDocs({
+          operationId: "listRolePermissions",
+          tags: ["Roles"],
+          description:
+            "The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding).",
+        }),
+  )
+  .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getRoleHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(idParamsSchema)
+      .withOutput(roleSchema)
+      .withDocs({
+        operationId: "getRole",
+        tags: ["Roles"],
+        description:
+          "Read one custom role. An id from another organization answers 404 custom_role_not_found.",
+      }),
+  )
+  .registerRoute(
+    "patch",
+    "/:id",
+    MANAGEMENT_API_VERSION,
+    updateRoleHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withParams(idParamsSchema)
+        .withInput(updateRoleSchema)
+        .withOutput(roleSchema)
+        .withDocs({
+          operationId: "updateRole",
+          tags: ["Roles"],
+          description:
+            "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright.",
+        }),
+  )
+  .registerRoute(
+    "delete",
+    "/:id",
+    MANAGEMENT_API_VERSION,
+    deleteRoleHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withParams(idParamsSchema)
+        .withOutput(z.object({ success: z.literal(true) }))
+        .withDocs({
+          operationId: "deleteRole",
+          tags: ["Roles"],
+          description:
+            "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
+        }),
+  )
   .build();

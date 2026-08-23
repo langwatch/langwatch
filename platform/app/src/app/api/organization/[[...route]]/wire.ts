@@ -8,7 +8,7 @@
  * the orchestration, and from `app.ts` so registration stays a list of
  * endpoints.
  */
-import type { BaseApp } from "@langwatch/api";
+import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
 import {
@@ -27,12 +27,18 @@ import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 
-/** The provider context every handler in this family receives. */
-export type OrganizationFamilyApp = BaseApp & {
-  organizations: OrganizationService;
-  invites: InviteService;
-  roleBindings: RoleBindingService;
-};
+/**
+ * The handler context every handler in this family receives: the framework's
+ * variables plus the providers registered in `app.ts`, read as
+ * `c.get("organizations")` and friends.
+ */
+export type OrganizationContext = ServiceContext<
+  EndpointVariables & {
+    organizations: OrganizationService;
+    invites: InviteService;
+    roleBindings: RoleBindingService;
+  }
+>;
 
 // ── wire schemas ─────────────────────────────────────────────────────────────
 

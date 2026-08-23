@@ -10,6 +10,7 @@ import type {
   LlmPromptConfigComponent,
   Signature,
 } from "../types/dsl";
+import { fieldSchema } from "../types/dsl";
 
 /**
  * Merges unsaved local configs into DSL nodes before sending to the Python executor.
@@ -94,17 +95,27 @@ function mergeSignatureLocalConfig(node: Node<Component>): Node<Component> {
     },
   ];
 
+  const outputs: LlmPromptConfigComponent["outputs"] = local.outputs.map(
+    (output) => {
+      const field = fieldSchema.parse({
+        identifier: output.identifier,
+        type: output.type,
+        json_schema: output.json_schema,
+      });
+      return {
+        ...field,
+        type: output.type as LlmConfigOutputType,
+      };
+    },
+  );
+
   const mergedData: LlmPromptConfigComponent = {
     ...data,
     inputs: local.inputs.map((input) => ({
       identifier: input.identifier,
       type: input.type as LlmConfigInputType,
     })),
-    outputs: local.outputs.map((output) => ({
-      identifier: output.identifier,
-      type: output.type as LlmConfigOutputType,
-      ...(output.json_schema ? { json_schema: output.json_schema } : {}),
-    })),
+    outputs,
     parameters,
     localPromptConfig: undefined,
     // Flag the dispatch as diverged from the saved version so nlpgo

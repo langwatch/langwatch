@@ -6,8 +6,8 @@
  * The organization profile over REST: the organization is implied by the
  * credential, reads return what writes accept, and the fields this API does
  * not own (single sign-on, the S3 secret) never appear. Also pins the
- * X-API-Version serving behavior: the dated and latest namespaces serve with
- * version headers while only the bare path is the documented one.
+ * X-API-Version serving behavior: every URL names its version namespace —
+ * dated or latest — and the bare path is gone.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -69,7 +69,7 @@ describe("Feature: Organization REST API", () => {
   describe("given an organization-scoped admin credential", () => {
     /** @scenario Fetching the organization returns the caller's organization */
     it("returns the caller's organization with its profile settings", async () => {
-      const response = await app.request("/api/organization", {
+      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
 
@@ -85,7 +85,7 @@ describe("Feature: Organization REST API", () => {
 
     /** @scenario Renaming the organization takes effect */
     it("applies a rename and reads it back", async () => {
-      const response = await app.request("/api/organization", {
+      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ name: `Acme Platform ${ns}` }),
@@ -95,7 +95,7 @@ describe("Feature: Organization REST API", () => {
       const body = await response.json();
       expect(body.name).toBe(`Acme Platform ${ns}`);
 
-      const readBack = await app.request("/api/organization", {
+      const readBack = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect((await readBack.json()).name).toBe(`Acme Platform ${ns}`);
@@ -108,7 +108,7 @@ describe("Feature: Organization REST API", () => {
         select: { name: true },
       });
 
-      const response = await app.request("/api/organization", {
+      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ name: "" }),
@@ -132,7 +132,7 @@ describe("Feature: Organization REST API", () => {
         data: { ssoDomain: `sso-${ns}.example.com`, ssoProvider: "okta" },
       });
 
-      const read = await app.request("/api/organization", {
+      const read = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect(read.status).toBe(200);
@@ -141,7 +141,7 @@ describe("Feature: Organization REST API", () => {
       expect(body).not.toHaveProperty("ssoProvider");
       expect(JSON.stringify(body)).not.toContain(`sso-${ns}.example.com`);
 
-      const update = await app.request("/api/organization", {
+      const update = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -164,7 +164,7 @@ describe("Feature: Organization REST API", () => {
   describe("given no credential", () => {
     /** @scenario Fetching the organization without credentials is refused */
     it("refuses with missing_credentials and 401", async () => {
-      const response = await app.request("/api/organization");
+      const response = await app.request(`/api/organization/${MANAGEMENT_API_VERSION}/`);
 
       expect(response.status).toBe(401);
       const body = await response.json();
@@ -173,8 +173,8 @@ describe("Feature: Organization REST API", () => {
   });
 
   describe("when the same endpoint is addressed through its version namespaces", () => {
-    /** @scenario The organization endpoint answers on its dated, latest and bare paths */
-    it("serves the dated, latest and bare paths, with only the bare one undated", async () => {
+    /** @scenario The organization endpoint answers on its dated and latest paths */
+    it("serves the dated and latest paths and nothing else", async () => {
       // The versioned namespaces address the family root with a trailing
       // slash (the framework's canonical dated URL shape).
       const dated = await app.request(
@@ -192,12 +192,12 @@ describe("Feature: Organization REST API", () => {
       expect(latest.headers.get("X-API-Version")).toBe("latest");
       expect(latest.headers.get("X-API-Version-Status")).toBe("latest");
 
+      // The bare alias is gone: no version segment is an unknown namespace.
       const bare = await app.request("/api/organization", {
         headers: authHeaders(),
       });
-      expect(bare.status).toBe(200);
-      expect(bare.headers.get("X-API-Version")).toBeNull();
-      expect(bare.headers.get("X-API-Version-Status")).toBe("unversioned");
+      expect(bare.status).toBe(404);
+      expect(bare.headers.get("X-API-Version-Status")).toBeNull();
 
       const unknownVersion = await app.request("/api/organization/2020-01-01", {
         headers: authHeaders(),

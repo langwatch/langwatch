@@ -1,6 +1,10 @@
-import { definePipeline } from "../../";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import {
   CompleteExperimentRunCommand,
   ComputeExperimentRunMetricsCommand,
@@ -16,6 +20,7 @@ import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
 } from "./projections/experimentRunState.foldProjection";
+import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "./schemas/constants";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 export interface ExperimentRunProcessingPipelineDeps {
@@ -47,17 +52,19 @@ export interface ExperimentRunProcessingPipelineDeps {
 export function createExperimentRunProcessingPipeline(
   deps: ExperimentRunProcessingPipelineDeps,
 ) {
-  const builder = definePipeline<ExperimentRunProcessingEvent>()
-    .withName("experiment_run_processing")
-    .withAggregateType("experiment_run")
-    .withFoldProjection(
-      "experimentRunState",
+  const builder = definePipeline<ExperimentRunProcessingEvent>({
+    name: "experiment_run_processing",
+    aggregate: defineAggregate({
+      type: "experiment_run",
+      events: defineEvents(EXPERIMENT_RUN_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new ExperimentRunStateFoldProjection({
         store: deps.experimentRunStateFoldStore,
       }),
     )
-    .withMapProjection(
-      "experimentRunResultStorage",
+    .withClickHouseMapProjection(
       new ExperimentRunResultStorageMapProjection({
         store: deps.experimentRunItemAppendStore,
       }),

@@ -5,6 +5,12 @@
  * Tests the actual CRUD operations through the tRPC layer.
  * Config formats must be DSL-compatible for direct execution.
  */
+import type {
+  CodeAgentConfig,
+  HttpAgentConfig,
+  SignatureAgentConfig,
+  WorkflowAgentConfig,
+} from "@langwatch/agents-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
@@ -30,12 +36,12 @@ const signatureConfig = {
   llm: {
     model: "openai/gpt-4o",
     temperature: 0.7,
-    maxTokens: 4096,
+    max_tokens: 4096,
   },
   prompt: "You are a helpful assistant",
   inputs: [{ identifier: "input", type: "str" }],
   outputs: [{ identifier: "output", type: "str" }],
-};
+} satisfies SignatureAgentConfig;
 
 const codeConfig = {
   name: "Python Processor",
@@ -48,13 +54,13 @@ const codeConfig = {
   ],
   inputs: [{ identifier: "input", type: "str" }],
   outputs: [{ identifier: "output", type: "str" }],
-};
+} satisfies CodeAgentConfig;
 
 const workflowConfig = {
   name: "Pipeline Agent",
   isCustom: true,
   workflow_id: "workflow_test_123",
-};
+} satisfies WorkflowAgentConfig;
 
 const httpConfig = {
   name: "HTTP Agent",
@@ -65,7 +71,7 @@ const httpConfig = {
   outputPath: "$.result",
   inputs: [{ identifier: "input", type: "str" as const }],
   outputs: [{ identifier: "output", type: "str" as const }],
-};
+} satisfies HttpAgentConfig;
 
 describe("Agents Endpoints", () => {
   const projectId = "test-project-id";

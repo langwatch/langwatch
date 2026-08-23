@@ -284,7 +284,7 @@ reasons:
    re-enqueues the next wait when it fires — a self-perpetuating chain. If one fire
    is lost (a crash between pop and re-enqueue, a Redis blip), the chain breaks
    *silently and permanently*. A durable row cannot break the chain: the row still
-   sits there and the next scan catches up. (ADR-023/025 is the cautionary tale of
+   sits there and the next scan catches up. (ADR-025 is the cautionary tale of
    such a chain that had to be removed.)
 3. **Edit / cancel / DST-recompute.** With parked waits, changing a schedule means
    finding and removing the queued job by id and re-adding; with a row it is one
@@ -571,7 +571,7 @@ for the other kinds.
   + fire-history the report configuration and delivery surface extend.
 - [ADR-052](./052-automations-on-process-manager-substrate.md) — the durable wake,
   leased intent, and GroupQueue substrate used by automation reactions.
-- [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating reactor
+- [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating cleanup chain
   chain; the cautionary tale for why a "re-enqueue the next wait" queue-chain is
   rejected in favour of a durable-row poll.
 - [ADR-040](./040-webhook-http-request-automation-channel.md) — the webhook notify

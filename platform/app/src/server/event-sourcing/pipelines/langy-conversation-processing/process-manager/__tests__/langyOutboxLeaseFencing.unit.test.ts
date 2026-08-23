@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+import type { ProcessDefinition } from "@langwatch/eventing";
 import {
+  buildProcessDefinition,
+  buildProcessManager,
   InMemoryProcessStore,
   type IntentHandler,
   OutboxDispatcherService,
   ProcessManagerService,
-} from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+} from "@langwatch/eventing";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { langyConversationProcess } from "../langyConversationProcess";
 import type { LangyConversationProcessState } from "../langyConversationProcess.types";
 import {

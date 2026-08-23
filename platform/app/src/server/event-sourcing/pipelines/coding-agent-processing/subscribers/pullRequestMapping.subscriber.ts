@@ -1,7 +1,6 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-
 import { isMappableGithubHost } from "~/server/app-layer/github/githubHost";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { CodingAgentSessionState } from "../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../schemas/events";
 

@@ -80,14 +80,13 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
         properties: {
           id: { type: "string" },
           name: { type: "string" },
-          description: { type: "string", nullable: true },
+          description: { type: ["string", "null"] },
           keyType: { type: "string", enum: ["personal", "service"] },
           assignedToUserId: {
-            type: "string",
-            nullable: true,
+            type: ["string", "null"],
             description: "The member who owns the key; null for a service key.",
           },
-          createdByUserId: { type: "string", nullable: true },
+          createdByUserId: { type: ["string", "null"] },
           permissionMode: {
             type: "string",
             enum: ["all", "readonly", "restricted"],
@@ -99,9 +98,18 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
               "The resource:action permissions a restricted key grants. Empty for the other modes.",
           },
           createdAt: { type: "string", format: "date-time" },
-          expiresAt: { type: "string", format: "date-time", nullable: true },
-          lastUsedAt: { type: "string", format: "date-time", nullable: true },
-          revokedAt: { type: "string", format: "date-time", nullable: true },
+          expiresAt: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
+          lastUsedAt: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
+          revokedAt: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
           roleBindings: {
             type: "array",
             items: {

@@ -28,7 +28,6 @@ import {
 import type { FeatureFlagServiceInterface } from "../types";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
-const FAMILY_FLAG = "es-trace-projection-spanstorage-killswitch";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
 const UNREGISTERED_FLAG = "experiment_some_adhoc_unregistered_flag";
@@ -160,33 +159,6 @@ describe("FeatureFlagService", () => {
         const { service, legacy } = buildService();
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
         const enabled = await service.isEnabled(SYSTEM_FLAG, {
-          distinctId: "tenant-a",
-          defaultValue: false,
-        });
-        expect(enabled).toBe(true);
-        expect(legacy.isEnabled).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("given a SYSTEM family-prefixed flag", () => {
-    describe("when no store row exists", () => {
-      it("resolves to family default off and skips the legacy service", async () => {
-        const { service, legacy } = buildService();
-        const enabled = await service.isEnabled(FAMILY_FLAG, {
-          distinctId: "tenant-a",
-          defaultValue: false,
-        });
-        expect(enabled).toBe(false);
-        expect(legacy.isEnabled).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when an operator flips the kill switch on via the store", () => {
-      it("returns true and still skips the legacy service", async () => {
-        const { service, store, legacy } = buildService();
-        await store.set(FAMILY_FLAG, true);
-        const enabled = await service.isEnabled(FAMILY_FLAG, {
           distinctId: "tenant-a",
           defaultValue: false,
         });

@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { ManagerExplorerService } from "../../manager-explorer.service";
 import { ProcessAuditRepository } from "../../process-audit.repository";
 import { ProcessOpsPrismaRepository } from "../../repositories/process-ops.prisma.repository";

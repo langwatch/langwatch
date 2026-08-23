@@ -1,5 +1,9 @@
-import type { Event } from "../../domain/types";
-import { definePipeline } from "../../pipeline/staticBuilder";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+} from "@langwatch/eventing";
 import {
   PROCESS_RETENTION_SWEEP_INTERVAL_MS,
   PROCESS_RETENTION_SWEEP_LEASE_MS,
@@ -46,36 +50,38 @@ export interface ProcessManagerMaintenancePipelineDeps {
 export function createProcessManagerMaintenancePipeline(
   deps: ProcessManagerMaintenancePipelineDeps,
 ) {
-  return (
-    definePipeline<Event>()
-      .withName("process_manager_maintenance")
+  return definePipeline<Event>({
+    name: "process_manager_maintenance",
+    aggregate: defineAggregate({
       // `global`, like blob_maintenance and langy_maintenance: this pipeline
       // appends no events, so minting an aggregate type that can never appear
       // in the event store would be taxonomy debt for nothing. The sweep spans
       // every tenant by design.
-      .withAggregateType("global")
-      .withProcessManager(PROCESS_RETENTION_SWEEP_PROCESS_NAME, (pm) =>
-        pm
-          .state<ProcessRetentionSweepState>({
-            lastSweepAt: null,
-            sweepsScheduled: 0,
-          })
-          .schedule({ everyMs: PROCESS_RETENTION_SWEEP_INTERVAL_MS })
-          .onWake(processRetentionSweepWake)
-          .intent(
-            "sweep",
-            processRetentionSweepSchema,
-            runProcessRetentionSweep(deps.retentionSweep),
-          )
-          // The sweep stops itself at RETENTION_SWEEP_DEADLINE_MS, which sits
-          // well inside this lease, so a slow run leaves work for the next tick
-          // rather than letting the lease lapse and a second worker start a
-          // concurrent sweep.
-          .outbox({
-            leaseDurationMs: PROCESS_RETENTION_SWEEP_LEASE_MS,
-            maxAttempts: 3,
-          }),
-      )
-      .build()
-  );
+      type: "global",
+      events: defineEvents([]),
+    }),
+  })
+    .withProcessManager(PROCESS_RETENTION_SWEEP_PROCESS_NAME, (pm) =>
+      pm
+        .state<ProcessRetentionSweepState>({
+          lastSweepAt: null,
+          sweepsScheduled: 0,
+        })
+        .schedule({ everyMs: PROCESS_RETENTION_SWEEP_INTERVAL_MS })
+        .onWake(processRetentionSweepWake)
+        .intent(
+          "sweep",
+          processRetentionSweepSchema,
+          runProcessRetentionSweep(deps.retentionSweep),
+        )
+        // The sweep stops itself at RETENTION_SWEEP_DEADLINE_MS, which sits
+        // well inside this lease, so a slow run leaves work for the next tick
+        // rather than letting the lease lapse and a second worker start a
+        // concurrent sweep.
+        .outbox({
+          leaseDurationMs: PROCESS_RETENTION_SWEEP_LEASE_MS,
+          maxAttempts: 3,
+        }),
+    )
+    .build();
 }

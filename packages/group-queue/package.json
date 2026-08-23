@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/group-queue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed Redis-backed queues with per-group FIFO ordering and independent producer and consumer capabilities.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./operational": {
+      "types": "./src/operational.ts",
+      "default": "./src/operational.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "fastq": "^1.20.1",
+    "ioredis": "5.10.1",
+    "msgpackr": "^2.0.4",
+    "prom-client": "^15.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

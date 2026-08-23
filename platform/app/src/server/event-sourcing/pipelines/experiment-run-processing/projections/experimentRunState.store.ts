@@ -1,5 +1,7 @@
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { ExperimentRunStateRepository } from "../repositories/experimentRunState.repository";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import { parseExperimentRunKey } from "../utils/compositeKey";

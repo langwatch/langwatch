@@ -1,7 +1,7 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { trackServerEvent } from "~/server/posthog";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 

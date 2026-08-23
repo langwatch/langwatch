@@ -4,7 +4,7 @@ import type {
   EventHandler,
   ProcessHandlerContext,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "@langwatch/eventing";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";

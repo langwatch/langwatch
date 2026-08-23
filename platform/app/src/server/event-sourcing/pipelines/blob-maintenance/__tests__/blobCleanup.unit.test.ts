@@ -1,6 +1,5 @@
+import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
-
-import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 import { createBlobMaintenancePipeline } from "../pipeline";
 import {
   BLOB_CLEANUP_PROCESS_NAME,

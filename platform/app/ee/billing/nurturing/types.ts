@@ -1,7 +1,7 @@
 /**
  * Customer.io trait schema contract.
  *
- * Defines the complete data model pushed to Customer.io by subscribers and hooks.
+ * Defines the complete data model pushed to Customer.io by nurturing integrations.
  * All call sites use these typed parameters instead of ad-hoc Record<string, unknown>.
  */
 
@@ -40,31 +40,18 @@ export interface CioPersonTraits {
   utm_content?: string;
   referrer?: string;
 
-  // Trace milestones (customerIoTraceSync subscriber)
+  // Trace milestones
   has_traces: boolean;
-  sdk_language: string;
-  sdk_framework: string;
-  first_trace_at: string;
-  trace_count: number;
-  daily_trace_count: number;
-  last_trace_at: string;
-  trace_count_updated_at: string;
 
-  // Evaluation milestones (customerIoEvaluationSync subscriber)
+  // Evaluation milestones
   has_evaluations: boolean;
-  evaluation_count: number;
-  first_evaluation_at: string;
-  last_evaluation_at: string;
 
   // Prompt milestones (prompt creation hook)
   has_prompts: boolean;
   prompt_count: number;
 
-  // Simulation milestones (customerIoSimulationSync subscriber)
+  // Simulation milestones
   has_simulations: boolean;
-  simulation_count: number;
-  first_simulation_at: string;
-  last_simulation_at: string;
 
   // Feature adoption
   team_member_count: number;
@@ -97,15 +84,11 @@ export interface CioOrgTraits {
 
 export type CioEventName =
   | "signed_up"
-  | "first_trace_integrated"
-  | "first_evaluation_created"
-  | "evaluation_ran"
   | "scenario_created"
   | "team_member_invited"
   | "workflow_created"
   | "experiment_ran"
   | "first_prompt_created"
-  | "first_simulation_ran"
   | "joined_via_invite"
   | "joined_via_sso";
 

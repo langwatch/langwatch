@@ -1,8 +1,15 @@
+import type {
+  Command,
+  CommandHandler,
+  FoldProjectionStore,
+} from "@langwatch/eventing";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { Command, CommandHandler } from "../../../";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import { computeRunMetricsCommandDataSchema } from "../schemas/commands";
 import {

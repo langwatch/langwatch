@@ -1,5 +1,5 @@
+import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { sendHttpDestination } from "~/server/webhooks/httpDestination";
 import { listSlackChannels, postSlackChatMessage } from "../slackWebApi";
 

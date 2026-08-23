@@ -10,8 +10,8 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 
+import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TenantId } from "../../../../domain/tenantId";
 import {
   contributeLogFactsCommandDataSchema,
   contributeMetricFactsCommandDataSchema,

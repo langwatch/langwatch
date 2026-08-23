@@ -2,7 +2,6 @@ export { StoredObjectsInternalApi } from "./api/internal/stored-object.api";
 export {
   StoredObjectsPublicApi,
   STORED_OBJECTS_PUBLIC_API_VERSION,
-  type StoredObjectsPublicApiEndpointMeta,
   type StoredObjectsPublicApiOptions,
 } from "./api/public/stored-object.api";
 export {

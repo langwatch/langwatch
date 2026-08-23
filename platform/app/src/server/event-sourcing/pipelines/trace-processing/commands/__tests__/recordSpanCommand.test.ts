@@ -3,8 +3,8 @@ import {
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
+import { type Command, createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type Command, createTenantId } from "../../../../";
 import type {
   PIIRedactionLevel,
   RecordSpanCommandData,

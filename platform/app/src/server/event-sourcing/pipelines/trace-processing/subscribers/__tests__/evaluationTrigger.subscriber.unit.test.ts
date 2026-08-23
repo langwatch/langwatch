@@ -1,7 +1,7 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
@@ -560,7 +560,7 @@ describe("evaluationTrigger subscriber", () => {
  * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
  * threw the job away. They are pure and read only the payload `handle` receives,
  * so `shouldDispatch` rejects them pre-enqueue instead (ADR-026). See
- * specs/event-sourcing/hot-trace-fold-amplification.feature.
+ * specs/trace-processing/hot-trace-fold-amplification.feature.
  */
 describe("evaluationTrigger relevance check", () => {
   const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>

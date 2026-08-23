@@ -1,10 +1,10 @@
-import type { LangyConversationStateData } from "@langwatch/langy";
-import type { Prisma } from "~/generated/prisma/client";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
+import type { LangyConversationStateData } from "@langwatch/langy";
+import type { Prisma } from "~/generated/prisma/client";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 

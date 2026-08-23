@@ -8,8 +8,12 @@ import {
   type WebhookDeliveryProcessDeps,
   webhookDeliveryPM,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import { definePipeline } from "../..";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
@@ -28,6 +32,7 @@ import {
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
+  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
 } from "./schemas/constants";
 import type { GatewaySpendProcessingEvent } from "./schemas/events";
 
@@ -68,11 +73,14 @@ export interface GatewaySpendProcessingPipelineDeps {
 export function createGatewaySpendProcessingPipeline(
   deps: GatewaySpendProcessingPipelineDeps,
 ) {
-  let pipeline = definePipeline<GatewaySpendProcessingEvent>()
-    .withName(GATEWAY_SPEND_PIPELINE_NAME)
-    .withAggregateType(GATEWAY_SPEND_AGGREGATE_TYPE)
-    .withFoldProjection(
-      "gatewaySpend",
+  let pipeline = definePipeline<GatewaySpendProcessingEvent>({
+    name: GATEWAY_SPEND_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: GATEWAY_SPEND_AGGREGATE_TYPE,
+      events: defineEvents(GATEWAY_SPEND_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new GatewaySpendFoldProjection({ store: deps.gatewaySpendStore }),
     )
     .withCommand("admitSpend", AdmitSpendCommand)

@@ -1,3 +1,8 @@
+import type {
+  EventSubscriberDefinition,
+  ProjectionCursor,
+} from "@langwatch/eventing";
+import { DispatchError } from "@langwatch/eventing";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -14,9 +19,6 @@ import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streami
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 import { projectionNotReadyError } from "./projection-cursor";
 

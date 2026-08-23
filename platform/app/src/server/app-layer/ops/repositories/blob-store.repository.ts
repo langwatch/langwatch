@@ -1,4 +1,4 @@
-import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
+import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 
 import type {
   OpsBlobPage,

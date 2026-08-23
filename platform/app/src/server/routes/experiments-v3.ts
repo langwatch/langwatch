@@ -21,7 +21,7 @@ import {
 } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import { ExperimentType } from "~/generated/prisma/client";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { Agent as TypedAgent } from "@langwatch/agents-contract";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

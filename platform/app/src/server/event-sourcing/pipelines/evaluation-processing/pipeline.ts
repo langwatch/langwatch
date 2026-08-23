@@ -1,12 +1,16 @@
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+  type TriggerContext,
+} from "@langwatch/eventing";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
 } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
-import { definePipeline } from "../../";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
 import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
@@ -24,13 +28,10 @@ import {
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_PROCESSING_EVENT_TYPES,
   EVALUATION_REPORTED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { EvaluationProcessingEvent } from "./schemas/events";
-import {
-  type CustomerIoEvaluationSyncSubscriberDeps,
-  createCustomerIoEvaluationSyncSubscriber,
-} from "./subscribers/customerIoEvaluationSync.subscriber";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
@@ -51,8 +52,6 @@ export interface EvaluationProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  /** CRM nurturing sync; absent until the counting strategy is finalised. */
-  customerIoEvaluationSync?: CustomerIoEvaluationSyncSubscriberDeps;
 }
 
 /**
@@ -70,28 +69,29 @@ export interface EvaluationProcessingPipelineDeps {
 export function createEvaluationProcessingPipeline(
   deps: EvaluationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<EvaluationProcessingEvent>()
-    .withName("evaluation_processing")
-    .withAggregateType("evaluation")
-    .withFoldProjection(
-      "evaluationRun",
+  return definePipeline<EvaluationProcessingEvent>({
+    name: "evaluation_processing",
+    aggregate: defineAggregate({
+      type: "evaluation",
+      events: defineEvents(EVALUATION_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new EvaluationRunFoldProjection({
         store: deps.evalRunStore,
       }),
     )
-    .withFoldProjection(
-      "evaluationAnalytics",
+    .withClickHouseFoldProjection(
       new EvaluationAnalyticsFoldProjection({
         store: deps.evaluationAnalyticsStore,
       }),
     )
-    .withMapProjection(
-      "evaluationAnalyticsRollup",
+    .withClickHouseMapProjection(
       new EvaluationAnalyticsRollupMapProjection({
         store: deps.evaluationAnalyticsRollupAppendStore,
       }),
     )
-    .withSubscriber("triggerMatch", {
+    .withProjectionSubscriber("triggerMatch", {
       fold: "evaluationRun",
       events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
       delay: 10_000,
@@ -99,7 +99,7 @@ export function createEvaluationProcessingPipeline(
       handler: (event, context) =>
         deps.automations.triggerMatchHandler(event, context),
     })
-    .withSubscriber("graphTriggerActivity", {
+    .withEventSubscriber("graphTriggerActivity", {
       events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
       delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
       dedup: {
@@ -115,16 +115,7 @@ export function createEvaluationProcessingPipeline(
       groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
-    });
-
-  if (deps.customerIoEvaluationSync) {
-    builder = builder.withSubscriber(
-      "customerIoEvaluationSync",
-      createCustomerIoEvaluationSyncSubscriber(deps.customerIoEvaluationSync),
-    );
-  }
-
-  return builder
+    })
     .withCommandInstance(
       "executeEvaluation",
       ExecuteEvaluationCommand,

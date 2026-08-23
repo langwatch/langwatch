@@ -28,7 +28,7 @@ type HttpNodeData = {
   parameters: Field[];
 };
 
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { Agent as TypedAgent } from "@langwatch/agents-contract";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
@@ -390,10 +390,6 @@ const buildTargetNode = (
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
-        default: {
-          const _exhaustive: never = loadedData.agent.type;
-          throw new Error(`Unknown agent type: ${_exhaustive}`);
-        }
       }
     } else {
       throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);

@@ -1,10 +1,10 @@
+import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,

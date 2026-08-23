@@ -1,3 +1,4 @@
+import { EventSourcing } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
@@ -7,13 +8,12 @@ import { PrismaTopicModelProjectionRepository } from "~/server/app-layer/topic-c
 import { seedProjectTopicModel } from "~/server/app-layer/topic-clustering/seedTopicModel";
 import { TopicClusteringStatusService } from "~/server/app-layer/topic-clustering/topic-clustering-status.service";
 import { prisma } from "~/server/db";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../../__tests__/integration/testContainers";
-import { EventSourcing } from "../../../eventSourcing";
-import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { createTopicClusteringProcessingPipeline } from "../pipeline";
 
 /**
@@ -139,7 +139,6 @@ describe.skipIf(!hasTestcontainers)(
       );
       eventSourcing = EventSourcing.createWithStores({
         eventStore,
-        clickhouse: async () => clickhouse,
       });
 
       const pipeline = eventSourcing.register(

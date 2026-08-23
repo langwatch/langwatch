@@ -10,7 +10,7 @@
  */
 
 import { ScimTokenService } from "@ee/scim/scim-token.service";
-import type { BaseApp, VersionBuilder } from "@langwatch/api";
+import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
@@ -25,8 +25,10 @@ const { service, guard } = createManagementService({
   feature: "SCIM",
 });
 
-type ScimTokensFamilyApp = BaseApp & { scimTokens: ScimTokenService };
-type ScimTokensVersion = VersionBuilder<ScimTokensFamilyApp>;
+/** The handler context: the framework's variables plus the family's provider. */
+type ScimTokensContext = ServiceContext<
+  EndpointVariables & { scimTokens: ScimTokenService }
+>;
 
 const tokenSummarySchema = z.object({
   id: z.string(),
@@ -46,28 +48,19 @@ const organizationOf = (c: Context): Organization =>
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const listTokensHandler = async (
-  c: Context,
-  { app }: { app: ScimTokensFamilyApp },
-) => {
-  const tokens = await app.scimTokens.list({
+const listTokensHandler = async (c: ScimTokensContext) => {
+  const tokens = await c.get("scimTokens").list({
     organizationId: organizationOf(c).id,
   });
   return { tokens };
 };
 
 const createTokenHandler = async (
-  c: Context,
-  {
-    input,
-    app,
-  }: {
-    input: z.infer<typeof createTokenSchema>;
-    app: ScimTokensFamilyApp;
-  },
+  c: ScimTokensContext,
+  input: z.infer<typeof createTokenSchema>,
 ) => {
   const organization = organizationOf(c);
-  const created = await app.scimTokens.generate({
+  const created = await c.get("scimTokens").generate({
     organizationId: organization.id,
     ...(input.description !== undefined
       ? { description: input.description }
@@ -86,15 +79,10 @@ const createTokenHandler = async (
   };
 };
 
-const revokeTokenHandler = async (
-  c: Context,
-  {
-    params,
-    app,
-  }: { params: z.infer<typeof idParamsSchema>; app: ScimTokensFamilyApp },
-) => {
+const revokeTokenHandler = async (c: ScimTokensContext) => {
+  const params = c.get("params") as z.infer<typeof idParamsSchema>;
   const organization = organizationOf(c);
-  await app.scimTokens.revoke({
+  await c.get("scimTokens").revoke({
     organizationId: organization.id,
     tokenId: params.id,
   });
@@ -107,60 +95,59 @@ const revokeTokenHandler = async (
   return { success: true as const };
 };
 
-// ── endpoint registration ────────────────────────────────────────────────────
-
-const registerEndpoints = (v: ScimTokensVersion): void => {
-  v.get(
-    "/",
-    {
-      ...guard("organization:manage"),
-      output: z.object({ tokens: z.array(tokenSummarySchema) }),
-      description:
-        "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
-      docs: { operationId: "listScimTokens", tags: ["SCIM Tokens"] },
-    },
-    listTokensHandler,
-  );
-
-  v.post(
-    "/",
-    {
-      ...guard("organization:manage"),
-      input: createTokenSchema,
-      output: z.object({
-        id: z.string(),
-        token: z.string(),
-        description: z.string().nullable(),
-      }),
-      status: 201,
-      description:
-        "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
-      docs: { operationId: "createScimToken", tags: ["SCIM Tokens"] },
-    },
-    createTokenHandler,
-  );
-
-  v.delete(
-    "/:id",
-    {
-      ...guard("organization:manage"),
-      params: idParamsSchema,
-      output: z.object({ success: z.literal(true) }),
-      description:
-        "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",
-      docs: { operationId: "revokeScimToken", tags: ["SCIM Tokens"] },
-    },
-    revokeTokenHandler,
-  );
-};
-
 // ── service wiring ───────────────────────────────────────────────────────────
 
 export const app = service
   .provide({
     scimTokens: () => ScimTokenService.create(prisma),
   })
-  .version(MANAGEMENT_API_VERSION, (v) => {
-    registerEndpoints(v);
-  })
+  .registerRoute("get", "/", MANAGEMENT_API_VERSION, listTokensHandler, (b) =>
+    guard("organization:manage")(b)
+      .withOutput(z.object({ tokens: z.array(tokenSummarySchema) }))
+      .withDocs({
+        operationId: "listScimTokens",
+        tags: ["SCIM Tokens"],
+        description:
+          "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
+      }),
+  )
+  .registerRoute(
+    "post",
+    "/",
+    MANAGEMENT_API_VERSION,
+    createTokenHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withInput(createTokenSchema)
+        .withOutput(
+          z.object({
+            id: z.string(),
+            token: z.string(),
+            description: z.string().nullable(),
+          }),
+        )
+        .withStatus(201)
+        .withDocs({
+          operationId: "createScimToken",
+          tags: ["SCIM Tokens"],
+          description:
+            "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+        }),
+  )
+  .registerRoute(
+    "delete",
+    "/:id",
+    MANAGEMENT_API_VERSION,
+    revokeTokenHandler,
+    (b) =>
+      guard("organization:manage")(b)
+        .withParams(idParamsSchema)
+        .withOutput(z.object({ success: z.literal(true) }))
+        .withDocs({
+          operationId: "revokeScimToken",
+          tags: ["SCIM Tokens"],
+          description:
+            "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",
+        }),
+  )
   .build();

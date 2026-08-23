@@ -11,8 +11,9 @@
  *
  * @see specs/langy/langy-turn-recovery.feature
  */
+
+import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TenantId } from "../../../domain/tenantId";
 import {
   FailAgentResponseCommand,
   RecordAgentResponseCommand,

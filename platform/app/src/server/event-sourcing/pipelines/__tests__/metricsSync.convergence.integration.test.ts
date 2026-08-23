@@ -14,22 +14,26 @@
  *
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
+
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  EventSourcing,
+} from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import type { AggregateType } from "../../";
-import { definePipeline } from "../../";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
   createTestTenantId,
   getTenantIdString,
 } from "../../__tests__/integration/testHelpers";
-import { EventSourcing } from "../../eventSourcing";
-import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
 import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
 import { deriveScenarioRoleMetricsFromSpans } from "../trace-processing/projections/services/scenario-role-metrics.derivation";
@@ -38,6 +42,7 @@ import { SpanStorageMapProjection } from "../trace-processing/projections/spanSt
 import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
+import { TRACE_PROCESSING_EVENT_TYPES } from "../trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
 
@@ -128,7 +133,6 @@ describe.skipIf(!hasTestcontainers)(
       // Use in-memory queue (no Redis) so commands are processed synchronously
       eventSourcing = EventSourcing.createWithStores({
         eventStore,
-        clickhouse: async () => clickHouseClient,
       });
 
       const spanAppendStore = new SpanAppendStore(
@@ -152,23 +156,43 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       const pipelineName = `trace_role_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const pipelineDef = definePipeline<TraceProcessingEvent>()
-        .withName(pipelineName)
-        .withAggregateType("trace" as AggregateType)
-        .withFoldProjection(
-          "traceSummary",
+      const pipelineDef = definePipeline<TraceProcessingEvent>({
+        name: pipelineName,
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
+        }),
+      })
+        .withClickHouseFoldProjection(
           new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
         )
-        .withMapProjection(
-          "spanStorage",
+        .withClickHouseMapProjection(
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
-        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
-        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
-        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
-        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
-        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
+        .withProjectionSubscriber(
+          "evaluationTrigger",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "customEvaluationSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "traceUpdateBroadcast",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "simulationMetricsSync",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "projectMetadata",
+          noopFoldSubscriber() as any,
+        )
+        .withProjectionSubscriber(
+          "spanStorageBroadcast",
+          noopMapSubscriber() as any,
+        )
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();

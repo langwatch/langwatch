@@ -1,10 +1,10 @@
-import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import type {
   EventHandler,
   ProcessHandlerContext,
+  ProcessIntent,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { ProcessIntent } from "~/server/event-sourcing/process-manager";
+} from "@langwatch/eventing";
+import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 
 import {
   type IngestionPullProcessingEvent,

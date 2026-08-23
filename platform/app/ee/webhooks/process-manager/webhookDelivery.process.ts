@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createHash } from "node:crypto";
+import type {
+  IntentContext,
+  JsonValue,
+  NewOutboxMessage,
+  ProcessManagerApplier,
+  ProcessStore,
+} from "@langwatch/eventing";
+import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -20,12 +26,6 @@ import {
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
-import type {
-  NewOutboxMessage,
-  ProcessStore,
-} from "~/server/event-sourcing/process-manager/stores/processStore.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";

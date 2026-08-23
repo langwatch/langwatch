@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-
-import { EventSchema } from "~/server/event-sourcing/domain/types";
 import {
   PULLED_USAGE_COST_BASIS,
   PULLED_USAGE_COST_STATUS,

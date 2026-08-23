@@ -1,7 +1,7 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { CanonicalLogAppendStore } from "../projections/stores";
 import type { CanonicalLogRecord } from "../schemas/logRecord";
 

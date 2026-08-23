@@ -1,5 +1,9 @@
-import { definePipeline } from "../../";
-import type { Event } from "../../domain/types";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+} from "@langwatch/eventing";
 import { ReportUsageForMonthCommand } from "./commands/reportUsageForMonth.command";
 
 export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
@@ -18,9 +22,13 @@ export interface BillingReportingPipelineDeps {
 export function createBillingReportingPipeline(
   deps: BillingReportingPipelineDeps,
 ) {
-  return definePipeline<Event>()
-    .withName(BILLING_REPORTING_PIPELINE_NAME)
-    .withAggregateType("billing_report")
+  return definePipeline<Event>({
+    name: BILLING_REPORTING_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: "billing_report",
+      events: defineEvents([]),
+    }),
+  })
     .withCommandInstance(
       "reportUsageForMonth",
       ReportUsageForMonthCommand,

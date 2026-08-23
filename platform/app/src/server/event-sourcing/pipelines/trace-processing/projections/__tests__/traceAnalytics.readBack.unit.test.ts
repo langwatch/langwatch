@@ -1,8 +1,7 @@
+import type { ProjectionStoreContext } from "@langwatch/eventing";
+import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   projectAnalyticsStateToRow,

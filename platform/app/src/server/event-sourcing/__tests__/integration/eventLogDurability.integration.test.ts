@@ -36,12 +36,10 @@
  * Pairs with parseOtlpBody.test.ts (parser-equivalence contract, 38106f768).
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { type AggregateType, createTenantId } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { AggregateType } from "../../";
-import { createTenantId } from "../../domain/tenantId";
-
-import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
+import { EventRepositoryClickHouse } from "../../adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "../../adapters/clickhouse/eventStoreClickHouse";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,

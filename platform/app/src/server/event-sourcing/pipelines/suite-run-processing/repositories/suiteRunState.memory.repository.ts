@@ -1,5 +1,5 @@
-import type { Projection } from "../../../";
-import { BaseMemoryProjectionStore } from "../../../stores/baseMemoryProjectionStore";
+import type { Projection } from "@langwatch/eventing";
+import { BaseMemoryProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateRepository } from "./suiteRunState.repository";
 
 export class SuiteRunStateRepositoryMemory<

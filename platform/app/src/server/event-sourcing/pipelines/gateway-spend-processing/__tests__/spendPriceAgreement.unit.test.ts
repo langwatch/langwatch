@@ -48,8 +48,8 @@ import {
   deliverPayloadToRow,
   webhookDeliveryPM,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import { createTenantId, EventUtils } from "~/server/event-sourcing";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,

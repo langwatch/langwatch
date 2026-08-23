@@ -22,7 +22,7 @@ import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 

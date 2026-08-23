@@ -5,9 +5,9 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
-import { AgentService } from "../agent.service";
 
 type EndResult = { identifier: string; type: string };
 
@@ -104,7 +104,7 @@ describe("AgentService field derivation", () => {
     cleanupWorkflowIds.push(workflowId);
     await commitVersion({ workflowId, endResults });
 
-    const service = AgentService.create(prisma);
+    const service = AgentsFeature.create({ prisma, session: null });
     const agent = await service.create({
       id: `test_agent_${nanoid(8)}`,
       projectId,
@@ -261,7 +261,7 @@ describe("AgentService field derivation", () => {
     describe("when the agent is read", () => {
       /** @scenario "A workflow agent pointing at no workflow at all reports no fields" */
       it("reports no fields and says it could not resolve them", async () => {
-        const service = AgentService.create(prisma);
+        const service = AgentsFeature.create({ prisma, session: null });
         const agent = await service.create({
           id: `test_agent_${nanoid(8)}`,
           projectId,

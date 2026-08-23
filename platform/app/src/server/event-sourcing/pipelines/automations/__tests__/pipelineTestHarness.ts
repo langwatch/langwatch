@@ -1,4 +1,4 @@
-import type { ProcessManagerDefinition } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { ProcessManagerDefinition } from "@langwatch/eventing";
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,

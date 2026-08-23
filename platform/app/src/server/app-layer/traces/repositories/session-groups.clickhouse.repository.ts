@@ -1,5 +1,5 @@
+import { EventUtils } from "@langwatch/eventing";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,

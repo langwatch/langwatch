@@ -4,7 +4,7 @@ import type {
   OutboxMessageRecord,
   PersistedProcessInstance,
   ProcessStore,
-} from "~/server/event-sourcing/process-manager/stores/processStore.types";
+} from "@langwatch/eventing";
 import {
   type EndpointStreamState,
   WEBHOOK_DELIVERY_PROCESS_NAME,

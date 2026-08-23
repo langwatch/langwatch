@@ -13,6 +13,9 @@
  *
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */
+
+import type { StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -25,9 +28,6 @@ import {
   langyConversationTurnEventSchema,
 } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
-
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 

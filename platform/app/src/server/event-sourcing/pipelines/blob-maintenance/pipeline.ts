@@ -1,6 +1,10 @@
-import type { Event } from "../../domain/types";
-import { definePipeline } from "../../pipeline/staticBuilder";
-import { BLOB_SWEEP_INTERVAL_MS } from "../../queues/groupQueue/blobConstants";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+} from "@langwatch/eventing";
+import { BLOB_SWEEP_INTERVAL_MS } from "@langwatch/group-queue/operational";
 import {
   BLOB_CLEANUP_PROCESS_NAME,
   type BlobCleanupDeps,
@@ -31,26 +35,28 @@ export interface BlobMaintenancePipelineDeps {
 export function createBlobMaintenancePipeline(
   deps: BlobMaintenancePipelineDeps,
 ) {
-  return (
-    definePipeline<Event>()
-      .withName("blob_maintenance")
+  return definePipeline<Event>({
+    name: "blob_maintenance",
+    aggregate: defineAggregate({
       // `global` rather than a new taxonomy entry: aggregate types are a
       // ClickHouse partition key, and this pipeline appends no events, so minting
       // an identifier that can never appear in the event store would be taxonomy
       // debt for nothing. The sweep is genuinely global — it belongs to the queue,
       // not to a tenant.
-      .withAggregateType("global")
-      .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
-        pm
-          .state<BlobCleanupState>({ lastSweepAt: null })
-          .schedule({ everyMs: BLOB_SWEEP_INTERVAL_MS })
-          .onWake(blobCleanupWake)
-          .intent("sweep", blobCleanupSchema, runBlobCleanup(deps.cleanup))
-          // A full keyspace pass is minutes of work in the worst case, so the
-          // lease has to outlast it or a second worker re-leases mid-sweep and
-          // both walk the same keys.
-          .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
-      )
-      .build()
-  );
+      type: "global",
+      events: defineEvents([]),
+    }),
+  })
+    .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
+      pm
+        .state<BlobCleanupState>({ lastSweepAt: null })
+        .schedule({ everyMs: BLOB_SWEEP_INTERVAL_MS })
+        .onWake(blobCleanupWake)
+        .intent("sweep", blobCleanupSchema, runBlobCleanup(deps.cleanup))
+        // A full keyspace pass is minutes of work in the worst case, so the
+        // lease has to outlast it or a second worker re-leases mid-sweep and
+        // both walk the same keys.
+        .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
+    )
+    .build();
 }

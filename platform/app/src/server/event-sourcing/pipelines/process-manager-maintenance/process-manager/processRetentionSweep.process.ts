@@ -1,10 +1,7 @@
+import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { toSafeFailureDiagnostic } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type {
-  IntentSpec,
-  WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { toSafeFailureDiagnostic } from "~/server/event-sourcing/process-manager/failureDiagnostic";
 import {
   incrementProcessManagerRetentionFailures,
   incrementProcessManagerRetentionSweptRows,
@@ -44,7 +41,7 @@ export const PROCESS_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
  * `(TenantId, BudgetId, GatewayRequestId)` in the ledger, and webhook
  * delivery claims its idempotency key before sending. Before making a
  * process transient, confirm its sinks do the same; see
- * specs/event-sourcing/transient-process-instances.feature.
+ * packages/eventing/specs/transient-process-instances.feature.
  */
 export const DISPATCHED_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
 

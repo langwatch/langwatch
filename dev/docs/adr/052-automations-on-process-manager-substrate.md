@@ -1,241 +1,162 @@
-# ADR-052: Automations on a dedicated process-manager pipeline
+# ADR-052: Automations use a dedicated process-manager pipeline
 
 **Date:** 2026-07-18
 
 **Status:** Accepted
 
-**Supersedes:** ADR-030's `ReactorOutbox` mechanism and `.withOutbox`
-pipeline primitive. ADR-026/027, ADR-031, ADR-034, ADR-035, ADR-036/041,
-ADR-040, and ADR-043 remain behavioral contracts, subject to ADR-026's
-2026-07-18 deterministic settle-window amendment.
+**Behavioural contract:**
+[automation dispatch on the process-manager substrate](../../../specs/automations/process-manager-dispatch.feature)
+
+**Related:** [per-trigger dispatch timing](./026-per-trigger-dispatch-timing.md),
+[typed dispatch errors](./027-typed-dispatcherror-contract.md),
+[email abuse protections](./031-trigger-email-abuse-protections.md),
+[event-sourced analytics](./034-event-sourced-analytics-materialization.md),
+[persist-class debounce](./035-persist-class-debounce.md),
+[notification templates](./036-liquid-templates-for-trigger-notifications.md),
+[webhook delivery](./040-webhook-http-request-automation-channel.md), and the
+[Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md).
 
 ## Context
 
-Automation dispatch previously combined three delivery systems: fold-attached
-outbox reactors, delayed settle/cadence/graph jobs in Redis, and a Postgres
-`ReactorOutbox` audit shadow. Graph absence detection added a heartbeat
-scheduler and Redis leader lock. Pending settlement disappeared on a Redis
-flush even though the audit table continued to imply durability, and the
-table itself became a high-volume production burden.
+Automation settlement is stake-sensitive orchestration. A matching trace may
+need to wait for more trace activity, join a notification cadence, survive a
+queue flush, retry an external effect, or wake later to evaluate absence. A
+best-effort subscriber is suitable for detecting a match, but it is not the
+durable home of those promises.
 
-The generic process-manager substrate already provides the two promises this
-domain needs: revision-fenced durable wakes and a leased transactional outbox.
-Automations therefore move to that substrate and own an event-sourced pipeline
-instead of mounting Postgres-shaped state on the high-volume trace pipeline.
+Automations therefore own an event-sourced pipeline backed by the Eventing
+process-manager substrate. Group Queue carries ordered work. Postgres holds
+the durable process inbox, state, wakes and intent outbox.
 
 ## Decision
 
 ```text
 trace pipeline                         evaluation pipeline
-  post-fold triggerMatch subscriber      post-fold triggerMatch subscriber
+  trigger-match projection subscriber   trigger-match projection subscriber
               │ IDs + timing config only │
               └──────────┬────────────────┘
-                         ▼ GroupQueue command, grouped by trigger
+                         ▼ Group Queue command, grouped by trigger
                  automations pipeline
                  aggregate type: trigger
                     recordTriggerMatch
                          │
-                 trigger_match_recorded ─────► automationAudit map (ClickHouse)
-                         │                     (removed — see Amendment 2026-07)
-                         │ GroupQueue, FIFO per trigger
+                 trigger_match_recorded
+                         │ FIFO per trigger
                          ▼
-                  triggerSettlement PM
-                  transactional inbox/state
-                         │ nextWakeAt
+                  triggerSettlement process manager
+                  inbox + state + nextWakeAt
+                         │
                          ▼
                   leased intent outbox
                   notifyDigest / persistMatch
 
-                 graphAlertSweep PM
-                 scheduled singleton wake every 30s
+                 graphAlertSweep process manager
+                 scheduled singleton wake every 30 seconds
 ```
 
-Every delivery hop uses GroupQueue: trace/evaluation subscribers, automation
-commands, projections, and process-manager event consumption. Postgres is not
-a competing transport. It is used only after PM consumption for durable
-`nextWakeAt` state and leased outbox intents.
+### Match subscribers carry IDs, not trace content
 
-### Trace and evaluation subscribers
+The trace and evaluation pipelines detect candidate matches only after their
+required projection has committed. They send trigger ID, trace ID, action
+class, timing configuration and the source event identity to the automations
+pipeline. Trace, span and message content never enters an automation event or
+a process-manager row.
 
-The trace pipeline mounts:
+Evaluation-filtered triggers are detected from the evaluation pipeline. Trace
+filters are detected from the trace pipeline. Each subscriber applies the
+source and origin guards owned by its feature before it records a match.
 
-```ts
-.withSubscriber("triggerMatch", {
-  fold: "traceSummary",
-  events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-  handler,
-})
+`recordTriggerMatch` uses the trigger ID as aggregate and queue identity. Its
+idempotency key includes the trigger, trace, debounce width and anchored settle
+window:
+
+```text
+triggerId : traceId : traceDebounceMs : floor(occurredAt / max(traceDebounceMs, 1))
 ```
 
-It runs after the fold commits, receives that committed fold as `ctx.state`,
-and applies `passesTraceOriginGuards`. Evaluation-filtered triggers are left
-to the equivalent `evaluationRun` subscriber. Both subscribers send only
-trigger ID, trace ID, action class, action, debounce, and cadence. Trace/span
-content never crosses into the automations event or Postgres PM tables.
+Duplicate delivery within one window evolves the process once. Activity in a
+later window is a distinct fact and can re-arm settlement.
 
-`recordTriggerMatch` uses trigger ID as aggregate/group identity and stamps
-`${triggerId}:${traceId}:${settleWindowBucket}` as the event idempotency key.
-The bucket combines the configured debounce width with
-`floor(occurredAt / max(traceDebounceMs, 1))`; including the width prevents a
-configuration change from colliding with an earlier round. The PM runtime uses
-that logical key for its transactional inbox, so duplicate activity within one
-window can briefly create two physical ClickHouse rows without evolving the
-process twice. Event-log reads and the audit projection also collapse the same
-key. Activity in a later window records a new event and re-arms the process.
+### `triggerSettlement` owns timing and durable intent
 
-### Dedicated automations pipeline
+There is one `triggerSettlement` process instance per project and trigger. A
+match records the trace in compact state and chooses the earliest required
+`nextWakeAt`. A wake:
 
-The pipeline has aggregate type `trigger`, the `recordTriggerMatch` command,
-an ID-only `automationAudit` ClickHouse map projection (since removed — see
-Amendment 2026-07), and both automation process managers. GroupQueue
-serializes commands and committed-event consumption by trigger, preserving
-FIFO end to end.
+- re-reads the settled trace before applying filters;
+- emits one `notifyDigest` intent per due cadence boundary;
+- emits bounded `persistMatch` page intents for due persist actions; and
+- schedules the next durable wake when more work remains.
 
-Process managers subscribe by declaring `.on(EVENT_TYPE, handler)`. There is
-no feed, fact port, `.trigger()`, or cross-pipeline PM mount. The runtime
-derives the live event subscription from the declared event types and sends
-the committed event through the transactional inbox.
+Pending state is bounded. When a match storm reaches the bound, the oldest
+persist matches are flushed into bounded intent pages instead of being
+dropped. Page identities include the settle window, so a later round cannot
+be swallowed by an earlier completed page.
 
-### Approved builder API
+The process transition, inbox marker, next state and intent messages commit in
+one Postgres transaction. Intent executors are at-least-once and retry-safe.
+`TriggerSent(triggerId, traceId)` is the permanent notification claim;
+dataset and annotation writes use deterministic identities or upserts.
+Claims are written after a successful external effect so retryable failures
+remain retryable.
 
-```ts
-.withProcessManager("triggerSettlement", pm => pm
-  .state<SettlementState>(initialState)
-  .intent("notifyDigest", notifyDigestSchema, sendDigest)
-  .intent("persistMatch", persistMatchSchema, persistMatch)
-  .on(TRIGGER_MATCH_RECORDED, (state, data, ctx) => ({
-    state: addPending(state, data, ctx.at),
-    nextWakeAt: settleBoundary(state, ctx.at),
-  }))
-  .onWake((state, ctx) => {
-    const due = drainDue(state, ctx.at);
-    return {
-      state: due.state,
-      intents: [
-        ...due.boundaries.map(b =>
-          ctx.intents.notifyDigest(`digest:${b.key}`, b.payload)),
-        ...due.settledMatches.map(m =>
-          ctx.intents.persistMatch(
-            `persist:${m.traceId}:${m.settleWindowBucket}`,
-            m.payload)),
-      ],
-      nextWakeAt: due.nextBoundary,
-    };
-  })
-  .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }))
+### Dispatch errors form a closed retry contract
 
-.withProcessManager("graphAlertSweep", pm => pm
-  .state<SweepState>(init)
-  .schedule({ everyMs: 30_000 })
-  .onWake(sweep)
-  .intent("evaluateGraph", sweepSchema, runSweep))
-```
+Intent executors throw `DispatchError` for expected delivery failures. A
+retryable error is returned to the leased outbox retry ladder; a terminal
+error is recorded and not retried. Unknown errors are treated as retryable
+until the attempt cap. Provider bodies and credentials are never persisted in
+an error record.
 
-The phantom-typed stages require state first, make intent factories available
-to evolve handlers, expose outbox configuration only after an intent exists,
-and reject a PM with neither an event handler nor a schedule. Evolve handlers
-are synchronous and pure: no I/O and no clocks; `ctx.at` supplies event or
-wake time. Zod is required for persisted intent payloads, not transient event
-typing.
+### Graph alerts use the same durable scheduling substrate
 
-### Settlement and dispatch
+The real-time graph subscriber applies a five-second, non-extending project
+debounce and calls the shared evaluator. `graphAlertSweep` is a scheduled
+singleton for absence and resolve evaluation. Revision fencing ensures that
+racing wake workers cannot both commit the same sweep.
 
-`triggerSettlement` has one instance per project/trigger. A match computes
-`settleDueAt`, its deterministic settle-window bucket, and the ADR-026/027
-cadence-snapped `dispatchDueAt` from the event timestamp, then stores the
-earliest boundary as `nextWakeAt`. Duplicate activity in one bucket collapses;
-activity in a later bucket records a new round and moves the pending wake. A
-wake emits one `notifyDigest` per cadence boundary and one window-identified
-`persistMatch` per settled persist-class trace. Pending state is bounded: a
-match storm past the cap flushes the oldest matches to immediate dispatch
-intents (degraded batching, never loss) and logs the flush count.
+The webhook delivery-log prune is also a scheduled process-manager singleton.
+Automations do not require application cron jobs or a separate leader lock.
 
-This is stronger than the old Redis-delayed settle path: once the PM commit
-succeeds, a Redis flush cannot erase the pending boundary or intent.
+### Replay excludes customer effects
 
-Intent executors preserve the existing dispatch contracts: settled-fold
-reconfirmation, ADR-031 retry-safe caps and suppression, claim-after-send
-`TriggerSent` at-most-once behavior, dataset/annotation actions, and ADR-040
-webhook SSRF protection, delivery log, and stable
-`X-LangWatch-Event-Id`. Retryable errors throw for leased-outbox backoff;
-Notify rounds in later windows remain suppressed after a successful send by
-the permanent `(triggerId, traceId)` claim. A persist round whose filters fail
-does not claim, so later trace activity gets a fresh window-identified intent
-and can persist once the settled state passes.
+Subscribers and process managers are live-delivery registrations. Projection
+replay invokes neither. Rebuilding trace, evaluation or automation projections
+therefore cannot send a notification, persist a match, evaluate an alert or
+run a webhook.
 
-### Graph alerts and replay
+### Ownership and storage boundaries
 
-The lightweight real-time graph subscriber retains the five-second
-non-extending project debounce and shared evaluator. `graphAlertSweep` is a
-scheduled singleton that replaces the heartbeat cron and Redis leader lock;
-revision fencing makes racing wake workers stand down. Candidate discovery
-and absence/resolve semantics are unchanged. The ADR-040 webhook delivery-log
-prune rides the same substrate: `webhookDeliveryPrune` is a daily scheduled
-singleton, so the Helm chart ships no automation CronJobs at all.
+- Automation services, repositories, provider adapters and delivery senders
+  live in the automation application layer or feature package.
+- Pipeline composition, subscribers and process definitions live with the
+  automations pipeline in the application composition root.
+- Eventing owns generic inbox, process-state, wake and leased-outbox contracts.
+- Group Queue owns ordered background transport.
+- Postgres process rows contain IDs, compact timing state and bounded intent
+  payloads; never trace, span or message bodies.
 
-Subscribers and generated PM consumers are live-delivery registrations. The
-projection replay path invokes neither, so rebuilding trace, evaluation, or
-automation projections cannot dispatch customer effects.
+## Alternatives considered
 
-### Deletion and cutover
-
-The entire `event-sourcing/outbox/` stack, six automation outbox reactors,
-`.withOutbox`, `ReactorOutbox`, heartbeat scheduler, and Redis leader lock are
-deleted. The `ReactorOutbox` table itself is NOT dropped in the cutover
-release: a rolling deploy runs migrations while old worker replicas still
-read and write the table, so dropping it here would crash them mid-drain.
-The drop migration ships one release later (expand/contract), after the old
-consumers and any drained rows are gone. Automation code consolidates:
-services, repositories, dispatch helpers and delivery senders under
-`server/app-layer/automations` (the `triggers` name is retired); process
-managers, subscribers and dispatch wiring under
-`server/event-sourcing/pipelines/automations`; provider definitions split
-per side into the `@langwatch/automations` workspace package
-(`packages/automations/src/providers`, shared across app/CLI/MCP — not the
-`shared/automations/providers` path originally planned here),
-`features/automations/providers`, and
-`server/app-layer/automations/providers`. Consumers import the new
-locations directly.
-
-For one release, the global event router recognizes stale
-settle/cadence/graphEval payloads, logs a warning, and acknowledges them. It
-does not parse them as events or poison-retry them.
-
-`withReactor` remains available for the unrelated plain reactors. Migrating
-those reactors, scenario execution, Langy, topic clustering, caches, and
-observability are outside this decision.
+Best-effort subscribers alone cannot atomically preserve a future wake or an
+external intent. A product-specific scheduler would duplicate the generic
+process-manager inbox, revision fencing and leased delivery semantics. Running
+filter evaluation directly on every trace event would also restore hot-path
+amplification and make partially assembled trace state observable.
 
 ## Consequences
 
 - Automations have one canonical event stream and per-trigger FIFO ordering.
-- Postgres holds IDs, timing/config snapshots, state revisions, and intent
-  payloads only; never trace/span/message content.
-- Settlement and cadence promises survive Redis loss.
-- `ReactorOutbox` write amplification and heartbeat infrastructure disappear.
-- Wake polling can deliver a boundary a few seconds late, but cannot silently
+- Settlement and cadence promises survive Redis loss once committed to the
+  process store.
+- External effects are retryable without copying trace content into Postgres.
+- Wake polling may deliver a boundary a few seconds late, but cannot silently
   lose a committed promise.
-
-## Amendment: automationAudit projection removed (2026-07)
-
-The ID-only `automationAudit` ClickHouse map projection is gone. It stored
-nothing the substrate does not already persist — every trigger match is a
-committed `trigger_match_recorded` event in the event log, and its settlement
-lifecycle lives in the `triggerSettlement` process-manager state in Postgres —
-and no code path ever read the `automation_audit` table. Maintaining it was
-pure write overhead: as a `dedupeByIdempotencyKey` projection it also paid an
-event-history dedup scan on every flush.
-
-The projection, its append store, and `AutomationAuditRepository` are removed.
-The `automation_audit` table and migration 00048 stay in place for one release
-(expand/contract — the same cutover shape the run-aggregates ADR
-(`061-run-aggregates-are-queries.md`, proposed on PR #6051) uses for
-`suite_runs`); the drop migration follows separately.
+- Operator tooling can inspect generic process instances, intent messages and
+  attempt records through the application adapters.
 
 ## References
 
-- [`specs/automations/process-manager-dispatch.feature`](../../../specs/automations/process-manager-dispatch.feature)
-- [`specs/automations/dispatch-timing.feature`](../../../specs/automations/dispatch-timing.feature)
-- ADR-049 (process-manager inbox/state/outbox)
-- ADR-051 (event-sourced topic clustering scheduling — introduces the durable
-  revision-fenced wake pattern this ADR generalises; in flight on PR #5902,
-  not yet on main)
+- [Automation process-manager behaviour](../../../specs/automations/process-manager-dispatch.feature)
+- [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
+- [Group Queue framework boundary](../../../packages/group-queue/adrs/20260820-group-queue-framework-boundary.md)

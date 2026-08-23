@@ -8,12 +8,13 @@
  * - "langevals returns status=error with a detail message"
  * - "evaluator throws an exception mid-execution"
  */
+
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
-import type { Command } from "../../..";
-import { createTenantId } from "../../../domain/tenantId";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 

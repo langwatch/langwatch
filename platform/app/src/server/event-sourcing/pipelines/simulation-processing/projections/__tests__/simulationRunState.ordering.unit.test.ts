@@ -13,10 +13,13 @@
  * - finished is ALWAYS after message_snapshot
  * - metrics_computed can arrive at any point after started
  */
+
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,

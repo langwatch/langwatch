@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { JsonValue, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type {
   GatewayBudgetLedgerStatus,
   PrismaClient,
 } from "~/generated/prisma/client";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -18,7 +18,6 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   BudgetDebitRow,
   GatewayBudgetClickHouseRepository,

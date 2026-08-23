@@ -16,7 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import components
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
 import { api } from "~/utils/api";
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import type { TargetConfig } from "../types";
@@ -103,6 +103,9 @@ const mockHttpAgent: TypedAgent = {
   archivedAt: null,
   createdAt: new Date("2025-01-10T10:00:00Z"),
   updatedAt: new Date("2025-01-15T10:00:00Z"),
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
 };
 
 const mockCodeAgent: TypedAgent = {
@@ -124,6 +127,9 @@ const mockCodeAgent: TypedAgent = {
   archivedAt: null,
   createdAt: new Date("2025-01-05T10:00:00Z"),
   updatedAt: new Date("2025-01-12T10:00:00Z"),
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
 };
 
 // Default mock implementation

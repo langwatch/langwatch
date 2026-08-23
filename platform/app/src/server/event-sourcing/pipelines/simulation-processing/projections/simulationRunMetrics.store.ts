@@ -1,8 +1,8 @@
 import type {
   AppendStore,
   BulkAppendContext,
-} from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { SimulationRunMetricsRepository } from "../repositories/simulationRunMetrics.clickhouse.repository";
 import type { SimulationRunMetricsProjectionRecord } from "./simulationRunMetrics.mapProjection";
 

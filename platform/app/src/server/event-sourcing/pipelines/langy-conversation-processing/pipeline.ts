@@ -1,17 +1,22 @@
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type EventSubscriberDefinition,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
+import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy";
 import type { LangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   langyConversationProcess,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
-import { definePipeline } from "../../";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,
@@ -97,29 +102,29 @@ export interface LangyConversationProcessingPipelineDeps {
 export function createLangyConversationProcessingPipeline(
   deps: LangyConversationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<LangyConversationProcessingEvent>()
-    .withName("langy_conversation_processing")
-    .withAggregateType("langy_conversation")
-    .withProjection(
-      "langyConversationState",
+  let builder = definePipeline<LangyConversationProcessingEvent>({
+    name: "langy_conversation_processing",
+    aggregate: defineAggregate({
+      type: "langy_conversation",
+      events: defineEvents(LANGY_CONVERSATION_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withPostgresProjection(
       new LangyConversationStateFoldProjection({
         store: deps.langyConversationProjectionStore,
       }),
     )
-    .withProjection(
-      "langyConversationTurn",
+    .withPostgresProjection(
       new LangyConversationTurnFoldProjection({
         store: deps.langyConversationTurnProjectionStore,
       }),
     )
-    .withMapProjection(
-      "langyMessageOperational",
+    .withClickHouseMapProjection(
       new LangyMessageOperationalMapProjection({
         store: deps.langyMessageProjectionStore,
       }),
     )
-    .withMapProjection(
-      "langyAnalyticsEvent",
+    .withClickHouseMapProjection(
       new LangyAnalyticsEventMapProjection({
         store: deps.langyAnalyticsEventProjectionStore,
       }),

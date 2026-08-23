@@ -100,6 +100,6 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 
 ## References
 
-- Related ADRs: [ADR-002: Event Sourcing](002-event-sourcing.md), [ADR-007: Event Sourcing Architecture](007-event-sourcing-architecture.md)
+- Related architecture: [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
 - GitHub issue: #1707
 - SDK sub-issue: langwatch/scenario#228

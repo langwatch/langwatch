@@ -197,9 +197,9 @@ pipeline registry alongside the outbox worker. Topic clustering is the
 first production consumer of the wake path; Langy can adopt it later
 without new infrastructure.
 
-### 6. Bootstrap, backfill, and legacy removal
+### 6. Bootstrap and recurring scheduling
 
-- The trace pipeline's `projectMetadata` reactor dispatches
+- The trace pipeline's `projectMetadata` projection subscriber dispatches
   `requestClustering` (bootstrap) on **every** real ingest, not only when
   `firstMessage` flips. This is deliberately **level-triggered**: an edge
   that is missed — a failed bootstrap, a project predating the feature, a

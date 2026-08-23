@@ -8,6 +8,14 @@ import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/serv
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import {
+  bindProcessFleetMetricsSource,
+  createEventingGroupQueueFactory,
+  Deferred,
+  EventSourcing,
+  InMemoryProcessStore,
+  RedisReplayMarkerChecker,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
@@ -46,9 +54,20 @@ import {
   closeClickHouseClient,
 } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import { BILLING_REPORTING_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/billing-reporting/pipeline";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
-import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
+import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
+import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
+import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
+import type { PipelineRepositories } from "~/server/event-sourcing/registration/pipelineRegistry";
+import {
+  type AppCommands,
+  PipelineRegistry,
+  type ScenarioExecutionPoolHolder,
+} from "~/server/event-sourcing/registration/pipelineRegistry";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -69,7 +88,9 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -95,14 +116,6 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import { EventSourcing } from "../event-sourcing";
-import { Deferred } from "../event-sourcing/deferred";
-import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
-import {
-  type AppCommands,
-  PipelineRegistry,
-  type ScenarioExecutionPoolHolder,
-} from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
@@ -122,10 +135,6 @@ import {
   SuiteRunStateRepositoryClickHouse,
   SuiteRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/suite-run-processing/repositories";
-import {
-  InMemoryProcessStore,
-  PrismaProcessStore,
-} from "../event-sourcing/process-manager";
 import { ExperimentService } from "../experiments/experiment.service";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { InviteService } from "../invites/invite.service";
@@ -989,15 +998,69 @@ export function initializeDefaultApp(options?: {
       )
     : undefined;
 
+  const eventStore = clickhouseEnabled
+    ? new EventStoreClickHouse(
+        new EventRepositoryClickHouse(resolveClickHouseClient),
+        retentionPolicyCache,
+      )
+    : undefined;
+  const configuredGlobalConcurrency = Number(
+    process.env.GLOBAL_QUEUE_CONCURRENCY,
+  );
+  const queueFactory = redis
+    ? createEventingGroupQueueFactory({
+        consumersEnabled: roleRunsWorkers(config.processRole),
+        dependencies: {
+          redis,
+          policy: {
+            globalConcurrency:
+              Number.isSafeInteger(configuredGlobalConcurrency) &&
+              configuredGlobalConcurrency > 0
+                ? configuredGlobalConcurrency
+                : undefined,
+            compression:
+              process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true"
+                ? "zstd"
+                : "gzip",
+            payloadCodec:
+              process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true"
+                ? "msgpack"
+                : "json",
+          },
+          objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+          resolveStorageDestination: resolveProjectStorageDestination,
+        },
+      })
+    : undefined;
+
   const es = new EventSourcing({
-    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
-    redis,
+    eventStore,
+    queueFactory,
     enabled: true,
-    isSaas: config.isSaas,
-    processRole: config.processRole,
+    consumersEnabled: roleRunsWorkers(config.processRole),
+    executionTarget:
+      config.processRole === "all" ? undefined : config.processRole,
+    replayMarkerChecker: redis
+      ? new RedisReplayMarkerChecker(redis)
+      : undefined,
     retentionPolicyResolver: retentionPolicyCache,
-    // ADR-052: durable persistence for withProcessManager declarations —
-    // the SAME store instance the registry's dependency assembly uses.
+    configureGlobalProjections: config.isSaas
+      ? (registry) => {
+          registry.registerMapProjection(orgBillableEventsMeterProjection);
+          registry.registerMapSubscriber(
+            "orgBillableEventsMeter",
+            createBillingMeterDispatchSubscriber({
+              getDispatch: () => {
+                const pipeline = es.getPipeline(
+                  BILLING_REPORTING_PIPELINE_NAME,
+                );
+                return (data) =>
+                  pipeline.commands.reportUsageForMonth.send(data);
+              },
+            }),
+          );
+        }
+      : undefined,
     processStore: repositories.processStore,
   });
 

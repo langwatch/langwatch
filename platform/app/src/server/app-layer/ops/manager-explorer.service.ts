@@ -1,7 +1,6 @@
+import type { ProcessRef, ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
-import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
-import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { getProcessManagerMetadata } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type {
   ProcessAuditEntryView,
   ProcessAuditSink,

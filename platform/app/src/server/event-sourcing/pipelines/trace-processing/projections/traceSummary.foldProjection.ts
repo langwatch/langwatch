@@ -1,3 +1,8 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -6,11 +11,6 @@ import {
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "~/server/event-sourcing/projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
@@ -554,7 +554,7 @@ export class TraceSummaryFoldProjection
    * lanes, because a hot trace's spans then arrive out of order constantly: one
    * trace re-folded 730 times in two hours, re-reading 5.66M event rows, and
    * never caught up (2026-07-09 —
-   * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   * specs/trace-processing/hot-trace-fold-amplification.feature).
    */
   /**
    * `readWindow` bounds the read-back to a partition-pruned window around the

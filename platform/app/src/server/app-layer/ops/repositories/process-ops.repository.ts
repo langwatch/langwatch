@@ -1,4 +1,4 @@
-import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
+import type { ProcessRef } from "@langwatch/eventing";
 
 /**
  * Fleet-level trouble counts for one process name — the row the operator

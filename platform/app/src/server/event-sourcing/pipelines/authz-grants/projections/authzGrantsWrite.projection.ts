@@ -26,9 +26,11 @@ import {
   RESOURCE_KIND_TO_DB,
   type RoleRowShape,
 } from "@langwatch/authz-server";
-import type { MapEventHandlers } from "../../../projections/abstractMapProjection";
-import { AbstractMapProjection } from "../../../projections/abstractMapProjection";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+import {
+  AbstractMapProjection,
+  type AppendStore,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,

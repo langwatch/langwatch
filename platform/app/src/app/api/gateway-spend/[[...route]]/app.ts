@@ -24,7 +24,7 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
 import {
   decodeSpendEventsCursor,

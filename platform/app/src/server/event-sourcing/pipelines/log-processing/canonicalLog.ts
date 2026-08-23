@@ -1,6 +1,6 @@
+import { compareOrdinal } from "@langwatch/eventing";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
-import { compareOrdinal } from "../../utils/compareOrdinal";
 import {
   sha256,
   stableStringify,

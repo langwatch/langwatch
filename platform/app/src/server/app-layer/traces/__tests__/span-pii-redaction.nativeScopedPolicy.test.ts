@@ -34,7 +34,7 @@ vi.mock("~/server/tracer/collector/piiCheck", () => ({
   PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
 }));
 
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { createTenantId } from "@langwatch/eventing";
 import { featureFlagService } from "~/server/featureFlag";
 import { batchPresidioClearPII } from "~/server/tracer/collector/piiCheck";
 

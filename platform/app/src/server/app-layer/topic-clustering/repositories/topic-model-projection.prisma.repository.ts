@@ -1,15 +1,14 @@
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
-
 import type {
   ProjectedTopic,
   TopicModelData,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**

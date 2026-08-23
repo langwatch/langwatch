@@ -3,7 +3,7 @@ import type {
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
-} from "../../../";
+} from "@langwatch/eventing";
 
 export interface ExperimentRunStateRepository<
   ProjectionType extends Projection = Projection,

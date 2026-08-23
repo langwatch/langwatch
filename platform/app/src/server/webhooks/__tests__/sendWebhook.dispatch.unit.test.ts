@@ -1,5 +1,5 @@
+import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 
 // Stub the SSRF-fenced transport and the rate limiter so these tests exercise
 // sendWebhook's ORCHESTRATION (event-id header, dispatch cap, Retry-After

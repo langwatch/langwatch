@@ -1,5 +1,5 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";

@@ -6,11 +6,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { Agent } from "@langwatch/agents-contract";
 import type { Evaluator } from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import { AgentService } from "~/server/agents/agent.service";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getFullDataset } from "~/server/api/routers/datasetRecord.utils";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
@@ -285,7 +285,7 @@ export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, TypedAgent>;
+  loadedAgents: Map<string, Agent>;
   loadedEvaluators: Map<string, Evaluator>;
   loadedWorkflows: Map<string, LoadedWorkflow>;
 };
@@ -428,8 +428,8 @@ export const loadExecutionData = async (
   }
 
   // Load agents for agent targets
-  const loadedAgents = new Map<string, TypedAgent>();
-  const agentService = AgentService.create(prisma);
+  const loadedAgents = new Map<string, Agent>();
+  const agentService = AgentsFeature.create({ prisma, session: null });
 
   for (const target of targets) {
     if (target.type === "agent" && target.dbAgentId) {

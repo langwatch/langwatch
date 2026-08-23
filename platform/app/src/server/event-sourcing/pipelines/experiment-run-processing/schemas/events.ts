@@ -1,6 +1,6 @@
+import { EventSchema } from "@langwatch/eventing";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
 import { targetSchema } from "./shared";
 

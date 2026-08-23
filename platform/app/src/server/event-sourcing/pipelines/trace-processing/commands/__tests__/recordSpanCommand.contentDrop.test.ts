@@ -6,6 +6,8 @@
  * content. The policy is supplied directly (the DB-backed resolution path has
  * its own integration tests); the real drop logic + real fold run end-to-end.
  */
+
+import { type Command, createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { stripOtlpSpanContent } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import {
@@ -14,7 +16,6 @@ import {
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
-import { type Command, createTenantId } from "../../../../";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import type {
   PIIRedactionLevel,

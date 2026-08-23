@@ -11,8 +11,9 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 import type {
   ManagementScopeType,
@@ -173,14 +174,14 @@ export class OrganizationApiService {
   async get(): Promise<OrganizationSettings> {
     return this.#request({
       operation: "fetch the organization",
-      path: "/api/organization",
+      path: managementPath("/api/organization"),
     });
   }
 
   async update(input: UpdateOrganizationInput): Promise<OrganizationSettings> {
     return this.#request({
       operation: "update the organization",
-      path: "/api/organization",
+      path: managementPath("/api/organization"),
       method: "PATCH",
       body: input,
     });
@@ -191,7 +192,7 @@ export class OrganizationApiService {
   ): Promise<ListMembersResponse> {
     return this.#request({
       operation: "list organization members",
-      path: "/api/organization/members",
+      path: managementPath("/api/organization/members"),
       query: {
         ...(options.includeDisabled !== undefined
           ? { includeDisabled: options.includeDisabled }
@@ -205,7 +206,7 @@ export class OrganizationApiService {
   async getMember(userId: string): Promise<OrganizationMemberDetail> {
     return this.#request({
       operation: `fetch member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}`),
     });
   }
 
@@ -218,7 +219,7 @@ export class OrganizationApiService {
   }): Promise<UpdatedOrganizationMember> {
     return this.#request({
       operation: `update member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}`),
       method: "PATCH",
       body: input,
     });
@@ -227,7 +228,7 @@ export class OrganizationApiService {
   async removeMember(userId: string): Promise<{ success: true }> {
     return this.#request({
       operation: `remove member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}`),
       method: "DELETE",
     });
   }
@@ -235,14 +236,14 @@ export class OrganizationApiService {
   async getMemberAccess(userId: string): Promise<MemberAccessBreakdown> {
     return this.#request({
       operation: `fetch the access of member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}/access`,
+      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}/access`),
     });
   }
 
   async listInvites(): Promise<{ invites: OrganizationInvite[] }> {
     return this.#request({
       operation: "list organization invites",
-      path: "/api/organization/invites",
+      path: managementPath("/api/organization/invites"),
     });
   }
 
@@ -251,7 +252,7 @@ export class OrganizationApiService {
   ): Promise<{ invites: CreatedOrganizationInvite[] }> {
     return this.#request({
       operation: "create organization invites",
-      path: "/api/organization/invites",
+      path: managementPath("/api/organization/invites"),
       method: "POST",
       body: input,
     });
@@ -260,7 +261,7 @@ export class OrganizationApiService {
   async revokeInvite(inviteId: string): Promise<{ success: true }> {
     return this.#request({
       operation: `revoke invite "${inviteId}"`,
-      path: `/api/organization/invites/${encodeURIComponent(inviteId)}`,
+      path: managementPath(`/api/organization/invites/${encodeURIComponent(inviteId)}`),
       method: "DELETE",
     });
   }

@@ -1,3 +1,4 @@
+import { readWindowAround } from "@langwatch/eventing";
 import {
   CODING_AGENT_SESSION_READ_WINDOW_MS,
   type CodingAgentSessionRow,
@@ -6,7 +7,6 @@ import {
   normalizeMetricName,
   normalizeTokenType,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
-import { readWindowAround } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 import type {
   CodingAgentSessionEventRow,

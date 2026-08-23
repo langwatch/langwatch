@@ -8,6 +8,9 @@
  * Scenarios from specs/evaluators/evaluator-config-skips.feature are bound
  * individually via the `@scenario` annotations below.
  */
+
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EvaluatorConfigError,
@@ -17,8 +20,6 @@ import {
 import type { EvaluationCostRecorder } from "../../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../../app-layer/monitors/monitor.service";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 

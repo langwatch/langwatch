@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AgentComponentConfig } from "~/server/agents/agent.repository";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
 
 import {
   buildCodeConfig,

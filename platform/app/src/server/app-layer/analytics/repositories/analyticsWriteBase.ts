@@ -1,8 +1,7 @@
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 
 /**
  * Shared base classes for the ADR-034 write-side ClickHouse analytics

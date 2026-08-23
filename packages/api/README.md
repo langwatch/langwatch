@@ -134,9 +134,9 @@ Every response carries `X-API-Version-Status` (`stable` | `latest` | `preview`) 
 
 ## OpenAPI documentation
 
-The document publishes **every dated version plus `latest`** of each documented endpoint, so a pinned client sees the schemas its version actually serves — and never `preview`, never a bare path. An endpoint is documented when its chain declares `withOutput` or `withDocs` and does not set `docs.hide: true`; withdrawn endpoints leave the document at the version they were withdrawn from. Set `docs.operationId` explicitly on every documented endpoint: generated ids leak URL shapes into SDK function names.
+The document publishes **every dated version plus `latest`** of each documented endpoint, so a pinned client sees the schemas its version actually serves — and never `preview`, never a bare path. An endpoint is documented when its chain declares `withOutput` or `withDocs` and does not set `docs.hide: true`; withdrawn endpoints leave the document at the version they were withdrawn from. Set `docs.operationId` explicitly on every documented endpoint: generated ids leak URL shapes into SDK function names. `latest` keeps that declared id, while each dated mount appends its version (for example, `createThing_2026_08_07`) so operation ids remain unique across the document.
 
-Hosts generating specs for a service with RPC endpoints MUST pass `excludeStaticFile: false` to `generateSpecs`: every RPC name is dotted and parameterless, so hono-openapi's default filter drops each one as a static file and the family generates zero paths, silently. The trap is pinned by `rpc-openapi.unit.test.ts`.
+Hosts generate framework service specs with `generateApiSpecs` exported by `@langwatch/api`, and MUST pass `excludeStaticFile: false` for RPC endpoints. hono-openapi stores route metadata under a package-local symbol, so importing its generator separately may not see framework routes when the workspace resolves two peer variants. Every RPC name is also dotted and parameterless, so hono-openapi's default filter drops the family as static files, silently. The traps are pinned by the package tests and the application spec-generation task.
 
 ## rpc.discover
 

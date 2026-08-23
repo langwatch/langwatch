@@ -1,6 +1,5 @@
+import type { IntentSpec } from "@langwatch/eventing";
 import { z } from "zod";
-
-import type { IntentSpec } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 

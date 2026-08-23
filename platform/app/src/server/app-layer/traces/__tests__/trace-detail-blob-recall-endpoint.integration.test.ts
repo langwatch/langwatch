@@ -21,6 +21,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { Event } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { resetApp } from "~/server/app-layer/app";
@@ -39,7 +40,6 @@ import {
 } from "~/server/app-layer/traces/lean-for-projection";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Event } from "~/server/event-sourcing";
 import {
   startTestContainers,
   stopTestContainers,

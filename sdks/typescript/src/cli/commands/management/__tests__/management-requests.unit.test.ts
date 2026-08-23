@@ -112,7 +112,7 @@ describe("role-bindings list", () => {
       });
 
       const url = new URL(lastRequest().url);
-      expect(url.pathname).toBe("/api/role-bindings");
+      expect(url.pathname).toBe("/api/role-bindings/latest/");
       expect(url.searchParams.get("apiKeyId")).toBe("key_1");
       expect(url.searchParams.get("scopeType")).toBe("PROJECT");
       expect(url.searchParams.get("scopeId")).toBe("project_1");
@@ -127,7 +127,7 @@ describe("role-bindings list", () => {
       respondWith({ bindings: [], totalCount: 0 });
       await listRoleBindingsCommand({});
       expect(lastRequest().url).toBe(
-        "https://app.langwatch.ai/api/role-bindings",
+        "https://app.langwatch.ai/api/role-bindings/latest/",
       );
     });
   });
@@ -146,7 +146,7 @@ describe("role-bindings update", () => {
       });
 
       const { url, body, init } = lastRequest();
-      expect(url).toBe("https://app.langwatch.ai/api/role-bindings/rb_1");
+      expect(url).toBe("https://app.langwatch.ai/api/role-bindings/latest/rb_1");
       expect(init.method).toBe("PATCH");
       expect(body).toEqual({ role: "CUSTOM", customRoleId: "crole_1" });
       expect(result?.data).toEqual({
@@ -318,7 +318,7 @@ describe("invites create", () => {
       const fromFlags = lastRequest();
 
       expect(fromFlags.url).toBe(
-        "https://app.langwatch.ai/api/organization/invites",
+        "https://app.langwatch.ai/api/organization/latest/invites",
       );
       expect(fromFlags.init.method).toBe("POST");
       expect(fromFlags.body).toEqual({

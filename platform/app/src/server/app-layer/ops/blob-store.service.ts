@@ -1,6 +1,5 @@
+import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { createLogger } from "@langwatch/observability";
-
-import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 
 import type { BlobStoreRepository } from "./repositories/blob-store.repository";
 import type {

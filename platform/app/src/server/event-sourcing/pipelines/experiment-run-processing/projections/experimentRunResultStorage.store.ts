@@ -1,8 +1,7 @@
+import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { ClickHouseExperimentRunResultRecord } from "./experimentRunResultStorage.mapProjection";
 
 const TABLE_NAME = "experiment_run_items" as const;

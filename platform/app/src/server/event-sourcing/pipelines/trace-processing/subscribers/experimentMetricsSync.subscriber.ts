@@ -1,6 +1,6 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { ComputeExperimentRunMetricsCommandData } from "../../experiment-run-processing/schemas/commands";
 import type { TraceProcessingEvent } from "../schemas/events";
 

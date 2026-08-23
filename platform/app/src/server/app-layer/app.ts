@@ -1,6 +1,6 @@
+import type { EventSourcing } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
 import type {

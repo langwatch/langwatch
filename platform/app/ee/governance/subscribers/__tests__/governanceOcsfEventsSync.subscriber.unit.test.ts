@@ -35,9 +35,9 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { TriggerContext } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   createGovernanceOcsfEventsSyncHandler,

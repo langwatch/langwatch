@@ -6,8 +6,9 @@
  * @see specs/coding-agent/session-aggregate.feature
  * @see specs/coding-agent/personal-usage.feature
  */
+
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "~/server/event-sourcing";
 import { canonicalAttributes } from "../../../metric-processing/canonical/attributes";
 import { stableStringify } from "../../../metric-processing/canonical/serialization";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../../metric-processing/schemas/constants";

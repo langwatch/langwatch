@@ -1,11 +1,11 @@
+import type { EventSubscriberContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 import { createLangyConversationUpdateBroadcastSubscriber } from "../langy-conversation-update-broadcast.subscriber";
 

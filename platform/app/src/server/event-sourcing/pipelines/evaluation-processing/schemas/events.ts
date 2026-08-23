@@ -1,5 +1,5 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,

@@ -1,9 +1,8 @@
-import type { Projection } from "../../../";
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+} from "@langwatch/eventing";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   EvaluatorResultEvent,
@@ -122,7 +121,7 @@ export class ExperimentRunStateFoldProjection
    * evaluatorResult per row×evaluator, thousands of events), so re-folding the
    * whole history on every out-of-order event is the same O(n²) amplification
    * that hit the trace folds — pure waste here since the result is identical.
-   * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+   * See specs/trace-processing/hot-trace-fold-amplification.feature.
    */
   readonly options = { refoldOnOutOfOrder: false } as const;
 

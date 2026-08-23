@@ -30,9 +30,9 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => loggerSpy,
 }));
 
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { DEFAULT_CODE_EVALUATOR_CONFIG } from "~/server/evaluators/codeEvaluator";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,

@@ -19,10 +19,10 @@
  * this path.
  */
 
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { EvaluatorConfigError } from "../../../../../app-layer/evaluations/errors";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,

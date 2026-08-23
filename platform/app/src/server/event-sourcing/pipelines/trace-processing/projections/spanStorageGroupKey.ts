@@ -28,7 +28,7 @@
  * business timestamp, independent of insert order.
  */
 
-import type { Event } from "../../../domain/types";
+import type { Event } from "@langwatch/eventing";
 import { shardIndexFor } from "../commands/commandShardKey";
 
 /**

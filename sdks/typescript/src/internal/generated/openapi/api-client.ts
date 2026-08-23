@@ -657,10 +657,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived agents for the project (paginated) */
+        /**
+         * @deprecated
+         * @description List all non-archived agents for the project (paginated)
+         */
         get: operations["getApiAgents"];
         put?: never;
-        /** @description Create a new agent */
+        /**
+         * @deprecated
+         * @description Create a new agent
+         */
         post: operations["postApiAgents"];
         delete?: never;
         options?: never;
@@ -675,15 +681,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get an agent by its id */
+        /**
+         * @deprecated
+         * @description Get an agent by its id
+         */
         get: operations["getApiAgentsById"];
         put?: never;
         post?: never;
-        /** @description Archive an agent (soft-delete) */
+        /**
+         * @deprecated
+         * @description Archive an agent (soft-delete)
+         */
         delete: operations["deleteApiAgentsById"];
         options?: never;
         head?: never;
-        /** @description Update an agent by its id */
+        /**
+         * @deprecated
+         * @description Update an agent by its id
+         */
         patch: operations["patchApiAgentsById"];
         trace?: never;
     };
@@ -2362,7 +2377,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization": {
+    "/api/organization/2026-08-07/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned. */
+        get: operations["getOrganization_2026_08_07"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns. */
+        patch: operations["updateOrganization_2026_08_07"];
+        trace?: never;
+    };
+    "/api/organization/2026-08-07/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true. */
+        get: operations["listOrganizationMembers_2026_08_07"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/2026-08-07/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages. */
+        get: operations["getOrganizationMember_2026_08_07"];
+        put?: never;
+        post?: never;
+        /** @description Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves. */
+        delete: operations["removeOrganizationMember_2026_08_07"];
+        options?: never;
+        head?: never;
+        /** @description Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan. */
+        patch: operations["updateOrganizationMember_2026_08_07"];
+        trace?: never;
+    };
+    "/api/organization/2026-08-07/members/{userId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on. */
+        get: operations["getOrganizationMemberAccess_2026_08_07"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/2026-08-07/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open. */
+        get: operations["listOrganizationInvites_2026_08_07"];
+        put?: never;
+        /** @description Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered. */
+        post: operations["createOrganizationInvites_2026_08_07"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/2026-08-07/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404. */
+        delete: operations["revokeOrganizationInvite_2026_08_07"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/latest/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2380,7 +2501,7 @@ export interface paths {
         patch: operations["updateOrganization"];
         trace?: never;
     };
-    "/api/organization/members": {
+    "/api/organization/latest/members": {
         parameters: {
             query?: never;
             header?: never;
@@ -2397,7 +2518,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/members/{userId}": {
+    "/api/organization/latest/members/{userId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2416,7 +2537,7 @@ export interface paths {
         patch: operations["updateOrganizationMember"];
         trace?: never;
     };
-    "/api/organization/members/{userId}/access": {
+    "/api/organization/latest/members/{userId}/access": {
         parameters: {
             query?: never;
             header?: never;
@@ -2433,7 +2554,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/invites": {
+    "/api/organization/latest/invites": {
         parameters: {
             query?: never;
             header?: never;
@@ -2451,7 +2572,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/invites/{id}": {
+    "/api/organization/latest/invites/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2512,7 +2633,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/role-bindings": {
+    "/api/role-bindings/2026-08-07/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
+        get: operations["listRoleBindings_2026_08_07"];
+        put?: never;
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
+        post: operations["createRoleBinding_2026_08_07"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings/2026-08-07/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. */
+        delete: operations["deleteRoleBinding_2026_08_07"];
+        options?: never;
+        head?: never;
+        /** @description Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. */
+        patch: operations["updateRoleBinding_2026_08_07"];
+        trace?: never;
+    };
+    "/api/role-bindings/latest/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2530,7 +2687,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/role-bindings/{id}": {
+    "/api/role-bindings/latest/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2548,7 +2705,61 @@ export interface paths {
         patch: operations["updateRoleBinding"];
         trace?: never;
     };
-    "/api/roles": {
+    "/api/roles/2026-08-07/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's custom roles with their permission sets. */
+        get: operations["listRoles_2026_08_07"];
+        put?: never;
+        /** @description Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken. */
+        post: operations["createRole_2026_08_07"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/2026-08-07/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding). */
+        get: operations["listRolePermissions_2026_08_07"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/2026-08-07/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one custom role. An id from another organization answers 404 custom_role_not_found. */
+        get: operations["getRole_2026_08_07"];
+        put?: never;
+        post?: never;
+        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
+        delete: operations["deleteRole_2026_08_07"];
+        options?: never;
+        head?: never;
+        /** @description Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. */
+        patch: operations["updateRole_2026_08_07"];
+        trace?: never;
+    };
+    "/api/roles/latest/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2566,7 +2777,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/roles/permissions": {
+    "/api/roles/latest/permissions": {
         parameters: {
             query?: never;
             header?: never;
@@ -2583,7 +2794,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/roles/{id}": {
+    "/api/roles/latest/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2602,7 +2813,42 @@ export interface paths {
         patch: operations["updateRole"];
         trace?: never;
     };
-    "/api/scim-tokens": {
+    "/api/scim-tokens/2026-08-07/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        get: operations["listScimTokens_2026_08_07"];
+        put?: never;
+        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        post: operations["createScimToken_2026_08_07"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim-tokens/2026-08-07/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found. */
+        delete: operations["revokeScimToken_2026_08_07"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim-tokens/latest/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2620,7 +2866,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/scim-tokens/{id}": {
+    "/api/scim-tokens/latest/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4146,7 +4392,378 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Agents page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: (({
+                            id: string;
+                            name: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            /** @constant */
+                            type: "signature";
+                            config: {
+                                _library_ref?: string;
+                                name?: string;
+                                description?: string;
+                                cls?: string;
+                                parameters?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                inputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                outputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                isCustom?: boolean;
+                                /** @constant */
+                                behave_as?: "evaluator";
+                                configId?: string;
+                                handle?: string | null;
+                                versionMetadata?: {
+                                    versionId: string;
+                                    versionNumber: number;
+                                    versionCreatedAt: string;
+                                };
+                                llm?: {
+                                    model: string;
+                                    temperature?: number;
+                                    max_tokens?: number;
+                                    top_p?: number;
+                                    frequency_penalty?: number;
+                                    presence_penalty?: number;
+                                    seed?: number;
+                                    top_k?: number;
+                                    min_p?: number;
+                                    repetition_penalty?: number;
+                                    reasoning?: string;
+                                    reasoning_effort?: string;
+                                    thinkingLevel?: string;
+                                    effort?: string;
+                                    verbosity?: string;
+                                    litellm_params?: {
+                                        [key: string]: string;
+                                    };
+                                };
+                                prompt?: string;
+                                messages?: {
+                                    /** @enum {string} */
+                                    role?: "system" | "user" | "assistant";
+                                    content?: string;
+                                }[];
+                                promptDraft?: boolean;
+                            };
+                        } | {
+                            id: string;
+                            name: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            /** @constant */
+                            type: "code";
+                            config: {
+                                _library_ref?: string;
+                                name?: string;
+                                description?: string;
+                                cls?: string;
+                                parameters: ({
+                                    /** @constant */
+                                    identifier: "code";
+                                    /** @constant */
+                                    type: "code";
+                                    value: string;
+                                    optional?: boolean;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                } | {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                })[];
+                                inputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                outputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                isCustom?: boolean;
+                                /** @constant */
+                                behave_as?: "evaluator";
+                                scenarioMappings?: {
+                                    [key: string]: {
+                                        /** @constant */
+                                        type: "source";
+                                        sourceId: string;
+                                        path: string[];
+                                    } | {
+                                        /** @constant */
+                                        type: "value";
+                                        value: string;
+                                    };
+                                };
+                                scenarioOutputField?: string;
+                            };
+                        } | {
+                            id: string;
+                            name: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            /** @constant */
+                            type: "workflow";
+                            config: {
+                                _library_ref?: string;
+                                name?: string;
+                                description?: string;
+                                cls?: string;
+                                parameters?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                inputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                outputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                isCustom?: boolean;
+                                /** @constant */
+                                behave_as?: "evaluator";
+                                workflow_id?: string;
+                                publishedId?: string;
+                                version_id?: string;
+                                versions?: {
+                                    [key: string]: unknown;
+                                };
+                                scenarioMappings?: {
+                                    [key: string]: {
+                                        /** @constant */
+                                        type: "source";
+                                        sourceId: string;
+                                        path: string[];
+                                    } | {
+                                        /** @constant */
+                                        type: "value";
+                                        value: string;
+                                    };
+                                };
+                                scenarioOutputField?: string;
+                            };
+                        } | {
+                            id: string;
+                            name: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            /** @constant */
+                            type: "http";
+                            config: {
+                                _library_ref?: string;
+                                name?: string;
+                                description?: string;
+                                cls?: string;
+                                parameters?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                inputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                outputs?: {
+                                    identifier: string;
+                                    /** @enum {string} */
+                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                    optional?: boolean;
+                                    value?: unknown;
+                                    desc?: string;
+                                    prefix?: string;
+                                    hidden?: boolean;
+                                    json_schema?: {
+                                        [key: string]: unknown;
+                                    };
+                                }[];
+                                isCustom?: boolean;
+                                /** @constant */
+                                behave_as?: "evaluator";
+                                url: string;
+                                /**
+                                 * @default POST
+                                 * @enum {string}
+                                 */
+                                method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+                                headers?: {
+                                    key: string;
+                                    value: string;
+                                }[];
+                                auth?: {
+                                    /** @constant */
+                                    type: "none";
+                                } | {
+                                    /** @constant */
+                                    type: "bearer";
+                                    token: string;
+                                } | {
+                                    /** @constant */
+                                    type: "api_key";
+                                    header: string;
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "basic";
+                                    username: string;
+                                    password: string;
+                                };
+                                bodyTemplate?: string;
+                                outputPath?: string;
+                                timeoutMs?: number;
+                                scenarioMappings?: {
+                                    [key: string]: {
+                                        /** @constant */
+                                        type: "source";
+                                        sourceId: string;
+                                        path: string[];
+                                    } | {
+                                        /** @constant */
+                                        type: "value";
+                                        value: string;
+                                    };
+                                };
+                                devTunnel?: {
+                                    previousUrl?: string;
+                                    connectedAt?: string;
+                                };
+                            };
+                        }) & {
+                            platformUrl: string;
+                        })[];
+                        pagination: {
+                            page: number;
+                            limit: number;
+                            total: number;
+                            totalPages: number;
+                        };
+                    };
+                };
+            };
+        };
     };
     postApiAgents: {
         parameters: {
@@ -4159,16 +4776,710 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    /** @enum {string} */
-                    type: "signature" | "code" | "workflow" | "http";
-                    config: {
-                        [key: string]: unknown;
-                    };
                     workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "signature";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        configId?: string;
+                        handle?: string | null;
+                        versionMetadata?: {
+                            versionId: string;
+                            versionNumber: number;
+                            versionCreatedAt: string;
+                        };
+                        llm?: {
+                            model: string;
+                            temperature?: number;
+                            max_tokens?: number;
+                            top_p?: number;
+                            frequency_penalty?: number;
+                            presence_penalty?: number;
+                            seed?: number;
+                            top_k?: number;
+                            min_p?: number;
+                            repetition_penalty?: number;
+                            reasoning?: string;
+                            reasoning_effort?: string;
+                            thinkingLevel?: string;
+                            effort?: string;
+                            verbosity?: string;
+                            litellm_params?: {
+                                [key: string]: string;
+                            };
+                        };
+                        prompt?: string;
+                        messages?: {
+                            /** @enum {string} */
+                            role?: "system" | "user" | "assistant";
+                            content?: string;
+                        }[];
+                        promptDraft?: boolean;
+                    };
+                } | {
+                    name: string;
+                    workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "code";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters: ({
+                            /** @constant */
+                            identifier: "code";
+                            /** @constant */
+                            type: "code";
+                            value: string;
+                            optional?: boolean;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                        } | {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        })[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        scenarioMappings?: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                sourceId: string;
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                        scenarioOutputField?: string;
+                    };
+                } | {
+                    name: string;
+                    workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "workflow";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        workflow_id?: string;
+                        publishedId?: string;
+                        version_id?: string;
+                        versions?: {
+                            [key: string]: unknown;
+                        };
+                        scenarioMappings?: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                sourceId: string;
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                        scenarioOutputField?: string;
+                    };
+                } | {
+                    name: string;
+                    workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "http";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        url: string;
+                        /**
+                         * @default POST
+                         * @enum {string}
+                         */
+                        method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+                        headers?: {
+                            key: string;
+                            value: string;
+                        }[];
+                        auth?: {
+                            /** @constant */
+                            type: "none";
+                        } | {
+                            /** @constant */
+                            type: "bearer";
+                            token: string;
+                        } | {
+                            /** @constant */
+                            type: "api_key";
+                            header: string;
+                            value: string;
+                        } | {
+                            /** @constant */
+                            type: "basic";
+                            username: string;
+                            password: string;
+                        };
+                        bodyTemplate?: string;
+                        outputPath?: string;
+                        timeoutMs?: number;
+                        scenarioMappings?: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                sourceId: string;
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                        devTunnel?: {
+                            previousUrl?: string;
+                            connectedAt?: string;
+                        };
+                    };
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Agent created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": ({
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "signature";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            configId?: string;
+                            handle?: string | null;
+                            versionMetadata?: {
+                                versionId: string;
+                                versionNumber: number;
+                                versionCreatedAt: string;
+                            };
+                            llm?: {
+                                model: string;
+                                temperature?: number;
+                                max_tokens?: number;
+                                top_p?: number;
+                                frequency_penalty?: number;
+                                presence_penalty?: number;
+                                seed?: number;
+                                top_k?: number;
+                                min_p?: number;
+                                repetition_penalty?: number;
+                                reasoning?: string;
+                                reasoning_effort?: string;
+                                thinkingLevel?: string;
+                                effort?: string;
+                                verbosity?: string;
+                                litellm_params?: {
+                                    [key: string]: string;
+                                };
+                            };
+                            prompt?: string;
+                            messages?: {
+                                /** @enum {string} */
+                                role?: "system" | "user" | "assistant";
+                                content?: string;
+                            }[];
+                            promptDraft?: boolean;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "code";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters: ({
+                                /** @constant */
+                                identifier: "code";
+                                /** @constant */
+                                type: "code";
+                                value: string;
+                                optional?: boolean;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                            } | {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            })[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "workflow";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            workflow_id?: string;
+                            publishedId?: string;
+                            version_id?: string;
+                            versions?: {
+                                [key: string]: unknown;
+                            };
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "http";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            url: string;
+                            /**
+                             * @default POST
+                             * @enum {string}
+                             */
+                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+                            headers?: {
+                                key: string;
+                                value: string;
+                            }[];
+                            auth?: {
+                                /** @constant */
+                                type: "none";
+                            } | {
+                                /** @constant */
+                                type: "bearer";
+                                token: string;
+                            } | {
+                                /** @constant */
+                                type: "api_key";
+                                header: string;
+                                value: string;
+                            } | {
+                                /** @constant */
+                                type: "basic";
+                                username: string;
+                                password: string;
+                            };
+                            bodyTemplate?: string;
+                            outputPath?: string;
+                            timeoutMs?: number;
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            devTunnel?: {
+                                previousUrl?: string;
+                                connectedAt?: string;
+                            };
+                        };
+                    }) & {
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
     getApiAgentsById: {
         parameters: {
@@ -4180,7 +5491,370 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": ({
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "signature";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            configId?: string;
+                            handle?: string | null;
+                            versionMetadata?: {
+                                versionId: string;
+                                versionNumber: number;
+                                versionCreatedAt: string;
+                            };
+                            llm?: {
+                                model: string;
+                                temperature?: number;
+                                max_tokens?: number;
+                                top_p?: number;
+                                frequency_penalty?: number;
+                                presence_penalty?: number;
+                                seed?: number;
+                                top_k?: number;
+                                min_p?: number;
+                                repetition_penalty?: number;
+                                reasoning?: string;
+                                reasoning_effort?: string;
+                                thinkingLevel?: string;
+                                effort?: string;
+                                verbosity?: string;
+                                litellm_params?: {
+                                    [key: string]: string;
+                                };
+                            };
+                            prompt?: string;
+                            messages?: {
+                                /** @enum {string} */
+                                role?: "system" | "user" | "assistant";
+                                content?: string;
+                            }[];
+                            promptDraft?: boolean;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "code";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters: ({
+                                /** @constant */
+                                identifier: "code";
+                                /** @constant */
+                                type: "code";
+                                value: string;
+                                optional?: boolean;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                            } | {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            })[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "workflow";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            workflow_id?: string;
+                            publishedId?: string;
+                            version_id?: string;
+                            versions?: {
+                                [key: string]: unknown;
+                            };
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "http";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            url: string;
+                            /**
+                             * @default POST
+                             * @enum {string}
+                             */
+                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+                            headers?: {
+                                key: string;
+                                value: string;
+                            }[];
+                            auth?: {
+                                /** @constant */
+                                type: "none";
+                            } | {
+                                /** @constant */
+                                type: "bearer";
+                                token: string;
+                            } | {
+                                /** @constant */
+                                type: "api_key";
+                                header: string;
+                                value: string;
+                            } | {
+                                /** @constant */
+                                type: "basic";
+                                username: string;
+                                password: string;
+                            };
+                            bodyTemplate?: string;
+                            outputPath?: string;
+                            timeoutMs?: number;
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            devTunnel?: {
+                                previousUrl?: string;
+                                connectedAt?: string;
+                            };
+                        };
+                    }) & {
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
     deleteApiAgentsById: {
         parameters: {
@@ -4192,7 +5866,24 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Agent archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        /** Format: date-time */
+                        archivedAt: string;
+                    };
+                };
+            };
+        };
     };
     patchApiAgentsById: {
         parameters: {
@@ -4216,7 +5907,370 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": ({
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "signature";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            configId?: string;
+                            handle?: string | null;
+                            versionMetadata?: {
+                                versionId: string;
+                                versionNumber: number;
+                                versionCreatedAt: string;
+                            };
+                            llm?: {
+                                model: string;
+                                temperature?: number;
+                                max_tokens?: number;
+                                top_p?: number;
+                                frequency_penalty?: number;
+                                presence_penalty?: number;
+                                seed?: number;
+                                top_k?: number;
+                                min_p?: number;
+                                repetition_penalty?: number;
+                                reasoning?: string;
+                                reasoning_effort?: string;
+                                thinkingLevel?: string;
+                                effort?: string;
+                                verbosity?: string;
+                                litellm_params?: {
+                                    [key: string]: string;
+                                };
+                            };
+                            prompt?: string;
+                            messages?: {
+                                /** @enum {string} */
+                                role?: "system" | "user" | "assistant";
+                                content?: string;
+                            }[];
+                            promptDraft?: boolean;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "code";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters: ({
+                                /** @constant */
+                                identifier: "code";
+                                /** @constant */
+                                type: "code";
+                                value: string;
+                                optional?: boolean;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                            } | {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            })[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "workflow";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            workflow_id?: string;
+                            publishedId?: string;
+                            version_id?: string;
+                            versions?: {
+                                [key: string]: unknown;
+                            };
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            scenarioOutputField?: string;
+                        };
+                    } | {
+                        id: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        /** @constant */
+                        type: "http";
+                        config: {
+                            _library_ref?: string;
+                            name?: string;
+                            description?: string;
+                            cls?: string;
+                            parameters?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            inputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            outputs?: {
+                                identifier: string;
+                                /** @enum {string} */
+                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                                optional?: boolean;
+                                value?: unknown;
+                                desc?: string;
+                                prefix?: string;
+                                hidden?: boolean;
+                                json_schema?: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            isCustom?: boolean;
+                            /** @constant */
+                            behave_as?: "evaluator";
+                            url: string;
+                            /**
+                             * @default POST
+                             * @enum {string}
+                             */
+                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+                            headers?: {
+                                key: string;
+                                value: string;
+                            }[];
+                            auth?: {
+                                /** @constant */
+                                type: "none";
+                            } | {
+                                /** @constant */
+                                type: "bearer";
+                                token: string;
+                            } | {
+                                /** @constant */
+                                type: "api_key";
+                                header: string;
+                                value: string;
+                            } | {
+                                /** @constant */
+                                type: "basic";
+                                username: string;
+                                password: string;
+                            };
+                            bodyTemplate?: string;
+                            outputPath?: string;
+                            timeoutMs?: number;
+                            scenarioMappings?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    sourceId: string;
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                            devTunnel?: {
+                                previousUrl?: string;
+                                connectedAt?: string;
+                            };
+                        };
+                    }) & {
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
     listApiKeys: {
         parameters: {
@@ -18291,6 +20345,417 @@ export interface operations {
             };
         };
     };
+    getOrganization_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganization_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    supportContact?: string | null;
+                    presenceEnabled?: boolean;
+                    traceSharingEnabled?: boolean;
+                    /** @enum {string|null} */
+                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                    s3Endpoint?: string | null;
+                    s3AccessKeyId?: string | null;
+                    s3SecretAccessKey?: string | null;
+                    s3Bucket?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationMembers_2026_08_07: {
+        parameters: {
+            query?: {
+                includeDisabled?: "true" | "false";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        members: {
+                            userId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            disabled: boolean;
+                            disabledAt: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            user: {
+                                id: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMember_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teams: {
+                            teamId: string;
+                            teamName: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    removeOrganizationMember_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganizationMember_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    disabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teamsLeftWithoutAdmin?: {
+                            id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMemberAccess_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                            orgRole: string;
+                            orgRolePermissions: string[];
+                        };
+                        groups: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            scimSource: string | null;
+                            bindings: {
+                                id: string;
+                                role: string;
+                                customRoleName: string | null;
+                                /** @enum {string} */
+                                scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                scopeId: string;
+                                scopeName: string | null;
+                                permissions: string[];
+                            }[];
+                        }[];
+                        directBindings: {
+                            id: string;
+                            role: string;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            permissions: string[];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationInvites_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createOrganizationInvites_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    invites: {
+                        /** Format: email */
+                        email: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        teams: {
+                            teamId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId?: string;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                            emailNotSent: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    revokeOrganizationInvite_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
     getOrganization: {
         parameters: {
             query?: never;
@@ -18909,6 +21374,178 @@ export interface operations {
             };
         };
     };
+    listRoleBindings_2026_08_07: {
+        parameters: {
+            query?: {
+                userId?: string;
+                groupId?: string;
+                apiKeyId?: string;
+                scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                scopeId?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bindings: {
+                            id: string;
+                            principal: {
+                                /** @enum {string} */
+                                type: "user" | "group" | "apiKey";
+                                id: string;
+                                name: string | null;
+                            };
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            createdAt: string;
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    createRoleBinding_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    userId?: string;
+                    groupId?: string;
+                    apiKeyId?: string;
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                        hasLegacyAccessNotice?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    deleteRoleBinding_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRoleBinding_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                    };
+                };
+            };
+        };
+    };
     listRoleBindings: {
         parameters: {
             query?: {
@@ -19076,6 +21713,189 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRoles_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roles: {
+                            id: string;
+                            name: string;
+                            description: string | null;
+                            permissions: string[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createRole_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string;
+                    permissions: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRolePermissions_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resources: {
+                            resource: string;
+                            organizationExclusive: boolean;
+                            actions: string[];
+                            permissions: string[];
+                        }[];
+                        actions: string[];
+                    };
+                };
+            };
+        };
+    };
+    getRole_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteRole_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRole_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    permissions?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
                     };
                 };
             };
@@ -19259,6 +22079,88 @@ export interface operations {
                         permissions: string[];
                         createdAt: string;
                         updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listScimTokens_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tokens: {
+                            id: string;
+                            description: string | null;
+                            createdAt: string;
+                            lastUsedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createScimToken_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    description?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        token: string;
+                        description: string | null;
+                    };
+                };
+            };
+        };
+    };
+    revokeScimToken_2026_08_07: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
                     };
                 };
             };

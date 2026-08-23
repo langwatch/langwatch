@@ -7,7 +7,7 @@
  * measured). They now share this: precomputed bytes, one ETag, one cache
  * policy, so the three cannot drift in how they answer either.
  *
- * See specs/api-reference/api-discovery.feature.
+ * See packages/api/specs/api-discovery.feature.
  */
 
 import type { Context } from "hono";

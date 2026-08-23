@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   predefinedEventsSchemas,
@@ -9,7 +10,6 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";

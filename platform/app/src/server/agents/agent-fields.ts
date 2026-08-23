@@ -1,11 +1,12 @@
+import type {
+  AgentConfig as AgentComponentConfig,
+  AgentFields as ContractAgentFields,
+  AgentType,
+  AgentWithFields as ContractAgentWithFields,
+} from "@langwatch/agents-contract";
 import type { Field, Workflow } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEndInputs } from "~/optimization_studio/utils/workflowFields";
-import type {
-  AgentComponentConfig,
-  AgentType,
-  TypedAgent,
-} from "./agent.repository";
 
 /**
  * The fields an agent reads and produces, whatever kind of agent it is.
@@ -16,27 +17,14 @@ import type {
  * Consumers should not have to know which kind they are holding, so this is
  * resolved for every agent at read time.
  */
-export type AgentFields = {
-  inputFields: Field[];
-  outputFields: Field[];
-  /**
-   * Whether the two lists above are what the agent actually declares.
-   *
-   * `false` only for a workflow agent whose graph could not be read — archived,
-   * deleted, or in another project. That is not the same as a workflow that
-   * declares no results, and a caller that cannot tell the two apart has to
-   * pick one wrong behaviour for both: either wipe a column's mappings the
-   * first time a lookup fails, or keep offering a result that was removed.
-   */
-  fieldsResolved: boolean;
-};
+export type AgentFields = ContractAgentFields;
 
 /**
  * What every read of an agent hands back: the row plus the fields it reads and
  * produces. Callers pick an agent from a list and immediately need its shape,
  * so the two always travel together.
  */
-export type AgentWithFields = TypedAgent & AgentFields;
+export type AgentWithFields = ContractAgentWithFields;
 
 /**
  * The Studio workflow a workflow agent points at.

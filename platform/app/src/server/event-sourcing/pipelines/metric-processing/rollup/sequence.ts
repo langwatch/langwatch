@@ -1,4 +1,4 @@
-import { compareOrdinal } from "../../../utils/compareOrdinal";
+import { compareOrdinal } from "@langwatch/eventing";
 import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/constants";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 

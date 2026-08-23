@@ -1,12 +1,11 @@
+import type { ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 
 import { ManagerExplorerService } from "../manager-explorer.service";
 import { NullProcessAuditSink } from "../process-audit.repository";
 import { NullProcessOpsRepository } from "../repositories/process-ops.repository";
 
-vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
+vi.mock("~/server/event-sourcing/registration/pipelineRegistry", () => ({
   getProcessManagerMetadata: vi.fn(),
 }));
 
@@ -17,7 +16,7 @@ const makeService = (store: ProcessStore) =>
     audit: new NullProcessAuditSink(),
   });
 
-import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import { getProcessManagerMetadata } from "~/server/event-sourcing/registration/pipelineRegistry";
 
 const perAggregate = {
   processName: "triggerSettlement",
@@ -62,6 +61,7 @@ function fakeStore(
 ): ProcessStore {
   return {
     findByRef: vi.fn(async () => null),
+    hasConsumedSource: vi.fn(async () => false),
     findMessagesByRef: vi.fn(async () => []),
     commit: vi.fn(),
     leaseDueMessages: vi.fn(),

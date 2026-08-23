@@ -16,7 +16,7 @@
  * prevent, and a worse one here, because a discovery request that "succeeds"
  * with HTML tells an agent the API is something it is not.
  *
- * See specs/api-reference/api-discovery.feature.
+ * See packages/api/specs/api-discovery.feature.
  */
 
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
@@ -60,8 +60,10 @@ legacy; new integrations should use \`Authorization\`.
 
 - [OpenAPI document](${WELL_KNOWN_OPENAPI_PATH}): the complete machine-readable
   description of the REST API. Also served at \`${API_OPENAPI_PATH}\`.
-- [RPC catalogue](${RPC_DISCOVER_PATH}): POST for the RPC-named operations and
-  their argument schemas, without reading the whole document.
+- [RPC catalogue](${RPC_DISCOVER_PATH}): POST for the index of API services,
+  each naming the URL of its own rpc.discover — the catalogue of that
+  service's RPC operations and their argument schemas, without reading the
+  whole document.
 
 ## Docs
 

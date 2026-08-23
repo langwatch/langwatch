@@ -20,6 +20,14 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { RegisteredMapProjection } from "@langwatch/eventing";
+import {
+  aggregateKey,
+  cleanupAll,
+  ReplayService as EventSourcingReplayService,
+  getCompletedSet,
+  unmarkBatch,
+} from "@langwatch/eventing";
 import type { Redis } from "ioredis";
 import {
   afterAll,
@@ -45,15 +53,8 @@ import { createSpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace
 import { TraceAnalyticsRollupMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
 import { TraceAnalyticsRollupAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import {
-  aggregateKey,
-  cleanupAll,
-  getCompletedSet,
-  unmarkBatch,
-} from "~/server/event-sourcing/replay/replayMarkers";
+import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import { ReplayService as EventSourcingReplayService } from "~/server/event-sourcing/replay/replayService";
-import type { RegisteredMapProjection } from "~/server/event-sourcing/replay/types";
 import { ReplayService } from "../../replay.service";
 import { ReplayRedisRepository } from "../../repositories/replay.redis.repository";
 
@@ -293,7 +294,7 @@ describe("given identical span history for tenants whose rollup is empty", () =>
       mapProjections: [registered],
       stateProjections: [],
       service: new EventSourcingReplayService({
-        clickhouseClientResolver: async () => client,
+        eventSource: new ClickHouseReplayEventSource(async () => client),
         redis,
       }),
       // The connection is shared with the suite, so closing is the harness's job.

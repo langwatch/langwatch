@@ -1,30 +1,24 @@
 import { randomUUID } from "node:crypto";
-
-import { createLogger } from "@langwatch/observability";
-import type IORedis from "ioredis";
-import type { ChainableCommander, Cluster } from "ioredis";
 import {
   CachedLuaScript,
-  isNoScriptResult,
-} from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
-import {
   decodeJobEnvelope,
-  isEnvelope,
-  readEnvelopeDescriptor,
-  readJobRoutingMeta,
-  splitEnvelope,
-} from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
-import { legacyStagedJobAttempt } from "~/server/event-sourcing/queues/groupQueue/legacyStagedJobAttempt";
-import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
-import {
   GROUP_QUEUE_REGISTRY_KEY,
+  isEnvelope,
+  isNoScriptResult,
   PARK_HELPER_LUA,
   PENDING_INDEX_HELPER_LUA,
   pendingDriftKey,
   pendingGroupsKey,
+  RedisJobBlobStore,
+  readEnvelopeDescriptor,
+  readJobRoutingMeta,
+  splitEnvelope,
+  TieredBlobStore,
   TTL_HELPER_LUA,
-} from "~/server/event-sourcing/queues/groupQueue/scripts";
-import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
+} from "@langwatch/group-queue/operational";
+import { createLogger } from "@langwatch/observability";
+import type IORedis from "ioredis";
+import type { ChainableCommander, Cluster } from "ioredis";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { normalizeErrorMessage } from "../normalize-error-message";
@@ -83,7 +77,7 @@ if wasBlocked > 0 then
 -- still unblocks cleanly while both are in the fleet. Derived from strikesKey
 -- (":strikes" is 8 chars) so the key arity stays fixed.
 redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
-  -- specs/event-sourcing/poison-group-park-guard.feature
+  -- packages/group-queue/specs/poison-group-park-guard.feature
   redis.call("DEL", attemptKey)
   redis.call("DEL", failStreakKey)
 
@@ -143,7 +137,7 @@ redis.call("DEL", errorKey)
 -- a re-created group with the same id inherits it: claim strikes park it on its
 -- first claim, a spent retry chain exhausts it on its first failure, and a
 -- carried failure streak re-quarantines it (ADR-080,
--- specs/event-sourcing/poison-group-park-guard.feature).
+-- packages/group-queue/specs/poison-group-park-guard.feature).
 redis.call("DEL", strikesKey)
 -- The poison guard's per-group state is the claim marker; the legacy strikes
 -- counter above is cleared alongside it so a group blocked by the old guard
@@ -487,27 +481,11 @@ function stripHashTag(name: string): string {
   return name;
 }
 
-/**
- * The head job's retry count, ADR-080 first: the group's retry chain lives in
- * the `group:{id}:attempt` key (TTL'd past the max backoff), written on every
- * restage. The `/r/<n>` job-id suffix stopped being written at ADR-080, so
- * parsing only the id read "—" for every retrying group — during the
- * 2026-08-05 backup it made day-old retry loops look never-attempted. The
- * legacy id parse stays as the last-resort fallback for jobs staged before an
- * ADR-080 deploy.
- */
-function resolveRetryCount({
-  attemptRaw,
-  jobId,
-}: {
-  attemptRaw: string | null;
-  jobId: string | null;
-}): number | null {
+/** Read the retry count from the group's canonical attempt key. */
+function resolveRetryCount(attemptRaw: string | null): number | null {
   const attempt = attemptRaw === null ? Number.NaN : parseInt(attemptRaw, 10);
   if (Number.isInteger(attempt) && attempt > 0) return attempt;
-  if (!jobId) return null;
-  const legacy = legacyStagedJobAttempt(jobId);
-  return legacy > 0 ? legacy : null;
+  return null;
 }
 
 // ── Repository Implementation ────────────────────────────────────────
@@ -773,10 +751,7 @@ export class QueueRedisRepository implements QueueRepository {
         errorTimestamp: errorInfo?.timestamp
           ? parseFloat(errorInfo.timestamp)
           : null,
-        retryCount: resolveRetryCount({
-          attemptRaw,
-          jobId: firstJobIds[i]!.jobId,
-        }),
+        retryCount: resolveRetryCount(attemptRaw),
         activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
         processingDurationMs: null,
       });
@@ -811,14 +786,14 @@ export class QueueRedisRepository implements QueueRepository {
 
   /**
    * The payload size to DISPLAY for a staged value: the encoder-recorded
-   * `header.s` when present, the stored length for bare JSON, and null when
-   * the value cannot say. Deliberately not `readJobPayloadBytes`, whose
+   * `header.s` when present, and null when the value cannot say. Deliberately
+   * not `readJobPayloadBytes`, whose
    * "unknown is worth the cap" sentinel is a batch-budget rule — rendered on
    * a job card it would read as a 50 MB payload that isn't one.
    */
   private readDisplayPayloadBytes(raw: string): number | null {
     try {
-      if (!isEnvelope(raw)) return Buffer.byteLength(raw, "utf8");
+      if (!isEnvelope(raw)) return null;
       const { header } = splitEnvelope(raw);
       return Number.isSafeInteger(header.s) && (header.s as number) >= 0
         ? (header.s as number)
@@ -874,11 +849,10 @@ export class QueueRedisRepository implements QueueRepository {
         redis: this.redis,
         queueName: params.queueName,
       });
-      // Wire the GQ2 tiered store too so an offloaded envelope renders its
-      // body in the ops dashboard once the write flag flips in prod. Without
+      // Wire the tiered store so an offloaded envelope renders its body in the
+      // ops dashboard. Without
       // it, decode throws "no tiered store provided" and the catch below hides
-      // the payload from any operator trying to diagnose a stuck GQ2 job
-      // (2026-07-03 audit follow-up).
+      // the payload from an operator trying to diagnose a stuck job.
       const tieredBlobs = new TieredBlobStore({
         redisBlobs: blobs,
         objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
@@ -893,7 +867,6 @@ export class QueueRedisRepository implements QueueRepository {
           await this.decorateJobFromRaw({
             job: jobs[i]!,
             raw,
-            blobs,
             tieredBlobs,
           });
         }),
@@ -907,12 +880,10 @@ export class QueueRedisRepository implements QueueRepository {
   private async decorateJobFromRaw({
     job,
     raw,
-    blobs,
     tieredBlobs,
   }: {
     job: JobEntry;
     raw: string;
-    blobs: RedisJobBlobStore;
     tieredBlobs: TieredBlobStore;
   }): Promise<void> {
     // Storage shape from the header alone — survives a body the decode below
@@ -924,11 +895,9 @@ export class QueueRedisRepository implements QueueRepository {
       // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
       // (2026-06-24 review). A repeatedly-viewed blocked group would
       // otherwise keep its orphan blobs alive indefinitely. readMode
-      // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
-      // to their peek variants.
+      // "peek" routes tiered blob reads to their non-refreshing variant.
       job.data = await decodeJobEnvelope({
         value: raw,
-        blobs,
         tieredBlobs,
         readMode: "peek",
       });
@@ -2293,10 +2262,7 @@ export class QueueRedisRepository implements QueueRepository {
     if (!indexed) return null;
     const alreadyIndexed = new Set(groupIds);
 
-    // TODO(cleanup): the lifecycle legs below exist only for groups the index has
-    // not learned about yet. Removable once no queue predates the index and no pod
-    // predates the writers.
-    const legacyLegs: { key: string; type: "zset" | "set" }[] = [
+    const lifecycleLegs: { key: string; type: "zset" | "set" }[] = [
       { key: `${prefix}ready`, type: "zset" },
       { key: `${prefix}blocked`, type: "set" },
       ...Array.from(parkedTenants, (tenantId) => ({
@@ -2305,7 +2271,7 @@ export class QueueRedisRepository implements QueueRepository {
       })),
     ];
 
-    for (const leg of legacyLegs) {
+    for (const leg of lifecycleLegs) {
       const held = await this.collectIndexMembers({
         key: leg.key,
         type: leg.type,

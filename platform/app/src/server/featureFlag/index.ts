@@ -9,7 +9,6 @@ export {
   type FrontendFeatureFlag,
 } from "./frontendFeatureFlags";
 export type {
-  EsKillSwitchKey,
   FeatureFlagDefinition,
   FeatureFlagFamily,
   FeatureFlagKey,

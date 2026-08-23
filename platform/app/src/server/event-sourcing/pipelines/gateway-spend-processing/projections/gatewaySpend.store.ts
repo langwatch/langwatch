@@ -1,6 +1,8 @@
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { GatewaySpendState } from "./gatewaySpend.foldProjection";
 
 /**

@@ -5,12 +5,17 @@ import {
   type PulledUsageLedgerProcessDeps,
   pulledUsageLedgerPM,
 } from "@ee/governance/process-manager/pulledUsageLedger.process";
-import { definePipeline } from "~/server/event-sourcing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 
 import { RecordPulledUsageCommand } from "./commands";
 import {
   PULLED_USAGE_AGGREGATE_TYPE,
   PULLED_USAGE_PIPELINE_NAME,
+  PULLED_USAGE_PROCESSING_EVENT_TYPES,
 } from "./schemas/constants";
 import type { PulledUsageProcessingEvent } from "./schemas/events";
 
@@ -34,10 +39,13 @@ import type { PulledUsageProcessingEvent } from "./schemas/events";
 export function createPulledUsageProcessingPipeline(
   deps: { ledger?: PulledUsageLedgerProcessDeps } = {},
 ) {
-  const pipeline = definePipeline<PulledUsageProcessingEvent>()
-    .withName(PULLED_USAGE_PIPELINE_NAME)
-    .withAggregateType(PULLED_USAGE_AGGREGATE_TYPE)
-    .withCommand("recordPulledUsage", RecordPulledUsageCommand);
+  const pipeline = definePipeline<PulledUsageProcessingEvent>({
+    name: PULLED_USAGE_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: PULLED_USAGE_AGGREGATE_TYPE,
+      events: defineEvents(PULLED_USAGE_PROCESSING_EVENT_TYPES),
+    }),
+  }).withCommand("recordPulledUsage", RecordPulledUsageCommand);
   if (!deps.ledger) return pipeline.build();
   return pipeline
     .withProcessManager(

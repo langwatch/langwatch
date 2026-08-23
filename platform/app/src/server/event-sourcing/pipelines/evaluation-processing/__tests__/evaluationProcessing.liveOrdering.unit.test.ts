@@ -1,16 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
-
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { createTenantId } from "../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { EventSourcedQueueProcessor } from "../../../queues";
-import { EventSourcingService } from "../../../services/eventSourcingService";
 import {
+  createTenantId,
+  type EventSourcedQueueProcessor,
+  EventSourcingService,
+  type FoldProjectionStore,
   type JobRegistryEntry,
+} from "@langwatch/eventing";
+import {
+  EventRepositoryMemory,
+  EventStoreMemory,
   QueueManager,
-} from "../../../services/queues/queueManager";
-import { EventStoreMemory } from "../../../stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../../stores/repositories/eventRepositoryMemory";
+} from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { CompleteEvaluationCommand, StartEvaluationCommand } from "../commands";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import {
@@ -18,6 +19,7 @@ import {
   EvaluationAnalyticsFoldProjection,
 } from "../projections/evaluationAnalytics.foldProjection";
 import { EvaluationRunFoldProjection } from "../projections/evaluationRun.foldProjection";
+import { EVALUATION_PROCESSING_EVENT_TYPES } from "../schemas/constants";
 import type {
   EvaluationCompletedEvent,
   EvaluationProcessingEvent,
@@ -113,6 +115,7 @@ describe("evaluation processing live FIFO", () => {
     new EventSourcingService<EvaluationProcessingEvent>({
       pipelineName: "evaluation_processing",
       aggregateType: "evaluation",
+      allowedEventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
       eventStore: new EventStoreMemory(new EventRepositoryMemory()),
       foldProjections: [
         new EvaluationRunFoldProjection({

@@ -1,5 +1,9 @@
-import { definePipeline } from "../../";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
@@ -9,6 +13,7 @@ import {
   type SuiteRunStateData,
   SuiteRunStateFoldProjection,
 } from "./projections/suiteRunState.foldProjection";
+import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "./schemas/constants";
 import type { SuiteRunProcessingEvent } from "./schemas/events";
 
 export interface SuiteRunProcessingPipelineDeps {
@@ -36,11 +41,14 @@ export interface SuiteRunProcessingPipelineDeps {
 export function createSuiteRunProcessingPipeline(
   deps: SuiteRunProcessingPipelineDeps,
 ) {
-  return definePipeline<SuiteRunProcessingEvent>()
-    .withName("suite_run_processing")
-    .withAggregateType("suite_run")
-    .withFoldProjection(
-      "suiteRunState",
+  return definePipeline<SuiteRunProcessingEvent>({
+    name: "suite_run_processing",
+    aggregate: defineAggregate({
+      type: "suite_run",
+      events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new SuiteRunStateFoldProjection({
         store: deps.suiteRunStateFoldStore,
       }),

@@ -1,5 +1,5 @@
+import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";
@@ -27,7 +27,10 @@ export interface TraceMetricsSyncSubscriberDeps {
  */
 export function createTraceMetricsSyncSubscriber(
   deps: TraceMetricsSyncSubscriberDeps,
-): SubscriberSpec<SimulationProcessingEvent> {
+): SubscriberSpec<SimulationProcessingEvent> & {
+  fold?: never;
+  map?: never;
+} {
   return {
     events: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
 

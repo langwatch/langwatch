@@ -1,3 +1,4 @@
+import type { ProcessEventEnvelope } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -18,7 +19,6 @@ import {
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager";
 
 import { buildLangyProcessEventView } from "../../langyConversationProcess";
 

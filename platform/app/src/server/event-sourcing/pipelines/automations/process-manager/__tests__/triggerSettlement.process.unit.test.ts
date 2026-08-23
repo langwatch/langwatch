@@ -1,6 +1,6 @@
+import { buildIntentFactories } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
-import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";

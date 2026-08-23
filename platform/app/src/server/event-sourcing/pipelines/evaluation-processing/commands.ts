@@ -1,4 +1,4 @@
-import { defineCommand } from "../../commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   evaluationCompletedEventDataSchema,
   evaluationReportedEventDataSchema,

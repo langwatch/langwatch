@@ -1,9 +1,8 @@
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { SessionMetricSeriesRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/sessionMetricSeries.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 
 const TABLE_NAME = "session_metric_series" as const;
 

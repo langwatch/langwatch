@@ -1,3 +1,4 @@
+import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
@@ -7,7 +8,6 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
 import type { EvalSummary, EvaluationRunData } from "../types";

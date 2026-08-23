@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
@@ -10,8 +11,6 @@ import type {
   CodingAgentSessionMetricSeriesRow,
   CodingAgentSessionRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
   type CodingAgentSessionListReadOutcome,
   observeCodingAgentSessionListReadDuration,

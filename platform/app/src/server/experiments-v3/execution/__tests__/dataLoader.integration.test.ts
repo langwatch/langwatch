@@ -10,7 +10,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AgentService } from "~/server/agents/agent.service";
+import { AgentsFeature } from "~/runtime/app/features/agents";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
@@ -86,7 +86,7 @@ describe("loadExecutionData", () => {
         "fast resolution agent workflow",
       );
 
-      const agentService = AgentService.create(prisma);
+      const agentService = AgentsFeature.create({ prisma, session: null });
       const agent = await agentService.create({
         id: `test_agent_${nanoid(8)}`,
         projectId,
@@ -135,7 +135,7 @@ describe("loadExecutionData", () => {
       });
       cleanupWorkflowIds.push(workflowId);
 
-      const agentService = AgentService.create(prisma);
+      const agentService = AgentsFeature.create({ prisma, session: null });
       const agent = await agentService.create({
         id: `test_agent_${nanoid(8)}`,
         projectId,

@@ -1,4 +1,8 @@
-import { definePipeline } from "../..";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -14,6 +18,7 @@ import {
 } from "./projections/authzGrantsWrite.projection";
 import {
   AUTHZ_GRANT_AGGREGATE_TYPE,
+  AUTHZ_GRANTS_EVENT_TYPES,
   AUTHZ_GRANT_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { AuthzGrantsEvent } from "./schemas/events";
@@ -44,14 +49,17 @@ export interface AuthzGrantsPipelineDeps {
  * command stamped: a grant id, or a role id.
  */
 export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
-  return definePipeline<AuthzGrantsEvent>()
-    .withName(AUTHZ_GRANT_PIPELINE_NAME)
-    .withAggregateType(AUTHZ_GRANT_AGGREGATE_TYPE)
-    .withMapProjection(
-      AUTHZ_GRANTS_WRITE_PROJECTION_NAME,
+  return definePipeline<AuthzGrantsEvent>({
+    name: AUTHZ_GRANT_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: AUTHZ_GRANT_AGGREGATE_TYPE,
+      events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseMapProjection(
       new AuthzGrantsWriteProjection({ store: deps.authzGrantsWriteStore }),
     )
-    .withSubscriber(
+    .withEventSubscriber(
       "auditTrail",
       createAuthzAuditTrailSubscriber({ store: deps.authzAuditTrailStore }),
     )

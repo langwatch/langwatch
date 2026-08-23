@@ -1,6 +1,6 @@
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { Command } from "../../../../commands/command";
-import { createTenantId } from "../../../../domain/tenantId";
 import type { RecordMetricDataPointCommandData } from "../../schemas/commands";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,

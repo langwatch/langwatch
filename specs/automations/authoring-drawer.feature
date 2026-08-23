@@ -348,8 +348,8 @@ Feature: Staged automation authoring drawer
       When the user opens the automation settings list
       Then each row shows the last-triggered timestamp and total fired count
 
-    Scenario: Pending and failed counts appear once outbox-backed dispatch is live
-      Given outbox-backed notify dispatch is wired in this environment
+    Scenario: Pending and failed counts reflect durable intent delivery
+      Given a notification automation has durable dispatch intents
       When the user opens the automation settings list
       Then each notification row shows pending, failed, and dead counts
 

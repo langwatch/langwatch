@@ -1,12 +1,15 @@
 import type { MiddlewareHandler } from "hono";
-import { AgentService } from "~/server/agents/agent.service";
+import { LegacyAgentsRestFeature } from "~/runtime/app/legacy-rest/agents";
 import { prisma } from "~/server/db";
 
 export type AgentServiceMiddlewareVariables = {
-  agentService: AgentService;
+  agentService: ReturnType<typeof LegacyAgentsRestFeature.create>;
 };
 
 export const agentServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set("agentService", AgentService.create(prisma));
+  c.set(
+    "agentService",
+    LegacyAgentsRestFeature.create({ prisma, session: null }),
+  );
   await next();
 };

@@ -46,6 +46,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { Event } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   AGGREGATE_TYPE,
@@ -66,7 +67,6 @@ import {
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Event } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
   startTestContainers,

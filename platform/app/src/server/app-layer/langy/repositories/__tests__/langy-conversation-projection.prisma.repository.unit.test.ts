@@ -1,14 +1,15 @@
+import type {
+  Event,
+  ProjectionStoreContext,
+  StateProjectionDefinition,
+} from "@langwatch/eventing";
+import { createTenantId, StateProjectionExecutor } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
 } from "~/generated/prisma/client";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { Event } from "~/server/event-sourcing/domain/types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type { StateProjectionDefinition } from "~/server/event-sourcing/projections/stateProjection.types";
-import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 
 type Row = LangyConversationProjection;

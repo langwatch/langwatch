@@ -1,7 +1,7 @@
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { generateApiSpecs } from "../index.js";
 import { createTestService as createService } from "./test-service.js";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ function buildRpcService() {
 describe("RPC OpenAPI generation", () => {
   describe("given an RPC endpoint declaring docs", () => {
     it("publishes it at every dated version plus latest, never a bare path", async () => {
-      const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
+      const spec = await generateApiSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
 
       const paths = Object.keys(spec.paths ?? {});
       expect(paths.filter((p) => p.includes("things.create")).sort()).toEqual([
@@ -48,18 +48,29 @@ describe("RPC OpenAPI generation", () => {
       ]);
     });
 
-    it("publishes it as a POST carrying its operationId", async () => {
-      const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
+    it("keeps the declared operationId on latest and qualifies the dated mount", async () => {
+      const spec = await generateApiSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
 
-      const operation = (
-        spec.paths as Record<string, Record<string, { operationId?: string }>>
-      )["/api/things/2026-08-07/things.create"]?.post;
+      const paths = spec.paths as Record<
+        string,
+        Record<string, { operationId?: string }>
+      >;
+      const dated = paths["/api/things/2026-08-07/things.create"]?.post;
+      const latest = paths["/api/things/latest/things.create"]?.post;
 
-      expect(operation?.operationId).toBe("createThing");
+      expect(dated?.operationId).toBe("createThing_2026_08_07");
+      expect(latest?.operationId).toBe("createThing");
+      expect(
+        Object.values(paths).flatMap((path) =>
+          Object.values(path).flatMap((operation) =>
+            operation.operationId ? [operation.operationId] : [],
+          ),
+        ),
+      ).toEqual(["createThing_2026_08_07", "createThing"]);
     });
 
     it("documents the request body the RPC arguments travel in", async () => {
-      const spec = await generateSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
+      const spec = await generateApiSpecs(buildRpcService(), RPC_SPEC_OPTIONS);
 
       const operation = (
         spec.paths as Record<string, Record<string, { requestBody?: unknown }>>
@@ -77,7 +88,7 @@ describe("RPC OpenAPI generation", () => {
    */
   describe("given the generator runs with its default options", () => {
     it("drops every RPC path as if it were a static file", async () => {
-      const spec = await generateSpecs(buildRpcService());
+      const spec = await generateApiSpecs(buildRpcService());
 
       expect(Object.keys(spec.paths ?? {})).toEqual([]);
     });

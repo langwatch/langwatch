@@ -1,4 +1,5 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { pMapLimited } from "@langwatch/eventing";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { JsonValue } from "@prisma/client/runtime/client";
@@ -28,7 +29,6 @@ import {
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
-import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";

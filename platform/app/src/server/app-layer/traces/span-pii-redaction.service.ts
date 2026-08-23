@@ -1,3 +1,4 @@
+import type { TenantId } from "@langwatch/eventing";
 import { env } from "~/env.mjs";
 import type {
   PiiLevel,
@@ -13,7 +14,6 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
-import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,

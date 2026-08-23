@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Relates to:** [ADR-064](./064-haven-cli-redesign.md) (the haven CLI and daemon this extends), [ADR-069](./069-payload-cost-doctrine.md) (the same "bound the cost at the seam that knows the cost" reasoning, applied to a queue rather than a laptop).
+**Relates to:** [ADR-064](./064-haven-cli-redesign.md) (the haven CLI and daemon this extends), [ADR-069](../../../packages/group-queue/adrs/069-payload-cost.md) (the same "bound the cost at the seam that knows the cost" reasoning, applied to a queue rather than a laptop).
 
 **Behavioural contract:** [specs/setup/heavy-run-admission.feature](../../../specs/setup/heavy-run-admission.feature), [specs/setup/memory-pressure-governor.feature](../../../specs/setup/memory-pressure-governor.feature).
 

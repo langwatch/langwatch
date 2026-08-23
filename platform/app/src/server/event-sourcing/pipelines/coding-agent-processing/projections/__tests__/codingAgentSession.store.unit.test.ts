@@ -1,10 +1,10 @@
+import type { ProjectionStoreContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import type {
   CodingAgentBranchSessionRow,
   CodingAgentSessionRepository,
 } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,

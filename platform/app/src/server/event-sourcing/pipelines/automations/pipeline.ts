@@ -1,4 +1,8 @@
-import { definePipeline } from "../../pipeline/staticBuilder";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -38,6 +42,7 @@ import {
   webhookDeliveryPruneWake,
 } from "./process-manager/webhookDeliveryPrune.process";
 import {
+  AUTOMATIONS_EVENT_TYPES,
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
 } from "./schemas/constants";
@@ -53,9 +58,13 @@ export interface AutomationsPipelineDeps {
 }
 
 export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
-  return definePipeline<AutomationEvent>()
-    .withName("automations")
-    .withAggregateType("trigger")
+  return definePipeline<AutomationEvent>({
+    name: "automations",
+    aggregate: defineAggregate({
+      type: "trigger",
+      events: defineEvents(AUTOMATIONS_EVENT_TYPES),
+    }),
+  })
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
       // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a

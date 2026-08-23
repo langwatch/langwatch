@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
+import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
-import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";

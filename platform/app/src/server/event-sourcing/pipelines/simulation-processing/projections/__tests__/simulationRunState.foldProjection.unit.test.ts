@@ -1,6 +1,6 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,

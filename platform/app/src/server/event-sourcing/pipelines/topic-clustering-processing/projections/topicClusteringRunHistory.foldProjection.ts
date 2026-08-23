@@ -1,10 +1,10 @@
-import { z } from "zod";
+import type { StateProjectionStore } from "@langwatch/eventing";
 
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
+} from "@langwatch/eventing";
+import { z } from "zod";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
   TOPIC_CLUSTERING_RUN_HISTORY_LIMIT,

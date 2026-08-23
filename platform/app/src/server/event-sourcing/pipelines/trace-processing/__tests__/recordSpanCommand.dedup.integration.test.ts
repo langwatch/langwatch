@@ -16,26 +16,32 @@
  */
 
 import crypto from "node:crypto";
+import type {
+  EventSourcing,
+  PipelineWithCommandHandlers,
+} from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+} from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import type { AggregateType } from "../../../";
-import { definePipeline } from "../../../";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
+  createTestEventSourcing,
   createTestTenantId,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import { EventSourcing } from "../../../eventSourcing";
-import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
-import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import {
   RECORD_SPAN_DEDUPLICATION,
@@ -45,6 +51,7 @@ import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjecti
 import { SpanAppendStore } from "../projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
+import { TRACE_PROCESSING_EVENT_TYPES } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 
@@ -159,11 +166,10 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
 
   // "web" role → consumerEnabled: false → jobs are staged but never consumed.
   // This keeps them in the GQ :data hash so we can inspect HLEN directly.
-  const eventSourcing = EventSourcing.createWithStores({
+  const eventSourcing = createTestEventSourcing({
     eventStore,
-    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
-    processRole: "web",
+    consumersEnabled: false,
   });
 
   const spanAppendStore = new SpanAppendStore(
@@ -177,15 +183,17 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
     ).repository,
   );
 
-  const pipelineDefinition = definePipeline<TraceProcessingEvent>()
-    .withName(pipelineName)
-    .withAggregateType("trace" as AggregateType)
-    .withFoldProjection(
-      "traceSummary",
+  const pipelineDefinition = definePipeline<TraceProcessingEvent>({
+    name: pipelineName,
+    aggregate: defineAggregate({
+      type: "trace",
+      events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
       new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
     )
-    .withMapProjection(
-      "spanStorage",
+    .withClickHouseMapProjection(
       new SpanStorageMapProjection({ store: spanAppendStore }) as any,
     )
     // Production-faithful registration: imports the SAME RECORD_SPAN_DEDUPLICATION

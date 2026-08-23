@@ -1,5 +1,3 @@
-import { tryGetApp } from "./app-layer/app";
-
 /**
  * Per-key sliding-window rate limiter. Uses Redis when available
  * (production / Redis-backed dev), in-memory otherwise (unit tests,
@@ -56,7 +54,10 @@ export async function rateLimit(opts: {
 
   // Fail-open by contract: no App or no Redis both mean the per-process
   // fallback below, never a crash (ADR-093).
-  const redisConnection = tryGetApp()?.redis ?? null;
+  // Lazy to keep route-description imports free of the complete app runtime.
+  // OpenAPI generation imports transport modules but never executes a request.
+  const redisConnection =
+    (await import("./app-layer/app")).tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;
     const count = await redisConnection.incr(redisKey);

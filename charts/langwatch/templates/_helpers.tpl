@@ -1518,7 +1518,7 @@ here, once, by name, so both consuming templates agree.
      of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
      answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
      and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
-     server. See specs/event-sourcing/worker-graceful-shutdown.feature.
+     server. See specs/background/worker-graceful-shutdown.feature.
 
      Validated rather than derived, matching the gateway subchart: an operator
      draining behind a slow load balancer wants a wider margin than a formula

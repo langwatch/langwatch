@@ -1,6 +1,6 @@
 import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
 import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,

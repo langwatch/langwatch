@@ -28,7 +28,7 @@ import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";

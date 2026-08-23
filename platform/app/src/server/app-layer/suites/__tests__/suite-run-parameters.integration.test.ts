@@ -15,6 +15,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
@@ -22,7 +23,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { QueueRunCommand } from "~/server/event-sourcing/pipelines/simulation-processing/commands";
 import {
   type SimulationRunStateData,
@@ -30,7 +30,6 @@ import {
 } from "~/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";

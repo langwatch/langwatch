@@ -1,4 +1,4 @@
-import { defineCommand } from "../../../commands/defineCommand";
+import { defineCommand } from "@langwatch/eventing";
 import {
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,

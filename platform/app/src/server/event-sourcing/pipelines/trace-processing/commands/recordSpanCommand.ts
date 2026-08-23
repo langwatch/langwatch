@@ -1,3 +1,10 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -15,13 +22,6 @@ import {
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { featureFlagService } from "~/server/featureFlag";
-import type { Command, CommandHandler } from "../../../";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-  type TenantId,
-} from "../../../";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,

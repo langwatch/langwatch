@@ -1,3 +1,9 @@
+import type { CommandEnvelope } from "@langwatch/eventing";
+import {
+  createTenantId,
+  REHYDRATION_WINDOW_MS,
+  type TenantId,
+} from "@langwatch/eventing";
 import type { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type {
@@ -35,13 +41,7 @@ import {
   serializeLangyTurnError,
 } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
-import {
-  createTenantId,
-  type TenantId,
-} from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationIdUnadoptableError,

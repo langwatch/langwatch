@@ -12,12 +12,12 @@
  * these tests pin the order through the batch and out the other side.
  *
  * See specs/coding-agent/session-aggregate.feature and
- * specs/event-sourcing/producer-append-coalescing.feature.
+ * packages/eventing/specs/producer-append-coalescing.feature.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../../domain/types";
-import { processCommandBatch } from "../../../services/commands/commandDispatcher";
+import type { Event } from "@langwatch/eventing";
+import { processCommandBatch } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
 import { ContributeLogFactsCommand } from "../commands/contributeLogFactsCommand";
 import { createCodingAgentProcessingPipeline } from "../pipeline";
 import type { ContributeLogFactsCommandData } from "../schemas/commands";
@@ -29,14 +29,6 @@ import {
   applyLogToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-
-vi.mock("../../../utils/killSwitch", () => ({
-  isComponentDisabled: vi.fn().mockResolvedValue(false),
-}));
-
-import { isComponentDisabled } from "../../../utils/killSwitch";
-
-const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
 
 const TENANT_ID = "tenant-coding-agent-coalescing";
 const SESSION_ID = "session-abc";
@@ -126,14 +118,6 @@ function foldInOrder(events: Event[]) {
 }
 
 describe("coding-agent contribution append coalescing", () => {
-  beforeEach(() => {
-    mockedIsComponentDisabled.mockResolvedValue(false);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("given the coding-agent pipeline is defined", () => {
     describe("when its contribution commands are registered", () => {
       /** @scenario "a busy session's contributions are written together" */
@@ -276,20 +260,6 @@ describe("coding-agent contribution append coalescing", () => {
         expect(session.truncated).toBe(true);
         // The chain the next call is compared against: the LAST call's context.
         expect(session.previousCallContextTokens).toBe(9_000);
-      });
-    });
-
-    describe("when the command is killed for the tenant", () => {
-      it("appends nothing for the whole batch", async () => {
-        mockedIsComponentDisabled.mockResolvedValue(true);
-        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) =>
-          modelCallPayload({ index, contextTokens: 1_000 }),
-        );
-
-        await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
-
-        expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
   });

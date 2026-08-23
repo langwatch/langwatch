@@ -76,8 +76,8 @@ import { createLogger } from "@langwatch/observability";
 import type { Hono } from "hono";
 import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
+import { createApp } from "./runtime/app";
 import { createApiRouter } from "./server/api-router";
-import { getApp } from "./server/app-layer/app";
 import {
   initializeInProcessApp,
   initializeWebApp,
@@ -156,11 +156,12 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // This was previously done by Next.js instrumentation hook. In-process mode
   // boots with the "all" role so the outbox consumer / drainer / heartbeat
   // scheduler wire up exactly as on a dedicated worker.
-  if (isInProcessWorkerModeEnabled) {
-    initializeInProcessApp();
-  } else {
-    initializeWebApp();
-  }
+  const appRuntime = await createApp({
+    initializeLegacy: isInProcessWorkerModeEnabled
+      ? initializeInProcessApp
+      : initializeWebApp,
+  });
+  await appRuntime.start();
 
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
@@ -479,7 +480,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         // See workers.ts: below the watchdog on purpose, so this bound can
         // actually fire before the process deadline does.
         timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
-        run: async () => await getApp().close({ terminating: true }),
+        run: async () => await appRuntime.close({ terminating: true }),
       },
       { name: "posthog", run: async () => await shutdownPostHog() },
     ],

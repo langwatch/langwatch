@@ -1,7 +1,10 @@
+import {
+  AggregateTypeSchema,
+  EventMetadataBaseSchema,
+  EventSchema,
+  TenantIdSchema,
+} from "@langwatch/eventing";
 import { z } from "zod";
-import { AggregateTypeSchema } from "../../../domain/aggregateType";
-import { TenantIdSchema } from "../../../domain/tenantId";
-import { EventMetadataBaseSchema, EventSchema } from "../../../domain/types";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,

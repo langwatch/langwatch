@@ -6,7 +6,7 @@
 
 **Extends:** [ADR-071](./071-coding-agent-session-immutable-storage-anchor.md) - sequencing step 3, applied to the fourth table in its inventory. ADR-071 recorded `trace_summaries` as a same-class instance of the anchor defect and deliberately left it unfixed, tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312). This is that fix. The rule is ADR-071's unchanged: a storage anchor is first-observed, frozen, and separate from any business value derived off it.
 
-**Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads, and the `clickhouse_windowed_read_total` outcomes that measured this), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
+**Relates to:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) (the read-back store that writes this row), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads, and the `clickhouse_windowed_read_total` outcomes that measured this), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
 
 ## Context
 
@@ -135,7 +135,7 @@ Neither is bundled with the anchor, because the anchor is correct and shippable 
 ## References
 
 - [ADR-071](./071-coding-agent-session-immutable-storage-anchor.md) - the storage-anchor rule, and the inventory this closes an entry in
-- [ADR-066](./066-projection-clickhouse-cached-store.md) - the ClickHouse-cached fold store whose read-back the version gate protects
+- [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) - the ClickHouse-cached fold store whose read-back the version gate protects
 - [ADR-068](./068-windowed-clickhouse-reads.md) - `queryWindowed`, its fallbacks, and the outcome metric
 - `dev/docs/best_practices/clickhouse-queries.md` - IN-tuple dedup, partition-key filtering
 - `specs/traces/trace-summary-storage-anchor.feature` - the behavioural contract

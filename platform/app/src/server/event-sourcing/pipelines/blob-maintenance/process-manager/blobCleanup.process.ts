@@ -1,11 +1,7 @@
+import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
-import type {
-  IntentSpec,
-  WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 
 const logger = createLogger("langwatch:group-queue:blob-cleanup");
 

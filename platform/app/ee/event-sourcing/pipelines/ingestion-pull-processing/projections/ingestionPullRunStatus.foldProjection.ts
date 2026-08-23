@@ -1,8 +1,8 @@
+import type { StateProjectionStore } from "@langwatch/eventing";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "~/server/event-sourcing/projections/abstractFoldProjection";
-import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
 import {
   INGESTION_PULL_PROJECTION_VERSIONS,
   INGESTION_PULL_RUN_OUTCOME,

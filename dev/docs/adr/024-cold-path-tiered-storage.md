@@ -274,8 +274,7 @@ plays out over hours, but throttled — not as a thundering herd.
 
 ## References
 
-- Related ADRs: ADR-022 (data retention, umbrella), ADR-023
-  (orphan-sweep reactor + chain — superseded), ADR-025 (orphan sweep removed)
+- Related ADRs: ADR-022 (data retention, umbrella), ADR-025 (orphan sweep removed)
 - Chart: `charts/clickhouse-serverless/{values.yaml,
   templates/statefulset.yaml, templates/_helpers.tpl}`
 - Image: `infra/clickhouse-serverless/internal/{config,storage,render}/`

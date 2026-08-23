@@ -1,9 +1,11 @@
+import type {
+  BulkAppendContext,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { BulkAppendContext } from "~/server/event-sourcing/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,

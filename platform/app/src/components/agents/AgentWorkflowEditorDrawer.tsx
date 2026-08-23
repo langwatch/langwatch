@@ -29,7 +29,7 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import type { AgentComponentConfig } from "~/server/agents/agent.repository";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
 import {
   type AgentWithFields,
   linkedWorkflowId,

@@ -19,6 +19,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -77,7 +78,7 @@ describe("Feature: SCIM tokens REST API", () => {
   describe("given SCIM tokens managed over REST", () => {
     /** @scenario Listing SCIM tokens never returns secrets */
     it("describes tokens without ever including a value or a hash", async () => {
-      const create = await app.request("/api/scim-tokens", {
+      const create = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ description: `List Secrets ${ns}` }),
@@ -85,7 +86,7 @@ describe("Feature: SCIM tokens REST API", () => {
       expect(create.status).toBe(201);
       const created = await create.json();
 
-      const response = await app.request("/api/scim-tokens", {
+      const response = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
@@ -109,7 +110,7 @@ describe("Feature: SCIM tokens REST API", () => {
 
     /** @scenario Creating a SCIM token returns the secret exactly once */
     it("returns the value once, and the value authenticates a SCIM request", async () => {
-      const response = await app.request("/api/scim-tokens", {
+      const response = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ description: "Okta production" }),
@@ -123,7 +124,7 @@ describe("Feature: SCIM tokens REST API", () => {
       const scimResponse = await scimUsersWith(created.token);
       expect(scimResponse.status).toBe(200);
 
-      const list = await app.request("/api/scim-tokens", {
+      const list = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect(JSON.stringify(await list.json())).not.toContain(created.token);
@@ -132,7 +133,7 @@ describe("Feature: SCIM tokens REST API", () => {
     /** @scenario Revoking a SCIM token stops it verifying */
     it("revokes the token, refuses SCIM requests with it, and 404s a second revoke", async () => {
       const created = await (
-        await app.request("/api/scim-tokens", {
+        await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
           method: "POST",
           headers: authHeaders(),
           body: JSON.stringify({ description: `Revoke ${ns}` }),
@@ -141,7 +142,7 @@ describe("Feature: SCIM tokens REST API", () => {
 
       expect((await scimUsersWith(created.token)).status).toBe(200);
 
-      const revoke = await app.request(`/api/scim-tokens/${created.id}`, {
+      const revoke = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -150,7 +151,7 @@ describe("Feature: SCIM tokens REST API", () => {
 
       expect((await scimUsersWith(created.token)).status).toBe(401);
 
-      const again = await app.request(`/api/scim-tokens/${created.id}`, {
+      const again = await app.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/${created.id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });

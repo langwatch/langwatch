@@ -58,7 +58,7 @@ Family entries cover dynamically-generated key shapes. Today the only family is 
 
 | Layer | Backend | TTL | Purpose |
 |-------|---------|-----|---------|
-| In-process | `Map` | 5 s | Absorbs per-event reactor reads on the hot path |
+| In-process | `Map` | 5 s | Absorbs per-event subscriber reads on the hot path |
 | Shared | Redis (via `TtlCache`) | 60 s | Cross-pod cache sharing |
 | Source of truth | Prisma `FeatureFlag` table | n/a | Operator-set overrides only; absence = registry default |
 

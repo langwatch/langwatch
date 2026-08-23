@@ -9,7 +9,12 @@ import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { nodeDataToLocalPromptConfig } from "~/prompts/utils/llmPromptConfigUtils";
 import { useSmartSetNode } from "../../hooks/useSmartSetNode";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, Field, Signature } from "../../types/dsl";
+import {
+  type Component,
+  type Field,
+  fieldSchema,
+  type Signature,
+} from "../../types/dsl";
 import {
   applyMappingChange,
   buildAvailableSources,
@@ -44,16 +49,15 @@ function mergeFields({
 }): Field[] {
   const newIds = new Set(newFields.map((f) => f.identifier));
 
-  const mapped = newFields.map((f) => {
+  const mapped = newFields.map((f): Field => {
     const existing = oldFields.find((e) => e.identifier === f.identifier);
-    return {
+    const candidate: Record<string, unknown> = {
       identifier: f.identifier,
       type: f.type as Field["type"],
-      ...(existing?.value != null ? { value: existing.value } : {}),
-      ...("json_schema" in f && f.json_schema != null
-        ? { json_schema: f.json_schema }
-        : {}),
     };
+    if (existing?.value != null) candidate.value = existing.value;
+    if (f.json_schema != null) candidate.json_schema = f.json_schema;
+    return fieldSchema.parse(candidate);
   });
 
   // Keep old fields that have connected edges but were removed from the config

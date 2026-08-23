@@ -202,7 +202,10 @@ does not create an event or a second quarantine store.
 The rollout is intentionally simple. Existing ClickHouse-backed behaviour stays
 authoritative while the migration runs. Old writers are drained, a final pass
 proves every latest legacy row is represented in Postgres, and only then is the
-Postgres-backed service enabled for that tenant. Supporting indefinite
+Postgres-backed service enabled for that tenant. That finalization requires
+operator confirmation. The migration remains inactive on self-hosted installs
+until the cloud rollout has soaked and a later release explicitly enables it.
+Supporting indefinite
 mixed-version writes or automatic bidirectional reconciliation is out of scope.
 
 ### Environment and configuration

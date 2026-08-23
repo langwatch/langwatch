@@ -1,10 +1,17 @@
-import { definePipeline } from "../..";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type EventSubscriberDefinition,
+} from "@langwatch/eventing";
 import { logCommandGroupKey } from "./canonicalLog";
 import { RecordCanonicalLogCommand } from "./commands/recordCanonicalLogCommand";
 import { CanonicalLogStorageMapProjection } from "./projections/canonicalLogStorage.mapProjection";
-import { LOG_COMMAND_COALESCE_MAX_BATCH } from "./schemas/constants";
+import {
+  LOG_COMMAND_COALESCE_MAX_BATCH,
+  LOG_PROCESSING_EVENT_TYPES,
+} from "./schemas/constants";
 import type { LogProcessingEvent } from "./schemas/events";
 import type { CanonicalLogRecord } from "./schemas/logRecord";
 
@@ -16,16 +23,18 @@ export interface LogProcessingPipelineDeps {
 }
 
 export function createLogProcessingPipeline(deps: LogProcessingPipelineDeps) {
-  let builder = definePipeline<LogProcessingEvent>()
-    .withName("log_processing")
-    .withAggregateType("log")
-    .withMapProjection(
-      "canonicalLogStorage",
-      new CanonicalLogStorageMapProjection({
-        store: deps.canonicalLogAppendStore,
-        shardCount: deps.logCommandShardCount,
-      }),
-    );
+  let builder = definePipeline<LogProcessingEvent>({
+    name: "log_processing",
+    aggregate: defineAggregate({
+      type: "log",
+      events: defineEvents(LOG_PROCESSING_EVENT_TYPES),
+    }),
+  }).withClickHouseMapProjection(
+    new CanonicalLogStorageMapProjection({
+      store: deps.canonicalLogAppendStore,
+      shardCount: deps.logCommandShardCount,
+    }),
+  );
 
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);

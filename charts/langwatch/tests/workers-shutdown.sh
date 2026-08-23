@@ -19,7 +19,7 @@
 # The suite asserts both halves of the pair: the pod's grace period, and the
 # SHUTDOWN_DRAIN_TIMEOUT_MS the process is given. Both come from one value, and
 # a process running a budget its pod was not sized for is the whole failure.
-# See specs/event-sourcing/worker-graceful-shutdown.feature.
+# See specs/background/worker-graceful-shutdown.feature.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
 # expressed as a hash-comment above the test function it verifies — the next

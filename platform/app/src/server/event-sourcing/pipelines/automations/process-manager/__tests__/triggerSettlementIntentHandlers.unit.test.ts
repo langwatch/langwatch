@@ -1,12 +1,9 @@
+import type { IntentContext } from "@langwatch/eventing";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import {
-  DispatchError,
-  isDispatchError,
-} from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import {
   createLogOverflowHandler,

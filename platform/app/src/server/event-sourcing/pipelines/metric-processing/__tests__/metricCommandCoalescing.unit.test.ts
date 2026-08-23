@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../../domain/types";
-import { processCommandBatch } from "../../../services/commands/commandDispatcher";
+import type { Event } from "@langwatch/eventing";
+import { processCommandBatch } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
 import { RecordMetricDataPointCommand } from "../commands/recordMetricDataPointCommand";
 import { createMetricProcessingPipeline } from "../pipeline";
 import {
@@ -10,14 +10,6 @@ import {
 } from "../schemas/constants";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 import { point } from "./fixtures/metric-point.fixtures";
-
-vi.mock("../../../utils/killSwitch", () => ({
-  isComponentDisabled: vi.fn().mockResolvedValue(false),
-}));
-
-import { isComponentDisabled } from "../../../utils/killSwitch";
-
-const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
 
 const TENANT_ID = "project_metric_coalescing";
 
@@ -61,14 +53,6 @@ function buildPipeline() {
 }
 
 describe("metric command append coalescing", () => {
-  beforeEach(() => {
-    mockedIsComponentDisabled.mockResolvedValue(false);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("given the metric-processing pipeline is defined", () => {
     describe("when recordDataPoint is registered", () => {
       /** @scenario 'many items for one aggregate become one insert' */
@@ -119,18 +103,6 @@ describe("metric command append coalescing", () => {
         expect(
           (events as Event[]).map((event) => event.idempotencyKey),
         ).toEqual(payloads.map((payload) => `${TENANT_ID}:${payload.pointId}`));
-      });
-    });
-
-    describe("when the command is killed for the tenant", () => {
-      it("appends nothing for the whole batch", async () => {
-        mockedIsComponentDisabled.mockResolvedValue(true);
-        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
-        const payloads = [0, 1, 2].map((index) => dataPoint({ index }));
-
-        await processCommandBatch(batchParamsFor({ payloads, storeEventsFn }));
-
-        expect(storeEventsFn).not.toHaveBeenCalled();
       });
     });
   });

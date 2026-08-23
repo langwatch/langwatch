@@ -1,11 +1,11 @@
-import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   IntentContext,
   IntentSpec,
+  ProcessManagerApplier,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 // TYPE-only, deliberately. A value import from the repository pulls the
 // ClickHouse client into this module's graph, and this module is reached from
 // the pipeline registry that several suites mock — which turns a

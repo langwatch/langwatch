@@ -1,6 +1,6 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { createTenantId, EventUtils } from "~/server/event-sourcing";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,

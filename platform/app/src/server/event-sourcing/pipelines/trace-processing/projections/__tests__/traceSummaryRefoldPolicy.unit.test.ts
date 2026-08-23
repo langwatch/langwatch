@@ -1,8 +1,7 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
@@ -18,7 +17,7 @@ import { createInitState } from "./fixtures/trace-summary-test.fixtures";
  * summary is order-insensitive, so a span is simply folded when it arrives and
  * the event log is never re-read.
  *
- * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+ * See specs/trace-processing/hot-trace-fold-amplification.feature.
  */
 
 const TENANT_ID = createTenantId("project-1");

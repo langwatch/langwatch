@@ -1,176 +1,84 @@
 /**
- * The RPC catalogue: every dotted `<resource>.<verb>` operation the API
- * publishes, with the schemas for its arguments and its result.
+ * The root RPC catalogue: every API service and the URL of that service's own
+ * catalogue, two levels deep.
  *
- * This is a PROJECTION of the OpenAPI document, computed on demand. It is not a
- * registry, nothing writes to it, and no family registers with it. That is the
- * whole design: an operation appears here because it appears in the published
- * document, so the catalogue cannot describe an endpoint that does not exist,
- * omit one that does, or disagree with the document about its schema. There is
- * one source of truth and this reads it.
+ * Each service serves its own `rpc.discover` — mounted by `@langwatch/api`
+ * itself, under every version namespace — listing the RPC operations it
+ * publishes. The root does not repeat them: it answers with the fleet, so a
+ * caller discovers every service in one call and any one service's operations
+ * in two.
  *
- * Two consequences worth stating, because both look like bugs and are not:
+ * Both levels are PROJECTIONS, not registries. The per-service catalogues are
+ * derived from the services' own registrations; this index is derived from
+ * the mounted route tables — a service appears here because the framework
+ * actually mounted its catalogue, and a service off the framework has no
+ * catalogue to point at. Neither can drift from the served surface: there is
+ * nothing to write to.
  *
- *   - An operation the document does not carry is absent here. `v.rpc` mounts a
- *     real POST, so the generator documents it like any other endpoint — but an
- *     endpoint that opts out with `docs: { hide: true }`, or that declares no
- *     `output`/`description`/`docs` at all, never reaches the document and so
- *     never reaches this. That is the same rule every other reader of the
- *     document already lives under, not a second one.
- *   - The catalogue is empty until a family adopts RPC naming. It is empty
- *     today. Nothing needs backfilling when one does.
- *
- * Recognising a dotted name is `isRpcPath` from `@langwatch/api` — the same
- * grammar `v.rpc` refuses a registration with, rather than a second regex here
- * that agrees with it until someone changes one of them.
- *
- * See specs/api-reference/api-discovery.feature.
+ * See packages/api/specs/api-discovery.feature.
  */
 
-import { isRpcPath } from "@langwatch/api";
+import { DISCOVER_NAME } from "@langwatch/api";
+import type { Hono } from "hono";
 
-/** One RPC operation, as the catalogue reports it. */
-export interface RpcOperation {
-  /** The dotted operation name, e.g. `endpoints.rollSecret`. */
+/** One service, as the root catalogue reports it. */
+export interface RpcServiceEntry {
+  /** The service's family name, e.g. `role-bindings`. */
   name: string;
-  /** The absolute path to POST to. */
-  path: string;
-  /** The document's operation id, which is also the SDK's function name. */
-  operationId?: string;
-  summary?: string;
-  description?: string;
-  /**
-   * JSON Schema for the request body, or `null` for an operation that takes no
-   * arguments. `$ref`s resolve against `components` below.
-   */
-  input: unknown;
-  /** JSON Schema for the success response body, or `null` when it sends none. */
-  output: unknown;
-  /** The success status this operation always answers. */
-  status: number;
+  /** The URL to POST for the service's own catalogue. */
+  discover: string;
 }
 
-export interface RpcCatalogue {
+export interface RpcServiceIndex {
   /**
-   * Where the complete description lives. The catalogue covers RPC-named
+   * Where the complete description lives. The catalogues cover RPC-named
    * operations only; a caller that wants the whole surface follows this.
    */
   openapi: string;
-  operations: RpcOperation[];
-  /** The document's shared schemas, so a `$ref` in an operation resolves. */
-  components: unknown;
+  services: RpcServiceEntry[];
 }
 
-type JsonObject = Record<string, unknown>;
+/** The `latest` mount of a service's catalogue, e.g. `/api/roles/latest/rpc.discover`. */
+const DISCOVER_SUFFIX = `/latest/${DISCOVER_NAME}`;
 
-const asObject = (value: unknown): JsonObject | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as JsonObject)
-    : undefined;
+/**
+ * The service's discover URL, found in its mounted route table — or undefined
+ * when the service is not on the framework and has no catalogue to point at.
+ * Reading the mount rather than a declared name is what keeps the index
+ * derived: it cannot list a service whose catalogue does not answer.
+ */
+function discoverMountOf(
+  app: Hono,
+): { name: string; discover: string } | undefined {
+  const route = app.routes.find(
+    (r) => r.method === "POST" && r.path.endsWith(DISCOVER_SUFFIX),
+  );
+  if (!route) return undefined;
 
-/** The dotted name is the last path segment; `/api/webhooks/endpoints.create`. */
-function rpcNameFor(path: string): string | undefined {
-  const lastSlash = path.lastIndexOf("/");
-  if (lastSlash === -1) return undefined;
-
-  const segment = path.slice(lastSlash);
-  return isRpcPath(segment) ? segment.slice(1) : undefined;
-}
-
-/** The `application/json` schema out of an OpenAPI request body or response. */
-function jsonSchemaOf(carrier: unknown): unknown {
-  const content = asObject(asObject(carrier)?.content);
-  const json = asObject(content?.["application/json"]);
-  return json?.schema ?? null;
+  // `/api/<family>/latest/rpc.discover` — the family segment.
+  const name = route.path.split("/")[2];
+  if (!name) return undefined;
+  return { name, discover: route.path };
 }
 
 /**
- * The success response, and the status it answers. `v.rpc` endpoints answer
- * exactly one success status — `assertStatusInvariant` in `@langwatch/api`
- * refuses a registration where it could move — so taking the first 2xx is
- * reading a decision the framework already made, not guessing between several.
+ * Projects the root catalogue out of the mounted service apps.
+ *
+ * @param apps - The framework-built service apps, from the composition root.
  */
-function successResponse(operation: JsonObject): {
-  status: number;
-  schema: unknown;
-} {
-  const responses = asObject(operation.responses) ?? {};
-  for (const [code, response] of Object.entries(responses)) {
-    const status = Number(code);
-    if (!Number.isInteger(status) || status < 200 || status > 299) continue;
-    return { status, schema: jsonSchemaOf(response) };
-  }
-  return { status: 200, schema: null };
-}
-
-/**
- * The prose the document carries about an operation, copied only where it is
- * actually a string. Omitted rather than set to undefined, so the catalogue's
- * JSON has no null-valued keys a client has to reason about.
- */
-function describedFields(operation: JsonObject): {
-  operationId?: string;
-  summary?: string;
-  description?: string;
-} {
-  const fields: {
-    operationId?: string;
-    summary?: string;
-    description?: string;
-  } = {};
-  for (const key of ["operationId", "summary", "description"] as const) {
-    const value = operation[key];
-    if (typeof value === "string") fields[key] = value;
-  }
-  return fields;
-}
-
-/** One path's RPC operation, or null when the path is not an RPC at all. */
-function rpcOperationFor({
-  path,
-  methods,
-}: {
-  path: string;
-  methods: unknown;
-}): RpcOperation | null {
-  const name = rpcNameFor(path);
-  if (!name) return null;
-
-  // An RPC is always a POST. Anything else on a dotted path is not one, and
-  // reporting it as one would advertise a call that does not work.
-  const operation = asObject(asObject(methods)?.post);
-  if (!operation) return null;
-
-  const { status, schema } = successResponse(operation);
-  return {
-    name,
-    path,
-    ...describedFields(operation),
-    input: jsonSchemaOf(operation.requestBody),
-    output: schema,
-    status,
-  };
-}
-
-/** Projects the RPC-named operations out of an OpenAPI document. */
-export function buildRpcCatalogue({
-  document,
+export function buildRpcServiceIndex({
+  apps,
   openapiUrl,
 }: {
-  document: Record<string, unknown>;
+  apps: Hono[];
   openapiUrl: string;
-}): RpcCatalogue {
-  const paths = asObject(document.paths) ?? {};
-  const operations = Object.entries(paths)
-    .map(([path, methods]) => rpcOperationFor({ path, methods }))
-    .filter((operation): operation is RpcOperation => operation !== null)
-    // Sorted so the response is stable between requests: the catalogue is
-    // derived per call, and Object.entries order is the document's, not ours.
-    .sort((a, b) => a.path.localeCompare(b.path));
+}): RpcServiceIndex {
+  const services = apps
+    .map(discoverMountOf)
+    .filter((entry): entry is RpcServiceEntry => entry !== undefined)
+    // Sorted so the response is stable between requests: the index is derived,
+    // and the apps' order is the router's, not ours.
+    .sort((a, b) => a.discover.localeCompare(b.discover));
 
-  return {
-    openapi: openapiUrl,
-    operations,
-    components: asObject(document.components)?.schemas ?? {},
-  };
+  return { openapi: openapiUrl, services };
 }

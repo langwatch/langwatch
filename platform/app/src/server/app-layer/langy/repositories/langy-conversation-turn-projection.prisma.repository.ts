@@ -1,3 +1,8 @@
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_TURN_STATUS,
   type LangyConversationTurnData,
@@ -9,11 +14,6 @@ import {
 } from "@langwatch/langy";
 import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather

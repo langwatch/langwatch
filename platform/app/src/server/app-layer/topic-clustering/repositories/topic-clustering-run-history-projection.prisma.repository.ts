@@ -1,17 +1,16 @@
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import type { Prisma } from "~/generated/prisma/client";
-
 import {
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunHistoryEntry,
   topicClusteringRunHistoryEntrySchema,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type Row = Prisma.TopicClusteringRunHistoryProjectionGetPayload<object>;

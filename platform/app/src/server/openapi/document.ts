@@ -19,11 +19,12 @@
  * artifact: it cannot change while the process is running. So it is serialised
  * once here, and the routes write bytes.
  *
- * That leaves the parsed object resident as well as the bytes. It stays
- * because `buildRpcCatalogue` reads it, and because an ESM JSON import is held
- * by the module registry regardless of what this file exports — dropping it
- * would mean not importing the JSON at all, which trades the guarantee in the
- * paragraph above for the saving. Not worth it at 5.8 MB.
+ * That leaves the parsed object resident as well as the bytes. The RPC
+ * catalogues no longer read it — the per-service ones are derived from the
+ * services' own registrations, the root index from the mounted route tables —
+ * but an ESM JSON import is held by the module registry regardless, and the
+ * export stays because the alternative is not importing the JSON at all,
+ * which trades the resolution guarantee above for the saving. Not worth it.
  */
 import { createHash } from "node:crypto";
 

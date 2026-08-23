@@ -1,5 +1,5 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../../..";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,

@@ -1,5 +1,6 @@
 import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
 import { app as scimApp } from "@ee/scim/routes";
+import { generateApiSpecs } from "@langwatch/api";
 import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
@@ -65,6 +66,24 @@ import { app as miscApp } from "../server/routes/misc";
  */
 const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
   requireDefaultedResponseFields(await generateSpecsUnpinned(hono, options, c));
+
+/**
+ * The services built on `@langwatch/api` (the management families) use the
+ * package's own generator. hono-openapi stores metadata under a package-local
+ * symbol, so a separately peer-resolved copy cannot see those routes. They
+ * also set `excludeStaticFile: false`: every RPC name is dotted and
+ * parameterless, so the default filter would drop the family silently.
+ * Pinned by rpc-openapi.unit.test.ts in @langwatch/api.
+ */
+const FRAMEWORK_SPEC_OPTIONS = { excludeStaticFile: false } as const;
+const generateFrameworkSpecs: typeof generateApiSpecs = async (
+  hono,
+  options,
+  context,
+) =>
+  requireDefaultedResponseFields(
+    await generateApiSpecs(hono, options, context),
+  );
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
@@ -226,7 +245,10 @@ export default async function execute() {
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building organization spec...");
-  const organizationSpec = await generateSpecs(organizationApp);
+  const organizationSpec = await generateFrameworkSpecs(
+    organizationApp,
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building organizations (instance provisioning) spec...");
   const organizationsSpec = await generateSpecs(
     organizationsApp,
@@ -235,11 +257,20 @@ export default async function execute() {
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
   console.log("Building roles spec...");
-  const rolesSpec = await generateSpecs(rolesApp);
+  const rolesSpec = await generateFrameworkSpecs(
+    rolesApp,
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building role bindings spec...");
-  const roleBindingsSpec = await generateSpecs(roleBindingsApp);
+  const roleBindingsSpec = await generateFrameworkSpecs(
+    roleBindingsApp,
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building scim tokens spec...");
-  const scimTokensSpec = await generateSpecs(scimTokensApp);
+  const scimTokensSpec = await generateFrameworkSpecs(
+    scimTokensApp,
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building scim spec...");
   // A family that authenticates with its own credential declares the scheme
   // next to the operations that name it, and `documentation` is how a

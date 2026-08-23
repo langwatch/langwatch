@@ -1,7 +1,7 @@
+import type { Event } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { Event } from "~/server/event-sourcing/domain/types";
 
 const logger = createLogger(
   "langwatch:triggers:graph-trigger-activity-subscriber",

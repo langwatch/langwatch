@@ -1,3 +1,4 @@
+import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
@@ -14,8 +15,6 @@ import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
 

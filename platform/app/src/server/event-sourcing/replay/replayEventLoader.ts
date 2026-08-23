@@ -1,7 +1,13 @@
 import type { ClickHouseClient, Row } from "@clickhouse/client";
+import type {
+  Event,
+  ReplayEventSource as ReplayEventSourcePort,
+} from "@langwatch/eventing";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
-import type { Event } from "../domain/types";
-import { compareOrdinal } from "../utils/compareOrdinal";
+
+function compareOrdinal(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -578,4 +584,88 @@ export async function batchLoadAggregateEvents({
 
   const rows = (await result.json()) as ClickHouseEventRow[];
   return rows.map(rowToEvent);
+}
+
+export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
+  constructor(
+    private readonly resolveClient: (
+      tenantId: string,
+    ) => Promise<ClickHouseClient>,
+  ) {}
+
+  async discoverAffectedAggregates(input: {
+    eventTypes: readonly string[];
+    sinceMs: number;
+    tenantId?: string;
+  }): Promise<DiscoveredAggregateWithEventTypes[]> {
+    return discoverAffectedAggregates({
+      client: await this.resolveClient(input.tenantId ?? "default"),
+      ...input,
+    });
+  }
+
+  async countEventsForAggregates(input: {
+    eventTypes: readonly string[];
+    sinceMs: number;
+    tenantId?: string;
+  }): Promise<number> {
+    return countEventsForAggregates({
+      client: await this.resolveClient(input.tenantId ?? "default"),
+      ...input,
+    });
+  }
+
+  async getBoundedCutoffs(input: {
+    tenantId: string;
+    aggregateTypes: string[];
+    aggregateIds: string[];
+    eventTypes: readonly string[];
+  }) {
+    return getBoundedCutoffs({
+      client: await this.resolveClient(input.tenantId),
+      ...input,
+    });
+  }
+
+  async streamEventsForAggregates(input: {
+    tenantId: string;
+    aggregateIds: string[];
+    eventTypes: readonly string[];
+    cutoffs: Map<string, CutoffInfo>;
+    occurredAtBounds?: OccurredAtBounds;
+    onEvent: (event: ReplayEvent) => void | Promise<void>;
+  }): Promise<{ eventsApplied: number }> {
+    return streamEventsForAggregatesBulk({
+      client: await this.resolveClient(input.tenantId),
+      ...input,
+    });
+  }
+
+  async loadAggregateEvents(input: {
+    tenantId: string;
+    aggregateIds: string[];
+    eventTypes: readonly string[];
+    maxCutoff: CutoffInfo;
+    cursor?: CutoffInfo;
+    batchSize: number;
+    occurredAtBounds?: OccurredAtBounds;
+  }): Promise<ReplayEvent[]> {
+    return batchLoadAggregateEvents({
+      client: await this.resolveClient(input.tenantId),
+      ...input,
+    });
+  }
+
+  async optimizeTables(
+    tenantId: string,
+    tables: readonly string[],
+  ): Promise<void> {
+    const client = await this.resolveClient(tenantId);
+    for (const table of tables) {
+      await client.command({
+        query: "OPTIMIZE TABLE {table:Identifier}",
+        query_params: { table },
+      });
+    }
+  }
 }

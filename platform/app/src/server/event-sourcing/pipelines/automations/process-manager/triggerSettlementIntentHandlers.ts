@@ -8,6 +8,13 @@ import {
   buildTemplateContext,
   type TemplateMatchInput,
 } from "@langwatch/automations/templating/templateContext";
+import type { FoldProjectionStore, IntentExecutor } from "@langwatch/eventing";
+import {
+  createTenantId,
+  DispatchError,
+  isDispatchError,
+  pMapLimited,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
 import { TriggerAction } from "~/generated/prisma/client";
@@ -31,14 +38,6 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import {
-  DispatchError,
-  isDispatchError,
-} from "~/server/event-sourcing/queues/dispatchError";
-import { pMapLimited } from "~/server/event-sourcing/replay/pMapLimited";
 import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
@@ -108,7 +107,7 @@ interface ActionParams {
 
 /**
  * Everything the settled dispatch needs. Mirrors the legacy outbox
- * dispatcher's deps (ADR-030/031/035/036/040/041 contracts) minus the
+ * dispatcher's dependencies minus the
  * queue transport — the ProcessManagerOutbox owns retry now.
  */
 export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {

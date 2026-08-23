@@ -1,6 +1,5 @@
+import { buildIntentFactories } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-
-import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import { WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS } from "../webhookDeliveryPrune.process";
 

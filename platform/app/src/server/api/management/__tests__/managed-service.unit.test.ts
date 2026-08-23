@@ -5,9 +5,10 @@
  * consumers that must never disagree: the route-policy registry the
  * authorization audit reads, and the enforcement chain that refuses requests.
  * These tests pin both halves structurally: every mount shape lands in the
- * registry (dated, latest, bare, and both version-namespace guards), the
- * enforcement chain runs auth, then the permission check, then the plan gate,
- * and an endpoint that never declared a policy cannot build at all.
+ * registry (dated, latest, both version-namespace guards, and the rpc.discover
+ * catalogue mounts), the enforcement chain runs auth, then the permission
+ * check, then the plan gate, and an endpoint that never declared a policy
+ * cannot build at all.
  */
 import type { MiddlewareHandler } from "hono";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -45,10 +46,9 @@ vi.mock("~/app/api/middleware/org-auth", async (importOriginal) => {
 });
 
 vi.mock("~/app/api/middleware/enterprise-gate", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/app/api/middleware/enterprise-gate")
-    >();
+  const actual = await importOriginal<
+    typeof import("~/app/api/middleware/enterprise-gate")
+  >();
   return {
     ...actual,
     requireEnterprisePlanRest:
@@ -75,27 +75,24 @@ describe("createManagementService", () => {
         feature: "MANAGEMENT_API",
       });
       app = service
-        .version(MANAGEMENT_API_VERSION, (v) => {
-          v.get(
-            "/things",
-            {
-              ...guard("organization:manage"),
-              output: z.object({ ok: z.boolean() }),
-              description: "toy",
-              docs: { operationId: "listToyThings" },
-            },
-            async () => ({ ok: true }),
-          );
-        })
+        .registerRoute(
+          "get",
+          "/things",
+          MANAGEMENT_API_VERSION,
+          async () => ({ ok: true }),
+          (b) =>
+            guard("organization:manage")(b)
+              .withOutput(z.object({ ok: z.boolean() }))
+              .withDocs({ operationId: "listToyThings", description: "toy" }),
+        )
         .build();
     });
 
     describe("when the service builds", () => {
-      it("registers the declared policy for the dated, latest and bare mounts", () => {
+      it("registers the declared policy for the dated and latest mounts", () => {
         for (const path of [
           `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
           "/api/toy-management/latest/things",
-          "/api/toy-management/things",
         ]) {
           const registered = getRoutePolicy("GET", path);
           expect(registered, path).toBeDefined();
@@ -121,13 +118,29 @@ describe("createManagementService", () => {
           }
         }
       });
+
+      it("registers the rpc.discover catalogue mounts as reasoned public endpoints", () => {
+        for (const path of [
+          `/api/toy-management/${MANAGEMENT_API_VERSION}/rpc.discover`,
+          "/api/toy-management/latest/rpc.discover",
+        ]) {
+          const registered = getRoutePolicy("POST", path);
+          expect(registered, path).toBeDefined();
+          expect(registered?.policy.kind).toBe("public");
+          if (registered?.policy.kind === "public") {
+            expect(registered.policy.reason).toContain("rpc.discover");
+          }
+        }
+      });
     });
 
     describe("when a request reaches a guarded endpoint", () => {
       it("runs auth, then the permission check, then the plan gate, then the handler", async () => {
         executionOrder.length = 0;
 
-        const response = await app.request("/api/toy-management/things");
+        const response = await app.request(
+          `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
+        );
 
         expect(response.status).toBe(200);
         expect(executionOrder).toEqual([
@@ -139,52 +152,46 @@ describe("createManagementService", () => {
     });
   });
 
-  describe("given an endpoint that also carries its own middleware", () => {
-    /** @scenario "An endpoint's middleware array cannot displace its declared check" */
-    it("still runs the declared permission check the framework mounted", async () => {
+  describe("given a guarded endpoint adds its own middleware", () => {
+    it("keeps the declared permission check in the framework-owned chain", async () => {
       const { service, guard } = createManagementService({
-        name: "toy-overwrite",
-        basePath: "/api/toy-overwrite",
+        name: "toy-additive",
+        basePath: "/api/toy-additive",
         feature: "MANAGEMENT_API",
       });
       const app = service
-        .version(MANAGEMENT_API_VERSION, (v) => {
-          v.get(
-            "/things",
-            {
-              ...guard("organization:manage"),
-              // The overwrite that used to bypass enforcement: a middleware
-              // key after the spread replaces the guard's array wholesale.
-              middleware: [
-                (async (_c, next) => {
-                  executionOrder.push("endpoint-middleware");
-                  await next();
-                }) satisfies MiddlewareHandler,
-              ],
-              output: z.object({ ok: z.boolean() }),
-              description: "toy",
-              docs: { operationId: "listOverwriteThings" },
-            },
-            async () => ({ ok: true }),
-          );
-        })
+        .registerRoute(
+          "get",
+          "/things",
+          MANAGEMENT_API_VERSION,
+          async () => ({ ok: true }),
+          (builder) =>
+            guard("organization:manage")(builder)
+              .withMiddleware(async (_context, next) => {
+                executionOrder.push("endpoint-middleware");
+                await next();
+              })
+              .withOutput(z.object({ ok: z.boolean() })),
+        )
         .build();
 
       executionOrder.length = 0;
-      const response = await app.request("/api/toy-overwrite/things");
+      const response = await app.request(
+        `/api/toy-additive/${MANAGEMENT_API_VERSION}/things`,
+      );
 
       expect(response.status).toBe(200);
       expect(executionOrder).toEqual([
         "auth",
         "permission:organization:manage",
+        "plan:MANAGEMENT_API",
         "endpoint-middleware",
       ]);
     });
   });
 
-  describe("given a policy that promises a permission the config does not enforce", () => {
-    /** @scenario "A registered policy that promises an unenforced permission fails the build" */
-    it("fails the build naming both halves", () => {
+  describe("given policy metadata and enforcement disagree", () => {
+    it("refuses the route at build time", () => {
       const { service, guard } = createManagementService({
         name: "toy-mismatch",
         basePath: "/api/toy-mismatch",
@@ -193,20 +200,16 @@ describe("createManagementService", () => {
 
       expect(() =>
         service
-          .version(MANAGEMENT_API_VERSION, (v) => {
-            // Cast: the AccessDeclaration types refuse this shape outright;
-            // the runtime cross-check is the layer under test.
-            (v.get as (p: string, c: unknown, h: unknown) => void)(
-              "/things",
-              {
-                ...guard("organization:manage"),
-                permission: undefined,
-                noPermission: { reason: "policy/permission mismatch probe" },
-                output: z.object({ ok: z.boolean() }),
-              },
-              async () => ({ ok: true }),
-            );
-          })
+          .registerRoute(
+            "get",
+            "/things",
+            MANAGEMENT_API_VERSION,
+            async () => ({ ok: true }),
+            (builder) =>
+              guard("organization:manage")(builder)
+                .withoutPermission("policy mismatch probe")
+                .withOutput(z.object({ ok: z.boolean() })),
+          )
           .build(),
       ).toThrow(/declares policy "organization:manage" but enforces "nothing"/);
     });
@@ -222,20 +225,18 @@ describe("createManagementService", () => {
 
       expect(() =>
         service
-          .version(MANAGEMENT_API_VERSION, (v) => {
-            // Cast: an endpoint with no access declaration no longer compiles;
-            // this pins the framework's boot check behind the types.
-            (v.get as (p: string, c: unknown, h: unknown) => void)(
-              "/things",
-              { output: z.object({ ok: z.boolean() }) },
-              async () => ({ ok: true }),
-            );
-          })
+          .registerRoute(
+            "get",
+            "/things",
+            MANAGEMENT_API_VERSION,
+            async () => ({ ok: true }),
+            (b) => b.withOutput(z.object({ ok: z.boolean() })),
+          )
           .build(),
       ).toThrow(/must declare exactly one of/);
     });
 
-    it("refuses an opt-out that carries no registered policy", () => {
+    it("refuses an explicit opt-out with no registered management policy", () => {
       const { service } = createManagementService({
         name: "toy-policyless",
         basePath: "/api/toy-policyless",
@@ -244,16 +245,16 @@ describe("createManagementService", () => {
 
       expect(() =>
         service
-          .version(MANAGEMENT_API_VERSION, (v) => {
-            v.get(
-              "/things",
-              {
-                noPermission: { reason: "management routes always guard" },
-                output: z.object({ ok: z.boolean() }),
-              },
-              async () => ({ ok: true }),
-            );
-          })
+          .registerRoute(
+            "get",
+            "/things",
+            MANAGEMENT_API_VERSION,
+            async () => ({ ok: true }),
+            (builder) =>
+              builder
+                .withoutPermission("management routes always guard")
+                .withOutput(z.object({ ok: z.boolean() })),
+          )
           .build(),
       ).toThrow(/declares no access policy/);
     });

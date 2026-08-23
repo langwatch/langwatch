@@ -236,3 +236,16 @@ export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
     this.name = "MigrationEnrollmentOrganizationNotFoundError";
   }
 }
+
+export class MigrationDrainProofRequiresMigratedError extends HandledError {
+  declare readonly code: "migration_drain_proof_requires_migrated";
+
+  constructor({ status }: { status: string }) {
+    super(
+      "migration_drain_proof_requires_migrated",
+      "Legacy writer drain can only be asserted for a held migrated organization",
+      { httpStatus: 409, fault: "customer", meta: { status } },
+    );
+    this.name = "MigrationDrainProofRequiresMigratedError";
+  }
+}

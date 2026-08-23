@@ -1,8 +1,9 @@
+import type { ProcessDefinition } from "@langwatch/eventing";
+import {
+  buildProcessDefinition,
+  buildProcessManager,
+} from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 

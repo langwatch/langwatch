@@ -1,10 +1,11 @@
+import type { ProcessDefinition } from "@langwatch/eventing";
+import {
+  buildProcessDefinition,
+  buildProcessManager,
+} from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import {
   buildProcessEventView,

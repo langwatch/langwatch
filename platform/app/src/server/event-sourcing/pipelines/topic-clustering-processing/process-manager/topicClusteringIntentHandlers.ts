@@ -1,10 +1,7 @@
+import type { IntentContext, IntentExecutor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
 import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
-import type {
-  IntentContext,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   incrementTopicClusteringPageTotal,
   observeTopicClusteringPageDuration,

@@ -1,12 +1,12 @@
+import type {
+  AppendStore,
+  BulkAppendContext,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { CodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type {
-  AppendStore,
-  BulkAppendContext,
-} from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { CodingAgentSessionEventRecord } from "./codingAgentSessionEvents.mapProjection";
 import type { CodingAgentTraceSessionRecord } from "./codingAgentTraceSessions.mapProjection";
 import type { SessionMetricSeriesRecord } from "./sessionMetricSeries.mapProjection";

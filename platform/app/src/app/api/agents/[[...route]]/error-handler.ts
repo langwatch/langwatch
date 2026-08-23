@@ -1,9 +1,18 @@
+import {
+  AgentNotFoundError,
+  InvalidAgentConfigError,
+} from "@langwatch/agents-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handleError } from "../../middleware/error-handler";
-import { HttpError, InternalServerError } from "../../shared/errors";
+import {
+  HttpError,
+  InternalServerError,
+  NotFoundError,
+  UnprocessableEntityError,
+} from "../../shared/errors";
 import { errorSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:agents:errors");
@@ -16,11 +25,20 @@ export const handleAgentError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
+  let mappedError: Error & { status?: ContentfulStatusCode } = error;
+  if (error instanceof AgentNotFoundError) {
+    mappedError = new NotFoundError(error.message);
+  }
+  if (error instanceof InvalidAgentConfigError) {
+    mappedError = new UnprocessableEntityError(error.message);
+  }
   const path = c.req.path;
   const method = c.req.method;
   const routeParams = c.req.param();
   const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+    mappedError instanceof HttpError
+      ? mappedError.status
+      : (mappedError.status ?? 500);
 
   logger.error(
     {
@@ -29,16 +47,16 @@ export const handleAgentError = async (
       routeParams,
       status,
       error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
+        name: mappedError.name,
+        message: mappedError.message,
+        stack: mappedError.stack,
       },
     },
-    `Agent API Error [${status}]: ${error.message || String(error)}`,
+    `Agent API Error [${status}]: ${mappedError.message || String(mappedError)}`,
   );
 
-  if (error instanceof HttpError) {
-    return c.json(errorSchema.parse(error), error.status);
+  if (mappedError instanceof HttpError) {
+    return c.json(errorSchema.parse(mappedError), mappedError.status);
   }
 
   // A handled error already knows its own status, code, meta, reasons and
@@ -46,7 +64,7 @@ export const handleAgentError = async (
   // report the caller's mistake as our outage. This handler exists to add the
   // family's domain mapping on top of the shared boundary, not to replace it,
   // so anything it has not specifically claimed goes to `handleError`.
-  if (HandledError.isHandled(error)) return handleError(error, c);
+  if (HandledError.isHandled(mappedError)) return handleError(mappedError, c);
 
   const internalError = new InternalServerError();
   return c.json(errorSchema.parse(internalError), internalError.status);

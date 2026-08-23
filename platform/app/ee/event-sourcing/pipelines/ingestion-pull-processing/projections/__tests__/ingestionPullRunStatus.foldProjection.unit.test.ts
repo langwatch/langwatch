@@ -1,6 +1,5 @@
+import type { StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-
-import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { IngestionPullProcessingEvent } from "../../schemas/events";
 import {
   type IngestionPullRunStatusData,

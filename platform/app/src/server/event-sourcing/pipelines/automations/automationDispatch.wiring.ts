@@ -1,3 +1,5 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { RedisCachedFoldStore } from "@langwatch/eventing";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -42,8 +44,6 @@ import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendWebhook } from "~/server/webhooks/sendWebhook";

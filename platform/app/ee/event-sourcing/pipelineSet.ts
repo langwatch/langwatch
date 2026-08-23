@@ -8,10 +8,10 @@ import {
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
+import type { EventSourcing } from "@langwatch/eventing";
+import { mapCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import { mapCommands } from "~/server/event-sourcing/mapCommands";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 

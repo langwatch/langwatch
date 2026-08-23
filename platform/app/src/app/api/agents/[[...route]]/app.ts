@@ -1,67 +1,28 @@
+import {
+  agentIdPathSchema,
+  agentListViewSchema,
+  agentViewWithPlatformUrlSchema,
+  archivedAgentViewSchema,
+  createAgentRequestSchema,
+  listAgentsQuerySchema,
+  updateAgentRequestSchema,
+} from "@langwatch/agents-contract";
 import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { ZodError, z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  type AgentComponentConfig,
-  agentTypeSchema,
-} from "../../../../server/agents/agent.repository";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AgentServiceMiddlewareVariables,
   agentServiceMiddleware,
 } from "../../middleware/agent-service";
-import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
 import { agentPlatformUrl } from "../agent-platform-url";
 import { handleAgentError } from "./error-handler";
 
 patchZodOpenapi();
 
 // -- Validation schemas --
-
-const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
-});
-
-const createAgentSchema = z.object({
-  name: z.string().min(1, "name is required").max(255),
-  type: agentTypeSchema,
-  config: z.record(z.unknown()),
-  workflowId: z.string().optional(),
-});
-
-const updateAgentSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  type: agentTypeSchema.optional(),
-  config: z.record(z.unknown()).optional(),
-  workflowId: z.string().nullable().optional(),
-});
-
-/**
- * Maps AgentNotFoundError from the service layer to the HTTP NotFoundError.
- */
-function mapAgentNotFoundError(error: unknown): never {
-  if (error instanceof Error && error.name === "AgentNotFoundError") {
-    throw new NotFoundError("Agent not found");
-  }
-  throw error;
-}
-
-/**
- * Maps ZodError from config validation to a 422 UnprocessableEntityError.
- * Config is validated against the agent type's DSL schema in the repository layer.
- */
-function mapConfigValidationError(error: unknown): never {
-  if (error instanceof ZodError) {
-    const issue = error.issues[0];
-    throw new UnprocessableEntityError(
-      issue?.message ?? "Invalid agent config",
-    );
-  }
-  throw error;
-}
 
 const secured = createProjectApp<AgentServiceMiddlewareVariables>({
   basePath: "/api/agents",
@@ -74,15 +35,25 @@ secured.access(requires("project:view")).get(
   "/",
   agentServiceMiddleware,
   describeRoute({
+    deprecated: true,
+    tags: ["Legacy"],
     description: "List all non-archived agents for the project (paginated)",
+    responses: {
+      200: {
+        description: "Agents page",
+        content: {
+          "application/json": { schema: resolver(agentListViewSchema) },
+        },
+      },
+    },
   }),
-  zValidator("query", paginationQuerySchema),
+  zValidator("query", listAgentsQuerySchema.omit({ projectId: true })),
   async (c) => {
     const project = c.get("project");
     const { page, limit } = c.req.valid("query");
     const service = c.get("agentService");
 
-    const result = await service.listAgents({
+    const result = await service.list({
       projectId: project.id,
       page,
       limit,
@@ -107,27 +78,31 @@ secured.access(requires("project:update")).post(
   "/",
   agentServiceMiddleware,
   describeRoute({
+    deprecated: true,
+    tags: ["Legacy"],
     description: "Create a new agent",
+    responses: {
+      201: {
+        description: "Agent created",
+        content: {
+          "application/json": {
+            schema: resolver(agentViewWithPlatformUrlSchema),
+          },
+        },
+      },
+    },
   }),
-  zValidator("json", createAgentSchema),
+  zValidator("json", createAgentRequestSchema),
   async (c) => {
     const project = c.get("project");
-    const { name, type, config, workflowId } = c.req.valid("json");
+    const body = c.req.valid("json");
     const service = c.get("agentService");
 
-    let agent;
-    try {
-      agent = await service.create({
-        id: `agent_${nanoid()}`,
-        projectId: project.id,
-        name,
-        type,
-        config: config as AgentComponentConfig,
-        workflowId,
-      });
-    } catch (error) {
-      return mapConfigValidationError(error);
-    }
+    const agent = await service.create({
+      ...body,
+      id: `agent_${nanoid()}`,
+      projectId: project.id,
+    });
 
     return c.json(
       {
@@ -153,22 +128,30 @@ secured.access(requires("project:view")).get(
   "/:id",
   agentServiceMiddleware,
   describeRoute({
+    deprecated: true,
+    tags: ["Legacy"],
     description: "Get an agent by its id",
+    responses: {
+      200: {
+        description: "Agent",
+        content: {
+          "application/json": {
+            schema: resolver(agentViewWithPlatformUrlSchema),
+          },
+        },
+      },
+    },
   }),
+  zValidator("param", agentIdPathSchema),
   async (c) => {
     const { id } = c.req.param();
     const project = c.get("project");
     const service = c.get("agentService");
 
-    let agent;
-    try {
-      agent = await service.getByIdOrThrow({
-        id,
-        projectId: project.id,
-      });
-    } catch (error) {
-      return mapAgentNotFoundError(error);
-    }
+    const agent = await service.get({
+      id,
+      projectId: project.id,
+    });
 
     return c.json({
       id: agent.id,
@@ -191,35 +174,33 @@ secured.access(requires("project:update")).patch(
   "/:id",
   agentServiceMiddleware,
   describeRoute({
+    deprecated: true,
+    tags: ["Legacy"],
     description: "Update an agent by its id",
+    responses: {
+      200: {
+        description: "Agent updated",
+        content: {
+          "application/json": {
+            schema: resolver(agentViewWithPlatformUrlSchema),
+          },
+        },
+      },
+    },
   }),
-  zValidator("json", updateAgentSchema),
+  zValidator("param", agentIdPathSchema),
+  zValidator("json", updateAgentRequestSchema),
   async (c) => {
     const { id } = c.req.param();
     const project = c.get("project");
     const body = c.req.valid("json");
     const service = c.get("agentService");
 
-    let agent;
-    try {
-      agent = await service.updateOrThrow({
-        id,
-        projectId: project.id,
-        data: {
-          ...(body.name && { name: body.name }),
-          ...(body.type && { type: body.type }),
-          ...(body.config && { config: body.config as AgentComponentConfig }),
-          ...(body.workflowId !== undefined && {
-            workflowId: body.workflowId,
-          }),
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === "AgentNotFoundError") {
-        throw new NotFoundError("Agent not found");
-      }
-      return mapConfigValidationError(error);
-    }
+    const agent = await service.update({
+      ...body,
+      id,
+      projectId: project.id,
+    });
 
     return c.json({
       id: agent.id,
@@ -242,27 +223,34 @@ secured.access(requires("project:delete")).delete(
   "/:id",
   agentServiceMiddleware,
   describeRoute({
+    deprecated: true,
+    tags: ["Legacy"],
     description: "Archive an agent (soft-delete)",
+    responses: {
+      200: {
+        description: "Agent archived",
+        content: {
+          "application/json": { schema: resolver(archivedAgentViewSchema) },
+        },
+      },
+    },
   }),
+  zValidator("param", agentIdPathSchema),
   async (c) => {
     const { id } = c.req.param();
     const project = c.get("project");
     const service = c.get("agentService");
 
-    try {
-      const agent = await service.archiveAgent({
-        id,
-        projectId: project.id,
-      });
-      return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        archivedAt: agent.archivedAt,
-      });
-    } catch (error) {
-      return mapAgentNotFoundError(error);
-    }
+    const agent = await service.archive({
+      id,
+      projectId: project.id,
+    });
+    return c.json({
+      id: agent.id,
+      name: agent.name,
+      type: agent.type,
+      archivedAt: agent.archivedAt,
+    });
   },
 );
 

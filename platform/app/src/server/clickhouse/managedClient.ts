@@ -1,10 +1,10 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { VendorClientResilience } from "@langwatch/clickhouse-client";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { detectColdScan } from "~/server/app-layer/clients/clickhouse/cold-scan-detector";
 import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
 import { getClickHouseMaxOpenConnections } from "./connectionPool";
 import {

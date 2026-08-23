@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+import type { ProcessDefinition } from "@langwatch/eventing";
 import {
+  buildProcessDefinition,
+  buildProcessManager,
   InMemoryProcessStore,
   ProcessManagerService,
   type ProcessRef,
-} from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+} from "@langwatch/eventing";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import { langyConversationProcess } from "../langyConversationProcess";
 import {

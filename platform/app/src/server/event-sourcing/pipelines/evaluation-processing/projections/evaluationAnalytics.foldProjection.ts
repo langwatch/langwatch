@@ -1,13 +1,13 @@
-import { createLogger } from "@langwatch/observability";
-import { trimAttributesForAnalytics } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
 import type {
   FoldProjectionOptions,
   FoldProjectionStore,
-} from "../../../projections/foldProjection.types";
+} from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { trimAttributesForAnalytics } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,

@@ -54,6 +54,11 @@ it under its own honest name. `preview` is never documented: preview is where
 an endpoint may change without notice, and documenting it would promise
 stability it does not have.
 
+The declared OpenAPI `operationId` belongs to the `latest` mount. Each dated
+mount appends its version, for example `createThing_2026_08_07`, because an
+OpenAPI document requires operation ids to be globally unique even when one
+logical endpoint is inherited across several version namespaces.
+
 The document growing with each version is bounded by withdrawal: a withdrawn
 endpoint leaves the document at the version it was withdrawn from.
 

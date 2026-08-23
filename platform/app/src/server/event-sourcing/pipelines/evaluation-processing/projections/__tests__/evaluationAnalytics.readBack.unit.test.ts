@@ -1,6 +1,6 @@
+import type { ProjectionStoreContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { EvaluationCompletedEvent } from "../../schemas/events";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,

@@ -1,9 +1,9 @@
+import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";

@@ -154,9 +154,9 @@ const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "pro
 
 /**
  * Parses an error response body as a handled-error envelope. Accepts both the
- * REST shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
- * serialized tRPC shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`).
- * Returns an empty object when the body is not a recognizable error envelope.
+ * clean framework shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`)
+ * and the legacy non-framework one (`{ error: "<code>", message }`). Returns
+ * an empty object when the body is not a recognizable error envelope.
  */
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
@@ -165,9 +165,10 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
       return {};
     }
     const body = parsed as Record<string, unknown>;
-    // Prefer `code` (the domain discriminant) over `error` — the
-    // packages/api unversioned envelope uses `error` for the HTTP status
-    // text ("Not Found") while `code` holds the real code.
+    // `code` is the domain discriminant. The `error` fallback reads the
+    // legacy envelope some non-framework families still send; the framework's
+    // own unversioned union envelope, which used `error` for the HTTP status
+    // text, is gone (packages/api/adrs/002).
     const code =
       typeof body.code === "string"
         ? body.code

@@ -1,12 +1,11 @@
-import crypto from "crypto";
-
 import type {
   EventHandler,
   IntentSpec,
   ProcessEvolution,
   ProcessHandlerContext,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "@langwatch/eventing";
+import crypto from "crypto";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 
 import {

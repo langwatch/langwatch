@@ -1,6 +1,5 @@
+import { buildIntentFactories } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-
-import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../graphAlertSweep.process";
 

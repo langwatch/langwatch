@@ -1,6 +1,5 @@
 import { createService, type MountedRoute } from "@langwatch/api";
 import type { StoredObjectsService as StoredObjectsServiceContract } from "@langwatch/stored-objects-contract";
-import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 import { StoredObjectsPublicApi } from "../src";
 
@@ -17,14 +16,13 @@ describe("StoredObjectsPublicApi", () => {
           return { allowed: true };
         },
       },
+      permissionEnforcer: () => async (_context, next) => next(),
     });
 
     StoredObjectsPublicApi.create({
       service: () => service,
       maximumUploadBytes: 1024,
       projectId: () => "project_1",
-      requirePermission: () =>
-        (async (_context, next) => next()) satisfies MiddlewareHandler,
       authorizeAudience: async () => undefined,
     })
       .install(builder)
@@ -37,8 +35,7 @@ describe("StoredObjectsPublicApi", () => {
     expect(
       latest.map((route) => ({
         path: route.path,
-        permission: (route.config?.meta as { permission?: string } | undefined)
-          ?.permission,
+        permission: route.config?.permission,
         rateLimit: route.config?.rateLimit,
       })),
     ).toEqual([

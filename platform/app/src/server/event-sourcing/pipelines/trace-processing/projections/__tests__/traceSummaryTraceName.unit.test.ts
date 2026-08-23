@@ -1,7 +1,7 @@
+import { createTenantId } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { createTenantId } from "~/server/event-sourcing";
 import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,

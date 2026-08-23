@@ -103,7 +103,7 @@ export function buildEndpointMiddlewareStack<TProject>(
 
   if (config.middleware) stack.push(...config.middleware);
 
-  appendOpenApiMiddleware({ stack, config, documented });
+  appendOpenApiMiddleware({ stack, config, documented, status, version });
   appendValidationMiddleware({
     stack,
     ep,
@@ -276,10 +276,14 @@ function appendOpenApiMiddleware({
   stack,
   config,
   documented,
+  status,
+  version,
 }: {
   stack: MiddlewareHandler[];
   config: EndpointDef;
   documented: boolean;
+  status: VersionStatus;
+  version: string;
 }): void {
   if (!documented) return;
 
@@ -302,7 +306,15 @@ function appendOpenApiMiddleware({
   if (docs?.description !== undefined) options.description = docs.description;
   if (docs?.summary !== undefined) options.summary = docs.summary;
   if (docs?.tags !== undefined) options.tags = docs.tags;
-  if (docs?.operationId !== undefined) options.operationId = docs.operationId;
+  if (docs?.operationId !== undefined) {
+    // Keep the declared id for the moving `latest` surface. Dated mounts need
+    // distinct ids because OpenAPI requires operationId to be unique across
+    // the whole document, including inherited registrations.
+    options.operationId =
+      status === "latest"
+        ? docs.operationId
+        : `${docs.operationId}_${version.replaceAll("-", "_")}`;
+  }
   if (docs?.security !== undefined) options.security = docs.security;
   if (config.deprecated !== undefined) {
     // Deprecated still answers and warns — on every dated mount the

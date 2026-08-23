@@ -1,3 +1,9 @@
+import type {
+  AppendStore,
+  EventSubscriberDefinition,
+  ProjectionStoreContext,
+  StateProjectionStore,
+} from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
@@ -12,10 +18,6 @@ import {
   CONVERSATION_ID,
   PROJECT_ID,
 } from "../../../../event-sourcing/pipelines/langy-conversation-processing/process-manager/__tests__/helpers/langyEventFixtures";
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import {
   createLangyConversationProcessingPipeline,
   type LangyConversationProcessingPipelineDeps,

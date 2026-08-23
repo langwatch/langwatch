@@ -1,9 +1,8 @@
-import type { Event } from "../../../domain/types";
+import type { AppendStore, Event } from "@langwatch/eventing";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
-} from "../../../projections/abstractMapProjection";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+} from "@langwatch/eventing";
 import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import type { ContributionFacts } from "../schemas/contributions";
 import {

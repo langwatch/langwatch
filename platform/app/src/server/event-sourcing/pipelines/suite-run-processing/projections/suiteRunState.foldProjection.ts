@@ -1,9 +1,8 @@
-import type { Projection } from "../../../";
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+} from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SuiteRunItemCompletedEvent,

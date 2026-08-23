@@ -1,9 +1,9 @@
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import type { AppendStore } from "@langwatch/eventing";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
-} from "../../../projections/abstractMapProjection";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+} from "@langwatch/eventing";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import {
   type LangyAgentRespondedEvent,
   LangyAgentRespondedEventSchema,

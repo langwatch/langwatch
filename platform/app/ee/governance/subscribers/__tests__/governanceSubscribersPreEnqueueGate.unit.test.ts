@@ -26,12 +26,8 @@ import {
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
   isGovernanceOcsfTrace,
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { Event } from "~/server/event-sourcing/domain/types";
-import { buildTraceDeps } from "~/server/event-sourcing/pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
-import { createTraceProcessingPipeline } from "~/server/event-sourcing/pipelines/trace-processing/pipeline";
-import { ProjectionRouter } from "~/server/event-sourcing/projections/projectionRouter";
+import type { Event, SubscriberDispatchDefinition } from "@langwatch/eventing";
+import { ProjectionRouter, throttledWindow } from "@langwatch/eventing";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -39,9 +35,11 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "~/server/event-sourcing/services/__tests__/testHelpers";
-import type { SubscriberDispatchDefinition } from "~/server/event-sourcing/subscribers/subscriber.types";
-import { throttledWindow } from "~/server/event-sourcing/subscribers/throttleWindow";
+} from "@langwatch/eventing/testing";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { buildTraceDeps } from "~/server/event-sourcing/pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
+import { createTraceProcessingPipeline } from "~/server/event-sourcing/pipelines/trace-processing/pipeline";
 import { incrementEsReactorTotal } from "~/server/metrics";
 
 vi.mock("~/server/metrics", async (importOriginal) => {

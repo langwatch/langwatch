@@ -1,4 +1,19 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  aggregateKey,
+  COMPLETED_KEY_PREFIX,
+  CUTOFF_KEY_PREFIX,
+  doneMarkerKey,
+  type FoldProjectionDefinition,
+  type MapProjectionDefinition,
+  RedisReplayMarkerChecker,
+  type RegisteredFoldProjection,
+  type RegisteredMapProjection,
+  type RegisteredStateProjection,
+  ReplayService,
+  type StateProjectionDefinition,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   getTestClickHouseClient,
@@ -7,25 +22,7 @@ import {
   stopTestContainers,
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
-import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import { RedisReplayMarkerChecker } from "../../projections/replayMarkerCheck";
-import type {
-  StateProjectionDefinition,
-  StateProjectionStore,
-} from "../../projections/stateProjection.types";
-import {
-  COMPLETED_KEY_PREFIX,
-  CUTOFF_KEY_PREFIX,
-  doneMarkerKey,
-} from "../replayConstants";
-import { aggregateKey } from "../replayMarkers";
-import { ReplayService } from "../replayService";
-import type {
-  RegisteredFoldProjection,
-  RegisteredMapProjection,
-  RegisteredStateProjection,
-} from "../types";
+import { ClickHouseReplayEventSource } from "../replayEventLoader";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -110,12 +107,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     const redis = getTestRedisConnection()!;
 
     const service = new ReplayService({
-      clickhouseClientResolver: async (tenantId: string) => {
+      eventSource: new ClickHouseReplayEventSource(async (tenantId: string) => {
         resolverCalls.push(tenantId);
         // In production, different tenants may resolve to different CH instances.
         // Here we return the same client but track which tenant IDs were requested.
         return client;
-      },
+      }),
       redis,
     });
 

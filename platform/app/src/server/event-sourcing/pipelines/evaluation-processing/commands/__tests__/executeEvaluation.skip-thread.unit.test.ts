@@ -5,9 +5,9 @@
  * All deps injected via constructor — zero vi.mock calls.
  */
 
+import type { Command } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { Command } from "../../../../";
-import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,

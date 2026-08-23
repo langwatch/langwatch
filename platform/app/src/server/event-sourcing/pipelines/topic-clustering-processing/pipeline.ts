@@ -1,4 +1,11 @@
 import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type ProcessManagerApplier,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   buildProcessEventView,
   handleClusteringRequested,
   handleClusteringRunCompleted,
@@ -18,10 +25,6 @@ import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   topicClusteringRunIntentSchema,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
-
-import { definePipeline } from "../../";
-import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,
@@ -42,7 +45,10 @@ import {
   type TopicModelData,
   TopicModelFoldProjection,
 } from "./projections/topicModel.foldProjection";
-import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
+import {
+  TOPIC_CLUSTERING_EVENT_TYPES,
+  TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+} from "./schemas/constants";
 import type { TopicClusteringProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -123,23 +129,24 @@ export function topicClusteringPM(
 export function createTopicClusteringProcessingPipeline(
   deps: TopicClusteringProcessingPipelineDeps,
 ) {
-  return definePipeline<TopicClusteringProcessingEvent>()
-    .withName("topic_clustering_processing")
-    .withAggregateType("topic_clustering")
-    .withProjection(
-      "topicClusteringRunStatus",
+  return definePipeline<TopicClusteringProcessingEvent>({
+    name: "topic_clustering_processing",
+    aggregate: defineAggregate({
+      type: "topic_clustering",
+      events: defineEvents(TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withPostgresProjection(
       new TopicClusteringRunStatusFoldProjection({
         store: deps.topicClusteringRunStatusStore,
       }),
     )
-    .withProjection(
-      "topicClusteringRunHistory",
+    .withPostgresProjection(
       new TopicClusteringRunHistoryFoldProjection({
         store: deps.topicClusteringRunHistoryStore,
       }),
     )
-    .withProjection(
-      "topicModel",
+    .withPostgresProjection(
       new TopicModelFoldProjection({ store: deps.topicModelStore }),
     )
     .withCommand("requestClustering", RequestTopicClusteringCommand)

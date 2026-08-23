@@ -1,3 +1,4 @@
+import { FoldProjectionExecutor } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
@@ -9,7 +10,6 @@ import {
   createTestTenantId,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import { FoldProjectionExecutor } from "../../../projections/foldProjectionExecutor";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";

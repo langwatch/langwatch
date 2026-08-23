@@ -1,12 +1,12 @@
+import type {
+  EventHandler,
+  IntentExecutor,
+  ProcessManagerApplier,
+} from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_TITLE_SOURCE,
 } from "@langwatch/langy";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type {
-  EventHandler,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   LANGY_PROCESS_INTENT_TYPES,

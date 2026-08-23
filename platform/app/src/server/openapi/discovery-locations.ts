@@ -13,7 +13,7 @@ export const WELL_KNOWN_OPENAPI_PATH = "/.well-known/openapi";
 /** The same document under the API namespace, for a caller already inside it. */
 export const API_OPENAPI_PATH = "/api/openapi.json";
 
-/** The RPC catalogue: a projection of the document, POST because it is an RPC. */
+/** The root RPC catalogue: the service index, POST because it is an RPC. */
 export const RPC_DISCOVER_PATH = "/api/rpc.discover";
 
 /** The plain-text index, for a reader arriving with no schema in mind. */

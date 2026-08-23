@@ -1,7 +1,6 @@
+import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceAnalyticsRollupRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { TraceAnalyticsRollupRow } from "./traceAnalyticsRollup.mapProjection";
 
 /**

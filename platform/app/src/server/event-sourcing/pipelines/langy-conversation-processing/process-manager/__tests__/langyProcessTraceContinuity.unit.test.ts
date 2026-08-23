@@ -7,6 +7,16 @@
  * and dispatching through the typed Langy intent
  * handlers — in a fresh context — continues that same trace.
  */
+
+import type { EventSubscriberContext } from "@langwatch/eventing";
+import {
+  buildIntentHandlers,
+  buildProcessManager,
+  InMemoryProcessStore,
+  OutboxDispatcherService,
+  type ProcessRef,
+  ProcessRuntime,
+} from "@langwatch/eventing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
@@ -22,18 +32,7 @@ import {
   expect,
   it,
 } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import {
-  InMemoryProcessStore,
-  OutboxDispatcherService,
-  type ProcessRef,
-} from "~/server/event-sourcing/process-manager";
-import {
-  buildIntentHandlers,
-  ProcessRuntime,
-} from "~/server/event-sourcing/process-manager/processRuntime";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { langyConversationProcess } from "../langyConversationProcess";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../langyConversationProcess.types";
 import { createStubLangyEffectPorts } from "../langyEffectPorts";

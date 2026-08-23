@@ -1,8 +1,10 @@
+import type {
+  AppendStore,
+  FoldProjectionStore,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import type { RetentionCategory } from "~/server/data-retention/retentionPolicy.schema";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 
 /**
  * Shared base classes for the ADR-034 analytics projection stores. The 8

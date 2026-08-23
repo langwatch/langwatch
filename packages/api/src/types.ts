@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz";
+import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -120,8 +120,9 @@ export interface EndpointDocs {
   /** Tags used to group the operation in the reference. */
   tags?: string[];
   /**
-   * Explicit operation id. Set it on every documented endpoint: generated ids
-   * leak URL shapes into SDK function names.
+   * Explicit operation id for the `latest` mount. Set it on every documented
+   * endpoint: generated ids leak URL shapes into SDK function names. Dated
+   * mounts append their version so every operation in the document is unique.
    */
   operationId?: string;
   /** Exclude the endpoint from the OpenAPI document entirely. */
@@ -190,6 +191,13 @@ export interface EndpointDef {
   /** Deprecation notice; the endpoint still answers, and warns. */
   deprecated?: string;
 }
+
+/**
+ * Author-facing endpoint configuration. Unlike the merged internal shape, an
+ * endpoint must choose exactly one access declaration at compile time.
+ */
+export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> &
+  AccessDeclaration;
 
 /**
  * The definition shape the chain builder accumulates before precedence is

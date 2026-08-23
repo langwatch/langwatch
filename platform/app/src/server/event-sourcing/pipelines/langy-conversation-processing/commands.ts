@@ -1,3 +1,11 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import {
+  defineCommand,
+  defineCommandSchema,
+  EventUtils,
+  stripEnvelope,
+  withCommandEnvelope,
+} from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_COMMAND_TYPES,
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -20,14 +28,6 @@ import {
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy";
 import { z } from "zod";
-import type { Command, CommandHandler } from "../../commands/command";
-import {
-  stripEnvelope,
-  withCommandEnvelope,
-} from "../../commands/commandEnvelope";
-import { defineCommandSchema } from "../../commands/commandSchema";
-import { defineCommand } from "../../commands/defineCommand";
-import { EventUtils } from "../../utils/event.utils";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 /**

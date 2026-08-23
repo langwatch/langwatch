@@ -1,6 +1,6 @@
+import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { extractSessionTitleFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../log-processing/schemas/events";
 import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS } from "../agents";

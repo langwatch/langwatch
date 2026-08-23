@@ -1,3 +1,8 @@
+import {
+  defineGroupQueue,
+  GroupQueueConsumer,
+  GroupQueueProducer,
+} from "@langwatch/group-queue";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -9,8 +14,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { GroupQueueProcessor } from "../../../../event-sourcing/queues/groupQueue/groupQueue";
-import type { EventSourcedQueueDefinition } from "../../../../event-sourcing/queues/queue.types";
 import { OpsMetricsCollector } from "../../metrics-collector";
 import {
   NullQueueRepository,
@@ -26,11 +29,16 @@ const hasTestcontainers = !!(
 );
 
 type TestPayload = { id: string; groupId: string };
+type TestQueue = {
+  send(payload: TestPayload): Promise<void>;
+  waitUntilReady(): Promise<void>;
+  close(): Promise<void>;
+};
 
 /** @scenario P50 and P99 reflect recent job durations after completion */
 describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
   let redis: Redis;
-  const queues: GroupQueueProcessor<TestPayload>[] = [];
+  const queues: TestQueue[] = [];
   const queueNames: string[] = [];
 
   beforeAll(async () => {
@@ -68,21 +76,49 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     await stopTestContainers();
   });
 
-  function createQueue(
-    overrides: Partial<EventSourcedQueueDefinition<TestPayload>> & {
-      process: (payload: TestPayload) => Promise<void>;
-    },
-  ): { queue: GroupQueueProcessor<TestPayload>; name: string } {
+  function createQueue(process: (payload: TestPayload) => Promise<void>): {
+    queue: TestQueue;
+    name: string;
+  } {
     const name = `{test/gq/lat/${crypto.randomUUID().slice(0, 8)}}`;
-    const def: EventSourcedQueueDefinition<TestPayload> = {
+    const definition = defineGroupQueue({
       name,
-      groupKey: (p) => p.groupId,
-      ...overrides,
+      payload: {
+        parse(value): TestPayload {
+          const payload = value as Partial<TestPayload>;
+          if (
+            typeof payload.id !== "string" ||
+            typeof payload.groupId !== "string"
+          ) {
+            throw new Error("Invalid latency-test payload");
+          }
+          return payload as TestPayload;
+        },
+      },
+      groupBy: (payload) => payload.groupId,
+      identify: (payload) => payload.id,
+    });
+    const dependencies = { redis };
+    const producer = new GroupQueueProducer(definition, dependencies);
+    const consumer = new GroupQueueConsumer(definition, dependencies).handle(
+      process,
+    );
+    const queue: TestQueue = {
+      send: (payload) => producer.send(payload),
+      waitUntilReady: async () => {
+        await Promise.all([
+          producer.waitUntilReady(),
+          consumer.waitUntilReady(),
+        ]);
+      },
+      close: async () => {
+        await producer.close();
+        await consumer.close();
+      },
     };
-    const q = new GroupQueueProcessor<TestPayload>(def, redis);
-    queues.push(q);
+    queues.push(queue);
     queueNames.push(name);
-    return { queue: q, name };
+    return { queue, name };
   }
 
   async function waitForLatencyCount(
@@ -104,10 +140,8 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
   describe("given a group-queue worker has completed several jobs", () => {
     describe("when the dashboard reads the latency buffer", () => {
       it("populates :gq:stats:latencies-ms with one entry per completed job", async () => {
-        const { queue, name } = createQueue({
-          process: async () => {
-            await new Promise((r) => setTimeout(r, 20));
-          },
+        const { queue, name } = createQueue(async () => {
+          await new Promise((r) => setTimeout(r, 20));
         });
         await queue.waitUntilReady();
 
@@ -128,11 +162,9 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
       });
 
       it("caps the buffer at 200 entries via LTRIM", async () => {
-        const { queue, name } = createQueue({
-          process: async () => {
-            // No work — keep the test fast. The cap check only needs the buffer
-            // to grow past the limit, not real latency.
-          },
+        const { queue, name } = createQueue(async () => {
+          // No work — keep the test fast. The cap check only needs the buffer
+          // to grow past the limit, not real latency.
         });
         await queue.waitUntilReady();
 
@@ -150,10 +182,8 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
       });
 
       it("surfaces non-zero P50/P99 through OpsMetricsCollector.getDashboardData()", async () => {
-        const { queue, name } = createQueue({
-          process: async () => {
-            await new Promise((r) => setTimeout(r, 15));
-          },
+        const { queue, name } = createQueue(async () => {
+          await new Promise((r) => setTimeout(r, 15));
         });
         await queue.waitUntilReady();
 
@@ -204,10 +234,8 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     describe("when the writer's detail cycle runs", () => {
       /** @scenario "Windowed percentiles ride the detail artifact" */
       it("publishes hour, day, week, and all-time percentiles a reader can serve", async () => {
-        const { queue, name } = createQueue({
-          process: async () => {
-            await new Promise((r) => setTimeout(r, 15));
-          },
+        const { queue, name } = createQueue(async () => {
+          await new Promise((r) => setTimeout(r, 15));
         });
         await queue.waitUntilReady();
 

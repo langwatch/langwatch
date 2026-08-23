@@ -1,3 +1,4 @@
+import type { QueueSendOptions } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
@@ -5,7 +6,6 @@ import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
-import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {

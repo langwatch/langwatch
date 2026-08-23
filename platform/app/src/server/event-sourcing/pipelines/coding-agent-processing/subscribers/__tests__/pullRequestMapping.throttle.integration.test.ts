@@ -16,14 +16,14 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
+
+import { GroupStagingScripts } from "@langwatch/group-queue/operational";
 import type { Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../__tests__/integration/testContainers";
-import { GroupStagingScripts } from "../../../../queues/groupQueue/scripts";
 import {
   type CodingAgentProcessingPipelineDeps,
   createCodingAgentProcessingPipeline,

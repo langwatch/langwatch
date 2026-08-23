@@ -1,4 +1,4 @@
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/eventing";
 import { rateLimit } from "~/server/rateLimit";
 
 /**

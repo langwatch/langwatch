@@ -20,6 +20,7 @@ import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -109,7 +110,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the organization API with 402, naming the feature and the way up", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await organizationApp.request("/api/organization", {
+      const response = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
 
@@ -121,7 +122,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       expect(body.docsUrl).toBeTruthy();
 
       mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
-      const entitled = await organizationApp.request("/api/organization", {
+      const entitled = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
       expect(entitled.status).toBe(200);
@@ -131,7 +132,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the roles API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request("/api/roles", {
+      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
 
@@ -143,7 +144,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the role bindings API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await roleBindingsApp.request("/api/role-bindings", {
+      const response = await roleBindingsApp.request(`/api/role-bindings/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
 
@@ -155,7 +156,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the SCIM tokens API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await scimTokensApp.request("/api/scim-tokens", {
+      const response = await scimTokensApp.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         headers: authHeaders(),
       });
 
@@ -168,7 +169,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("answers 403 insufficient_permissions before the plan gate can answer 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request("/api/roles", {
+      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
         headers: {
           Authorization: `Bearer ${viewOnlyToken}`,
           "Content-Type": "application/json",
@@ -188,7 +189,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("still answers 401 before the gate", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await organizationApp.request("/api/organization");
+      const response = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`);
 
       expect(response.status).toBe(401);
       expect((await response.json()).code).toBe("missing_credentials");

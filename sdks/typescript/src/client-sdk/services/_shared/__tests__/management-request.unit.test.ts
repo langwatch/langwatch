@@ -9,7 +9,10 @@ import {
   INSTANCE_ADMIN_KEY_ENV,
   OrganizationsAdminApiService,
 } from "../../organizations-admin/organizations-admin-api.service";
-import { createManagementRequest } from "../management-request";
+import {
+  createManagementRequest,
+  managementPath,
+} from "../management-request";
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
@@ -102,5 +105,19 @@ describe("OrganizationsAdminApiService", () => {
         (init.headers as Record<string, string>).Authorization,
       ).toBe("Bearer instance-secret");
     });
+  });
+});
+
+describe("managementPath", () => {
+  it("addresses the latest namespace explicitly, with the collection root at its trailing slash", () => {
+    // The bare alias is gone (packages/api/adrs/002): a bare call 404s, and a
+    // family root mounts at `/{version}/` because its route path is `/`.
+    expect(managementPath("/api/roles")).toBe("/api/roles/latest/");
+    expect(managementPath("/api/roles/permissions")).toBe(
+      "/api/roles/latest/permissions",
+    );
+    expect(managementPath("/api/organization/invites/invite_1")).toBe(
+      "/api/organization/latest/invites/invite_1",
+    );
   });
 });

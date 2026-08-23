@@ -1,5 +1,5 @@
+import { REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
   LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,

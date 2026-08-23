@@ -1,3 +1,9 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import {
+  type createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { extractErrorMessage } from "../../../../../utils/captureError";
@@ -19,12 +25,6 @@ import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { MappingState } from "../../../../tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
-import type { Command, CommandHandler } from "../../../";
-import {
-  type createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 import { executeEvaluationCommandDataSchema } from "../schemas/commands";
 import {

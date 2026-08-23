@@ -15,8 +15,17 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  cleanupAll,
+  nullLog,
+  type RegisteredMapProjection,
+  runFoldMapReplay,
+} from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { createSpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
+import { TraceAnalyticsRollupMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import { TraceAnalyticsRollupAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import {
   getTestClickHouseClient,
@@ -28,13 +37,7 @@ import {
   generateTestAggregateId,
   generateTestTenantId,
 } from "../../__tests__/integration/testHelpers";
-import { createSpanReceivedEvent } from "../../pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import { TraceAnalyticsRollupMapProjection } from "../../pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
-import { TraceAnalyticsRollupAppendStore } from "../../pipelines/trace-processing/projections/traceAnalyticsRollup.store";
-import { runFoldMapReplay } from "../replayEngine";
-import { nullLog } from "../replayLog";
-import { cleanupAll } from "../replayMarkers";
-import type { RegisteredMapProjection } from "../types";
+import { ClickHouseReplayEventSource } from "../replayEventLoader";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -281,7 +284,7 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
       const result = await runFoldMapReplay({
         ctx: {
           redis,
-          resolveClient: async () => client,
+          eventSource: new ClickHouseReplayEventSource(async () => client),
           accumulatorOpts: {},
         },
         config: {
