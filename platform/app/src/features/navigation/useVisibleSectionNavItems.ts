@@ -13,8 +13,10 @@ import type { SectionNavItemData } from "./sectionNavItems";
  * Hooks cannot be called in a loop over arbitrary flags, so every flag
  * that appears in a nav list is resolved here by name. Today that is one:
  * the billed-cost placeholders. Adding a second flag to a nav list means
- * adding its call here — the exhaustive `default: false` lookup below
- * makes a forgotten flag hide its item, which is the safe failure.
+ * touching three places here — its `useFeatureFlag` call, its `case` in
+ * the lookup, and the `enabled` gate that skips the query for lists which
+ * do not use it. Forgetting any of them hides the item rather than
+ * showing it, which is the safe failure.
  */
 export function useVisibleSectionNavItems(
   items: readonly SectionNavItemData[],
@@ -27,9 +29,19 @@ export function useVisibleSectionNavItems(
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  // Gateway pages render this hook too (AiGatewayLayout), and gatewayNavItems
+  // carries no flagged entry — without this the flag round-trips on every
+  // gateway page for a result the filter below never reads.
+  const needsBilledCost = items.some(
+    (item) =>
+      item.featureFlag === "release_ui_governance_billed_cost_enabled",
+  );
   const billedCost = useFeatureFlag(
     "release_ui_governance_billed_cost_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id && needsBilledCost,
+    },
   );
 
   const flagEnabled = (

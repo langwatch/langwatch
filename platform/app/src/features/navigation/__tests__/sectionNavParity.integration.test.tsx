@@ -88,6 +88,18 @@ describe("given the gateway section navigation data", () => {
         ),
       ).toEqual([]);
     });
+
+    it("does not resolve the billed-cost flag, which no gateway entry uses", () => {
+      harness.flagCallOptions = {};
+      render(<AiGatewayLayout>x</AiGatewayLayout>);
+
+      // useVisibleSectionNavItems must call the hook unconditionally (hook
+      // rules), but gatewayNavItems carries no flagged entry, so the query
+      // is disabled rather than round-tripping for a result never read.
+      expect(
+        harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
+      ).toEqual({ organizationId: "org-1", enabled: false });
+    });
   });
 });
 
