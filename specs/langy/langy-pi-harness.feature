@@ -162,12 +162,16 @@ Feature: Langy can run a conversation on the pi harness
   # Provider prompt caching is what makes a long conversation affordable, and
   # the default cache tier expires faster than the pauses between a user's
   # messages. The worker asks for the long tier: anthropic's hour-long
-  # cache_control, the Responses lane's day-long retention.
+  # cache_control, the Responses lane's day-long retention. The codex lane is
+  # the exception: the ChatGPT backend rejects the retention parameter with a
+  # 400 (the API-key endpoint accepts it), and in production that 400 killed
+  # every codex turn on its first LLM call. So the codex lane never asks.
   @unit
   Scenario: The worker asks the provider for long cache retention
     Given a pi worker provisioned for an anthropic or openai model
     When its config and environment are assembled
     Then the model allows long cache retention and the environment selects it
+    But a codex model never asks for it, because its backend refuses the request
 
   @unit
   Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn

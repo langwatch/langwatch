@@ -173,8 +173,11 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if compatOf(model)["supportsStore"] != false {
 			t.Errorf("codex must pin supportsStore false, got %v", compatOf(model))
 		}
-		if compatOf(model)["supportsLongCacheRetention"] != true {
-			t.Errorf("codex lane must allow long cache retention, got %v", compatOf(model))
+		// The ChatGPT codex backend rejects prompt_cache_retention with 400
+		// "Unsupported parameter" — the flag that makes pi send it must stay
+		// off on this lane, or every codex turn dies on its first LLM call.
+		if _, present := compatOf(model)["supportsLongCacheRetention"]; present {
+			t.Errorf("codex lane must not ask for long cache retention, got %v", compatOf(model))
 		}
 		if model["id"] != "openai_codex/gpt-5-codex" {
 			t.Errorf("codex id must ride verbatim, got %v", model["id"])

@@ -270,14 +270,16 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
 		}
 	}
-	// The codex backend refuses the sampling params the wider Responses API
-	// accepts: a body carrying temperature or top_p comes back 400 Bad Request.
-	// Clients that set them for other providers (the title generator and the
-	// tiny assists both send temperature) would break every codex call, so
-	// strip them here where the gateway already owns the backend's invariants.
-	// DeleteBytes is a no-op when the key is absent, so this is safe for the
-	// opencode turns that never set them.
-	for _, path := range []string{"temperature", "top_p"} {
+	// The codex backend refuses params the wider Responses API accepts: a body
+	// carrying temperature, top_p, or prompt_cache_retention comes back
+	// 400 Bad Request ("Unsupported parameter", verified against the live
+	// backend; prompt_cache_key passes). Clients that set them for other
+	// providers would break every codex call — the title generator and the
+	// tiny assists send temperature, and pi's long-cache-retention mode sends
+	// prompt_cache_retention — so strip them here where the gateway already
+	// owns the backend's invariants. DeleteBytes is a no-op when the key is
+	// absent, so this is safe for the opencode turns that never set them.
+	for _, path := range []string{"temperature", "top_p", "prompt_cache_retention"} {
 		body, err = sjson.DeleteBytes(body, path)
 		if err != nil {
 			return nil, fmt.Errorf("strip %s from codex body: %w", path, err)
