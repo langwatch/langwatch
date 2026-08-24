@@ -127,6 +127,20 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => ({ data: undefined, isLoading: false }),
         },
       },
+      // Org admin ceiling so the device-session flow defaults to a full
+      // organization scope selection and the Approve button stays enabled;
+      // the key-selection UI itself is covered by
+      // cliAuthKeySelection.integration.test.tsx.
+      apiKey: {
+        myBindings: {
+          useQuery: () => ({
+            data: [
+              { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+            ],
+            isLoading: false,
+          }),
+        },
+      },
       project: {
         getHasFirstMessage: {
           useQuery: (
@@ -172,10 +186,10 @@ const serveCliAuthEndpoints = () => {
       );
     }
     if (url.includes("/api/auth/cli/approve")) {
-      return new Response(
-        JSON.stringify({ ok: true, personal_vk_label: "default" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(JSON.stringify({}), {
       status: 200,
@@ -263,7 +277,7 @@ describe("/cli/auth first-trace watch", () => {
     expect(screen.getByText(/You're signed in!/i)).toBeDefined();
   });
 
-  /** @scenario "Generating a project API key does not start the first-trace watcher" */
+  /** @scenario "Sending a project API key keeps the success card still, with no waiting line and no redirect" */
   it("does not watch for traces on the project API key flow", async () => {
     credentialTypeRef.current = "project_api_key";
     renderPage();
@@ -271,12 +285,12 @@ describe("/cli/auth first-trace watch", () => {
     const user = userEvent.setup();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Generate API key" }),
+        screen.getByRole("button", { name: "Send API key" }),
       ).toBeDefined(),
     );
-    await user.click(screen.getByRole("button", { name: "Generate API key" }));
+    await user.click(screen.getByRole("button", { name: "Send API key" }));
     await waitFor(() =>
-      expect(screen.getByText(/API key generated!/i)).toBeDefined(),
+      expect(screen.getByText(/API key approved/i)).toBeDefined(),
     );
 
     await new Promise((resolve) => setTimeout(resolve, 500));

@@ -382,33 +382,27 @@ export function renderLangyConversationTranscript({
  * varies a byte across a conversation's turns (provider prompt caching depends
  * on that stability), while the data it talks about (the transcript, the
  * resource memory, the screen context) rides the turn's user message. The
- * wording is therefore position-neutral: "you have already been told", never
+ * wording is therefore position-neutral: "already in this conversation", never
  * "described above".
  *
- * Two failures happened in that transcript and this addresses the second one.
- * The agent did not merely fail to find "it"; it invented an unrelated,
- * expensive action, announced the invention as an assumption, and ran it. A
- * stated assumption is a question that was never asked, and stating it out loud
- * does not make acting on it reasonable.
+ * It answers one production failure: the agent did not merely fail to find
+ * "it", it invented an unrelated expensive action, announced the invention as
+ * an assumption, and ran it. A stated assumption is a question that was never
+ * asked, and saying it out loud does not make acting on it reasonable.
  *
- * What this block deliberately does NOT say is "ask when you are unsure".
- * AGENTS.md rule 2 forbids clarifying questions and rule 4 forbids asking for an
- * id, and this block is PREPENDED to the turn — read before AGENTS.md — so it
- * must never contradict it (see `langyPromptRegistry`). Changing "never ask" to
- * "ask when the referent is genuinely ambiguous" is an AGENTS.md change, and it
- * belongs there rather than in a control-plane block quietly overriding it.
- * What IS said here only sharpens rules 6, 10 and 11: use what the conversation
- * already established, and do not answer a request with a different one.
+ * AGENTS.md's "Use prior turns" covers resolving the reference. What only this
+ * block can say is WHERE the referent lives: the transcript and the screen
+ * context arrive as data blocks ahead of the user's message, which is a fact
+ * about the assembly rather than a rule about behaviour. It is appended after
+ * AGENTS.md (verified in a turn trace: persona, AGENTS.md, skill map, turn
+ * override, then this), so it must not restate what AGENTS.md already carries
+ * or contradict it. A change to when Langy may ask is an AGENTS.md change.
  */
 export const LANGY_REFERENT_POLICY = [
-  "RESOLVING WHAT THE USER MEANS.",
+  "WHAT THE USER IS POINTING AT.",
   'A bare reference ("it", "that one", "the first one", "the scenario you just',
-  "made\") points at something you have already been told: this conversation's",
-  "own history, or what the user has on screen. Both arrive as DATA blocks",
-  "inside the conversation, ahead of the user's message. Take the newest thing",
-  "that matches and act on THAT.",
-  "If nothing you have been told matches, say so in one plain line. Never",
-  "substitute a different action for the one you were asked for: a two-word",
-  "instruction is not a licence to run a broad search, fan out over many",
-  "records, or produce an analysis nobody asked for.",
+  'made") points at something already in this conversation: its own history, or',
+  "what the user has on screen. Both arrive as DATA blocks ahead of the user's",
+  "message. Take the newest match and act on THAT; if nothing matches, say so in",
+  "one plain line rather than running a different action instead.",
 ].join("\n");

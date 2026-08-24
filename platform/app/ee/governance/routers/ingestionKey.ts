@@ -3,7 +3,7 @@
 /**
  * tRPC router for ingestion keys — the user-side mint/rotate/list flow for
  * personal-project trace ingest. An "ingestion key" is one row of the single
- * ApiKey primitive (`sk-lw-`) carrying a non-null `ingestSourceType`.
+ * ApiKey primitive (`ik-lw-`) carrying a non-null `ingestSourceType`.
  *
  * `organizationId` IS accepted in the input: a user can have a personal
  * project per org they're a member of, and the caller's currently-active
@@ -20,7 +20,6 @@
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const mintInput = z.object({
@@ -37,7 +36,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.listForPersonalProject({
@@ -53,7 +52,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   install: protectedProcedure
     .input(mintInput)
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.ensureForPersonalProject({
@@ -71,7 +70,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   rotate: protectedProcedure
     .input(mintInput)
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.ensureForPersonalProject({

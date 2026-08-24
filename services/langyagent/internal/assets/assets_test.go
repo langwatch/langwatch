@@ -22,6 +22,30 @@ func TestAgentsTemplate_CarriesPlaceholder(t *testing.T) {
 	}
 }
 
+// The prompt has a byte budget so it cannot silently grow back into a rule
+// pile. It once reached 52,795 bytes by accreting one rule per observed
+// failure. A fix that needs the ceiling raised is a fix at the wrong layer:
+// state the class in one principle, or move the constraint into the harness
+// config. See https://scenario.langwatch.ai/best-practices/improving-your-agent
+//
+// @scenario "The prompt fits its size budget"
+func TestAgentsTemplate_FitsSizeBudget(t *testing.T) {
+	const maxPromptBytes = 16 * 1024
+
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	// Reported on every run, not only on failure: a passing "under 16KB" says
+	// nothing about which prompt is embedded, so it cannot confirm a rebuild
+	// picked up an edit. The number can.
+	t.Logf("AGENTS.md is %d bytes of the %d-byte budget", len(tmpl), maxPromptBytes)
+
+	if got := len(tmpl); got > maxPromptBytes {
+		t.Errorf("AGENTS.md is %d bytes, over the %d-byte budget: shrink it (merge overlapping rules, state the class, or move the constraint into the harness config) instead of raising the ceiling", got, maxPromptBytes)
+	}
+}
+
 // MaterializeSkills writes the embedded skills tree to disk (a subprocess cannot
 // read embed.FS), preserving the <name>/SKILL.md layout opencode discovers.
 func TestMaterializeSkills_WritesTreeToDisk(t *testing.T) {

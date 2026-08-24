@@ -88,7 +88,7 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("/settings/governance/budgets");
+      expect(call[0].html).toContain("/gateway/budgets");
       expect(call[0].html).toContain("Approve via LangWatch");
     });
   });

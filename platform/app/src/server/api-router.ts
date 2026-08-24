@@ -11,6 +11,7 @@ import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
@@ -50,12 +51,14 @@ import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
+import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
+import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import {
   app as experimentsV3App,
@@ -67,6 +70,7 @@ import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
+import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
@@ -74,6 +78,7 @@ import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
+import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
@@ -120,6 +125,7 @@ export function createApiRouter() {
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);
@@ -145,6 +151,13 @@ export function createApiRouter() {
   // and cannot be shadowed by a sibling that later grows a parameterised
   // segment at the root of that namespace.
   api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
+  // The same document at the two locations a caller tries first, plus the RPC
+  // catalogue and /llms.txt. Two apps because the route-coverage gate only
+  // reads files declaring an `/api` basePath — see api-discovery.ts. The
+  // root-level pair only arrives here at all because start.ts consults
+  // `isRootDiscoveryPath`; without that they meet the SPA fallback.
+  api.route("/", apiDiscoveryApp); // /api/openapi.json, /api/rpc.discover
+  api.route("/", rootDiscoveryApp); // /.well-known/openapi, /llms.txt
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
@@ -182,8 +195,10 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
+  api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
+  api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);

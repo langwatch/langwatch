@@ -76,6 +76,19 @@ export function computeSpanCost({
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]) ?? 0,
   );
 
+  // Audio token counts, emitted SEPARATELY from input_tokens / output_tokens
+  // the same way the cache buckets are. An audio token costs eight times a
+  // text one on the realtime models, so pricing them off the flat totals is
+  // what made a trace state a different cost from the budget it charged.
+  const inputAudioTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]) ?? 0,
+  );
+  const outputAudioTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]) ?? 0,
+  );
+
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
   // its own cache rates (customer override); when it does not, cache tokens
   // fall back to the input rate (counted, just not discounted).
@@ -121,6 +134,11 @@ export function computeSpanCost({
         cacheReadTokens,
         cacheCreationTokens,
         cacheCreation1hTokens,
+        // No audio rates on an enrichment override, so these price at the
+        // override's text rate. Dropping them would charge nothing at all for
+        // the audio half of the turn.
+        inputAudioTokens,
+        outputAudioTokens,
       }) ?? 0
     );
   }
@@ -152,7 +170,9 @@ export function computeSpanCost({
       cacheCreationTokens > 0 ||
       cacheCreation1hTokens > 0 ||
       inputCharacters > 0 ||
-      audioSeconds > 0)
+      audioSeconds > 0 ||
+      inputAudioTokens > 0 ||
+      outputAudioTokens > 0)
   ) {
     const matched = matchModelCostWithFallbacks(
       resolvedModel,
@@ -166,6 +186,8 @@ export function computeSpanCost({
         cacheReadTokens,
         cacheCreationTokens,
         cacheCreation1hTokens,
+        inputAudioTokens,
+        outputAudioTokens,
         inputCharacters,
         audioSeconds,
       });

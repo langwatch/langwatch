@@ -23,8 +23,9 @@ export default function Dataset() {
       enabled: !!project && !!datasetId,
       // Poll only while preparing; the functional form lets the query schedule
       // its own stop once the status settles (mirrors useTraceFacets).
-      refetchInterval: (data) =>
-        data?.status === "processing" || data?.status === "uploading"
+      refetchInterval: (query) =>
+        query.state.data?.status === "processing" ||
+        query.state.data?.status === "uploading"
           ? 3000
           : false,
     },

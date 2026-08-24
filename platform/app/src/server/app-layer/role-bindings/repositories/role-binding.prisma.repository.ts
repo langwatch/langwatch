@@ -1,4 +1,9 @@
-import { type PrismaClient, RoleBindingScopeType } from "@prisma/client";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {
   RoleBindingForSynthesis,
@@ -7,7 +12,16 @@ import type {
 } from "./role-binding.repository";
 
 export class PrismaRoleBindingRepository implements RoleBindingRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    // The listing reads go through the per-organization fork (ADR-092,
+    // delivery-plan PR 3 follow-up): a cut-over organization's member lists
+    // are served from the ledger's own head, everyone else's from the legacy
+    // tables, behind the same gate the decision fork reads.
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   async listForOrganizationsAndUser({
     orgIds,
@@ -16,44 +30,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     orgIds: string[];
     userId: string;
   }): Promise<RoleBindingForSynthesis[]> {
-    const bindings = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId: { in: orgIds },
-        OR: [{ userId }, { group: { members: { some: { userId } } } }],
-        scopeType: {
-          in: [
-            RoleBindingScopeType.TEAM,
-            RoleBindingScopeType.ORGANIZATION,
-            RoleBindingScopeType.PROJECT,
-          ],
-        },
-      },
-      select: {
-        organizationId: true,
-        scopeType: true,
-        scopeId: true,
-        role: true,
-        customRoleId: true,
-        customRole: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            permissions: true,
-            organizationId: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        },
-        group: { select: { organizationId: true } },
-      },
-    });
-
-    return bindings.filter(
-      (binding) =>
-        !binding.group ||
-        binding.group.organizationId === binding.organizationId,
-    );
+    return this.accessListing.findBindingsForSynthesis({ orgIds, userId });
   }
 
   async listTeamScopedUserBindingsByTeamIds({
@@ -63,41 +40,10 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     organizationId: string;
     teamIds: string[];
   }): Promise<Map<string, TeamScopedMemberBinding[]>> {
-    // Pre-seed every requested teamId so the caller can rely on a hit even for
-    // teams with no members, and so a single query covers all teams (no N+1).
-    const byTeam = new Map<string, TeamScopedMemberBinding[]>(
-      teamIds.map((teamId) => [teamId, []]),
-    );
-    if (teamIds.length === 0) return byTeam;
-
-    const bindings = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: { in: teamIds },
-        userId: { not: null },
-        user: { orgMemberships: { some: { organizationId } } },
-      },
-      include: { user: true, customRole: true },
+    return this.accessListing.findTeamMemberBindings({
+      organizationId,
+      teamIds,
     });
-
-    for (const binding of bindings) {
-      // The query filters userId non-null and includes user, but Prisma's types
-      // don't narrow — skip defensively rather than assert, so a future change
-      // to the where/include can't silently produce undefined fields.
-      if (!binding.userId || !binding.user) continue;
-      byTeam.get(binding.scopeId)?.push({
-        userId: binding.userId,
-        role: binding.role,
-        customRoleId: binding.customRoleId,
-        createdAt: binding.createdAt,
-        updatedAt: binding.updatedAt,
-        user: binding.user,
-        customRole: binding.customRole,
-      });
-    }
-
-    return byTeam;
   }
 
   async validateScopeInOrg({

@@ -6,11 +6,7 @@
  * performs a best-effort ClickHouse sync (stubbed here) that must never block
  * the mutation.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -21,6 +17,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
@@ -39,30 +40,57 @@ const { mockAddAnnotation, mockRemoveAnnotation } = vi.hoisted(() => ({
   mockRemoveAnnotation: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    traces: {
-      addAnnotation: mockAddAnnotation,
-      removeAnnotation: mockRemoveAnnotation,
-      // The correction store is real here: the suggestion dual-write and the
-      // trace correction it produces are what these tests assert on.
-      editOverlay: TraceEditOverlayService.create(prisma),
-      // A correction is read and written through the trace's own content
-      // gates, and the summary is what decides the visibility-window half of
-      // them. These tests are about the suggestion dual-write, so the window is
-      // pinned open and the privacy policy is left to decide on its own.
-      summary: {
-        getByTraceId: async () => ({ redactedByVisibilityWindow: false }),
+vi.mock("~/server/app-layer/app", async () => {
+  const clickhouseClients = await import(
+    "~/server/clickhouse/clickhouseClient"
+  );
+  // The real composition over the real test database: `.permission()`
+  // procedures decide through getApp().permissions (ADR-092), so a fake App
+  // without it dies at the middleware, before the code this suite tests.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: permissionsServiceFor(dbForPermissions),
+      // The trace service resolves its client through getApp().clickhouse now
+      // (two-door access); the queue-item reads join real ClickHouse summaries,
+      // so the facet delegates to the environment-configured client.
+      clickhouse: {
+        enabled: true,
+        resolveClient: (tenantId: string) =>
+          clickhouseClients.getClickHouseClientForTenant(tenantId),
+        resolveOrganizationClient: async () => {
+          throw new Error("no organization client in this suite");
+        },
+        allInstances: async () => [],
       },
-    },
-    organizations: {
-      // The shared test user belongs to the org through the legacy TeamUser
-      // row rather than a RoleBinding, so this is the lookup the protections
-      // read falls back to.
-      getUserOrgRoleByTeamId: async () => OrganizationUserRole.MEMBER,
-    },
-  }),
-}));
+      traces: {
+        addAnnotation: mockAddAnnotation,
+        removeAnnotation: mockRemoveAnnotation,
+        // The correction store is real here: the suggestion dual-write and the
+        // trace correction it produces are what these tests assert on.
+        editOverlay: TraceEditOverlayService.create(prisma),
+        // A correction is read and written through the trace's own content
+        // gates, and the summary is what decides the visibility-window half of
+        // them. These tests are about the suggestion dual-write, so the window is
+        // pinned open and the privacy policy is left to decide on its own.
+        summary: {
+          getByTraceId: async () => ({ redactedByVisibilityWindow: false }),
+        },
+      },
+      organizations: {
+        // The shared test user belongs to the org through the legacy TeamUser
+        // row rather than a RoleBinding, so this is the lookup the protections
+        // read falls back to.
+        getUserOrgRoleByTeamId: async () => OrganizationUserRole.MEMBER,
+      },
+    }),
+  };
+});
 
 /**
  * Every trace this suite writes to. The project is shared with other suites,

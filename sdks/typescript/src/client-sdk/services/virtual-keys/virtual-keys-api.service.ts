@@ -64,6 +64,13 @@ export interface VirtualKey {
   updated_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
+  /**
+   * When the key stops serving, or null for a key that never expires.
+   * Requests presented after this moment are refused with
+   * `virtual_key_expired`. `status` stays "active" past the date, so read
+   * this field rather than the status to tell an expired key apart.
+   */
+  expires_at: string | null;
 }
 
 /**
@@ -91,6 +98,11 @@ export interface CreateVirtualKeyInput {
   trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
+  /**
+   * When the key stops serving, as an ISO 8601 instant. Omit it and the key
+   * never expires. A date already in the past is refused.
+   */
+  expires_at?: string;
   /** Optional cap created atomically with the key. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;
@@ -115,6 +127,12 @@ export interface UpdateVirtualKeyInput {
   trace_project_id?: string | null;
   routing_policy_id?: string | null;
   routing_mode?: VirtualKeyRoutingMode;
+  /**
+   * Undefined leaves the expiration alone; null clears it, so the key never
+   * expires; an ISO 8601 instant moves it. An expired key accepts this edit
+   * like any other, which is how it goes back into service.
+   */
+  expires_at?: string | null;
   /** Undefined leaves the cap alone; a value upserts it; null archives it. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;

@@ -205,9 +205,25 @@ func (s Stack) observabilityEnv() []string {
 		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
-	// Loopback: the link is followed by the developer's own browser on this machine.
-	if s.ObservabilityGrafanaPort != 0 {
+	// The proxied hostname when the portless proxy carries the route (stable,
+	// matches every other haven surface); loopback otherwise — either way the
+	// link is followed by the developer's own browser on this machine.
+	if s.ObservabilityGrafanaURL != "" {
+		env = append(env, "GRAFANA_BASE_URL="+s.ObservabilityGrafanaURL)
+	} else if s.ObservabilityGrafanaPort != 0 {
 		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
+	}
+	// Continuous profiling. Named only while Pyroscope is actually listening,
+	// because the profiler is a push: with nowhere to push to, a process that
+	// started one would sample itself on a timer, fail every upload, and pay the
+	// native profiler's boot cost for nothing. Absence of this variable is the off
+	// switch, exactly as OTEL_EXPORTER_OTLP_ENDPOINT's absence is for traces.
+	//
+	// The service name and the worktree tag come from the OTel variables above, so
+	// a flame graph is attributable to the same service and worktree as the trace
+	// beside it without a second set of identity variables to keep in step.
+	if s.ObservabilityPyroscopePort != 0 {
+		env = append(env, fmt.Sprintf("PYROSCOPE_SERVER_ADDRESS=http://127.0.0.1:%d", s.ObservabilityPyroscopePort))
 	}
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {

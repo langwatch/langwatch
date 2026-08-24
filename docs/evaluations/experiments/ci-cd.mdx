@@ -59,7 +59,7 @@ result.printSummary();
   </Tab>
 </Tabs>
 
-That's it! The experiment runs with the configuration saved in LangWatch.
+The experiment runs with the configuration saved in LangWatch.
 
 ### GitHub Actions Example
 
@@ -133,10 +133,10 @@ console.log(runUrl);        // open the run in LangWatch
 
 By default the run uses the dataset attached to the experiment. You can override the data from CI without changing the platform configuration:
 
-- `parameters` — constant inputs merged into every row (and the single row when there is no dataset), handy for a feature flag or a model name
-- `data` — inline rows to evaluate
-- `dataset_id` — a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
-- `row_indices` — a subset of dataset row indices to evaluate, instead of the whole dataset
+- `parameters`: constant inputs merged into every row (and the single row when there is no dataset), for example a feature flag or a model name
+- `data`: inline rows to evaluate
+- `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
+- `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
 
 <Tabs>
   <Tab title="Python">
@@ -160,6 +160,8 @@ await langwatch.experiments.runWithResults("my-experiment", { parameters: { mode
 ```
   </Tab>
 </Tabs>
+
+Scenario suite runs also accept a `parameters` field. There the values apply to every scenario in the run. See [Scenario run parameters](/agent-simulations/scenario-parameters).
 
 ---
 
@@ -273,7 +275,7 @@ Where `scripts/run_evaluation.py` contains your full experiment code.
 
 ### Comparing Multiple Configurations
 
-SDK experiments shine when comparing different configurations:
+SDK experiments can compare different configurations in the same run:
 
 ```python
 import langwatch
@@ -283,9 +285,9 @@ experiment = langwatch.experiment.init("model-comparison-ci")
 
 for idx, row in experiment.loop(dataset.iterrows()):
     def compare(idx, row):
-        # Test GPT-4
-        with experiment.target("gpt-4o", {"model": "gpt-4o", "temperature": 0.7}):
-            response = call_openai("gpt-4o", row["input"])
+        # Test the OpenAI model
+        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini"}):
+            response = call_openai("gpt-5-mini", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
                 "input": row["input"],
@@ -293,9 +295,9 @@ for idx, row in experiment.loop(dataset.iterrows()):
                 "contexts": row["contexts"],
             })
 
-        # Test Claude
-        with experiment.target("claude-3.5", {"model": "claude-3-5-sonnet"}):
-            response = call_anthropic(row["input"])
+        # Test the Anthropic model
+        with experiment.target("claude-sonnet-5", {"model": "claude-sonnet-5"}):
+            response = call_anthropic("claude-sonnet-5", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
                 "input": row["input"],
@@ -328,10 +330,10 @@ Both approaches output a CI-friendly summary:
   Pass Rate:  93.3%
 ────────────────────────────────────────────────────────────
   TARGETS:
-    gpt-4o: 20 passed, 2 failed
+    gpt-5-mini: 20 passed, 2 failed
       Avg latency: 1250ms
       Total cost: $0.0125
-    claude-3.5: 22 passed, 1 failed
+    claude-sonnet-5: 22 passed, 1 failed
       Avg latency: 980ms
       Total cost: $0.0098
 ────────────────────────────────────────────────────────────

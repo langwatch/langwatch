@@ -3,7 +3,7 @@ title: Migrate to v3
 description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 ---
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration, the process is the same whether you're coming from v1.x or v2.x.
+LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration. The process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
 This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.
@@ -34,7 +34,7 @@ This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-
 
 ## Step 1: Deploy ClickHouse
 
-Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stays running, both will operate in parallel during migration.
+Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stays running, both operate in parallel during migration.
 
 ### Docker Compose
 
@@ -66,7 +66,7 @@ volumes:
 
 ### Kubernetes (Helm)
 
-The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. No additional setup is needed, ClickHouse will be deployed when you upgrade the chart in Step 2.
+The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. No additional setup is needed; the chart deploys ClickHouse when you upgrade it in Step 2.
 
 ## Step 2: Upgrade LangWatch to v3
 
@@ -100,7 +100,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.0.0 \
+  --version 3.16.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -130,7 +130,7 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
 
-# Install dependencies — the repo is a single pnpm workspace, so one
+# Install dependencies. The repo is a single pnpm workspace, so one
 # install at the repo root covers everything
 pnpm install
 
@@ -165,7 +165,7 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 **This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 49 days, so ClickHouse would try to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
@@ -211,7 +211,7 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-The TTL reconciler runs on startup and updates the ClickHouse table metadata without reorganizing existing data. Any data that needs to be moved to a different storage tier due to the new TTL policy, will happen asynchronously and be managed by ClickHouse.
+The TTL reconciler runs on startup and updates the ClickHouse table metadata without reorganizing existing data. ClickHouse then moves any data the new TTL policy assigns to a different storage tier, asynchronously.
 
 #### After Migration: Restore TTLs
 

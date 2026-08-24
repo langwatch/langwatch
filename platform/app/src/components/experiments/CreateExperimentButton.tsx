@@ -17,7 +17,7 @@ export const CreateExperimentButton = () => {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
       void utils.experiments.getAllForEvaluationsList.invalidate();

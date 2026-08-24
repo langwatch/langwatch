@@ -6,7 +6,7 @@ import {
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 
-// getRun resolves its ClickHouse client through getClickHouseClientForProject;
+// getRun resolves its ClickHouse client through getClickHouseClientForTenant;
 // point that at the testcontainer client so the real query path runs.
 let testClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
@@ -16,8 +16,27 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...actual,
-    getClickHouseClientForProject: async () => testClient,
+    getClickHouseClientForTenant: async () => testClient,
   };
+});
+
+// The service resolves its client through getApp().clickhouse now (two-door
+// access); this App stub delegates to the clickhouseClient mock above, so
+// the suite's existing per-tenant wiring keeps working unchanged.
+vi.mock("~/server/app-layer/app", async () => {
+  const clients = await import("~/server/clickhouse/clickhouseClient");
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: (tenantId: string) =>
+        clients.getClickHouseClientForTenant(tenantId),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
 });
 
 // Imported after the mock is registered.

@@ -48,7 +48,6 @@ export function showSuiteRunError({
       title,
       description: description || undefined,
       type: "error",
-      meta: { closable: true },
       action: { label: "Edit Run Plan", onClick: onEditRunPlan },
     });
     return;

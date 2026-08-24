@@ -39,7 +39,7 @@ vi.mock("~/utils/api", () => ({
       upsert: {
         useMutation: (options: typeof mutationOptions) => {
           mutationOptions = options;
-          return { mutate, isLoading: isSaving };
+          return { mutate, isPending: isSaving };
         },
       },
     },

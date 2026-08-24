@@ -16,13 +16,12 @@
  */
 
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(
@@ -41,7 +40,7 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -69,7 +68,7 @@ export const activityMonitorRouter = createTRPCRouter({
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -102,7 +101,7 @@ export const activityMonitorRouter = createTRPCRouter({
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -132,7 +131,7 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -159,7 +158,7 @@ export const activityMonitorRouter = createTRPCRouter({
         groupBy: z.enum(["team", "user", "model"]).default("team"),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -175,7 +174,7 @@ export const activityMonitorRouter = createTRPCRouter({
    */
   ingestionSourcesHealth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -185,10 +184,10 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by the anomaly-detection subscriber.
    * Service-routed read of `prisma.anomalyAlert` keyed by org, sorted
    * by detectedAt DESC. Returns [] when no rules have fired or when
-   * ClickHouse is disabled (the reactor short-circuits without CH).
+   * ClickHouse is disabled (the subscriber short-circuits without CH).
    */
   recentAnomalies: protectedProcedure
     .input(
@@ -197,7 +196,7 @@ export const activityMonitorRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(50),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -221,7 +220,7 @@ export const activityMonitorRouter = createTRPCRouter({
         beforeIso: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
@@ -239,7 +238,7 @@ export const activityMonitorRouter = createTRPCRouter({
         sourceId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("activityMonitor:view"))
+    .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);

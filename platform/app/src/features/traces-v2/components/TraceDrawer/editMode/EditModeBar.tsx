@@ -174,7 +174,7 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
     });
   }, [project, rebaseOntoStoredCorrection, traceId, upsert]);
 
-  return { save, isSaving: upsert.isLoading || isRebasing };
+  return { save, isSaving: upsert.isPending || isRebasing };
 }
 
 /**

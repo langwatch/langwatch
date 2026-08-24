@@ -119,6 +119,13 @@ type WorkerInfo struct {
 	// never read from the worker's OTLP.
 	SourceOrganizationID string
 	SourceProjectID      string
+	// Harness names the coding-agent harness this worker runs on
+	// (domain.HarnessOpenCode | domain.HarnessPi), normalized by the pool at
+	// Register. It gates the LLM proxy's span synthesis: a pi worker exports
+	// no OTLP of its own, so the relay retells each mediated LLM call as one
+	// gen_ai span into the customer's trace; opencode workers keep exporting
+	// their own spans and get none synthesized.
+	Harness string
 }
 
 // workerEntry is one registered worker: its info plus the conversation's
@@ -300,7 +307,7 @@ type Options struct {
 // ctx is the manager-lifetime context (carries the logger); Shutdown stops the
 // listener.
 func New(ctx context.Context, opts Options) (*Relay, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("otelrelay listen: %w", err)
 	}

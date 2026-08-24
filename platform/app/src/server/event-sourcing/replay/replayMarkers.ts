@@ -120,7 +120,7 @@ export async function unmarkBatch({
  * was staged — but never active — during the replay pause is not drained by
  * `waitForActiveJobs`; after unpause it runs, and without the boundary it would
  * re-process events at/before the cutoff and double-write records replay just
- * rebuilt (and re-fire map reactors). The done-marker keeps the live checker
+ * rebuilt (and re-fire map subscribers). The done-marker keeps the live checker
  * skipping those events while still letting genuinely newer events through.
  *
  * The boundary lives in its own short-TTL key rather than in the cutoff hash so
@@ -281,72 +281,146 @@ export async function hasPreviousRun({
   return { completedCount, markerCount };
 }
 
-/** Pipeline HSET "pending" for a batch of aggregate keys across ALL projections. */
-export async function markPendingBatchMulti({
+/**
+ * One pipeline covering every projection's "pending" markers for a batch.
+ * Each projection carries only the aggregate keys whose event types it
+ * declares — never the full cross product.
+ */
+export async function markPendingForProjections({
   redis,
-  projectionNames,
-  aggKeys,
+  aggKeysByProjection,
 }: {
   redis: IORedis;
-  projectionNames: string[];
-  aggKeys: string[];
+  aggKeysByProjection: Map<string, string[]>;
 }): Promise<void> {
-  if (aggKeys.length === 0 || projectionNames.length === 0) return;
   const pipeline = redis.pipeline();
-  for (const projName of projectionNames) {
+  let commands = 0;
+  for (const [projName, aggKeys] of aggKeysByProjection) {
+    if (aggKeys.length === 0) continue;
     const key = cutoffKey(projName);
     for (const aggKey of aggKeys) {
       pipeline.hset(key, aggKey, "pending");
     }
     pipeline.expire(key, MARKER_TTL_SECONDS);
+    commands++;
   }
+  if (commands === 0) return;
   const results = await pipeline.exec();
-  checkPipelineErrors(results, "markPendingBatchMulti");
+  checkPipelineErrors(results, "markPendingForProjections");
 }
 
-/** Pipeline HSET cutoff markers for a batch of aggregate keys across ALL projections. */
-export async function markCutoffBatchMulti({
+/** One pipeline covering every projection's cutoff markers for a batch. */
+export async function markCutoffForProjections({
   redis,
-  projectionNames,
-  cutoffs,
+  cutoffsByProjection,
 }: {
   redis: IORedis;
-  projectionNames: string[];
-  cutoffs: Map<string, { timestamp: number; eventId: string }>;
+  cutoffsByProjection: Map<
+    string,
+    Map<string, { timestamp: number; eventId: string }>
+  >;
 }): Promise<void> {
-  if (cutoffs.size === 0 || projectionNames.length === 0) return;
   const pipeline = redis.pipeline();
-  for (const projName of projectionNames) {
+  let commands = 0;
+  for (const [projName, cutoffs] of cutoffsByProjection) {
+    if (cutoffs.size === 0) continue;
     const key = cutoffKey(projName);
     for (const [aggKey, cutoff] of cutoffs) {
       pipeline.hset(key, aggKey, `${cutoff.timestamp}:${cutoff.eventId}`);
     }
     pipeline.expire(key, MARKER_TTL_SECONDS);
+    commands++;
   }
+  if (commands === 0) return;
   const results = await pipeline.exec();
-  checkPipelineErrors(results, "markCutoffBatchMulti");
+  checkPipelineErrors(results, "markCutoffForProjections");
 }
 
-/** Pipeline HDEL + SADD for a batch of aggregate keys across ALL projections. */
-export async function unmarkBatchMulti({
+/**
+ * One pipeline covering every projection's terminal transition for a batch —
+ * the multi-projection form of {@link markCompletedBatch}, with the same
+ * done-marker semantics per aggregate.
+ */
+export async function markCompletedForProjections({
   redis,
-  projectionNames,
-  aggKeys,
+  cutoffsByProjection,
 }: {
   redis: IORedis;
-  projectionNames: string[];
-  aggKeys: string[];
+  cutoffsByProjection: Map<
+    string,
+    Map<string, { timestamp: number; eventId: string }>
+  >;
 }): Promise<void> {
-  if (aggKeys.length === 0 || projectionNames.length === 0) return;
   const pipeline = redis.pipeline();
-  for (const projName of projectionNames) {
+  let commands = 0;
+  for (const [projName, cutoffs] of cutoffsByProjection) {
+    if (cutoffs.size === 0) continue;
+    const cKey = cutoffKey(projName);
+    const compKey = completedKey(projName);
+    for (const [aggKey, cutoff] of cutoffs) {
+      pipeline.hdel(cKey, aggKey);
+      pipeline.set(
+        doneMarkerKey(projName, aggKey),
+        `${cutoff.timestamp}:${cutoff.eventId}`,
+        "EX",
+        DONE_MARKER_TTL_SECONDS,
+      );
+      pipeline.sadd(compKey, aggKey);
+    }
+    commands++;
+  }
+  if (commands === 0) return;
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "markCompletedForProjections");
+}
+
+/**
+ * One pipeline covering every projection's no-event unmark for a batch — the
+ * multi-projection form of {@link unmarkBatch} (HDEL + completed-set SADD).
+ */
+export async function unmarkForProjections({
+  redis,
+  aggKeysByProjection,
+}: {
+  redis: IORedis;
+  aggKeysByProjection: Map<string, string[]>;
+}): Promise<void> {
+  const pipeline = redis.pipeline();
+  let commands = 0;
+  for (const [projName, aggKeys] of aggKeysByProjection) {
+    if (aggKeys.length === 0) continue;
     const cKey = cutoffKey(projName);
     const compKey = completedKey(projName);
     for (const aggKey of aggKeys) {
       pipeline.hdel(cKey, aggKey);
       pipeline.sadd(compKey, aggKey);
     }
+    commands++;
+  }
+  if (commands === 0) return;
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "unmarkForProjections");
+}
+
+/** Fetch every projection's completed set in one pipeline of SMEMBERS. */
+export async function getCompletedSets({
+  redis,
+  projectionNames,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+}): Promise<Map<string, Set<string>>> {
+  const sets = new Map<string, Set<string>>();
+  if (projectionNames.length === 0) return sets;
+  const pipeline = redis.pipeline();
+  for (const projName of projectionNames) {
+    pipeline.smembers(completedKey(projName));
   }
   const results = await pipeline.exec();
-  checkPipelineErrors(results, "unmarkBatchMulti");
+  checkPipelineErrors(results, "getCompletedSets");
+  projectionNames.forEach((projName, i) => {
+    const members = (results?.[i]?.[1] ?? []) as string[];
+    sets.set(projName, new Set(members));
+  });
+  return sets;
 }

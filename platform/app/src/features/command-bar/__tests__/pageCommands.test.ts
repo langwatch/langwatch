@@ -1,107 +1,67 @@
-import { describe, expect, it } from "vitest";
+import { Star } from "lucide-react";
+import { afterEach, describe, expect, it } from "vitest";
 import { getPageCommands, pageCommandRegistry } from "../pageCommands";
-import { tracesPageCommands } from "../pageCommands/tracesPageCommands";
+import type { Command } from "../types";
 
-describe("pageCommands", () => {
-  describe("getPageCommands", () => {
-    it("returns traces page commands for messages route", () => {
-      const commands = getPageCommands("/my-project/messages");
-      expect(commands).toBe(tracesPageCommands);
-      expect(commands.length).toBeGreaterThan(0);
+/**
+ * The registry ships empty — the legacy Traces page was the only page that
+ * ever registered commands, and it is gone. What still has to work is the
+ * lookup: a concrete URL (`/acme/widgets`) has to resolve to the entry
+ * registered under the route pattern (`/[project]/widgets`), whatever the
+ * project slug and whether or not the path carries a trailing slash.
+ */
+const widgetCommands: Command[] = [
+  {
+    id: "page-widgets-example",
+    label: "Example",
+    icon: Star,
+    category: "actions",
+    keywords: ["example"],
+  },
+];
+
+function registerWidgetsPage() {
+  pageCommandRegistry["/[project]/widgets"] = widgetCommands;
+}
+
+describe("getPageCommands", () => {
+  afterEach(() => {
+    delete pageCommandRegistry["/[project]/widgets"];
+  });
+
+  describe("when the route has commands registered", () => {
+    it("resolves a concrete path to the route pattern's commands", () => {
+      registerWidgetsPage();
+
+      expect(getPageCommands("/my-project/widgets")).toBe(widgetCommands);
     });
 
-    it("returns empty array for unknown route", () => {
-      const commands = getPageCommands("/unknown/route");
-      expect(commands).toEqual([]);
+    it("resolves the same commands whatever the project slug is", () => {
+      registerWidgetsPage();
+
+      expect(getPageCommands("/project-a/widgets")).toBe(widgetCommands);
+      expect(getPageCommands("/project-b/widgets")).toBe(widgetCommands);
+      expect(getPageCommands("/123/widgets")).toBe(widgetCommands);
     });
 
-    it("returns empty array for settings route", () => {
-      const commands = getPageCommands("/settings");
-      expect(commands).toEqual([]);
-    });
+    it("ignores a trailing slash", () => {
+      registerWidgetsPage();
 
-    it("normalizes project slug in path", () => {
-      // Different project slugs should all map to the same commands
-      expect(getPageCommands("/project-a/messages")).toBe(tracesPageCommands);
-      expect(getPageCommands("/project-b/messages")).toBe(tracesPageCommands);
-      expect(getPageCommands("/123/messages")).toBe(tracesPageCommands);
-    });
-
-    it("handles trailing slashes in pathname", () => {
-      // Paths with trailing slashes should match the same commands
-      expect(getPageCommands("/my-project/messages/")).toBe(tracesPageCommands);
-      expect(getPageCommands("/project-a/messages/")).toBe(tracesPageCommands);
+      expect(getPageCommands("/my-project/widgets/")).toBe(widgetCommands);
     });
   });
 
-  describe("tracesPageCommands", () => {
-    it("contains view switching commands", () => {
-      const listView = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-view-list",
-      );
-      const tableView = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-view-table",
-      );
-
-      expect(listView).toBeDefined();
-      expect(listView?.label).toBe("Switch to List View");
-
-      expect(tableView).toBeDefined();
-      expect(tableView?.label).toBe("Switch to Table View");
+  describe("when the route has nothing registered", () => {
+    it("returns no commands for an unknown project route", () => {
+      expect(getPageCommands("/unknown/route")).toEqual([]);
     });
 
-    it("contains date range commands", () => {
-      const date7d = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-7d",
-      );
-      const date30d = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-30d",
-      );
-      const today = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-today",
-      );
-
-      expect(date7d).toBeDefined();
-      expect(date7d?.label).toBe("Last 7 Days");
-
-      expect(date30d).toBeDefined();
-      expect(date30d?.label).toBe("Last 30 Days");
-
-      expect(today).toBeDefined();
-      expect(today?.label).toBe("Today");
+    it("returns no commands for a non-project route", () => {
+      expect(getPageCommands("/settings")).toEqual([]);
     });
 
-    it("contains clear filters command", () => {
-      const clearFilters = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-clear-filters",
-      );
-
-      expect(clearFilters).toBeDefined();
-      expect(clearFilters?.label).toBe("Clear All Filters");
-    });
-
-    it("all commands have required fields", () => {
-      tracesPageCommands.forEach((cmd) => {
-        expect(cmd.id).toBeDefined();
-        expect(cmd.label).toBeDefined();
-        expect(cmd.icon).toBeDefined();
-        expect(cmd.category).toBe("actions");
-      });
-    });
-
-    it("all commands have keywords for search", () => {
-      tracesPageCommands.forEach((cmd) => {
-        expect(cmd.keywords).toBeDefined();
-        expect(cmd.keywords!.length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe("pageCommandRegistry", () => {
-    it("has registry for traces page", () => {
-      expect(pageCommandRegistry["/[project]/messages"]).toBe(
-        tracesPageCommands,
-      );
+    it("returns no commands for the removed legacy Traces path", () => {
+      expect(getPageCommands("/my-project/messages")).toEqual([]);
     });
   });
 });

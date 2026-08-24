@@ -13,19 +13,22 @@
  * row's Azure resource and 404'd ("Resource not found") — breaking
  * translate, Ask AI, and topic clustering for the whole project.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+} from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prepareLitellmParams } from "../../api/routers/modelProviders.utils";
 import { setupModelEnv } from "../../app-layer/evaluations/evaluation-execution.factories";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
+
+wireDefaultTestApp();
 
 describe("Runtime provider-row selection follows the model (real DB)", () => {
   const ns = `mp-row-${nanoid(8)}`;

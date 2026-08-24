@@ -4,6 +4,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
+import { parseScenarioParameterDefinitions } from "../parameters";
 import { ScenarioService } from "../scenario.service";
 
 describe("ScenarioService", () => {
@@ -62,6 +63,76 @@ describe("ScenarioService", () => {
       expect(result.id).toMatch(/^scenario_/);
       expect(result.name).toBe("Refund Test");
       expect(result.projectId).toBe(projectId);
+    });
+  });
+
+  describe("when the scenario declares parameters", () => {
+    /** @scenario "Parameter definitions are persisted on a scenario" */
+    it("reads the declarations back with their descriptions and defaults", async () => {
+      const created = await service.create({
+        projectId,
+        name: "Refund Test",
+        situation: "A {{ params.account_tier }} customer requests a refund",
+        criteria: ["Acknowledges issue"],
+        labels: ["support"],
+        parameters: [
+          {
+            name: "account_tier",
+            description: "Which plan the customer is on",
+            defaultValue: "gold",
+          },
+          { name: "region" },
+        ],
+      });
+
+      const readBack = await service.getById({ id: created.id, projectId });
+
+      expect(parseScenarioParameterDefinitions(readBack?.parameters)).toEqual([
+        {
+          name: "account_tier",
+          description: "Which plan the customer is on",
+          defaultValue: "gold",
+        },
+        { name: "region" },
+      ]);
+    });
+
+    /** @scenario "Parameter definitions are persisted on a scenario" */
+    it("reads a secret declaration back as secret", async () => {
+      const created = await service.create({
+        projectId,
+        name: "Secret Test",
+        situation: "The agent calls the billing API",
+        criteria: ["Calls the API"],
+        labels: [],
+        parameters: [
+          { name: "api_token", description: "The billing token", secret: true },
+        ],
+      });
+
+      const readBack = await service.getById({ id: created.id, projectId });
+
+      expect(parseScenarioParameterDefinitions(readBack?.parameters)).toEqual([
+        { name: "api_token", description: "The billing token", secret: true },
+      ]);
+    });
+
+    /** @scenario "Parameter definitions are persisted on a scenario" */
+    it("reads a scenario that declares none as declaring none", async () => {
+      const created = await service.create({
+        projectId,
+        name: "No Parameters",
+        situation: "User requests refund",
+        criteria: [],
+        labels: [],
+      });
+
+      const readBack = await service.getById({ id: created.id, projectId });
+
+      expect(readBack?.parameters).toBeNull();
+      expect(parseScenarioParameterDefinitions(readBack?.parameters)).toEqual(
+        [],
+      );
     });
   });
 

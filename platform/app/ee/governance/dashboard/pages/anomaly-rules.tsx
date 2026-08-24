@@ -17,6 +17,7 @@ import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -50,9 +51,9 @@ const SEVERITY_OPTIONS: Array<{
   { value: "info", label: "Info", tone: "blue" },
 ];
 
-// Reactor evaluates organization / source_type / source today; team and
+// Subscriber evaluates organization / source_type / source today; team and
 // project are persisted but skipped at evaluation time, so they're held
-// back from the composer until the reactor adds them. See
+// back from the composer until the subscriber adds them. See
 // docs/ai-gateway/governance/anomaly-rules.mdx scope coverage table.
 const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
   { value: "organization", label: "Organization" },
@@ -60,8 +61,8 @@ const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
   { value: "source", label: "Specific ingestion source" },
 ];
 
-// Only spend_spike is wired to the anomaly reactor today; the other rule
-// types accept persistence but the reactor logs debug + skips them. The
+// Only spend_spike is wired to the anomaly subscriber today; the other rule
+// types accept persistence but the subscriber logs debug + skips them. The
 // composer offers only the live type — admins typing a custom value can
 // still override (the field stays freeform), but autocomplete won't
 // promise something the runtime doesn't deliver. Doc page lists the full
@@ -192,23 +193,230 @@ const blankComposer = (): ComposerState => ({
   destinationConfig: "{}",
 });
 
-function AnomalyRulesPage() {
-  const { organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-  const orgId = organization?.id ?? "";
-
-  const rulesQuery = api.anomalyRules.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+function AnomalyRulesHeader() {
+  return (
+    <HStack alignItems="end">
+      <VStack align="start" gap={1}>
+        <HStack gap={2}>
+          <Heading size="md">Anomaly Rules</Heading>
+          <Badge colorPalette="purple" size="sm" variant="surface">
+            Preview
+          </Badge>
+        </HStack>
+        <Text color="fg.muted" fontSize="sm" maxW="3xl">
+          Define thresholds that page on-call when activity drifts. Rules
+          surface on the{" "}
+          <Link href="/governance" color="blue.600">
+            governance overview
+          </Link>{" "}
+          once they fire.
+        </Text>
+      </VStack>
+      <Spacer />
+    </HStack>
   );
-  const utils = api.useUtils();
-  const refetch = () =>
-    utils.anomalyRules.list.invalidate({ organizationId: orgId });
+}
 
-  const [composer, setComposer] = useState<ComposerState | null>(null);
+/**
+ * The id the archive mutation is currently working on, so one row can show its
+ * own spinner without every row spinning. Null while idle.
+ */
+function pendingRuleId(mutation: {
+  isPending: boolean;
+  variables?: { id: string } | undefined;
+}): string | null {
+  return mutation.isPending ? (mutation.variables?.id ?? null) : null;
+}
 
-  const createMutation = api.anomalyRules.create.useMutation({
+/**
+ * The severity sections count off the loaded list, so a failed load would
+ * render "Critical 0 / Warning 0 / Info 0". On an alerting surface that reads
+ * as "you have no critical rules", a claim we cannot make when we never got
+ * the list. This says what went wrong and offers the retry instead. The
+ * sections and their "New rule" buttons stay, because a failed read is no
+ * reason to take away the ability to write.
+ */
+function RuleListLoadError({
+  error,
+  isRefetching,
+  onRetry,
+}: {
+  error: unknown;
+  isRefetching: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <VStack align="start" gap={2}>
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load anomaly rules"
+      />
+      <Button
+        size="xs"
+        variant="outline"
+        onClick={onRetry}
+        loading={isRefetching}
+      >
+        <RotateCw size={12} /> Try again
+      </Button>
+    </VStack>
+  );
+}
+
+/** One severity bucket: its count, its "New rule" control, and its rows. */
+function RuleSeveritySection({
+  severity,
+  rules,
+  knowsFleetIsEmpty,
+  canManage,
+  composerOpen,
+  archivingId,
+  onNewRule,
+  onEdit,
+  onArchive,
+}: {
+  severity: Severity;
+  rules: Rule[];
+  knowsFleetIsEmpty: boolean;
+  canManage: boolean;
+  composerOpen: boolean;
+  archivingId: string | null;
+  onNewRule: () => void;
+  onEdit: (rule: Rule) => void;
+  onArchive: (rule: Rule) => void;
+}) {
+  const meta = SEVERITY_OPTIONS.find((o) => o.value === severity)!;
+  return (
+    <Box
+      as="section"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
+      <HStack alignItems="start" marginBottom={3}>
+        <VStack align="start" gap={0}>
+          <HStack gap={2}>
+            <Text fontSize="sm" fontWeight="semibold">
+              {meta.label}
+            </Text>
+            {/* A count is a claim about the fleet. We only have one when
+                the list actually arrived. */}
+            {knowsFleetIsEmpty && (
+              <Badge size="sm" variant="surface">
+                {rules.length}
+              </Badge>
+            )}
+          </HStack>
+        </VStack>
+        <Spacer />
+        {/* The write is `anomalyRules:manage`. A viewer who only reads is
+            not offered a composer the server refuses. */}
+        {canManage && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onNewRule}
+            disabled={composerOpen}
+          >
+            <Plus size={14} /> New rule
+          </Button>
+        )}
+      </HStack>
+
+      <VStack align="stretch" gap={2}>
+        {/* Same rule as the sibling sources page: "None" is a claim we can
+            only make when we know. */}
+        {rules.length === 0 && knowsFleetIsEmpty && (
+          <Text fontSize="sm" color="fg.muted">
+            No {meta.label.toLowerCase()} rules.
+          </Text>
+        )}
+        {rules.map((rule) => (
+          <RuleRow
+            key={rule.id}
+            rule={rule}
+            onEdit={() => onEdit(rule)}
+            onArchive={() => onArchive(rule)}
+            isArchiving={archivingId === rule.id}
+            canManage={canManage}
+          />
+        ))}
+      </VStack>
+    </Box>
+  );
+}
+
+/** The composer state that edits an existing rule. */
+function composerFromRule(rule: Rule): ComposerState {
+  return {
+    id: rule.id,
+    name: rule.name,
+    description: rule.description ?? "",
+    severity: rule.severity as Severity,
+    ruleType: rule.ruleType,
+    scope: rule.scope as Scope,
+    scopeId: rule.scopeId,
+    thresholdConfig: JSON.stringify(rule.thresholdConfig ?? {}, null, 2),
+    destinationConfig: JSON.stringify(rule.destinationConfig ?? {}, null, 2),
+  };
+}
+
+/**
+ * The fields both the create and the update call carry, or `null` when the
+ * composer cannot be submitted: no name, no scope id on a scoped rule, or
+ * config text the browser cannot parse (which this has already toasted about).
+ */
+function buildRulePayload({
+  composer,
+  orgId,
+}: {
+  composer: ComposerState;
+  orgId: string;
+}) {
+  if (!composer.name.trim()) return null;
+  if (!composer.scopeId.trim() && composer.scope !== "organization")
+    return null;
+  let thresholdConfig: Record<string, unknown>;
+  let destinationConfig: Record<string, unknown>;
+  try {
+    thresholdConfig = JSON.parse(composer.thresholdConfig || "{}");
+    destinationConfig = JSON.parse(composer.destinationConfig || "{}");
+  } catch (parseFailure) {
+    // Local `JSON.parse` failure on text the user typed. The syntax detail
+    // ("Unexpected token } in JSON at position 42") is the whole point, and
+    // nothing here crossed the wire, so it is safe to show verbatim.
+    toaster.create({
+      title: "Invalid JSON in config field",
+      description: // no-raw-error-toast-ok
+        parseFailure instanceof SyntaxError ? parseFailure.message : "",
+      type: "error",
+    });
+    return null;
+  }
+  return {
+    organizationId: orgId,
+    name: composer.name.trim(),
+    description: composer.description.trim() || null,
+    severity: composer.severity,
+    ruleType: composer.ruleType,
+    scope: composer.scope,
+    scopeId:
+      composer.scope === "organization" ? orgId : composer.scopeId.trim(),
+    thresholdConfig,
+    destinationConfig,
+  };
+}
+
+/** The three mutations the page drives, with their toasts and cache busting. */
+function useAnomalyRuleMutations({
+  refetch,
+  setComposer,
+}: {
+  refetch: () => unknown;
+  setComposer: (next: ComposerState | null) => void;
+}) {
+  const create = api.anomalyRules.create.useMutation({
     onSuccess: () => {
       void refetch();
       setComposer(null);
@@ -217,7 +425,7 @@ function AnomalyRulesPage() {
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't create the rule" }),
   });
-  const updateMutation = api.anomalyRules.update.useMutation({
+  const update = api.anomalyRules.update.useMutation({
     onSuccess: () => {
       void refetch();
       setComposer(null);
@@ -226,7 +434,7 @@ function AnomalyRulesPage() {
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't update the rule" }),
   });
-  const archiveMutation = api.anomalyRules.archive.useMutation({
+  const archive = api.anomalyRules.archive.useMutation({
     onSuccess: () => {
       void refetch();
       toaster.create({ title: "Rule archived", type: "success" });
@@ -234,85 +442,102 @@ function AnomalyRulesPage() {
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't archive the rule" }),
   });
+  return { create, update, archive };
+}
 
-  const grouped = useMemo(() => {
+/** Rules split into the three severity buckets the page renders. */
+function useGroupedRules(rules: Rule[] | undefined) {
+  return useMemo(() => {
     const out: Record<Severity, Rule[]> = {
       critical: [],
       warning: [],
       info: [],
     };
-    for (const r of rulesQuery.data ?? []) {
+    for (const r of rules ?? []) {
       out[r.severity as Severity]?.push(r);
     }
     return out;
-  }, [rulesQuery.data]);
+  }, [rules]);
+}
 
-  const startEdit = (rule: Rule) =>
-    setComposer({
-      id: rule.id,
-      name: rule.name,
-      description: rule.description ?? "",
-      severity: rule.severity as Severity,
-      ruleType: rule.ruleType,
-      scope: rule.scope as Scope,
-      scopeId: rule.scopeId,
-      thresholdConfig: JSON.stringify(rule.thresholdConfig ?? {}, null, 2),
-      destinationConfig: JSON.stringify(rule.destinationConfig ?? {}, null, 2),
-    });
+/**
+ * Everything the page needs: the org it is scoped to, what the viewer may do,
+ * the rule list, the composer state and the mutations that drive them. State
+ * and callbacks only, the component owns the markup.
+ */
+function useAnomalyRulesPage() {
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const canRead = hasAnyPermission("anomalyRules:view");
+  const canManage = hasAnyPermission("anomalyRules:manage");
+
+  const rulesQuery = api.anomalyRules.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
+  );
+  const utils = api.useUtils();
+  const refetch = () =>
+    utils.anomalyRules.list.invalidate({ organizationId: orgId });
+
+  const [composer, setComposer] = useState<ComposerState | null>(null);
+
+  const {
+    create: createMutation,
+    update: updateMutation,
+    archive: archiveMutation,
+  } = useAnomalyRuleMutations({ refetch, setComposer });
 
   const onSubmit = () => {
     if (!composer) return;
-    if (!composer.name.trim()) return;
-    if (!composer.scopeId.trim() && composer.scope !== "organization") return;
-    let thresholdConfig: Record<string, unknown>;
-    let destinationConfig: Record<string, unknown>;
-    try {
-      thresholdConfig = JSON.parse(composer.thresholdConfig || "{}");
-      destinationConfig = JSON.parse(composer.destinationConfig || "{}");
-    } catch (parseFailure) {
-      // Local `JSON.parse` failure on text the user typed — the syntax detail
-      // ("Unexpected token } in JSON at position 42") is the whole point, and
-      // nothing here crossed the wire, so it is safe to show verbatim.
-      toaster.create({
-        title: "Invalid JSON in config field",
-        description: // no-raw-error-toast-ok
-          parseFailure instanceof SyntaxError ? parseFailure.message : "",
-        type: "error",
-      });
-      return;
-    }
-    const scopeId =
-      composer.scope === "organization" ? orgId : composer.scopeId.trim();
-
+    const payload = buildRulePayload({ composer, orgId });
+    if (!payload) return;
     if (composer.id) {
-      updateMutation.mutate({
-        id: composer.id,
-        organizationId: orgId,
-        name: composer.name.trim(),
-        description: composer.description.trim() || null,
-        severity: composer.severity,
-        ruleType: composer.ruleType,
-        scope: composer.scope,
-        scopeId,
-        thresholdConfig,
-        destinationConfig,
-      });
+      updateMutation.mutate({ id: composer.id, ...payload });
     } else {
-      createMutation.mutate({
-        organizationId: orgId,
-        name: composer.name.trim(),
-        description: composer.description.trim() || null,
-        severity: composer.severity,
-        ruleType: composer.ruleType,
-        scope: composer.scope,
-        scopeId,
-        thresholdConfig,
-        destinationConfig,
-      });
+      createMutation.mutate(payload);
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  return {
+    orgId,
+    canRead,
+    canManage,
+    rulesQuery,
+    grouped: useGroupedRules(rulesQuery.data),
+    composer,
+    setComposer,
+    archivingId: pendingRuleId(archiveMutation),
+    archiveRule: (rule: Rule) =>
+      archiveMutation.mutate({ id: rule.id, organizationId: orgId }),
+    startEdit: (rule: Rule) => setComposer(composerFromRule(rule)),
+    startCreate: (severity: Severity) => {
+      const fresh = blankComposer();
+      fresh.severity = severity;
+      setComposer(fresh);
+    },
+    onSubmit,
+    isPending: createMutation.isPending || updateMutation.isPending,
+  };
+}
+
+function AnomalyRulesPage() {
+  const {
+    orgId,
+    canRead,
+    canManage,
+    rulesQuery,
+    grouped,
+    composer,
+    setComposer,
+    archivingId,
+    archiveRule,
+    startEdit,
+    startCreate,
+    onSubmit,
+    isPending,
+  } = useAnomalyRulesPage();
 
   return (
     <GovernanceLayout pageTitle="Anomaly Rules · Governance · LangWatch">
@@ -321,27 +546,16 @@ function AnomalyRulesPage() {
         description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."
       >
         <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-          <HStack alignItems="end">
-            <VStack align="start" gap={1}>
-              <HStack gap={2}>
-                <Heading size="md">Anomaly Rules</Heading>
-                <Badge colorPalette="purple" size="sm" variant="surface">
-                  Preview
-                </Badge>
-              </HStack>
-              <Text color="fg.muted" fontSize="sm" maxW="3xl">
-                Define thresholds that page on-call when activity drifts. Rules
-                surface on the{" "}
-                <Link href="/governance" color="blue.600">
-                  governance overview
-                </Link>{" "}
-                once they fire.
-              </Text>
-            </VStack>
-            <Spacer />
-          </HStack>
+          <AnomalyRulesHeader />
 
-          {composer && (
+          {!canRead && (
+            <PermissionRequiredNotice
+              permission="anomalyRules:view"
+              detail="The rule list stays hidden until then."
+            />
+          )}
+
+          {canManage && composer && (
             <RuleComposer
               composer={composer}
               setComposer={setComposer}
@@ -354,101 +568,36 @@ function AnomalyRulesPage() {
 
           {rulesQuery.isLoading && <Spinner size="sm" />}
 
-          {/* The severity sections below count off `rulesQuery.data ?? []`, so
-              a failed load renders "Critical 0 / Warning 0 / Info 0". On an
-              alerting-configuration surface that reads as "you have no
-              critical rules" — a claim we cannot make when we never got the
-              list. The alert says what went wrong, and the empty-state
-              sentence inside each section is suppressed; the sections and
-              their "New rule" buttons stay, because a failed read is no
-              reason to take away the ability to write. */}
           {rulesQuery.error && (
-            <VStack align="start" gap={2}>
-              <HandledErrorAlert
-                error={rulesQuery.error}
-                fallbackTitle="Couldn't load anomaly rules"
-              />
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => void rulesQuery.refetch()}
-                loading={rulesQuery.isFetching}
-              >
-                <RotateCw size={12} /> Try again
-              </Button>
-            </VStack>
+            <RuleListLoadError
+              error={rulesQuery.error}
+              isRefetching={rulesQuery.isFetching}
+              onRetry={() => void rulesQuery.refetch()}
+            />
           )}
 
-          {(["critical", "warning", "info"] as const).map((sev) => {
-            const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
-            return (
-              <Box
+          {canRead &&
+            (["critical", "warning", "info"] as const).map((sev) => (
+              <RuleSeveritySection
                 key={sev}
-                as="section"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={4}
-              >
-                <HStack alignItems="start" marginBottom={3}>
-                  <VStack align="start" gap={0}>
-                    <HStack gap={2}>
-                      <Text fontSize="sm" fontWeight="semibold">
-                        {meta.label}
-                      </Text>
-                      {/* A count is a claim about the fleet. We only have
-                            one when the list actually arrived. */}
-                      {!rulesQuery.error && (
-                        <Badge size="sm" variant="surface">
-                          {grouped[sev].length}
-                        </Badge>
-                      )}
-                    </HStack>
-                  </VStack>
-                  <Spacer />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const fresh = blankComposer();
-                      fresh.severity = sev;
-                      setComposer(fresh);
-                    }}
-                    disabled={!!composer}
-                  >
-                    <Plus size={14} /> New rule
-                  </Button>
-                </HStack>
+                severity={sev}
+                rules={grouped[sev]}
+                knowsFleetIsEmpty={!rulesQuery.error}
+                canManage={canManage}
+                composerOpen={!!composer}
+                archivingId={archivingId}
+                onNewRule={() => startCreate(sev)}
+                onEdit={startEdit}
+                onArchive={archiveRule}
+              />
+            ))}
 
-                <VStack align="stretch" gap={2}>
-                  {/* Same rule as the sibling sources page: "None" is a
-                        claim we can only make when we know. */}
-                  {grouped[sev].length === 0 && !rulesQuery.error && (
-                    <Text fontSize="sm" color="fg.muted">
-                      No {meta.label.toLowerCase()} rules.
-                    </Text>
-                  )}
-                  {grouped[sev].map((rule) => (
-                    <RuleRow
-                      key={rule.id}
-                      rule={rule}
-                      onEdit={() => startEdit(rule)}
-                      onArchive={() =>
-                        archiveMutation.mutate({
-                          id: rule.id,
-                          organizationId: orgId,
-                        })
-                      }
-                      isArchiving={
-                        archiveMutation.isPending &&
-                        archiveMutation.variables?.id === rule.id
-                      }
-                    />
-                  ))}
-                </VStack>
-              </Box>
-            );
-          })}
+          {canRead && !canManage && (
+            <PermissionRequiredNotice
+              permission="anomalyRules:manage"
+              detail="You can read the rules. Creating, editing, and archiving need this grant."
+            />
+          )}
         </VStack>
       </EnterpriseLockedSurface>
     </GovernanceLayout>
@@ -460,11 +609,13 @@ function RuleRow({
   onEdit,
   onArchive,
   isArchiving,
+  canManage,
 }: {
   rule: Rule;
   onEdit: () => void;
   onArchive: () => void;
   isArchiving: boolean;
+  canManage: boolean;
 }) {
   return (
     <HStack
@@ -501,19 +652,23 @@ function RuleRow({
             : ""}
         </Text>
       </VStack>
-      <Button size="sm" variant="ghost" onClick={onEdit}>
-        <Pencil size={14} /> Edit
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onArchive}
-        loading={isArchiving}
-        title="Archive rule"
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canManage && (
+        <>
+          <Button size="sm" variant="ghost" onClick={onEdit}>
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onArchive}
+            loading={isArchiving}
+            title="Archive rule"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </>
+      )}
     </HStack>
   );
 }
@@ -647,7 +802,7 @@ function RuleComposer({
                       ruleType: nextRuleType,
                       // Auto-fill the threshold template when the user picks
                       // spend_spike from a blank composer — saves them
-                      // grepping the reactor for the schema. If they've
+                      // grepping the subscriber for the schema. If they've
                       // already customised the JSON, leave it alone.
                       thresholdConfig:
                         nextRuleType === "spend_spike" &&
@@ -666,7 +821,7 @@ function RuleComposer({
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
                   Only <code>spend_spike</code> is evaluated by the anomaly
-                  reactor today. Other rule types (<code>rate_limit</code>,
+                  subscriber today. Other rule types (<code>rate_limit</code>,
                   <code>after_hours</code>, …) are{" "}
                   <Link
                     href="/ai-gateway/governance/anomaly-rules"
@@ -929,7 +1084,7 @@ function ThresholdPreview({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", {
+  withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
   })(AnomalyRulesPage),
 );

@@ -1,7 +1,8 @@
 Feature: AI Gateway Governance — Personal virtual keys
   As an enterprise developer
-  I want a personal virtual key auto-issued at first login that grants me access
-  to my org's approved providers, governed by my org's default routing policy
+  I want a personal virtual key issued the first time a tool of mine routes
+  through the gateway, granting me access to my org's approved providers,
+  governed by my org's default routing policy
   So that any coding tool I run (Claude Code, Codex, Cursor, Gemini CLI) just works
   with my identity attached and my company's spend caps enforced
 
@@ -14,7 +15,7 @@ Feature: AI Gateway Governance — Personal virtual keys
   inheritance the rest of the system uses.
 
   Personal VKs reference a `RoutingPolicy` that an org admin published once
-  (e.g. "developer-default" — providers + model allowlist + strategy).
+  (e.g. "developer-default", carrying providers plus the model name mapping).
   The admin configures providers + policies; users just get keys.
 
   Background:
@@ -25,18 +26,22 @@ Feature: AI Gateway Governance — Personal virtual keys
       | openai    | ORGANIZATION | "Acme OpenAI Prod"    |
       | gemini    | ORGANIZATION | "Acme Gemini Prod"    |
     And admin "carol@acme.com" has published a default RoutingPolicy "developer-default":
-      | scope | scopeId | strategy | providerCredentialIds         | modelAllowlist                                                          |
-      | ORG   | acme    | priority | [anthropic, openai, gemini]   | ["claude-*", "gpt-5-mini", "gpt-5", "gemini-2.5-flash", "gemini-2.5-pro"] |
+      | scope | scopeId | providerCredentialIds       | defaultModel                     |
+      | ORG   | acme    | [anthropic, openai, gemini] | anthropic/claude-sonnet-4-5      |
     And user "jane@acme.com" exists with role MEMBER
 
   # ---------------------------------------------------------------------------
-  # Auto-issuance at first login
+  # Issuance on first gateway use
   # ---------------------------------------------------------------------------
+  # Login itself mints nothing. The CLI asks for the key through
+  # POST /api/auth/cli/virtual-key at the moment a tool resolves to gateway
+  # mode, so a user who only sends traces never gets one and a re-login never
+  # leaves a spare key behind. See cli-login.feature.
 
   @bdd @personal-keys @issuance
-  Scenario: Personal VK is auto-issued on first CLI login
-    Given user "jane@acme.com" has never logged in via the CLI
-    When she completes the device-code flow successfully
+  Scenario: Personal VK is issued the first time a tool uses the gateway
+    Given user "jane@acme.com" has logged in via the CLI and holds no personal VK
+    When a tool of hers first resolves to gateway mode
     Then the system creates exactly one personal VK for jane@acme.com in organization "acme"
     And the personal VK has:
       | field             | value                                              |
@@ -46,8 +51,8 @@ Feature: AI Gateway Governance — Personal virtual keys
       | routingPolicyId   | the org's default "developer-default" policy id    |
       | secretPrefix      | starts with "vk-lw-"                               |
       | revokedAt         | null                                               |
-    And the personal VK secret is returned exactly once in the device-exchange response (`default_personal_vk`)
-    And subsequent logins re-use the existing personal VK rather than re-issuing
+    And the personal VK secret is returned exactly once, in the mint response
+    And a later request from the same machine re-uses the stored key rather than re-issuing
 
   @bdd @personal-keys @issuance
   Scenario: `virtualKey.issuePersonal` (tRPC) issues an additional personal VK for a specific provider
@@ -61,14 +66,10 @@ Feature: AI Gateway Governance — Personal virtual keys
   Scenario: When org has no default RoutingPolicy but has accessible providers, personal-key issuance succeeds with no policy bound
     Given organization "acme" has no RoutingPolicy with isDefault=true
     And at least one ModelProvider scoped at ORGANIZATION "acme" is enabled
-    When user "jane@acme.com" logs in via the CLI device-flow
+    When the CLI asks for her personal virtual key
     Then a personal VK is minted with `routingPolicyId=null`
     And the gateway dispatch path uses scope-cascade + `fallbackPriorityGlobal` ordering to pick a provider
-    # Pre-7651d2464 this failed with a generic 409 in the device approve
-    # handler, blocking solo signups + any org that hadn't published a
-    # default routing policy yet. 7651d2464 made the approve tolerate
-    # the empty-policy state but left the wrapper bailing later. The
-    # current behavior: mint succeeds, gateway dispatch falls back to
+    # The mint succeeds and gateway dispatch falls back to
     # `fallbackPriorityGlobal` ASC + `createdAt` ASC on eligible MPs
     # (mirrors `eligibleModelProvidersForVk` when policy is null).
 
@@ -76,8 +77,8 @@ Feature: AI Gateway Governance — Personal virtual keys
   Scenario: When org has no AI providers at all, personal-key issuance fails with a clear error
     Given organization "acme" has no RoutingPolicy with isDefault=true
     And no ModelProvider is reachable from "jane@acme.com"'s personal team via scope cascade
-    When user "jane@acme.com" tries to login via the CLI device-flow
-    Then the device-exchange response status is 409
+    When the CLI asks for her personal virtual key
+    Then the response status is 409
     And the response body contains `{ "error": "no_eligible_providers", "message": "Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers." }`
     And no personal VK is created
 
@@ -92,25 +93,27 @@ Feature: AI Gateway Governance — Personal virtual keys
   Scenario: When the default RoutingPolicy has zero providers, personal-key issuance fails with a clear error (validate-before-mint)
     Given organization "acme" HAS a default RoutingPolicy
     But that policy has zero ProviderCredentials in its `providerCredentialIds` chain
-    When user "jane@acme.com" tries to login via the CLI device-flow
-    Then the device-exchange response status is 422
+    When the /me portal calls `api.personalVirtualKeys.issuePersonal`
+    Then the response status is 422
     And the response body contains `{ "error": "routing_policy_has_no_providers", "message": "Your organization admin must bind at least one provider to the default routing policy before personal keys can be issued." }`
     And no personal VK is created
-    # Regression-invariant: pre-637c4e137, the empty-policy mint succeeded
-    # but every gateway call returned 504 provider_timeout (Ariana QA G34
-    # caught the green-success-then-504 mismatch). Now validate-before-mint
-    # symmetric with the no_default_routing_policy invariant above. Same
-    # contract surfaces from `api.personalVirtualKeys.issuePersonal` (tRPC
-    # UNPROCESSABLE_CONTENT → HTTP 422) and `POST /api/auth/cli/exchange`
-    # (HTTP 422 + JSON error body) — no green-success on either path.
+    # Validate before mint: an empty policy would mint a VK whose every
+    # gateway call returns 504 provider_timeout. The 422 above is the tRPC
+    # surface (`api.personalVirtualKeys.issuePersonal` maps the error to
+    # UNPROCESSABLE_CONTENT). The CLI surface,
+    # `POST /api/auth/cli/virtual-key`, collapses both empty-provider causes
+    # into 409 `no_eligible_providers`, since the user's next step is the
+    # same either way. Neither path reports a green success.
 
   @bdd @personal-keys @issuance @policy-resolution
   Scenario: Empty-policy invariant applies symmetrically to /me portal mint and CLI device-flow mint
     Given the same empty-default-policy state above
     When EITHER the /me portal calls `api.personalVirtualKeys.issuePersonal`
-    OR the CLI device-flow exchange runs
-    Then both surfaces return HTTP 422 with `routing_policy_has_no_providers`
-    And both surfaces include the same actionable admin hint message
+    OR the CLI asks `POST /api/auth/cli/virtual-key` for a key
+    Then neither surface reports success: the portal returns HTTP 422
+    `routing_policy_has_no_providers`, the CLI returns HTTP 409
+    `no_eligible_providers`
+    And both surfaces include an actionable admin hint message
     And neither surface creates a personal VK
 
   # ---------------------------------------------------------------------------

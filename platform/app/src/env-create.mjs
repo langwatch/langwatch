@@ -371,7 +371,7 @@ export function createEnvConfig() {
       ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
-      // bypass the reactor depth check; emergency rollback only.
+      // bypass the subscriber depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
       // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
       // groups per tenant in the DISPATCH_LUA scheduler.
@@ -436,6 +436,17 @@ export function createEnvConfig() {
       // request (`{audience}/.default`). Defaults to the public-cloud
       // "https://storage.azure.com" audience when unset.
       AZURE_BLOB_TOKEN_AUDIENCE: z.string().optional(),
+      // The ADR-022 trace spool is bounded by a lifecycle rule the operator
+      // provisions on the container, NOT by anything the application does: it
+      // deletes eagerly after the event_log INSERT, and a crash between those
+      // two steps is what the rule reaps. That rule lives on Azure's
+      // MANAGEMENT plane (Microsoft.Storage/.../managementPolicies), and this
+      // deployment holds only a data-plane key, so the app cannot read it back
+      // to check. This flag is the operator asserting it exists. Default false
+      // means an Azure install that enables the spool without thinking about
+      // retention degrades to inline payloads rather than accumulating
+      // customer data nothing will ever reap.
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED: z.boolean().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -468,10 +479,15 @@ export function createEnvConfig() {
       //                                installation webhooks.
       //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
       //                                github.com/apps/<slug>/installations/new.
+      //
+      // GITHUB_LANGY_HOST is the GitHub host this instance connects to. Unset
+      // means github.com. Set it to a GitHub Enterprise Server hostname to bind
+      // the instance to that server.
       GITHUB_LANGY_APP_ID: z.string().optional(),
       GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
       GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
       GITHUB_LANGY_APP_SLUG: z.string().optional(),
+      GITHUB_LANGY_HOST: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -661,6 +677,10 @@ export function createEnvConfig() {
       AZURE_BLOB_AUTH_MODE: process.env.AZURE_BLOB_AUTH_MODE,
       AZURE_BLOB_AUTHORITY_HOST: process.env.AZURE_BLOB_AUTHORITY_HOST,
       AZURE_BLOB_TOKEN_AUDIENCE: process.env.AZURE_BLOB_TOKEN_AUDIENCE,
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED:
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
+          "true",
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
@@ -686,6 +706,7 @@ export function createEnvConfig() {
       GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
       GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
       GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
+      GITHUB_LANGY_HOST: process.env.GITHUB_LANGY_HOST,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

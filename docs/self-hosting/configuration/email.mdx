@@ -16,7 +16,7 @@ Until a gateway is configured, those messages are not sent, and the places that 
 | SendGrid | `sendgrid` | You have a SendGrid account |
 | Resend | `resend` | You have a Resend account |
 
-SMTP is the one to reach for when nothing else fits. Any gateway that speaks it will work.
+SMTP is the one to reach for when nothing else fits. Any gateway that speaks it works.
 
 <Note>
 `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it unset and the gateway is inferred from whichever credentials are present, `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used when named.
@@ -24,7 +24,7 @@ SMTP is the one to reach for when nothing else fits. Any gateway that speaks it 
 
 ## Sender Address
 
-`EMAIL_DEFAULT_FROM` is the address recipients see, for example `LangWatch <langwatch@yourcompany.com>`. Set it to something your gateway is allowed to send as: a domain you have verified with the provider, or an address your relay accepts. Left unset, LangWatch derives one from `BASE_HOST`, which most providers will reject as unverified.
+`EMAIL_DEFAULT_FROM` is the address recipients see, for example `LangWatch <langwatch@yourcompany.com>`. Set it to something your gateway is allowed to send as: a domain you have verified with the provider, or an address your relay accepts. Left unset, LangWatch derives one from `BASE_HOST`, and a provider rejects that address unless its domain is verified with the provider.
 
 ## Configuration
 
@@ -70,7 +70,7 @@ app:
 | `SMTP_USER` | Username. Omit for an unauthenticated internal relay | - |
 | `SMTP_PASSWORD` | Password | - |
 
-Omitting `SMTP_USER` sends unauthenticated, which is what most internal relays expect.
+Omitting `SMTP_USER` sends unauthenticated. Use that when your relay accepts mail without credentials.
 
 ### AWS SES
 

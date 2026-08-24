@@ -8,7 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type { Cell } from "@tanstack/react-table";
-import { AlertTriangle, Bot, Clock, GitBranch, User, Zap } from "lucide-react";
+import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -334,13 +334,6 @@ const TurnPreviewCell: React.FC<{
         textStyleOverride="xs"
       />
     ) : null}
-    {trace.spanCount > 1 && (
-      <CountChip
-        icon={<GitBranch />}
-        iconColor="fg.subtle"
-        value={trace.spanCount}
-      />
-    )}
     {trace.events.totalCount > 0 && (
       <CountChip
         icon={<Zap />}

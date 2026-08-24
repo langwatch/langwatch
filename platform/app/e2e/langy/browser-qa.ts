@@ -107,13 +107,16 @@ export async function browserQA(
   try {
     const context = await getSharedContext();
     page = await context.newPage();
-    // Org-scoped pages (e.g. AI Gateway's /settings/gateway/**) are absolute
-    // — a leading "/settings" (or any leading "/" the caller wants taken
-    // literally) skips the project-slug prefix. Project-scoped pages don't
-    // start with "/", e.g. "/prompts".
-    const target = (check.path ?? "").startsWith("/settings")
-      ? `${APP_BASE}${check.path}`
-      : `${APP_BASE}/${PROJECT_SLUG}${check.path ?? ""}`;
+    // Org-scoped pages are absolute: settings, and the top-level Gateway
+    // and Governance products. They skip the project-slug prefix.
+    // Project-scoped pages take the prefix, e.g. "/prompts".
+    const checkPath = check.path ?? "";
+    const isOrgScopedPath = ["/settings", "/gateway", "/governance"].some(
+      (prefix) => checkPath === prefix || checkPath.startsWith(`${prefix}/`),
+    );
+    const target = isOrgScopedPath
+      ? `${APP_BASE}${checkPath}`
+      : `${APP_BASE}/${PROJECT_SLUG}${checkPath}`;
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // The app is a client-rendered SPA shell — wait for actual content, not
     // just DOM-ready, or the screenshot captures a blank/loading frame.

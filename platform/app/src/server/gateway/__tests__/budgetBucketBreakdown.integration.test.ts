@@ -15,11 +15,16 @@
  * writes with, and come back out through the same method the budgets list,
  * the detail page, and the management API all read.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -116,6 +121,11 @@ function overCap(buckets: BucketSpend[], limitUsd = Number(LIMIT_USD)): number {
     .length;
 }
 
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
+
 describe("given per-user buckets recorded against attributed-user templates", () => {
   beforeAll(async () => {
     await startTestContainers();
@@ -144,7 +154,7 @@ describe("given per-user buckets recorded against attributed-user templates", ()
     });
 
     repo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     });

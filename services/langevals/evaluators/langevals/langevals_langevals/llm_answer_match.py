@@ -74,7 +74,6 @@ class LLMAnswerMatchEvaluator(
             )
 
         lm = model_to_dspy_lm(self.settings.model)
-        dspy.settings.configure(experimental=True)
 
         answer_match = dspy.Predict(
             LLMAnswerMatchSignature.with_instructions(self.settings.prompt)

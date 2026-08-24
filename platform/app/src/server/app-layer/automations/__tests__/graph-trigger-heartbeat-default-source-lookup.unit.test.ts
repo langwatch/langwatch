@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { defaultGraphTriggerHeartbeatDeps } from "../graph-trigger-heartbeat";
 import type { TriggerService } from "../trigger.service";
 
@@ -85,7 +86,7 @@ describe("defaultGraphTriggerHeartbeatDeps lookupTriggerSource", () => {
 
       expect(findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: GRAPH, projectId: PROJECT },
+          where: { id: GRAPH, projectId: PROJECT, kind: BUILDER_CHART_KIND },
         }),
       );
     });

@@ -61,7 +61,7 @@ Feature: AI Tools Portal — Grid layout on /me
     And user "alice@acme.com" can manage the catalog (aiTools:manage)
     When user "alice@acme.com" loads "/me"
     Then the AI-governance getting-started banner renders
-    And it links to the tool catalog at "/settings/governance/tool-catalog"
+    And it links to the tool tiles page at "/governance/tool-catalog"
     And no install-the-CLI affordance renders in the empty state
 
   Scenario: team-scoped entries override org-scoped entries by slug

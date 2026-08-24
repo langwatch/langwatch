@@ -138,6 +138,7 @@ describe("createAdapter — project API key threading", () => {
       url: "https://api.example.com/chat",
       method: "POST",
       headers: [],
+      secrets: {},
     };
 
     /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */

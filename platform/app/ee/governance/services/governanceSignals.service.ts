@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget, PrismaClient, VirtualKey } from "@prisma/client";
+import type {
+  GatewayBudget,
+  PrismaClient,
+  VirtualKey,
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import type {
   BudgetCrossingKind,

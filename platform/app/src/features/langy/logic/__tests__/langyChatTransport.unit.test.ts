@@ -19,24 +19,25 @@ const subscription = vi.fn<
   (path: string, input: unknown, opts: unknown) => Unsubscribable
 >(() => ({ unsubscribe: vi.fn() }));
 
-// The mock mirrors tRPC's real `TRPCUntypedClient`, whose `mutation`/`subscription`
-// run `this.requestAsPromise(...)` internally (see @trpc/client dist). Modelling
-// that `this` dependency is load-bearing: a transport that DETACHES the method
-// (`const m = trpcClient.mutation; m(...)`) loses `this` and throws
-// "Cannot read properties of undefined (reading 'requestAsPromise')" — the exact
-// crash that shipped. A bare `vi.fn()` (no `this`) would silently hide it, which
-// is how it slipped through before. Each method touches `this.requestAsPromise`
-// the way the real client does, then delegates to the spy for assertions.
+// The mock mirrors the v11 PROXY client the transport now calls: procedures
+// are addressed as `trpcClient.langy.<proc>.mutate/subscribe`. The spies keep
+// receiving the dotted path so the assertions still name the procedure. (The
+// v10-era detached-`this` hazard died with the dotted-path client — every
+// proxy access mints a bound call.)
 vi.mock("~/utils/api", () => ({
   trpcClient: {
-    requestAsPromise: true,
-    mutation(path: string, input: unknown) {
-      void (this as { requestAsPromise: unknown }).requestAsPromise;
-      return mutation(path, input);
-    },
-    subscription(path: string, input: unknown, opts: unknown) {
-      void (this as { requestAsPromise: unknown }).requestAsPromise;
-      return subscription(path, input, opts);
+    langy: {
+      createConversation: {
+        mutate: (input: unknown) => mutation("langy.createConversation", input),
+      },
+      continueConversation: {
+        mutate: (input: unknown) =>
+          mutation("langy.continueConversation", input),
+      },
+      onTurnStream: {
+        subscribe: (input: unknown, opts: unknown) =>
+          subscription("langy.onTurnStream", input, opts),
+      },
     },
   },
 }));
@@ -77,7 +78,7 @@ describe("createLangyChatTransport", () => {
     subscription.mockClear();
   });
 
-  describe("given no conversation id yet (a fresh conversation)", () => {
+  describe("when no conversation id yet (a fresh conversation)", () => {
     it("starts the turn via langy.createConversation and adopts the minted ids", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
       await transport.sendMessages(options());
@@ -91,6 +92,60 @@ describe("createLangyChatTransport", () => {
         conversationId: "conv-1",
         turnId: "turn-1",
       });
+    });
+
+    it("sends only the user's own messages on a create", async () => {
+      // Starting a new chat while the previous reply streams leaves the old
+      // assistant message in useChat state; a create must not seed the new
+      // conversation (or its title) with it.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ role: string }> }).messages).toEqual(
+        [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+      );
+    });
+
+    it("sends only THIS message, not the previous conversation's questions", async () => {
+      // Dropping the assistant turns is not enough. The state that survives a
+      // mid-stream new chat holds the old USER messages too, and sending those
+      // seeds the new conversation, and the title generated from it, with
+      // questions the user did not just ask.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "user",
+              parts: [{ type: "text", text: "the previous question" }],
+            },
+            {
+              id: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ id: string }> }).messages).toEqual([
+        { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ]);
     });
 
     it("mints a fresh idempotency key for each logical send", async () => {
@@ -114,7 +169,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given an active conversation id", () => {
+  describe("when an active conversation id", () => {
     it("continues via langy.continueConversation carrying that conversation id", async () => {
       const { transport } = makeTransport({ conversationId: "conv-active" });
       await transport.sendMessages(options());
@@ -123,9 +178,36 @@ describe("createLangyChatTransport", () => {
       expect(path).toBe("langy.continueConversation");
       expect(input).toMatchObject({ conversationId: "conv-active" });
     });
+
+    it("ignores a pending warm id once a conversation is active", async () => {
+      const { transport } = makeTransport({
+        conversationId: "conv-active",
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.continueConversation");
+      expect(input).toMatchObject({ conversationId: "conv-active" });
+    });
   });
 
-  describe("given per-send context (model override + composer chips)", () => {
+  describe("when a pending conversation id from a panel-open warm", () => {
+    /** @scenario The first message adopts the warmed conversation */
+    it("creates the conversation under the warmed id so the turn reuses the warm worker", async () => {
+      const { transport } = makeTransport({
+        conversationId: null,
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.createConversation");
+      expect(input).toMatchObject({ conversationId: "conv-warmed" });
+    });
+  });
+
+  describe("when per-send context (model override + composer chips)", () => {
     it("threads only the present fields onto the turn input", async () => {
       const { transport } = makeTransport({
         conversationId: null,
@@ -146,7 +228,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the turn-start mutation rejects", () => {
+  describe("when the turn-start mutation rejects", () => {
     it("propagates the error to useChat and never subscribes to a stream", async () => {
       mutation.mockRejectedValue(new Error("boom"));
       const { transport, onIds } = makeTransport({ conversationId: null });
@@ -157,17 +239,10 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the tRPC client method depends on its `this` binding", () => {
-    it("keeps the mutation call attached to trpcClient so a send never throws the detached-`this` TypeError", async () => {
-      // Regression: the transport shipped `const mutate = trpcClient.mutation`,
-      // which drops `this`. The first send then threw synchronously with
-      // "Cannot read properties of undefined (reading 'requestAsPromise')" —
-      // before any request left the browser (no network, generic error card).
-      // Reverting the transport to a detached reference makes this (and every
-      // other send test) throw against the `this`-faithful mock above.
+  describe("when a full send round-trip", () => {
+    it("resolves the send, adopts the ids and opens the live stream", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
 
-      // Must RESOLVE. A detached call rejects with the TypeError instead.
       await expect(transport.sendMessages(options())).resolves.toBeDefined();
       expect(mutation).toHaveBeenCalledTimes(1);
       expect(onIds).toHaveBeenCalledWith({
@@ -179,7 +254,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries plan and sub-status entries", () => {
+  describe("when the live stream carries plan and sub-status entries", () => {
     /** Grab the onData callback the transport handed the subscription. */
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
@@ -199,7 +274,7 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       // The manager's cold-window placeholder, then the first real output (plan).
-      onData({ type: "status", status: "Waking Langy up…" });
+      onData({ type: "status", status: "Starting Langy…" });
       onData({
         type: "plan",
         items: [{ content: "Find the slow traces", status: "in_progress" }],
@@ -215,6 +290,35 @@ describe("createLangyChatTransport", () => {
         ([s]) => s.type === "status" && s.status === "",
       );
       expect(cleared).toHaveLength(1);
+    });
+
+    it("marks a pre-output status as readiness and a post-output status as real", async () => {
+      // A replayed stream re-delivers the readiness placeholder after the
+      // answer is already on screen; the flag is what lets the panel suppress
+      // it there instead of rendering "Thinking…" under the visible reply.
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({ type: "status", status: "Thinking…" });
+      onData({ type: "delta", text: "Sure —" });
+      onData({ type: "status", status: "Analysing 1,204 traces…" });
+
+      const statuses = onSignal.mock.calls
+        .map(([s]) => s)
+        .filter((s) => s.type === "status" && s.status !== "");
+      expect(statuses).toEqual([
+        { type: "status", status: "Thinking…", readiness: true },
+        {
+          type: "status",
+          status: "Analysing 1,204 traces…",
+          readiness: false,
+        },
+      ]);
     });
 
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
@@ -237,15 +341,17 @@ describe("createLangyChatTransport", () => {
       expect(onSignal).toHaveBeenNthCalledWith(1, {
         type: "status",
         status: "Searching traces…",
+        readiness: false,
       });
       expect(onSignal).toHaveBeenNthCalledWith(2, {
         type: "status",
         status: "",
+        readiness: false,
       });
     });
   });
 
-  describe("given the live stream terminates", () => {
+  describe("when the live stream terminates", () => {
     function handlers() {
       return subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;
@@ -302,7 +408,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries a navigate instruction", () => {
+  describe("when the live stream carries a navigate instruction", () => {
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;

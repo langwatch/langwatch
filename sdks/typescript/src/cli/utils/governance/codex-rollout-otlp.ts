@@ -9,8 +9,36 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+  type GitRunner,
+  readSessionContext,
+  runGitCommand,
+} from "@/cli/commands/ingestion/git-context";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { GovernanceCliError } from "./cli-api";
-import { type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
+import {
+  type CodexRolloutMeta,
+  type CodexTurnIO,
+  parseCodexRollout,
+} from "./codex-rollout";
+import {
+  defaultStateDir,
+  readFingerprint,
+  stateFilePath,
+  writeFingerprint,
+} from "./hook-state";
+import {
+  codexSessionIndexPath,
+  readCodexThreadNames,
+} from "./codex-session-index";
+import {
+  buildSessionContextLogPayload,
+  normalizeSessionName,
+  parseGitRemoteUrl,
+  type SessionContext,
+  sessionContextFingerprint,
+  sessionTitleFromPrompt,
+} from "./session-context";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {
@@ -188,29 +216,44 @@ export async function harvestCodexThread(args: {
   threadId: string;
   nowMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
+  runGit?: GitRunner;
 }): Promise<number> {
   const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const file = await findRolloutForThread(args.threadId, root);
   if (!file) return 0;
-  let parsed: CodexTurnIO[];
+  let turns: CodexTurnIO[];
+  let meta: CodexRolloutMeta | null;
   try {
-    parsed = parseCodexRollout(await readFile(file, "utf8"));
+    ({ turns, meta } = parseCodexRollout(await readFile(file, "utf8")));
   } catch {
     return 0;
   }
-  const turns = parsed.slice(-RECENT_TURN_WINDOW);
-  if (turns.length === 0) return 0;
+  const threadNames = await readCodexThreadNames(codexSessionIndexPath(root));
+  await postCodexSessionContext({
+    meta,
+    nowMs: args.nowMs,
+    logsEndpoint: args.logsEndpoint,
+    token: args.token,
+    threadName: meta?.sessionId ? threadNames.get(meta.sessionId) : null,
+    stateDir: args.stateDir,
+    fetchImpl: args.fetchImpl,
+    runGit: args.runGit,
+  });
+  const recent = turns.slice(-RECENT_TURN_WINDOW);
+  if (recent.length === 0) return 0;
   await postCodexTurns({
-    turns,
+    turns: recent,
     nowMs: args.nowMs,
     endpoint: args.endpoint,
     token: args.token,
     fetchImpl: args.fetchImpl,
   });
-  return turns.length;
+  return recent.length;
 }
 
 /**
@@ -236,21 +279,27 @@ export async function findRecentRollouts(
   return out;
 }
 
-/** Read + parse every in-window rollout into one flat turn list. */
-async function readRolloutTurns(
-  sinceMs: number,
-  sessionsRoot: string,
-): Promise<CodexTurnIO[]> {
+/** Read + parse every in-window rollout: one flat turn list, one meta per session. */
+async function readRollouts({
+  sinceMs,
+  sessionsRoot,
+}: {
+  sinceMs: number;
+  sessionsRoot: string;
+}): Promise<{ turns: CodexTurnIO[]; metas: CodexRolloutMeta[] }> {
   const files = await findRecentRollouts(sinceMs, sessionsRoot);
   const turns: CodexTurnIO[] = [];
+  const metas: CodexRolloutMeta[] = [];
   for (const file of files) {
     try {
-      turns.push(...parseCodexRollout(await readFile(file, "utf8")));
+      const parsed = parseCodexRollout(await readFile(file, "utf8"));
+      turns.push(...parsed.turns);
+      if (parsed.meta) metas.push(parsed.meta);
     } catch {
       /* skip unreadable rollout */
     }
   }
-  return turns;
+  return { turns, metas };
 }
 
 /**
@@ -315,6 +364,217 @@ async function postCodexTurns(args: {
 }
 
 /**
+ * POST the session's repository identity as one `langwatch.session_context`
+ * log record, the same record the command hooks send for claude, built here
+ * from the rollout's `session_meta` line instead of a hook payload: codex
+ * needs no hooks.json entry (and no per-hook trust grant) for its sessions to
+ * say which repository and branch they worked on, because the rollout already
+ * records both and the harvest is already trusted to run.
+ *
+ * Deduped through the same fingerprint state the hooks use, so a device
+ * carrying both seams posts the context once per session, and a notify that
+ * fires after every turn re-posts nothing while the context is unchanged.
+ * Best-effort by construction: a session without git identity, a remote URL
+ * the grammar cannot read, or a refused POST emits nothing and reports false,
+ * because the content spans riding beside this are worth posting either way.
+ */
+/**
+ * Which repository and branch a codex session is working in.
+ *
+ * The rollout's own `session_meta` is the weaker of the two sources and is
+ * consulted second. Codex fills it only when the session STARTED inside a
+ * repository, and never revises it: a reviewer that checks out one pull
+ * request's branch after another still reports the branch it opened with, and a
+ * session started a directory above the checkout reports nothing for its whole
+ * life, however much repository work it does. Codex has no equivalent of a
+ * native worktree switch, so that first directory is the session for good.
+ *
+ * The harvest runs on the machine that ran the turn, moments after it, so the
+ * working directory can be read directly and answers for the turn being
+ * harvested rather than for the session's first minute. The rollout's values
+ * stay as the fallback, which is what a transcript harvested on another machine
+ * (or after the checkout is gone) still has.
+ */
+function codexSessionContext({
+  meta,
+  runGit,
+}: {
+  meta: CodexRolloutMeta;
+  runGit: GitRunner;
+}): SessionContext | null {
+  const live = meta.cwd
+    ? readSessionContext({ directory: meta.cwd, runGit })
+    : null;
+  if (live) return live;
+  const repository = meta.gitRepositoryUrl
+    ? parseGitRemoteUrl(meta.gitRepositoryUrl)
+    : null;
+  if (!repository) return null;
+  return {
+    repository,
+    ...(meta.gitBranch ? { branch: meta.gitBranch } : {}),
+  };
+}
+
+export async function postCodexSessionContext(args: {
+  meta: CodexRolloutMeta | null;
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  /** The session's name from codex's own session index, when it has one. */
+  threadName?: string | null;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+  runGit?: GitRunner;
+}): Promise<boolean> {
+  const {
+    meta,
+    nowMs,
+    logsEndpoint,
+    token,
+    threadName,
+    stateDir,
+    fetchImpl,
+    runGit,
+  } = args;
+  if (!logsEndpoint) return false;
+  if (!meta?.sessionId) return false;
+  const title = meta.firstUserMessage
+    ? sessionTitleFromPrompt(meta.firstUserMessage)
+    : null;
+  const name = normalizeSessionName(threadName);
+  const context = codexSessionContext({
+    meta,
+    runGit: runGit ?? runGitCommand,
+  });
+  // A codex session appears in the sessions screen only through this
+  // record, so a session outside any repository still posts one as long
+  // as there is a name to carry. With no identity and no name there is
+  // nothing to say.
+  if (!context && !title && !name) return false;
+  const fingerprint = sessionContextFingerprint(context ?? {}, { title, name });
+  const stateFile = stateFilePath({
+    stateDir: stateDir ?? defaultStateDir(),
+    agent: "codex",
+    sessionId: meta.sessionId,
+  });
+  if (readFingerprint(stateFile) === fingerprint) return false;
+  const payload = buildSessionContextLogPayload({
+    sessionId: meta.sessionId,
+    agent: "codex",
+    context: context ?? {},
+    timeUnixNano: `${nowMs}000000`,
+    scopeVersion: LANGWATCH_SDK_VERSION,
+    // Codex withholds prompt text from its own events, so the transcript's
+    // first typed prompt titles the session — and codex's OWN name for the
+    // thread, from its session index, outranks it whenever one exists.
+    title,
+    name,
+  });
+  const doFetch = fetchImpl ?? fetch;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  let response: Response;
+  try {
+    response = await doFetch(logsEndpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok) return false;
+  // Written only after the server took it, so a failed POST retries on the
+  // next turn instead of assuming the context landed. A state-dir that cannot
+  // be written costs a re-POST next turn and nothing else, so it must not
+  // reject: the caller awaits this before it posts the turn spans, and losing
+  // the conversation over a bookkeeping write would be the worse trade.
+  try {
+    writeFingerprint({ stateFile, fingerprint, now: () => nowMs });
+  } catch {
+    // Deliberately swallowed; the context record already landed.
+  }
+  return true;
+}
+
+/** How many context posts are in flight at once. */
+const CONTEXT_POST_CONCURRENCY = 6;
+/** How long the whole batch of context posts may hold the turn spans back. */
+const CONTEXT_POST_BUDGET_MS = 15_000;
+
+/**
+ * POST every session's context record before the turn spans go out.
+ *
+ * The spans wait for these on purpose: the title on the context record is
+ * first-write, so it has to reach the server before the spans create the
+ * session row. That makes a slow logs endpoint a delay on the conversation
+ * itself, and awaiting the posts one at a time turned it into a long one:
+ * `--all` reads every rollout on disk, and against an endpoint that never
+ * answers each of those sessions spent the full 5 s per-post timeout before
+ * the next one started.
+ *
+ * So the posts run together, a few at a time, and the batch stops starting
+ * new ones once the budget is gone. The worst case is the budget plus the one
+ * post still in flight, whatever the session count. Sessions the batch does
+ * not reach keep their state file empty and are offered again on the next
+ * harvest, which is the same path a refused POST already takes.
+ */
+async function postCodexSessionContexts(args: {
+  metas: CodexRolloutMeta[];
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  /** Codex's own name per session id, from its session index. */
+  threadNames?: Map<string, string>;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+  runGit?: GitRunner;
+}): Promise<void> {
+  const { metas, threadNames, ...post } = args;
+  if (metas.length === 0) return;
+  let next = 0;
+  let outOfBudget = false;
+  const budget = setTimeout(() => {
+    outOfBudget = true;
+  }, CONTEXT_POST_BUDGET_MS);
+  // A CLI must not stay alive for the budget alone: every post can finish
+  // early, and then there is nothing left to wait for.
+  budget.unref?.();
+  try {
+    await Promise.all(
+      Array.from(
+        { length: Math.min(CONTEXT_POST_CONCURRENCY, metas.length) },
+        async () => {
+          while (!outOfBudget && next < metas.length) {
+            // Read and advance in one synchronous step, so two workers never
+            // take the same session.
+            const meta = metas[next++] ?? null;
+            // `postCodexSessionContext` reports failure rather than throwing,
+            // and this guard keeps that true for the caller if it ever stops.
+            await postCodexSessionContext({
+              meta,
+              threadName: meta?.sessionId
+                ? threadNames?.get(meta.sessionId)
+                : null,
+              ...post,
+            }).catch(() => false);
+          }
+        },
+      ),
+    );
+  } finally {
+    clearTimeout(budget);
+  }
+}
+
+/**
  * Recover codex turn I/O from rollouts written during this session and POST it
  * as OTLP spans. Returns the number of turns emitted (0 when nothing was
  * found), and rejects when the upload did not land, so a caller that reports a
@@ -324,15 +584,39 @@ export async function harvestAndEmitCodexIO(args: {
   sinceMs: number;
   nowMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
+  runGit?: GitRunner;
 }): Promise<number> {
-  const { sinceMs, nowMs, endpoint, token, sessionsRoot, fetchImpl } = args;
-  const turns = await readRolloutTurns(
+  const {
     sinceMs,
-    sessionsRoot ?? defaultCodexSessionsRoot(),
-  );
+    nowMs,
+    endpoint,
+    logsEndpoint,
+    token,
+    sessionsRoot,
+    stateDir,
+    fetchImpl,
+    runGit,
+  } = args;
+  const root = sessionsRoot ?? defaultCodexSessionsRoot();
+  const { turns, metas } = await readRollouts({
+    sinceMs,
+    sessionsRoot: root,
+  });
+  await postCodexSessionContexts({
+    metas,
+    nowMs,
+    logsEndpoint,
+    token,
+    threadNames: await readCodexThreadNames(codexSessionIndexPath(root)),
+    stateDir,
+    fetchImpl,
+    runGit,
+  });
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;
@@ -351,15 +635,35 @@ export async function harvestAndEmitCodexIO(args: {
 export function createCodexIOStreamer(args: {
   sinceMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
+  runGit?: GitRunner;
 }): { harvest: (nowMs: number) => Promise<number> } {
   const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const emitted = new Set<string>();
   return {
     async harvest(nowMs: number): Promise<number> {
-      const turns = await readRolloutTurns(args.sinceMs, root);
+      const { turns, metas } = await readRollouts({
+        sinceMs: args.sinceMs,
+        sessionsRoot: root,
+      });
+      // The fingerprint state dedups across ticks (and across the notify
+      // seam), so re-offering every in-window session each tick posts once —
+      // and re-reading the index each tick is what lets a rename land on the
+      // very next turn, as a changed fingerprint.
+      await postCodexSessionContexts({
+        metas,
+        nowMs,
+        logsEndpoint: args.logsEndpoint,
+        token: args.token,
+        threadNames: await readCodexThreadNames(codexSessionIndexPath(root)),
+        stateDir: args.stateDir,
+        fetchImpl: args.fetchImpl,
+        runGit: args.runGit,
+      });
       const fresh = turns.filter((t) => t.traceId && !emitted.has(t.traceId));
       if (fresh.length === 0) return 0;
       await postCodexTurns({

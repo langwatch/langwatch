@@ -60,9 +60,15 @@ func Root(ctx context.Context, _ []string) error {
 	ssrfOpts := httpblock.SSRFOptions{
 		AllowedHosts:     allowedProxyHosts,
 		StrictPublicOnly: cfg.Engine.EgressStrictPublicOnly,
-		Logger:           deps.Logger,
+		// BLOCK_LOCAL_HTTP_CALLS is the product-wide switch for reaching
+		// private networks, and this is where it reaches the workflow
+		// engine. It is read as a permission here because the block is
+		// spelled as one; see SSRFOptions.AllowLocal.
+		AllowLocal: !cfg.BlockLocalHTTPCalls,
+		Logger:     deps.Logger,
 	}
 	clog.Get(ctx).Info("nlpgo_egress_policy",
+		zap.Bool("block_local_http_calls", cfg.BlockLocalHTTPCalls),
 		zap.Bool("strict_public_only", ssrfOpts.StrictPublicOnly),
 		zap.Int("allowed_hosts", len(allowedProxyHosts)),
 	)

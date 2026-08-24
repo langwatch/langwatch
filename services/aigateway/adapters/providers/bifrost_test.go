@@ -344,6 +344,43 @@ func TestParseGeminiPassthroughUsage_CacheRead(t *testing.T) {
 	}
 }
 
+// Gemini reports thinking tokens outside candidatesTokenCount and bills them
+// at the output rate. Reading candidatesTokenCount alone billed a 47-token
+// answer for a 243-token turn and reported no reasoning at all.
+func TestParseGeminiPassthroughUsage_ThinkingTokens(t *testing.T) {
+	body := []byte(`{"candidates":[],"usageMetadata":{"promptTokenCount":25,` +
+		`"candidatesTokenCount":47,"thoughtsTokenCount":196,"totalTokenCount":268}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 196 {
+		t.Fatalf("ReasoningTokens: want 196, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 243 {
+		t.Fatalf("CompletionTokens: want 243 (47 visible + 196 thinking), got %d", u.CompletionTokens)
+	}
+	if u.PromptTokens+u.CompletionTokens != u.TotalTokens {
+		t.Fatalf("totals disagree: %d + %d != %d", u.PromptTokens, u.CompletionTokens, u.TotalTokens)
+	}
+}
+
+// A model that did not think reports no thoughtsTokenCount, and the
+// completion total stays exactly what the provider said.
+func TestParseGeminiPassthroughUsage_NoThinking(t *testing.T) {
+	body := []byte(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":4,"totalTokenCount":14}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 0 {
+		t.Fatalf("ReasoningTokens: want 0, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 4 {
+		t.Fatalf("CompletionTokens: want 4, got %d", u.CompletionTokens)
+	}
+}
+
 // Regression: opencode (Vercel AI SDK Anthropic provider) Zod-rejected
 // the OpenAI-shape `delta.choices` chunks Bifrost's ChatCompletionStream
 // emitted for /v1/messages with `No matching discriminator on 'type'`,

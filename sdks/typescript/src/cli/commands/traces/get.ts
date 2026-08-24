@@ -11,9 +11,9 @@ import {
 
 export const getTraceCommand = async (
   traceId: string,
-  options: RawOutputFlags,
+  options: RawOutputFlags & { project?: string },
 ): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const service = new TracesApiService();
   const spinner = createSpinner(`Fetching trace "${traceId}"...`).start();

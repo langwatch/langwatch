@@ -17,7 +17,7 @@ interface TraceTableLayoutProps {
   totalHits: number;
   nextCursor?: PageCursor | null;
   visibleCount?: number;
-  /** What one row is, for the totals copy: "traces" (default) or "sessions". */
+  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
   itemNoun?: string;
   children: React.ReactNode;
   /**

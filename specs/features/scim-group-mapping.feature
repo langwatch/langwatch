@@ -1,12 +1,26 @@
 Feature: SCIM Group Mapping
   As an organization admin
-  I want SCIM-provisioned groups to be stored as Groups in LangWatch and assigned RoleBindings
+  I want identity-provider groups mirrored in LangWatch and granted scoped access
   So that identity-provider group membership automatically grants scoped access
 
-  # Parity status: 4 of 24 scenarios bound to existing tests.
+  # Storage-neutral by design (ADR-092 §13): "RoleBinding" in the scenario
+  # titles below names the customer-visible fact - a group holds a role at a
+  # scope - not a table. Behind the grants ledger the same fact is a Grant
+  # row projected from events; every scenario here must hold identically
+  # before and after an organization's cutover.
+  #
+  # SCIM is a RECONCILER (delivery plan decision 18): the IdP pushes
+  # declarative state, the handler diffs it against the current projection
+  # and emits only the difference. Removals carry instant enforcement -
+  # an IdP deprovision is the fired-employee case, so the deny effect
+  # holds before the push returns, queue or no queue.
+
+  # Parity status: 4 of 26 scenarios bound to existing tests.
   # The remaining are tracked under #3458:
-  #   - 20 NO_TEST: behavior shipped + correct, no integration test yet exists
+  #   - 22 NO_TEST: behavior shipped + correct, no integration test yet exists
   # NO_TEST gaps:
+  #   - "A replayed SCIM push changes nothing"
+  #   - "An IdP removal takes effect before the push returns, with the queue stopped"
   #   - "Entra pushes a new group via SCIM"
   #   - "Entra pushes a group that already exists"
   #   - "Entra pushes members for a group with no RoleBindings"
@@ -31,6 +45,23 @@ Feature: SCIM Group Mapping
   Background:
     Given an organization on the ENTERPRISE plan
     And SCIM provisioning is enabled for the organization
+
+  # --- The reconciler (grants ledger, ADR-092 §13) ---
+
+  @integration @unimplemented
+  Scenario: A replayed SCIM push changes nothing
+    Given group "abc-123" already has exactly the members the IdP declares
+    When Entra pushes the same full member list again
+    Then no grant or membership fact is written
+    And the push succeeds
+
+  @integration @unimplemented
+  Scenario: An IdP removal takes effect before the push returns, with the queue stopped
+    Given user "user-1" is a member of group "abc-123" and the group holds a role
+    And the queue infrastructure is stopped
+    When Entra pushes a member list without "user-1"
+    Then the push succeeds
+    And "user-1"'s next permission check no longer resolves the group's role
 
   # --- SCIM group ingestion ---
 

@@ -9,12 +9,9 @@ vi.mock("../httpDestination", () => ({ sendHttpDestination: vi.fn() }));
 vi.mock("~/server/rateLimit", () => ({ rateLimit: vi.fn() }));
 
 import { rateLimit } from "~/server/rateLimit";
+import { WEBHOOK_DISPATCH_HOURLY_CAP } from "../dispatchBudget";
 import { sendHttpDestination } from "../httpDestination";
-import {
-  assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DISPATCH_HOURLY_CAP,
-} from "../sendWebhook";
+import { assertWebhookDelivered, sendWebhook } from "../sendWebhook";
 
 const mockedSend = vi.mocked(sendHttpDestination);
 const mockedRateLimit = vi.mocked(rateLimit);

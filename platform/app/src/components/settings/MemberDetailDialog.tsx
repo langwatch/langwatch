@@ -8,17 +8,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import {
   BindingInputRow,
@@ -67,7 +67,7 @@ export function MemberDetailDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(
     member.role,
@@ -250,7 +250,6 @@ export function MemberDetailDialog({
             : undefined,
         type: "success",
         duration: teamsLeftWithoutAdmin.length > 0 ? 10000 : undefined,
-        meta: { closable: true },
       });
       onClose();
     } catch (e) {

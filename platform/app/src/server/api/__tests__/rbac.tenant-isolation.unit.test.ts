@@ -1,9 +1,9 @@
+import { describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 
 import type { Session } from "~/server/auth";
 
@@ -108,9 +108,10 @@ describe("read-path tenant isolation", () => {
           }),
         },
         organizationUser: {
-          findFirst: vi
-            .fn()
-            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          findFirst: vi.fn().mockResolvedValue({
+            role: OrganizationUserRole.MEMBER,
+            disabledAt: null,
+          }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
@@ -173,9 +174,10 @@ describe("read-path tenant isolation", () => {
     it("still grants a genuine member", async () => {
       const prisma = {
         organizationUser: {
-          findFirst: vi
-            .fn()
-            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          findFirst: vi.fn().mockResolvedValue({
+            role: OrganizationUserRole.MEMBER,
+            disabledAt: null,
+          }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {

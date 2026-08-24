@@ -331,7 +331,7 @@ describe("memory-safety", () => {
         }
       });
 
-      it("clickhouse-trace.service.ts uses getClickHouseClientForProject which wraps with default settings", () => {
+      it("clickhouse-trace.service.ts resolves through the App, which wraps with default settings", () => {
         const traceServicePath = path.resolve(
           __dirname,
           "..",
@@ -342,11 +342,12 @@ describe("memory-safety", () => {
         );
         const source = fs.readFileSync(traceServicePath, "utf-8");
 
-        // The trace service must use getClickHouseClientForProject, which
-        // internally wraps clients with wrapWithDefaultSettings. This ensures
-        // memory-safety defaults are automatically injected on every query.
-        // The wrapper's merge behavior is tested in safeClickhouseClient.unit.test.ts.
-        expect(source).toContain("getClickHouseClientForProject");
+        // The trace service must resolve through the App's per-tenant
+        // resolver, whose clients are built by the one construction path that
+        // wraps them with wrapWithDefaultSettings - so memory-safety defaults
+        // are automatically injected on every query. The wrapper's merge
+        // behavior is tested in safeClickhouseClient.unit.test.ts.
+        expect(source).toContain("clickhouse.resolveClient(");
       });
     });
   });

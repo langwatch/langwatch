@@ -615,15 +615,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
     {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
-    {{- if not $found }}
-      {{/* Every lookup comes back empty during `helm template` and dry runs, so
-           "Secret not found" there means "we cannot see the cluster", not "it is
-           missing". Probe with an object every real cluster has: if kube-system
-           is invisible too, stay quiet rather than failing a plain render. */}}
-      {{- if lookup "v1" "Namespace" "" "kube-system" }}
-        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
-      {{- end }}
-    {{- else if not (index ($found.data | default dict) $langyKey) }}
+    {{/* Only the "Secret is readable but the key is missing" case is reported,
+         and reporting it needs no permission beyond the read on the line above.
+
+         A Secret that is absent is deliberately NOT reported. `lookup` returns
+         the same empty result for "not there" and "no cluster behind this
+         render", so telling them apart takes a SECOND read whose only job is to
+         prove the cluster is visible — and every candidate for that read costs
+         a permission the chart otherwise does not need. kube-system was
+         cluster-scoped, which is the bug this whole change exists to remove.
+         The namespace's own default ServiceAccount is at least namespaced, but
+         `get serviceaccounts` is still a distinct grant a role can withhold,
+         so it reintroduces the same class of failure in a smaller blast radius.
+         Neither is worth a hard render failure for an operator whose setup is
+         correct, in service of a message.
+
+         What that costs: a completely absent Secret is no longer named at
+         render time. It surfaces as CreateContainerConfigError on the pods,
+         which is exactly where it surfaced before this guard existed. What it
+         keeps is the case operators actually hit — the Secret is there and the
+         one key was never added — reported precisely, for free. */}}
+    {{- if and $found (not (index ($found.data | default dict) $langyKey)) }}
       {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
     {{- end }}
   {{- end }}
@@ -890,6 +902,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
+{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# The ADR-022 trace spool stays off on Azure until the operator states that the
+# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
+# days. That policy is management-plane; the app holds a data-plane key and
+# cannot read it back, so this is an assertion, not a check. Left unset, an
+# oversized span keeps its payload inline instead of leaving an object behind
+# that nothing reaps. Emitted here, beside the write toggle rather than with
+# the connection settings below, because it gates only the spool WRITE path —
+# a legacyAzureRead migration reads existing spool objects without it.
+- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+  value: "true"
+{{- end }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"
@@ -1212,6 +1236,169 @@ podAffinity:
           app.kubernetes.io/name: {{ .Release.Name }}-app
           app.kubernetes.io/instance: {{ .Release.Name }}
       topologyKey: kubernetes.io/hostname
+{{- end -}}
+
+{{/*
+  Shared pod spec for the stored-objects upgrade hook Jobs, up to and including
+  the `containers:` key. Both the pre-upgrade and the post-upgrade Job run the
+  same image with the same identity, so the parts that are not the script live
+  here rather than being written twice.
+
+  automountServiceAccountToken is true on purpose. These Jobs are the only
+  workloads in the release that call the Kubernetes API, so they need the token
+  global.automountServiceAccountToken withholds from the rest.
+
+  nodeSelector, tolerations, affinity and priorityClassName come from
+  global.scheduling so the Jobs land where the rest of the release lands. On a
+  cluster whose nodes are tainted or whose workloads carry a required node
+  affinity, a hook that ignored them would sit Pending and stall every upgrade.
+
+  global.scheduling.topologySpreadConstraints is deliberately NOT copied. A
+  spread constraint describes how the replicas of a service should be
+  distributed; on a single-run Job it can only make the pod unschedulable when
+  whenUnsatisfiable is DoNotSchedule, which for a fail-closed pre-upgrade hook
+  means a blocked upgrade.
+
+  imagePullSecrets are their own value rather than a chart-wide one, because
+  these Jobs run under their OWN ServiceAccount. Pull secrets an operator
+  attached to the namespace's `default` ServiceAccount, which is what the rest
+  of the release uses when global.serviceAccount.create is false, do not reach
+  them.
+
+  See templates/app/stored-objects-serialize-upgrade.yaml.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookPodSpec" -}}
+restartPolicy: Never
+serviceAccountName: {{ .Release.Name }}-stored-objects-upgrade
+automountServiceAccountToken: true
+{{- with .Values.app.storedObjects.localFilesystem.serializeUpgradesPullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.affinity }}
+affinity:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.priorityClassName }}
+priorityClassName: {{ . | quote }}
+{{- end }}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+containers:
+{{- end -}}
+
+{{/*
+  Shell functions both stored-objects upgrade hook Jobs use. They read the
+  `ns`, `deploy` and `selector` variables the Job's script sets above them.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookShellHelpers" -}}
+deployment_exists() {
+  kubectl -n "$ns" get deployment "$deploy" >/dev/null 2>&1
+}
+
+scale_workers() {
+  kubectl -n "$ns" patch deployment "$deploy" --subresource=scale --type=merge -p "{\"spec\":{\"replicas\":${1}}}"
+}
+
+wait_for_workers_gone() {
+  printf 'serialize-upgrade: waiting up to %ss for the %s pods to go away\n' "${1}" "$deploy"
+  out=$(kubectl -n "$ns" wait --for=delete pod --selector="$selector" --timeout="${1}s" 2>&1)
+  status=$?
+  printf '%s\n' "$out"
+  [ "$status" -eq 0 ] && return 0
+  # kubectl below 1.31 reports an empty selector result as an error. No pods
+  # left IS the state this waits for, so it must not read as a failure.
+  case "$out" in
+    *'no matching resources found'*) return 0 ;;
+  esac
+  return 1
+}
+{{- end -}}
+
+{{/*
+  The post-upgrade hook's wait for the app rollout. Reads `ns` and `app`.
+
+  It polls rather than calling `kubectl rollout status`, which LISTs
+  Deployments. Kubernetes ignores resourceNames on `list`, so `rollout status`
+  cannot run under a Role restricted to two Deployments by name, and using it
+  would mean granting read access to every Deployment in the namespace. The
+  condition below is the one `rollout status` itself applies.
+
+  All four parts are needed to prove the NEW app pod, not the one it replaced,
+  is the pod holding the volume:
+
+    observedGeneration >= generation   the controller has seen the new spec
+    updatedReplicas    == replicas     every pod asked for is from the new spec
+    statusReplicas     == updated      no pod from the old spec is left
+    available          >= updated      the new pods are ready
+
+  readyReplicas alone is not enough, and getting that wrong would reintroduce
+  the wedge this hook exists to prevent: it counts ready pods across EVERY
+  ReplicaSet, so during a kill-then-start rollout there is a window where the
+  controller has already recorded the new generation while the still-Ready OLD
+  pod satisfies the count. The workers would then come back against the node
+  the app is leaving.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookAppRolloutHelper" -}}
+is_number() {
+  case "${1:-}" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+app_rollout_done() {
+  # Pipe-separated, not space-separated. A status field that is absent (which
+  # is how the API reports zero) renders as nothing, so on whitespace splitting
+  # every later field shifts left and is read as the wrong one. With an
+  # explicit separator the empty field keeps its place, and an empty field
+  # fails is_number below, which reads as "not done yet" and keeps waiting.
+  state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
+  old_ifs=$IFS
+  IFS='|'
+  set -- $state
+  IFS=$old_ifs
+  # The three status counters default to 0, because the API omits a zero-valued
+  # one and an app parked at replicaCount 0 is a finished rollout, not one that
+  # never starts. The desired count stays mandatory: with it missing there is
+  # nothing to compare against. Defaulting the counters does not weaken the
+  # check, since a rollout that has not produced its pods yet reports 0 against
+  # a desired count above 0 and still reads as unfinished.
+  generation="${1:-}"; observed="${2:-}"; want="${3:-}"; updated="${4:-0}"; current="${5:-0}"; available="${6:-0}"
+  is_number "$generation" || return 1
+  is_number "$observed" || return 1
+  is_number "$want" || return 1
+  is_number "$updated" || return 1
+  is_number "$current" || return 1
+  is_number "$available" || return 1
+  [ "$observed" -ge "$generation" ] || return 1
+  [ "$updated" -eq "$want" ] || return 1
+  [ "$current" -eq "$updated" ] || return 1
+  [ "$available" -ge "$updated" ] || return 1
+  return 0
+}
+
+wait_for_app_rollout() {
+  deadline=$(( $(date +%s) + ${1} ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if app_rollout_done; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
 {{- end -}}
 
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}

@@ -1,5 +1,5 @@
-import type { SimulationSuite } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import type { AgentRepository } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
@@ -57,6 +57,7 @@ function makeMockRepository(
 type MockScenarioRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
   findNamesByIds: ReturnType<typeof vi.fn>;
+  findRunConfigByIds: ReturnType<typeof vi.fn>;
 };
 
 type MockAgentRepository = {
@@ -77,6 +78,15 @@ function makeMockScenarioRepository(
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
     findNamesByIds: vi.fn(async () => []),
+    findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({
+        id,
+        name: id,
+        situation: "A customer asks for help",
+        criteria: ["Answers the question"],
+        parameters: null,
+      })),
+    ),
     ...overrides,
   };
 }
@@ -253,6 +263,147 @@ describe("SuiteService", () => {
           expect(suiteRunService.startRun).toHaveBeenCalledWith(
             expect.objectContaining({ repeatCount: 3 }),
           );
+        });
+      });
+    });
+
+    describe("given the run supplies parameter values", () => {
+      const declaring = (parameters: unknown) => ({
+        findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+          ids.map((id) => ({
+            id,
+            name: id,
+            situation: "A {{ params.account_tier }} customer asks for help",
+            criteria: ["Answers the question"],
+            parameters,
+          })),
+        ),
+      });
+
+      describe("when every supplied name is declared", () => {
+        it("hands the resolved values to suiteRunService per scenario", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "region", defaultValue: "eu-central" },
+            ]),
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"] }),
+            ...RUN_DEFAULTS,
+            parameters: { account_tier: "platinum" },
+          });
+
+          const { parametersByScenarioId } = suiteRunService.startRun.mock
+            .calls[0]?.[0] as {
+            parametersByScenarioId: Map<string, Record<string, unknown>>;
+          };
+          expect(parametersByScenarioId.get("scen_1")).toEqual({
+            account_tier: "platinum",
+            region: "eu-central",
+          });
+        });
+      });
+
+      describe("when a supplied name is declared by no scenario in the run", () => {
+        it("rejects with scenario_parameter_unknown before anything is scheduled", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({ scenarioIds: ["scen_1"] }),
+              ...RUN_DEFAULTS,
+              parameters: { regoin: "eu-central" },
+            }),
+          ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when a scenario declares one of them secret", () => {
+        const declaringSecret = {
+          findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+            ids.map((id) => ({
+              id,
+              name: id,
+              situation: "A {{ params.account_tier }} customer asks for help",
+              criteria: ["Answers the question"],
+              parameters: [
+                { name: "account_tier", defaultValue: "gold" },
+                { name: "api_token", secret: true },
+              ],
+            })),
+          ),
+        };
+
+        // The store boundary itself is covered where it is crossed, in
+        // suite-run-parameters.integration.test.ts. What this pins is the
+        // handoff: the value leaves the suite service encrypted, and the plain
+        // record it travels beside never holds it.
+        it("hands the secret to suiteRunService encrypted and out of the plain values", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"] }),
+            ...RUN_DEFAULTS,
+            parameters: { api_token: "tok-live-1" },
+          });
+
+          const { parametersByScenarioId, secretParametersByScenarioId } =
+            suiteRunService.startRun.mock.calls[0]?.[0] as {
+              parametersByScenarioId: Map<string, Record<string, unknown>>;
+              secretParametersByScenarioId: Map<string, Record<string, string>>;
+            };
+
+          expect(parametersByScenarioId.get("scen_1")).toEqual({
+            account_tier: "gold",
+          });
+          const stamped = secretParametersByScenarioId.get("scen_1");
+          expect(Object.keys(stamped!)).toEqual(["api_token"]);
+          expect(stamped!.api_token).not.toContain("tok-live-1");
+        });
+
+        /** @scenario "A secret parameter value must be supplied when the run starts" */
+        it("rejects the run when the secret has no value", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({ scenarioIds: ["scen_1"] }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "scenario_secret_parameter_missing",
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when the scenario reads a parameter nothing resolves", () => {
+        it("rejects with scenario_parameter_missing before anything is scheduled", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([{ name: "account_tier" }]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({ scenarioIds: ["scen_1"] }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({ code: "scenario_parameter_missing" });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });

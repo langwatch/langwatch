@@ -32,23 +32,17 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
   runEvaluationForTrace: vi.fn(),
 }));
 
-// Bypass the RBAC middleware — we're testing the handler logic, not auth.
+// Bypass the RBAC resolver — we're testing the handler logic, not auth.
 vi.mock("../../rbac", () => ({
-  checkProjectPermission:
-    () =>
-    ({
-      next,
-      ctx,
-    }: {
-      next: () => unknown;
-      ctx: { permissionChecked?: boolean };
-    }) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
+  resolveProjectPermission: vi
+    .fn()
+    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }));
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { evaluationsRouter } from "../evaluations";
+
+wireDefaultTestApp();
 
 function createCaller(_projectId: string) {
   return evaluationsRouter.createCaller({

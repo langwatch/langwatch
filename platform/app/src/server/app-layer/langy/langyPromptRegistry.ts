@@ -74,33 +74,28 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * bytes — no drift between what we seed as version 1 and what we fall back to.
  */
 /**
- * This block is PREPENDED to the turn context, so it is read before AGENTS.md
- * and must never contradict it. It said three things that did:
+ * This block rides the per-message `system` field, appended AFTER AGENTS.md in
+ * the assembled prompt. It exists as the operator's hot-patch channel: promote
+ * a new `langy-turn-override` registry version and the wording changes without
+ * a deploy. The worker already carries the persona twice (the build agent's
+ * config prompt and AGENTS.md), so the default stays at three lines: repeating
+ * the operating rules here made the model read the same commandments three
+ * times, and any drift between the copies became a contradiction it had to
+ * arbitrate.
  *
- *   - that Langy reaches the platform "via the available MCP tools", and then
- *     named twelve of them (`search_traces`, `get_analytics`, …). There is no
- *     LangWatch MCP server and there never was; AGENTS.md rule 1 says the CLI is
- *     the only interface. Naming tools that do not exist in a block the model
- *     reads first is an instruction to hallucinate them.
- *   - that it does not "run shell" — which is precisely how the CLI is reached.
- *   - to report "a relevant LangWatch UI URL", which rule 9 forbids outright:
- *     the panel renders the command's own `platformUrl` as a trusted, rewritten
- *     card action, and a URL the model writes is a worker-side host
- *     (`host.docker.internal`, a container port) that would not resolve.
- *
- * What survives is the part only this block can say — the role framing and the
- * act-don't-narrate stance. Everything about HOW to reach the platform belongs
- * to AGENTS.md, which is the one place that describes it correctly.
+ * The rules kept here are the measured defects, because last position in the
+ * prompt is the right place to spend on them. Grounding: in production, 40% of
+ * turns that reach `status: "completed"` make zero tool calls, so the answer
+ * came from the model rather than from the project. Ending: on the pi harness
+ * the model closes replies with a next-actions question, which AGENTS.md bans;
+ * mid-prompt the ban loses to the model's own habit, so the pointer rides
+ * here.
  */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
-  "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
-  "You are NOT a general code/repo assistant: your job is to read and act on the",
-  "user's LangWatch project, using the `langwatch` CLI in your shell as described",
-  "in AGENTS.md.",
-  "Act immediately — never describe what you would do, never list your capabilities,",
-  "never ask which project, never hand the work back. Pick a reasonable default and act.",
-  "The panel renders links, names and counts as cards, so your prose never restates one:",
-  "after an action it carries what the reader might want next, or nothing at all.",
+  "You are Langy, the in-product LangWatch assistant.",
+  "AGENTS.md is your operating contract and applies to every reply.",
+  "Facts about the user's project come from what you retrieve this turn, never from memory.",
+  "End on the answer: no closing question or next-actions menu (AGENTS.md names the exceptions).",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {

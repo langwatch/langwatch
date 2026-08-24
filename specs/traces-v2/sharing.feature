@@ -1,5 +1,5 @@
 # Trace sharing (redesign) — Gherkin Spec
-# ADR: dev/docs/adr/039-token-gated-trace-sharing.md
+# ADR: dev/docs/adr/057-token-gated-trace-sharing.md
 #
 # Supersedes the legacy PublicShare feature. The legacy model authorized
 # anonymous reads by checking whether *a share row existed* for a given
@@ -254,6 +254,33 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When a viewer opens the link once
       Then exactly one view is counted
       And the trace is shown
+
+  Rule: A link's view budget survives its organization moving onto the engine
+
+    # ADR-092 delivery-plan PR 3 (decision 22). A cut-over organization's
+    # share links are authored through the grants ledger, and view
+    # consumption moves to a separate accounting row that the projection
+    # never rewrites. What must not change for the customer holding the link
+    # is the only thing they can perceive: how many views they have left.
+    #
+    # The failure this pins is a refill, not a crash — an already-spent link
+    # coming back to life the moment its organization is served by the
+    # engine, which no error surface would ever report.
+
+    @integration
+    Scenario: A cut-over organization's share link consumes its remaining budget
+      Given a share link capped at two views that has already been opened once
+      And its organization is now served by the authorization engine
+      When a visitor presents the link
+      Then the view is allowed and the view budget is now exhausted
+      And the next visitor presenting it is refused
+
+    @integration
+    Scenario: An exhausted share link stays exhausted after cutover
+      Given a share link whose view cap was already reached
+      And its organization is now served by the authorization engine
+      When a visitor presents the link
+      Then the link grants nothing
 
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 

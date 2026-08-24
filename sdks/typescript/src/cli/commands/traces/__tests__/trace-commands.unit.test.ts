@@ -116,6 +116,46 @@ describe("searchTracesCommand()", () => {
 		});
 	});
 
+	// The query is matched as a phrase, so a Lucene-style query returns zero
+	// rows rather than an error, and zero rows reads like "you have none of
+	// those". An agent asked to find failing traces reports that as the answer.
+	describe("when a query with boolean operators finds nothing", () => {
+		let log: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+		});
+
+		// Restored here rather than after each assertion: a rejected command
+		// would skip an inline mockRestore and leave every later test in this
+		// file writing into a mocked logger.
+		afterEach(() => {
+			log.mockRestore();
+		});
+
+		/** @scenario A boolean query that finds nothing says why */
+		it("says the operators were searched for as words", async () => {
+			await searchTracesCommand({ query: "error OR exception" });
+
+			expect(log.mock.calls.flat().join("\n")).toContain(
+				"searched for as words",
+			);
+		});
+
+		/** @scenario A plain query that finds nothing does not blame the operators */
+		it("stays quiet about them when the query is one phrase", async () => {
+			await searchTracesCommand({ query: "validation failed" });
+
+			expect(log.mock.calls.flat().join("\n")).not.toContain(
+				"searched for as words",
+			);
+		});
+	});
+
 	describe("when format is json", () => {
 		it("outputs raw JSON", async () => {
 			const result = {
@@ -169,6 +209,47 @@ describe("searchTracesCommand()", () => {
 			expect(mockSearch).toHaveBeenCalledWith(
 				expect.objectContaining({
 					filters: { "traces.origin": ["application", "evaluation"] },
+				}),
+			);
+		});
+	});
+
+	// An error is recorded on the span, not in the trace's searchable text, so
+	// before this flag existed the only way to answer "show me my failed
+	// traces" was to pull every trace and filter locally. An agent that instead
+	// searched for the word "error" got zero rows and reported a clean project.
+	describe("when --errors-only is provided", () => {
+		/** @scenario Search only traces that contain an error */
+		it("passes a traces.error filter to the search API", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ errorsOnly: true });
+
+			expect(mockSearch).toHaveBeenCalledWith(
+				expect.objectContaining({
+					filters: { "traces.error": ["true"] },
+				}),
+			);
+		});
+
+		/** @scenario Combine the error filter with an origin filter */
+		it("combines with --origin instead of replacing it", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ errorsOnly: true, origin: "application" });
+
+			expect(mockSearch).toHaveBeenCalledWith(
+				expect.objectContaining({
+					filters: {
+						"traces.origin": ["application"],
+						"traces.error": ["true"],
+					},
 				}),
 			);
 		});

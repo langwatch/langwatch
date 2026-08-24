@@ -18,6 +18,9 @@ var LeanCheckoutWorkflows = []string{
 	// that timeout mid-clone, at 297-298s in checkout against a 22.8s average
 	// for the runs that finished.
 	".github/workflows/migration-order.yml",
+	// readme-links builds the checker from source, so it takes a working tree
+	// — and the media is the one part of it no link check ever opens.
+	".github/workflows/readme-links.yml",
 }
 
 // RequiredExclusions are the repository's marketing media: 165 MB of .gif and
@@ -41,6 +44,38 @@ const wholeDocsExclusion = "!/docs/"
 // .github — the change gates. They need no media exclusions because they take
 // no working tree at all.
 const gateOnlyPattern = ".github"
+
+// wholeTreePatterns are the sparse-checkout entries that ask for everything.
+// Their presence is what turns a pattern list into a denylist, and a denylist
+// is the only shape that can pull the media by accident.
+var wholeTreePatterns = []string{"/*", "*", "/**", "**"}
+
+// isAllowlist reports whether the patterns name what the job wants rather than
+// taking the whole tree and carving pieces back out.
+//
+// An allowlist cannot pull the media, because anything it does not name is
+// never checked out — `sparse-checkout: platform/app/vitest.durations.json`
+// takes exactly one file. Requiring the media exclusions of such a step is
+// noise: the negations would be three lines asserting the absence of
+// directories the step already never asked for, and under a non-cone allowlist
+// they change nothing at all.
+//
+// This generalises the `.github` gate exemption above, which is the same idea
+// hardcoded to one pattern.
+func isAllowlist(patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+
+	for _, pattern := range patterns {
+		trimmed := strings.TrimSpace(pattern)
+		if strings.HasPrefix(trimmed, "!") || slices.Contains(wholeTreePatterns, trimmed) {
+			return false
+		}
+	}
+
+	return true
+}
 
 // LeanCheckout reports every checkout that would pull the media.
 func LeanCheckout(repoRoot string) ([]string, error) {
@@ -77,6 +112,13 @@ func leanCheckoutStep(step ciscan.CheckoutStep) []string {
 	patterns := step.Step.SparsePatterns()
 	if len(patterns) == 0 {
 		return []string{fmt.Sprintf("%s declares no sparse-checkout, so it pulls the media too", where)}
+	}
+
+	// An allowlist is lean by construction, so the media exclusions have
+	// nothing to do. Checked after the empty case above, so a job with no
+	// sparse-checkout at all is still reported.
+	if isAllowlist(patterns) {
+		return nil
 	}
 
 	problems := keepsDocsProse(where, patterns)

@@ -1,6 +1,6 @@
 # Metric processing - three map projections and not a single fold
 
-Every projection in here is a map projection. No folds, no reactors. That is
+Every projection in here is a map projection. No folds, no subscribers. That is
 deliberate, and it comes down to one property: a metric data point is immutable
 and content-addressed. `PointId` is `sha256(seriesId ‖ canonical payload)`, and
 `getAggregateId` returns that same `PointId`, so every point is its own

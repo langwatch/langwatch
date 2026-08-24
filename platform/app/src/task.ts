@@ -4,12 +4,8 @@
 import "./env-load";
 
 import { createLogger } from "@langwatch/observability";
+import { tryGetApp } from "./server/app-layer/app";
 import { TASKS } from "./tasks.generated";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const redis = process.env.SKIP_REDIS
-  ? null
-  : require("./server/redis").connection;
 
 const logger = createLogger("langwatch:task");
 
@@ -38,7 +34,19 @@ const runAsync = async () => {
     logger.error({ error: e, taskName }, "failed");
     throw e;
   } finally {
-    redis?.disconnect();
+    // Only the tasks that initialize an App have anything open; closing it
+    // releases Redis along with everything else the task booted. `tryGetApp`,
+    // not `getApp`, because the question here is whether a task built one at
+    // all — and most do not.
+    // Caught, because a rejection raised from `finally` would replace the task
+    // error rethrown above — turning a diagnosable failure into a shutdown
+    // error about the wrong thing. Closing is best-effort; the process exits
+    // either way.
+    try {
+      await tryGetApp()?.close();
+    } catch (closeError) {
+      logger.error({ error: closeError, taskName }, "failed to close the app");
+    }
     logger.info("done");
   }
 

@@ -61,6 +61,13 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
+    // Never enabled in project_api_key mode; present because the page always
+    // calls the hook.
+    apiKey: {
+      myBindings: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
     project: {
       getHasFirstMessage: {
         useQuery: () => ({ data: undefined, isLoading: false }),
@@ -202,7 +209,7 @@ const renderPage = () =>
   );
 
 const approveButton = () =>
-  screen.getByRole("button", { name: "Generate API key" }) as HTMLButtonElement;
+  screen.getByRole("button", { name: "Send API key" }) as HTMLButtonElement;
 
 beforeEach(() => {
   fetchMock.mockReset();

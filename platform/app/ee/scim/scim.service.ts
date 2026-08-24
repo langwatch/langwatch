@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DepartmentService } from "@ee/governance/services/department/department.service";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
   type User,
-} from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+} from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -19,22 +24,80 @@ import {
   type ScimPatchRequest,
   type ScimUser,
 } from "./scim.types";
+import { reconcileScimGrants } from "./scim-grants.reconciler";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
  * All operations are scoped to an organization for multi-tenancy.
  */
 export class ScimService {
+  private readonly prisma: PrismaClient;
+  private readonly writer: GrantsLedgerWriter;
   private readonly userService: UserService;
   private readonly departmentService: DepartmentService;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor({
+    prisma,
+    writer = grantsLedgerWriter(),
+  }: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }) {
+    this.prisma = prisma;
+    this.writer = writer;
     this.userService = UserService.create(prisma);
     this.departmentService = DepartmentService.create(prisma);
   }
 
-  static create(prisma: PrismaClient): ScimService {
-    return new ScimService(prisma);
+  /**
+   * The directory acts as itself, not as whoever happens to hold the SCIM
+   * token. When identity connections exist this becomes the connection id
+   * (ADR-092's identity-platform seam); the event shape already takes it.
+   */
+  private static readonly ACTOR = {
+    type: "system",
+    id: SYSTEM_ACTORS.scim,
+  } as const;
+
+  /**
+   * The organization-scoped membership grant a directory push asserts,
+   * reconciled rather than written: re-pushing the same state emits nothing.
+   */
+  private async reconcileOrganizationMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await reconcileScimGrants({
+      prisma: this.prisma,
+      writer: this.writer,
+      organizationId,
+      where: {
+        userId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+      desired: [
+        {
+          principal: { userId },
+          role: TeamUserRole.MEMBER,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
+        },
+      ],
+      actor: ScimService.ACTOR,
+      mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    });
+  }
+
+  static create(options: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }): ScimService {
+    return new ScimService(options);
   }
 
   /**
@@ -158,22 +221,24 @@ export class ScimService {
             role: "MEMBER",
           },
         });
-        await this.prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: existingUser.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: organizationId,
-          },
-        });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
+          // The membership already exists (lost a race, or a retried push),
+          // but its grant may not: reconcile so a SCIM retry still repairs a
+          // membership left without its grant.
+          await this.reconcileOrganizationMembership({
+            userId: existingUser.id,
+            organizationId,
+          });
           return this.toScimUser(existingUser);
         }
         throw e;
       }
+
+      await this.reconcileOrganizationMembership({
+        userId: existingUser.id,
+        organizationId,
+      });
 
       if (existingUser.deactivatedAt) {
         await this.userService.reactivate({ id: existingUser.id });
@@ -204,15 +269,6 @@ export class ScimService {
           role: "MEMBER",
         },
       });
-      await this.prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: newUser.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-      });
     } catch (e) {
       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         return this.scimError({
@@ -222,6 +278,11 @@ export class ScimService {
       }
       throw e;
     }
+
+    await this.reconcileOrganizationMembership({
+      userId: newUser.id,
+      organizationId,
+    });
 
     await this.syncCostCenterFromScim({
       userId: newUser.id,
@@ -467,14 +528,29 @@ export class ScimService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
-      }),
-      this.prisma.roleBinding.deleteMany({
-        where: { userId: id, organizationId },
-      }),
-    ]);
+    // A deprovision is the fired-employee case: the grants go first and carry
+    // instant enforcement (ADR-092 decision 7), so the deny holds before this
+    // returns rather than whenever the queue next drains. `offboardMember`
+    // (not the id-diff `reconcileScimGrants` this used to call) is what makes
+    // that hold even against a lagging projection: its fold sweeps every
+    // grant the principal holds, not only the ones this read could see, so a
+    // grant appended moments before this push — invisible to `current` — is
+    // still revoked once the fold catches up rather than surviving forever.
+    // The id list below is the audit record and today's synchronous
+    // enforcement, not the instruction.
+    const visibleGrants = await this.prisma.roleBinding.findMany({
+      where: { organizationId, userId: id },
+      select: { id: true },
+    });
+    await this.writer.offboardMember({
+      organizationId,
+      userId: id,
+      revokedGrantIds: visibleGrants.map((row) => row.id),
+      actor: ScimService.ACTOR,
+    });
+    await this.prisma.organizationUser.delete({
+      where: { userId_organizationId: { userId: id, organizationId } },
+    });
     await this.userService.deactivate({ id });
     return null;
   }

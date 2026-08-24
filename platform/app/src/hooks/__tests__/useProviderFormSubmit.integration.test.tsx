@@ -39,7 +39,7 @@ const {
 
 vi.mock("../../utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       organization: {
         getAll: {
           invalidate: mockInvalidate,
@@ -111,6 +111,7 @@ function buildSnapshot(overrides: Partial<FormSnapshot> = {}): FormSnapshot {
   return {
     provider: buildAzureProvider(),
     name: "Azure OpenAI",
+    routingHandle: "",
     projectId: "proj-1",
     organizationId: "org_test",
     isUsingEnvVars: true,

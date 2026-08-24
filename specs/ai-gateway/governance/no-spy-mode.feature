@@ -40,7 +40,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   @bdd @no-spy-mode @setting @audit
   Scenario Outline: Admin changes the org-level no-spy mode
     Given the org's current `governanceLogContentMode` is "<from>"
-    When carol navigates to /settings/governance and selects the "<to>" mode
+    When carol navigates to /governance and selects the "<to>" mode
     Then `Organization.governanceLogContentMode` is updated to "<to>"
     And an audit row `gateway.organization.governance_log_content_mode_changed`
         is emitted with payload { fromMode: "<from>", toMode: "<to>", actorUserId: carol.id }
@@ -166,7 +166,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   Scenario: Trace viewer shows a "stripped by org policy" banner when mode is non-full
     Given a trace was stripped at ingest (per mode="strip_io")
     When carol opens the trace at /[project]/messages/[traceId]
-    Then the input/output panels show "Content stripped by org no-spy policy. See /settings/governance."
+    Then the input/output panels show "Content stripped by org no-spy policy. See /governance."
     And the model / cost / tokens / latency panels show their values
     # Distinguishes from PII redaction (per-project) so admins know WHICH
     # policy applied. Both can be active simultaneously.

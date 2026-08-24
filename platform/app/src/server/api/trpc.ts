@@ -16,15 +16,18 @@ import {
   SpanKind,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import type { inferParser } from "@trpc/server";
-import {
-  initTRPC,
-  type ProcedureBuilder,
-  type ProcedureParams,
-  type Simplify,
-  TRPCError,
-} from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+// The permission-builder below re-implements the typing of tRPC's own
+// `procedureBuilder.input`, which is only expressible in terms of these
+// internals (v10 exposed them via the `@trpc-internal/*` path aliases).
+import type {
+  inferParser,
+  Parser,
+  ProcedureBuilder,
+  Simplify,
+  UnsetMarker,
+} from "@trpc/server/unstable-core-do-not-import";
 
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
@@ -34,22 +37,42 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import type {
+  AuthzPermission,
+  DeclarationError,
+  DeclaredAuthzMiddleware,
+  NoPermissionOptions,
+  ScopeTierField,
+  ValidatePermissionForInput,
+  ViaFieldFor,
+} from "@langwatch/authz";
+import { authzDeclarationOf } from "@langwatch/authz";
+import {
+  HandledError,
+  isZodLikeError,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
-import type { OrganizationUserRole } from "@prisma/client";
-import type { Parser } from "@trpc-internal/parser";
-import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
-import { ZodError } from "zod";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { type App, getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
+import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
+import { scopeLineageGuard } from "../app-layer/authz/scope-lineage-guard";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "../app-layer/authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -66,6 +89,13 @@ interface CreateContextOptions {
   req?: NextApiRequest;
   res?: NextApiResponse;
   session: Session | null;
+  /**
+   * The composed App this request decides through. The request path passes
+   * `getApp()`; a test can inject a fake here instead of mocking the App
+   * module. Left unset, App-reading middleware falls back to the process
+   * singleton.
+   */
+  app?: App;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
@@ -96,6 +126,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     req: opts.req,
     res: opts.res,
     prisma,
+    app: opts.app,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
@@ -120,6 +151,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     session,
+    app: getApp(),
     permissionChecked: false,
     publiclyShared: false,
   });
@@ -236,10 +268,12 @@ export function errorFormatter({
   // other failure: `fromZodError` flattens the issues into
   // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
   // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
-  // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  // already does (packages/api/src/errors.ts::validationErrorFromZod). Matched
+  // by shape, since the routers behind this one boundary no longer share a
+  // single zod and an `instanceof` sees one major only — see `isZodLikeError`.
   const handled = HandledError.isHandled(error.cause)
     ? error.cause
-    : error.cause instanceof ZodError
+    : isZodLikeError(error.cause)
       ? ValidationError.fromZodError(error.cause)
       : null;
 
@@ -434,7 +468,11 @@ const auditLogTRPCErrors = t.middleware(
         organizationId: (input as any)?.organizationId,
         projectId: (input as any)?.projectId,
         action: path,
-        args: input,
+        // Through the same redaction as the success path. This middleware
+        // sits before the input parser, so `input` is unset here today; the
+        // call is what keeps a chain that changes from storing in clear what
+        // the other middleware takes out.
+        args: redactAuditArgs({ input, action: path }),
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
@@ -575,11 +613,72 @@ function isAuditLogExempt(path: string): boolean {
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
+/**
+ * Action paths whose input carries values a person typed for one run, keyed by
+ * the field that holds them.
+ *
+ * `parameters` on a run can hold a credential: a scenario can declare a
+ * parameter secret, and the value is supplied when the run starts.
+ * `templateVariables` on the http test button is where the same person types a
+ * test token. Both field names are ordinary words other mutations use for
+ * harmless things, so the rule is bound to the action rather than to the name.
+ *
+ * The names are kept: "which parameters did this run set" is the part of the
+ * record worth having.
+ */
+const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "suites.run": ["parameters"],
+  "scenarios.run": ["parameters"],
+  "httpProxy.execute": ["templateVariables"],
+};
+
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
     Object.keys(source).map((name) => [name, "[redacted]"]),
   );
+}
+
+/** The object fields whose values this action must not store. */
+function redactedObjectFieldsFor(action?: string): readonly string[] {
+  if (!action) return CREDENTIAL_OBJECT_FIELDS;
+  return [
+    ...CREDENTIAL_OBJECT_FIELDS,
+    ...(REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []),
+  ];
+}
+
+/**
+ * The redacted form of one field, or undefined when the field holds nothing to
+ * redact.
+ *
+ * No schema produces an array here, but a redactor has to fail safe on a shape
+ * it did not expect rather than wave it through: the cost of guessing wrong is
+ * a secret in a durable table.
+ */
+function redactObjectField(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Array.isArray(value)
+    ? value.map(() => "[redacted]")
+    : redactValues(value as Record<string, unknown>);
+}
+
+/**
+ * The redacted form of an `extraHeaders` list.
+ *
+ * A list of `{ key, value }` pairs rather than an object, so the header name
+ * survives and only what it carries is dropped. An entry of any other shape is
+ * replaced whole: a redactor cannot tell a name from a value in a shape it does
+ * not know, and a header is where an `Authorization: Bearer …` is typed.
+ */
+function redactHeaderValues(headers: readonly unknown[]): unknown[] {
+  return headers.map((header) => {
+    if (typeof header !== "object" || header === null) return "[redacted]";
+    const { key } = header as Record<string, unknown>;
+    return typeof key === "string"
+      ? { key, value: "[redacted]" }
+      : "[redacted]";
+  });
 }
 
 /**
@@ -590,8 +689,17 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
  * key out of a URL. A secret in a durable, queryable table is worse than one
  * in a request line, so the values go. The field names stay, because "which
  * credentials were set" is the part of the record worth having.
+ *
+ * `action` is the tRPC path. It selects the rules that only apply to one
+ * mutation, such as a run's parameter values.
  */
-export function redactAuditArgs(input: unknown): unknown {
+export function redactAuditArgs({
+  input,
+  action,
+}: {
+  input: unknown;
+  action?: string;
+}): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
@@ -604,32 +712,13 @@ export function redactAuditArgs(input: unknown): unknown {
     redacted[field] = value;
   };
 
-  for (const field of CREDENTIAL_OBJECT_FIELDS) {
-    const value = record[field];
-    if (typeof value !== "object" || value === null) continue;
-
-    // No schema produces an array here, but a redactor has to fail safe on a
-    // shape it did not expect rather than wave it through — the cost of
-    // guessing wrong is a secret in a durable table.
-    replace(
-      field,
-      Array.isArray(value)
-        ? value.map(() => "[redacted]")
-        : redactValues(value as Record<string, unknown>),
-    );
+  for (const field of redactedObjectFieldsFor(action)) {
+    const value = redactObjectField(record[field]);
+    if (value !== undefined) replace(field, value);
   }
 
-  // A list of `{ key, value }` pairs rather than an object, so the header
-  // name survives and only what it carries is dropped.
   if (Array.isArray(record.extraHeaders)) {
-    replace(
-      "extraHeaders",
-      record.extraHeaders.map((header) =>
-        typeof header === "object" && header !== null && "value" in header
-          ? { ...header, value: "[redacted]" }
-          : header,
-      ),
-    );
+    replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
 
   return redacted ?? input;
@@ -650,7 +739,7 @@ const auditLogMutations = t.middleware(
       organizationId: (input as any)?.organizationId,
       projectId: (input as any)?.projectId,
       action: path,
-      args: redactAuditArgs(input),
+      args: redactAuditArgs({ input, action: path }),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,
@@ -791,7 +880,7 @@ export const tracerMiddleware = t.middleware(
     // so the error span's duration matches the actual call.
     const parentContext = callerTraceContext({ req: ctx.req, type });
 
-    if (isSilencedCall(path, type)) {
+    if (isSilencedCall({ path, type })) {
       const startTime = Date.now();
       const result = await next();
       if (result.ok) return result;
@@ -921,6 +1010,42 @@ const handledErrorMiddleware = t.middleware(async ({ next }) => {
   return result;
 });
 
+/**
+ * How long a call may take before its record is raised from info to warning.
+ *
+ * A call that succeeds slowly used to log exactly like one that succeeded
+ * instantly, so the only way to find one was for a customer to say a screen
+ * felt broken. That is how the scenario editor's multi-second load went
+ * unnoticed: every procedure on the path reported success, and the duration
+ * was already on the record but never changed the level.
+ *
+ * One second, because that regression ran at 1.5 to 2.3 seconds per call
+ * and a higher budget would have kept it invisible. Procedures that are
+ * legitimately long (a model generating a draft, an export) still warn,
+ * and the warning for those is still true: it states what the call cost.
+ * The per-path throttle is what keeps the volume down.
+ */
+const DEFAULT_SLOW_CALL_MS = 1000;
+
+const SLOW_CALL_THROTTLE_MS = 60_000;
+
+const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
+
+/** Zero or negative turns the warning off; unset or unparseable keeps the default. */
+export function resolveSlowCallBudgetMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.TRPC_SLOW_CALL_MS;
+  if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_SLOW_CALL_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_SLOW_CALL_MS;
+}
+
+/** Test seam: the throttle is process-wide state and must not leak between tests. */
+export function resetSlowCallThrottle(): void {
+  slowCallThrottle.reset();
+}
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -931,6 +1056,8 @@ export function handleTrpcCallLogging({
   statusCode,
   log,
   capture,
+  slowCallBudgetMs = resolveSlowCallBudgetMs(),
+  now = Date.now(),
 }: {
   result: { ok: boolean; error?: unknown };
   path: string;
@@ -940,6 +1067,8 @@ export function handleTrpcCallLogging({
   statusCode: number | null;
   log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
   capture: (error: Error | string) => void;
+  slowCallBudgetMs?: number;
+  now?: number;
 }): void {
   const logData: Record<string, any> = {
     path,
@@ -995,9 +1124,28 @@ export function handleTrpcCallLogging({
         : "error"
       : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
-  } else {
-    log.info(logData, "trpc call");
+    return;
   }
+
+  // The call succeeded, so this is not a failure and the record carries no
+  // cause. It is raised only because the time it took is worth watching by
+  // rate, which is what warning means here.
+  if (slowCallBudgetMs > 0 && duration > slowCallBudgetMs) {
+    const suppressed = slowCallThrottle.claim({ key: path, now });
+    if (suppressed !== undefined) {
+      log.warn(
+        {
+          ...logData,
+          budgetMs: slowCallBudgetMs,
+          suppressedSincePrevious: suppressed,
+        },
+        "trpc call",
+      );
+      return;
+    }
+  }
+
+  log.info(logData, "trpc call");
 }
 
 /**
@@ -1020,8 +1168,36 @@ function isSilencedPath(path: string): boolean {
   return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
-function isSilencedCall(path: string, type: string): boolean {
+function isSilencedCall({
+  path,
+  type,
+}: {
+  path: string;
+  type: string;
+}): boolean {
   return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
+/**
+ * Records one finished tRPC call: decides whether it is logged at all, then
+ * how loudly.
+ *
+ * The two halves belong together. Silencing runs first and drops the record
+ * entirely, so "a slow presence heartbeat raises nothing" is a property of the
+ * pair and of neither alone. Asserting it against the classifier proves only
+ * that a boolean is what it is, and asserting it against the logger tests a
+ * call the middleware never makes. This is the seam that can be asked the real
+ * question.
+ */
+export function recordTrpcCall(
+  args: Parameters<typeof handleTrpcCallLogging>[0],
+): void {
+  // Errors are still reported on a silenced path: the volume that earns the
+  // silence is happy-path volume, and a failing heartbeat is worth seeing.
+  if (isSilencedCall({ path: args.path, type: args.type }) && args.result.ok) {
+    return;
+  }
+  handleTrpcCallLogging(args);
 }
 
 export const loggerMiddleware = t.middleware(
@@ -1042,14 +1218,7 @@ export const loggerMiddleware = t.middleware(
       const result = await next();
       const duration = Date.now() - start;
 
-      // Silence happy-path logs for high-frequency, low-signal routes
-      // (presence heartbeats) — still log errors so real failures are
-      // visible.
-      if (isSilencedCall(path, type) && result.ok) {
-        return result;
-      }
-
-      handleTrpcCallLogging({
+      recordTrpcCall({
         result,
         path,
         type,
@@ -1086,47 +1255,269 @@ type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
  * a permission check middleware to use, and that this permission check should be compatible with the
  * inputs required
  */
-interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
-  // Copy-paste from @trpc core internals procedureBuilder
+interface PendingPermissionProcedureBuilder<
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller extends boolean,
+> {
+  // Mirrors tRPC core's procedureBuilder.input typing (v11 generics)
   input: <$Parser extends Parser>(
     schema: $Parser,
-  ) => PendingPermissionProcedureBuilder<{
-    _config: TParams["_config"];
-    _meta: TParams["_meta"];
-    _ctx_out: TParams["_ctx_out"];
-    _input_in: OverwriteIfDefined<
-      TParams["_input_in"],
-      inferParser<$Parser>["in"]
-    >;
-    _input_out: OverwriteIfDefined<
-      TParams["_input_out"],
-      inferParser<$Parser>["out"]
-    >;
-
-    _output_in: TParams["_output_in"];
-    _output_out: TParams["_output_out"];
-  }>;
+  ) => PendingPermissionProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    OverwriteIfDefined<TInputIn, inferParser<$Parser>["in"]>,
+    OverwriteIfDefined<TInputOut, inferParser<$Parser>["out"]>,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * The custom-check escape hatch, and it only takes middleware that says
+   * what it is: `declareAuthzMiddleware(...)` is the sole way to produce the
+   * brand, so a hand-rolled function that flips `ctx.permissionChecked`
+   * without declaring its policy is a compile error here rather than a CI
+   * sweep finding. Non-authz middleware (plan gates, error handlers) belongs
+   * AFTER the declaration, on the plain builder this returns.
+   */
   use: (
-    middleware: PermissionMiddleware<TParams["_input_out"]>,
-  ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
+    middleware: DeclaredAuthzMiddleware<PermissionMiddleware<TInputOut>>,
+  ) => ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * ADR-092 delivery-plan decision 25: declare the required permission,
+   * typed against the validated input the check reads its scope id from.
+   * The permission's registry tiers decide which of `projectId` / `teamId` /
+   * `organizationId` the input must carry — a missing id, or an id from a
+   * tier the permission cannot be granted at, is a compile error naming the
+   * problem. The most specific allowed tier present decides the check scope.
+   */
+  permission<P extends AuthzPermission>(
+    permission: P & ValidateDeclaredPermission<P, TInputOut>,
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * The derivation form, for a permission whose tier the input does not name
+   * directly: `.permission("organization:manage", { via: "teamId" })` checks
+   * the organization the input's team belongs to. `via` must name a required
+   * input field whose tier can derive one the permission is grantable at —
+   * the derivation is written at the call site, never inferred.
+   */
+  permission<P extends AuthzPermission>(
+    permission: P,
+    options: { via: ViaFieldFor<P, TInputOut> },
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * Any one of the permissions is enough, checked at the input's project
+   * scope. List the primary surface's permission first — the denial names
+   * it, so granting it resolves the refusal whichever feature the caller
+   * came through.
+   */
+  permissionAny<Ps extends readonly [AuthzPermission, ...AuthzPermission[]]>(
+    ...permissions: PermissionAnyArgs<Ps, TInputOut>
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * Authenticated, deliberately unchecked — for procedures that read no
+   * organization-, team-, or project-scoped data. Requires a written reason,
+   * and every scope id the input carries must be individually allowed with
+   * one: the legacy `skipPermissionCheck` runtime guard, moved to compile
+   * time.
+   */
+  noPermission(
+    options: DeclaredNoPermissionOptions<TInputOut>,
+  ): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+  /**
+   * The scope is data the handler loads at runtime (a row's own scope set),
+   * so the SERVICE performs the real authorization. The declaration records
+   * why, and which permissions the service enforces — this only moves WHERE
+   * the check happens, never whether one does.
+   */
+  authorizeInService(options: {
+    reason: string;
+    permissions: readonly AuthzPermission[];
+  }): ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
 }
 
-const permissionProcedureBuilder = <TParams extends ProcedureParams>(
-  procedure: ProcedureBuilder<TParams>,
-): PendingPermissionProcedureBuilder<TParams> => {
+/**
+ * `.permission()` reads its scope id from the validated input, so an input
+ * must be declared first — `UnsetMarker` is tRPC's "no .input() yet".
+ */
+type ValidateDeclaredPermission<
+  P extends AuthzPermission,
+  I,
+> = UnsetMarker extends I
+  ? DeclarationError<"declare .input() before .permission() — the check reads its scope id from the validated input">
+  : ValidatePermissionForInput<P, I>;
+
+type PermissionAnyArgs<
+  Ps extends readonly [AuthzPermission, ...AuthzPermission[]],
+  I,
+> = UnsetMarker extends I
+  ? [
+      AuthzPermission &
+        DeclarationError<"declare .input() before .permissionAny() — the check reads its projectId from the validated input">,
+    ]
+  : I extends { projectId: string }
+    ? {
+        [K in keyof Ps]: Ps[K] &
+          ValidatePermissionForInput<Ps[K] & AuthzPermission, I>;
+      }
+    : [
+        AuthzPermission &
+          DeclarationError<".permissionAny() checks at the project scope and needs a required 'projectId' in the input">,
+      ];
+
+type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
+  ? { reason: string; allow?: undefined }
+  : NoPermissionOptions<I>;
+
+const permissionProcedureBuilder = <
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller extends boolean,
+>(
+  procedure: ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >,
+): PendingPermissionProcedureBuilder<
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller
+> => {
+  /** The builder this call returns, named once rather than spelled out at
+   *  every cast below — the instantiation is identical in all of them. */
+  type Pending = PendingPermissionProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
+
+  /**
+   * The one chain both entry points build: the surrounding middlewares are
+   * identical and only the permission check in the middle differs, so
+   * `.use()` and `.permission()` cannot drift in what wraps them. Order is
+   * behaviour — the check must sit inside the error/tracing middlewares and
+   * before `enforcePermissionCheck`, which is what proves a check ran at all.
+   */
+  const withPermissionCheck = (check: unknown) =>
+    procedure
+      .use(tracerMiddleware as any)
+      .use(loggerMiddleware as any)
+      .use(handledErrorMiddleware as any)
+      // Ahead of the check on purpose: a request mixing scope ids across
+      // organizations is refused before ANY declaration kind — declared,
+      // custom, or opted-out — can pass on one id while the handler acts on
+      // another. See scope-lineage-guard.ts.
+      .use(scopeLineageGuard(authzDeclarationOf(check)) as any)
+      .use(check as any)
+      .use(enforcePermissionCheck as any)
+      .use(auditLogMutations as any) as any;
+
   return {
-    input: (input) => {
+    input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
-    },
-    use: (middleware) => {
-      return procedure
-        .use(tracerMiddleware as any)
-        .use(loggerMiddleware as any)
-        .use(handledErrorMiddleware as any)
-        .use(middleware as any)
-        .use(enforcePermissionCheck as any)
-        .use(auditLogMutations as any) as any;
-    },
+    }) as Pending["input"],
+    use: (middleware) => withPermissionCheck(middleware),
+    permission: ((
+      permission: AuthzPermission,
+      options?: { via?: ScopeTierField },
+    ) =>
+      withPermissionCheck(
+        checkDeclaredPermission({ permission, via: options?.via }),
+      )) as Pending["permission"],
+    permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
+      withPermissionCheck(
+        checkDeclaredPermissionAny(permissions),
+      )) as Pending["permissionAny"],
+    noPermission: ((options: {
+      reason: string;
+      allow?: Record<string, string>;
+    }) =>
+      withPermissionCheck(
+        declaredNoPermission(options),
+      )) as Pending["noPermission"],
+    authorizeInService: (options) =>
+      withPermissionCheck(declaredServiceAuthorization(options)),
   };
 };
 

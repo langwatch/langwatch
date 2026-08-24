@@ -29,6 +29,10 @@ function createMockRepo(
     getBlockedSummary: vi
       .fn()
       .mockResolvedValue({ totalBlocked: 0, clusters: [] }),
+    enumerateParkedTenants: vi
+      .fn()
+      .mockResolvedValue({ tenants: [], total: 0 }),
+    listParkedGroups: vi.fn().mockResolvedValue({ groups: [], total: 0 }),
     unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
     unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 0 }),
     drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 0 }),
@@ -44,6 +48,14 @@ function createMockRepo(
     replayAllFromDlq: vi
       .fn()
       .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    redriveManyFromDlq: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, jobsRedriven: 0 }),
+    discardManyFromDlq: vi.fn().mockResolvedValue({
+      discardedCount: 0,
+      jobsDiscarded: 0,
+      lastErrors: [],
+    }),
     canaryRedrive: vi
       .fn()
       .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),

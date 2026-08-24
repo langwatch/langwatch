@@ -12,10 +12,11 @@ const overlay = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  keepPreviousData: (previous: unknown) => previous,
   useQuery: () => ({
     data: spans.current,
     isFetching: false,
-    isPreviousData: false,
+    isPlaceholderData: false,
   }),
   useQueryClient: () => ({ getQueryData: vi.fn(), setQueryData: vi.fn() }),
 }));
@@ -28,7 +29,11 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: vi.fn() } },
     }),
-    tracesV2: { spanTreeDelta: { useQuery: vi.fn() } },
+    tracesV2: {
+      spanTreeDelta: {
+        useQuery: vi.fn(() => ({ data: undefined, dataUpdatedAt: 0 })),
+      },
+    },
     traceEditOverlay: {
       getByTraceId: { useQuery: () => ({ data: overlay.current }) },
     },

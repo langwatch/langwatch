@@ -24,13 +24,14 @@
  * eadd6e38f (admin-surface tightening), fb8f3e8b8 (email redaction),
  * 4162531ff (personal-workspace strip).
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
@@ -334,7 +335,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     it("role.getAll → UNAUTHORIZED for member", async () => {
       await expect(
         memberCaller.role.getAll({ organizationId: ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("organization.getAllOrganizationMembers → UNAUTHORIZED for member", async () => {
@@ -342,7 +343,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         memberCaller.organization.getAllOrganizationMembers({
           organizationId: ORG_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("organization.getOrganizationPendingInvites → UNAUTHORIZED for member", async () => {
@@ -350,7 +351,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         memberCaller.organization.getOrganizationPendingInvites({
           organizationId: ORG_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("team.getTeamsWithRoleBindings → UNAUTHORIZED for member", async () => {
@@ -358,7 +359,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         memberCaller.team.getTeamsWithRoleBindings({
           organizationId: ORG_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("organization.getMemberById → UNAUTHORIZED for member", async () => {
@@ -367,7 +368,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
           organizationId: ORG_ID,
           userId: ADMIN_USER_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("admin can call all five procedures successfully", async () => {
@@ -521,7 +522,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
           organizationId: ORG_ID,
           groupId: GROUP_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("group.listForMember → UNAUTHORIZED for member", async () => {
@@ -533,14 +534,14 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
           organizationId: ORG_ID,
           userId: ADMIN_USER_ID,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("group.listAll → UNAUTHORIZED for member", async () => {
       // Member can't enumerate every group's role-binding map.
       await expect(
         memberCaller.group.listAll({ organizationId: ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("admin can call all three group procedures successfully", async () => {
@@ -579,7 +580,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
           currentMonthMessagesCount: 99999,
           maxMonthlyUsageLimit: 100,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("admin can call limits.checkAndSendUsageLimitNotification", async () => {

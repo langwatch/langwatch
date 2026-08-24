@@ -9,8 +9,9 @@
  * `RoleBindingService.validateBindingRoles`; group bindings reach the same
  * resolver and must refuse it the same way.
  */
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { RoleService } from "~/server/role";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { GroupRestService } from "../group.service";
@@ -74,6 +75,7 @@ describe("GroupRestService", () => {
                 scopeId: "team_1",
               },
             ],
+            actor: { type: "user", id: "actor_1" },
           }),
         ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
 
@@ -93,6 +95,7 @@ describe("GroupRestService", () => {
             customRoleId: CUSTOM_ROLE_ID,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: "team_1",
+            actor: { type: "user", id: "actor_1" },
           }),
         ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
 
@@ -111,6 +114,7 @@ describe("GroupRestService", () => {
           customRoleId: CUSTOM_ROLE_ID,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: ORGANIZATION_ID,
+          actor: { type: "user", id: "actor_1" },
         });
 
         expect(createBinding).toHaveBeenCalledTimes(1);
@@ -130,6 +134,7 @@ describe("GroupRestService", () => {
           customRoleId: CUSTOM_ROLE_ID,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team_1",
+          actor: { type: "user", id: "actor_1" },
         });
 
         expect(createBinding).toHaveBeenCalledTimes(1);

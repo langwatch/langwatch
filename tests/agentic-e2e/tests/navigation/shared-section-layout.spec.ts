@@ -20,7 +20,7 @@ const sections: SectionCase[] = [
   },
   {
     name: "AI Gateway",
-    path: () => "/settings/gateway/virtual-keys",
+    path: () => "/gateway/virtual-keys",
     sectionLabel: "AI Gateway",
     pageHeading: "Virtual Keys",
     screenshot: "gateway-shared-layout.png",
@@ -107,9 +107,9 @@ test("complex product areas share one local navigation layout", async ({
     name: "AI Governance navigation",
   });
   await governanceNavigation
-    .getByRole("link", { name: "Ingestion Sources", exact: true })
+    .getByRole("link", { name: "Catalog", exact: true })
     .click();
-  await expect(page).toHaveURL("/settings/governance/ingestion-sources");
+  await expect(page).toHaveURL("/governance/ingestion-sources");
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav
@@ -120,7 +120,7 @@ test("complex product areas share one local navigation layout", async ({
       .getByRole("link", { name: "Overview", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     const activeBackground = await governanceNavigation
-      .getByRole("link", { name: "Ingestion Sources", exact: true })
+      .getByRole("link", { name: "Catalog", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(overviewBackground).not.toBe(activeBackground);
   }).toPass({ timeout: 15_000 });

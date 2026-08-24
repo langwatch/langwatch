@@ -16,10 +16,17 @@
 // Visitor interface
 // ---------------------------------------------------------------------------
 
-/** Source shape for image/audio/video/document parts. */
+/**
+ * Source shape for image/audio/video/document parts.
+ *
+ * `mimeType` is optional on both variants because wire payloads routinely omit
+ * it. The renderer then falls back to a default per media kind, and the
+ * extractor declines the part, because bytes with no media type would come
+ * back as an octet-stream download instead of a picture or a player.
+ */
 export type ContentSource =
   | { type: "url"; value: string; mimeType?: string }
-  | { type: "data"; value: string; mimeType: string };
+  | { type: "data"; value: string; mimeType?: string };
 
 /** Binary part — exactly the ag-ui BinaryInputContent shape. */
 export interface BinaryPart {
@@ -93,6 +100,136 @@ export type AsyncContentPartVisitor<R> = {
 };
 
 // ---------------------------------------------------------------------------
+// Provider source shapes
+// ---------------------------------------------------------------------------
+
+/** A media part after the source shape has been normalized. */
+interface NormalizedMediaPart {
+  type: "image" | "audio" | "video" | "document";
+  source: ContentSource;
+}
+
+/**
+ * Normalize a media part's `source` into `ContentSource`.
+ *
+ * AG-UI writes `{type:"url"|"data", value, mimeType}` and passes straight
+ * through. Anthropic writes two of its own, `{type:"base64", media_type,
+ * data}` for inline bytes and `{type:"url", url}` for a hosted file, and
+ * instrumentation records the request as the customer wrote it, so both
+ * arrive here verbatim. Casting them blindly produced a source whose `value`
+ * was undefined, which made the bytes invisible to the extractor and gave the
+ * renderer an image with no payload.
+ *
+ * Returns null when the object is not a media source, so the part falls to the
+ * `unknown` branch and passes through untouched.
+ */
+export function normalizeContentSource(source: unknown): ContentSource | null {
+  if (typeof source !== "object" || source === null) return null;
+  const s = source as Record<string, unknown>;
+
+  // AG-UI names the media type `mimeType`, Anthropic names it `media_type`.
+  const mimeType = firstString(s, "mimeType", "media_type")?.toLowerCase();
+
+  // AG-UI carries the payload in `value` either way. Anthropic carries an
+  // address in `url` and inline bytes in `data`.
+  if (s.type === "url") {
+    return typedSource("url", firstString(s, "value", "url"), mimeType);
+  }
+  if (s.type === "data" || s.type === "base64") {
+    return typedSource("data", firstString(s, "value", "data"), mimeType);
+  }
+  return null;
+}
+
+/** A source of one kind, or null when the payload is absent. */
+function typedSource(
+  type: "url" | "data",
+  value: string | undefined,
+  mimeType: string | undefined,
+): ContentSource | null {
+  if (value === undefined) return null;
+  return mimeType ? { type, value, mimeType } : { type, value };
+}
+
+/** The first of the named keys holding a string, or undefined when none does. */
+function firstString(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = o[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+/**
+ * Media kind for a payload that names only its media type. A Gemini
+ * `inline_data` part has no part type of its own, so the media type is the
+ * only thing that says whether it renders as a picture, a player or a chip.
+ */
+function mediaKindForMimeType(
+  mimeType: string,
+): "image" | "audio" | "video" | "document" {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return "document";
+}
+
+/**
+ * Gemini and Vertex content part: `{inline_data:{mime_type, data}}`, or
+ * `{inlineData:{mimeType, data}}` from the JavaScript SDK. The part carries no
+ * `type` key at all, so the carrier is what identifies it. A `file_data` part
+ * (a provider-hosted `file_uri`) has no bytes and is deliberately not matched.
+ */
+export function inlineDataToMediaPart(
+  o: Record<string, unknown>,
+): NormalizedMediaPart | null {
+  const carrier = o.inline_data ?? o.inlineData;
+  if (typeof carrier !== "object" || carrier === null) return null;
+  const c = carrier as Record<string, unknown>;
+  const data = typeof c.data === "string" ? c.data : undefined;
+  const rawMimeType =
+    typeof c.mime_type === "string"
+      ? c.mime_type
+      : typeof c.mimeType === "string"
+        ? c.mimeType
+        : undefined;
+  if (data === undefined || rawMimeType === undefined) return null;
+  const mimeType = rawMimeType.toLowerCase();
+  return {
+    type: mediaKindForMimeType(mimeType),
+    source: { type: "data", value: data, mimeType },
+  };
+}
+
+/**
+ * The media part a raw object represents, in either the AG-UI typed-source
+ * vocabulary or a provider's own, or null when it is not a media part.
+ */
+function toMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
+  if (
+    (o.type === "image" ||
+      o.type === "audio" ||
+      o.type === "video" ||
+      o.type === "document") &&
+    o.source
+  ) {
+    const source = normalizeContentSource(o.source);
+    return source ? { type: o.type, source } : null;
+  }
+  return inlineDataToMediaPart(o);
+}
+
+/** True when the rewritten reference must replace the whole part, not its source. */
+export function isInlineDataCarrier(part: unknown): boolean {
+  if (typeof part !== "object" || part === null) return false;
+  const o = part as Record<string, unknown>;
+  return o.inline_data !== undefined || o.inlineData !== undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -126,18 +263,11 @@ export function visitContentPart<R>(
     return visitor.text(text);
   }
 
-  // media parts: image / audio / video / document with a source object
-  if (
-    (o.type === "image" ||
-      o.type === "audio" ||
-      o.type === "video" ||
-      o.type === "document") &&
-    o.source
-  ) {
-    return visitor.media({
-      type: o.type as "image" | "audio" | "video" | "document",
-      source: o.source as ContentSource,
-    });
+  // media parts: image / audio / video / document with a typed source
+  // (AG-UI or Anthropic), and Gemini `inline_data` parts
+  {
+    const mediaPart = toMediaPart(o);
+    if (mediaPart) return visitor.media(mediaPart);
   }
 
   // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
@@ -330,18 +460,11 @@ export async function visitContentPartAsync<R>(
     return visitor.text(text);
   }
 
-  // media parts: image / audio / video / document with a source object
-  if (
-    (o.type === "image" ||
-      o.type === "audio" ||
-      o.type === "video" ||
-      o.type === "document") &&
-    o.source
-  ) {
-    return visitor.media({
-      type: o.type as "image" | "audio" | "video" | "document",
-      source: o.source as ContentSource,
-    });
+  // media parts: image / audio / video / document with a typed source
+  // (AG-UI or Anthropic), and Gemini `inline_data` parts
+  {
+    const mediaPart = toMediaPart(o);
+    if (mediaPart) return visitor.media(mediaPart);
   }
 
   // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}

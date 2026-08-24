@@ -1,8 +1,8 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { Prisma, PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { Prisma, PrismaClient, Scenario } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");
@@ -16,6 +16,16 @@ export type CreateScenarioInput = Omit<
 export type UpdateScenarioInput = Partial<
   Omit<CreateScenarioInput, "projectId">
 >;
+
+/** What a run reads off a scenario before it schedules any job for it. */
+export type ScenarioRunConfig = {
+  id: string;
+  name: string;
+  situation: string;
+  criteria: string[];
+  /** The declared parameters, as stored. Read with `parseScenarioParameterDefinitions`. */
+  parameters: Prisma.JsonValue;
+};
 
 export class ScenarioRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -210,6 +220,31 @@ export class ScenarioRepository {
     return this.prisma.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * Find everything a run needs to know about a scenario before scheduling it:
+   * its name for the queued row, the parameters it declares, and the text those
+   * parameters are rendered into.
+   *
+   * Archived scenarios are included so a caller that resolved them separately
+   * (a suite run classifies archived references itself) sees one consistent
+   * set of rows.
+   */
+  async findRunConfigByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<ScenarioRunConfig[]> {
+    return this.prisma.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: {
+        id: true,
+        name: true,
+        situation: true,
+        criteria: true,
+        parameters: true,
+      },
     });
   }
 

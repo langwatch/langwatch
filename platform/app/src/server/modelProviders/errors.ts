@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
+import { ROUTING_HANDLE_RULE } from "./routingHandle";
+
 /**
  * The model provider a read or write named does not exist, or is not visible
  * to the caller's scopes.
@@ -164,6 +166,41 @@ export class ModelProviderScopeForbiddenError extends HandledError {
 }
 
 /**
+ * The caller cannot manage one of the scopes a default-models write would
+ * touch.
+ *
+ * Same shape and rationale as {@link ModelProviderScopeForbiddenError}, with
+ * its own code because the copy differs: this one is about the Default Models
+ * policies, not the provider credentials. Every default-models write path
+ * (tRPC drawer save, REST create/update/delete) routes through
+ * `assertCanWriteScope`, which raises this. A plain `Error` here used to
+ * surface as an unknown 500 and log a routine permission refusal as an
+ * incident.
+ */
+export class ModelDefaultScopeForbiddenError extends HandledError {
+  declare readonly code: "model_default_scope_forbidden";
+
+  constructor({
+    scopeType,
+    requiredPermission,
+  }: {
+    scopeType: string;
+    requiredPermission: string;
+  }) {
+    super(
+      "model_default_scope_forbidden",
+      "You don't have permission to manage default models here.",
+      {
+        meta: { scopeType, requiredPermission },
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelDefaultScopeForbiddenError";
+  }
+}
+
+/**
  * Too many credential checks in too short a window.
  *
  * Every check is an outbound request from our servers carrying a customer's
@@ -224,5 +261,94 @@ export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
       },
     );
     this.name = "ModelProviderCredentialsWouldBeDroppedError";
+  }
+}
+
+/**
+ * A save would replace credentials the server holds but cannot read.
+ *
+ * Separate from `ModelProviderCredentialsWouldBeDroppedError` because the
+ * advice differs. There the stored value is fine and the save just has to stop
+ * leaving it out; here the stored value will not decrypt, usually because
+ * CREDENTIALS_SECRET changed after the row was written, so the only way
+ * forward is a new credential. Letting the save through would overwrite
+ * ciphertext that restoring the old secret would have recovered.
+ */
+export class ModelProviderCredentialsUnreadableError extends HandledError {
+  declare readonly code: "model_provider_credentials_unreadable";
+
+  constructor({ provider }: { provider: string }) {
+    super(
+      "model_provider_credentials_unreadable",
+      "The credentials stored for this provider cannot be read, so this save would replace them with nothing. Type a new credential and save again.",
+      {
+        meta: { provider },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderCredentialsUnreadableError";
+  }
+}
+
+/**
+ * A routing handle the write cannot store.
+ *
+ * `shape` means the text is not a handle at all (wrong characters, or too
+ * long); `reserved` means the text already names a provider family, which the
+ * gateway reads before it reads handles, so accepting it would shadow that
+ * family for the whole organization.
+ *
+ * Both are the caller's to fix by typing a different name, which is what makes
+ * this a handled error rather than a validation crash.
+ */
+export class ModelProviderRoutingHandleInvalidError extends HandledError {
+  declare readonly code: "model_provider_routing_handle_invalid";
+
+  constructor({
+    handle,
+    problem,
+  }: {
+    handle: string;
+    problem: "shape" | "reserved";
+  }) {
+    super(
+      "model_provider_routing_handle_invalid",
+      problem === "reserved"
+        ? "That routing handle already names a provider type, so requests using it would be ambiguous. Choose a different name."
+        : `That routing handle is not a valid name. ${ROUTING_HANDLE_RULE}`,
+      {
+        meta: { handle, problem },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderRoutingHandleInvalidError";
+  }
+}
+
+/**
+ * Another provider in this organization already uses the routing handle.
+ *
+ * A handle has to resolve to exactly one provider or it cannot pin anything, so
+ * the organization owns the name space. Enforced by a unique index over
+ * (organizationId, routingHandle) as well, which is what makes two simultaneous
+ * saves safe; this error is the one a person reads. Postgres treats NULLs as
+ * distinct, so the providers that set no handle all still fit.
+ */
+export class ModelProviderRoutingHandleTakenError extends HandledError {
+  declare readonly code: "model_provider_routing_handle_taken";
+
+  constructor({ handle }: { handle: string }) {
+    super(
+      "model_provider_routing_handle_taken",
+      "Another model provider in this organization already uses that routing handle. Choose a different name.",
+      {
+        meta: { handle },
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderRoutingHandleTakenError";
   }
 }

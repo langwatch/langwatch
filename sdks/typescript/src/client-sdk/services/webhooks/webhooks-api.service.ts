@@ -14,9 +14,46 @@ import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
 
+/** Where an endpoint delivers. */
+export type WebhookDestinationKind = "http" | "sqs";
+
+/** The queue an `sqs` endpoint delivers to, as any read surface sees it: the
+ *  secret half of a static key pair is never returned. */
+export interface WebhookSqsDestination {
+  queue_url: string;
+  /** Read off the queue URL, never configured beside it. */
+  region: string;
+  /** Whose queue it is. */
+  account_id: string;
+  queue_name: string;
+  credential_mode: "assume_role" | "static" | "ambient";
+  role_arn: string | null;
+  /** Generated at save time, to paste into the role's trust policy. */
+  external_id: string | null;
+  access_key_id: string | null;
+}
+
+/** The queue half of a create or update body. */
+export interface WebhookSqsDestinationInput {
+  queue_url: string;
+  /** The role to assume, with an external id we generate. The recommended
+   *  way to grant access: nothing long-lived is stored, and the customer
+   *  revokes by editing their own trust policy. */
+  role_arn?: string;
+  external_id?: string;
+  /** A static key pair instead. The secret is stored encrypted and never
+   *  returned. */
+  access_key_id?: string;
+  secret_access_key?: string;
+}
+
 export interface WebhookEndpointSummary {
   id: string;
-  url: string;
+  destination_kind: WebhookDestinationKind;
+  /** The receiver URL on an `http` endpoint, null on every other kind. */
+  url: string | null;
+  /** The queue on an `sqs` endpoint, null on every other kind. */
+  sqs: WebhookSqsDestination | null;
   max_batch_size: number;
   max_batch_delay_ms: number;
   max_in_flight: number;
@@ -36,9 +73,8 @@ export interface WebhookEndpointWithSecret extends WebhookEndpointSummary {
   secret: string;
 }
 
-/** The POST body, exactly as the wire takes it. */
-export interface CreateWebhookEndpointInput {
-  url: string;
+/** Everything a create body carries that is not the destination. */
+interface CreateWebhookEndpointBase {
   enabled_events: string[];
   /** Envelopes per delivery. The receiver always gets an array. */
   max_batch_size?: number;
@@ -48,9 +84,36 @@ export interface CreateWebhookEndpointInput {
   max_in_flight?: number;
 }
 
+/**
+ * The POST body, exactly as the wire takes it.
+ *
+ * A destination is one kind and one address, so the two are a union rather
+ * than independent optional fields: the type refuses `{destination_kind:
+ * "sqs"}` with no queue, and `{url, sqs}` together, which is what the server
+ * refuses too. `destination_kind` is optional only on the http branch, where
+ * absent has always meant http.
+ */
+export type WebhookDestinationInput =
+  | { destination_kind?: "http"; url: string; sqs?: never }
+  | { destination_kind: "sqs"; sqs: WebhookSqsDestinationInput; url?: never };
+
+export type CreateWebhookEndpointInput = CreateWebhookEndpointBase &
+  WebhookDestinationInput;
+
 /** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
 export interface UpdateWebhookEndpointInput {
   url?: string;
+  /** Only the queue's own fields; the destination kind cannot change, because
+   *  batches already planned against the old transport are in flight. Create
+   *  a new endpoint and archive this one once it has drained. A credential
+   *  field sent as null is CLEARED; omitted keeps what is stored. */
+  sqs?: Partial<{
+    queue_url: string;
+    role_arn: string | null;
+    external_id: string | null;
+    access_key_id: string | null;
+    secret_access_key: string | null;
+  }>;
   enabled_events?: string[];
   status?: "active" | "disabled";
   max_batch_size?: number;

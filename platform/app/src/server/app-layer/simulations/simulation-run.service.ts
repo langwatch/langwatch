@@ -2,6 +2,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
+  BatchSummary,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
@@ -51,9 +52,16 @@ export class SimulationRunService {
     return this.repository.getBatchHistoryForScenarioSet(params);
   }
 
+  async getBatchSummary(params: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<BatchSummary | null> {
+    return this.repository.getBatchSummary(params);
+  }
+
   async getRunDataForBatchRun(params: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<BatchRunDataResult> {

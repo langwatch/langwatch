@@ -1,6 +1,10 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-# Upstream jobs skip when paths don't match, and `alls-green` reports the
-# final status.
+# Path-gated in `on:`, with no gate job and no aggregator. This workflow has
+# no required status check, which is what makes that safe — GitHub evaluates
+# `on.paths` before allocating anything, so an irrelevant PR costs zero runner
+# slots instead of two (a gate job to decide, and an aggregator to report the
+# decision). A filtered-out workflow never reports at all, so a workflow whose
+# `*-complete` IS required must keep the always-run pattern; see #3223 and the
+# ones that still do.
 #
 # What it guards: the plugin is published as a directory of hand-authored JSON
 # plus one bundled script, so nothing about it is checked by any other job. Its
@@ -11,10 +15,35 @@
 name: agent-plugin-ci
 
 on:
+  # Only `pull_request` is filtered. "Push to main always runs all workflows"
+  # (specs/ci/path-filters.feature) — every commit that lands on main keeps its
+  # own validation, which is the same reason `cancel-in-progress` is off there.
   push:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the job's draft
+    # guard below would never get its first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      # The hook script is bundled from the SDK sources below, so a change to
+      # any of them changes what the published plugin runs.
+      - "plugins/**"
+      - "sdks/typescript/src/cli/plugin/**"
+      - "sdks/typescript/src/cli/commands/ingestion/**"
+      - "sdks/typescript/src/internal/endpoint.ts"
+      - "sdks/typescript/tsup.plugin-hook.config.ts"
+      - "sdks/typescript/package.json"
+      # The single lockfile, workspace definition, root manifest and hoist
+      # config live at the repo root since ADR-076; a dependency or override
+      # change touches only these.
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".npmrc"
+      - ".github/workflows/agent-plugin-ci.yml"
+      - ".github/actions/setup-pnpm-node/**"
   merge_group:
   workflow_dispatch:
 
@@ -29,46 +58,11 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      relevant: ${{ steps.detect.outputs.relevant }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/.
-          sparse-checkout: .github
-      - uses: ./.github/actions/detect-changes
-        id: detect
-        with:
-          filters: |
-            relevant:
-              - 'plugins/**'
-              # The hook script is bundled from these, so a change to any of
-              # them changes what the published plugin runs.
-              - 'sdks/typescript/src/cli/plugin/**'
-              - 'sdks/typescript/src/cli/commands/ingestion/**'
-              - 'sdks/typescript/src/internal/endpoint.ts'
-              - 'sdks/typescript/tsup.plugin-hook.config.ts'
-              - 'sdks/typescript/package.json'
-              # The single lockfile, workspace definition, root manifest and
-              # hoist config live at the repo root since ADR-076; a dependency
-              # or override change touches only these.
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - 'package.json'
-              - '.npmrc'
-              - '.github/workflows/agent-plugin-ci.yml'
-              - '.github/actions/setup-pnpm-node/**'
-              # The gate itself: a change here decides whether any of the
-              # filters above are ever consulted, so it has to match too.
-              - '.github/actions/detect-changes/**'
-
   build_and_test:
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    # Draft PRs release the runner slot entirely; the work returns on
+    # ready_for_review and in the merge queue. This was `needs.changes.outputs
+    # .heavy`, which cost a whole gate job to compute the same expression.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -99,12 +93,10 @@ jobs:
       - name: Run tests
         run: pnpm --filter @langwatch/agent-plugin run test
 
-  agent-plugin-complete:
-    needs: [changes, build_and_test]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
-        with:
-          jobs: ${{ toJSON(needs) }}
-          allowed-skips: build_and_test
+  # `agent-plugin-complete` used to sit here. It existed only so branch
+  # protection had one stable check to require while the real job skipped —
+  # but it was never added to the ruleset, so it was reporting to nobody at
+  # the cost of a runner lease on every push. If this workflow is ever
+  # promoted to a required check, the aggregator AND the always-run trigger
+  # have to come back together: `on.paths` and a required check are mutually
+  # exclusive, because a filtered-out workflow never reports at all.

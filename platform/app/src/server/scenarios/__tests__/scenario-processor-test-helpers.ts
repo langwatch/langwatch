@@ -221,12 +221,14 @@ export function createTestJobData(
       criteria: ["Must respond politely"],
       labels: ["integration-test", "otel-isolation"],
     },
+    parameters: {},
     adapterData: {
       type: "http",
       agentId: "test-agent",
       url: "http://localhost:9999/api/test", // Won't actually be called in error scenario
       method: "POST",
       headers: [],
+      secrets: {},
     },
     modelParams: {
       api_key: "test-api-key",

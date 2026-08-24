@@ -10,6 +10,7 @@ export {
 } from "./commands";
 export type { ComputeRunMetricsDeps } from "./commands/computeRunMetrics.command";
 export { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
+export type { FinishRunDeps } from "./commands/finishRun.command";
 export type { SimulationProcessingPipelineDeps } from "./pipeline";
 export { createSimulationProcessingPipeline } from "./pipeline";
 

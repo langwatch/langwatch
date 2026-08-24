@@ -22,7 +22,7 @@
  * each operation's `description` says which one it takes.
  */
 
-import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";
+import type { DescribeRouteOptions, GenerateSpecOptions } from "hono-openapi";
 
 type ParameterSpec = NonNullable<DescribeRouteOptions["parameters"]>[number];
 
@@ -52,7 +52,7 @@ const NO_SECURITY: DescribeRouteOptions["security"] = [];
  * the admin key would tell an identity administrator to paste the wrong
  * secret.
  */
-export const SCIM_SPEC_OPTIONS: OpenApiSpecsOptions = {
+export const SCIM_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
   documentation: {
     components: {
       securitySchemes: {
@@ -478,7 +478,7 @@ export const PATCH_USER: DescribeRouteOptions = {
   operationId: "scimPatchUser",
   summary: "Update a provisioned user",
   description:
-    "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.",
+    "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.",
   tags: TAGS,
   security: SCIM_SECURITY,
   parameters: [idParameter("The LangWatch user id.")],
@@ -598,7 +598,7 @@ export const PATCH_GROUP: DescribeRouteOptions = {
   operationId: "scimPatchGroup",
   summary: "Update a provisioned group",
   description:
-    "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.",
+    "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.",
   tags: TAGS,
   security: SCIM_SECURITY,
   parameters: [idParameter("The LangWatch group id.")],
