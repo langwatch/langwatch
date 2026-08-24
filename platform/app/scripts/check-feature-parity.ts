@@ -453,16 +453,26 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
+  // D12's join requests, written ahead of the deliverable: every scenario is
+  // @unimplemented on purpose, and the implementing PRs bind them as they
+  // land. Remove each entry with its first binding.
+  "specs/identity/domain-auto-join.feature",
   // ADR-116's design contract, every scenario @unimplemented on purpose: the
   // ADR ships ahead of the identity storage adapter, and the adapter PR binds
   // these as it lands. Remove this entry with the first binding.
   "specs/identity/identity-storage-adapter.feature",
-  // D05's three surfaces, every scenario @unimplemented on purpose: the
-  // deliverable's specs ship ahead of the onboarding tiers, the platform-ops
-  // lookup and the organization identity surface, and the PRs that build each
-  // one bind them as they land. Remove each entry with its first binding.
+  // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
+  // specs ship ahead of the code, and the PR that builds each surface binds its
+  // file as it lands. Remove each entry with its first binding.
+  "specs/identity/domain-auto-join.feature",
+  "specs/identity/join-before-create.feature",
+  "specs/identity/join-matching-and-privacy.feature",
+  "specs/identity/join-requests.feature",
+  "specs/identity/mfa-and-session-shape.feature",
   "specs/identity/org-admin-identity-surface.feature",
+  "specs/identity/passkeys.feature",
   "specs/identity/platform-ops-identity-lookup.feature",
+  "specs/identity/scim-connection-sync.feature",
   "specs/identity/sso-onboarding-tiers.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
