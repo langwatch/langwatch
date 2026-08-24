@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { bodyLimit } from "~/server/routes/_lib/body-limit";
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
@@ -105,11 +105,11 @@ secured.access(requires("scenarios:create")).post(
       );
     }
 
-    await dispatchSimulationEvent(project.id, event);
+    await dispatchSimulationEvent(c.app, project.id, event);
 
     // Streaming events: broadcast only, no persistence
     if (isStreamingEvent(event.type)) {
-      await broadcastStreamingEvent(project.id, event);
+      await broadcastStreamingEvent(c.app, project.id, event);
       return c.json({ success: true }, 201);
     }
 
@@ -120,7 +120,7 @@ secured.access(requires("scenarios:create")).post(
       event.type === ScenarioEventType.TEXT_MESSAGE_START ||
       event.type === ScenarioEventType.TEXT_MESSAGE_END
     ) {
-      await broadcastStreamingEvent(project.id, event);
+      await broadcastStreamingEvent(c.app, project.id, event);
     }
 
     const path = `/${project.slug}/simulations/${
@@ -221,7 +221,7 @@ secured.access(requires("scenarios:create")).post(
       url,
     });
 
-    await getApp().broadcast.broadcastToTenant(
+    await c.app.broadcast.broadcastToTenant(
       project.id,
       JSON.stringify(payload),
       "simulation_updated",
@@ -275,6 +275,7 @@ export const route = secured.access(requires("scenarios:manage")).delete(
     const { scenarioSetId } = c.req.valid("query");
 
     const result = await archiveScenarioSetRuns({
+      app: c.app,
       projectId: project.id,
       scenarioSetId,
     });
@@ -288,6 +289,7 @@ export type ScenarioEventsAppType = typeof route;
 export const app = secured.hono;
 
 async function dispatchSimulationEvent(
+  app: App,
   projectId: string,
   event: ScenarioEvent,
 ): Promise<void> {
@@ -298,7 +300,7 @@ async function dispatchSimulationEvent(
   };
 
   if (event.type === ScenarioEventType.RUN_STARTED) {
-    await getApp().simulations.startRun({
+    await app.simulations.startRun({
       ...basePayload,
       scenarioId: event.scenarioId,
       batchRunId: event.batchRunId,
@@ -309,7 +311,7 @@ async function dispatchSimulationEvent(
     });
   } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
     const messages = event.messages ?? [];
-    await getApp().simulations.messageSnapshot({
+    await app.simulations.messageSnapshot({
       ...basePayload,
       messages: messages as Array<{
         trace_id?: string;
@@ -320,14 +322,14 @@ async function dispatchSimulationEvent(
         .filter((id): id is string => typeof id === "string"),
     });
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
-    await getApp().simulations.textMessageStart({
+    await app.simulations.textMessageStart({
       ...basePayload,
       messageId: event.messageId,
       role: event.role,
       messageIndex: event.messageIndex,
     });
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
-    await getApp().simulations.textMessageEnd({
+    await app.simulations.textMessageEnd({
       ...basePayload,
       messageId: event.messageId,
       role: event.role,
@@ -337,7 +339,7 @@ async function dispatchSimulationEvent(
       messageIndex: event.messageIndex,
     });
   } else if (event.type === ScenarioEventType.RUN_FINISHED) {
-    await getApp().simulations.finishRun({
+    await app.simulations.finishRun({
       ...basePayload,
       results: event.results
         ? {
@@ -373,9 +375,11 @@ function isStreamingEvent(type: string): boolean {
  * the run-id lookup hit its cap, i.e. more runs may remain to archive.
  */
 export async function archiveScenarioSetRuns({
+  app,
   projectId,
   scenarioSetId,
 }: {
+  app: Pick<App, "simulations">;
   projectId: string;
   scenarioSetId: string;
 }): Promise<{
@@ -385,7 +389,7 @@ export async function archiveScenarioSetRuns({
   hasMore: boolean;
 }> {
   const { runIds, reachedCap } =
-    await getApp().simulations.runs.getRunIdsForSet({
+    await app.simulations.runs.getRunIdsForSet({
       projectId,
       scenarioSetId,
     });
@@ -399,7 +403,7 @@ export async function archiveScenarioSetRuns({
     concurrency: 8,
     fn: async (id) => {
       try {
-        await getApp().simulations.deleteRun({
+        await app.simulations.deleteRun({
           tenantId: projectId,
           scenarioRunId: id,
           occurredAt: now,
@@ -443,6 +447,7 @@ async function pMapLimited<T>({
 }
 
 async function broadcastStreamingEvent(
+  app: Pick<App, "broadcast">,
   projectId: string,
   event: ScenarioEvent,
 ): Promise<void> {
@@ -486,7 +491,7 @@ async function broadcastStreamingEvent(
         ? ("delta" as const)
         : ("structural" as const);
 
-    await getApp().broadcast.broadcastToTenantRateLimited(
+    await app.broadcast.broadcastToTenantRateLimited(
       projectId,
       payload,
       "simulation_updated",

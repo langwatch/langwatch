@@ -1,25 +1,21 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import type { Scenario } from "~/generated/prisma/client";
-import { requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { prisma } from "~/server/db";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import {
   parseScenarioParameterDefinitions,
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
-} from "~/server/scenarios/parameters";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
+  ScenarioNotFoundError,
+  type Scenario,
+} from "@langwatch/scenario-contract";
+import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod/v4";
+import { badRequestSchema } from "~/app/api/shared/schemas";
+import { requires, type SecuredApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");
-
-const getService = () => ScenarioService.create(prisma);
 
 const scenarioResponseSchema = z.object({
   id: z.string(),
@@ -102,8 +98,7 @@ function registerListScenariosRoute(
       const project = c.get("project");
       logger.info({ projectId: project.id }, "Listing scenarios");
 
-      const service = getService();
-      const scenarios = await service.getAll({ projectId: project.id });
+      const scenarios = await c.app.scenarios.list({ projectId: project.id });
 
       return c.json(
         scenarios.map((s) => ({
@@ -152,8 +147,10 @@ function registerGetScenarioRoute(
         "Getting scenario",
       );
 
-      const service = getService();
-      const scenario = await service.getById({ id, projectId: project.id });
+      const scenario = await c.app.scenarios.tryGetById({
+        id,
+        projectId: project.id,
+      });
 
       if (!scenario) {
         return c.json({ error: "Scenario not found" }, 404);
@@ -207,8 +204,7 @@ function registerCreateScenarioRoute(
 
       logger.info({ projectId: project.id }, "Creating scenario");
 
-      const service = getService();
-      const scenario = await service.create({
+      const scenario = await c.app.scenarios.create({
         projectId: project.id,
         name: body.name,
         situation: body.situation,
@@ -271,13 +267,17 @@ function registerUpdateScenarioRoute(
         "Updating scenario",
       );
 
-      const service = getService();
-      const existing = await service.getById({ id, projectId: project.id });
+      const existing = await c.app.scenarios.tryGetById({
+        id,
+        projectId: project.id,
+      });
       if (!existing) {
         return c.json({ error: "Scenario not found" }, 404);
       }
 
-      const scenario = await service.update(id, project.id, {
+      const scenario = await c.app.scenarios.update({
+        id,
+        projectId: project.id,
         ...(body.name !== undefined && { name: body.name }),
         ...(body.situation !== undefined && { situation: body.situation }),
         ...(body.criteria !== undefined && { criteria: body.criteria }),
@@ -338,9 +338,8 @@ function registerDeleteScenarioRoute(
         "Archiving scenario",
       );
 
-      const service = getService();
       try {
-        await service.archive({ id, projectId: project.id });
+        await c.app.scenarios.archive({ id, projectId: project.id });
         return c.json({ id, archived: true });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {

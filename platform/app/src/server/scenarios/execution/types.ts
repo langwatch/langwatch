@@ -6,7 +6,7 @@
  * only depend on what they actually need.
  */
 
-import { z } from "zod";
+import { z } from "zod/v4";
 import { FieldMappingSchema } from "../field-mapping";
 import { runParameterValuesSchema } from "../parameters";
 

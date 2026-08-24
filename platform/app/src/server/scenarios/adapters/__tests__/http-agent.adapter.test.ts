@@ -2,7 +2,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type {
   Agent as TypedAgent,
   AgentService,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import { Response } from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";

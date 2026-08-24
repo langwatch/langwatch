@@ -20,7 +20,7 @@
  * This test seeds EXACTLY the pair codexApplyCodingDefaults writes for the
  * FAST role (paired with a real DEFAULT role default so the simulator /
  * judge — who genuinely need an inference model — resolve fine) using
- * `createDataPrefetcherDependencies()` with NO arguments: the real
+ * `createDataPrefetcherDependencies({ app, prisma })`: the real
  * production dependency graph, hitting the real database, the real
  * resolver, and the real litellm-params / codex backstop. There is
  * deliberately no dependency-injection override of any kind anywhere in
@@ -40,6 +40,7 @@ import {
   cleanupTestRows,
 } from "../../../../test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
+import { getApp } from "../../../app-layer/app";
 import { CODEX_DEFAULT_MODEL } from "../../../modelProviders/codexRestrictions";
 import { setRoleAtScope } from "../../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../../modelProviders/modelProvider.service";
@@ -309,7 +310,10 @@ describe.skipIf(!hasCredentialsSecret)(
         /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
         /** @scenario "Coding defaults never break a simulation run" */
         it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
-          const deps = createDataPrefetcherDependencies();
+          const deps = createDataPrefetcherDependencies({
+            app: getApp(),
+            prisma,
+          });
           const target: TargetConfig = {
             type: label,
             referenceId: referenceId(),

@@ -81,7 +81,7 @@ describe("prefetchScenarioData", () => {
     };
 
     const promptFetcher: PromptFetcher = {
-      getPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
+      tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
     };
 
     const agentFetcher: AgentFetcher = {
@@ -237,7 +237,7 @@ describe("prefetchScenarioData", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: mockModelParamsProvider,
           });
@@ -259,7 +259,7 @@ describe("prefetchScenarioData", () => {
         it("never calls the agent-under-test resolver", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
           });
 
@@ -300,7 +300,7 @@ describe("prefetchScenarioData", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi
+              tryGetPromptByIdOrHandle: vi
                 .fn()
                 .mockResolvedValue(promptWithoutModel),
             },
@@ -337,7 +337,7 @@ describe("prefetchScenarioData", () => {
         it("calls the agent-under-test resolver exactly once", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi
+              tryGetPromptByIdOrHandle: vi
                 .fn()
                 .mockResolvedValue(promptWithoutModel),
             },
@@ -361,7 +361,7 @@ describe("prefetchScenarioData", () => {
         it("prepares model params exactly three times — agent, simulator, and judge", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi
+              tryGetPromptByIdOrHandle: vi
                 .fn()
                 .mockResolvedValue(promptWithoutModel),
             },
@@ -775,7 +775,7 @@ describe("prefetchScenarioData", () => {
         it("returns failure with prompt not found error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
             },
           });
 
@@ -909,7 +909,7 @@ describe("prefetchScenarioData", () => {
         it("returns failure with model params error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: {
               prepare: vi.fn().mockResolvedValue({
@@ -1067,7 +1067,7 @@ describe("prefetchScenarioData", () => {
         it("returns success with complete data", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
           });
 
@@ -1935,7 +1935,7 @@ describe("prefetchScenarioData", () => {
       return createMockDeps({
         scenarioFetcher: { getById: vi.fn().mockResolvedValue(scenario) },
         promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+          tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
             id: "prompt_123",
             prompt: "You are helpful",
             messages: [],
@@ -2184,7 +2184,7 @@ describe("prefetchScenarioData", () => {
           }),
         },
         promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+          tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
             id: "prompt_123",
             prompt: "You are helpful",
             messages: [],
@@ -2252,7 +2252,7 @@ describe("prefetchScenarioData", () => {
       it("computes no budget and carries none on the job data", async () => {
         const deps = createMockDeps({
           promptFetcher: {
-            getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+            tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
               id: "prompt_123",
               prompt: "You are helpful",
               messages: [],

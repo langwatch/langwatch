@@ -10,7 +10,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import { decrypt, encrypt } from "~/utils/encryption";
 

@@ -16,7 +16,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 
-import { z } from "zod";
+import { z } from "zod/v4";
 
 /** How many parameters one scenario may declare. */
 export const MAX_SCENARIO_PARAMETER_DEFINITIONS = 20;

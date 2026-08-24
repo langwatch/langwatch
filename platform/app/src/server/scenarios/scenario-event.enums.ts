@@ -1,11 +1,7 @@
-/**
- * Verdict enum represents the possible outcomes of a test scenario
- */
-export enum Verdict {
-  SUCCESS = "success",
-  FAILURE = "failure",
-  INCONCLUSIVE = "inconclusive",
-}
+export {
+  SimulationVerdict as Verdict,
+  SimulationRunStatus as ScenarioRunStatus,
+} from "@langwatch/simulation-contract";
 
 // Scenario event type enum
 export enum ScenarioEventType {
@@ -18,32 +14,6 @@ export enum ScenarioEventType {
   TOOL_CALL_START = "SCENARIO_TOOL_CALL_START",
   TOOL_CALL_ARGS = "SCENARIO_TOOL_CALL_ARGS",
   TOOL_CALL_END = "SCENARIO_TOOL_CALL_END",
-}
-
-/**
- * Domain-level statuses persisted in ES/ClickHouse (PENDING, IN_PROGRESS, …).
- * QUEUED is written to ClickHouse via the fold projection when a queueRun
- * command is dispatched. RUNNING maps to a job the queue is executing and
- * remains a UI-only overlay.
- */
-export enum ScenarioRunStatus {
-  SUCCESS = "SUCCESS",
-  ERROR = "ERROR",
-  CANCELLED = "CANCELLED",
-  IN_PROGRESS = "IN_PROGRESS",
-  PENDING = "PENDING",
-  FAILED = "FAILED",
-  /**
-   * Kept for external API/UI compatibility and any legacy stored rows.
-   * No longer produced anywhere: a stalled run now reaches terminal ERROR
-   * (reason "stalled") via the simulationRunExecution process manager's
-   * stall watchdog — nothing derives STALLED at read time anymore.
-   */
-  STALLED = "STALLED",
-  /** Queue waiting state - job is queued but not yet picked up by a worker */
-  QUEUED = "QUEUED",
-  /** Queue active state - job is being executed by a worker */
-  RUNNING = "RUNNING",
 }
 
 /** Statuses that are eligible for cancellation (still in-flight). */

@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: vi.fn(),
-}));
+import type { App } from "~/server/app-layer/app";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -15,12 +10,12 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { getApp } from "~/server/app-layer/app";
 import { archiveScenarioSetRuns } from "../[[...route]]/app";
 
 describe("archiveScenarioSetRuns()", () => {
   let mockGetRunIdsForSet: Mock;
   let mockDeleteRun: Mock;
+  let app: Pick<App, "simulations">;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,14 +23,14 @@ describe("archiveScenarioSetRuns()", () => {
     mockGetRunIdsForSet = vi.fn();
     mockDeleteRun = vi.fn().mockResolvedValue(undefined);
 
-    (getApp as Mock).mockReturnValue({
+    app = {
       simulations: {
         runs: {
           getRunIdsForSet: mockGetRunIdsForSet,
         },
         deleteRun: mockDeleteRun,
       },
-    });
+    } as Pick<App, "simulations">;
   });
 
   describe("when getRunIdsForSet returns N runs", () => {
@@ -45,6 +40,7 @@ describe("archiveScenarioSetRuns()", () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
 
       const result = await archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "set-a",
       });
@@ -69,6 +65,7 @@ describe("archiveScenarioSetRuns()", () => {
         .mockResolvedValueOnce(undefined);
 
       const result = await archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "set-a",
       });
@@ -88,6 +85,7 @@ describe("archiveScenarioSetRuns()", () => {
       });
 
       const result = await archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "set-big",
       });
@@ -104,6 +102,7 @@ describe("archiveScenarioSetRuns()", () => {
       });
 
       const result = await archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "set-small",
       });
@@ -136,6 +135,7 @@ describe("archiveScenarioSetRuns()", () => {
 
       // Start archiving (will block until resolvers are called)
       const archivePromise = archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "set-32",
       });
@@ -164,6 +164,7 @@ describe("archiveScenarioSetRuns()", () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
 
       const result = await archiveScenarioSetRuns({
+        app,
         projectId: "project-a",
         scenarioSetId: "ghost-set",
       });

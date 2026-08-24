@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import type { AgentService } from "@langwatch/agents-contract";
+import type { AgentService } from "@langwatch/agent-contract";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";

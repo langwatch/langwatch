@@ -80,6 +80,7 @@ async function bootScenarioProcessor(
   const { SCENARIO_WORKER } = await import(
     "~/server/scenarios/scenario.constants"
   );
+  const { prisma } = await import("~/server/db");
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
@@ -87,6 +88,8 @@ async function bootScenarioProcessor(
   scenarioExecutionPool?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({
     pool: scenarioPool,
+    app,
+    prisma,
   });
   if (scenarioProcessor) {
     shutdownHandles.push(() => scenarioProcessor.close());

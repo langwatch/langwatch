@@ -4,27 +4,26 @@
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import {
+  type RunParameterValues,
+  runParameterValuesSchema,
+  type ScenarioService,
+} from "@langwatch/scenario-contract";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { z } from "zod/v4";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import {
-  type RunParameterValues,
-  runParameterValuesSchema,
-} from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import {
   encryptRunSecretValues,
   type RunSecretCiphertext,
 } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
@@ -65,12 +64,12 @@ const runScenarioSchema = projectSchema.extend({
  * refuses the request rather than producing a run that fails halfway through.
  */
 async function resolveParametersForRun({
-  prisma,
+  scenarios,
   projectId,
   scenarioId,
   values,
 }: {
-  prisma: PrismaClient;
+  scenarios: ScenarioService;
   projectId: string;
   scenarioId: string;
   values?: RunParameterValues;
@@ -78,11 +77,11 @@ async function resolveParametersForRun({
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
 }> {
-  const scenarios = await ScenarioService.create(prisma).getRunConfigByIds({
+  const configs = await scenarios.getRunConfigs({
     ids: [scenarioId],
     projectId,
   });
-  const resolved = await resolveRunParameters({ scenarios, values });
+  const resolved = await resolveRunParameters({ scenarios: configs, values });
   const forScenario = resolved.get(scenarioId);
   return {
     parameters: forScenario?.parameters ?? {},
@@ -105,6 +104,7 @@ async function resolveParametersForRun({
  * the metadata.
  */
 async function queueRun({
+  app,
   projectId,
   scenarioId,
   scenarioRunId,
@@ -115,6 +115,7 @@ async function queueRun({
   parameters,
   secretParameters,
 }: {
+  app: Pick<App, "simulations">;
   projectId: string;
   scenarioId: string;
   scenarioRunId: string;
@@ -131,7 +132,7 @@ async function queueRun({
     ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
   };
   try {
-    await getApp().simulations.queueRun({
+    await app.simulations.queueRun({
       tenantId: projectId,
       scenarioRunId,
       scenarioId,
@@ -175,14 +176,17 @@ export const simulationRunnerRouter = createTRPCRouter({
       const batchRunId = input.batchRunId ?? generateBatchRunId();
 
       const { parameters, secretParameters } = await resolveParametersForRun({
-        prisma: ctx.prisma,
+        scenarios: ctx.app.scenarios,
         projectId: input.projectId,
         scenarioId: input.scenarioId,
         values: input.parameters,
       });
 
       // Validate early - prefetch data to catch configuration errors before scheduling
-      const deps = createDataPrefetcherDependencies();
+      const deps = createDataPrefetcherDependencies({
+        app: ctx.app,
+        prisma: ctx.prisma,
+      });
       const prefetchResult = await prefetchScenarioData({
         context: {
           projectId: input.projectId,
@@ -224,6 +228,7 @@ export const simulationRunnerRouter = createTRPCRouter({
       );
 
       await queueRun({
+        app: ctx.app,
         projectId: input.projectId,
         scenarioId: input.scenarioId,
         scenarioRunId,

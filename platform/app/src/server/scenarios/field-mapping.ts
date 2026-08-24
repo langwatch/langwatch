@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 
 /**
  * How one agent input is filled: from a scenario source, or from a literal.

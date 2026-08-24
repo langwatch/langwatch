@@ -3,7 +3,7 @@
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
 import { EventType } from "@ag-ui/core";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { chatMessageSchema } from "~/server/tracer/types";
 import {
   ScenarioEventType,

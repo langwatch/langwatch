@@ -14,15 +14,15 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "~/generated/prisma/client";
+import type { App } from "~/server/app-layer/app";
 import { type ChildProcess, spawn } from "child_process";
-import { tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
   createContextFromJobData,
   type JobContextMetadata,
   runWithContext,
 } from "../context/asyncContext";
-import { prisma } from "../db";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
@@ -35,6 +35,7 @@ import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
   createDataPrefetcherDependencies,
+  type DataPrefetcherDependencies,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type {
@@ -46,7 +47,6 @@ import type {
   ScenarioExecutionResult,
 } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
-import { ScenarioService } from "./scenario.service";
 import {
   type FailureEventParams,
   ScenarioFailureHandler,
@@ -73,6 +73,7 @@ export interface FailureEmitter {
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
+  dataPrefetcher?: DataPrefetcherDependencies;
 }
 
 // ============================================================================
@@ -82,18 +83,24 @@ export interface ProcessorDependencies {
 /**
  * Creates production dependencies for the scenario processor.
  */
-export function createProcessorDependencies(): ProcessorDependencies {
-  const scenarioService = ScenarioService.create(prisma);
+export function createProcessorDependencies({
+  app,
+  prisma,
+}: {
+  app: Pick<App, "agents" | "prompts" | "scenarios">;
+  prisma: PrismaClient;
+}): ProcessorDependencies {
   const failureHandler = ScenarioFailureHandler.create();
 
   return {
     scenarioLookup: {
-      getById: (params) => scenarioService.getById(params),
+      getById: (params) => app.scenarios.tryGetById(params),
     },
     failureEmitter: {
       ensureFailureEventsEmitted: (params) =>
         failureHandler.ensureFailureEventsEmitted(params),
     },
+    dataPrefetcher: createDataPrefetcherDependencies({ app, prisma }),
   };
 }
 
@@ -295,7 +302,7 @@ function prefetchContext(jobData: ExecutionJobData) {
 export async function executeScenarioRun(
   jobData: ExecutionJobData,
   pool: ScenarioExecutionPool,
-  deps: ProcessorDependencies = createProcessorDependencies(),
+  deps: ProcessorDependencies,
 ): Promise<void> {
   const contextMetadata: JobContextMetadata = {
     projectId: jobData.projectId,
@@ -308,7 +315,12 @@ export async function executeScenarioRun(
     getJobProcessingCounter("scenario", "processing").inc();
     jobLogger.info("Processing scenario job");
 
-    const prefetchDeps = createDataPrefetcherDependencies();
+    const prefetchDeps = deps.dataPrefetcher;
+    if (!prefetchDeps) {
+      throw new Error(
+        "Scenario processor requires data-prefetcher dependencies at composition.",
+      );
+    }
     const prefetchResult = await prefetchScenarioData({
       context: prefetchContext(jobData),
       target: jobData.target,
@@ -557,13 +569,17 @@ async function spawnScenarioChildProcess(
 export async function startScenarioProcessor({
   pool,
   injectedDeps,
+  app,
+  prisma,
 }: {
   pool: ScenarioExecutionPool;
   injectedDeps?: ProcessorDependencies | undefined;
+  app: Pick<App, "agents" | "prompts" | "scenarios" | "redis">;
+  prisma?: PrismaClient;
 }): Promise<{ close: () => Promise<void> } | undefined> {
   // Skipping the processor is this function's documented outcome when there
   // is no Redis, so absence must not raise (ADR-093).
-  const connection = tryGetApp()?.redis ?? null;
+  const connection = app.redis;
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;
@@ -572,7 +588,16 @@ export async function startScenarioProcessor({
   // Resolved after the guard rather than as a default parameter, because
   // defaults evaluate before the body runs: on the "no Redis, skip" path that
   // would build the Prisma-backed services this immediately throws away.
-  const deps = injectedDeps ?? createProcessorDependencies();
+  const deps = injectedDeps
+    ? injectedDeps
+    : (() => {
+        if (!prisma) {
+          throw new Error(
+            "Scenario processor must receive the process App and Prisma client at composition.",
+          );
+        }
+        return createProcessorDependencies({ app, prisma });
+      })();
 
   // Wire the spawn function into the pool
   pool.setSpawnFunction(async (jobData) => {

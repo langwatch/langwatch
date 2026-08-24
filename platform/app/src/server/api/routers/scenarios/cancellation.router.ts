@@ -10,9 +10,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { projectSchema } from "./schemas";
@@ -31,8 +31,10 @@ const cancelBatchRunSchema = projectSchema.extend({
   batchRunId: z.string(),
 });
 
-function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
-  const simulationRuns = getApp().simulations.runs;
+function createGetRunsForBatch(
+  app: Pick<App, "simulations">,
+): CancellationServiceDeps["getRunsForBatch"] {
+  const simulationRuns = app.simulations.runs;
 
   return async (params) => {
     const result = await simulationRuns.getRunDataForBatchRun(params);
@@ -40,32 +42,34 @@ function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
   };
 }
 
-let _service: ScenarioCancellationService | null = null;
-function getService(): ScenarioCancellationService {
-  if (!_service) {
-    _service = new ScenarioCancellationService({
-      getRunsForBatch: createGetRunsForBatch(),
+const services = new WeakMap<App, ScenarioCancellationService>();
+
+function serviceFor(app: App): ScenarioCancellationService {
+  const cached = services.get(app);
+  if (cached) return cached;
+  const service = new ScenarioCancellationService({
+      getRunsForBatch: createGetRunsForBatch(app),
       dispatchCancelRequested: async ({
         tenantId,
         scenarioRunId,
         occurredAt,
       }) => {
-        await getApp().simulations.cancelRun({
+        await app.simulations.cancelRun({
           tenantId,
           scenarioRunId,
           occurredAt,
         });
       },
     });
-  }
-  return _service;
+  services.set(app, service);
+  return service;
 }
 
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
     .permission("scenarios:manage")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       logger.info(
         {
           projectId: input.projectId,
@@ -75,13 +79,13 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      return getService().cancelJob(input);
+      return serviceFor(ctx.app).cancelJob(input);
     }),
 
   cancelBatchRun: protectedProcedure
     .input(cancelBatchRunSchema)
     .permission("scenarios:manage")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       logger.info(
         {
           projectId: input.projectId,
@@ -91,6 +95,6 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      return getService().cancelBatchRun(input);
+      return serviceFor(ctx.app).cancelBatchRun(input);
     }),
 });

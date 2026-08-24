@@ -17,26 +17,12 @@ import {
   describe,
   expect,
   it,
-  vi,
 } from "vitest";
 
-// `startScenarioProcessor` reads its connection through `tryGetApp` — skipping
-// the processor is its documented outcome when there is none, so overriding
-// `getApp` here would leave it silently skipped and the suite watching a
-// processor that never started. Partial-mock: only the accessor it reads is
-// replaced, and `beforeAll` fills the connection in once testContainers is up.
 let _testRedis: any = null;
-vi.mock("~/server/app-layer/app", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/app-layer/app")>();
-  return {
-    ...actual,
-    tryGetApp: () => (_testRedis ? { redis: _testRedis } : null),
-  };
-});
 
 import type { Redis } from "ioredis";
-import { tryGetApp } from "../../app-layer/app";
+import type { App } from "../../app-layer/app";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -420,9 +406,8 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
       };
 
-      // Use the REAL startScenarioProcessor with the test Redis, which the
-      // `tryGetApp` mock at the top of this file serves.
-      const testConnection = tryGetApp()?.redis;
+      // Use the real processor wiring with the test process App's Redis.
+      const testConnection = _testRedis;
 
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
@@ -454,6 +439,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         const handle = await startScenarioProcessor({
           pool,
           injectedDeps: mockDeps,
+          app: { redis: testConnection } as App,
         });
         if (handle) cleanupFns.push(handle.close);
       }

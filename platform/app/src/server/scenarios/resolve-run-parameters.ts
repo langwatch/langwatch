@@ -33,8 +33,8 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
   withoutParameterNames,
-} from "./parameters";
-import type { ScenarioRunConfig } from "./scenario.repository";
+} from "@langwatch/scenario-contract";
+import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
 
 /**
  * What one scenario in the run resolved.

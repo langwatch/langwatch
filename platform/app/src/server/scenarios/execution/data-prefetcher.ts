@@ -11,24 +11,25 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Agent } from "@langwatch/agents-contract";
-import type { Edge, Node } from "@xyflow/react";
-import { z } from "zod";
-import { env } from "~/env.mjs";
-import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
-import { AgentsFeature } from "~/runtime/app/features/agents";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
-import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
-import { extractSuiteId } from "../../suites/suite-set-id";
-import { parseSuiteTargets } from "../../suites/types";
+import { AgentNotFoundError, type Agent } from "@langwatch/agent-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
   type RunParameterValues,
   withoutParameterNames,
-} from "../parameters";
+} from "@langwatch/scenario-contract";
+import type { Edge, Node } from "@xyflow/react";
+import { z } from "zod/v4";
+import { env } from "~/env.mjs";
+import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
+import type { App } from "~/server/app-layer/app";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
+import { extractSuiteId } from "../../suites/suite-set-id";
+import { parseSuiteTargets } from "../../suites/types";
 import {
   decryptRunSecretValues,
   type RunSecretCiphertext,
@@ -43,13 +44,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { prisma } from "../../db";
-import {
-  PromptService,
-  type VersionedPrompt,
-} from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
-import { ScenarioService } from "../scenario.service";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
@@ -118,10 +113,7 @@ export interface SuiteConfigFetcher {
 
 /** Minimal interface for prompt lookup - uses only what prefetcher needs */
 export interface PromptFetcher {
-  getPromptByIdOrHandle(params: {
-    projectId: string;
-    idOrHandle: string;
-  }): Promise<VersionedPrompt | null>;
+  tryGetPromptByIdOrHandle: PromptService["tryGetPromptByIdOrHandle"];
 }
 
 /** Minimal interface for agent lookup - uses only what prefetcher needs */
@@ -773,7 +765,7 @@ async function fetchPromptConfigData(
   promptId: string,
   fetcher: PromptFetcher,
 ): Promise<PromptConfigData | null> {
-  const prompt = await fetcher.getPromptByIdOrHandle({
+  const prompt = await fetcher.tryGetPromptByIdOrHandle({
     projectId,
     idOrHandle: promptId,
   });
@@ -1225,14 +1217,17 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
  * - Prisma for project lookup
  * - Model providers for LiteLLM params
  */
-export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
-  const scenarioService = ScenarioService.create(prisma);
-  const promptService = new PromptService(prisma);
-  const agentService = AgentsFeature.create({ prisma, session: null });
+export function createDataPrefetcherDependencies({
+  app,
+  prisma,
+}: {
+  app: Pick<App, "agents" | "prompts" | "scenarios">;
+  prisma: import("~/generated/prisma/client").PrismaClient;
+}): DataPrefetcherDependencies {
 
   return {
     scenarioFetcher: {
-      getById: (params) => scenarioService.getById(params),
+      getById: (params) => app.scenarios.tryGetById(params),
     },
     suiteConfigFetcher: {
       getBySetId: async (setId, projectId) => {
@@ -1251,11 +1246,18 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       },
     },
     promptFetcher: {
-      getPromptByIdOrHandle: (params) =>
-        promptService.getPromptByIdOrHandle(params),
+      tryGetPromptByIdOrHandle: (params) =>
+        app.prompts.tryGetPromptByIdOrHandle(params),
     },
     agentFetcher: {
-      findById: (params) => agentService.getById(params),
+      findById: async (params) => {
+        try {
+          return await app.agents.getById(params);
+        } catch (error) {
+          if (error instanceof AgentNotFoundError) return null;
+          throw error;
+        }
+      },
     },
     workflowVersionFetcher: {
       getLatestDsl: async ({ projectId, workflowId }) => {
