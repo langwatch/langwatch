@@ -217,12 +217,13 @@ export const auth = betterAuth({
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
-   * The stock adapter, and deliberately nothing else (ADR-116). `Account`
-   * is a PROJECTION of the identity event log, not storage identity serves:
-   * better-auth reads and writes it exactly as it always has, and the fold
-   * maintains its linkage columns. Wrapping this adapter cannot work — the
-   * factory's own traffic (its join emulation, its transactions) runs below
-   * a wrapper and never reaches it.
+   * The stock adapter — ADR-116's bridge phase. `Account` is a PROJECTION
+   * of the identity event log: better-auth reads and writes it exactly as
+   * it always has, and the fold maintains its linkage columns. Wrapping
+   * this adapter can never intercept a model — the factory's own traffic
+   * (its join emulation, its transactions) runs below a wrapper — which is
+   * why ADR-116's identity storage adapter takes over AT the factory in
+   * its later phases, not in front of this one.
    */
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 

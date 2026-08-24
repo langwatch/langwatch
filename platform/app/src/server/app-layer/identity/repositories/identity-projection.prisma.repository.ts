@@ -10,7 +10,7 @@ import type {
 import { factToRow, rowToFact } from "./identifier-row";
 
 /**
- * The columns the fold owns on `Account` (ADR-116 §2).
+ * The columns the fold owns on `Account` (ADR-116's bridge phase).
  *
  * Secrets are absent deliberately, and the list is narrow on purpose: a
  * replay that rewrote `access_token` would undo a token refresh that
@@ -121,7 +121,7 @@ export class PrismaIdentityProjectionRepository
   }
 
   /**
-   * `Account` as the identifiers imply it (ADR-116 §5, §6).
+   * `Account` as the identifiers imply it (ADR-116).
    *
    * Convergent rather than atomic. On the live path better-auth has already
    * written this row, with the id the ceremony pinned, so the upsert

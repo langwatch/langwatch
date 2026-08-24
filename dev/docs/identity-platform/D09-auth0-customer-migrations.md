@@ -68,7 +68,7 @@ Per-tenant migration state is a `@langwatch/system-migrations` record (migration
 // finalized is what enables Step 7 teardown; rolled_back pins the org on grace
 ```
 
-Progress reads are queries over identifier data (Account rows with `connectionId = <direct>` vs legacy), not stored counters; the wizard and the report render the same query.
+Progress reads are queries over identifier data (`Identifier` rows with `connectionId = <direct>` vs legacy — ADR-116 retires `Account`, so nothing here may read it), not stored counters; the wizard and the report render the same query.
 
 # Out of Scope
 

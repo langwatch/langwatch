@@ -132,7 +132,7 @@ describe("the email verification ceremony", () => {
   });
 
   describe("when the user's identifier backfill is not finalized", () => {
-    /** @scenario "The adapter's write gate ships closed for every user" */
+    /** @scenario "The write gate ships closed for every user" */
     it("refuses completion before any command: no live event precedes the user's history", async () => {
       const { service, verifyIdentifier } = harness({ latched: false });
       const codeVerifier = "secret";

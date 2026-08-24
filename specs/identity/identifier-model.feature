@@ -17,8 +17,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
   #        │   the fold is the queue's)
   #        └── never carries secrets; emails yes (erasure wipes them, R11)
   #
-  #   Account / Session / VerificationToken (PG) - pure row-truth protocol
-  #   tables written by repositories; never projections, never in replay.
+  #   Session / VerificationToken (PG) - pure row-truth protocol tables
+  #   written by repositories; never projections, never in replay.
+  #
+  #   Account (PG) - under ADR-116 a projection of the same log for as long
+  #   as it exists: the fold owns its linkage columns, better-auth its
+  #   secret columns, and the table retires when the identity storage
+  #   adapter's last phase lands
+  #   (specs/identity/identity-storage-adapter.feature).
   #
   # Rollout is ADR-110's shape re-tenanted to users - one migration, and
   # finishing it IS the switch: the ceremonies sit behind a per-user write
@@ -242,10 +248,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then no identifier answers, so the legacy column stands
     And attaching an address can therefore never redirect "sam"'s mail
 
-  # ADR-116: `Account` is demoted from a source of truth to a PROJECTION of
-  # the event log, alongside `Identifier`. better-auth reads and writes it
+  # ADR-116: `Account` is a PROJECTION of the event log, alongside
+  # `Identifier`. During the bridge phase better-auth reads and writes it
   # with the completely stock adapter - nothing intercepts it - and the fold
-  # owns its linkage columns. One truth, two projections.
+  # owns its linkage columns. One truth, two projections, until the table
+  # retires with the identity storage adapter's last phase.
 
   @unit
   Scenario: better-auth reads an account through its own storage

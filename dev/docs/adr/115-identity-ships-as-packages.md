@@ -309,10 +309,10 @@ the app composes (the write gate and the clock).
 `createIdentityDatabase`, the routing table, `IdentityAdapterUnroutedWriteError`,
 the transaction guard, `findAllRows` and `pinnedToIds` — over the stock
 `prismaAdapter` as its row engine. ADR-101 §2 withdrew that seam in favour
-of the hooks, and all of it is deleted. **ADR-116 then brought a different
-adapter back** — a storage-REPLACING one for the `account` model — so
-better-auth is a peer again, on this subpath only; the root entry and every
-service stay free of it. `accountCeremonies.ts`'s two raw `prisma.identifier.*` queries
+of the hooks, and all of it is deleted. **ADR-116 keeps the hooks as its
+bridge phase and moves the seam into an identity-owned storage adapter when
+its later phases land** — so better-auth stays a peer on this subpath only;
+the root entry and every service stay free of it. `accountCeremonies.ts`'s two raw `prisma.identifier.*` queries
 became `heads.findIdentifierIdForAccount`, and the ceremony's one `User`
 read became `IdentityUsersRepository.findEmail`.
 `secondaryStorageResilience.ts` was excluded from the move as D02's Redis

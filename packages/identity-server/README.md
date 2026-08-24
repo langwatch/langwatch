@@ -55,12 +55,13 @@ Even there the contact is thin: the ceremonies take plain row shapes and
 never learn that a hook called them, so the root entry — and therefore every
 service — is free of the library entirely.
 
-Nothing here implements a `DBAdapter`. ADR-116 tried that and it cannot
-work: better-auth satisfies its own `join: { account: true }` with a query
-issued *below* any wrapper, so wrapping a built adapter never intercepts a
-model completely. `Account` is instead a PROJECTION of the event log written
-by the fold, and better-auth reads it with the completely stock
-`prismaAdapter`.
+Nothing here implements a `DBAdapter` today. Wrapping a built adapter can
+never intercept a model completely — better-auth satisfies its own
+`join: { account: true }` with a query issued *below* any wrapper — so
+`Account` is a PROJECTION of the event log written by the fold, and
+better-auth reads it with the completely stock `prismaAdapter` (ADR-116's
+bridge phase). ADR-116's later phases put an identity-owned adapter AT the
+factory, where the library's own traffic lands on it by construction.
 
 Spec: `specs/identity/identifier-model.feature`,
 `specs/identity/identity-packages.feature`.

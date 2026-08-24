@@ -19,7 +19,8 @@
  *   identity-command-id          every form a command id takes, in one place
  *   identity-backfill-plan       what the legacy rows imply, as a pure plan
  *   ./better-auth                the ceremonies better-auth's databaseHooks
- *                                call; no adapter, no storage (ADR-116)
+ *                                call; no adapter, no storage (ADR-116's
+ *                                bridge phase)
  *
  * No storage engine lives here, no environment read, and no event-sourcing
  * framework: the heads, the ledger and the records are ports the app
