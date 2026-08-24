@@ -330,32 +330,40 @@ describe("given events that are not conversations", () => {
 });
 
 describe("given a message a sweep caught mid-answer", () => {
-  it("routes nothing while a known in-flight status stands — the trace door keeps the FIRST write per span id, and a pinned mid-flight capture can never be repaired", () => {
-    const inFlight = genieEvent(
-      completedMessage({ status: "ASKING_AI", attachments: [] }),
-    );
-    expect(mapGenieEventsToTraceRequest([inFlight], ORIGIN)).toBeNull();
+  describe("when the status is a known in-flight one", () => {
+    it("routes nothing — the trace door keeps the FIRST write per span id, and a pinned mid-flight capture can never be repaired", () => {
+      const inFlight = genieEvent(
+        completedMessage({ status: "ASKING_AI", attachments: [] }),
+      );
+      expect(mapGenieEventsToTraceRequest([inFlight], ORIGIN)).toBeNull();
+    });
   });
 
-  it("routes the message once the re-read finds it settled", () => {
-    const settled = genieEvent(completedMessage());
-    const request = mapGenieEventsToTraceRequest([settled], ORIGIN);
-    expect(request).not.toBeNull();
+  describe("when the re-read finds the status settled", () => {
+    it("routes the message", () => {
+      const settled = genieEvent(completedMessage());
+      const request = mapGenieEventsToTraceRequest([settled], ORIGIN);
+      expect(request).not.toBeNull();
+    });
   });
 
-  it("treats an unrecognised status as still in flight — the puller's polarity: wrong that way costs a re-read, routing it costs a permanently wrong trace", () => {
-    const unknown = genieEvent(
-      completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
-    );
-    expect(mapGenieEventsToTraceRequest([unknown], ORIGIN)).toBeNull();
+  describe("when the status is unrecognised", () => {
+    it("treats it as still in flight — the puller's polarity: wrong that way costs a re-read, routing it costs a permanently wrong trace", () => {
+      const unknown = genieEvent(
+        completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
+      );
+      expect(mapGenieEventsToTraceRequest([unknown], ORIGIN)).toBeNull();
+    });
   });
 
-  it("routes a message with no status as it stands — the puller never holds the watermark for it, so skipping would drop it outright", () => {
-    const statusless = genieEvent(
-      completedMessage({ status: undefined, attachments: [] }),
-    );
-    const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
-    expect(request).not.toBeNull();
+  describe("when there is no status at all", () => {
+    it("routes the message as it stands — the puller never holds the watermark for it, so skipping would drop it outright", () => {
+      const statusless = genieEvent(
+        completedMessage({ status: undefined, attachments: [] }),
+      );
+      const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
+      expect(request).not.toBeNull();
+    });
   });
 });
 

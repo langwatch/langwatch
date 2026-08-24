@@ -126,30 +126,43 @@ describe("TurnSteps", () => {
 });
 
 describe("turnHasGenieSteps", () => {
-  it("admits a routed Genie turn that carries a step beyond the root", () => {
-    expect(
-      turnHasGenieSteps({
-        traceName: "databricks_genie.message",
-        spanCount: 2,
-      }),
-    ).toBe(true);
+  describe("given a routed Genie turn", () => {
+    describe("when it carries a step beyond the root", () => {
+      it("admits the turn", () => {
+        expect(
+          turnHasGenieSteps({
+            traceName: "databricks_genie.message",
+            spanCount: 2,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the root is its only span", () => {
+      it("refuses the turn — the message generated no SQL, so the strip would announce steps and then find none", () => {
+        expect(
+          turnHasGenieSteps({
+            traceName: "databricks_genie.message",
+            spanCount: 1,
+          }),
+        ).toBe(false);
+      });
+    });
   });
 
-  it("refuses a Genie turn whose only span is the root", () => {
-    // A message that generated no SQL — mounting the strip would announce
-    // steps and then find none.
-    expect(
-      turnHasGenieSteps({
-        traceName: "databricks_genie.message",
-        spanCount: 1,
-      }),
-    ).toBe(false);
-  });
+  describe("given a turn that is not a routed Genie message", () => {
+    describe("when it carries a foreign trace name", () => {
+      it("refuses the turn regardless of span count", () => {
+        expect(
+          turnHasGenieSteps({ traceName: "my-app-trace", spanCount: 5 }),
+        ).toBe(false);
+      });
+    });
 
-  it("refuses non-Genie turns regardless of span count", () => {
-    expect(turnHasGenieSteps({ traceName: "my-app-trace", spanCount: 5 })).toBe(
-      false,
-    );
-    expect(turnHasGenieSteps({ spanCount: 5 })).toBe(false);
+    describe("when it carries no trace name at all", () => {
+      it("refuses the turn regardless of span count", () => {
+        expect(turnHasGenieSteps({ spanCount: 5 })).toBe(false);
+      });
+    });
   });
 });
