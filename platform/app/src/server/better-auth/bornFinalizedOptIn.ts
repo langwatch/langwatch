@@ -47,6 +47,14 @@ const SIGN_UP_PATH_SUFFIX = "/sign-up/email";
  *
  * ## What is NOT covered, said plainly
  *
+ * **The product's own sign-up page.** It posts to `api.user.register`, which
+ * writes the `User` row through Prisma directly and never reaches
+ * `auth.api.signUpEmail` — so it does not pass this gate at all, and today
+ * the entrance is reachable only by a client calling better-auth's sign-up
+ * route itself. Routing the tRPC path through `auth.api.signUpEmail` is
+ * future work (ADR-116 §3); until it lands, a flagged organization signing up
+ * through the UI is created on the legacy branch and adopted by the backfill.
+ *
  * A social sign-up. A new user minted inside an OAuth callback arrives on
  * the same URL an existing user's sign-in uses, with no address in the body
  * to evaluate a flag against, so it is indistinguishable here and takes the

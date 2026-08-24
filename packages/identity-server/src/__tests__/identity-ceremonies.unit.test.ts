@@ -107,11 +107,29 @@ describe("the identity ceremonies", () => {
           userId: USER,
           accountId: "acc_1",
           provider: "google",
+          providerId: "google",
           providerAccountId: "gid_1",
           value: "sam@acme.com",
           occurredAtMs: T0,
           ceremony: { flow: "better-auth" },
         }),
+      );
+    });
+
+    /** @scenario "The projected Account row keeps better-auth's own provider id" */
+    it("carries better-auth's own provider id, unfolded, beside the folded one", async () => {
+      const { ceremonies, identity } = harness();
+
+      await ceremonies.beforeAccountCreate(
+        accountRow({ providerId: "auth0", accountId: "auth0|42" }),
+      );
+
+      // The identifier vocabulary folds auth0 into `oidc`, and `Account` is a
+      // projection of the log: a fact that carried only the folded name would
+      // make the fold rewrite the row's provider and the genericOAuth
+      // callback's lookup would stop finding it.
+      expect(identity.attachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "oidc", providerId: "auth0" }),
       );
     });
 

@@ -105,6 +105,18 @@ export interface IdentityAccountsPort {
     accountIds: readonly string[];
     secrets: IdentityAccountSecrets;
   }): Promise<void>;
+  /**
+   * The mirrored rows, removed with the method they mirror (ADR-116 §8).
+   *
+   * The fold removes an unlinked identifier's `Account` row too, and this is
+   * not a second writer racing it: the mirror has been keeping that row's
+   * secret columns current, so between the unlink and the fold it is a live
+   * credential for a sign-in method the customer just removed. Deleted with
+   * the table in Phase 3, like the mirror itself.
+   */
+  deleteBridgeAccounts(args: {
+    accountIds: readonly string[];
+  }): Promise<number>;
 }
 
 /** A user the identity tables can name, with the one status that lets the

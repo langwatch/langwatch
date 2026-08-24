@@ -3,22 +3,29 @@
  * `@langwatch/identity-server`'s IdentityLedger port, in the shape the
  * grants ledger already has (`app-layer/authz/ledger.ts`, ADR-110):
  *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-user GroupQueue, awaited — the fold
- *      is the queue's, and this package never applies a projection itself;
- *   3. a bounded read-your-writes wait, watching the projection's cursor
- *      reach the events just appended.
+ *   1. the command staged onto the per-user GroupQueue — the queued run is
+ *      what APPENDS, re-running the same guard the calling path ran;
+ *   2. a bounded read-your-writes wait, watching the projection's cursor
+ *      reach the events the guard decided.
  *
- * `commit` runs all three back to back, which is what every ceremony wants.
+ * The staged command is the SOLE appender, and that is the correction ADR-110
+ * already made for grants. Appending here as well and staging the command
+ * afterwards writes every fact twice: the queued run re-executes the handler
+ * against heads the fold has not advanced yet, so it restates and appends a
+ * second row. The projection converges either way — the store dedupes
+ * `commandId:index` on read — but the log would carry two rows per ceremony,
+ * and "a re-run costs no row" would not be true.
+ *
+ * `commit` runs both legs back to back, which is what every ceremony wants.
  * The born-finalized entrance (ADR-116 §3) is the one caller that has to
- * interleave: its Postgres row writes belong between the append and the
- * fold, because the fold declines to project a user that does not exist yet.
- * It reaches `append` and `stageAndAwait` directly rather than reimplementing
- * either.
+ * interleave: its Postgres row writes belong between handing the facts to the
+ * engine and observing the fold, so it reaches `stage` and `awaitFold`
+ * directly rather than reimplementing either. Staging FIRST is what keeps its
+ * loud failure honest — an engine that cannot take the command fails the
+ * sign-up before any row exists on either branch.
  *
  * The wait is an OBSERVATION, not inline processing. A fold that cannot run
- * makes it time out; the facts are still durable, the caller still succeeds,
+ * makes it time out; the command is still queued, the caller still succeeds,
  * and the rows appear when the queue drains. That is why the guards read the
  * heads and state only what the heads do not carry (#7429): a pass that runs
  * against a lagging projection restates, and restating is the repair.
@@ -49,16 +56,11 @@ import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
-import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import {
-  IDENTITY_PIPELINE_NAME,
-  USER_IDENTITY_AGGREGATE_TYPE,
-} from "~/server/event-sourcing/pipelines/identity/schemas/constants";
+import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
@@ -66,7 +68,7 @@ import {
 
 const logger = createLogger("langwatch:identity:ledger");
 
-/** How long a ceremony waits for the App handle before the append gives up. */
+/** How long a ceremony waits for the App handle before staging gives up. */
 const IDENTITY_APP_HANDLE_WAIT_MS = 5_000;
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
@@ -85,29 +87,22 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [ERASE_USER_COMMAND_TYPE]: "eraseUser",
 };
 
-async function resolveEventStore(): Promise<EventStore<IdentityEvent>> {
+/**
+ * The pipeline's sender for one command, once the App exists.
+ *
+ * The wait is why this is async: better-auth builds its adapter at module
+ * load, so a ceremony can reach here while the App is still composing, and
+ * refusing then would fail a ceremony over a race rather than a defect.
+ */
+async function resolveStagedSender(
+  name: string,
+): Promise<IdentityStagedSender | null> {
   const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
   let app = tryGetApp();
   while (!app && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 50));
     app = tryGetApp();
   }
-  const eventStore = app?.eventSourcing?.isEnabled
-    ? app.eventSourcing.getEventStore<IdentityEvent>()
-    : undefined;
-  if (!eventStore) {
-    // A plain Error on purpose (error doctrine): the caller cannot act on an
-    // unavailable event stack, and the ceremony degrades to a retryable
-    // failure with a trace id.
-    throw new Error(
-      "identity ledger cannot append: the event-sourcing stack is unavailable",
-    );
-  }
-  return eventStore;
-}
-
-function resolveStagedSender(name: string): IdentityStagedSender | null {
-  const app = tryGetApp();
   if (!app?.eventSourcing?.isEnabled) return null;
   try {
     const pipeline = app.eventSourcing.getPipeline(
@@ -121,22 +116,21 @@ function resolveStagedSender(name: string): IdentityStagedSender | null {
 
 export interface IdentityLedgerWriterDeps {
   projectionStore: StateProjectionStore<IdentityFoldState>;
-  /** Production resolves the App's event store lazily; tests hand one in. */
-  eventStore?: () => Promise<EventStore<IdentityEvent>>;
-  stagedSender?: (name: string) => IdentityStagedSender | null;
+  /** Production resolves the pipeline handle lazily; tests hand one in. */
+  stagedSender?: (name: string) => Promise<IdentityStagedSender | null>;
   /** The read-your-writes window; production uses the constants above. */
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
 export class IdentityLedgerWriter implements IdentityLedger {
   private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
-  private readonly eventStore: () => Promise<EventStore<IdentityEvent>>;
-  private readonly stagedSender: (name: string) => IdentityStagedSender | null;
+  private readonly stagedSender: (
+    name: string,
+  ) => Promise<IdentityStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: IdentityLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
-    this.eventStore = deps.eventStore ?? resolveEventStore;
     this.stagedSender = deps.stagedSender ?? resolveStagedSender;
     this.convergence = deps.convergence ?? {
       timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
@@ -155,7 +149,6 @@ export class IdentityLedgerWriter implements IdentityLedger {
     if (events.length === 0) return [];
     const done = identityCommitDurationSeconds.startTimer();
     try {
-      await this.append({ command, events });
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
@@ -164,36 +157,9 @@ export class IdentityLedgerWriter implements IdentityLedger {
   }
 
   /**
-   * Leg one on its own: the durable append, waited — the fact lands before
-   * this returns, and nothing has been projected yet.
-   *
-   * Public because ADR-116 §3's born-finalized entrance has to put its
-   * Postgres row writes BETWEEN the append and the fold: the fold declines
-   * to project a user that does not exist, so staging before the rows commit
-   * would leave the newborn's `Identifier` row missing when sign-up returns.
-   * The entrance sequences the same two legs this method and the next
-   * implement, rather than a second copy of them.
-   */
-  async append({
-    command,
-    events,
-  }: {
-    command: IdentityCommand;
-    events: IdentityEvent[];
-  }): Promise<void> {
-    const { tenantId } = command.data;
-    const eventStore = await this.eventStore();
-    await eventStore.storeEvents(
-      events,
-      { tenantId: createTenantId(tenantId) },
-      USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
-    );
-  }
-
-  /**
-   * Legs two and three: staging — the fold is the queue's, so this is how
-   * the projection ever learns; a failure here is a real failure, because
-   * nothing else would apply these events — followed by the bounded
+   * Both legs: staging — the queued run appends and folds, so this is how the
+   * log and the projection ever learn, and a failure here is a real failure
+   * because nothing else would state these events — followed by the bounded
    * read-your-writes wait. The backfill's own pass depends on that wait: it
    * verifies an identifier the same pass just attached.
    */
@@ -209,13 +175,19 @@ export class IdentityLedgerWriter implements IdentityLedger {
     await this.awaitFold({ userId, tenantId, events });
   }
 
-  private async stage({
-    command,
-  }: {
-    command: IdentityCommand;
-  }): Promise<void> {
+  /**
+   * Leg one on its own: the command handed to the queue, which is where the
+   * append happens.
+   *
+   * Public because ADR-116 §3's born-finalized entrance has to put its
+   * Postgres row writes BETWEEN the two legs — the engine must have taken the
+   * facts before any row exists, and the `Identifier` row must be there when
+   * sign-up returns. The entrance sequences the same two legs these methods
+   * implement, rather than a second copy of them.
+   */
+  async stage({ command }: { command: IdentityCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.stagedSender(senderName);
+    const sender = await this.stagedSender(senderName);
     if (!sender) {
       // A wiring defect, not a transient: the pipeline exposed no sender for
       // a command type it declares. Loud, because nothing downstream folds.
@@ -227,12 +199,12 @@ export class IdentityLedgerWriter implements IdentityLedger {
   }
 
   /**
-   * Wait for the projection's cursor to reach the last event appended. The
-   * same comparison the fold uses to decide an event is already applied,
-   * read here instead of written — which is what makes this an observation
-   * of the queue's work rather than a second writer racing it.
+   * Leg two: wait for the projection's cursor to reach the last event the
+   * guard decided. The same comparison the fold uses to decide an event is
+   * already applied, read here instead of written — which is what makes this
+   * an observation of the queue's work rather than a second writer racing it.
    */
-  private async awaitFold({
+  async awaitFold({
     userId,
     tenantId,
     events,
@@ -253,7 +225,7 @@ export class IdentityLedgerWriter implements IdentityLedger {
         identityProjectionConvergenceTimeoutsTotal.inc();
         logger.warn(
           { userId, commandCount: events.length },
-          "identity projection did not land a ceremony's events within the read-your-writes window; the append is durable and the fold will converge",
+          "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
         );
         return;
       }

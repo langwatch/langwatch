@@ -29,6 +29,7 @@ export {
   parseAccountQuery,
 } from "./better-auth/account-queries";
 export {
+  anyBornInThisRequest,
   birthAwareGate,
   currentIdentityBirth,
   IdentityEngineUnavailableError,
@@ -39,7 +40,10 @@ export {
   runWithIdentityBirth,
   wasBornInThisRequest,
 } from "./better-auth/identity-birth";
-export { IdentityCeremonies } from "./better-auth/identity-ceremonies";
+export {
+  bridgeAccountCeremonies,
+  IdentityCeremonies,
+} from "./better-auth/identity-ceremonies";
 export {
   createIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,

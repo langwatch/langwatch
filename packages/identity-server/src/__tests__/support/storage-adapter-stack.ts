@@ -14,7 +14,10 @@ import {
   IdentityEngineUnavailableError,
   runWithIdentityBirth,
 } from "../../better-auth/identity-birth";
-import { IdentityCeremonies } from "../../better-auth/identity-ceremonies";
+import {
+  bridgeAccountCeremonies,
+  IdentityCeremonies,
+} from "../../better-auth/identity-ceremonies";
 import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
 import type {
   IdentityAccountsPort,
@@ -29,6 +32,7 @@ import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
 import { InMemoryHeads, T0 } from "./in-memory-heads";
+import { InMemoryReservations } from "./in-memory-reservations";
 import {
   inertIdentityPorts,
   InMemoryIdentityStorage,
@@ -51,12 +55,16 @@ const emptyDb = (): MemoryDB => ({
  * Sharing the literal keeps their inferred `Auth<Options>` types the same,
  * which is what lets one walk drive either of them.
  */
-function authOver(database: BetterAuthOptions["database"]) {
+function authOver(
+  database: BetterAuthOptions["database"],
+  databaseHooks?: BetterAuthOptions["databaseHooks"],
+) {
   return betterAuth({
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
     emailAndPassword: { enabled: true },
+    ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });
 }
 
@@ -97,10 +105,12 @@ export interface IdentityStack {
  * better-auth over the identity storage adapter (ADR-116 §1), with the same
  * memory engine underneath as the legacy branch.
  *
- * There are deliberately NO `databaseHooks` here. The application still binds
- * them during the bridge phase, but the adapter has to state its own facts —
- * ADR-116 §5's move from a hook-level veto to a storage-level one — and a
- * suite that wired the hooks could not tell which of the two did it.
+ * `databaseHooks` are OFF by default. The adapter has to state its own facts
+ * — ADR-116 §5's move from a hook-level veto to a storage-level one — and a
+ * suite that always wired the hooks could not tell which of the two did it.
+ * `withDatabaseHooks` turns on the application's own composition, hooks and
+ * adapter together, which is the one arrangement that can prove they do not
+ * both state the fact.
  *
  * `inert` gives the ports nothing to answer with and makes every identity
  * WRITE throw, so a closed gate that nevertheless put a row into identity
@@ -108,7 +118,8 @@ export interface IdentityStack {
  */
 export function identityStack({
   inert = false,
-}: { inert?: boolean } = {}): IdentityStack {
+  withDatabaseHooks = false,
+}: { inert?: boolean; withDatabaseHooks?: boolean } = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
   const commands: IdentityCommand[] = [];
@@ -163,6 +174,8 @@ export function identityStack({
     },
   };
 
+  const reservations = new InMemoryReservations();
+
   const storage = new InMemoryIdentityStorage(
     heads,
     (userId) => finalized.is(userId),
@@ -170,9 +183,15 @@ export function identityStack({
   );
   const isUserOnIdentityWrites = async ({ userId }: { userId: string }) =>
     gate.open(userId);
+  /** The fleet-level short-circuit, answered from the same two sources the
+   *  per-user fork reads rather than a third one kept in step by hand. */
+  const isAnyoneOnIdentityWrites = async () =>
+    (db.user ?? []).some(
+      (row) => typeof row.id === "string" && gate.open(row.id),
+    ) || [...migrationState.values()].includes("finalized");
 
   const identity = new IdentityService(
-    new IdentityGuards(heads, users),
+    new IdentityGuards(heads, users, reservations),
     ledger,
   );
 
@@ -208,6 +227,7 @@ export function identityStack({
           commandId: adoptUserEmailCommandId({ userId }),
           accountId: null,
           provider: "email",
+          providerId: null,
           providerAccountId: null,
           value: email,
           occurredAtMs: createdAtMs,
@@ -234,6 +254,10 @@ export function identityStack({
     ? inertIdentityPorts.resolution
     : storage;
 
+  const bridge = bridgeAccountCeremonies({
+    ceremonies,
+    routesToIdentity: birthAwareGate(isUserOnIdentityWrites),
+  });
   const auth = authOver(
     createIdentityStorageAdapter({
       legacyEngine: memoryAdapter(db),
@@ -241,8 +265,19 @@ export function identityStack({
       resolution,
       ceremonies,
       isUserOnIdentityWrites,
+      isAnyoneOnIdentityWrites,
       birth,
     }),
+    // The application's own wiring, verbatim: the account ceremonies bound to
+    // better-auth's `databaseHooks` alongside the adapter that also runs them.
+    withDatabaseHooks
+      ? {
+          account: {
+            create: { before: (account) => bridge.beforeAccountCreate(account) },
+            delete: { before: (account) => bridge.beforeAccountDelete(account) },
+          },
+        }
+      : undefined,
   );
 
   return {

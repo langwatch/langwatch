@@ -334,6 +334,10 @@ describe("better-auth over the identity storage adapter", () => {
         expect(listed.map((row) => row.id).sort()).toEqual(pinned.sort());
 
         const google = listed.find((row) => row.providerId === "google");
+        // The bridge row the mirror has been keeping this method's secrets
+        // on. While it stands, the fail-closed fallback to the legacy branch
+        // can still authenticate with them.
+        seedBridgeRow(stack, google?.id as string);
         await context.internalAdapter.deleteAccount(google?.id as string);
 
         expect(stack.commands.map((command) => command.type)).toContain(
@@ -345,8 +349,39 @@ describe("better-auth over the identity storage adapter", () => {
           )?.state,
         ).toBe("DETACHED");
         expect(stack.storage.credentials.has(google?.id as string)).toBe(false);
+        expect(accountRow(stack, google?.id as string)).toBeUndefined();
         const remaining = await context.internalAdapter.findAccounts(userId);
         expect(remaining.map((row) => row.providerId)).toEqual(["credential"]);
+      });
+    });
+
+    describe("when better-auth issues an account query with an unenumerated operator", () => {
+      /** @scenario "An operator the branch has not enumerated never reads as an equality" */
+      it("refuses rather than reading `ne` as an equality and deleting the row it spared", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          accountId: "sub-google-1",
+        });
+        const kept = (await context.internalAdapter.findAccounts(userId))[0];
+
+        await expect(
+          context.adapter.delete({
+            model: "account",
+            where: [{ field: "id", value: kept?.id as string, operator: "ne" }],
+          }),
+        ).rejects.toMatchObject({
+          body: { code: "identity_unsupported_storage_query" },
+        });
+
+        // Both sign-in methods survive: the refusal is what stops a query
+        // meaning "every row except this one" from removing exactly that one.
+        expect(await context.internalAdapter.findAccounts(userId)).toHaveLength(
+          2,
+        );
       });
     });
 
@@ -653,6 +688,36 @@ describe("better-auth over the identity storage adapter", () => {
     });
   });
 
+  describe("given the application's own composition, hooks and adapter together", () => {
+    /** @scenario "One writer states a latched user's account attach" */
+    it("states exactly one attach for a latched user", async () => {
+      const stack = identityStack({ withDatabaseHooks: true });
+      stack.gate.open = () => true;
+
+      await signUp(stack.auth, EMAIL);
+
+      // Two collaborators run the same ceremony in one request — the
+      // `account.create.before` hook and the adapter. Only the adapter may
+      // state the fact, or the second one appends it again whenever the
+      // first fold has not landed (ADR-116 §5).
+      expect(
+        stack.commands.filter(
+          (command) => command.type === "lw.identity.attach_identifier",
+        ),
+      ).toHaveLength(1);
+      expect(statedIdentifiers(stack)).toHaveLength(1);
+    });
+
+    it("leaves an unlatched user's account create on the legacy branch, hooks and all", async () => {
+      const stack = identityStack({ withDatabaseHooks: true, inert: true });
+
+      await signUp(stack.auth, EMAIL);
+
+      expect(stack.commands).toHaveLength(0);
+      expect(stack.db.account).toHaveLength(1);
+    });
+  });
+
   describe("given one finalized user and one who is not", () => {
     let stack: Stack;
 
@@ -740,6 +805,7 @@ function attachVerifiedAlias(
         userId,
         accountId: null,
         provider: "email",
+        providerId: null,
         providerAccountId: null,
         value,
         identifierHash: null,

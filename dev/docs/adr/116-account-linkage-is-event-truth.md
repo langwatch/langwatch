@@ -176,6 +176,15 @@ A flagged sign-up (the opt-in sign-in page → backend feature-flag check, per
 organization/allowlist) sets a request-scoped marker at the auth route
 boundary (AsyncLocalStorage).
 
+The reach of that boundary is narrower than it looks today, and saying so is
+part of the decision: the product's own sign-up posts to the tRPC
+`user.register` procedure, which writes the `User` row through Prisma and
+never calls `auth.api.signUpEmail`, so it does not pass the entrance at all.
+The entrance is reachable only by a client calling better-auth's sign-up route
+directly. Routing `user.register` through `auth.api.signUpEmail` is future
+work, and it is a precondition of the general rollout this entrance is
+hardened for.
+
 **The marker governs every routed write in that request**, not only the
 `user` create. better-auth creates the user and then, in the same request,
 the credential account; that second write is routed by the gate, and the
@@ -201,13 +210,29 @@ migration-state row is written at `migrated`, carrying a born report. Only
 leaves behind is a handle, and the residual below is what needs one. The
 legs, in order:
 
-1. the **waited idempotent append** of the attach facts;
+1. the **idempotent attach command, staged** onto the per-user queue. The
+   queued run is the sole appender (ADR-110's shape: appending on the calling
+   path as well and staging afterwards writes every fact twice, because the
+   staged run re-executes the guard against heads the fold has not advanced
+   yet). Staging is what fails loudly when the engine is unavailable, and it
+   happens before any row exists on either branch;
 2. **one Postgres transaction** over the row writes the entrance itself
    performs — the user row and the `finalized` migration-state row. These
    *can* share a transaction: they are one store;
-3. the **fold staged onto the queue**, with the ceremonies' bounded wait.
-   The fold skips harmlessly and retries while the user row is not yet
-   visible.
+3. the **bounded wait** on the fold. The fold skips harmlessly and retries
+   while the user row is not yet visible.
+
+Nothing after leg two may fail the sign-up. Once the transaction commits, the
+user exists and is `finalized`; a throw from the observation that follows
+would leave a user nothing owns, since the runner skips terminal tenants and
+the sweep hunts claims with no user row behind them.
+
+The pinned user id is a convergence key for a RETRY of one birth, never a
+claim on a user who already exists. Normalization strips plus-tags, so
+`sam+x@acme.com` derives the id `sam@acme.com` was born under; adopting
+whatever row stands at that id would hand the second signer a session as the
+first. An occupied pinned id is refused with `identity_email_in_use` before
+any fact is stated.
 
 The `AccountCredential` row sits outside that transaction, and better-auth
 is what puts it there. `signUpEmail` runs `createUser` and then
@@ -346,6 +371,24 @@ direction, a legacy sign-up's duplicate check already sees latched users'
 verified identifiers through the resolution read, so it cannot claim one.
 Unverified (`ATTACHED`) identifiers block nobody — verify is the choke
 point both ways, so there is no squatting.
+
+**Those are reads, and a read cannot decide a race**, so a Postgres row-truth
+**address lock** (`IdentifierReservation`, keyed by the normalized value)
+decides it. The claim is taken atomically before the verification proof is
+consumed and before any fact is appended: the loser is refused synchronously
+with `identity_email_in_use`, and the event log never records a verification
+that did not hold. The born-finalized entrance claims through the same lock,
+so the two entrances contend on one constraint. It is a LOCK, not a truth
+table — `Identifier` remains the record of who holds which sign-in method —
+so the fold RELEASES a claim when its identifier stops carrying the value
+(detached, dead-ended, erased), and the identity sweep reaps a claim whose
+fact never landed.
+
+The lock is the only place this can live. A unique constraint on
+`Identifier.value` is unsound at any width: one user legitimately holds
+several proven identifiers carrying one address — a credential sign-in and a
+Google sign-in are two VERIFIED rows with the same email — so "one USER per
+proven address" is not a row-level rule about that table.
 
 **The account model's id is the identifier's pinned account id.** The
 identity branch presents `Identifier.accountId` — the KSUID pinned at

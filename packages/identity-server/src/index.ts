@@ -72,6 +72,10 @@ export {
   newIdentityCommandId,
 } from "./identity-command-id";
 export type { IdentityHeadsRepository } from "./identity-heads.repository";
+export type {
+  IdentifierReservationHolder,
+  IdentityReservationRepository,
+} from "./identity-reservations.repository";
 export type { IdentityLedger } from "./identity-ledger";
 export type { IdentityUserGate } from "./identity-user-gate";
 export type { IdentityUsersRepository } from "./identity-users.repository";

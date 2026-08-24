@@ -68,6 +68,12 @@ export function wasBornInThisRequest({ userId }: { userId: string }): boolean {
   return scope.getStore()?.born.has(userId) === true;
 }
 
+/** Whether this request bore ANYONE — the fleet-level question, asked of a
+ *  request whose newborn no state row can answer for yet. */
+export function anyBornInThisRequest(): boolean {
+  return (scope.getStore()?.born.size ?? 0) > 0;
+}
+
 /**
  * The per-user gate, plus the answer it cannot give for a user this request
  * just bore. ONE implementation, because two collaborators fork on the same

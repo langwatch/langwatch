@@ -16,6 +16,7 @@ import {
   USER,
 } from "./support/in-memory-heads";
 import { InMemoryUsers } from "./support/in-memory-users";
+import { InMemoryReservations } from "./support/in-memory-reservations";
 
 /** No legacy holder: this suite is about the service's sequencing, not the
  *  cross-population collision guard. */
@@ -42,7 +43,7 @@ class RecordingLedger implements IdentityLedger {
 function harness() {
   const heads = new InMemoryHeads();
   const ledger = new RecordingLedger();
-  const service = new IdentityService(new IdentityGuards(heads, users), ledger);
+  const service = new IdentityService(new IdentityGuards(heads, users, new InMemoryReservations()), ledger);
   return { heads, ledger, service };
 }
 

@@ -184,6 +184,15 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no legacy Account write occurs for the newborn
 
   @unit
+  Scenario: One writer states a latched user's account attach
+    Given the application's own composition, with the databaseHooks bound and the adapter live
+    And a user "sam" whose identifier backfill is finalized
+    When better-auth creates an account for "sam"
+    Then exactly one attach is stated for the identifier
+    And the hook defers to the adapter, which is the storage-level veto
+    But the hook still runs, and still does nothing, for an unlatched user
+
+  @unit
   Scenario: A retried flagged sign-up converges instead of duplicating
     Given a flagged sign-up appended its facts and failed before the rows committed
     When the sign-up is retried
@@ -191,11 +200,41 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And exactly one Identifier row and one user row exist after the retry
 
   @unit
+  Scenario: A flagged sign-up is refused when its pinned id is already someone's
+    Given a finalized user "sam" was born under the address "sam@acme.com"
+    When a flagged sign-up arrives for "sam+news@acme.com"
+    Then the sign-up is refused with the handled code "identity_email_in_use"
+    And no identity event is stated under "sam"'s tenant
+    And no credential is written against "sam"'s user
+
+  @unit
   Scenario: An abandoned flagged sign-up leaves no reachable identity
-    Given a flagged sign-up appended its facts and was never retried
+    Given a flagged sign-up staged its facts and was never retried
     When the address it used is looked up
     Then no user resolves on either branch
     And the reconciliation sweep removes the orphaned stream
+
+  @unit
+  Scenario: The reconciliation sweep runs on every migration pass
+    Given the born-finalized entrance is deployed
+    When a system migration pass runs
+    Then the abandoned-newborn sweep runs beside the user-rooted migrations
+    And a sweep that fails does not fail the pass
+
+  @unit
+  Scenario: The sweep finds an orphan behind a page of held users
+    Given more held users than one sweep page holds carry the same migrated status
+    And one abandoned newborn claim is older than all of them
+    When the sweep asks for a single candidate
+    Then the claim it returns is the abandoned newborn, never a held user
+
+  @unit
+  Scenario: A newborn whose rows committed is never failed by the fold wait
+    Given a flagged sign-up whose user row and finalized state row have committed
+    And the read-your-writes wait cannot complete
+    When the entrance finishes
+    Then the sign-up succeeds and returns the newborn's user row
+    And nothing leaves a finalized user for the sweep to own
 
   @unit
   Scenario: A flagged sign-up fails loudly when the engine is unavailable
@@ -256,6 +295,22 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the customer-facing copy comes from the presentation registry, never the raw code
     And the verification proof is not consumed by the refusal
 
+  @unit
+  Scenario: A verification that loses a uniqueness race reports the collision
+    Given a finalized user "sam" completing verification for "shared@acme.com"
+    And another user verifies the same address first
+    When "sam"'s completion is processed
+    Then the completion fails with the handled code "identity_email_in_use"
+    And it never reports the identifier as verified
+    And the single-use proof is not consumed
+
+  @unit
+  Scenario: The sign-in screen renders a platform refusal from the registry
+    Given the auth response carries the handled code "identity_email_in_use"
+    When the sign-in screen renders the failure
+    Then the customer reads the registry's copy for that code
+    And neither the raw code nor a generic server-side sentence is shown
+
   # ── Unlink and erasure ─────────────────────────────────────────────────
 
   @unit
@@ -267,6 +322,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then an identifier_detached event is appended
     And the fold tombstones the Identifier row
     And the AccountCredential row is deleted in the same operation
+    And the mirrored Account row is deleted with it, so no stale secret authenticates
+
+  @unit
+  Scenario: Deleting a user reaps the credentials of an unlatched one too
+    Given an unlatched user whose Account secrets were carried into AccountCredential
+    When their User row is deleted
+    Then their AccountCredential rows go with it
+    And no password hash or provider token outlives the user
 
   @unit @unimplemented
   Scenario: Deleting a user detaches every identifier and erases
@@ -276,6 +339,29 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the erase command is dispatched
     And "sam"'s AccountCredential rows are deleted
     And "sam"'s sessions are deleted by the stock branch
+
+  @unit @unimplemented
+  Scenario: Erasing a user leaves no address anywhere in their history
+    Given a finalized user "sam" whose identity history names their email
+    When "sam" is erased
+    Then no event of "sam"'s carries the address any more
+    And a replay of "sam"'s history reproduces the tombstone and never the address
+    And a replay bounded to a moment before the erasure cannot restore it either
+
+  @unit
+  Scenario: Unlinking an address frees it for somebody else
+    Given a finalized user "sam" holding a verified secondary address
+    When "sam" unlinks it
+    Then the address lock "sam" held is released
+    And another user can verify that address afterwards
+
+  @unit
+  Scenario: An address lock whose fact never landed is reaped
+    Given a ceremony took the address lock and its fact never landed
+    And the claim is older than the sweep's horizon
+    When the identity sweep runs
+    Then the lock is released
+    And a lock younger than the horizon is left alone, because its ceremony may still be in flight
 
   # ── Latching an existing user ──────────────────────────────────────────
 
@@ -297,6 +383,21 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the failure names the model and operator in the log, never in the message
     And no user-model query can raise it
     But the same query for an unlatched user executes on the legacy branch untouched
+
+  @unit
+  Scenario: An operator the branch has not enumerated never reads as an equality
+    Given a finalized user "sam" holding two sign-in methods
+    When better-auth issues an account delete for every row whose id is NOT the one it names
+    Then the operation fails with the handled code "identity_unsupported_storage_query"
+    And neither sign-in method is deleted
+
+  @unit
+  Scenario: A fleet with nobody latched never meets the loud failure
+    Given no user's identifier backfill has finalized
+    When better-auth issues an account query the identity branch has not enumerated
+    Then the query executes on the legacy branch untouched
+    And no unsupported-query failure occurs
+    And the same is true of a sort or an offset over the account model
 
   @integration
   Scenario: The end-to-end suite is the upgrade net

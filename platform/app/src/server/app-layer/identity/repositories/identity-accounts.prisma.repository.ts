@@ -13,6 +13,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 interface LinkedIdentifierRow {
   userId: string;
   provider: string;
+  providerId: string | null;
   value: string | null;
   accountId: string | null;
   providerAccountId: string | null;
@@ -211,6 +212,20 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
     return count;
   }
 
+  async deleteBridgeAccounts({
+    accountIds,
+  }: {
+    accountIds: readonly string[];
+  }): Promise<number> {
+    if (accountIds.length === 0) return 0;
+    // `deleteMany`, not `delete`: a row the fold has already removed is the
+    // expected case rather than an error.
+    const { count } = await this.prisma.account.deleteMany({
+      where: { id: { in: [...accountIds] } },
+    });
+    return count;
+  }
+
   async mirrorSecretsOntoAccounts({
     accountIds,
     secrets,
@@ -276,10 +291,13 @@ function toAccountRow({
   return {
     id: accountId,
     userId: identifier.userId,
-    // better-auth's own provider id, which only the credential row carries:
-    // the identifier vocabulary folds every generic OAuth and enterprise IdP
-    // into `oidc`, so it cannot answer this.
-    providerId: credential?.provider ?? identifier.provider,
+    // better-auth's own provider id, unfolded. The credential row carries it
+    // for a method written on the identity branch and the identifier carries
+    // it on the fact (ADR-116); the folded `provider` is the last resort only
+    // for a fact stated before either did, since it collapses every generic
+    // OAuth and enterprise IdP into `oidc`.
+    providerId:
+      credential?.provider ?? identifier.providerId ?? identifier.provider,
     // better-auth's `accountId` is the PROVIDER's subject. A credential
     // account's subject is the mailbox, which is the identifier value.
     accountId: identifier.providerAccountId ?? identifier.value ?? "",

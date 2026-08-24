@@ -157,6 +157,7 @@ export class IdentityBackfillService {
         commandId: plan.commandId,
         accountId: plan.accountId,
         provider: plan.provider,
+        providerId: plan.providerId,
         providerAccountId: plan.providerAccountId,
         value: email,
         occurredAtMs: plan.occurredAtMs,

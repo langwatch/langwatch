@@ -49,6 +49,14 @@ CREATE INDEX "Identifier_value_idx" ON "Identifier"("value");
 -- CreateIndex
 CREATE INDEX "Identifier_domain_idx" ON "Identifier"("domain");
 
+-- No unique index on `value`, and the reason is this table's own shape: ONE
+-- user legitimately holds several proven identifiers carrying the same
+-- address - a credential sign-in and a Google sign-in are two rows with one
+-- email, both VERIFIED. The rule uniqueness has to enforce is "one USER per
+-- proven address", which no row-level constraint on this table can express.
+-- "IdentifierReservation" (20260824120003) is where it lives: one row per
+-- address, carrying the user who holds it.
+
 -- CreateTable
 CREATE TABLE "IdentityProjectionCursor" (
     "userId" TEXT NOT NULL,

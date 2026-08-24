@@ -15,6 +15,7 @@ import {
   T0,
   USER,
 } from "./support/in-memory-heads";
+import { InMemoryReservations } from "./support/in-memory-reservations";
 import { InMemoryUsers } from "./support/in-memory-users";
 
 /** No legacy user holds anything, which is what every test below assumes
@@ -28,7 +29,7 @@ describe("attachIdentifier guard", () => {
     it("states the normalized email, domain, and HMAC hash as a VERIFIED arrival", async () => {
       const heads = new InMemoryHeads();
       heads.hashKeys.set(USER, "key_material");
-      const facts = await new IdentityGuards(heads, users).attachIdentifier(
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).attachIdentifier(
         attachData(),
       );
       expect(facts).toHaveLength(1);
@@ -53,6 +54,9 @@ describe("attachIdentifier guard", () => {
         // it is the public `sub` an IdP puts in a token, and the projection
         // needs it to answer a callback without the legacy Account row.
         "providerAccountId",
+        // better-auth's own provider id, unfolded — what the projected
+        // `Account` row is keyed by (ADR-116).
+        "providerId",
         "state",
         "userId",
         "value",
@@ -60,29 +64,43 @@ describe("attachIdentifier guard", () => {
     });
 
     it("records a null hash when the user's hash key is not yet minted", async () => {
-      const facts = await new IdentityGuards(new InMemoryHeads(), users).attachIdentifier(
+      const facts = await new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations()).attachIdentifier(
         attachData(),
       );
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
 
     it("attaches email-provider identifiers ATTACHED, awaiting the ceremony", async () => {
-      const facts = await new IdentityGuards(new InMemoryHeads(), users).attachIdentifier(
-        attachData({ provider: "email", providerAccountId: null, accountId: null }),
+      const facts = await new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations()).attachIdentifier(
+        attachData({
+          provider: "email",
+          providerId: null,
+          providerAccountId: null,
+          accountId: null,
+        }),
       );
       expect(facts[0]?.data).toMatchObject({ state: "ATTACHED" });
     });
   });
 
-  describe("when another user already actively holds the arriving value", () => {
-    /** @scenario "Concurrent verification races dead-end the loser" */
+  describe("when another user already holds the address lock", () => {
+    /** @scenario "A VERIFIED arrival that loses the address lock dead-ends" */
     it("dead-ends the VERIFIED-arrival attach instead of granting the value", async () => {
       const heads = new InMemoryHeads();
-      heads.activeByValue.set("sam.j@acme.com", {
+      const reservations = new InMemoryReservations();
+      await reservations.claim({
+        normalizedValue: "sam.j@acme.com",
         userId: "user_other",
         identifierId: "idf_theirs",
+        commandId: "idcmd_theirs",
       });
-      const facts = await new IdentityGuards(heads, users).attachIdentifier(attachData());
+      const facts = await new IdentityGuards(
+        heads,
+        users,
+        reservations,
+      ).attachIdentifier(attachData());
+      // No caller to refuse on this side: an IdP callback that failed would
+      // tell the customer nothing they could act on (D01).
       expect(facts).toHaveLength(2);
       expect(facts[0]!.type).toBe(IDENTIFIER_ATTACHED_EVENT_TYPE);
       expect(facts[0]!.data).toMatchObject({ state: "ATTACHED" });
@@ -92,20 +110,45 @@ describe("attachIdentifier guard", () => {
 
     it("still verifies the holder's own re-attach of their value", async () => {
       const heads = new InMemoryHeads();
-      heads.activeByValue.set("sam.j@acme.com", {
+      const reservations = new InMemoryReservations();
+      await reservations.claim({
+        normalizedValue: "sam.j@acme.com",
         userId: USER,
         identifierId: "idf_mine",
+        commandId: "idcmd_mine",
       });
-      const facts = await new IdentityGuards(heads, users).attachIdentifier(attachData());
+      const facts = await new IdentityGuards(
+        heads,
+        users,
+        reservations,
+      ).attachIdentifier(attachData());
       expect(facts).toHaveLength(1);
       expect(facts[0]!.data).toMatchObject({ state: "VERIFIED" });
+    });
+
+    /** @scenario "An email attach takes no address lock" */
+    it("takes no lock for an ATTACHED arrival, so nobody can squat an address", async () => {
+      const reservations = new InMemoryReservations();
+      await new IdentityGuards(
+        new InMemoryHeads(),
+        users,
+        reservations,
+      ).attachIdentifier(
+        attachData({
+          provider: "email",
+          providerId: null,
+          providerAccountId: null,
+          accountId: null,
+        }),
+      );
+      expect(reservations.held.size).toBe(0);
     });
   });
 
   describe("when the same fact is stated twice", () => {
     /** @scenario "Identifier ids are deterministic so backfill and live emission converge" */
     it("derives the same identifier id whatever the command id", async () => {
-      const guards = new IdentityGuards(new InMemoryHeads(), users);
+      const guards = new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations());
       const first = await guards.attachIdentifier(attachData());
       const second = await guards.attachIdentifier(
         attachData({ commandId: "idcmd_2" }),
@@ -120,7 +163,7 @@ describe("attachIdentifier guard", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
     it("states nothing, whatever the command id", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users);
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
       heads.fold(USER, await guards.attachIdentifier(attachData()));
 
       const restated = await guards.attachIdentifier(
@@ -131,7 +174,7 @@ describe("attachIdentifier guard", () => {
 
     it("still states an identifier the heads lack", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users);
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
       const first = await guards.attachIdentifier(attachData());
       heads.fold(USER, first);
 
@@ -148,7 +191,7 @@ describe("attachIdentifier guard", () => {
 
 describe("verifyIdentifier guard", () => {
   const verify = (heads: InMemoryHeads, identifierId = "idf_work") =>
-    new IdentityGuards(heads, users).verifyIdentifier({
+    new IdentityGuards(heads, users, new InMemoryReservations()).verifyIdentifier({
       tenantId: USER,
       userId: USER,
       commandId: "idcmd_v1",
@@ -160,17 +203,80 @@ describe("verifyIdentifier guard", () => {
     });
 
   describe("when another user already holds the verified value", () => {
-    /** @scenario "Concurrent verification races dead-end the loser" */
-    it("dead-ends the identifier instead of verifying it", async () => {
+    /** @scenario "A verification refused because another user holds the address" */
+    it("refuses with the collision code instead of verifying it", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
       heads.activeByValue.set("sam@acme.com", {
         userId: "user_other",
         identifierId: "idf_theirs",
       });
-      const facts = await verify(heads);
-      expect(facts).toHaveLength(1);
-      expect(facts[0]!.type).toBe(IDENTIFIER_DEAD_ENDED_EVENT_TYPE);
+      await expect(verify(heads)).rejects.toMatchObject({
+        code: "identity_email_in_use",
+      });
+    });
+  });
+
+  describe("when two verifications of one address race", () => {
+    /** @scenario "Two concurrent verifications of one address: the loser is refused before any fact" */
+    it("refuses the loser on the lock, before it states anything", async () => {
+      const reservations = new InMemoryReservations();
+      await reservations.claim({
+        normalizedValue: "sam@acme.com",
+        userId: "user_other",
+        identifierId: "idf_theirs",
+        commandId: "idcmd_theirs",
+      });
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })),
+      );
+
+      await expect(
+        new IdentityGuards(heads, users, reservations).verifyIdentifier({
+          tenantId: USER,
+          userId: USER,
+          commandId: "idcmd_v1",
+          identifierId: "idf_work",
+          verificationId: "verif_1",
+          method: "magic-link",
+          occurredAtMs: T0 + 1000,
+          actor: ACTOR,
+        }),
+      ).rejects.toMatchObject({ code: "identity_email_in_use" });
+    });
+
+    /** @scenario "A retried verification holds the lock it already took" */
+    it("lets the same command claim the lock it already holds", async () => {
+      const reservations = new InMemoryReservations();
+      await reservations.claim({
+        normalizedValue: "sam@acme.com",
+        userId: "user_other",
+        identifierId: "idf_theirs",
+        commandId: "idcmd_v1",
+      });
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })),
+      );
+
+      const facts = await new IdentityGuards(
+        heads,
+        users,
+        reservations,
+      ).verifyIdentifier({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_v1",
+        identifierId: "idf_work",
+        verificationId: "verif_1",
+        method: "magic-link",
+        occurredAtMs: T0 + 1000,
+        actor: ACTOR,
+      });
+      expect(facts[0]!.type).toBe(IDENTIFIER_VERIFIED_EVENT_TYPE);
     });
   });
 
@@ -225,7 +331,7 @@ describe("verifyIdentifier guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy).verifyIdentifier({
+        new IdentityGuards(heads, legacy, new InMemoryReservations()).verifyIdentifier({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_v1",
@@ -252,7 +358,7 @@ describe("verifyIdentifier guard", () => {
         email: "sam@acme.com",
       });
 
-      const facts = await new IdentityGuards(heads, legacy).verifyIdentifier({
+      const facts = await new IdentityGuards(heads, legacy, new InMemoryReservations()).verifyIdentifier({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_v1",
@@ -275,7 +381,7 @@ describe("verifyIdentifier guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy).verifyIdentifier({
+        new IdentityGuards(heads, legacy, new InMemoryReservations()).verifyIdentifier({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_v1",
@@ -312,7 +418,7 @@ describe("markPrimary guard", () => {
           fact({ identifierId: "idf_personal", state: "PRIMARY", value: "sam@personal.dev" }),
         ),
       );
-      const facts = await new IdentityGuards(heads, users).markPrimary({
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_p1",
@@ -330,7 +436,7 @@ describe("markPrimary guard", () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
       await expect(
-        new IdentityGuards(heads, users).markPrimary({
+        new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_p1",
@@ -363,7 +469,7 @@ describe("markPrimary guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy).markPrimary({
+        new IdentityGuards(heads, legacy, new InMemoryReservations()).markPrimary({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_p1",
@@ -388,7 +494,7 @@ describe("markPrimary guard", () => {
 
 describe("detachIdentifier guard", () => {
   const detach = (heads: InMemoryHeads, identifierId: string) =>
-    new IdentityGuards(heads, users).detachIdentifier({
+    new IdentityGuards(heads, users, new InMemoryReservations()).detachIdentifier({
       tenantId: USER,
       userId: USER,
       commandId: "idcmd_d1",
@@ -414,7 +520,7 @@ describe("detachIdentifier guard", () => {
     /** @scenario "A detached identifier is a tombstone, forever resolvable" */
     it("states the detach; a second detach states nothing", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users);
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
       const attached = await guards.attachIdentifier(attachData());
       const identifierId = (attached[0]!.data as { identifierId: string }).identifierId;
       heads.fold(USER, attached);
@@ -441,7 +547,7 @@ describe("eraseUser guard", () => {
         USER,
         headsWith(fact({ identifierId: "idf_a" }), fact({ identifierId: "idf_b" })),
       );
-      const facts = await new IdentityGuards(heads, users).eraseUser({
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).eraseUser({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_e1",

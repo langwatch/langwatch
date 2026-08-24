@@ -42,6 +42,7 @@ function applyAttached(
     domain: data.domain,
     identifierHash: data.identifierHash,
     accountId: data.accountId,
+    providerId: data.providerId,
     providerAccountId: data.providerAccountId,
     connectionId: data.connectionId,
     state: data.state,

@@ -35,6 +35,9 @@ import {
 export type PlannedIdentifier = ExpectedIdentifier & {
   commandId: string;
   accountId: string | null;
+  /** The legacy row's own `provider` string, unfolded — what better-auth
+   *  queries `Account` by, and therefore what the fact has to carry. */
+  providerId: string | null;
   providerAccountId: string | null;
   occurredAtMs: number;
 };
@@ -56,6 +59,7 @@ export function planIdentifiers({
   const planned = [
     {
       provider: "email" as const,
+      providerId: null,
       providerAccountId: null,
       accountId: null,
       occurredAtMs: user.createdAtMs,
@@ -69,6 +73,7 @@ export function planIdentifiers({
       const provider = identifierProviderFor(account.provider);
       return {
         provider,
+        providerId: account.provider,
         providerAccountId: account.providerAccountId,
         accountId: account.id,
         occurredAtMs: account.createdAtMs,

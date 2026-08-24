@@ -5,6 +5,7 @@ import { createTenantId } from "~/server/event-sourcing";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
 import { PrismaIdentityProjectionRepository } from "../identity-projection.prisma.repository";
+import { PrismaIdentityReservationRepository } from "../identity-reservations.prisma.repository";
 
 /**
  * The fold's store against real Postgres: rows are upserted whole
@@ -14,7 +15,8 @@ import { PrismaIdentityProjectionRepository } from "../identity-projection.prism
  */
 const namespace = `idproj-${nanoid(8)}`;
 const USER = `${namespace}-user`;
-const repository = new PrismaIdentityProjectionRepository(prisma);
+const reservations = new PrismaIdentityReservationRepository(prisma);
+const repository = new PrismaIdentityProjectionRepository(prisma, reservations);
 const context = { aggregateId: USER, tenantId: createTenantId(USER) };
 
 function projection(
@@ -45,6 +47,7 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED") => ({
   domain: "acme.com",
   identifierHash: "hmac:abc",
   accountId: null,
+  providerId: null,
   providerAccountId: null,
   connectionId: null,
   state,
@@ -76,6 +79,7 @@ async function withUserRow() {
 }
 
 afterEach(async () => {
+  await prisma.identifierReservation.deleteMany({ where: { userId: USER } });
   await prisma.identifier.deleteMany({ where: { userId: USER } });
   await prisma.identityProjectionCursor.deleteMany({ where: { userId: USER } });
   await prisma.account.deleteMany({ where: { userId: USER } });
@@ -199,13 +203,15 @@ describe("PrismaIdentityProjectionRepository", () => {
       ).toEqual([]);
     });
 
-    /** @scenario "The fold says nothing about a user who is gone" */
-    it("creates nothing for a deleted user, rather than failing the fold", async () => {
+    /** @scenario "The fold reports a user it cannot find, and projects anyway" */
+    it("writes the rows and reports the anomaly for a user with no User row", async () => {
       const id = `${namespace}-linked`;
 
-      // No `User` row: the delete cascaded their accounts away, and
-      // recreating one would fail the foreign key rather than restore
-      // anything. The fold must still complete.
+      // No `User` row while the log carries this user's linkage: an anomaly,
+      // not a branch. The projection stays TOTAL — a fold that silently
+      // declined would leave it quietly incomplete with nothing to read about
+      // it — and the row carries no database foreign key to prevent the write
+      // (`relationMode = "prisma"`).
       await repository.store(
         projection(
           { [id]: linkedFact(id, "VERIFIED") },
@@ -216,12 +222,122 @@ describe("PrismaIdentityProjectionRepository", () => {
 
       expect(
         await prisma.account.findUnique({ where: { id: `${namespace}-acc` } }),
-      ).toBeNull();
-      // The identifier head is still written: it is event truth, and does
-      // not depend on the legacy row surviving.
+      ).not.toBeNull();
+      // The identifier head is written for the same reason: it is event
+      // truth, and does not depend on the legacy row surviving.
       expect(
         await prisma.identifier.findUnique({ where: { id } }),
       ).not.toBeNull();
+    });
+
+    /** @scenario "The projected Account row keeps better-auth's own provider id" */
+    it("keeps better-auth's own provider id rather than the folded vocabulary", async () => {
+      await withUserRow();
+      const id = `${namespace}-auth0`;
+
+      await repository.store(
+        projection(
+          {
+            [id]: {
+              ...linkedFact(id, "VERIFIED"),
+              // The vocabulary folds auth0 into `oidc`; the fact carries the
+              // unfolded id, and `Account` is keyed by that.
+              provider: "oidc" as const,
+              providerId: "auth0",
+            },
+          },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      const row = await prisma.account.findUnique({
+        where: { id: `${namespace}-acc` },
+      });
+      expect(row?.provider).toBe("auth0");
+      // Which is what better-auth's own callback lookup asks for.
+      expect(
+        await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: "auth0",
+              providerAccountId: `${namespace}-sub`,
+            },
+          },
+        }),
+      ).not.toBeNull();
+    });
+  });
+
+  describe("when one user holds two proven identifiers for one address", () => {
+    it("writes both, because a sign-in method is not an address claim", async () => {
+      await withUserRow();
+      const credential = `${namespace}-credential`;
+      const google = `${namespace}-google`;
+
+      // A credential sign-in and a Google sign-in are two rows carrying one
+      // email, both VERIFIED. Any row-level uniqueness on `value` would
+      // forbid the ordinary case; "one USER per proven address" is the
+      // address lock's rule, not this table's.
+      await repository.store(
+        projection(
+          {
+            [credential]: fact(credential, "VERIFIED"),
+            [google]: { ...fact(google, "VERIFIED"), provider: "google" },
+          },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      expect(
+        await prisma.identifier.count({
+          where: { userId: USER, state: "VERIFIED" },
+        }),
+      ).toBe(2);
+    });
+  });
+
+  describe("when the fold reconciles the address locks a user holds", () => {
+    /** @scenario "Unlinking an address frees it for somebody else" */
+    it("releases the lock once no live identifier of theirs carries the value", async () => {
+      const id = `${namespace}-locked`;
+      const value = `${namespace}@acme.com`;
+      await reservations.claim({
+        normalizedValue: value,
+        userId: USER,
+        identifierId: id,
+        commandId: "idcmd_1",
+      });
+
+      await repository.store(
+        projection(
+          { [id]: fact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+      expect(
+        await prisma.identifierReservation.findUnique({
+          where: { normalizedValue: value },
+        }),
+      ).not.toBeNull();
+
+      await repository.store(
+        projection(
+          { [id]: fact(id, "DETACHED") },
+          { acceptedAt: 20, eventId: "evt_2" },
+        ),
+        context,
+      );
+
+      // The address is somebody else's to take now, which is the whole point
+      // of releasing rather than keeping a record of who once held it.
+      expect(
+        await prisma.identifierReservation.findUnique({
+          where: { normalizedValue: value },
+        }),
+      ).toBeNull();
     });
   });
 

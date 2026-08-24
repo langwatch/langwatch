@@ -26,6 +26,7 @@ import {
   deriveIdentifierId,
 } from "./crypto/identifier-identity";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
+import type { IdentityReservationRepository } from "./identity-reservations.repository";
 import type { IdentityUsersRepository } from "./identity-users.repository";
 
 /**
@@ -41,18 +42,79 @@ import type { IdentityUsersRepository } from "./identity-users.repository";
  * Facts come back without their envelope; the ledger stamps business time,
  * tenancy and idempotency from the command that produced them.
  *
- * Two repositories, because uniqueness spans two populations (ADR-116 §6).
- * The heads answer for latched users; `User.email` answers for everyone the
- * identity branch has not adopted yet. A guard that consulted only the
- * projection would call an address free while a legacy user held it, and the
- * collision would surface as a unique-constraint failure inside the fold
- * rather than a refusal the caller can act on.
+ * THREE repositories, because uniqueness spans two populations and a race
+ * (ADR-116 §6). The heads answer for latched users; `User.email` answers for
+ * everyone the identity branch has not adopted yet — a guard that consulted
+ * only the projection would call an address free while a legacy user held it.
+ * Neither read can decide two concurrent claims, though, so the third is the
+ * address LOCK: claimed atomically before any fact is stated, which is what
+ * keeps a losing verification out of the log and its proof unburned.
  */
 export class IdentityGuards {
   constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
+    private readonly reservations: IdentityReservationRepository,
   ) {}
+
+  /**
+   * Take the address lock, or refuse (ADR-116 §6).
+   *
+   * The two reads above it name the ordinary case — somebody was already
+   * sitting there — and this decides the race, which no read can. It runs
+   * BEFORE any fact is stated, so a loser's verification never reaches the
+   * log and the ceremony's single-use proof is still unburned when the
+   * refusal surfaces.
+   *
+   * A claim already held by this user, or by this same command, is this
+   * caller's own: every ceremony's staged re-run arrives here a second time
+   * with the same command id, and that must cost nothing.
+   */
+  private async holdsAddressLock({
+    userId,
+    identifierId,
+    commandId,
+    normalizedValue,
+  }: {
+    userId: string;
+    identifierId: string;
+    commandId: string;
+    normalizedValue: string;
+  }): Promise<boolean> {
+    const holder = await this.reservations.claim({
+      normalizedValue,
+      userId,
+      identifierId,
+      commandId,
+    });
+    return holder.userId === userId || holder.commandId === commandId;
+  }
+
+  private async claimOrRefuse({
+    userId,
+    identifierId,
+    commandId,
+    normalizedValue,
+    verb,
+  }: {
+    userId: string;
+    identifierId: string;
+    commandId: string;
+    normalizedValue: string | null;
+    verb: string;
+  }): Promise<void> {
+    if (normalizedValue === null) return;
+    const held = await this.holdsAddressLock({
+      userId,
+      identifierId,
+      commandId,
+      normalizedValue,
+    });
+    if (held) return;
+    throw new IdentityEmailInUseError(
+      `${verb}: another user holds the lock on this address`,
+    );
+  }
 
   /**
    * The cross-population uniqueness check (ADR-116 §6), asked at the two
@@ -94,9 +156,11 @@ export class IdentityGuards {
       userId,
       accountId,
       provider,
+      providerId,
       providerAccountId,
       value,
       occurredAtMs,
+      commandId,
       actor,
     } = data;
     const normalizedValue = normalizeIdentifierValue(value);
@@ -113,17 +177,25 @@ export class IdentityGuards {
     const heads = await this.heads.findHeads({ userId });
     if (heads.identifiers[identifierId]) return [];
     const userHashKey = await this.heads.findUserHashKey({ userId });
-    // Uniqueness of VERIFIED values is a command-time guard (D01). Non-email
-    // providers arrive VERIFIED with no verify ceremony to re-check them, so
-    // the attach itself is where a cross-user race resolves: the loser
-    // arrives ATTACHED and dead-ends in the same emission, mirroring the
-    // verify path's `uniqueness_race_lost`.
+    // Non-email providers arrive VERIFIED with no verify ceremony to
+    // re-check them, so the attach itself is where a cross-user race
+    // resolves — and the address lock is what resolves it, atomically. The
+    // loser arrives ATTACHED and dead-ends in the same emission, which is
+    // D01's answer for a side with no caller to refuse: an IdP callback that
+    // failed would tell the customer nothing they could act on.
+    //
+    // An `email` attach takes no lock. It arrives ATTACHED, blocks nobody,
+    // and locking there is exactly the squatting mechanism the state machine
+    // exists to prevent.
     const arrivalState = arrivalStateForProvider(provider);
-    const holder =
-      arrivalState !== "VERIFIED"
-        ? null
-        : await this.heads.findActiveIdentifierByValue({ normalizedValue });
-    const isRaceLoser = holder !== null && holder.userId !== userId;
+    const isRaceLoser =
+      arrivalState === "VERIFIED" &&
+      !(await this.holdsAddressLock({
+        userId,
+        identifierId,
+        commandId,
+        normalizedValue,
+      }));
     const attached = (state: IdentifierArrivalState): IdentityFactInput => ({
       type: IDENTIFIER_ATTACHED_EVENT_TYPE,
       data: {
@@ -131,6 +203,7 @@ export class IdentityGuards {
         userId,
         accountId,
         provider,
+        providerId,
         providerAccountId,
         value: normalizedValue,
         identifierHash:
@@ -158,7 +231,8 @@ export class IdentityGuards {
   async verifyIdentifier(
     data: VerifyIdentifierCommandData,
   ): Promise<IdentityFactInput[]> {
-    const { userId, identifierId, verificationId, method, actor } = data;
+    const { userId, identifierId, verificationId, method, commandId, actor } =
+      data;
     const heads = await this.heads.findHeads({ userId });
     const head = heads.identifiers[identifierId];
     if (!head) {
@@ -182,11 +256,8 @@ export class IdentityGuards {
       normalizedValue: head.value,
       verb: "verify_identifier",
     });
-    // Uniqueness of VERIFIED values is re-checked here — concurrent verifies
-    // of the same value are serialized by the per-user queue only within one
-    // user, so the loser of a cross-user race dead-ends rather than verifying
-    // (D01). No DB unique constraint backs this up: tombstones and replay
-    // make constraints lie.
+    // The identity population, read the same way — a named refusal for the
+    // ordinary case, where the other holder was already sitting there.
     const holder =
       head.value === null
         ? null
@@ -194,13 +265,20 @@ export class IdentityGuards {
             normalizedValue: head.value,
           });
     if (holder && holder.userId !== userId) {
-      return [
-        {
-          type: IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
-          data: { identifierId, reason: "uniqueness_race_lost", actor },
-        },
-      ];
+      throw new IdentityEmailInUseError(
+        "verify_identifier: another user already holds this address as a proven identifier",
+      );
     }
+    // And the lock, which is what actually decides a race: both reads above
+    // can pass concurrently, and only one user may hold a proven address.
+    // Before any fact, so the loser's verification is never recorded.
+    await this.claimOrRefuse({
+      userId,
+      identifierId,
+      commandId,
+      normalizedValue: head.value,
+      verb: "verify_identifier",
+    });
     return [
       {
         type: IDENTIFIER_VERIFIED_EVENT_TYPE,

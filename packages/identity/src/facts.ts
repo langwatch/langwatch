@@ -60,6 +60,14 @@ export const identifierAttachedPayloadSchema = z.object({
    *  exists (an email alias attached for routing has none). */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
+  /** better-auth's OWN provider id, verbatim, when a protocol row backs
+   *  this identifier. `provider` above is the folded vocabulary — every
+   *  generic OAuth and enterprise IdP collapses into `oidc` and microsoft
+   *  into `azure-ad` — so it cannot answer a callback that asks for
+   *  `auth0`. `Account` is a projection of this log (ADR-116), and the
+   *  column it keys its uniqueness by is this one. Null for an identifier
+   *  no protocol row backs (the email adopted from `User.email`). */
+  providerId: z.string().min(1).nullable(),
   /** The provider's own subject for this user - `sub` for OIDC, the
    *  mailbox for `email`. It is what an IdP callback arrives holding, so
    *  the projection has to carry it to answer "who is this?" without the
@@ -170,6 +178,10 @@ export interface IdentifierFact {
   /** `hmac:`-prefixed; null once erased or when no key existed at attach. */
   identifierHash: string | null;
   accountId: string | null;
+  /** better-auth's own provider id (ADR-116), verbatim and unfolded - what
+   *  the projected `Account` row is keyed by. Null when no protocol row
+   *  backs the identifier. */
+  providerId: string | null;
   /** The provider's own subject (ADR-116) - the IdP callback's lookup key. */
   providerAccountId: string | null;
   connectionId: string | null;
@@ -255,6 +267,8 @@ export const attachIdentifierCommandDataSchema = commandDataSchema({
   /** The better-auth protocol row, when one exists. */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
+  /** better-auth's own provider id, verbatim — see the fact payload. */
+  providerId: z.string().min(1).nullable(),
   /** The provider's own account id (OAuth `providerAccountId`) — part of
    *  the identifier's deterministic identity when present, and from
    *  ADR-116 stated on the fact so the projection can answer an IdP

@@ -13,6 +13,50 @@ import type {
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
 
+/**
+ * The account ceremonies as better-auth's `databaseHooks` bind them once the
+ * identity storage adapter is live (ADR-116 §5).
+ *
+ * There are two callers of the same two ceremonies in one request, and only
+ * one of them may state the fact. better-auth runs `account.create.before`
+ * and THEN `adapter.create`, so for a user the adapter routes to the identity
+ * branch both would attach the same identifier — and the second one appends
+ * again whenever the first fold has not landed, because the guard reads the
+ * heads off the projection the fold writes.
+ *
+ * The adapter owns it, per §5: the storage-level veto replaces the hook-level
+ * one, and the adapter needs the ceremony anyway to pin the account id its
+ * credential row is keyed by. So the hook defers for exactly the population
+ * the adapter serves, and remains the bridge for everyone else — where it goes
+ * on doing nothing, because their gate is shut.
+ *
+ * The predicate is the adapter's own routing question, handed in rather than
+ * re-derived: two collaborators forking on one question must ask it once.
+ */
+export function bridgeAccountCeremonies({
+  ceremonies,
+  routesToIdentity,
+}: {
+  ceremonies: IdentityAccountCeremonies;
+  routesToIdentity: IdentityUserGate;
+}): Pick<
+  IdentityAccountCeremonies,
+  "beforeAccountCreate" | "beforeAccountDelete"
+> {
+  const deferred = async (userId: unknown): Promise<boolean> =>
+    typeof userId === "string" && (await routesToIdentity({ userId }));
+  return {
+    async beforeAccountCreate(account) {
+      if (await deferred(account.userId)) return;
+      return ceremonies.beforeAccountCreate(account);
+    },
+    async beforeAccountDelete(account) {
+      if (await deferred(account.userId)) return;
+      await ceremonies.beforeAccountDelete(account);
+    },
+  };
+}
+
 /** The `User` fields a ceremony reads. */
 interface UserRow {
   id?: unknown;
@@ -102,6 +146,9 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       commandId: this.clock.newCommandId(),
       accountId: accountRowId,
       provider: identifierProviderFor(providerId),
+      // better-auth's own id, unfolded: the projected `Account` row is keyed
+      // by it, and `provider` above cannot answer for it.
+      providerId,
       providerAccountId:
         typeof account.accountId === "string" ? account.accountId : null,
       value,
@@ -143,6 +190,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       commandId: this.clock.newCommandId(),
       accountId: null,
       provider: "email",
+      providerId: null,
       providerAccountId: null,
       value: email,
       occurredAtMs: this.clock.now(),

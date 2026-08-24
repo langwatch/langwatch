@@ -18,8 +18,10 @@ import {
   newIdentityCommandId,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
+import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import {
   birthAwareGate,
+  bridgeAccountCeremonies,
   createIdentityStorageAdapter,
   IdentityCeremonies,
 } from "@langwatch/identity-server/better-auth";
@@ -37,18 +39,26 @@ import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfi
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
+import { PrismaIdentityReservationRepository } from "./repositories/identity-reservations.prisma.repository";
 import { PrismaIdentityResolutionRepository } from "./repositories/identity-resolution.prisma.repository";
 import { PrismaIdentitySecretCarryRepository } from "./repositories/identity-secret-carry.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
-import { forgetIdentityWriteGate, isUserOnIdentityWrites } from "./write-gate";
+import {
+  forgetIdentityWriteGate,
+  isAnyoneOnIdentityWrites,
+  isUserOnIdentityWrites,
+} from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
 const identityNewborns = new PrismaIdentityNewbornRepository(prisma);
+/** The address lock (ADR-116 §6): one constraint, contended by the guards and
+ *  the born-finalized entrance alike. */
+const identityReservations = new PrismaIdentityReservationRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
 /** The per-user fork as the services take it: one closure, one state
@@ -58,6 +68,19 @@ const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 export function isLatched({ userId }: { userId: string }): Promise<boolean> {
   return isUserOnIdentityWrites({ userId, state: migrationState });
 }
+
+/** The same question asked of the FLEET, for an `account` query that names
+ *  no user (ADR-116 §7). */
+export function isAnyoneLatched(): Promise<boolean> {
+  return isAnyoneOnIdentityWrites({ state: migrationState });
+}
+
+/**
+ * The write fork the storage adapter uses, birth-aware — and therefore the
+ * one question the `databaseHooks` bridge has to ask before it states an
+ * attach the adapter is about to state as well (ADR-116 §5).
+ */
+export const routesToIdentityBranch = birthAwareGate(isLatched);
 
 /**
  * The read fork for `User.email`. A module-level singleton rather than a
@@ -78,11 +101,21 @@ export function identityEmail(): IdentityEmailService {
  */
 export function identityService(): IdentityService {
   return new IdentityService(
-    new IdentityGuards(identityHeads, identityUsers),
-    new IdentityLedgerWriter({
-      projectionStore: new PrismaIdentityProjectionRepository(prisma),
-    }),
+    identityGuards(),
+    new IdentityLedgerWriter({ projectionStore: identityProjectionStore() }),
   );
+}
+
+/** The guards, over all three of their repositories (ADR-116 §6). */
+export function identityGuards(): IdentityGuards {
+  return new IdentityGuards(identityHeads, identityUsers, identityReservations);
+}
+
+/** The fold's store, which also releases the address locks a user stops
+ *  holding — composed here so both the pipeline and the ledger's wait read the
+ *  same instance shape. */
+export function identityProjectionStore(): PrismaIdentityProjectionRepository {
+  return new PrismaIdentityProjectionRepository(prisma, identityReservations);
 }
 
 export function verificationCeremony(): VerificationCeremonyService {
@@ -147,6 +180,22 @@ export function identityCeremonies(): IdentityCeremonies {
 }
 
 /**
+ * The two account ceremonies as `databaseHooks` bind them (ADR-116 §5): the
+ * SAME instances, deferring for every user the storage adapter routes to the
+ * identity branch, because the adapter states those facts itself and a second
+ * statement in the same request appends the event twice.
+ */
+export function identityBridgeCeremonies(): Pick<
+  IdentityAccountCeremonies,
+  "beforeAccountCreate" | "beforeAccountDelete"
+> {
+  return bridgeAccountCeremonies({
+    ceremonies: identityCeremonies(),
+    routesToIdentity: routesToIdentityBranch,
+  });
+}
+
+/**
  * ADR-116 §3's born-finalized entrance. Composed per call like every other
  * identity write surface, because the ledger writer it sequences resolves
  * the pipeline handle lazily — better-auth builds its adapter at module
@@ -154,11 +203,12 @@ export function identityCeremonies(): IdentityCeremonies {
  */
 export function identityBirth(): IdentityBirthService {
   return new IdentityBirthService({
-    guards: new IdentityGuards(identityHeads, identityUsers),
+    guards: identityGuards(),
     ledger: new IdentityLedgerWriter({
-      projectionStore: new PrismaIdentityProjectionRepository(prisma),
+      projectionStore: identityProjectionStore(),
     }),
     rows: identityNewborns,
+    reservations: identityReservations,
     forgetGate: forgetIdentityWriteGate,
   });
 }
@@ -171,6 +221,7 @@ export function identityNewbornReconciliation(): IdentityNewbornReconciliationSe
   return new IdentityNewbornReconciliationService({
     newborns: identityNewborns,
     identity: identityService(),
+    reservations: identityReservations,
   });
 }
 
@@ -193,6 +244,7 @@ const identityStorage = createIdentityStorageAdapter({
   resolution: identityResolution,
   ceremonies: identityCeremonies(),
   isUserOnIdentityWrites: isLatched,
+  isAnyoneOnIdentityWrites: isAnyoneLatched,
   birth: identityBirth(),
 });
 

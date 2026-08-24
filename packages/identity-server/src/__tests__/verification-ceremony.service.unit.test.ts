@@ -1,5 +1,6 @@
 import {
   emptyIdentityHeads,
+  IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IdentityEmailInUseError,
   IdentityVerificationInvalidError,
   type VerifyIdentifierCommandData,
@@ -50,10 +51,14 @@ function harness(options?: {
   identifierProvider?: "email" | "google";
   now?: () => number;
   latched?: boolean;
+  /** The guard's emission: a dead end is how a uniqueness race resolves on a
+   *  side that reached the command before the lock could refuse it. */
+  emits?: () => unknown[];
 }) {
   const store = new InMemoryVerificationStore();
   const verifyIdentifier = vi.fn(
-    async (_data: VerifyIdentifierCommandData) => [],
+    async (_data: VerifyIdentifierCommandData): Promise<unknown[]> =>
+      options?.emits?.() ?? [],
   );
   const service = new VerificationCeremonyService(
     store,
@@ -177,6 +182,45 @@ describe("the email verification ceremony", () => {
       verifyIdentifier.mockResolvedValue([]);
       await expect(complete()).resolves.toBeUndefined();
       expect(store.records.has(WORK)).toBe(false);
+    });
+  });
+
+  describe("when the emission dead-ends on a uniqueness race", () => {
+    /** @scenario "A verification that loses a uniqueness race reports the collision" */
+    it("reports the collision instead of a completed verification, and keeps the proof", async () => {
+      const { service, store } = harness({
+        emits: () => [
+          {
+            type: IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
+            data: {
+              identifierId: WORK,
+              reason: "uniqueness_race_lost",
+              actor: { type: "user", id: USER },
+            },
+            occurredAt: 1,
+          },
+        ],
+      });
+      const codeVerifier = "the-initiating-context-secret";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+
+      await expect(
+        service.completeEmailVerification({
+          userId: USER,
+          identifierId: WORK,
+          verificationId: minted.verificationId,
+          token: minted.token,
+          codeVerifier,
+        }),
+      ).rejects.toMatchObject({ code: "identity_email_in_use" });
+
+      // The identifier dead-ended, so the token can verify nothing — and a
+      // ceremony that rejected the proof must not have charged for it.
+      expect(store.records.get(WORK)).toBeDefined();
     });
   });
 

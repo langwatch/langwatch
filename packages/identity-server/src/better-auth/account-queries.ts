@@ -5,7 +5,10 @@ import { HandledError } from "@langwatch/handled-error";
  *
  * A storage-replacing branch cannot answer "any query at all" — it answers
  * the ones its caller actually asks. better-auth's internal adapter issues a
- * small, fixed set against `account`, and every one of them is named here.
+ * small, fixed set against `account`, and every one of them is named here —
+ * fields, connectors AND operators. All three are part of a shape: a clause
+ * recognized by its field alone answers a question nobody asked, and answering
+ * `id ne X` as `id eq X` inverts a delete.
  *
  * An unrecognized shape THROWS, and that is the load-bearing part: a missed
  * shape would be a silent wrong answer on the sign-in path, where `findOne`
@@ -71,25 +74,51 @@ const shapeOf = (where: readonly AccountWhere[]): string =>
     .sort()
     .join(", ") || "no predicate";
 
+/**
+ * The operators a field may carry, by field.
+ *
+ * Every shape below is an equality; `id` additionally arrives as an `in` list
+ * when a user delete fans out. Validating the operator is load-bearing rather
+ * than defensive: without it `where id ne X` matches the `byId` shape and is
+ * answered as `byId(X)`, so a delete that meant "every row except X" removes
+ * exactly the row it was told to spare.
+ */
+const OPERATORS_BY_FIELD: Record<string, readonly string[]> = { id: ["eq"] };
+const EQUALITY_ONLY: readonly string[] = ["eq"];
+
+const operatorIsEnumerated = (clause: AccountWhere): boolean =>
+  (OPERATORS_BY_FIELD[clause.field] ?? EQUALITY_ONLY).includes(
+    clause.operator?.toLowerCase() ?? "eq",
+  );
+
 const only = (where: readonly AccountWhere[], ...fields: string[]): boolean =>
   where.length === fields.length &&
   fields.every((field) =>
     where.some(
       (clause) =>
         clause.field === field &&
+        operatorIsEnumerated(clause) &&
         (clause.connector === undefined ||
           clause.connector.toUpperCase() === "AND"),
     ),
   );
 
+/** The `id in [...]` shape, which is the one non-equality the branch serves. */
+const onlyIdIn = (where: readonly AccountWhere[]): boolean => {
+  const clause = where[0];
+  return (
+    where.length === 1 &&
+    clause !== undefined &&
+    clause.field === "id" &&
+    clause.operator?.toLowerCase() === "in" &&
+    Array.isArray(clause.value) &&
+    (clause.connector === undefined ||
+      clause.connector.toUpperCase() === "AND")
+  );
+};
+
 const valueOf = (where: readonly AccountWhere[], field: string): unknown =>
   where.find((clause) => clause.field === field)?.value;
-
-const operatorOf = (
-  where: readonly AccountWhere[],
-  field: string,
-): string | undefined =>
-  where.find((clause) => clause.field === field)?.operator?.toLowerCase();
 
 /** Recognize one of the shapes above, or throw naming what arrived. */
 export function parseAccountQuery({
@@ -106,14 +135,15 @@ export function parseAccountQuery({
       return { kind: "byProviderSubject", providerId, accountId };
     }
   }
+  if (onlyIdIn(where)) {
+    const ids = valueOf(where, "id") as unknown[];
+    return {
+      kind: "byIds",
+      ids: ids.filter((value): value is string => typeof value === "string"),
+    };
+  }
   if (only(where, "id")) {
     const id = valueOf(where, "id");
-    if (operatorOf(where, "id") === "in" && Array.isArray(id)) {
-      return {
-        kind: "byIds",
-        ids: id.filter((value): value is string => typeof value === "string"),
-      };
-    }
     if (typeof id === "string") return { kind: "byId", id };
   }
   if (only(where, "userId")) {

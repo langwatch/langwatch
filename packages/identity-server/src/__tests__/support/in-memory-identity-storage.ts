@@ -144,6 +144,22 @@ export class InMemoryIdentityStorage
     return deleted;
   }
 
+  async deleteBridgeAccounts({
+    accountIds,
+  }: {
+    accountIds: readonly string[];
+  }): Promise<number> {
+    let deleted = 0;
+    for (let index = this.accountRows.length - 1; index >= 0; index -= 1) {
+      const row = this.accountRows[index];
+      if (typeof row?.id === "string" && accountIds.includes(row.id)) {
+        this.accountRows.splice(index, 1);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  }
+
   async mirrorSecretsOntoAccounts({
     accountIds,
     secrets,
@@ -219,7 +235,8 @@ export class InMemoryIdentityStorage
       userId: identifier.userId,
       // better-auth's own provider id when the credential row carries it;
       // the identifier's vocabulary is lossy for generic OAuth.
-      providerId: credential?.providerId ?? identifier.provider,
+      providerId:
+        credential?.providerId ?? identifier.providerId ?? identifier.provider,
       accountId: identifier.providerAccountId ?? identifier.value ?? "",
       ...secrets,
       createdAt: credential?.createdAt ?? new Date(identifier.attachedAtMs),
@@ -258,6 +275,7 @@ export const inertIdentityPorts = {
     createCredential: refuses("createCredential"),
     updateCredentials: refuses("updateCredentials"),
     deleteCredentials: refuses("deleteCredentials"),
+    deleteBridgeAccounts: refuses("deleteBridgeAccounts"),
     mirrorSecretsOntoAccounts: refuses("mirrorSecretsOntoAccounts"),
   } satisfies IdentityAccountsPort,
   resolution: {

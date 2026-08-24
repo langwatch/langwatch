@@ -21,6 +21,7 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
+  identityBridgeCeremonies,
   identityCeremonies,
   identityStorageAdapter,
 } from "~/server/app-layer/identity/runtime";
@@ -481,7 +482,12 @@ export const auth = betterAuth({
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live
           // identifier id and the backfill's derived id the same id.
-          return identityCeremonies().beforeAccountCreate(account);
+          //
+          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
+          // storage adapter states this fact itself for every user it routes
+          // to the identity branch, and a hook that stated it too would
+          // append the event twice whenever the first fold had not landed.
+          return identityBridgeCeremonies().beforeAccountCreate(account);
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId)
@@ -514,9 +520,10 @@ export const auth = betterAuth({
         },
       },
       delete: {
-        /** ADR-101 §2: an account row removed is an identifier detach. */
+        /** ADR-101 §2: an account row removed is an identifier detach — and
+         *  the adapter's own, for anyone it routes to the identity branch. */
         before: async (account) => {
-          await identityCeremonies().beforeAccountDelete(account);
+          await identityBridgeCeremonies().beforeAccountDelete(account);
         },
       },
     },

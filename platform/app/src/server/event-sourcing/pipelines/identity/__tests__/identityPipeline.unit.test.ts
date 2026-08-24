@@ -4,7 +4,10 @@ import {
   type IdentityHeadsRepository,
 } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
-import { inMemoryIdentityUsers } from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
 import { createTenantId } from "../../..";
 import type { AggregateType } from "../../../domain/aggregateType";
 import { EventSourcing } from "../../../eventSourcing";
@@ -101,6 +104,7 @@ describe("identity pipeline", () => {
           identityGuards: new IdentityGuards(
             new ProjectionHeads(store),
             inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
           ),
         }),
       );
@@ -112,6 +116,7 @@ describe("identity pipeline", () => {
           commandId: "idcmd_rt1",
           accountId: "acc_1",
           provider: "google",
+          providerId: "google",
           providerAccountId: "gid_123",
           value: "Sam.J+x@Acme.com",
           occurredAtMs: T0,

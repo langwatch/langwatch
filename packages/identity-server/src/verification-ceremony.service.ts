@@ -1,4 +1,7 @@
 import {
+  IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
+  type IdentityFact,
+  IdentityEmailInUseError,
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
 } from "@langwatch/identity";
@@ -18,6 +21,15 @@ import type { IdentityVerificationWrites } from "./identity-writes";
 const logger = createLogger("langwatch:identity:verification-ceremony");
 
 export const IDENTITY_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+
+/** The emission that means the address went to somebody else mid-ceremony. */
+function lostTheUniquenessRace(facts: readonly IdentityFact[]): boolean {
+  return facts.some(
+    (fact) =>
+      fact.type === IDENTIFIER_DEAD_ENDED_EVENT_TYPE &&
+      fact.data.reason === "uniqueness_race_lost",
+  );
+}
 
 export interface MintedEmailVerification {
   verificationId: string;
@@ -108,6 +120,10 @@ export class VerificationCeremonyService {
    * command's own idempotency (an already-VERIFIED identifier emits nothing),
    * so a consume that reports the record already gone is success, not a
    * refusal; a later replay of the completion then finds no record at all.
+   *
+   * The one emission that is NOT success is the uniqueness race's dead-end:
+   * the identifier ends DEAD_END rather than VERIFIED, so the ceremony reports
+   * `identity_email_in_use` instead of returning as though it had worked.
    */
   async completeEmailVerification(args: {
     userId: string;
@@ -157,7 +173,7 @@ export class VerificationCeremonyService {
     // Dispatch BEFORE consuming: if persistence rejects, the record survives
     // and the same valid link retries. The command is idempotent, so a
     // concurrent identical completion cannot double-verify.
-    await this.identity.verifyIdentifier({
+    const facts = await this.identity.verifyIdentifier({
       tenantId: userId,
       userId,
       commandId: newIdentityCommandId(),
@@ -167,6 +183,24 @@ export class VerificationCeremonyService {
       occurredAtMs: this.now(),
       actor: { type: "user", id: userId },
     });
+
+    if (lostTheUniquenessRace(facts)) {
+      // The guard resolved a cross-user race by DEAD-ENDING this identifier
+      // rather than refusing (D01: on the losing side of a concurrent verify
+      // there is no caller to refuse). There is a caller here, so the caller
+      // is told: reporting this as a completed verification would leave a
+      // customer believing an address is theirs while it belongs to somebody
+      // else. The record is left unconsumed — the identifier is DEAD_END, so
+      // the token can no longer verify anything, and burning it would be the
+      // ceremony charging for a proof it rejected.
+      logger.warn(
+        { userId, identifierId, verificationId },
+        "verification completion dead-ended: another user holds this address",
+      );
+      throw new IdentityEmailInUseError(
+        "complete_email_verification: another user's verified identifier holds this address",
+      );
+    }
 
     const consumed = await this.store.consume({ identifierId, verificationId });
     if (!consumed) {

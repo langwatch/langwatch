@@ -1,5 +1,7 @@
 import type { IdentifierFact } from "@langwatch/identity";
 import { isLiveIdentifierState } from "@langwatch/identity";
+import type { IdentityReservationRepository } from "@langwatch/identity-server";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -26,6 +28,8 @@ export const FOLD_OWNED_ACCOUNT_COLUMNS = [
   "providerAccountId",
 ] as const;
 
+const logger = createLogger("langwatch:identity:projection");
+
 /**
  * The identity pipeline's projection store (ADR-101 §3, ADR-116): the
  * Postgres `Identifier` head, the linkage columns of `Account`, and the
@@ -43,7 +47,10 @@ export const FOLD_OWNED_ACCOUNT_COLUMNS = [
 export class PrismaIdentityProjectionRepository
   implements StateProjectionStore<IdentityFoldState>
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly reservations: IdentityReservationRepository,
+  ) {}
 
   async load(
     key: string,
@@ -89,14 +96,10 @@ export class PrismaIdentityProjectionRepository
     const { state } = projection;
 
     for (const fact of Object.values(state.identifiers)) {
-      const { id, ...columns } = factToRow(fact);
-      await this.prisma.identifier.upsert({
-        where: { id },
-        create: { id, ...columns },
-        update: columns,
-      });
+      await this.writeIdentifier(fact);
     }
 
+    await this.releaseAddressLocks({ userId, state });
     await this.projectAccounts({ userId, state });
 
     // Cursor last: it is the commit marker. A crash before this line leaves
@@ -117,6 +120,51 @@ export class PrismaIdentityProjectionRepository
         occurredAt: new Date(projection.occurredAt),
         projectionVersion: projection.version,
       },
+    });
+  }
+
+  /**
+   * One identifier row, upserted whole.
+   *
+   * No database constraint arbitrates a collision here, and none can: ONE user
+   * legitimately holds several proven identifiers carrying the same address —
+   * a credential sign-in and a Google sign-in are two rows with one email,
+   * both VERIFIED. "One USER per proven address" is not a row-level rule, so
+   * it lives in `IdentifierReservation`, claimed before any fact is stated.
+   */
+  private async writeIdentifier(fact: IdentifierFact): Promise<void> {
+    const { id, ...columns } = factToRow(fact);
+    await this.prisma.identifier.upsert({
+      where: { id },
+      create: { id, ...columns },
+      update: columns,
+    });
+  }
+
+  /**
+   * The address locks this user no longer backs (ADR-116 §6).
+   *
+   * The lock is row-truth taken before a fact is stated, so the fold never
+   * CREATES one — it only lets go. A user's claim survives while a live
+   * identifier of theirs still carries the value; a detach, a dead end and an
+   * erasure (which nulls the value) all end that, and the address becomes
+   * somebody else's to take.
+   */
+  private async releaseAddressLocks({
+    userId,
+    state,
+  }: {
+    userId: string;
+    state: IdentityFoldState;
+  }): Promise<void> {
+    const holding = Object.values(state.identifiers)
+      .filter(
+        (fact) => isLiveIdentifierState(fact.state) && fact.value !== null,
+      )
+      .map((fact) => fact.identifierId);
+    await this.reservations.release({
+      userId,
+      holdingIdentifierIds: holding,
     });
   }
 
@@ -144,14 +192,23 @@ export class PrismaIdentityProjectionRepository
     );
     if (linked.length === 0) return;
 
-    // A deleted user's rows went with them (`Account` cascades on delete),
-    // and recreating one would fail the foreign key rather than restore
-    // anything. The fold has nothing to say about a user who is gone.
+    // A `User` row that is not there is an ANOMALY, not a branch: the fold is
+    // projecting a user's linkage while nothing in `User` carries them. It is
+    // surfaced and the projection stays total — the row is written anyway,
+    // because `Account` carries no database foreign key (the schema's
+    // `relationMode = "prisma"` makes the cascade the client's) and a fold
+    // that silently declined would leave the projection quietly incomplete
+    // with nothing to read about it.
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
     });
-    if (!user) return;
+    if (!user) {
+      logger.warn(
+        { userId, identifiers: linked.length },
+        "the identity fold is projecting Account rows for a user with no User row; the rows are written and the anomaly is reported",
+      );
+    }
 
     const tombstoned = linked
       .filter((fact) => !isLiveIdentifierState(fact.state))
@@ -170,14 +227,25 @@ export class PrismaIdentityProjectionRepository
       // Without a subject there is nothing to key the row by. Facts stated
       // before ADR-116 carry none, and are left to better-auth's own row.
       if (fact.providerAccountId === null) continue;
+      // better-auth's own provider id, never the folded vocabulary. The
+      // identifier's `provider` collapses auth0, okta and every custom OIDC
+      // connection into `oidc`; `Account`'s uniqueness and the genericOAuth
+      // callback's lookup are both keyed by the unfolded name, so writing the
+      // folded one here makes a held user's account unfindable by the library
+      // that wrote it. A fact stated before ADR-116 carries none, and its row
+      // keeps whatever it already had.
       const columns = {
         userId: fact.userId,
-        provider: fact.provider,
+        ...(fact.providerId === null ? {} : { provider: fact.providerId }),
         providerAccountId: fact.providerAccountId,
       };
       await this.prisma.account.upsert({
         where: { id: fact.accountId },
-        create: { id: fact.accountId, ...columns },
+        create: {
+          id: fact.accountId,
+          ...columns,
+          provider: fact.providerId ?? fact.provider,
+        },
         update: columns,
       });
     }

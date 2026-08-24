@@ -19,6 +19,7 @@ import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
+  IdentityReservationRepository,
   IdentityUsersRepository,
 } from "@langwatch/identity-server";
 import { IdentityGuards } from "@langwatch/identity-server";
@@ -370,6 +371,12 @@ export interface PipelineRepositories {
    * the queue state a fact the caller was refused.
    */
   identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -675,6 +682,7 @@ export class PipelineRegistry {
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
           this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
         ),
       }),
     );

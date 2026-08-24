@@ -21,6 +21,7 @@ async function identifierRow(args: {
   value?: string | null;
   state?: string;
   accountId?: string | null;
+  providerId?: string | null;
   providerAccountId?: string | null;
   detachedAt?: Date | null;
 }) {
@@ -33,6 +34,7 @@ async function identifierRow(args: {
       domain: "acme.com",
       identifierHash: null,
       accountId: args.accountId ?? null,
+      providerId: args.providerId ?? null,
       providerAccountId: args.providerAccountId ?? null,
       state: args.state ?? "VERIFIED",
       connectionId: null,
@@ -57,6 +59,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         id: `${namespace}-idf1`,
         userId: USER,
         state: "PRIMARY",
+        providerId: "auth0",
         providerAccountId: "sub-12345",
       });
 
@@ -71,6 +74,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         domain: "acme.com",
         identifierHash: null,
         accountId: null,
+        providerId: "auth0",
         providerAccountId: "sub-12345",
         connectionId: null,
         state: "PRIMARY",

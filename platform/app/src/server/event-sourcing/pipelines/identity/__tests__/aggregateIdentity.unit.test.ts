@@ -8,7 +8,10 @@ import {
   type IdentityHeadsRepository,
 } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
-import { inMemoryIdentityUsers } from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
 import { createTenantId } from "../../..";
 import type { Command } from "../../../commands/command";
 import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
@@ -32,6 +35,7 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
     domain: "acme.com",
     identifierHash: null,
     accountId: null,
+    providerId: null,
     providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",
@@ -102,6 +106,7 @@ describe("identity event aggregate type", () => {
           new IdentityGuards(
             new HeadsOf(emptyIdentityHeads({ userId: USER })),
             inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
           ),
         ),
         data: {
@@ -109,6 +114,7 @@ describe("identity event aggregate type", () => {
           commandId: "idcmd_1",
           accountId: null,
           provider: "google" as const,
+          providerId: "google",
           providerAccountId: "gid_9",
           value: "Sam.J@Acme.com",
           ceremony: { flow: "better-auth" },
@@ -125,6 +131,7 @@ describe("identity event aggregate type", () => {
               },
             }),
             inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
           ),
         ),
         data: {
@@ -138,21 +145,33 @@ describe("identity event aggregate type", () => {
       {
         label: "mark primary",
         handler: new MarkPrimaryCommand(
-          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
+          new IdentityGuards(
+            new HeadsOf(held),
+            inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
+          ),
         ),
         data: { ...base, commandId: "idcmd_3", identifierId: "idf_1" },
       },
       {
         label: "detach",
         handler: new DetachIdentifierCommand(
-          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
+          new IdentityGuards(
+            new HeadsOf(held),
+            inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
+          ),
         ),
         data: { ...base, commandId: "idcmd_4", identifierId: "idf_2" },
       },
       {
         label: "erase",
         handler: new EraseUserCommand(
-          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
+          new IdentityGuards(
+            new HeadsOf(held),
+            inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
+          ),
         ),
         data: { ...base, commandId: "idcmd_5" },
       },
@@ -182,6 +201,7 @@ describe("identity event aggregate type", () => {
         new IdentityGuards(
           new HeadsOf(emptyIdentityHeads({ userId: USER })),
           inMemoryIdentityUsers(),
+          inMemoryIdentityReservations(),
         ),
       );
       const data = {
@@ -189,6 +209,7 @@ describe("identity event aggregate type", () => {
         commandId: "idcmd_1",
         accountId: null,
         provider: "google" as const,
+        providerId: "google",
         providerAccountId: "gid_9",
         value: "Sam.J@Acme.com",
         ceremony: { flow: "better-auth" },

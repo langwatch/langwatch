@@ -1,4 +1,4 @@
--- ADR-116: the provider's own subject, on the projection.
+-- ADR-116: the provider's own id and subject, on the projection.
 --
 -- `Account` is demoted from a source of truth to a projection of the event
 -- log, alongside `Identifier` - the fold owns its linkage columns and
@@ -11,12 +11,23 @@
 -- identity event has ever been emitted and there is no history to re-state.
 -- That window closes the moment anyone is enrolled.
 --
--- To roll back, uncomment and run manually. The column is additive and
--- nothing outside identity reads it.
+-- The same holds for `providerId`, and for the same reason one layer over:
+-- `Identifier.provider` is the FOLDED identifier vocabulary, which collapses
+-- auth0, okta and every custom OIDC connection into `oidc` and microsoft into
+-- `azure-ad`. better-auth queries `Account` by its OWN provider id, so a fold
+-- that wrote the folded name would break the very lookup `Account` exists to
+-- answer. The identifier therefore carries better-auth's id verbatim as well.
+--
+-- To roll back, uncomment and run manually. Both columns are additive and
+-- nothing outside identity reads them.
 -- ALTER TABLE "Identifier" DROP COLUMN "providerAccountId";
+-- ALTER TABLE "Identifier" DROP COLUMN "providerId";
 
 -- AlterTable
 ALTER TABLE "Identifier" ADD COLUMN "providerAccountId" TEXT;
+
+-- AlterTable
+ALTER TABLE "Identifier" ADD COLUMN "providerId" TEXT;
 
 -- Answers an IdP callback's `(provider, subject)` lookup.
 -- CreateIndex
@@ -31,6 +42,8 @@ CREATE INDEX "Identifier_accountId_idx" ON "Identifier"("accountId");
 -- backfill has not reached has no identifiers and is filled in when it
 -- reaches them.
 UPDATE "Identifier" i
-SET "providerAccountId" = a."providerAccountId"
+SET "providerAccountId" = a."providerAccountId",
+    "providerId" = a."provider"
 FROM "Account" a
-WHERE i."accountId" = a."id" AND i."providerAccountId" IS NULL;
+WHERE i."accountId" = a."id"
+  AND (i."providerAccountId" IS NULL OR i."providerId" IS NULL);

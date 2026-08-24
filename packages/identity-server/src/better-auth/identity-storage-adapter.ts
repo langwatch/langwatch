@@ -24,6 +24,7 @@ import {
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
 import {
+  anyBornInThisRequest,
   birthAwareGate,
   currentIdentityBirth,
   type IdentityBirthPort,
@@ -67,6 +68,18 @@ export interface IdentityStorageAdapterDeps {
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
+  /**
+   * Whether ANY user has finalized, fleet-wide — the same pre-rollout
+   * short-circuit the write gate already reads.
+   *
+   * The per-user gate cannot be asked about a query that names no user, and
+   * §7's loud failure must not catch a population it can never serve: on a
+   * fleet where nobody has latched, an `account` shape the branch has not
+   * enumerated belongs to a legacy user by construction and has to run
+   * untouched. Fail-closed here means "legacy", exactly as the per-user gate's
+   * does.
+   */
+  isAnyoneOnIdentityWrites: () => Promise<boolean>;
   /**
    * ADR-116 §3's entrance, reached only inside a request the auth route
    * boundary marked. Outside one this is never called, which is what keeps a
@@ -156,6 +169,7 @@ function identityCustomAdapter({
   resolution,
   ceremonies,
   isUserOnIdentityWrites,
+  isAnyoneOnIdentityWrites,
   birth,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
@@ -174,6 +188,10 @@ function identityCustomAdapter({
      * route a newborn's account write to the legacy table.
      */
     const routesToIdentity = birthAwareGate(isUserOnIdentityWrites);
+
+    /** The same fork asked of the fleet, for a query that names nobody. */
+    const anyoneRoutesToIdentity = async (): Promise<boolean> =>
+      anyBornInThisRequest() || (await isAnyoneOnIdentityWrites());
 
     const toCanonicalKeys = (model: string, data: Row): Row =>
       Object.fromEntries(
@@ -208,6 +226,9 @@ function identityCustomAdapter({
      * finalized user and run untouched for everyone else, and the gate can
      * only be asked once a user is known. A clause that is not a plain
      * `AND`-connected equality is not a user this query is scoped to.
+     *
+     * A query that names nobody — a row id, a provider subject — is decided by
+     * the FLEET-level question instead, never by parsing it first.
      */
     const namedUserId = (where: readonly AccountWhere[]): string | null => {
       const clause = where.find(
@@ -333,7 +354,13 @@ function identityCustomAdapter({
     }): Promise<IdentityAccountRow[] | null> => {
       const canonical = canonicalWhere(model, where);
       const named = namedUserId(canonical);
-      if (named !== null && !(await routesToIdentity({ userId: named }))) {
+      if (named !== null) {
+        if (!(await routesToIdentity({ userId: named }))) return null;
+      } else if (!(await anyoneRoutesToIdentity())) {
+        // Nobody is on the identity branch, so no `account` query can be one
+        // of its — including a shape §7 would otherwise refuse. This is what
+        // makes deploying the adapter change nothing for a fleet where no
+        // operator has enrolled anyone.
         return null;
       }
       return serveAccounts(parseAccountQuery({ operation, where: canonical }));
@@ -588,18 +615,21 @@ function identityCustomAdapter({
         join,
       }) => {
         if (modelOf(model) === "account") {
-          if (sortBy !== undefined || (offset ?? 0) > 0) {
-            throw new IdentityUnsupportedStorageQueryError(
-              `identity storage adapter: better-auth issued an account findMany with ${sortBy ? "a sort" : "an offset"}. ` +
-                "The identity branch serves a user's sign-in methods unordered and unpaged; teach it the ordering the caller needs rather than guessing one.",
-            );
-          }
           const rows = await routeAccount({
             model,
             operation: "findMany",
             where,
           });
           if (rows !== null) {
+            // Refused only once the query is known to be the identity
+            // branch's. The legacy engine has always served sorts and offsets,
+            // and a fleet nobody has enrolled must keep getting that answer.
+            if (sortBy !== undefined || (offset ?? 0) > 0) {
+              throw new IdentityUnsupportedStorageQueryError(
+                `identity storage adapter: better-auth issued an account findMany with ${sortBy ? "a sort" : "an offset"}. ` +
+                  "The identity branch serves a user's sign-in methods unordered and unpaged; teach it the ordering the caller needs rather than guessing one.",
+              );
+            }
             return rows
               .slice(0, limit)
               .map((row) => toStorageKeys(model, { ...row })) as never;
@@ -766,9 +796,16 @@ function identityCustomAdapter({
 
     /**
      * Unlink, and the fan-out a user delete performs (ADR-116 §8): a detach
-     * fact per identifier, and the credential rows removed with them. The
-     * `Account` row itself is the fold's — a tombstoned identifier projects
-     * to no row — so nothing here deletes it a second time.
+     * fact per identifier, and both secret-bearing rows removed with them.
+     *
+     * The bridge `Account` row is deleted HERE rather than left to the fold.
+     * The fold does remove it — a tombstoned identifier projects to no row —
+     * but only once it runs, and the mirror (§4) has been writing this user's
+     * newest password onto that row all along. A window in which the row
+     * outlives the unlink is a window in which the fail-closed fallback to the
+     * legacy branch still authenticates the method the customer just removed.
+     * The fold's own delete stays as the replay-time answer; this one is what
+     * makes the unlink true when it returns.
      */
     async function detachOnIdentityBranch(
       rows: readonly IdentityAccountRow[],
@@ -780,9 +817,9 @@ function identityCustomAdapter({
           providerId: row.providerId,
         });
       }
-      await accounts.deleteCredentials({
-        accountIds: rows.map((row) => row.id),
-      });
+      const accountIds = rows.map((row) => row.id);
+      await accounts.deleteCredentials({ accountIds });
+      await accounts.deleteBridgeAccounts({ accountIds });
       return rows.length;
     }
 

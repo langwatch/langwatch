@@ -168,5 +168,27 @@ describe("better-auth over the identity storage adapter", () => {
       expect(identity.db.session).toHaveLength(1);
       expect(identity.commands).toHaveLength(0);
     });
+
+    /** @scenario "A fleet with nobody latched never meets the loud failure" */
+    it("runs an account query the branch never enumerated, rather than refusing it", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+
+      // The shape names no user, so the per-user gate cannot be asked. On a
+      // fleet where nobody has latched there is nobody the branch could be
+      // answering for, and §7's loud failure must not catch the whole legacy
+      // population — "deploying this changes nothing" is the claim.
+      const byShape = await context.adapter.findMany({
+        model: "account",
+        where: [{ field: "scope", value: "openid" }],
+      });
+      expect(byShape).toEqual([]);
+
+      const sorted = await context.adapter.findMany({
+        model: "account",
+        sortBy: { field: "createdAt", direction: "asc" },
+      });
+      expect(sorted).toHaveLength(1);
+    });
   });
 });

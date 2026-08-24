@@ -1,4 +1,7 @@
-import type { IdentityCeremonyWrites } from "@langwatch/identity-server";
+import type {
+  IdentityCeremonyWrites,
+  IdentityReservationRepository,
+} from "@langwatch/identity-server";
 import { newIdentityCommandId } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
@@ -19,6 +22,8 @@ const MAX_SWEPT_PER_PASS = 200;
 export interface IdentityNewbornReconciliationDeps {
   newborns: PrismaIdentityNewbornRepository;
   identity: Pick<IdentityCeremonyWrites, "eraseUser">;
+  /** The address lock (ADR-116 §6), for the claims whose fact never landed. */
+  reservations: IdentityReservationRepository;
   now?: () => number;
   abandonedAfterMs?: number;
 }
@@ -27,6 +32,8 @@ export interface IdentityNewbornSweepSummary {
   examined: number;
   erased: number;
   failed: number;
+  /** Address locks released because no live identifier ever backed them. */
+  locksReaped: number;
 }
 
 /**
@@ -44,6 +51,11 @@ export interface IdentityNewbornSweepSummary {
  * command a real deletion uses (ADR-101 R11) rather than a deletion path of
  * its own — the facts are wiped by the fold the way every other erasure is,
  * and the audit record of the erasure is itself a fact.
+ *
+ * It also reaps the OTHER residue the entrance and the ceremonies leave: an
+ * address lock claimed before a fact that never landed. Same shape, same
+ * horizon, and the same reason — a lock nothing backs is an address nobody can
+ * ever take again.
  *
  * Shaped like the backfill's pass: one bounded pass over candidates, a
  * summary rather than a promise of completion, and a failure on one tenant
@@ -68,6 +80,7 @@ export class IdentityNewbornReconciliationService {
       examined: abandoned.length,
       erased: 0,
       failed: 0,
+      locksReaped: await this.reapAddressLocks(),
     };
     for (const newborn of abandoned) {
       try {
@@ -83,10 +96,36 @@ export class IdentityNewbornReconciliationService {
         );
       }
     }
-    if (summary.examined > 0) {
+    if (summary.examined > 0 || summary.locksReaped > 0) {
       logger.info(summary, "swept abandoned newborn identity streams");
     }
     return summary;
+  }
+
+  /**
+   * Address locks nothing backs (ADR-116 §6).
+   *
+   * A claim is taken before the fact is stated, which is the whole point — so
+   * a ceremony that claimed and then failed leaves a lock on an address no
+   * live identifier holds, and nobody could ever take it again. The horizon is
+   * what keeps the sweep off a ceremony that is merely still in flight.
+   *
+   * Bounded and best-effort like the rest of the pass: a reap that fails costs
+   * one pass, not the stream erasures beside it.
+   */
+  private async reapAddressLocks(): Promise<number> {
+    try {
+      return await this.deps.reservations.reapOrphans({
+        olderThan: new Date(this.now() - this.abandonedAfterMs),
+        limit: MAX_SWEPT_PER_PASS,
+      });
+    } catch (error) {
+      logger.warn(
+        { error },
+        "could not reap orphaned identifier address locks; the next pass retries",
+      );
+      return 0;
+    }
   }
 
   private async erase(userId: string): Promise<void> {

@@ -41,6 +41,7 @@ import type { IdentityLedger } from "../identity-ledger";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import { IdentityService } from "../identity.service";
 import { InMemoryHeads, T0 } from "./support/in-memory-heads";
+import { InMemoryReservations } from "./support/in-memory-reservations";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 
@@ -84,7 +85,7 @@ function harness() {
     },
   };
 
-  const identity = new IdentityService(new IdentityGuards(heads, users), ledger);
+  const identity = new IdentityService(new IdentityGuards(heads, users, new InMemoryReservations()), ledger);
   const ceremonies = new IdentityCeremonies(
     heads,
     users,
