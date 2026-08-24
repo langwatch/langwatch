@@ -48,7 +48,14 @@ export function FrontDoorShell({
 
   return (
     <Box
-      className="lw-front-door"
+      // The modifier says the value panel is on screen, which is the one thing
+      // the card needs to know without being told: it drops its own wordmark
+      // so the page says it once, above the headline.
+      className={
+        isHosted && headline
+          ? "lw-front-door lw-front-door--split"
+          : "lw-front-door"
+      }
       position="relative"
       backgroundColor="var(--lw-front-door-ground)"
       minHeight="100vh"

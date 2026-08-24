@@ -253,6 +253,21 @@
 }
 
 /*
+ * Where the value panel is on screen it carries the wordmark, above the
+ * headline, and the card drops its own. The mark belongs to the PAGE: said
+ * twice on one screen it stops being an identity and becomes a repeated
+ * graphic, and the card's copy was the one labelling a form rather than
+ * introducing anything.
+ *
+ * Done here rather than by a prop because the card is the same component on
+ * every installation and must not learn what is beside it. A self-hosted
+ * centred door has no panel, never gets the modifier, and keeps its wordmark.
+ */
+.lw-front-door--split [data-auth-card-logo] {
+	display: none;
+}
+
+/*
  * The site's dark-section texture, verbatim: a faint grid dissolving toward
  * the glow, so the headline's side of a dark ground is a surface rather than
  * a void. Light mode has the mesh for a ground and shows nothing here.

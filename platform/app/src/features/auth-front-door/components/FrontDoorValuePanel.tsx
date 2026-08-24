@@ -1,5 +1,6 @@
 import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { FullLogo } from "~/components/icons/FullLogo";
 import "../authFrontDoor.css";
 import { HEADING_FONT, MONO_FONT } from "../logic/brand";
 
@@ -56,6 +57,18 @@ export function FrontDoorValuePanel({
         maxWidth="520px"
         marginInlineStart={{ base: 0, md: "min(6vw, 72px)" }}
       >
+        {/* The wordmark belongs to the PAGE, not to the card. Sitting in the
+            card's header it read as a label on a form; above the headline it
+            is the thing saying the sentence underneath it, which is what a
+            wordmark is for. The card drops its own copy whenever this panel is
+            on screen (`lw-front-door--split`), so it is never said twice. */}
+        <Box
+          data-testid="front-door-panel-logo"
+          display="flex"
+          marginBottom={{ base: 1, md: 2 }}
+        >
+          <FullLogo width={132} height={32.4} />
+        </Box>
         <Heading
           as="h2"
           fontSize="clamp(30px, 3.4vw, 52px)"
