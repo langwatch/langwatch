@@ -80,6 +80,13 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
+      /**
+       * One short line describing why the run was started. Any caller that can
+       * set run metadata can set it, platform or SDK.
+       *
+       * @see specs/suites/run-note-metadata-convention.feature
+       */
+      note: z.string().optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),

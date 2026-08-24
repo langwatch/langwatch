@@ -291,6 +291,8 @@ export class SuiteService {
     batchRunId?: string;
     /** Values supplied for the run, overriding each scenario's own defaults. */
     parameters?: RunParameterValues;
+    /** One short line describing why this batch was run. */
+    note?: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -353,6 +355,7 @@ export class SuiteService {
           batchRunId: params.batchRunId,
           parametersByScenarioId,
           secretParametersByScenarioId,
+          note: params.note,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);

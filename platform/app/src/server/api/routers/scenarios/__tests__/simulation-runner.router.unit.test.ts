@@ -25,17 +25,19 @@ vi.mock("~/server/scenarios/scenario.ids", () => ({
 // The run resolves the scenario's declared parameters before it queues
 // anything, which is the router's only database read. Stubbed here so this
 // suite stays a unit test of the router's own decisions.
-const mockGetRunConfigByIds = vi.fn<
-  (params: { ids: string[]; projectId: string }) => Promise<unknown[]>
->(async ({ ids }) =>
-  ids.map((id) => ({
+async function scenariosWithoutParameters({ ids }: { ids: string[] }) {
+  return ids.map((id) => ({
     id,
     name: "Test Scenario",
     situation: "User asks a question",
     criteria: ["Must respond politely"],
     parameters: null,
-  })),
-);
+  }));
+}
+
+const mockGetRunConfigByIds = vi.fn<
+  (params: { ids: string[]; projectId: string }) => Promise<unknown[]>
+>(scenariosWithoutParameters);
 vi.mock("~/server/scenarios/scenario.service", () => ({
   ScenarioService: {
     create: vi.fn().mockReturnValue({
@@ -122,6 +124,9 @@ describe("simulationRunnerRouter.run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueueRun.mockResolvedValue(undefined);
+    // clearAllMocks keeps implementations, so a suite that gave scenarios their
+    // own parameters would otherwise keep them for every suite after it.
+    mockGetRunConfigByIds.mockImplementation(scenariosWithoutParameters);
     caller = createTestCaller();
   });
 
@@ -519,6 +524,82 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockPrefetchScenarioData).not.toHaveBeenCalled();
         expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run carries a note", () => {
+      /** @scenario "The note is written under the top-level note key of the run metadata" */
+      /** @scenario "A note on a single test case run is stored with that run" */
+      it("writes the note under the top-level note key of the run metadata", async () => {
+        await caller.run({ ...defaultInput, note: "nightly regression" });
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: { note: "nightly regression" },
+          }),
+        );
+      });
+
+      /** @scenario "The note is written under the top-level note key of the run metadata" */
+      it("keeps the note out of the reserved langwatch namespace", async () => {
+        await caller.run({ ...defaultInput, note: "nightly regression" });
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata?.langwatch).toBeUndefined();
+      });
+
+      it("keeps the note beside the resolved parameters", async () => {
+        mockGetRunConfigByIds.mockImplementation(async ({ ids }) =>
+          ids.map((id) => ({
+            id,
+            name: "Test Scenario",
+            situation: "A {{ params.account_tier }} customer asks a question",
+            criteria: ["Must respond politely"],
+            parameters: [{ name: "account_tier", defaultValue: "gold" }],
+          })),
+        );
+
+        await caller.run({ ...defaultInput, note: "checking the gold path" });
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: {
+              note: "checking the gold path",
+              parameters: { account_tier: "gold" },
+            },
+          }),
+        );
+      });
+
+      it("drops a note of only spaces", async () => {
+        await caller.run({ ...defaultInput, note: "   " });
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata).toBeUndefined();
+      });
+
+      it("rejects a note longer than the limit before anything is queued", async () => {
+        await expect(
+          caller.run({ ...defaultInput, note: "a".repeat(201) }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run carries no note", () => {
+      /** @scenario "A run queued without a note records metadata identical to before notes existed" */
+      it("records no note key at all", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata).toBeUndefined();
       });
     });
   });

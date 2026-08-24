@@ -21537,6 +21537,7 @@ export interface operations {
                     metadata: {
                         name?: string;
                         description?: string;
+                        note?: string;
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
@@ -24468,6 +24469,8 @@ export interface operations {
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
                 };
             };
         };

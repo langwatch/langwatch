@@ -104,10 +104,12 @@ type BatchAggregateRow = {
  *
  * stalledCount stays out: the history page counts it from the preview items it
  * already holds, and the single-batch summary reads the StalledCount column.
+ * The note stays out for the same reason: the history page reads it off the
+ * preview rows, the single-batch summary off its own aggregate.
  */
 function mapBatchAggregateRow(
   row: BatchAggregateRow,
-): Omit<BatchSummary, "stalledCount"> {
+): Omit<BatchSummary, "stalledCount" | "note"> {
   const firstCompletedAt = Number(row.FirstCompletedAt);
   const allCompletedAt = Number(row.AllCompletedAt);
 
@@ -343,12 +345,25 @@ const LIST_COLUMNS = `
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
+/**
+ * The run note, read out of the run metadata server-side so only the short
+ * string crosses the wire.
+ *
+ * The note is a top-level metadata key, the same one an SDK or CI caller
+ * writes, so a batch reports its note whether it came from the platform or from
+ * outside it. A run without one extracts as the empty string.
+ *
+ * @see specs/suites/run-note-metadata-convention.feature
+ */
+const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
+
 /** Columns for a slim batch-history preview — no full message arrays. */
 const PREVIEW_COLUMNS = `
   ScenarioRunId, BatchRunId, Name, Description, Status,
   toString(DurationMs) AS DurationMs,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
+  ${RUN_NOTE_EXPR} AS Note,
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
@@ -367,6 +382,7 @@ interface PreviewItemRow {
   DurationMs: string | null;
   UpdatedAt: string;
   FinishedAt: string | null;
+  Note: string;
   MessagePreviewRoles: string[];
   MessagePreviewContents: string[];
 }
@@ -668,9 +684,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
 
+      // Every run of a batch is stamped with the same note at queue time, so
+      // the first non-empty one is the batch's note. Reading it here costs no
+      // extra query: the preview rows are already loaded.
+      const note =
+        (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")
+          ?.Note ?? null;
+
       return {
         ...mapBatchAggregateRow(b),
         stalledCount,
+        note,
         items,
       };
     });
@@ -701,8 +725,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const whereFilters =
       "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
 
-    const rows = await this.queryRows<BatchAggregateRow>(
-      `SELECT ${BATCH_AGGREGATE_COLUMNS}
+    // The note read is safe here and not in BATCH_AGGREGATE_COLUMNS: this query
+    // is bounded to one batch, while the history page shares those columns with
+    // a step that aggregates over the whole run set.
+    const rows = await this.queryRows<BatchAggregateRow & { Note: string }>(
+      `SELECT ${BATCH_AGGREGATE_COLUMNS},
+        anyIf(${RUN_NOTE_EXPR}, ${RUN_NOTE_EXPR} != '')                AS Note
        FROM ${TABLE_NAME}
        WHERE ${whereFilters}
          AND ArchivedAt IS NULL
@@ -717,6 +745,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return {
       ...mapBatchAggregateRow(row),
       stalledCount: Number(row.StalledCount),
+      note: row.Note === "" ? null : row.Note,
     };
   }
 

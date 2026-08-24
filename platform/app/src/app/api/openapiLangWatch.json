@@ -45780,6 +45780,9 @@
                           "description": {
                             "type": "string"
                           },
+                          "note": {
+                            "type": "string"
+                          },
                           "langwatch": {
                             "type": "object",
                             "properties": {
@@ -52576,6 +52579,11 @@
                       ]
                     },
                     "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters."
                   }
                 }
               }

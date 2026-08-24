@@ -19,6 +19,7 @@ import {
   runParameterValuesSchema,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
+import { runNoteSchema, withNote } from "~/server/scenarios/run-note";
 import {
   encryptRunSecretValues,
   type RunSecretCiphertext,
@@ -53,6 +54,8 @@ const runScenarioSchema = projectSchema.extend({
    * scenario's own default for that name.
    */
   parameters: runParameterValuesSchema.optional(),
+  /** One short line describing why this run was started. */
+  note: runNoteSchema,
 });
 
 /**
@@ -114,6 +117,7 @@ async function queueRun({
   target,
   parameters,
   secretParameters,
+  note,
 }: {
   projectId: string;
   scenarioId: string;
@@ -124,9 +128,11 @@ async function queueRun({
   target: z.infer<typeof simulationTargetSchema>;
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
+  note: string | undefined;
 }): Promise<void> {
   const secretParameterNames = Object.keys(secretParameters);
   const metadata = {
+    ...withNote(note),
     ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
     ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
   };
@@ -233,6 +239,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         target: input.target,
         parameters,
         secretParameters,
+        note: input.note,
       });
 
       // No explicit job scheduling — the execution subscriber picks up the queued

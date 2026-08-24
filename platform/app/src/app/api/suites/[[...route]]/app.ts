@@ -9,6 +9,7 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runNoteSchema } from "~/server/scenarios/run-note";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -66,6 +67,9 @@ const runSuiteInputSchema = z.object({
     .describe(
       "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.",
     ),
+  note: runNoteSchema.describe(
+    "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
+  ),
 });
 
 const suiteRunResultSchema = z.object({
@@ -422,6 +426,7 @@ secured.access(requires("scenarios:create")).post(
         organizationId,
         idempotencyKey,
         parameters: body.parameters,
+        note: body.note,
       });
 
       return c.json({

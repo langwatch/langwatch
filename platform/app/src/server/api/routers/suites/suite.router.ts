@@ -11,6 +11,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runNoteSchema } from "~/server/scenarios/run-note";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
@@ -139,6 +140,11 @@ export const suiteRouter = createTRPCRouter({
          * supplied here overrides the scenario's own default for that name.
          */
         parameters: runParameterValuesSchema.optional(),
+        /**
+         * One short line describing why this batch was run, stamped onto every
+         * run of the batch.
+         */
+        note: runNoteSchema,
       }),
     )
     .permission("scenarios:manage")
@@ -175,6 +181,7 @@ export const suiteRouter = createTRPCRouter({
         idempotencyKey: input.idempotencyKey,
         batchRunId: input.batchRunId,
         parameters: input.parameters,
+        note: input.note,
       });
 
       return {

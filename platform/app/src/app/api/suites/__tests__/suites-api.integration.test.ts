@@ -420,6 +420,110 @@ describe("Feature: Suites REST API", () => {
       });
     });
 
+    describe("when the run carries a note", () => {
+      async function createRunnableSuiteWithTwoCasesAndTwoTargets() {
+        const first = await createScenario("Refund Flow");
+        const second = await createScenario("Cancellation Flow");
+        const third = await createScenario("Upgrade Flow");
+        const firstTarget = await createHttpAgent();
+        const secondTarget = await createHttpAgent();
+        const suite = await prisma.simulationSuite.create({
+          data: {
+            id: `suite_${nanoid()}`,
+            projectId: testProjectId,
+            name: "Noted Suite",
+            slug: `noted-suite-${nanoid()}`,
+            scenarioIds: [first.id, second.id, third.id],
+            targets: [
+              { type: "http", referenceId: firstTarget.id },
+              { type: "http", referenceId: secondTarget.id },
+            ],
+            repeatCount: 1,
+            labels: [],
+          },
+        });
+        return suite;
+      }
+
+      /** @scenario "Every run of a batch carries the note stamped at queue time" */
+      /** @scenario "A note given on the command line is stored with the batch" */
+      it("stamps the note on every queued run of the batch", async () => {
+        const suite = await createRunnableSuiteWithTwoCasesAndTwoTargets();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-1",
+          note: "switched judge to the stricter rubric",
+        });
+
+        expect(res.status).toBe(200);
+        expect(queueSimulationRun).toHaveBeenCalledTimes(6);
+        for (const call of queueSimulationRun.mock.calls) {
+          expect(call[0].metadata).toMatchObject({
+            note: "switched judge to the stricter rubric",
+          });
+        }
+      });
+
+      it("removes the spaces around the note before storing it", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-2",
+          note: "  retry after the timeout fix  ",
+        });
+
+        expect(queueSimulationRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              note: "retry after the timeout fix",
+            }),
+          }),
+        );
+      });
+
+      it("records no note key when the note is only spaces", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-3",
+          note: "   ",
+        });
+
+        const queued = queueSimulationRun.mock.calls[0]?.[0];
+        expect(queued?.metadata).not.toHaveProperty("note");
+      });
+    });
+
+    describe("when the note is longer than the limit", () => {
+      /** @scenario "A note over two hundred characters is rejected with validation_error" */
+      it("rejects the run with validation_error naming the note field", async () => {
+        const { suite } = await createRunnableSuite();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-4",
+          note: "a".repeat(201),
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("validation_error");
+        expect(body.fields).toContain("note");
+      });
+
+      /** @scenario "A note over two hundred characters is rejected with validation_error" */
+      it("schedules nothing", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-5",
+          note: "a".repeat(201),
+        });
+
+        expect(startSuiteRun).not.toHaveBeenCalled();
+        expect(queueSimulationRun).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when a supplied name is declared by no scenario in the run", () => {
       /** @scenario "A run-time key no scenario in the run declares is rejected with scenario_parameter_unknown" */
       it("rejects the run with scenario_parameter_unknown", async () => {

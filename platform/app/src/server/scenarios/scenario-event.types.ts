@@ -81,6 +81,14 @@ export type BatchSummary = {
   lastUpdatedAt: number; // max UpdatedAt (cache comparison key)
   firstCompletedAt: number | null; // earliest completion timestamp
   allCompletedAt: number | null; // max UpdatedAt once no run is running
+  /**
+   * The one short line the person left with this batch, or null when the batch
+   * was started without one. Every run of a batch carries the same note, so it
+   * is read back off the runs themselves.
+   *
+   * @see specs/suites/run-notes.feature
+   */
+  note: string | null;
 };
 
 /**

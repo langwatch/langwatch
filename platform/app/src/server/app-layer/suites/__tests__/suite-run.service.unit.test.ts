@@ -106,5 +106,99 @@ describe("SuiteRunService", () => {
         expect(result.items).toHaveLength(12);
       });
     });
+
+    describe("when a run is started with a note", () => {
+      /** @scenario "Every run of a batch carries the note stamped at queue time" */
+      it("stamps the note on every queued run of the batch", async () => {
+        await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1", "s2", "s3"],
+          scenarioNameMap: new Map(),
+          activeTargets: [
+            { type: "http", referenceId: "t1" },
+            { type: "http", referenceId: "t2" },
+          ],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-note-1",
+          note: "switched judge to the stricter rubric",
+        });
+
+        expect(queueSimulationRunCommand).toHaveBeenCalledTimes(6);
+        for (const call of queueSimulationRunCommand.mock.calls) {
+          expect(call[0].metadata.note).toBe(
+            "switched judge to the stricter rubric",
+          );
+        }
+      });
+
+      it("removes the spaces around the note", async () => {
+        await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1"],
+          scenarioNameMap: new Map(),
+          activeTargets: [{ type: "http", referenceId: "t1" }],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-note-2",
+          note: "  retry after the timeout fix  ",
+        });
+
+        expect(queueSimulationRunCommand.mock.calls[0]?.[0].metadata.note).toBe(
+          "retry after the timeout fix",
+        );
+      });
+
+      /** @scenario "A note of only spaces is dropped" */
+      it("records the same metadata as a run with no note when the note is only spaces", async () => {
+        const withOnlySpaces = await metadataOfFirstQueuedRun({
+          idempotencyKey: "idem-note-3",
+          note: "   ",
+        });
+        const withoutNote = await metadataOfFirstQueuedRun({
+          idempotencyKey: "idem-note-4",
+        });
+
+        expect(withOnlySpaces).toEqual(withoutNote);
+      });
+    });
+
+    describe("when a run is started with no note", () => {
+      /** @scenario "A run queued without a note records metadata identical to before notes existed" */
+      it("records no note key at all", async () => {
+        const metadata = await metadataOfFirstQueuedRun({
+          idempotencyKey: "idem-note-5",
+        });
+
+        expect(metadata).not.toHaveProperty("note");
+        expect(metadata).toEqual({
+          langwatch: { targetReferenceId: "t1" },
+        });
+      });
+    });
+
+    async function metadataOfFirstQueuedRun({
+      idempotencyKey,
+      note,
+    }: {
+      idempotencyKey: string;
+      note?: string;
+    }) {
+      queueSimulationRunCommand.mockClear();
+      await service.startRun({
+        suiteId: "suite-1",
+        projectId: "project-1",
+        activeScenarioIds: ["s1"],
+        scenarioNameMap: new Map(),
+        activeTargets: [{ type: "http", referenceId: "t1" }],
+        repeatCount: 1,
+        skippedArchived: { scenarios: [], targets: [] },
+        idempotencyKey,
+        note,
+      });
+      return queueSimulationRunCommand.mock.calls[0]?.[0].metadata;
+    }
   });
 });

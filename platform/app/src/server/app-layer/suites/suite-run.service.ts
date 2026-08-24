@@ -5,6 +5,7 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import { withNote } from "~/server/scenarios/run-note";
 import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
@@ -144,6 +145,11 @@ export class SuiteRunService {
      * credential.
      */
     secretParametersByScenarioId?: Map<string, RunSecretCiphertext>;
+    /**
+     * One short line describing why this batch was run. Stamped onto every run
+     * of the batch, so a run carries its note from its first moment.
+     */
+    note?: string;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -156,6 +162,7 @@ export class SuiteRunService {
       idempotencyKey,
       parametersByScenarioId,
       secretParametersByScenarioId,
+      note,
     } = params;
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
@@ -225,6 +232,7 @@ export class SuiteRunService {
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
+            ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
             ...withSecretParameterNames(secretParameters),
           },
