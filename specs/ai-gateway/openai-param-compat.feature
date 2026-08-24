@@ -175,11 +175,13 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
   Rule: Every parameter has an explicit disposition per translated lane
 
     # The parameter policy table (adapters/providers/param_policy.go) is
-    # the single source of truth: every OpenAI chat-completions parameter
-    # is mapped, dropped with a signal, or refused, per lane. Raw-forward
-    # lanes bypass it entirely. The docs page
-    # docs/ai-gateway/parameter-mapping.mdx renders the table and a parity
-    # test keeps the two in sync.
+    # the single source of truth for every lane the gateway authors the
+    # body for: the translated chat lanes here, and the codex Responses
+    # lane (specs/model-providers/codex-account-provider.feature). Every
+    # parameter is mapped, dropped with a signal, or refused. Raw-forward
+    # lanes bypass it entirely: when the gateway forwards bytes, it never
+    # touches them. The docs page docs/ai-gateway/parameter-mapping.mdx
+    # renders the tables and a parity test keeps the two in sync.
 
     @unit
     Scenario: tier-3 params are dropped with a signal by default
