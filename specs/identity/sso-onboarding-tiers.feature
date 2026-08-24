@@ -72,10 +72,16 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   # ── What a tier is, and what it is not ─────────────────────────────────
 
   @unit @unimplemented
+  # Not "the same states": a tier may legitimately skip one. An attestation
+  # proves a domain in a single step, so tier 1 goes APPROVED -> VERIFIED with
+  # no VERIFICATION_PENDING in between, while a tier waiting on a DNS record
+  # passes through it. What every tier shares is the ORDER and the guards - each
+  # tier's history is an ordered subsequence of the one lifecycle, and no tier
+  # owns a state of its own.
   Scenario: Every tier drives one connection through one lifecycle
     Given a connection that reached live traffic through any of the three tiers
     When its history is read back
-    Then the same states were recorded in the same order
+    Then its states are an ordered subsequence of the one lifecycle
     And no tier skipped a guard, and no tier recorded a state another cannot
 
   @integration @unimplemented
