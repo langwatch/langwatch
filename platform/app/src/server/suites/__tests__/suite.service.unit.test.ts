@@ -90,6 +90,7 @@ function makeMockScenarioRepository(
         situation: "A customer asks for help",
         criteria: ["Answers the question"],
         parameters: null,
+        version: 1,
       })),
     ),
     findManyByFolder: vi.fn(async () => []),
@@ -286,6 +287,7 @@ describe("SuiteService", () => {
             situation: "A {{ params.account_tier }} customer asks for help",
             criteria: ["Answers the question"],
             parameters,
+            version: 1,
           })),
         ),
       });

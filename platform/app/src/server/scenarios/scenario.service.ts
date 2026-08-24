@@ -1,12 +1,33 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { PrismaClient, Scenario } from "~/generated/prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+  type Scenario,
+  type ScenarioVersion,
+} from "~/generated/prisma/client";
+import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
 import {
   assertAssignableFolder,
   reconcileFolderMembership,
 } from "../suites/folder-membership";
-import { ScenarioNotFoundError } from "./errors";
+import {
+  ScenarioNotFoundError,
+  ScenarioStaleVersionError,
+  ScenarioVersionNotFoundError,
+} from "./errors";
+import {
+  buildSnapshotEnvelope,
+  diffSnapshotFields,
+  parseSnapshotEnvelope,
+  SCENARIO_SNAPSHOT_SCHEMA_VERSION,
+  type ScenarioActor,
+  type ScenarioAuthorLabel,
+  type ScenarioSnapshotFields,
+  snapshotFieldsOf,
+  touchesVersionedFields,
+} from "./scenario-versioning";
 import {
   type CreateScenarioInput,
   ScenarioRepository,
@@ -16,6 +37,70 @@ import {
 
 const tracer = getLangWatchTracer("langwatch.scenarios.service");
 const logger = createLogger("langwatch:scenarios:service");
+
+const DEFAULT_VERSION_PAGE_SIZE = 20;
+const MAX_VERSION_PAGE_SIZE = 100;
+
+/** Options a write surface passes beside the scenario data. */
+export type ScenarioWriteOptions = {
+  /** Who saves. Derived from `lastUpdatedById` when the caller sends none. */
+  actor?: ScenarioActor;
+  /**
+   * The version the caller loaded. When sent, a save against any other
+   * version is refused with `scenario_stale_version`. When absent the save
+   * lands over whatever is there and takes the next number.
+   */
+  expectedVersion?: number;
+  /** One line the history entry shows, e.g. what a restore restored. */
+  changeDescription?: string;
+};
+
+/** One entry of a scenario's version history, newest first. */
+export type ScenarioVersionSummary = {
+  version: number;
+  authorId: string | null;
+  /** Null on the synthesized Created entry: nobody recorded that save. */
+  authorLabel: ScenarioAuthorLabel | null;
+  changeDescription: string | null;
+  changedFields: string[];
+  createdAt: Date;
+  /**
+   * True on the Created entry a pre-versioning scenario shows: it is built
+   * from the scenario's createdAt and has no stored snapshot to open or
+   * restore.
+   */
+  synthesized: boolean;
+};
+
+/** One full version, snapshot included. */
+export type ScenarioVersionDetail = ScenarioVersionSummary & {
+  fields: ScenarioSnapshotFields;
+  schemaVersion: number;
+};
+
+/**
+ * The recorded writer when a surface names none: the save of a person carries
+ * their user id, everything else is the API.
+ */
+function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
+  return lastUpdatedById
+    ? { userId: lastUpdatedById, label: "user" }
+    : { userId: null, label: "api" };
+}
+
+/** A stored version row as one history entry. */
+function toVersionSummary(row: ScenarioVersion): ScenarioVersionSummary {
+  const envelope = parseSnapshotEnvelope(row.snapshot);
+  return {
+    version: row.version,
+    authorId: row.authorId,
+    authorLabel: row.authorLabel as ScenarioAuthorLabel,
+    changeDescription: row.changeDescription,
+    changedFields: envelope.changedFields,
+    createdAt: row.createdAt,
+    synthesized: false,
+  };
+}
 
 export class ScenarioService {
   constructor(
@@ -27,7 +112,10 @@ export class ScenarioService {
     return new ScenarioService(new ScenarioRepository(prisma), prisma);
   }
 
-  async create(input: CreateScenarioInput): Promise<Scenario> {
+  async create(
+    input: CreateScenarioInput,
+    options?: Pick<ScenarioWriteOptions, "actor">,
+  ): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioService.create",
       {
@@ -39,22 +127,43 @@ export class ScenarioService {
       async (span) => {
         logger.debug({ projectId: input.projectId }, "Creating scenario");
         const folderId = input.folderId ?? null;
-        const result = folderId
-          ? await this.prisma.$transaction(async (tx) => {
-              await assertAssignableFolder({
-                projectId: input.projectId,
-                folderId,
-                tx,
-              });
-              const created = await this.repository.create(input, tx);
-              await reconcileFolderMembership({
-                projectId: input.projectId,
-                folderId,
-                tx,
-              });
-              return created;
-            })
-          : await this.repository.create(input);
+        const actor = options?.actor ?? actorFor(input.lastUpdatedById);
+        // One transaction holds the row, its v1 version and the folder
+        // membership, so a create that fails part way leaves nothing behind.
+        const result = await this.prisma.$transaction(async (tx) => {
+          if (folderId) {
+            await assertAssignableFolder({
+              projectId: input.projectId,
+              folderId,
+              tx,
+            });
+          }
+          const created = await this.repository.create(input, tx);
+          await this.repository.createVersionRow(
+            {
+              scenarioId: created.id,
+              projectId: created.projectId,
+              version: 1,
+              authorId: actor.userId,
+              authorLabel: actor.label,
+              changeDescription: "Created",
+              snapshot: buildSnapshotEnvelope({
+                fields: snapshotFieldsOf(created),
+                changedFields: [],
+              }),
+              schemaVersion: SCENARIO_SNAPSHOT_SCHEMA_VERSION,
+            },
+            tx,
+          );
+          if (folderId) {
+            await reconcileFolderMembership({
+              projectId: input.projectId,
+              folderId,
+              tx,
+            });
+          }
+          return created;
+        });
         span.setAttribute("scenario.id", result.id);
         return result;
       },
@@ -158,6 +267,7 @@ export class ScenarioService {
     id: string,
     projectId: string,
     data: UpdateScenarioInput,
+    options?: ScenarioWriteOptions,
   ): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioService.update",
@@ -170,39 +280,279 @@ export class ScenarioService {
       },
       async () => {
         logger.debug({ projectId, scenarioId: id }, "Updating scenario");
-        if (data.folderId === undefined) {
-          return await this.repository.update(id, projectId, data);
-        }
-        // The update changes folder membership: validate the destination and
-        // recompute both folders' member lists in the same transaction, so a
-        // write that fails part way leaves both sides untouched.
-        const nextFolderId = data.folderId;
+        const actor = options?.actor ?? actorFor(data.lastUpdatedById);
+        // An update that names an editable field is a save: it bumps the
+        // version and records a version row. One that names none (a folder
+        // move, an author stamp) leaves the history alone.
+        const versioned = touchesVersionedFields(data);
+        // One transaction holds the row, the version row and both folders'
+        // member lists, so a write that fails part way leaves all of them
+        // untouched.
         return await this.prisma.$transaction(async (tx) => {
           const existing = await tx.scenario.findFirst({
             where: { id, projectId, archivedAt: null },
-            select: { folderId: true },
           });
           if (!existing) {
             throw new ScenarioNotFoundError();
           }
-          if (nextFolderId) {
+          if (
+            options?.expectedVersion !== undefined &&
+            options.expectedVersion !== existing.version
+          ) {
+            // Refused before the write, not rolled back after it.
+            throw new ScenarioStaleVersionError({
+              currentVersion: existing.version,
+            });
+          }
+          if (data.folderId) {
             await assertAssignableFolder({
               projectId,
-              folderId: nextFolderId,
+              folderId: data.folderId,
               tx,
             });
           }
-          const updated = await this.repository.update(id, projectId, data, tx);
-          const touchedFolderIds = new Set(
-            [existing.folderId, nextFolderId].filter(
-              (folderId): folderId is string => !!folderId,
-            ),
-          );
-          for (const folderId of touchedFolderIds) {
-            await reconcileFolderMembership({ projectId, folderId, tx });
+
+          let updated: Scenario;
+          if (versioned) {
+            try {
+              updated = await this.repository.updateWithVersionBump(
+                id,
+                projectId,
+                data,
+                tx,
+                options?.expectedVersion,
+              );
+            } catch (error) {
+              // The version rode in the WHERE and matched no row: a racing
+              // save landed between our read and our write.
+              if (
+                isRecordNotFoundError(error) &&
+                options?.expectedVersion !== undefined
+              ) {
+                throw new ScenarioStaleVersionError({
+                  currentVersion: existing.version,
+                });
+              }
+              throw error;
+            }
+            await this.repository.createVersionRow(
+              {
+                scenarioId: id,
+                projectId,
+                version: updated.version,
+                authorId: actor.userId,
+                authorLabel: actor.label,
+                changeDescription: options?.changeDescription ?? null,
+                snapshot: buildSnapshotEnvelope({
+                  fields: snapshotFieldsOf(updated),
+                  changedFields: diffSnapshotFields(
+                    snapshotFieldsOf(existing),
+                    snapshotFieldsOf(updated),
+                  ),
+                }),
+                schemaVersion: SCENARIO_SNAPSHOT_SCHEMA_VERSION,
+              },
+              tx,
+            );
+          } else {
+            updated = await this.repository.update(id, projectId, data, tx);
+          }
+
+          if (data.folderId !== undefined) {
+            const touchedFolderIds = new Set(
+              [existing.folderId, data.folderId].filter(
+                (folderId): folderId is string => !!folderId,
+              ),
+            );
+            for (const folderId of touchedFolderIds) {
+              await reconcileFolderMembership({ projectId, folderId, tx });
+            }
           }
           return updated;
         });
+      },
+    );
+  }
+
+  /**
+   * The version history, newest first. `cursor` is the version to page below.
+   *
+   * A scenario stored before versions existed has no v1 row; the page that
+   * reaches the bottom of the stored history closes with a synthesized
+   * Created entry built from the scenario's createdAt, so every history
+   * starts at 1.
+   */
+  async listVersions(params: {
+    projectId: string;
+    scenarioId: string;
+    limit?: number;
+    cursor?: number;
+  }): Promise<{
+    versions: ScenarioVersionSummary[];
+    nextCursor: number | null;
+  }> {
+    return tracer.withActiveSpan(
+      "ScenarioService.listVersions",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "scenario.id": params.scenarioId,
+        },
+      },
+      async () => {
+        // Archived scenarios keep a readable history, like their runs do.
+        const scenario = await this.repository.findByIdIncludingArchived({
+          id: params.scenarioId,
+          projectId: params.projectId,
+        });
+        if (!scenario) {
+          throw new ScenarioNotFoundError();
+        }
+
+        const take = Math.min(
+          Math.max(params.limit ?? DEFAULT_VERSION_PAGE_SIZE, 1),
+          MAX_VERSION_PAGE_SIZE,
+        );
+        const rows = await this.repository.findVersions({
+          projectId: params.projectId,
+          scenarioId: params.scenarioId,
+          take,
+          beforeVersion: params.cursor,
+        });
+        const versions = rows.map(toVersionSummary);
+
+        const reachedBottom = rows.length < take;
+        const hasStoredV1 = rows.some((row) => row.version === 1);
+        const pageCoversV1 = params.cursor === undefined || params.cursor > 1;
+        if (reachedBottom && !hasStoredV1 && pageCoversV1) {
+          versions.push({
+            version: 1,
+            authorId: null,
+            authorLabel: null,
+            changeDescription: "Created",
+            changedFields: [],
+            createdAt: scenario.createdAt,
+            synthesized: true,
+          });
+        }
+
+        const last = rows[rows.length - 1];
+        return {
+          versions,
+          nextCursor:
+            rows.length === take && last && last.version > 1
+              ? last.version
+              : null,
+        };
+      },
+    );
+  }
+
+  /** One version with its snapshot. Unknown numbers refuse with a code. */
+  async getVersion(params: {
+    projectId: string;
+    scenarioId: string;
+    version: number;
+  }): Promise<ScenarioVersionDetail> {
+    return tracer.withActiveSpan(
+      "ScenarioService.getVersion",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "scenario.id": params.scenarioId,
+        },
+      },
+      async () => {
+        const scenario = await this.repository.findByIdIncludingArchived({
+          id: params.scenarioId,
+          projectId: params.projectId,
+        });
+        if (!scenario) {
+          throw new ScenarioNotFoundError();
+        }
+        const row = await this.repository.findVersionByNumber(params);
+        if (!row) {
+          throw new ScenarioVersionNotFoundError({
+            scenarioId: params.scenarioId,
+            version: params.version,
+          });
+        }
+        const envelope = parseSnapshotEnvelope(row.snapshot);
+        return {
+          ...toVersionSummary(row),
+          fields: envelope.fields as ScenarioSnapshotFields,
+          schemaVersion: row.schemaVersion,
+        };
+      },
+    );
+  }
+
+  /**
+   * Brings an old version back by writing it FORWARD as a new save. History
+   * is never rewritten: the version restored from is still there, and the
+   * restore itself is one more entry in the list.
+   *
+   * The snapshot carries the editable content only, so the case's folder,
+   * archive state and run history ride across unchanged. An archived case is
+   * refused: from outside it is gone, and a restore must not resurrect it.
+   */
+  async restoreVersion(params: {
+    projectId: string;
+    scenarioId: string;
+    version: number;
+    actor: ScenarioActor;
+  }): Promise<Scenario> {
+    return tracer.withActiveSpan(
+      "ScenarioService.restoreVersion",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "scenario.id": params.scenarioId,
+        },
+      },
+      async () => {
+        const scenario = await this.repository.findById({
+          id: params.scenarioId,
+          projectId: params.projectId,
+        });
+        if (!scenario) {
+          throw new ScenarioNotFoundError();
+        }
+        const row = await this.repository.findVersionByNumber(params);
+        if (!row) {
+          throw new ScenarioVersionNotFoundError({
+            scenarioId: params.scenarioId,
+            version: params.version,
+          });
+        }
+        const { fields } = parseSnapshotEnvelope(row.snapshot);
+        return await this.update(
+          params.scenarioId,
+          params.projectId,
+          {
+            name: fields.name,
+            situation: fields.situation,
+            criteria: fields.criteria,
+            labels: fields.labels,
+            parameters:
+              fields.parameters === null
+                ? Prisma.DbNull
+                : (fields.parameters as Prisma.InputJsonValue),
+            simulatorModel: fields.simulatorModel,
+            judgeModel: fields.judgeModel,
+            maxTurns: fields.maxTurns,
+            minTurns: fields.minTurns,
+            lastUpdatedById: params.actor.userId,
+          },
+          {
+            actor: params.actor,
+            expectedVersion: scenario.version,
+            changeDescription: `Restored from v${params.version}`,
+          },
+        );
       },
     );
   }
@@ -259,8 +609,8 @@ export class ScenarioService {
           throw new ScenarioNotFoundError();
         }
         // Goes through create so everything create does for a new scenario
-        // (folder reconciliation now, version rows once scenarios version)
-        // covers duplicates too.
+        // (folder reconciliation, its own v1 version row) covers duplicates
+        // too: the copy starts a history of its own at version 1.
         const copy = await this.create({
           projectId: original.projectId,
           name: `${original.name} (copy)`,

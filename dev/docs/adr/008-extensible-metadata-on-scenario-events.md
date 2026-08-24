@@ -74,6 +74,7 @@ await scenario.run({
 | `targetReferenceId` | `string` | yes | ID of the agent/prompt target this run was executed against |
 | `targetType` | `"prompt" \| "http" \| "code"` | yes | Target kind, matches `scenarioJobSchema.target.type` |
 | `simulationSuiteId` | `string` | no | `SimulationSuite.id` — which suite dispatched this run |
+| `scenarioVersion` | `number` | no | `Scenario.version` at the moment the run was queued; absent on runs recorded before scenario versioning existed |
 
 The entire `langwatch` object is optional on metadata (SDK users never send it).
 

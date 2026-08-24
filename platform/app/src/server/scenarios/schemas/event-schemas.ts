@@ -65,6 +65,14 @@ export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
   targetType: z.enum(["prompt", "http", "code", "workflow"]),
   simulationSuiteId: z.string().optional(),
+  /**
+   * The version of the scenario at the moment the run was queued. A later
+   * edit of the scenario never changes what an old run says. Absent on runs
+   * recorded before versions existed.
+   *
+   * @see specs/scenarios/scenario-version-on-runs.feature
+   */
+  scenarioVersion: z.number().int().optional(),
 });
 
 /**

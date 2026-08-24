@@ -12,6 +12,7 @@ import {
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
 } from "~/server/scenarios/parameters";
+import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -67,6 +68,21 @@ const updateScenarioSchema = z.object({
     .describe(parametersDescription),
   folderId: z.string().nullish().describe(folderIdDescription),
 });
+
+/**
+ * Who a version row written through this surface names as its author.
+ *
+ * A project key names no person, so `userId` stays null. The `langwatch` CLI
+ * declares itself with `X-LangWatch-Surface: cli` on its scenario writes;
+ * only that value is honored, so a caller cannot spoof an in-process surface
+ * over the wire. Everything else is the API.
+ */
+function actorFromRequest(c: {
+  req: { header: (name: string) => string | undefined };
+}): ScenarioActor {
+  const declared = c.req.header("X-LangWatch-Surface")?.toLowerCase();
+  return { userId: null, label: declared === "cli" ? "cli" : "api" };
+}
 
 function toScenarioResponse(scenario: Scenario) {
   return {
@@ -220,15 +236,18 @@ function registerCreateScenarioRoute(
       logger.info({ projectId: project.id }, "Creating scenario");
 
       const service = getService();
-      const scenario = await service.create({
-        projectId: project.id,
-        name: body.name,
-        situation: body.situation,
-        criteria: body.criteria,
-        labels: body.labels,
-        ...(body.parameters !== undefined && { parameters: body.parameters }),
-        ...(body.folderId !== undefined && { folderId: body.folderId }),
-      });
+      const scenario = await service.create(
+        {
+          projectId: project.id,
+          name: body.name,
+          situation: body.situation,
+          criteria: body.criteria,
+          labels: body.labels,
+          ...(body.parameters !== undefined && { parameters: body.parameters }),
+          ...(body.folderId !== undefined && { folderId: body.folderId }),
+        },
+        { actor: actorFromRequest(c) },
+      );
 
       return c.json(
         {
@@ -290,14 +309,19 @@ function registerUpdateScenarioRoute(
         return c.json({ error: "Scenario not found" }, 404);
       }
 
-      const scenario = await service.update(id, project.id, {
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.situation !== undefined && { situation: body.situation }),
-        ...(body.criteria !== undefined && { criteria: body.criteria }),
-        ...(body.labels !== undefined && { labels: body.labels }),
-        ...(body.parameters !== undefined && { parameters: body.parameters }),
-        ...(body.folderId !== undefined && { folderId: body.folderId }),
-      });
+      const scenario = await service.update(
+        id,
+        project.id,
+        {
+          ...(body.name !== undefined && { name: body.name }),
+          ...(body.situation !== undefined && { situation: body.situation }),
+          ...(body.criteria !== undefined && { criteria: body.criteria }),
+          ...(body.labels !== undefined && { labels: body.labels }),
+          ...(body.parameters !== undefined && { parameters: body.parameters }),
+          ...(body.folderId !== undefined && { folderId: body.folderId }),
+        },
+        { actor: actorFromRequest(c) },
+      );
 
       return c.json({
         ...toScenarioResponse(scenario),

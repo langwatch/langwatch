@@ -1,9 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createCliScenariosService } from "./cli-scenarios-service";
 
 export const createScenarioCommand = async (
   name: string,
@@ -11,7 +11,7 @@ export const createScenarioCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const service = new ScenariosApiService();
+  const service = createCliScenariosService();
   const spinner = createSpinner(`Creating scenario "${name}"...`).start();
 
   try {

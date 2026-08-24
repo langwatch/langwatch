@@ -21543,6 +21543,7 @@ export interface operations {
                             /** @enum {string} */
                             targetType: "prompt" | "http" | "code" | "workflow";
                             simulationSuiteId?: string;
+                            scenarioVersion?: number;
                         };
                     } & {
                         [key: string]: unknown;
@@ -23522,6 +23523,10 @@ export interface operations {
                             updatedAt: number;
                             durationInMs: number;
                             totalCost?: number;
+                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
+                            note: string | null;
+                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
+                            scenarioVersion: number | null;
                             /** Format: uri */
                             platformUrl: string;
                         }[];
@@ -23619,6 +23624,10 @@ export interface operations {
                         updatedAt: number;
                         durationInMs: number;
                         totalCost?: number;
+                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
+                        note: string | null;
+                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
+                        scenarioVersion: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23724,6 +23733,8 @@ export interface operations {
                             allCompletedAt: number | null;
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
+                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
+                            note: string | null;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -23815,6 +23826,8 @@ export interface operations {
                         allCompletedAt: number | null;
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;
+                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
+                        note: string | null;
                     };
                 };
             };

@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createCliScenariosService } from "./cli-scenarios-service";
 
 export const updateScenarioCommand = async (
   id: string,
@@ -12,7 +12,7 @@ export const updateScenarioCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const service = new ScenariosApiService();
+  const service = createCliScenariosService();
   const spinner = createSpinner(`Updating scenario "${id}"...`).start();
 
   try {

@@ -51,6 +51,7 @@ describe("SuiteRunService", () => {
           projectId: "project-1",
           activeScenarioIds: ["scenario-1"],
           scenarioNameMap: new Map([["scenario-1", "My Scenario"]]),
+          scenarioVersionMap: new Map([["scenario-1", 1]]),
           activeTargets: [{ type: "http", referenceId: "target-1" }],
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
@@ -72,6 +73,7 @@ describe("SuiteRunService", () => {
           projectId: "project-1",
           activeScenarioIds: ["scenario-1"],
           scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map(),
           activeTargets: [{ type: "http", referenceId: "target-1" }],
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
@@ -92,6 +94,10 @@ describe("SuiteRunService", () => {
           scenarioNameMap: new Map([
             ["s1", "Scenario 1"],
             ["s2", "Scenario 2"],
+          ]),
+          scenarioVersionMap: new Map([
+            ["s1", 2],
+            ["s2", 7],
           ]),
           activeTargets: [
             { type: "http", referenceId: "t1" },
@@ -115,6 +121,7 @@ describe("SuiteRunService", () => {
           projectId: "project-1",
           activeScenarioIds: ["s1", "s2", "s3"],
           scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map(),
           activeTargets: [
             { type: "http", referenceId: "t1" },
             { type: "http", referenceId: "t2" },
@@ -139,6 +146,7 @@ describe("SuiteRunService", () => {
           projectId: "project-1",
           activeScenarioIds: ["s1"],
           scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map(),
           activeTargets: [{ type: "http", referenceId: "t1" }],
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
@@ -174,7 +182,74 @@ describe("SuiteRunService", () => {
 
         expect(metadata).not.toHaveProperty("note");
         expect(metadata).toEqual({
-          langwatch: { targetReferenceId: "t1" },
+          langwatch: {
+            targetReferenceId: "t1",
+            targetType: "http",
+            scenarioVersion: 3,
+          },
+        });
+      });
+    });
+
+    describe("the version stamp on queued runs", () => {
+      /** @scenario "The version stamped is the version read when the batch was queued" */
+      it("stamps each queued run with its own scenario's version from the queue-time read", async () => {
+        await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1", "s2"],
+          scenarioNameMap: new Map([
+            ["s1", "First case"],
+            ["s2", "Second case"],
+          ]),
+          scenarioVersionMap: new Map([
+            ["s1", 3],
+            ["s2", 7],
+          ]),
+          activeTargets: [{ type: "http", referenceId: "t1" }],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-version-1",
+        });
+
+        const byScenarioId = new Map(
+          queueSimulationRunCommand.mock.calls.map((call) => [
+            call[0].scenarioId,
+            call[0].metadata.langwatch,
+          ]),
+        );
+        expect(byScenarioId.get("s1")).toEqual({
+          targetReferenceId: "t1",
+          targetType: "http",
+          scenarioVersion: 3,
+        });
+        expect(byScenarioId.get("s2")).toEqual({
+          targetReferenceId: "t1",
+          targetType: "http",
+          scenarioVersion: 7,
+        });
+      });
+
+      /** @scenario "A suite run records the kind of target as well as the target" */
+      it("records the target and its kind in the reserved namespace", async () => {
+        await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1"],
+          scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map([["s1", 1]]),
+          activeTargets: [{ type: "prompt", referenceId: "prompt-9" }],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-version-2",
+        });
+
+        expect(
+          queueSimulationRunCommand.mock.calls[0]?.[0].metadata.langwatch,
+        ).toEqual({
+          targetReferenceId: "prompt-9",
+          targetType: "prompt",
+          scenarioVersion: 1,
         });
       });
     });
@@ -192,6 +267,7 @@ describe("SuiteRunService", () => {
         projectId: "project-1",
         activeScenarioIds: ["s1"],
         scenarioNameMap: new Map(),
+        scenarioVersionMap: new Map([["s1", 3]]),
         activeTargets: [{ type: "http", referenceId: "t1" }],
         repeatCount: 1,
         skippedArchived: { scenarios: [], targets: [] },

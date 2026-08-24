@@ -45800,6 +45800,9 @@
                               },
                               "simulationSuiteId": {
                                 "type": "string"
+                              },
+                              "scenarioVersion": {
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -50262,6 +50265,20 @@
                           "totalCost": {
                             "type": "number"
                           },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                          },
+                          "scenarioVersion": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                          },
                           "platformUrl": {
                             "type": "string",
                             "format": "uri"
@@ -50279,6 +50296,8 @@
                           "timestamp",
                           "updatedAt",
                           "durationInMs",
+                          "note",
+                          "scenarioVersion",
                           "platformUrl"
                         ]
                       }
@@ -50526,6 +50545,20 @@
                     "totalCost": {
                       "type": "number"
                     },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                    },
+                    "scenarioVersion": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50543,6 +50576,8 @@
                     "timestamp",
                     "updatedAt",
                     "durationInMs",
+                    "note",
+                    "scenarioVersion",
                     "platformUrl"
                   ]
                 }
@@ -50733,6 +50768,13 @@
                           "isComplete": {
                             "type": "boolean",
                             "description": "True when every run of the batch reached a terminal status."
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
                           }
                         },
                         "required": [
@@ -50747,7 +50789,8 @@
                           "lastUpdatedAt",
                           "firstCompletedAt",
                           "allCompletedAt",
-                          "isComplete"
+                          "isComplete",
+                          "note"
                         ]
                       }
                     },
@@ -50940,6 +50983,13 @@
                     "isComplete": {
                       "type": "boolean",
                       "description": "True when every run of the batch reached a terminal status."
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
                     }
                   },
                   "required": [
@@ -50954,7 +51004,8 @@
                     "lastUpdatedAt",
                     "firstCompletedAt",
                     "allCompletedAt",
-                    "isComplete"
+                    "isComplete",
+                    "note"
                   ]
                 }
               }

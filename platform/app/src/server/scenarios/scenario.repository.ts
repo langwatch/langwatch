@@ -2,7 +2,12 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Prisma, PrismaClient, Scenario } from "~/generated/prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  Scenario,
+  ScenarioVersion,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");
@@ -25,14 +30,22 @@ export type ScenarioRunConfig = {
   criteria: string[];
   /** The declared parameters, as stored. Read with `parseScenarioParameterDefinitions`. */
   parameters: Prisma.JsonValue;
+  /**
+   * The version at the moment of this read. Stamped onto every run queued
+   * from it, so a run says which state of the case produced it.
+   */
+  version: number;
 };
 
 /**
  * The client a repository write runs on: the repository's own PrismaClient by
  * default, or the caller's transaction client when the write must land with
- * other writes (folder membership reconciliation) or not at all.
+ * other writes (folder membership reconciliation, version rows) or not at all.
  */
-type ScenarioWriteClient = Pick<Prisma.TransactionClient, "scenario">;
+type ScenarioWriteClient = Pick<
+  Prisma.TransactionClient,
+  "scenario" | "scenarioVersion"
+>;
 
 export class ScenarioRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -294,6 +307,7 @@ export class ScenarioRepository {
         situation: true,
         criteria: true,
         parameters: true,
+        version: true,
       },
     });
   }
@@ -327,6 +341,101 @@ export class ScenarioRepository {
         });
       },
     );
+  }
+
+  /**
+   * Updates a scenario and moves its version counter one up, in one UPDATE.
+   *
+   * With `expectedVersion` the version rides in the WHERE, which is the
+   * compare-and-set itself: a racing writer that already bumped it makes this
+   * update match no row, and Prisma raises P2025 rather than overwriting the
+   * newer save. Without it the counter increments atomically, so two callers
+   * that both asked for "save over whatever is there" get two numbers.
+   */
+  async updateWithVersionBump(
+    id: string,
+    projectId: string,
+    data: UpdateScenarioInput,
+    tx: ScenarioWriteClient,
+    expectedVersion?: number,
+  ): Promise<Scenario> {
+    return tracer.withActiveSpan(
+      "ScenarioRepository.updateWithVersionBump",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "UPDATE",
+          "db.table": "Scenario",
+          "tenant.id": projectId,
+          "scenario.id": id,
+        },
+      },
+      async () =>
+        tx.scenario.update({
+          where: {
+            id,
+            projectId,
+            archivedAt: null,
+            ...(expectedVersion !== undefined
+              ? { version: expectedVersion }
+              : {}),
+          },
+          data: {
+            ...data,
+            version:
+              expectedVersion !== undefined
+                ? expectedVersion + 1
+                : { increment: 1 },
+          },
+        }),
+    );
+  }
+
+  /** Appends one version row. The unique (scenarioId, version) backstops it. */
+  async createVersionRow(
+    data: Prisma.ScenarioVersionUncheckedCreateInput,
+    tx: ScenarioWriteClient,
+  ): Promise<void> {
+    await tx.scenarioVersion.create({ data });
+  }
+
+  /**
+   * A page of version rows, newest first. `beforeVersion` pages below a
+   * version number.
+   */
+  async findVersions(input: {
+    projectId: string;
+    scenarioId: string;
+    take: number;
+    beforeVersion?: number;
+  }): Promise<ScenarioVersion[]> {
+    return this.prisma.scenarioVersion.findMany({
+      where: {
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        ...(input.beforeVersion !== undefined
+          ? { version: { lt: input.beforeVersion } }
+          : {}),
+      },
+      orderBy: { version: "desc" },
+      take: input.take,
+    });
+  }
+
+  /** One version row by number, or null when the number names none. */
+  async findVersionByNumber(input: {
+    projectId: string;
+    scenarioId: string;
+    version: number;
+  }): Promise<ScenarioVersion | null> {
+    return this.prisma.scenarioVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        version: input.version,
+      },
+    });
   }
 
   /**

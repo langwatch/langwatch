@@ -58,6 +58,18 @@ function withParameters(
 }
 
 /**
+ * The `scenarioVersion` entry of the reserved langwatch namespace, or nothing
+ * at all. The map built from the queue-time read holds every scheduled
+ * scenario, so an absent entry only happens if a caller schedules a scenario
+ * it never read; the run then records no version rather than an undefined.
+ */
+function withScenarioVersion(
+  version: number | undefined,
+): { scenarioVersion: number } | Record<string, never> {
+  return version !== undefined ? { scenarioVersion: version } : {};
+}
+
+/**
  * The names of the secrets a run used, for the run's metadata.
  *
  * Names only. They are what lets a person see which credentials a run needed;
@@ -126,6 +138,12 @@ export class SuiteRunService {
     projectId: string;
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    /**
+     * Each scenario's version from the same read that resolved the names, so
+     * every queued run says which state of its scenario it ran. Stamped at
+     * queue time: a later edit never changes what an old run says.
+     */
+    scenarioVersionMap: Map<string, number>;
     activeTargets: SuiteRunTarget[];
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
@@ -156,6 +174,7 @@ export class SuiteRunService {
       projectId,
       activeScenarioIds,
       scenarioNameMap,
+      scenarioVersionMap,
       activeTargets,
       repeatCount,
       skippedArchived,
@@ -231,7 +250,11 @@ export class SuiteRunService {
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+            langwatch: {
+              targetReferenceId: item.target.referenceId,
+              targetType: item.target.type,
+              ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
+            },
             ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
             ...withSecretParameterNames(secretParameters),

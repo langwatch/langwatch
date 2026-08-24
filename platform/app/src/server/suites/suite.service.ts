@@ -577,6 +577,7 @@ export class SuiteService {
           projectId,
           activeScenarioIds: resolved.activeScenarioIds,
           scenarioNameMap: resolved.scenarioNameMap,
+          scenarioVersionMap: resolved.scenarioVersionMap,
           activeTargets: resolved.activeTargets,
           repeatCount: suite.repeatCount,
           skippedArchived: resolved.skippedArchived,
@@ -836,6 +837,7 @@ export class SuiteService {
   }): Promise<{
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    scenarioVersionMap: Map<string, number>;
     scenarioConfigs: ScenarioRunConfig[];
     activeTargets: SuiteTarget[];
     skippedArchived: SuiteRunResult["skippedArchived"];
@@ -883,10 +885,16 @@ export class SuiteService {
     const scenarioNameMap = new Map(
       scenarioConfigs.map((scenario) => [scenario.id, scenario.name]),
     );
+    // The version each queued run is stamped with, from the same read as the
+    // names, so the stamp is the state the run was scheduled from.
+    const scenarioVersionMap = new Map(
+      scenarioConfigs.map((scenario) => [scenario.id, scenario.version]),
+    );
 
     return {
       activeScenarioIds: scenarioResolution.active,
       scenarioNameMap,
+      scenarioVersionMap,
       scenarioConfigs,
       activeTargets: targetResolution.active,
       skippedArchived: {

@@ -2314,6 +2314,11 @@ model Scenario {
   // See specs/suites/folder-membership-invariant.feature.
   folderId        String?
   folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // Counts one up on every save of the editable fields. Each number has a
+  // ScenarioVersion row holding the state as saved; the unique constraint
+  // there is what keeps two concurrent saves from sharing a number. See
+  // specs/scenarios/scenario-versioning.feature.
+  version         Int       @default(1)
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2322,6 +2327,38 @@ model Scenario {
 
   @@index([projectId])
   @@index([projectId, folderId])
+}
+
+// One saved state of a scenario's editable fields. Append-only: a restore
+// writes a new row rather than rewriting an old one. See
+// specs/scenarios/scenario-versioning.feature and
+// specs/scenarios/scenario-version-restore.feature.
+model ScenarioVersion {
+  id         String @id @default(nanoid())
+  scenarioId String
+  projectId  String
+  version    Int
+
+  authorId String?
+  /// Who wrote this version: "user", "api", "cli" or "langy".
+  authorLabel String
+
+  changeDescription String?
+
+  /// Envelope { schemaVersion, fields, changedFields } holding the editable
+  /// field set as saved and the names of the fields this save changed.
+  snapshot Json
+  /// Schema version of `snapshot`, so a later shape change can be read forward.
+  schemaVersion Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scenarioId, version])
+  // The history pages by version inside one scenario, and a restore reads one
+  // version number. Both name all three columns, so the sort key belongs in
+  // the index rather than being applied to fetched rows.
+  @@index([projectId, scenarioId, version])
+  @@index([createdAt])
 }
 
 model SimulationSuite {

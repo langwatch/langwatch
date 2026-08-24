@@ -282,6 +282,8 @@ export const APP_ERROR_CODES = [
   "scenario_secret_parameter_conflict",
   "scenario_secret_parameter_in_text",
   "scenario_secret_parameter_missing",
+  "scenario_stale_version",
+  "scenario_version_not_found",
   "schedule_already_in_flight",
   "schedule_inactive",
   "schedule_not_found",

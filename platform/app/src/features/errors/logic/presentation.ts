@@ -1619,6 +1619,18 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  scenario_stale_version: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This test case changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  scenario_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the history to see what this test case still has.",
+  },
   // ---- billing ----
   billing_customer_email_required: {
     title: "Add a billing email first",

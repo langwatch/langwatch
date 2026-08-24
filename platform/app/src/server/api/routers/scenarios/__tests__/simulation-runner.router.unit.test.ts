@@ -32,6 +32,7 @@ async function scenariosWithoutParameters({ ids }: { ids: string[] }) {
     situation: "User asks a question",
     criteria: ["Must respond politely"],
     parameters: null,
+    version: 5,
   }));
 }
 
@@ -480,6 +481,7 @@ describe("simulationRunnerRouter.run", () => {
               { name: "account_tier", defaultValue: "gold" },
               { name: "region", defaultValue: "eu-central" },
             ],
+            version: 5,
           })),
         );
       });
@@ -492,9 +494,9 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockQueueRun).toHaveBeenCalledWith(
           expect.objectContaining({
-            metadata: {
+            metadata: expect.objectContaining({
               parameters: { account_tier: "platinum", region: "eu-central" },
-            },
+            }),
           }),
         );
       });
@@ -535,7 +537,7 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockQueueRun).toHaveBeenCalledWith(
           expect.objectContaining({
-            metadata: { note: "nightly regression" },
+            metadata: expect.objectContaining({ note: "nightly regression" }),
           }),
         );
       });
@@ -547,7 +549,7 @@ describe("simulationRunnerRouter.run", () => {
         const queued = mockQueueRun.mock.calls[0]?.[0] as {
           metadata?: Record<string, unknown>;
         };
-        expect(queued.metadata?.langwatch).toBeUndefined();
+        expect(queued.metadata?.langwatch).not.toHaveProperty("note");
       });
 
       it("keeps the note beside the resolved parameters", async () => {
@@ -558,6 +560,7 @@ describe("simulationRunnerRouter.run", () => {
             situation: "A {{ params.account_tier }} customer asks a question",
             criteria: ["Must respond politely"],
             parameters: [{ name: "account_tier", defaultValue: "gold" }],
+            version: 5,
           })),
         );
 
@@ -565,10 +568,10 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockQueueRun).toHaveBeenCalledWith(
           expect.objectContaining({
-            metadata: {
+            metadata: expect.objectContaining({
               note: "checking the gold path",
               parameters: { account_tier: "gold" },
-            },
+            }),
           }),
         );
       });
@@ -579,7 +582,7 @@ describe("simulationRunnerRouter.run", () => {
         const queued = mockQueueRun.mock.calls[0]?.[0] as {
           metadata?: Record<string, unknown>;
         };
-        expect(queued.metadata).toBeUndefined();
+        expect(queued.metadata).not.toHaveProperty("note");
       });
 
       it("rejects a note longer than the limit before anything is queued", async () => {
@@ -599,7 +602,35 @@ describe("simulationRunnerRouter.run", () => {
         const queued = mockQueueRun.mock.calls[0]?.[0] as {
           metadata?: Record<string, unknown>;
         };
-        expect(queued.metadata).toBeUndefined();
+        expect(queued.metadata).not.toHaveProperty("note");
+        // Only the reserved namespace is recorded: the note added nothing.
+        expect(queued.metadata).toEqual({
+          langwatch: {
+            targetReferenceId: "prompt_123",
+            targetType: "prompt",
+            scenarioVersion: 5,
+          },
+        });
+      });
+    });
+
+    describe("the reserved langwatch namespace on a one-off run", () => {
+      /** @scenario "A one-off run records which target it ran against" */
+      /** @scenario "A one-off run of a single case records that case version" */
+      it("records the target, its kind and the scenario version read at queue time", async () => {
+        await caller.run(defaultInput);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              langwatch: {
+                targetReferenceId: "prompt_123",
+                targetType: "prompt",
+                scenarioVersion: 5,
+              },
+            }),
+          }),
+        );
       });
     });
   });

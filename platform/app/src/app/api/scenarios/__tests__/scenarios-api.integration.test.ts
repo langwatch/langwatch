@@ -88,6 +88,7 @@ describe("Scenarios API", () => {
 
   afterEach(async () => {
     await cleanupTestRows(prisma, [
+      ["scenarioVersion", { projectId: testProjectId }],
       ["scenario", { projectId: testProjectId }],
       ["simulationSuite", { projectId: testProjectId }],
     ]);
@@ -399,6 +400,76 @@ describe("Scenarios API", () => {
           expect(res.status).toBe(422);
           const body = await res.json();
           expect(body).toHaveProperty("error");
+        });
+      });
+
+      describe("the version history of the save", () => {
+        /** @scenario "A save over the public API is recorded with the API as its author" */
+        it("records the save with the API as its author and no person", async () => {
+          const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+            situation: "Updated over the API",
+          });
+          expect(res.status).toBe(200);
+
+          const stored = await prisma.scenario.findFirstOrThrow({
+            where: { id: scenario.id, projectId: testProjectId },
+          });
+          expect(stored.version).toBe(2);
+
+          const row = await prisma.scenarioVersion.findFirstOrThrow({
+            where: {
+              projectId: testProjectId,
+              scenarioId: scenario.id,
+              version: 2,
+            },
+          });
+          expect(row.authorLabel).toBe("api");
+          expect(row.authorId).toBeNull();
+        });
+
+        /** @scenario "A save from the command line is recorded with the command line as its author" */
+        it("records a save that declares the CLI surface with the command line as its author", async () => {
+          const res = await app.request(`/api/scenarios/${scenario.id}`, {
+            method: "PUT",
+            headers: {
+              ...createAuthHeaders(testApiKey),
+              // The header the langwatch CLI sends on its scenario writes.
+              "X-LangWatch-Surface": "cli",
+            },
+            body: JSON.stringify({ situation: "Updated from the CLI" }),
+          });
+          expect(res.status).toBe(200);
+
+          const row = await prisma.scenarioVersion.findFirstOrThrow({
+            where: {
+              projectId: testProjectId,
+              scenarioId: scenario.id,
+              version: 2,
+            },
+          });
+          expect(row.authorLabel).toBe("cli");
+          expect(row.authorId).toBeNull();
+        });
+
+        it("does not honor a surface value it does not know", async () => {
+          const res = await app.request(`/api/scenarios/${scenario.id}`, {
+            method: "PUT",
+            headers: {
+              ...createAuthHeaders(testApiKey),
+              "X-LangWatch-Surface": "trpc",
+            },
+            body: JSON.stringify({ situation: "Spoofed surface" }),
+          });
+          expect(res.status).toBe(200);
+
+          const row = await prisma.scenarioVersion.findFirstOrThrow({
+            where: {
+              projectId: testProjectId,
+              scenarioId: scenario.id,
+              version: 2,
+            },
+          });
+          expect(row.authorLabel).toBe("api");
         });
       });
     });
