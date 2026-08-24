@@ -234,6 +234,26 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
     Then the headline and its tagline stand in their own panel beside the card
     And a company's own installation shows the card with nothing beside it
 
+  # The strip under the pitch is reassurance, and reassurance has to be read to
+  # work. It NAMES what LangWatch works with rather than showing marks: a name
+  # is a fact we are entitled to state and a borrowed logo is not, and at the
+  # size this strip runs at a mark is a smudge the reader has to guess at.
+  #
+  # Named but undifferentiated, it is only a tag cloud — a list of things
+  # rather than a claim. Sorting them by kind is what makes it an argument:
+  # covering the models is table stakes, and covering the models AND the
+  # framework on top AND the tracing underneath is the whole pitch, legible
+  # from the shape before a single name is read. The count carries the rest,
+  # turning a handful of examples into a claim about the reader's own stack.
+  @integration
+  Scenario: The strip names what LangWatch works with, and how much more there is
+    Given a hosted deployment
+    When the front door makes its case beside the card
+    Then the strip names integrations the reader can recognise by name
+    And it sorts them into the kinds of thing they are
+    And it says how many more there are than the ones it shows
+    And it shows no customer's mark and no vendor's mark
+
   # The card is live from the first frame; the entrance only decides what is
   # painted while the first keystroke is being typed, and when focus is taken.
   @integration
