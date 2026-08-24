@@ -1,0 +1,24 @@
+import type { ApiKey, ApiKeyScope } from "@langwatch/api-key-contract";
+
+export type StoredApiKey = ApiKey & { hashedSecret: string };
+export type ApiKeyCreateRecord = { name: string; description: string | null; lookupId: string; hashedSecret: string; permissionMode: string; userId: string | null; createdByUserId: string | null; createdByDeviceLabel?: string | null; organizationId: string; expiresAt: Date | null; ingestSourceType: string | null; ingestionTemplateId: string | null; startsDisabled: boolean; roleBindings: ApiKeyScope[] };
+export type ApiKeyUpdateRecord = { id: string; name?: string; description?: string | null; permissionMode?: string; roleBindings?: ApiKeyScope[]; revokedAt?: Date | null; lastUsedAt?: Date; hashedSecret?: string };
+
+/** Private persistence boundary for the API-key aggregate. */
+export abstract class ApiKeyRepository {
+  abstract create(input: ApiKeyCreateRecord): Promise<StoredApiKey>;
+  abstract activate(input: { id: string }): Promise<StoredApiKey>;
+  abstract tryFindByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null>;
+  abstract tryFindById(input: { id: string }): Promise<StoredApiKey | null>;
+  abstract tryFindByIdInOrganization(input: { id: string; organizationId: string }): Promise<StoredApiKey | null>;
+  abstract listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]>;
+  abstract listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]>;
+  abstract update(input: ApiKeyUpdateRecord): Promise<StoredApiKey>;
+  abstract revoke(input: { id: string }): Promise<StoredApiKey>;
+  abstract updateLastUsedAt(input: { id: string }): Promise<void>;
+  abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
+  abstract tryFindIngestKey(input: { organizationId: string; projectId: string; sourceType: string }): Promise<StoredApiKey | null>;
+  abstract findIngestKeysForProject(input: { organizationId: string; projectId: string }): Promise<StoredApiKey[]>;
+  /** Resolves personal team/project ownership without leaking foreign persistence to the service. */
+  abstract tryFindPersonalWorkspaceOwner(input: { organizationId: string; scopeId: string }): Promise<{ ownerUserId: string | null } | null>;
+}
