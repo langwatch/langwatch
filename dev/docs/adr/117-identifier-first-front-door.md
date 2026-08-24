@@ -239,6 +239,43 @@ The screen set and routes are D13's spec
   (wrong password, rate-limit wait, origin mismatch, honest unknown) binds
   to the new screens unchanged.
 
+### Revision (2026-08-24) — D04 landed; the SAML engine choice moves to D05
+
+The aggregate, its guards, the projection, the grandfather migration and
+`SSOCONN_ROUTING` are implemented. Four things §5 said differently:
+
+- **The aggregate rides its own pipeline**, not the identity one. A pipeline
+  declares ONE aggregate type and the event store refuses at append any
+  event whose type differs from it (#7406); identity's is `user_identity`,
+  tenanted by the user, and a connection is neither. The vocabulary stays
+  identity's — the events are `lw.identity.connection_*`, the facts live in
+  `@langwatch/identity`, the guards in `@langwatch/identity-server`. Only
+  the storage partition is separate.
+- **Grandfathering states history rather than commanding a change.** One
+  command emits the whole lifecycle a legacy organization would have had,
+  and it can only CREATE — a connection that already exists gets nothing. So
+  "grandfathering never weakens a guard" is structural: no guard has a
+  grandfathered branch, and every later state change is the ordinary guarded
+  verb. Such a domain's verification method is `legacy-configuration`, which
+  no ceremony can request.
+- **The break-glass binding is a port, answered weakly until D05.** Bindings
+  do not exist yet; activation asks the port anyway, and the interim
+  implementation answers whether the deployment still holds a local door at
+  all — which refuses exactly the lockout case the requirement exists for.
+  D05 makes bindings the port's answer with no guard, command or test
+  changing.
+- **`ssoDomain` writes stop AT `enforce`, and that refusal ships now.**
+  Inert at `off`/`shadow`, so nothing changes on deploy; shipped with the
+  flag rather than at the flip so the cutover stays one value in one place.
+
+**The SAML engine choice is NOT made here.** The aggregate is
+protocol-agnostic (`type: oidc | saml`, `idpMetadata` carries either) and
+nothing in Wave 2 or Wave 3 needs SAML terminated — grandfathered and
+self-serve OIDC connections are the whole surface. The choice
+(`@better-auth/sso` with its `ssoProvider` table as protocol state, vs
+genericOAuth-with-SAML) moves to D05's onboarding, where the first customer
+who needs it arrives. It remains this ADR's named debt.
+
 ### Revision (2026-08-24) — the screen-level no-oracle is retired
 
 D13's implementation converts both dead ends into the other journey, at the
