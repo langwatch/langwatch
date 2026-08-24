@@ -190,7 +190,7 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 |---|---|---|
 | `User.email` UNIQUE = identity key | `provider="email"` identifier row (PRIMARY); `User.email` = display default | D01 |
 | `Account` rows | Stay pure protocol storage; the new `Identifier` projection carries lifecycle + widened provider vocabulary | D01 |
-| (no passkey/MFA) | `Passkey` + `TwoFactor` plugin tables; passkey mirror rows | D06, D07 |
+| (no passkey/MFA) | `Passkey` + `TwoFactor` plugin tables; passkey mirror `Identifier` rows; `Session.{identifierId, amr, mfaVerifiedAt}` (nullable) and `Organization.mfaRequired` | D06, D07 |
 | `Organization.ssoDomain/ssoProvider` | `SsoConnection` aggregate + projection; grandfathered VERIFIED | D04 |
 | `NEXTAUTH_PROVIDER` one-method | Identifier-first router; env = self-hosted default method set | D03 |
 | `pendingSsoSetup` flag | Mismatch visible as data (events + states); column dropped | D03 |
@@ -311,19 +311,19 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 - **Domain claim abuse**: ops manual approval; DNS proof before routing; disputes resolved from event history.
 - **Break-glass local path**: bound to break-glass bindings only, audited, rate-limited.
 - **Teardown lockout**: invariant guard (no user left with only the torn-down connection's identifiers) + live break-glass binding with expiry warnings.
-- **MFA bypass paths**: disable requires password+TOTP or audited org-admin action; impersonation requires an MFA-verified actor when policy demands; legacy sessions destroyed at D06 precisely because they can't prove `amr`.
+- **MFA bypass paths**: disable requires password+TOTP or audited org-admin action; impersonation requires an MFA-verified actor when policy demands; a session that cannot prove `amr` is stepped up or revoked **when its organization turns `mfaRequired` on** — per org, by the admin who chose it, not fleet-wide at deploy (D06, revised 2026-08-24).
 - **PII in the log**: emails appear in events only where the fact needs them; erasure wipes those fields via ClickHouse mutation, deletes PG rows and protocol tables, and shreds the per-user HMAC key; secrets never appear in any event.
 - **SCIM token scope**: per-connection; cross-org writes impossible; de-enroll failures are visible dead-letters.
 - **Plugin protocol secrets**: TOTP secrets and backup codes live in plugin tables (encrypted/hashed), never in events.
 - **Rate limiting**: better-auth's existing limiter only; one acceptance check that the router endpoint is covered. When the Redis breaker is open, rate limiting fails open (logged) — accepted for outage windows.
-- **Forced re-login (D06)**: one-time, communicated; precedent set by the better-auth cutover.
+- **Forced re-login (D06)**: ~~one-time, communicated~~ — **there isn't one** (revised 2026-08-24). The session columns land nullable and nothing reads them until an organization turns `mfaRequired` on, at which point that organization's unproven sessions are stepped up or revoked. The only deploy-time revoke is sessions holding the legacy `impersonating` payload: LangWatch operators, one click to resume.
 
 # Open Questions
 
 1. SAML protocol engine: `@better-auth/sso` (its `ssoProvider` table as protocol state only) vs genericOAuth-based SAML — decide at D04/D05 design time.
 2. Who staffs the domain-approval queue day-to-day, and its SLA.
 3. Env renames (`NEXTAUTH_SECRET` → better-auth-native names) during D10 cleanup, or keep for compatibility?
-4. Passkey `amr` semantics: confirm `["phw"]` satisfies org MFA policy — product/security decision to record in the D06/D07 ADR.
+4. ~~Passkey `amr` semantics~~ — **resolved 2026-08-24: `["phw"]` satisfies org MFA policy.** A passkey is possession-based and phishing-resistant, so it is strictly stronger than TOTP against the attack the policy exists to stop; a synced passkey is weaker than a hardware-bound one and still at least as strong as a typed code, so it does not change the answer. Reasoning in `identity-platform/D07-passkeys.md`, scenarios in `specs/identity/passkeys.feature`. An org-level hardware-bound-keys-only refinement is deferred until asked for.
 5. IdP-initiated SSO (launch from Okta/Entra portal): in scope for enterprise? SAML-specific; affects the D04/D05 protocol decision.
 6. Auto-redirect configuration: instance env only, or per-connection override as well? (Lean: env default true when exactly one ACTIVE connection, per-connection override for edge cases.)
 7. Auth0 migration frontend flow: the Notion comment is still unpasted, so D09 now carries an **assumed design** — a migration wizard in org Settings (detect legacy connection → guided OIDC setup → test login → grace with %-linked progress → SCIM repoint → guarded teardown) plus nudges and an ops exception queue. Validate against the comment when it surfaces; adjust D09 scope if it contradicts.
