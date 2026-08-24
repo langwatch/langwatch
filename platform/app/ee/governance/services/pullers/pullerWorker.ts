@@ -44,7 +44,7 @@ import {
   pullerAdapterRegistry,
   registerBuiltInPullers,
 } from "./index";
-import { buildPulledUsageRecord } from "./pulledUsageRecord";
+import { AppPulledUsageRecordService } from "./pulledUsageRecord";
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
 
@@ -388,9 +388,9 @@ async function recordPulledUsageFor({
 }): Promise<void> {
   if (!pulledUsage) return;
 
-  let record: ReturnType<typeof buildPulledUsageRecord>;
+  let record: ReturnType<AppPulledUsageRecordService["build"]>;
   try {
-    record = buildPulledUsageRecord({
+    record = AppPulledUsageRecordService.create().build({
       event,
       source: {
         ingestionSourceId: source.id,

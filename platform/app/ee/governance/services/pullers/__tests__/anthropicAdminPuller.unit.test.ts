@@ -22,7 +22,10 @@ vi.mock("~/utils/ssrfProtection", () => ({
 }));
 
 import { AnthropicAdminPuller } from "../anthropicAdmin.puller";
-import { buildPulledUsageRecord } from "../pulledUsageRecord";
+import { AppPulledUsageRecordService } from "../pulledUsageRecord";
+
+const pulledUsageRecords = AppPulledUsageRecordService.create();
+const buildPulledUsageRecord = pulledUsageRecords.build.bind(pulledUsageRecords);
 
 const SOURCE = {
   ingestionSourceId: "src_1",

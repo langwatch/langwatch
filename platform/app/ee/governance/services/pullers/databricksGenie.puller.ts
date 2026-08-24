@@ -69,7 +69,7 @@ import {
   warehouseCostPieces,
   warehouseCostRowSchema,
 } from "./databricksWarehouseCost";
-import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,

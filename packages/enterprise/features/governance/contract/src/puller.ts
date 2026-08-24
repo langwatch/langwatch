@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  PULLED_USAGE_COST_BASIS,
+  PULLED_USAGE_COST_STATUS,
+} from "./pulled-usage.events";
 
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 const costUsdSchema = z
@@ -49,3 +53,52 @@ export abstract class GovernancePuller<Configuration = unknown> {
     config: Configuration,
   ): Promise<PullResult>;
 }
+
+export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
+
+export const pulledUsageHintSchema = z
+  .object({
+    costBasis: z.enum([
+      PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+      PULLED_USAGE_COST_BASIS.COMPUTED,
+    ]),
+    costStatus: z
+      .enum([PULLED_USAGE_COST_STATUS.EXACT, PULLED_USAGE_COST_STATUS.ESTIMATE])
+      .optional(),
+    dimensions: z
+      .record(z.string(), z.string())
+      .refine((dimensions) => Object.keys(dimensions).length > 0, {
+        message: "a pulled usage hint must name at least one dimension to key on",
+      }),
+    costUsd: z.string().optional(),
+    model: z.string().optional(),
+    tokensCacheRead: z.number().int().nonnegative().default(0),
+    tokensCacheWrite: z.number().int().nonnegative().default(0),
+  })
+  .strict()
+  .superRefine((hint, context) => {
+    if (
+      hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED &&
+      !hint.costStatus
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["costStatus"],
+        message:
+          "a provider-reported cost must declare costStatus: only the adapter knows whether the provider's figure is the invoice or an approximation of one",
+      });
+    }
+  });
+export type PulledUsageHint = z.infer<typeof pulledUsageHintSchema>;
+
+export const pulledUsageSourceAttributionSchema = z
+  .object({
+    ingestionSourceId: z.string().min(1),
+    sourceType: z.string().min(1),
+    organizationId: z.string().min(1),
+    teamId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type PulledUsageSourceAttribution = z.infer<
+  typeof pulledUsageSourceAttributionSchema
+>;

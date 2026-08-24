@@ -33,11 +33,11 @@
  * hash with a later `observedAt` and replaces rather than adds.
  */
 
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,

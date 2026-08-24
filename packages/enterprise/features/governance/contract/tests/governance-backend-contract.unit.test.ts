@@ -12,7 +12,10 @@ import {
   ottlTransformInputSchema,
   ottlValidationResultSchema,
 } from "../src/ottl";
-import { normalizedPullEventSchema } from "../src/puller";
+import {
+  normalizedPullEventSchema,
+  pulledUsageHintSchema,
+} from "../src/puller";
 
 describe("governance backend contract", () => {
   it("accepts HTTPS destinations and quarantines malformed legacy rows", () => {
@@ -49,6 +52,22 @@ describe("governance backend contract", () => {
     });
     expect(event.cost_usd).toBe("1e-9");
     expect(event.tokens_input).toBe(0);
+  });
+
+  it("requires provider-reported usage to declare whether its cost is exact", () => {
+    expect(
+      pulledUsageHintSchema.safeParse({
+        costBasis: "provider_reported",
+        dimensions: { workspaceId: "workspace" },
+      }).success,
+    ).toBe(false);
+    expect(
+      pulledUsageHintSchema.safeParse({
+        costBasis: "provider_reported",
+        costStatus: "exact",
+        dimensions: { workspaceId: "workspace" },
+      }).success,
+    ).toBe(true);
   });
 
   it("recognizes governance traces by the canonical origin attribute", () => {

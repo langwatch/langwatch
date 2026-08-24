@@ -8,10 +8,30 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  buildPulledUsageRecord,
+  type NormalizedPullEvent,
   type PulledUsageSourceAttribution,
-} from "../pulledUsageRecord";
-import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+} from "@langwatch/enterprise-governance-contract";
+import { PulledUsageRatePort } from "../src/ports/pulled-usage-rate.port";
+import { PulledUsagePricingService } from "../src/services/pulled-usage-pricing.service";
+import { PulledUsageRecordService } from "../src/services/pulled-usage-record.service";
+
+class FixedRatePort extends PulledUsageRatePort {
+  rate(input: Parameters<PulledUsageRatePort["rate"]>[0]): {
+    costNanoUsd: number;
+    rateVersion: string;
+  } {
+    return {
+      costNanoUsd:
+        input.quantities.tokensInput + input.quantities.tokensOutput,
+      rateVersion: "test-rate",
+    };
+  }
+}
+
+const pulledUsageRecords = PulledUsageRecordService.create(
+  PulledUsagePricingService.create(new FixedRatePort()),
+);
+const buildPulledUsageRecord = pulledUsageRecords.build.bind(pulledUsageRecords);
 
 const SOURCE: PulledUsageSourceAttribution = {
   ingestionSourceId: "src_1",

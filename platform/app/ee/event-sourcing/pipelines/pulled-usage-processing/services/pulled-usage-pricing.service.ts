@@ -26,9 +26,7 @@ class GatewayPulledUsageRatePort extends PulledUsageRatePort {
 }
 
 export class AppPulledUsagePricingService {
-  private constructor(
-    private readonly service: PulledUsagePricingService,
-  ) {}
+  private constructor(private readonly service: PulledUsagePricingService) {}
 
   static create(): AppPulledUsagePricingService {
     return new AppPulledUsagePricingService(
@@ -38,5 +36,9 @@ export class AppPulledUsagePricingService {
 
   price(input: PulledUsagePriceInput) {
     return this.service.price(input);
+  }
+
+  pricing(): PulledUsagePricingService {
+    return this.service;
   }
 }

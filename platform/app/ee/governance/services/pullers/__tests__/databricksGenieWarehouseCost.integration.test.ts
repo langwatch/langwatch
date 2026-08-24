@@ -39,7 +39,7 @@ import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
 } from "../databricksWarehouseCost";
-import { PULLED_USAGE_HINT_KEY } from "../pulledUsageRecord";
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 
 const SPACE_ID = "space-1";
 const CONVERSATION_ID = "conv-1";

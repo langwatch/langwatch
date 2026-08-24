@@ -26,4 +26,5 @@ export * from "./services/ingestion-pull.service";
 export * from "./services/pull-destination.service";
 export * from "./services/pulled-usage-ledger-process.service";
 export * from "./services/pulled-usage-pricing.service";
+export * from "./services/pulled-usage-record.service";
 export * from "./services/puller-registry.service";
