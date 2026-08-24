@@ -155,6 +155,22 @@ type workerEntry struct {
 	// answers the NEXT call with a terminal 400 carrying this body instead of
 	// proxying. Cleared by a clean stream, a new turn, or clearLLMError.
 	llmStreamCut []byte
+	// loggedParamsDropped is the last gateway params-dropped set already
+	// logged for this worker, so a busy turn logs each distinct set once,
+	// not once per LLM call.
+	loggedParamsDropped string
+}
+
+// noteParamsDropped records a gateway drop set and reports whether it is new
+// for this worker; the caller logs only when it is.
+func (e *workerEntry) noteParamsDropped(set string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.loggedParamsDropped == set {
+		return false
+	}
+	e.loggedParamsDropped = set
+	return true
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {

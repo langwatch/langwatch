@@ -5,18 +5,24 @@ package otelrelay
 // gen_ai span synthesis that replaces the OTLP a pi worker never exports.
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -292,6 +298,53 @@ func TestLLMProxy_PiHarnessReadsAnthropicStreamUsage(t *testing.T) {
 // a bare usage on the non-stream body) with the hour-long write share nested
 // under cache_creation; the OpenAI Responses API reports reads as
 // input_tokens_details.cached_tokens.
+// @scenario "An option the gateway dropped from a model call is visible on the turn's telemetry"
+func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
+	var calls atomic.Int32
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("X-LangWatch-Params-Dropped", "max_output_tokens,temperature")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cmpl_1","usage":{"prompt_tokens":1,"completion_tokens":1}}`))
+	}))
+	defer gateway.Close()
+
+	core, logs := observer.New(zapcore.DebugLevel)
+	relay, err := New(clog.Set(context.Background(), zap.New(core)), Options{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = relay.Shutdown(ctx)
+	})
+	ingest := startSignallingIngest(t)
+	token := registerPiWorker(t, relay, gateway.URL, ingest.srv.URL)
+
+	for range 2 {
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		_, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
+	_, span := firstSpan(t, ingest.await(t))
+	if v, ok := span.Attributes().Get("langwatch.langy.params_dropped"); !ok || v.Str() != "max_output_tokens,temperature" {
+		t.Errorf("the retold span must record what the gateway dropped, got %v", v.Str())
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("expected both calls to reach the gateway, got %d", calls.Load())
+	}
+	// A busy turn makes many LLM calls; the same drop set is logged once.
+	logged := logs.FilterMessage("gateway dropped params from a langy model call")
+	if logged.Len() != 1 {
+		t.Errorf("the drop set must be logged once per worker, got %d lines", logged.Len())
+	}
+}
+
 // @scenario "The retold LLM span carries the provider's cached-token usage"
 func TestLLMProxy_PiHarnessReadsCachedTokenUsage(t *testing.T) {
 	for _, tc := range []struct {
