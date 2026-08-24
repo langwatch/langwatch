@@ -16,6 +16,7 @@ import {
   buildAnthropicAdminPullConfig,
   isBackfillStartLocked,
   isEditablePullSource,
+  isEditSaveBlocked,
   lockedParserKeys,
   parserFieldPresentation,
   seedComposerParserConfig,
@@ -85,6 +86,66 @@ describe("isBackfillStartLocked", () => {
     expect(isBackfillStartLocked({ hasPulled: true, report: undefined })).toBe(
       false,
     );
+  });
+});
+
+describe("isEditSaveBlocked", () => {
+  it("blocks a blank name whatever the source type", () => {
+    expect(
+      isEditSaveBlocked({
+        name: "   ",
+        sourceType: "anthropic_admin",
+        pullSchedule: "0 * * * *",
+      }),
+    ).toBe(true);
+  });
+
+  describe("given a pull source whose config this form rebuilds", () => {
+    it("blocks a cron the cadence field has already marked invalid", () => {
+      // The create drawer refuses this; the edit drawer used to accept the
+      // click and let the server say no.
+      expect(
+        isEditSaveBlocked({
+          name: "Anthropic org",
+          sourceType: "anthropic_admin",
+          pullSchedule: "not a cron",
+        }),
+      ).toBe(true);
+    });
+
+    it("allows a valid cron", () => {
+      expect(
+        isEditSaveBlocked({
+          name: "Anthropic org",
+          sourceType: "anthropic_admin",
+          pullSchedule: "0 * * * *",
+        }),
+      ).toBe(false);
+    });
+
+    it("allows a blank cadence, which means the recommended schedule", () => {
+      // Blank is not absent: it resolves to the default the field displays.
+      expect(
+        isEditSaveBlocked({
+          name: "Anthropic org",
+          sourceType: "anthropic_admin",
+          pullSchedule: "",
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a source this form does not rebuild", () => {
+    it("gates on the name alone", () => {
+      // A push-mode source has no schedule for the field to have judged.
+      expect(
+        isEditSaveBlocked({
+          name: "Webhook source",
+          sourceType: undefined,
+          pullSchedule: "not a cron",
+        }),
+      ).toBe(false);
+    });
   });
 });
 

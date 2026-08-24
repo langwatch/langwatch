@@ -1273,6 +1273,33 @@ function PullConfigEditFields({
  * upstream's running configuration); admins who need to change it archive +
  * recreate.
  */
+/**
+ * Whether Save should refuse the click.
+ *
+ * The same two conditions the create drawer gates on, so the two cannot
+ * disagree about what is worth submitting. The cadence half only applies to a
+ * source whose adapter config this form rebuilds — a push-mode source has no
+ * schedule for the field to have marked invalid.
+ *
+ * The server refuses an invalid cron regardless (`assertPullSchedule`, on the
+ * update path), so this is not what keeps a bad schedule out of the column.
+ * It is what stops the form submitting a value it has already told the admin
+ * is wrong.
+ */
+export function isEditSaveBlocked({
+  name,
+  sourceType,
+  pullSchedule,
+}: {
+  name: string;
+  sourceType: SourceType | undefined;
+  pullSchedule: string;
+}): boolean {
+  if (!name.trim()) return true;
+  if (!isEditablePullSource(sourceType)) return false;
+  return composerCadenceError({ sourceType, pullSchedule }) !== null;
+}
+
 export function SourceEditDrawer({
   organizationId,
   source,
@@ -1392,18 +1419,11 @@ export function SourceEditDrawer({
               onClick={handleSubmit}
               loading={isPending}
               // The same gate the create drawer uses. The server already
-              // refuses an invalid cron, so this is not what keeps a bad
-              // schedule out of the column — it is what stops the two drawers
-              // disagreeing about whether a cron the field has already marked
-              // invalid is worth submitting.
-              disabled={
-                !form.name.trim() ||
-                (isEditablePullSource(sourceType) &&
-                  composerCadenceError({
-                    sourceType,
-                    pullSchedule: form.pullSchedule,
-                  }) !== null)
-              }
+              disabled={isEditSaveBlocked({
+                name: form.name,
+                sourceType,
+                pullSchedule: form.pullSchedule,
+              })}
             >
               Save changes
             </Button>
