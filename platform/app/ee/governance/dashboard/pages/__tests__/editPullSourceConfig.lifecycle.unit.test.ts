@@ -212,8 +212,8 @@ describe("given a row whose column and parser copy disagree", () => {
     });
   });
 
-  describe("when a rename is seeded from the parser copy instead", () => {
-    it("moves the live cadence onto the stale copy", async () => {
+  describe("when a rename is seeded from the parser copy, as it once was", () => {
+    it("silently moves the live cadence onto the stale copy", async () => {
       // Pins the damage rather than the fix. This is what shipped before: the
       // seed came from `parserConfig.schedule`, and the rename silently moved
       // the source from six-hourly to hourly.
