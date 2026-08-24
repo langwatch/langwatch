@@ -41,6 +41,7 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { passkeySignUpRegistration } from "./passkey-signup";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { runSignInRouterShadow } from "./signInRouterShadow";
 
@@ -119,6 +120,13 @@ const plugins = [
           // The relying party is the app's own origin. Left to the plugin's
           // default derivation from `baseURL` so a self-hosted install on
           // its own hostname works without a second place to configure it.
+
+          // Signing UP with a passkey, not only adding one to an account that
+          // already exists. This is what drops the session requirement from
+          // the two registration endpoints — see `passkey-signup.ts` for what
+          // stands in its place, and why an address that already has an
+          // account must be refused there.
+          registration: passkeySignUpRegistration,
         }),
       ]
     : []),
@@ -491,6 +499,14 @@ export const auth = betterAuth({
       // prevents using that response as an enumeration side-channel).
       "/request-password-reset": { window: 60 * 60, max: 5 },
       "/reset-password": { window: 60 * 60, max: 5 },
+      // Passkey sign-up drops the session requirement from these two, so they
+      // are an unauthenticated way to create an account and are limited as
+      // one — alongside `/sign-up/email`, which is the same thing by another
+      // door. Options are generated once per attempt and verification runs
+      // only after a system prompt, so a person doing this by hand never
+      // approaches either number.
+      "/passkey/generate-register-options": { window: 60 * 60, max: 50 },
+      "/passkey/verify-registration": { window: 60 * 60, max: 50 },
     },
   },
 

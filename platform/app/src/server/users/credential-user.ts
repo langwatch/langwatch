@@ -45,3 +45,45 @@ export async function createCredentialUser({
 
   return { id: created.id };
 }
+
+/**
+ * Creating an account whose credential is a passkey.
+ *
+ * The passkey row is written by the plugin, against the id this returns, so
+ * there is no password to take and nothing here writes one.
+ *
+ * The credential Account row is still created, holding a NULL password, and
+ * that is the whole point of it. Password reset updates credential rows in
+ * place (`updateMany` on `provider: "credential"`), so an account with no such
+ * row cannot be recovered by resetting a password — the update matches nothing
+ * and reports success, which is a reset that silently does nothing and a
+ * person locked out of their own account with no error to show for it. A row
+ * with a null password is refused by sign-in exactly as a missing one is
+ * (BetterAuth hashes a dummy and answers "invalid email or password", so the
+ * timing does not differ either), and it gives recovery something to land on.
+ */
+export async function createPasskeyUser({
+  prisma,
+  email,
+}: {
+  prisma: PrismaClient;
+  email: string;
+}): Promise<{ id: string }> {
+  const created = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({ data: { name: null, email } });
+    await tx.account.create({
+      data: {
+        userId: user.id,
+        type: "credential",
+        provider: "credential",
+        providerAccountId: user.id,
+        password: null,
+      },
+    });
+    return user;
+  });
+
+  trackServerEvent({ userId: created.id, event: "signed_up" });
+
+  return { id: created.id };
+}

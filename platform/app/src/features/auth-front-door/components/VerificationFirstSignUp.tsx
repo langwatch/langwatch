@@ -9,6 +9,7 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { useSignInRouting } from "../hooks/useSignInRouting";
+import { forgetCarriedEmail, readCarriedEmail } from "../logic/carriedEmail";
 import type { FrontDoorDepth } from "../logic/groundPalette";
 import { usePublishFrontDoorStage } from "../logic/groundStage";
 import {
@@ -58,7 +59,12 @@ export function VerificationFirstSignUp() {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const verifyToken = query?.get("verify");
-  const carriedEmail = query?.get("email") ?? undefined;
+  // Carried in the FRAGMENT, so the address the log-in door hands over never
+  // travelled on a request line. Read at first paint because the field it
+  // prefills is drawn then, and forgotten immediately after — see
+  // `carriedEmail`.
+  const [carriedEmail] = useState(readCarriedEmail);
+  useEffect(forgetCarriedEmail, []);
 
   const requestVerification =
     api.frontDoor.requestSignUpVerification.useMutation();
@@ -213,11 +219,15 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  // The password step, which is the step that creates the account. Confirming
-  // the address happens after it and does not gate anything.
+  // The credential step, which is the step that creates the account. It takes
+  // a passkey or a password — named for the choice rather than for one of its
+  // answers. Confirming the address happens after it and gates nothing.
   if (signingUpEmail) {
     return (
-      <AuthCard title="Choose a password" finePrint={<FrontDoorFinePrint />}>
+      <AuthCard
+        title="Choose how to sign in"
+        finePrint={<FrontDoorFinePrint />}
+      >
         <SignUpCredentialForm
           email={signingUpEmail}
           callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -235,7 +245,6 @@ export function VerificationFirstSignUp() {
   return (
     <AuthCard
       title="Create your LangWatch account"
-      intro="We will confirm your email address before anything else."
       finePrint={<FrontDoorFinePrint />}
     >
       {requestVerification.error ? (

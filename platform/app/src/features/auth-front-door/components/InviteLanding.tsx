@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
@@ -156,6 +156,8 @@ function SignedOutInvite({
   const routing = useSignInRouting();
   const { decide } = routing;
   const asked = useRef(false);
+  // A refused passkey ceremony, reported by the rail and drawn once at the top.
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
   const callbackUrl = inviteCallbackUrl(inviteCode);
 
   // Asked with no address: the invitation names the organization, never the
@@ -169,6 +171,14 @@ function SignedOutInvite({
 
   return (
     <AuthCard title={`Join ${organizationName}`}>
+      {/* At the top, like every other failure on these screens: an alert that
+          opened part-way down the rail of methods would push the rest of it
+          down the page and say its piece where nobody is looking. */}
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
+      />
       <Text data-testid="invite-inviter">
         {inviterName
           ? `${inviterName} invited you to ${organizationName} on LangWatch.`
@@ -178,6 +188,8 @@ function SignedOutInvite({
         <SignInMethodPicker
           methodSet={routing.decision.methodSet}
           reasonCode={routing.decision.reasonCode}
+          callbackUrl={callbackUrl}
+          onPasskeyError={setPasskeyError}
           onFederatedMethodChosen={(method) =>
             void signIn(method.id, { callbackUrl })
           }

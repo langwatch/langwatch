@@ -21,7 +21,10 @@ const {
   routeMock,
   registerMock,
   signInMock,
+  addPasskeyMock,
+  navigateMock,
   searchParamsRef,
+  publicEnvRef,
 } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
@@ -29,7 +32,10 @@ const {
   routeMock: vi.fn(),
   registerMock: vi.fn(),
   signInMock: vi.fn(),
+  addPasskeyMock: vi.fn(),
+  navigateMock: vi.fn(),
   searchParamsRef: { current: new URLSearchParams("") },
+  publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
 }));
 
 /**
@@ -86,12 +92,21 @@ vi.mock("~/utils/api", async () => {
 });
 
 vi.mock("~/hooks/usePublicEnv", () => ({
-  usePublicEnv: () => ({ data: { IS_SAAS: true } }),
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();
-  return { ...actual, signIn: signInMock, useSession: () => ({ data: null }) };
+  return {
+    ...actual,
+    signIn: signInMock,
+    navigate: navigateMock,
+    useSession: () => ({ data: null }),
+    authClient: {
+      ...actual.authClient,
+      passkey: { addPasskey: addPasskeyMock },
+    },
+  };
 });
 
 vi.mock("~/utils/compat/next-navigation", () => ({
@@ -142,6 +157,7 @@ describe("given the sign-up screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsRef.current = new URLSearchParams("");
+    publicEnvRef.current = { IS_SAAS: true };
     requestVerificationMock.mockResolvedValue({ sent: true });
     routeMock.mockResolvedValue(localPicker);
   });
@@ -421,6 +437,96 @@ describe("given the sign-up screen", () => {
       )) {
         expect(field.getAttribute("autocomplete")).toBe("new-password");
       }
+    });
+  });
+
+  describe("when the deployment offers passkeys", () => {
+    /** Reaches the credential step with an address typed on the one before. */
+    const reachCredentialStep = async () => {
+      const rendered = renderScreen();
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("signup-identifier");
+      return rendered;
+    };
+
+    beforeEach(() => {
+      publicEnvRef.current = { IS_SAAS: true, PASSKEYS_ENABLED: true };
+    });
+
+    it("offers a passkey as well as a password, not instead of one", async () => {
+      const { container } = await reachCredentialStep();
+
+      expect(await screen.findByTestId("passkey-sign-up")).toBeTruthy();
+      await waitFor(() => {
+        expect(
+          container.querySelector('input[type="password"]'),
+        ).not.toBeNull();
+      });
+    });
+
+    it("carries the typed address into the ceremony", async () => {
+      addPasskeyMock.mockResolvedValue({ data: { id: "passkey_1" } });
+      await reachCredentialStep();
+
+      await userEvent.click(screen.getByTestId("passkey-sign-up"));
+
+      await waitFor(() => {
+        expect(addPasskeyMock).toHaveBeenCalledWith(
+          expect.objectContaining({ context: "sam@acme.com" }),
+        );
+      });
+    });
+
+    /** @scenario Declining the passkey leaves the password fields where they were */
+    it("says nothing and keeps the password fields when the prompt is dismissed", async () => {
+      addPasskeyMock.mockResolvedValue({
+        error: { code: "ERROR_CEREMONY_ABORTED", status: 400 },
+      });
+      const { container } = await reachCredentialStep();
+
+      await userEvent.click(screen.getByTestId("passkey-sign-up"));
+
+      await waitFor(() => {
+        expect(addPasskeyMock).toHaveBeenCalled();
+      });
+      // A decision, not a fault. Nothing is reported, nothing navigates, and
+      // the other way of finishing is exactly where it was.
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(navigateMock).not.toHaveBeenCalled();
+      expect(container.querySelector('input[type="password"]')).not.toBeNull();
+    });
+
+    /** @scenario Sign-up with an address that already has an account becomes a log-in */
+    it("turns into the log-in screen when the address already has an account", async () => {
+      addPasskeyMock.mockResolvedValue({
+        error: { code: "EMAIL_ALREADY_REGISTERED", status: 400 },
+      });
+      await reachCredentialStep();
+
+      await userEvent.click(screen.getByTestId("passkey-sign-up"));
+
+      // Not a failed ceremony — the wrong door, answered by the right one with
+      // the address already in it.
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+    });
+  });
+
+  describe("when this deployment never mounted passkeys", () => {
+    it("offers no passkey, because there is no endpoint behind one", async () => {
+      renderScreen();
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      await screen.findByTestId("signup-identifier");
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
   });
 });

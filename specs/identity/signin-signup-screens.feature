@@ -86,6 +86,49 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
     Then my account is created and I am signed in
     And a confirmation link is sent without my having to wait for it
 
+  # A passkey is a way to CREATE an account, not only a way back into one
+  # (Passkey Central, "New account creation with a passkey"). The credential
+  # step offers both, and the passkey sits above the password fields because it
+  # is the better thing to leave with — beside them rather than in front of
+  # them, so declining costs a glance and the other way on is already drawn.
+  #
+  # Creating the account only once the ceremony succeeds is what keeps an
+  # abandoned attempt free: asking for options writes nothing down.
+  @unit
+  Scenario: Signing up with a passkey creates the account and the session together
+    Given I have typed an address that has no account
+    When I create a passkey instead of choosing a password
+    Then my account is created and the passkey belongs to it
+    And I am signed in without a second system prompt
+    And a confirmation link is sent without my having to wait for it
+
+  # THE one that matters. Registration without a session is what lets somebody
+  # sign up with a passkey at all, and the same opening would otherwise let
+  # anyone attach their own passkey to anybody's account by naming the address.
+  @unit
+  Scenario: A passkey is never registered against an address that already has an account
+    Given the address I named already has an account
+    When a passkey registration is started for it
+    Then it is refused before any ceremony begins
+    And no system prompt opens for it
+
+  @unit
+  Scenario: Declining the passkey leaves the password fields where they were
+    When I dismiss the passkey prompt
+    Then nothing is reported as having gone wrong
+    And I can still finish by choosing a password
+
+  # The address is the only personal data on these screens, and a query string
+  # is written down by every hop it passes: access logs, proxies, error
+  # reports, and the `Referer` of whatever is loaded next. The fragment is the
+  # one part of a URL the browser keeps to itself.
+  @unit
+  Scenario: An address carried between the two screens never reaches the server
+    Given I typed my address on the log-in screen
+    When I follow the link to sign up instead
+    Then the address is carried in the URL fragment, not the query
+    And the sign-up screen prefills it and takes it back out of the address bar
+
   # The nudge and its resend live in the signed-in shell rather than the front
   # door, so they are a slice of their own. Tagged honestly until that slice
   # lands: an untagged scenario would report itself bound and enforce nothing.

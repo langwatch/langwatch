@@ -16,6 +16,9 @@
     "src/server/api/routers/frontDoor.ts",
     "src/server/api/routers/publicEnv.ts",
     "src/server/app-layer/identity/**/*.ts",
+    "src/server/better-auth/passkey-signup.ts",
+    "src/server/users/credential-user.ts",
+    "src/components/me/PasskeysSection.tsx",
     "src/server/mailer/signUpVerificationEmail.tsx",
     "src/routes.tsx"
   ]

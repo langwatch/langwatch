@@ -10,6 +10,7 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { usePasskeyAutofill } from "../hooks/usePasskeyAutofill";
 import { useSignInRouting } from "../hooks/useSignInRouting";
+import { signUpHref } from "../logic/carriedEmail";
 import type { FrontDoorDepth } from "../logic/groundPalette";
 import { usePublishFrontDoorStage } from "../logic/groundStage";
 import {
@@ -336,10 +337,10 @@ function SignUpLink({
   email?: string | null;
   label: string;
 }) {
-  const params = new URLSearchParams();
-  if (callbackUrl) params.set("callbackUrl", callbackUrl);
-  if (email) params.set("email", email);
-  const query = params.toString();
+  // The address rides in the FRAGMENT, which is the half of a URL the browser
+  // does not send: it reaches no access log and no `Referer` on the way to the
+  // other door. See `signUpHref`.
+  const href = signUpHref({ callbackUrl, email });
 
   // The question reads quiet and only the answer is the link, the way the
   // board draws its footers. A label with no question is all link.
@@ -359,7 +360,7 @@ function SignUpLink({
         textDecorationColor="border"
         _hover={{ textDecorationColor: "fg" }}
       >
-        <Link viewTransition href={`/auth/signup${query ? `?${query}` : ""}`}>
+        <Link viewTransition href={href}>
           {linked}
         </Link>
       </Box>

@@ -13,6 +13,7 @@ import {
   HandledErrorAlert,
   readHandledError,
 } from "~/features/errors";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authFailureMessage } from "~/pages/auth/authFailureMessage";
 import { api } from "~/utils/api";
 import { signIn } from "~/utils/auth-client";
@@ -22,7 +23,9 @@ import "../authFrontDoor.css";
 import { BRAND, SHAPE } from "../logic/brand";
 import { EmailPill } from "./EmailPill";
 import { FrontDoorField } from "./FrontDoorField";
+import { PasskeySignUpButton } from "./PasskeySignUpButton";
 import { PasswordInput } from "./PasswordInput";
+import { MethodDivider } from "./SignInMethodPicker";
 
 // No name. Onboarding asks for it, in a place where it is worth asking —
 // putting it here charges a field at the one moment somebody has least
@@ -58,9 +61,11 @@ const ACCOUNT_CREATED_FALLBACK =
   "Your account was created. Log in with your new details to carry on.";
 
 /**
- * Choosing a password, which is the step that creates the account.
+ * Choosing how to sign in, which is the step that creates the account. It
+ * takes a passkey or a password, and either one finishes the sign-up.
  *
- * It registers, signs in, and sends the address confirmation after both — the
+ * The password half registers, signs in, and sends the address confirmation
+ * after both — the
  * confirmation follows somebody in rather than standing in front of them
  * (ADR-117 §6, revised). The address is the one typed on the step before and
  * is not asked for again: it rides along in a hidden field so a password
@@ -122,6 +127,12 @@ export function SignUpCredentialForm({
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+  // Only where this deployment mounted the plugin. Offering to create a
+  // passkey against an endpoint that was never registered is an offer we
+  // cannot honour.
+  const publicEnv = usePublicEnv();
+  const offersPasskeys = publicEnv.data?.PASSKEYS_ENABLED === true;
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitError(null);
@@ -181,6 +192,12 @@ export function SignUpCredentialForm({
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
+        {/* Every failure this card can have shows in one place, at the top. */}
+        <HandledErrorAlert
+          error={passkeyError}
+          fallbackTitle="Could not create a passkey"
+          className="lw-front-door-alert"
+        />
         {/* The address this is for, and the way back to change it. It is the
             last chance to notice a typo before it becomes an account. */}
         <EmailPill
@@ -189,6 +206,21 @@ export function SignUpCredentialForm({
           onAction={onUseDifferentEmail}
           testId="signup-identifier"
         />
+        {/* Above the password fields, because it is the better thing to leave
+            with and the one most people have never been offered. Beside them
+            rather than in front of them: declining has to cost nothing, and
+            here it costs a glance — the fields are already on the screen. */}
+        {offersPasskeys ? (
+          <>
+            <PasskeySignUpButton
+              email={email}
+              callbackUrl={callbackUrl}
+              onError={setPasskeyError}
+              onAddressAlreadyRegistered={onAddressAlreadyRegistered}
+            />
+            <MethodDivider />
+          </>
+        ) : null}
         {/* Carried in the form as well as shown above it, so a password
             manager saves the pair it was registered with. */}
         <input
